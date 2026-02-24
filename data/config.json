@@ -1,0 +1,92 @@
+{
+    "$schema": "../assets/json/configScheme.json",
+    "spider": {
+        "userAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 MicroMessenger/7.0.17(0x17001126) NetType/WIFI Language/zh_CN",
+        "params": {
+            "eKey": "OpenCRHTracker"
+        }
+    },
+    "data": {
+        "assets": {
+            "EMUList": {
+                "file": "data/emu_list.json",
+                "provider": "https://storage.lihugang.top/open_crh_tracker/initialized_data/emu_list.json"
+            },
+            "QRCode": {
+                "file": "data/qrcode.json",
+                "provider": "https://storage.lihugang.top/open_crh_tracker/initialized_data/qrcode.json"
+            },
+            "schedule": {
+                "file": "data/schedule.json",
+                "provider": "https://storage.lihugang.top/open_crh_tracker/initialized_data/schedule.json"
+            }
+        },
+        "databases": {
+            "task": "data/task.db",
+            "EMUTracked": "data/emu.db",
+            "users": "data/users.db"
+        }
+    },
+    "user": {
+        "saltLength": 16,
+        "apiKeyPrefix": "ocrh_",
+        "apiKeyBytes": 24,
+        "apiKeyTtlSeconds": 2592000,
+        "scrypt": {
+            "keyLength": 64,
+            "cost": 16384,
+            "blockSize": 8,
+            "parallelization": 1
+        }
+    },
+    "api": {
+        "versionPrefix": "/api/v1",
+        "apiKeyHeader": "x-api-key",
+        "headers": {
+            "remain": "remain",
+            "cost": "cost",
+            "retryAfter": "Retry-After"
+        },
+        "pagination": {
+            "defaultLimit": 20,
+            "maxLimit": 200
+        },
+        "timestampUnit": "seconds",
+        "debug": {
+            "enableEchoError": true
+        }
+    },
+    "quota": {
+        "anonymousMaxTokens": 20,
+        "userMaxTokens": 1000,
+        "refillAmount": 100,
+        "refillIntervalSeconds": 3600,
+        "resetToMaxOnRestart": true
+    },
+    "cost": {
+        "fixed": {
+            "health": 0,
+            "quotaMe": 1,
+            "debugEchoError": 0,
+            "authLogin": 2,
+            "authIssueApiKey": 10,
+            "authListApiKeys": 2,
+            "authRevokeApiKey": 1,
+            "exportDaily": 100
+        },
+        "perRecord": {
+            "historyEmu": {
+                "unitCost": 0.05,
+                "rounding": "ceil"
+            },
+            "historyTrain": {
+                "unitCost": 0.05,
+                "rounding": "ceil"
+            },
+            "recordsDaily": {
+                "unitCost": 0.05,
+                "rounding": "ceil"
+            }
+        }
+    }
+}

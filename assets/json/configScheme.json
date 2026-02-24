@@ -1,0 +1,408 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Config Scheme",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+        "spider": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "userAgent": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "params": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "eKey": {
+                            "type": "string",
+                            "minLength": 1
+                        }
+                    },
+                    "required": [
+                        "eKey"
+                    ]
+                }
+            },
+            "required": [
+                "userAgent",
+                "params"
+            ]
+        },
+        "data": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "assets": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "EMUList": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "file": {
+                                    "type": "string",
+                                    "minLength": 1
+                                },
+                                "provider": {
+                                    "type": "string",
+                                    "minLength": 1
+                                }
+                            },
+                            "required": [
+                                "file"
+                            ]
+                        },
+                        "QRCode": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "file": {
+                                    "type": "string",
+                                    "minLength": 1
+                                },
+                                "provider": {
+                                    "type": "string",
+                                    "minLength": 1
+                                }
+                            },
+                            "required": [
+                                "file"
+                            ]
+                        },
+                        "schedule": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "file": {
+                                    "type": "string",
+                                    "minLength": 1
+                                },
+                                "provider": {
+                                    "type": "string",
+                                    "minLength": 1
+                                }
+                            },
+                            "required": [
+                                "file"
+                            ]
+                        }
+                    },
+                    "required": [
+                        "EMUList",
+                        "QRCode",
+                        "schedule"
+                    ]
+                },
+                "databases": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "task": {
+                            "type": "string",
+                            "minLength": 1
+                        },
+                        "EMUTracked": {
+                            "type": "string",
+                            "minLength": 1
+                        },
+                        "users": {
+                            "type": "string",
+                            "minLength": 1
+                        }
+                    },
+                    "required": [
+                        "task",
+                        "EMUTracked",
+                        "users"
+                    ]
+                }
+            },
+            "required": [
+                "assets",
+                "databases"
+            ]
+        },
+        "user": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "saltLength": {
+                    "type": "integer",
+                    "minimum": 8
+                },
+                "apiKeyPrefix": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "apiKeyBytes": {
+                    "type": "integer",
+                    "minimum": 16
+                },
+                "apiKeyTtlSeconds": {
+                    "type": "integer",
+                    "minimum": 60
+                },
+                "scrypt": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "keyLength": {
+                            "type": "integer",
+                            "minimum": 16
+                        },
+                        "cost": {
+                            "type": "integer",
+                            "minimum": 2
+                        },
+                        "blockSize": {
+                            "type": "integer",
+                            "minimum": 1
+                        },
+                        "parallelization": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    "required": [
+                        "keyLength",
+                        "cost",
+                        "blockSize",
+                        "parallelization"
+                    ]
+                }
+            },
+            "required": [
+                "saltLength",
+                "apiKeyPrefix",
+                "apiKeyBytes",
+                "apiKeyTtlSeconds",
+                "scrypt"
+            ]
+        },
+        "api": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "versionPrefix": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "apiKeyHeader": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "headers": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "remain": {
+                            "type": "string",
+                            "minLength": 1
+                        },
+                        "cost": {
+                            "type": "string",
+                            "minLength": 1
+                        },
+                        "retryAfter": {
+                            "type": "string",
+                            "minLength": 1
+                        }
+                    },
+                    "required": [
+                        "remain",
+                        "cost",
+                        "retryAfter"
+                    ]
+                },
+                "pagination": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "defaultLimit": {
+                            "type": "integer",
+                            "minimum": 1
+                        },
+                        "maxLimit": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    "required": [
+                        "defaultLimit",
+                        "maxLimit"
+                    ]
+                },
+                "timestampUnit": {
+                    "type": "string",
+                    "enum": [
+                        "seconds"
+                    ]
+                },
+                "debug": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "enableEchoError": {
+                            "type": "boolean"
+                        }
+                    },
+                    "required": [
+                        "enableEchoError"
+                    ]
+                }
+            },
+            "required": [
+                "versionPrefix",
+                "apiKeyHeader",
+                "headers",
+                "pagination",
+                "timestampUnit",
+                "debug"
+            ]
+        },
+        "quota": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "anonymousMaxTokens": {
+                    "type": "integer",
+                    "minimum": 1
+                },
+                "userMaxTokens": {
+                    "type": "integer",
+                    "minimum": 1
+                },
+                "refillAmount": {
+                    "type": "integer",
+                    "minimum": 1
+                },
+                "refillIntervalSeconds": {
+                    "type": "integer",
+                    "minimum": 1
+                },
+                "resetToMaxOnRestart": {
+                    "type": "boolean"
+                }
+            },
+            "required": [
+                "anonymousMaxTokens",
+                "userMaxTokens",
+                "refillAmount",
+                "refillIntervalSeconds",
+                "resetToMaxOnRestart"
+            ]
+        },
+        "cost": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "fixed": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "health": {
+                            "type": "integer",
+                            "minimum": 0
+                        },
+                        "quotaMe": {
+                            "type": "integer",
+                            "minimum": 0
+                        },
+                        "debugEchoError": {
+                            "type": "integer",
+                            "minimum": 0
+                        },
+                        "authLogin": {
+                            "type": "integer",
+                            "minimum": 0
+                        },
+                        "authIssueApiKey": {
+                            "type": "integer",
+                            "minimum": 0
+                        },
+                        "authListApiKeys": {
+                            "type": "integer",
+                            "minimum": 0
+                        },
+                        "authRevokeApiKey": {
+                            "type": "integer",
+                            "minimum": 0
+                        },
+                        "exportDaily": {
+                            "type": "integer",
+                            "minimum": 0
+                        }
+                    },
+                    "required": [
+                        "health",
+                        "quotaMe",
+                        "debugEchoError",
+                        "authLogin",
+                        "authIssueApiKey",
+                        "authListApiKeys",
+                        "authRevokeApiKey",
+                        "exportDaily"
+                    ]
+                },
+                "perRecord": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "historyEmu": {
+                            "$ref": "#/definitions/perRecordRule"
+                        },
+                        "historyTrain": {
+                            "$ref": "#/definitions/perRecordRule"
+                        },
+                        "recordsDaily": {
+                            "$ref": "#/definitions/perRecordRule"
+                        }
+                    },
+                    "required": [
+                        "historyEmu",
+                        "historyTrain",
+                        "recordsDaily"
+                    ]
+                }
+            },
+            "required": [
+                "fixed",
+                "perRecord"
+            ]
+        }
+    },
+    "definitions": {
+        "perRecordRule": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "unitCost": {
+                    "type": "number",
+                    "minimum": 0
+                },
+                "rounding": {
+                    "type": "string",
+                    "enum": [
+                        "ceil"
+                    ]
+                }
+            },
+            "required": [
+                "unitCost",
+                "rounding"
+            ]
+        }
+    },
+    "required": [
+        "spider",
+        "data",
+        "user",
+        "api",
+        "quota",
+        "cost"
+    ]
+}
