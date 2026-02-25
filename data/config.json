@@ -87,6 +87,11 @@
             "enableEchoError": true
         }
     },
+    "task": {
+        "scheduler": {
+            "pollIntervalMs": 300000
+        }
+    },
     "quota": {
         "anonymousMaxTokens": 20,
         "userMaxTokens": 1000,

@@ -68,6 +68,11 @@ export interface Config {
             enableEchoError: boolean;
         };
     };
+    task: {
+        scheduler: {
+            pollIntervalMs: number;
+        };
+    };
     quota: {
         anonymousMaxTokens: number;
         userMaxTokens: number;
@@ -187,6 +192,8 @@ function validateConfig(raw: unknown): Config {
     const apiHeaders = asObject(api.headers, 'api.headers');
     const apiPagination = asObject(api.pagination, 'api.pagination');
     const apiDebug = asObject(api.debug, 'api.debug');
+    const task = asObject(root.task, 'task');
+    const taskScheduler = asObject(task.scheduler, 'task.scheduler');
 
     const quota = asObject(root.quota, 'quota');
 
@@ -408,6 +415,15 @@ function validateConfig(raw: unknown): Config {
                 enableEchoError: asBoolean(
                     apiDebug.enableEchoError,
                     'api.debug.enableEchoError'
+                )
+            }
+        },
+        task: {
+            scheduler: {
+                pollIntervalMs: asInteger(
+                    taskScheduler.pollIntervalMs,
+                    'task.scheduler.pollIntervalMs',
+                    1000
                 )
             }
         },

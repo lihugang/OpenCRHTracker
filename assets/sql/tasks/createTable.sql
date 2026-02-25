@@ -5,4 +5,4 @@ CREATE TABLE IF NOT EXISTS tasks (
     executionTime INTEGER NOT NULL
 );
 
-CREATE INDEX executionTimeIndex ON executionTime ON tasks(executionTime);
+CREATE INDEX IF NOT EXISTS executionTimeIndex ON tasks(executionTime);

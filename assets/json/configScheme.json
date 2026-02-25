@@ -362,6 +362,28 @@
                 "debug"
             ]
         },
+        "task": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "scheduler": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "pollIntervalMs": {
+                            "type": "integer",
+                            "minimum": 1000
+                        }
+                    },
+                    "required": [
+                        "pollIntervalMs"
+                    ]
+                }
+            },
+            "required": [
+                "scheduler"
+            ]
+        },
         "quota": {
             "type": "object",
             "additionalProperties": false,
@@ -500,6 +522,7 @@
         "data",
         "user",
         "api",
+        "task",
         "quota",
         "cost"
     ]
