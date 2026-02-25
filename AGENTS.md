@@ -33,7 +33,7 @@ Naming:
 - Use descriptive utility filenames like `parseDateAsTimestamp.ts`.
 - Keep SQL scripts in `assets/sql/` with verb-based names.
 
-Prioritize reusing existing code rather than adding new functions. Place utility classes in either `utils/` (client-side code) or `server/utils` (server-side code).
+Prioritize reusing existing code rather than adding new functions. Place utility classes in either `utils/` (client-side code) or `server/utils` (server-side code). You should check whether the utility function is declared in other places.
 Inline SQL statements are strictly forbidden.
 
 ## Testing Guidelines
