@@ -4,6 +4,7 @@ import importSqlBatch from '~/server/utils/sql/importSqlBatch';
 import { useTaskDatabase } from '~/server/libs/database/task';
 import { getTaskExecutor } from '~/server/services/taskExecutorRegistry';
 import type { TaskRecord } from '~/server/services/taskQueue';
+import getNowSeconds from '~/server/utils/time/getNowSeconds';
 
 const logger = getLogger('task-scheduler');
 const taskSql = importSqlBatch('tasks');
@@ -18,10 +19,6 @@ function ensureTaskSql(key: string): string {
         throw new Error(`Task SQL not found: ${key}`);
     }
     return statement;
-}
-
-function nowSeconds() {
-    return Math.floor(Date.now() / 1000);
 }
 
 function parseTaskArguments(rawArguments: string): {
@@ -92,7 +89,7 @@ async function tick(): Promise<void> {
         const selectTasksSql = ensureTaskSql('selectTasks');
         const dueTasks = db
             .prepare(selectTasksSql)
-            .all(nowSeconds()) as TaskRecord[];
+            .all(getNowSeconds()) as TaskRecord[];
 
         logger.info(
             `[task-scheduler] tick_start dueTasks=${dueTasks.length}`

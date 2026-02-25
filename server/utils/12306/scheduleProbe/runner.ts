@@ -5,6 +5,7 @@ import { expandKeyword } from './prefixTree';
 import { normalizeTrainCodeItems, sortScheduleItems } from './filterAndSort';
 import queryWithRetry from './queryWithRetry';
 import { saveScheduleState } from './stateStore';
+import getNowSeconds from '~/server/utils/time/getNowSeconds';
 import type { ScheduleFile, ScheduleItem, ScheduleProbeRuntimeConfig } from './types';
 
 function pushUnique(list: string[], value: string): void {
@@ -288,7 +289,7 @@ export default async function runScheduleProbe(
 
     updateItemsFromMap(state, itemsByCode, config);
     state.stats.durationMs = Math.max(0, Date.now() - state.startedAtMs);
-    state.generatedAt = Math.floor(Date.now() / 1000);
+    state.generatedAt = getNowSeconds();
     state.lastBuildDate = state.date;
     state.status =
         state.progress.failedKeywords.length > 0 ||

@@ -1,4 +1,5 @@
 import fs from 'fs';
+import { parseDailyTimeHHmm } from '~/server/utils/date/shanghaiDateTime';
 
 interface CostPerRecordRule {
     unitCost: number;
@@ -23,6 +24,7 @@ export interface Config {
             minIntervalMs: number;
         }>;
         scheduleProbe: {
+            dailyTimeHHmm: string;
             retryAttempts: number;
             maxBatchSize: number;
             checkpointFlushEvery: number;
@@ -237,6 +239,10 @@ function validateConfig(raw: unknown): Config {
                 }
             },
             scheduleProbe: {
+                dailyTimeHHmm: asString(
+                    spiderScheduleProbe.dailyTimeHHmm,
+                    'spider.scheduleProbe.dailyTimeHHmm'
+                ),
                 retryAttempts: asInteger(
                     spiderScheduleProbe.retryAttempts,
                     'spider.scheduleProbe.retryAttempts',
@@ -531,6 +537,15 @@ function validateConfig(raw: unknown): Config {
         configResult.spider.scheduleProbe.prefixRules.length > 0,
         'spider.scheduleProbe.prefixRules must not be empty'
     );
+    try {
+        parseDailyTimeHHmm(configResult.spider.scheduleProbe.dailyTimeHHmm);
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        assert(
+            false,
+            `spider.scheduleProbe.dailyTimeHHmm is invalid: ${message}`
+        );
+    }
     const dedupPrefix = new Set<string>();
     for (const rule of configResult.spider.scheduleProbe.prefixRules) {
         assert(

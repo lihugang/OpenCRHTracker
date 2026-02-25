@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import useConfig from '~/server/config';
 import { useUsersDatabase } from '~/server/libs/database/users';
 import importSqlBatch from '~/server/utils/sql/importSqlBatch';
+import getNowSeconds from '~/server/utils/time/getNowSeconds';
 
 export interface UserRecord {
     username: string;
@@ -21,10 +22,6 @@ export interface ApiKeyRecord {
 }
 
 const authSql = importSqlBatch('users/queries');
-
-function nowSeconds() {
-    return Math.floor(Date.now() / 1000);
-}
 
 function createPasswordHash(password: string, salt: string) {
     const config = useConfig();
@@ -60,7 +57,7 @@ export function verifyUserPassword(user: UserRecord, password: string) {
 
 export function updateLastLoginAt(username: string) {
     const db = useUsersDatabase();
-    const now = nowSeconds();
+    const now = getNowSeconds();
     db.prepare(authSql.updateUserLastLogin).run(now, username);
 }
 
@@ -69,7 +66,7 @@ export function createApiKey(userId: string) {
     const db = useUsersDatabase();
 
     const key = `${config.user.apiKeyPrefix}${crypto.randomBytes(config.user.apiKeyBytes).toString('base64url')}`;
-    const createdAt = nowSeconds();
+    const createdAt = getNowSeconds();
     const expiresAt = createdAt + config.user.apiKeyTtlSeconds;
 
     db.prepare(authSql.insertApiKey).run(
@@ -98,14 +95,14 @@ export function listApiKeysByUser(userId: string) {
 
 export function revokeApiKeyByUser(key: string, userId: string) {
     const db = useUsersDatabase();
-    const now = nowSeconds();
+    const now = getNowSeconds();
     const result = db.prepare(authSql.revokeApiKeyByUser).run(now, key, userId);
     return result.changes > 0;
 }
 
 export function getValidApiKey(key: string) {
     const db = useUsersDatabase();
-    const now = nowSeconds();
+    const now = getNowSeconds();
     return db.prepare(authSql.selectValidApiKey).get(key, now) as
         | ApiKeyRecord
         | undefined;

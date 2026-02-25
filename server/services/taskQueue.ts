@@ -1,5 +1,6 @@
 import importSqlBatch from '~/server/utils/sql/importSqlBatch';
 import { useTaskDatabase } from '~/server/libs/database/task';
+import getNowSeconds from '~/server/utils/time/getNowSeconds';
 
 const taskSql = importSqlBatch('tasks');
 
@@ -9,10 +10,6 @@ function ensureTaskSql(key: string): string {
         throw new Error(`Task SQL not found: ${key}`);
     }
     return statement;
-}
-
-function nowSeconds() {
-    return Math.floor(Date.now() / 1000);
 }
 
 export interface TaskRecord {
@@ -53,5 +50,5 @@ export function enqueueTaskAfterDelaySeconds(
     if (!Number.isInteger(delaySeconds) || delaySeconds < 0) {
         throw new Error('delaySeconds must be a non-negative integer');
     }
-    return enqueueTask(executor, args, nowSeconds() + delaySeconds);
+    return enqueueTask(executor, args, getNowSeconds() + delaySeconds);
 }

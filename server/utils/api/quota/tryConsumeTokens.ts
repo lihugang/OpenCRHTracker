@@ -1,10 +1,10 @@
 import useConfig from '~/server/config';
-import getNowSeconds from '~/server/utils/api/quota/getNowSeconds';
 import hydrateBucket from '~/server/utils/api/quota/hydrateBucket';
 import type {
     QuotaConsumeResult,
     QuotaSubject
 } from '~/server/utils/api/quota/QuotaTypes';
+import getNowSeconds from '~/server/utils/time/getNowSeconds';
 
 export default function tryConsumeTokens(
     subject: QuotaSubject,

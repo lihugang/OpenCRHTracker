@@ -15,6 +15,7 @@
             }
         },
         "scheduleProbe": {
+            "dailyTimeHHmm": "0000",
             "retryAttempts": 3,
             "maxBatchSize": 200,
             "checkpointFlushEvery": 20,
