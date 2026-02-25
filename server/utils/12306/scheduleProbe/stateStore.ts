@@ -9,6 +9,8 @@ interface LoadedScheduleState {
     resumed: boolean;
     reason:
         | 'resume'
+        | 'skip_done'
+        | 'retry_partial_failed'
         | 'init_missing_file'
         | 'reset_invalid_file'
         | 'reset_non_running'
@@ -142,6 +144,53 @@ function asScheduleFile(value: unknown): ScheduleFile | null {
     return file as ScheduleFile;
 }
 
+function preparePartialRetryState(existing: ScheduleFile): ScheduleFile {
+    const failedKeywords = Array.from(
+        new Set(
+            existing.progress.failedKeywords
+                .map((item) => item.trim())
+                .filter((item) => item.length > 0)
+        )
+    );
+    const failedEnrichCodeSet = new Set(
+        existing.progress.failedEnrichCodes
+            .map((item) => item.trim().toUpperCase())
+            .filter((item) => item.length > 0)
+    );
+
+    existing.status = 'running';
+    existing.startedAtMs = Date.now();
+    existing.stats.durationMs = 0;
+    existing.generatedAt = 0;
+
+    if (failedKeywords.length > 0) {
+        const failedKeywordSet = new Set(failedKeywords);
+        existing.progress.phase = 'discover';
+        existing.progress.discoverQueue = failedKeywords;
+        existing.progress.discoverProcessed = existing.progress.discoverProcessed.filter(
+            (item) => !failedKeywordSet.has(item)
+        );
+    } else {
+        existing.progress.phase = 'enrich';
+        existing.progress.discoverQueue = [];
+    }
+
+    existing.progress.enrichCursor = 0;
+    existing.progress.failedKeywords = [];
+    existing.progress.failedEnrichCodes = [];
+
+    if (failedEnrichCodeSet.size > 0) {
+        for (const item of existing.items) {
+            if (failedEnrichCodeSet.has(item.code.toUpperCase())) {
+                item.startAt = null;
+                item.endAt = null;
+            }
+        }
+    }
+
+    return existing;
+}
+
 export function loadOrInitScheduleState(
     scheduleFilePath: string,
     config: ScheduleProbeRuntimeConfig
@@ -166,18 +215,43 @@ export function loadOrInitScheduleState(
                 reason: 'reset_invalid_file'
             };
         }
-        if (existing.status !== 'running') {
-            return {
-                state: createInitialScheduleState(today, config),
-                resumed: false,
-                reason: 'reset_non_running'
-            };
-        }
         if (existing.date !== today) {
             return {
                 state: createInitialScheduleState(today, config),
                 resumed: false,
                 reason: 'reset_cross_day'
+            };
+        }
+
+        if (existing.status === 'done') {
+            return {
+                state: existing,
+                resumed: true,
+                reason: 'skip_done'
+            };
+        }
+
+        if (existing.status === 'partial_failed') {
+            if (!isSameScopeAndStrategy(existing, config)) {
+                return {
+                    state: createInitialScheduleState(today, config),
+                    resumed: false,
+                    reason: 'reset_scope_or_strategy_changed'
+                };
+            }
+
+            return {
+                state: preparePartialRetryState(existing),
+                resumed: true,
+                reason: 'retry_partial_failed'
+            };
+        }
+
+        if (existing.status !== 'running') {
+            return {
+                state: createInitialScheduleState(today, config),
+                resumed: false,
+                reason: 'reset_non_running'
             };
         }
         if (!isSameScopeAndStrategy(existing, config)) {
