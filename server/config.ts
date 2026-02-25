@@ -12,6 +12,9 @@ export interface Config {
             // 12306 api
             eKey: string;
         };
+        rateLimit: {
+            minIntervalMs: number;
+        };
     };
     data: {
         assets: Record<
@@ -126,6 +129,7 @@ function validateConfig(raw: unknown): Config {
 
     const spider = asObject(root.spider, 'spider');
     const spiderParams = asObject(spider.params, 'spider.params');
+    const spiderRateLimit = asObject(spider.rateLimit, 'spider.rateLimit');
 
     const data = asObject(root.data, 'data');
     const assets = asObject(data.assets, 'data.assets');
@@ -162,6 +166,13 @@ function validateConfig(raw: unknown): Config {
             userAgent: asString(spider.userAgent, 'spider.userAgent'),
             params: {
                 eKey: asString(spiderParams.eKey, 'spider.params.eKey')
+            },
+            rateLimit: {
+                minIntervalMs: asNumber(
+                    spiderRateLimit.minIntervalMs,
+                    'spider.rateLimit.minIntervalMs',
+                    0
+                )
             }
         },
         data: {
@@ -285,7 +296,7 @@ function validateConfig(raw: unknown): Config {
                     'api.timestampUnit must be "seconds"'
                 );
                 return unit;
-            })(),
+            })() as 'seconds',
             debug: {
                 enableEchoError: asBoolean(
                     apiDebug.enableEchoError,
@@ -390,7 +401,7 @@ function validateConfig(raw: unknown): Config {
 
     assert(
         configResult.api.pagination.maxLimit >=
-            configResult.api.pagination.defaultLimit,
+        configResult.api.pagination.defaultLimit,
         'api.pagination.maxLimit must be >= defaultLimit'
     );
     return configResult;

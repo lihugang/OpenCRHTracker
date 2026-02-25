@@ -1,5 +1,6 @@
 import useConfig from '~/server/config';
 import getCurrentDateString from '../date/getCurrentDateString';
+import waitFor12306RequestSlot from './requestLimiter';
 
 interface EMUInfoResponse {
     errMsg: string;
@@ -37,11 +38,11 @@ const config = useConfig();
 
 export default async function fetchEMUInfoBySeatCode(route: string) {
     try {
+        await waitFor12306RequestSlot();
         const response = await fetch(
             `https://mobile.12306.cn/wxxcx/openplatform-inner/miniprogram/wifiapps/appFrontEnd/v2/lounge/open-smooth-common/trainStyleBatch/getCarDetail?carCode=CR400AF-C-2214&trainCode=${route}&runningDay=${getCurrentDateString()}&reqType=form`,
             {
                 headers: {
-                    'content-type': 'application/x-www-form-urlencoded',
                     'user-agent': config.spider.userAgent
                 },
                 method: 'GET'

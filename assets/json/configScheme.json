@@ -4,6 +4,10 @@
     "type": "object",
     "additionalProperties": false,
     "properties": {
+        "$schema": {
+            "type": "string",
+            "minLength": 1
+        },
         "spider": {
             "type": "object",
             "additionalProperties": false,
@@ -24,11 +28,25 @@
                     "required": [
                         "eKey"
                     ]
+                },
+                "rateLimit": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "minIntervalMs": {
+                            "type": "integer",
+                            "minimum": 0
+                        }
+                    },
+                    "required": [
+                        "minIntervalMs"
+                    ]
                 }
             },
             "required": [
                 "userAgent",
-                "params"
+                "params",
+                "rateLimit"
             ]
         },
         "data": {

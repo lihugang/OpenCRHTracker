@@ -1,5 +1,6 @@
 import parseDateAsTimestamp from '@/server/utils/date/parseDateAsTimestamp';
 import parseTimeAsTimestamp from '@/server/utils/date/parseTimeAsTimestamp';
+import waitFor12306RequestSlot from './requestLimiter';
 import useConfig from '~/server/config';
 
 interface EMUInfoResponse {
@@ -56,6 +57,7 @@ const config = useConfig();
 
 export default async function fetchEMUInfoBySeatCode(code: string) {
     try {
+        await waitFor12306RequestSlot();
         const response = await fetch(
             'https://mobile.12306.cn/wxxcx/wechat/main/travelServiceDecodeQrcode',
             {
