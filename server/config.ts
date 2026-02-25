@@ -12,9 +12,9 @@ export interface Config {
             // 12306 api
             eKey: string;
         };
-        rateLimit: {
+        rateLimit: Record<'search' | 'query', {
             minIntervalMs: number;
-        };
+        }>;
     };
     data: {
         assets: Record<
@@ -130,6 +130,14 @@ function validateConfig(raw: unknown): Config {
     const spider = asObject(root.spider, 'spider');
     const spiderParams = asObject(spider.params, 'spider.params');
     const spiderRateLimit = asObject(spider.rateLimit, 'spider.rateLimit');
+    const spiderRateLimitQuery = asObject(
+        spiderRateLimit.query,
+        'spider.rateLimit.query'
+    );
+    const spiderRateLimitSearch = asObject(
+        spiderRateLimit.search,
+        'spider.rateLimit.search'
+    );
 
     const data = asObject(root.data, 'data');
     const assets = asObject(data.assets, 'data.assets');
@@ -168,11 +176,20 @@ function validateConfig(raw: unknown): Config {
                 eKey: asString(spiderParams.eKey, 'spider.params.eKey')
             },
             rateLimit: {
-                minIntervalMs: asNumber(
-                    spiderRateLimit.minIntervalMs,
-                    'spider.rateLimit.minIntervalMs',
-                    0
-                )
+                query: {
+                    minIntervalMs: asNumber(
+                        spiderRateLimitQuery.minIntervalMs,
+                        'spider.rateLimit.query.minIntervalMs',
+                        0
+                    )
+                },
+                search: {
+                    minIntervalMs: asNumber(
+                        spiderRateLimitSearch.minIntervalMs,
+                        'spider.rateLimit.search.minIntervalMs',
+                        0
+                    )
+                }
             }
         },
         data: {

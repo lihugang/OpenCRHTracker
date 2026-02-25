@@ -82,7 +82,7 @@ const config = useConfig();
 
 export default async function fetchRouteInfo(route: string) {
     try {
-        await waitFor12306RequestSlot();
+        await waitFor12306RequestSlot('query');
         const response = await fetch(
             'https://mobile.12306.cn/wxxcx/wechat/main/travelServiceQrcodeTrainInfo',
             {

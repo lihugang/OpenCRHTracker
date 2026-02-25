@@ -38,7 +38,7 @@ const config = useConfig();
 
 export default async function fetchEMUInfoBySeatCode(route: string) {
     try {
-        await waitFor12306RequestSlot();
+        await waitFor12306RequestSlot('query');
         const response = await fetch(
             `https://mobile.12306.cn/wxxcx/openplatform-inner/miniprogram/wifiapps/appFrontEnd/v2/lounge/open-smooth-common/trainStyleBatch/getCarDetail?carCode=CR400AF-C-2214&trainCode=${route}&runningDay=${getCurrentDateString()}&reqType=form`,
             {

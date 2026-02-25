@@ -5,10 +5,13 @@
     "scripts": {
         "build": "nuxt build",
         "dev": "nuxt dev",
+        "typecheck": "nuxi typecheck",
+        "typecheck:server": "pnpm exec tsc -p server/tsconfig.json --noEmit",
         "generate": "nuxt generate",
         "preview": "nuxt preview",
         "postinstall": "nuxt prepare",
-        "format": "prettier --write \"./**/*.{vue,ts,js,json}\""
+        "format": "prettier --write \"./**/*.{vue,ts,js,json}\"",
+        "format:check": "prettier --check \"./**/*.{vue,ts,js,json}\""
     },
     "devDependencies": {
         "@tailwindcss/container-queries": "^0.1.1",

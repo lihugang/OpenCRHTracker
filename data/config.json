@@ -6,7 +6,12 @@
             "eKey": "OpenCRHTracker"
         },
         "rateLimit": {
-            "minIntervalMs": 1000
+            "query": {
+                "minIntervalMs": 3000
+            },
+            "search": {
+                "minIntervalMs": 15000
+            }
         }
     },
     "data": {
