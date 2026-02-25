@@ -18,10 +18,12 @@ export interface TaskRecord {
     arguments: string;
     executionTime: number;
     isIdle: 0 | 1;
+    expectedDurationMs: number;
 }
 
 export interface EnqueueTaskOptions {
     isIdle?: boolean;
+    expectedDurationMs?: number;
 }
 
 export function enqueueTask(
@@ -38,6 +40,16 @@ export function enqueueTask(
         throw new Error('executionTime must be a non-negative integer timestamp in seconds');
     }
     const normalizedIsIdle = options.isIdle ? 1 : 0;
+    if (normalizedIsIdle === 1 && typeof options.expectedDurationMs === 'undefined') {
+        throw new Error('expectedDurationMs must be provided for idle tasks');
+    }
+    const normalizedExpectedDurationMs = options.expectedDurationMs ?? 0;
+    if (
+        !Number.isInteger(normalizedExpectedDurationMs) ||
+        normalizedExpectedDurationMs < 0
+    ) {
+        throw new Error('expectedDurationMs must be a non-negative integer');
+    }
 
     const db = useTaskDatabase();
     const addTaskSql = ensureTaskSql('addTask');
@@ -45,7 +57,8 @@ export function enqueueTask(
         normalizedExecutor,
         JSON.stringify(args ?? null),
         executionTime,
-        normalizedIsIdle
+        normalizedIsIdle,
+        normalizedExpectedDurationMs
     );
     return Number(result.lastInsertRowid);
 }

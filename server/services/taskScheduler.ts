@@ -4,6 +4,7 @@ import importSqlBatch from '~/server/utils/sql/importSqlBatch';
 import { useTaskDatabase } from '~/server/libs/database/task';
 import { getTaskExecutor } from '~/server/services/taskExecutorRegistry';
 import type { TaskRecord } from '~/server/services/taskQueue';
+import { observeIdleTaskDurationMs } from '~/server/services/idleTaskEstimator';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
 
 const logger = getLogger('task-scheduler');
@@ -41,7 +42,13 @@ function parseTaskArguments(rawArguments: string): {
     }
 }
 
-async function runSingleTask(task: TaskRecord): Promise<void> {
+interface RunTaskResult {
+    durationMs: number;
+    executed: boolean;
+}
+
+async function runSingleTask(task: TaskRecord): Promise<RunTaskResult> {
+    const startedAtMs = Date.now();
     const db = useTaskDatabase();
     const completeTaskSql = ensureTaskSql('completeTask');
 
@@ -51,7 +58,10 @@ async function runSingleTask(task: TaskRecord): Promise<void> {
             `[task-scheduler] invalid_task_arguments id=${task.id} executor=${task.executor} error=${parsedArguments.message}`
         );
         db.prepare(completeTaskSql).run(task.id);
-        return;
+        return {
+            durationMs: Math.max(0, Date.now() - startedAtMs),
+            executed: false
+        };
     }
 
     const executor = getTaskExecutor(task.executor);
@@ -60,7 +70,10 @@ async function runSingleTask(task: TaskRecord): Promise<void> {
             `[task-scheduler] executor_not_registered id=${task.id} executor=${task.executor}`
         );
         db.prepare(completeTaskSql).run(task.id);
-        return;
+        return {
+            durationMs: Math.max(0, Date.now() - startedAtMs),
+            executed: false
+        };
     }
 
     try {
@@ -74,6 +87,11 @@ async function runSingleTask(task: TaskRecord): Promise<void> {
     } finally {
         db.prepare(completeTaskSql).run(task.id);
     }
+
+    return {
+        durationMs: Math.max(0, Date.now() - startedAtMs),
+        executed: true
+    };
 }
 
 async function tick(): Promise<void> {
@@ -86,13 +104,14 @@ async function tick(): Promise<void> {
     const startedAt = Date.now();
     try {
         const config = useConfig();
-        const now = getNowSeconds();
+        const nowSeconds = getNowSeconds();
+        const nextTickAtMs = startedAt + config.task.scheduler.pollIntervalMs;
         const db = useTaskDatabase();
         const selectTasksSql = ensureTaskSql('selectTasks');
         const maxTasksPerQuery = config.task.scheduler.maxTasksPerQuery;
         const dueNormalTasks = db
             .prepare(selectTasksSql)
-            .all(0, now, maxTasksPerQuery) as TaskRecord[];
+            .all(0, nowSeconds, maxTasksPerQuery) as TaskRecord[];
 
         logger.info(
             `[task-scheduler] tick_start dueNormalTasks=${dueNormalTasks.length}`
@@ -104,14 +123,33 @@ async function tick(): Promise<void> {
         const maxIdleTasksPerTick = config.task.scheduler.idle.maxTasksPerTick;
         const dueIdleTasks = db
             .prepare(selectTasksSql)
-            .all(1, now, maxIdleTasksPerTick) as TaskRecord[];
+            .all(1, nowSeconds, maxIdleTasksPerTick) as TaskRecord[];
+
+        let idleExecuted = 0;
+        let idleSkippedBudget = 0;
 
         for (const task of dueIdleTasks) {
-            await runSingleTask(task);
+            const remainingMs = Math.max(0, nextTickAtMs - Date.now());
+            if (task.expectedDurationMs < remainingMs) {
+                logger.info(
+                    `[task-scheduler] idle_task_run id=${task.id} executor=${task.executor} expectedDurationMs=${task.expectedDurationMs} remainingMs=${remainingMs}`
+                );
+                const result = await runSingleTask(task);
+                idleExecuted += 1;
+                if (result.executed) {
+                    observeIdleTaskDurationMs(task.executor, result.durationMs);
+                }
+                continue;
+            }
+
+            idleSkippedBudget += 1;
+            logger.info(
+                `[task-scheduler] idle_task_skip_budget id=${task.id} executor=${task.executor} expectedDurationMs=${task.expectedDurationMs} remainingMs=${remainingMs}`
+            );
         }
 
         logger.info(
-            `[task-scheduler] tick_finish dueNormalTasks=${dueNormalTasks.length} dueIdleTasks=${dueIdleTasks.length} maxTasksPerQuery=${maxTasksPerQuery} maxIdleTasksPerTick=${maxIdleTasksPerTick} durationMs=${Date.now() - startedAt}`
+            `[task-scheduler] tick_finish dueNormalTasks=${dueNormalTasks.length} dueIdleTasks=${dueIdleTasks.length} idleExecuted=${idleExecuted} idleSkippedBudget=${idleSkippedBudget} maxTasksPerQuery=${maxTasksPerQuery} maxIdleTasksPerTick=${maxIdleTasksPerTick} durationMs=${Date.now() - startedAt}`
         );
     } catch (error) {
         const message =

@@ -82,6 +82,7 @@ export interface Config {
             maxTasksPerQuery: number;
             idle: {
                 maxTasksPerTick: number;
+                emaAlpha: number;
             };
         };
     };
@@ -468,6 +469,11 @@ function validateConfig(raw: unknown): Config {
                         taskSchedulerIdle.maxTasksPerTick,
                         'task.scheduler.idle.maxTasksPerTick',
                         1
+                    ),
+                    emaAlpha: asNumber(
+                        taskSchedulerIdle.emaAlpha,
+                        'task.scheduler.idle.emaAlpha',
+                        0
                     )
                 }
             }
@@ -593,6 +599,11 @@ function validateConfig(raw: unknown): Config {
         );
         dedupPrefix.add(rule.prefix);
     }
+    assert(
+        configResult.task.scheduler.idle.emaAlpha > 0 &&
+        configResult.task.scheduler.idle.emaAlpha <= 1,
+        'task.scheduler.idle.emaAlpha must be > 0 and <= 1'
+    );
     return configResult;
 }
 

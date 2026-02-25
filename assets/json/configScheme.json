@@ -409,10 +409,16 @@
                                 "maxTasksPerTick": {
                                     "type": "integer",
                                     "minimum": 1
+                                },
+                                "emaAlpha": {
+                                    "type": "number",
+                                    "exclusiveMinimum": 0,
+                                    "maximum": 1
                                 }
                             },
                             "required": [
-                                "maxTasksPerTick"
+                                "maxTasksPerTick",
+                                "emaAlpha"
                             ]
                         }
                     },

@@ -1,5 +1,6 @@
 import getLogger from '~/server/libs/log4js';
 import useConfig from '~/server/config';
+import { estimateIdleTaskDurationMs } from '~/server/services/idleTaskEstimator';
 import { registerTaskExecutor } from '~/server/services/taskExecutorRegistry';
 import { enqueueTask } from '~/server/services/taskQueue';
 import { loadExistingScheduleState } from '~/server/utils/12306/scheduleProbe/stateStore';
@@ -16,13 +17,29 @@ const logger = getLogger('task-executor:generate-route-refresh');
 
 let registered = false;
 
-function enqueueSelfTask(executionTime: number): number {
+function estimateGenerateRouteRefreshTaskDurationMs(): number {
+    return estimateIdleTaskDurationMs(GENERATE_ROUTE_REFRESH_TASKS_EXECUTOR, 0);
+}
+
+function estimateRefreshRouteBatchTaskDurationMs(batchSize: number): number {
+    const queryMinIntervalMs = useConfig().spider.rateLimit.query.minIntervalMs;
+    return estimateIdleTaskDurationMs(
+        REFRESH_ROUTE_BATCH_TASK_EXECUTOR,
+        batchSize * queryMinIntervalMs
+    );
+}
+
+function enqueueSelfTask(
+    executionTime: number,
+    expectedDurationMs: number
+): number {
     return enqueueTask(
         GENERATE_ROUTE_REFRESH_TASKS_EXECUTOR,
         {},
         executionTime,
         {
-            isIdle: true
+            isIdle: true,
+            expectedDurationMs
         }
     );
 }
@@ -32,9 +49,10 @@ async function executeGenerateRouteRefreshTasks() {
     const scheduleFilePath = config.data.assets.schedule.file;
     const state = loadExistingScheduleState(scheduleFilePath);
     const now = getNowSeconds();
+    const selfExpectedDurationMs = estimateGenerateRouteRefreshTaskDurationMs();
 
     if (!state) {
-        const selfTaskId = enqueueSelfTask(now);
+        const selfTaskId = enqueueSelfTask(now, selfExpectedDurationMs);
         logger.warn(
             `[task-executor:generate-route-refresh] schedule_not_found file=${scheduleFilePath} selfTaskId=${selfTaskId}`
         );
@@ -75,13 +93,16 @@ async function executeGenerateRouteRefreshTasks() {
             { codes: batchCodes },
             now,
             {
-                isIdle: true
+                isIdle: true,
+                expectedDurationMs: estimateRefreshRouteBatchTaskDurationMs(
+                    batchCodes.length
+                )
             }
         );
         created += 1;
     }
 
-    const selfTaskId = enqueueSelfTask(now);
+    const selfTaskId = enqueueSelfTask(now, selfExpectedDurationMs);
     logger.info(
         `[task-executor:generate-route-refresh] done staleCodes=${staleCodes.length} createdTasks=${created} batchSize=${batchSize} ttlHours=${config.spider.scheduleProbe.refresh.ttlHours} selfTaskId=${selfTaskId}`
     );

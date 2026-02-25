@@ -1,4 +1,4 @@
-SELECT id, executor, arguments, executionTime, isIdle
+SELECT id, executor, arguments, executionTime, isIdle, expectedDurationMs
 FROM tasks
 WHERE isIdle = ?
   AND executionTime <= ?

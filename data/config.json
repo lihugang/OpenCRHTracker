@@ -97,7 +97,8 @@
             "pollIntervalMs": 300000,
             "maxTasksPerQuery": 2147483647,
             "idle": {
-                "maxTasksPerTick": 4
+                "maxTasksPerTick": 4,
+                "emaAlpha": 0.3
             }
         }
     },
