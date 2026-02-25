@@ -7,6 +7,10 @@ import {
     loadExistingScheduleState,
     saveScheduleState
 } from '~/server/utils/12306/scheduleProbe/stateStore';
+import {
+    getGroupKey,
+    normalizeCode
+} from '~/server/utils/12306/scheduleProbe/taskHelpers';
 import type { ScheduleItem } from '~/server/utils/12306/scheduleProbe/types';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
 
@@ -18,18 +22,6 @@ let registered = false;
 
 interface RefreshRouteBatchTaskArgs {
     codes: string[];
-}
-
-function normalizeCode(code: string) {
-    return code.trim().toUpperCase();
-}
-
-function getGroupKey(item: ScheduleItem): string {
-    const internalCode = item.internalCode.trim().toUpperCase();
-    if (internalCode.length > 0) {
-        return `internal:${internalCode}`;
-    }
-    return `code:${normalizeCode(item.code)}`;
 }
 
 function parseTaskArgs(

@@ -2,8 +2,11 @@ import getLogger from '~/server/libs/log4js';
 import useConfig from '~/server/config';
 import { registerTaskExecutor } from '~/server/services/taskExecutorRegistry';
 import { enqueueTask } from '~/server/services/taskQueue';
-import type { ScheduleItem } from '~/server/utils/12306/scheduleProbe/types';
 import { loadExistingScheduleState } from '~/server/utils/12306/scheduleProbe/stateStore';
+import {
+    getGroupKey,
+    splitIntoBatches
+} from '~/server/utils/12306/scheduleProbe/taskHelpers';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
 import { REFRESH_ROUTE_BATCH_TASK_EXECUTOR } from './refreshRouteBatchTaskExecutor';
 
@@ -12,26 +15,6 @@ export const GENERATE_ROUTE_REFRESH_TASKS_EXECUTOR = 'generate_route_refresh_tas
 const logger = getLogger('task-executor:generate-route-refresh');
 
 let registered = false;
-
-function normalizeCode(code: string) {
-    return code.trim().toUpperCase();
-}
-
-function getGroupKey(item: ScheduleItem): string {
-    const internalCode = item.internalCode.trim().toUpperCase();
-    if (internalCode.length > 0) {
-        return `internal:${internalCode}`;
-    }
-    return `code:${normalizeCode(item.code)}`;
-}
-
-function splitIntoBatches(list: string[], size: number): string[][] {
-    const batches: string[][] = [];
-    for (let index = 0; index < list.length; index += size) {
-        batches.push(list.slice(index, index + size));
-    }
-    return batches;
-}
 
 function enqueueSelfTask(executionTime: number): number {
     return enqueueTask(

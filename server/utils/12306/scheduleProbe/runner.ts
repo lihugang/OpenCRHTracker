@@ -5,6 +5,7 @@ import { expandKeyword } from './prefixTree';
 import { normalizeTrainCodeItems, sortScheduleItems } from './filterAndSort';
 import queryWithRetry from './queryWithRetry';
 import { saveScheduleState } from './stateStore';
+import { getGroupKey, normalizeCode } from './taskHelpers';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
 import type { ScheduleFile, ScheduleItem, ScheduleProbeRuntimeConfig } from './types';
 
@@ -15,22 +16,10 @@ function pushUnique(list: string[], value: string): void {
     list.push(value);
 }
 
-function normalizeCodeKey(code: string): string {
-    return code.trim().toUpperCase();
-}
-
-function getItemGroupKey(item: ScheduleItem): string {
-    const internalCode = item.internalCode.trim().toUpperCase();
-    if (internalCode.length > 0) {
-        return `internal:${internalCode}`;
-    }
-    return `code:${normalizeCodeKey(item.code)}`;
-}
-
 function buildGroupIndex(items: ScheduleItem[]): Map<string, number[]> {
     const indexByGroup = new Map<string, number[]>();
     for (const [index, item] of items.entries()) {
-        const groupKey = getItemGroupKey(item);
+        const groupKey = getGroupKey(item);
         const groupItems = indexByGroup.get(groupKey);
         if (groupItems) {
             groupItems.push(index);
@@ -201,7 +190,7 @@ export default async function runScheduleProbe(
             `[schedule-probe] enrich start runId=${runId} totalItems=${state.items.length} fromCursor=${state.progress.enrichCursor}`
         );
         const pendingRetrySet = new Set(
-            state.progress.failedEnrichCodes.map((code) => normalizeCodeKey(code))
+            state.progress.failedEnrichCodes.map((code) => normalizeCode(code))
         );
         state.progress.failedEnrichCodes = [];
         const groupIndexByKey = buildGroupIndex(state.items);
@@ -219,8 +208,8 @@ export default async function runScheduleProbe(
             index += 1
         ) {
             const item = state.items[index]!;
-            const itemCodeKey = normalizeCodeKey(item.code);
-            const groupKey = getItemGroupKey(item);
+            const itemCodeKey = normalizeCode(item.code);
+            const groupKey = getGroupKey(item);
             if (processedGroupKeys.has(groupKey)) {
                 state.progress.enrichCursor = index + 1;
                 continue;
@@ -230,7 +219,7 @@ export default async function runScheduleProbe(
             const groupItems = groupIndexes.map((itemIndex) => state.items[itemIndex]!);
             const shouldRetryFailed = pendingRetrySet.has(itemCodeKey);
             const shouldRetryFailedGroup = groupItems.some((groupItem) =>
-                pendingRetrySet.has(normalizeCodeKey(groupItem.code))
+                pendingRetrySet.has(normalizeCode(groupItem.code))
             );
             const shouldBackfillMissing = groupItems.some((groupItem) =>
                 groupItem.isRunningToday &&
