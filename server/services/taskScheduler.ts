@@ -1,26 +1,24 @@
 import getLogger from '~/server/libs/log4js';
 import useConfig from '~/server/config';
 import importSqlBatch from '~/server/utils/sql/importSqlBatch';
-import { useTaskDatabase } from '~/server/libs/database/task';
+import { createPreparedSqlStore } from '~/server/libs/database/prepared';
 import { getTaskExecutor } from '~/server/services/taskExecutorRegistry';
 import type { TaskRecord } from '~/server/services/taskQueue';
 import { observeIdleTaskDurationMs } from '~/server/services/idleTaskEstimator';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
 
 const logger = getLogger('task-scheduler');
-const taskSql = importSqlBatch('tasks');
+type TaskSqlKey = 'completeTask' | 'selectTasks';
+const taskSql = importSqlBatch('tasks') as Record<TaskSqlKey, string>;
+const taskStatements = createPreparedSqlStore<TaskSqlKey>({
+    dbName: 'task',
+    scope: 'tasks',
+    sql: taskSql
+});
 
 let started = false;
 let isChecking = false;
 let timer: NodeJS.Timeout | null = null;
-
-function ensureTaskSql(key: string): string {
-    const statement = taskSql[key];
-    if (!statement) {
-        throw new Error(`Task SQL not found: ${key}`);
-    }
-    return statement;
-}
 
 function parseTaskArguments(rawArguments: string): {
     ok: true;
@@ -49,15 +47,13 @@ interface RunTaskResult {
 
 async function runSingleTask(task: TaskRecord): Promise<RunTaskResult> {
     const startedAtMs = Date.now();
-    const db = useTaskDatabase();
-    const completeTaskSql = ensureTaskSql('completeTask');
 
     const parsedArguments = parseTaskArguments(task.arguments);
     if (!parsedArguments.ok) {
         logger.error(
             `[task-scheduler] invalid_task_arguments id=${task.id} executor=${task.executor} error=${parsedArguments.message}`
         );
-        db.prepare(completeTaskSql).run(task.id);
+        taskStatements.run('completeTask', task.id);
         return {
             durationMs: Math.max(0, Date.now() - startedAtMs),
             executed: false
@@ -69,7 +65,7 @@ async function runSingleTask(task: TaskRecord): Promise<RunTaskResult> {
         logger.error(
             `[task-scheduler] executor_not_registered id=${task.id} executor=${task.executor}`
         );
-        db.prepare(completeTaskSql).run(task.id);
+        taskStatements.run('completeTask', task.id);
         return {
             durationMs: Math.max(0, Date.now() - startedAtMs),
             executed: false
@@ -85,7 +81,7 @@ async function runSingleTask(task: TaskRecord): Promise<RunTaskResult> {
             `[task-scheduler] task_failed id=${task.id} executor=${task.executor} error=${message}`
         );
     } finally {
-        db.prepare(completeTaskSql).run(task.id);
+        taskStatements.run('completeTask', task.id);
     }
 
     return {
@@ -106,12 +102,13 @@ async function tick(): Promise<void> {
         const config = useConfig();
         const nowSeconds = getNowSeconds();
         const nextTickAtMs = startedAt + config.task.scheduler.pollIntervalMs;
-        const db = useTaskDatabase();
-        const selectTasksSql = ensureTaskSql('selectTasks');
         const maxTasksPerQuery = config.task.scheduler.maxTasksPerQuery;
-        const dueNormalTasks = db
-            .prepare(selectTasksSql)
-            .all(0, nowSeconds, maxTasksPerQuery) as TaskRecord[];
+        const dueNormalTasks = taskStatements.all<TaskRecord>(
+            'selectTasks',
+            0,
+            nowSeconds,
+            maxTasksPerQuery
+        );
 
         logger.info(
             `[task-scheduler] tick_start dueNormalTasks=${dueNormalTasks.length}`
@@ -121,9 +118,12 @@ async function tick(): Promise<void> {
         }
 
         const maxIdleTasksPerTick = config.task.scheduler.idle.maxTasksPerTick;
-        const dueIdleTasks = db
-            .prepare(selectTasksSql)
-            .all(1, nowSeconds, maxIdleTasksPerTick) as TaskRecord[];
+        const dueIdleTasks = taskStatements.all<TaskRecord>(
+            'selectTasks',
+            1,
+            nowSeconds,
+            maxIdleTasksPerTick
+        );
 
         let idleExecuted = 0;
         let idleSkippedBudget = 0;

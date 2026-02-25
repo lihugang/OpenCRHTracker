@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import useConfig from '~/server/config';
-import { useUsersDatabase } from '~/server/libs/database/users';
+import { createPreparedSqlStore } from '~/server/libs/database/prepared';
 import importSqlBatch from '~/server/utils/sql/importSqlBatch';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
 
@@ -21,7 +21,20 @@ export interface ApiKeyRecord {
     daily_token_limit: number;
 }
 
-const authSql = importSqlBatch('users/queries');
+type AuthSqlKey =
+    | 'insertApiKey'
+    | 'revokeApiKeyByUser'
+    | 'selectApiKeysByUser'
+    | 'selectUserByUsername'
+    | 'selectValidApiKey'
+    | 'updateUserLastLogin';
+
+const authSql = importSqlBatch('users/queries') as Record<AuthSqlKey, string>;
+const authStatements = createPreparedSqlStore<AuthSqlKey>({
+    dbName: 'users',
+    scope: 'users/queries',
+    sql: authSql
+});
 
 function createPasswordHash(password: string, salt: string) {
     const config = useConfig();
@@ -44,10 +57,7 @@ function equalsSafe(left: string, right: string) {
 }
 
 export function getUserByUsername(username: string) {
-    const db = useUsersDatabase();
-    return db.prepare(authSql.selectUserByUsername).get(username) as
-        | UserRecord
-        | undefined;
+    return authStatements.get<UserRecord>('selectUserByUsername', username);
 }
 
 export function verifyUserPassword(user: UserRecord, password: string) {
@@ -56,20 +66,19 @@ export function verifyUserPassword(user: UserRecord, password: string) {
 }
 
 export function updateLastLoginAt(username: string) {
-    const db = useUsersDatabase();
     const now = getNowSeconds();
-    db.prepare(authSql.updateUserLastLogin).run(now, username);
+    authStatements.run('updateUserLastLogin', now, username);
 }
 
 export function createApiKey(userId: string) {
     const config = useConfig();
-    const db = useUsersDatabase();
 
     const key = `${config.user.apiKeyPrefix}${crypto.randomBytes(config.user.apiKeyBytes).toString('base64url')}`;
     const createdAt = getNowSeconds();
     const expiresAt = createdAt + config.user.apiKeyTtlSeconds;
 
-    db.prepare(authSql.insertApiKey).run(
+    authStatements.run(
+        'insertApiKey',
         key,
         userId,
         createdAt,
@@ -87,25 +96,18 @@ export function createApiKey(userId: string) {
 }
 
 export function listApiKeysByUser(userId: string) {
-    const db = useUsersDatabase();
-    return db
-        .prepare(authSql.selectApiKeysByUser)
-        .all(userId) as ApiKeyRecord[];
+    return authStatements.all<ApiKeyRecord>('selectApiKeysByUser', userId);
 }
 
 export function revokeApiKeyByUser(key: string, userId: string) {
-    const db = useUsersDatabase();
     const now = getNowSeconds();
-    const result = db.prepare(authSql.revokeApiKeyByUser).run(now, key, userId);
+    const result = authStatements.run('revokeApiKeyByUser', now, key, userId);
     return result.changes > 0;
 }
 
 export function getValidApiKey(key: string) {
-    const db = useUsersDatabase();
     const now = getNowSeconds();
-    return db.prepare(authSql.selectValidApiKey).get(key, now) as
-        | ApiKeyRecord
-        | undefined;
+    return authStatements.get<ApiKeyRecord>('selectValidApiKey', key, now);
 }
 
 export function maskApiKey(key: string) {

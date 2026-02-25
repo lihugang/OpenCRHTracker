@@ -1,16 +1,15 @@
 import importSqlBatch from '~/server/utils/sql/importSqlBatch';
-import { useTaskDatabase } from '~/server/libs/database/task';
+import { createPreparedSqlStore } from '~/server/libs/database/prepared';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
 
-const taskSql = importSqlBatch('tasks');
+type TaskSqlKey = 'addTask';
 
-function ensureTaskSql(key: string): string {
-    const statement = taskSql[key];
-    if (!statement) {
-        throw new Error(`Task SQL not found: ${key}`);
-    }
-    return statement;
-}
+const taskSql = importSqlBatch('tasks') as Record<TaskSqlKey, string>;
+const taskStatements = createPreparedSqlStore<TaskSqlKey>({
+    dbName: 'task',
+    scope: 'tasks',
+    sql: taskSql
+});
 
 export interface TaskRecord {
     id: number;
@@ -51,9 +50,8 @@ export function enqueueTask(
         throw new Error('expectedDurationMs must be a non-negative integer');
     }
 
-    const db = useTaskDatabase();
-    const addTaskSql = ensureTaskSql('addTask');
-    const result = db.prepare(addTaskSql).run(
+    const result = taskStatements.run(
+        'addTask',
         normalizedExecutor,
         JSON.stringify(args ?? null),
         executionTime,
