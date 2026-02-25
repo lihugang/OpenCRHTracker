@@ -30,29 +30,6 @@ export default async function buildTodaySchedule(): Promise<BuildScheduleResult>
         `[schedule-probe] start runId=${runId} resumed=${resumed} reason=${reason} date=${state.date} file=${scheduleFilePath} retryAttempts=${runtimeConfig.retryAttempts} maxBatchSize=${runtimeConfig.maxBatchSize} checkpointFlushEvery=${runtimeConfig.checkpointFlushEvery} prefixRules=${JSON.stringify(runtimeConfig.prefixRules)}`
     );
 
-    if (reason === 'skip_done') {
-        logger.info(
-            `[schedule-probe] skip_done runId=${runId} date=${state.date} uniqueItems=${state.stats.uniqueItems} generatedAt=${state.generatedAt}`
-        );
-        return {
-            ok: true,
-            resumed,
-            date: state.date,
-            file: scheduleFilePath,
-            stats: {
-                apiCalls: state.progress.counters.apiCalls,
-                apiRetries: state.progress.counters.apiRetries,
-                processedKeywords: state.progress.discoverProcessed.length,
-                pendingKeywords: state.progress.discoverQueue.length,
-                rawItems: state.stats.rawItems,
-                uniqueItems: state.stats.uniqueItems,
-                durationMs: state.stats.durationMs
-            },
-            failedKeywords: state.progress.failedKeywords,
-            failedEnrichCodes: state.progress.failedEnrichCodes
-        };
-    }
-
     saveScheduleState(scheduleFilePath, state);
 
     try {

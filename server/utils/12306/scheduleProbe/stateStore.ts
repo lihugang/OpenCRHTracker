@@ -9,13 +9,13 @@ interface LoadedScheduleState {
     resumed: boolean;
     reason:
         | 'resume'
-        | 'skip_done'
         | 'retry_partial_failed'
+        | 'refresh_done'
+        | 'refresh_non_running'
+        | 'refresh_cross_day'
+        | 'refresh_scope_or_strategy_changed'
         | 'init_missing_file'
-        | 'reset_invalid_file'
-        | 'reset_non_running'
-        | 'reset_cross_day'
-        | 'reset_scope_or_strategy_changed';
+        | 'reset_invalid_file';
 }
 
 function createInitialScheduleState(
@@ -25,6 +25,7 @@ function createInitialScheduleState(
     return {
         version: 1,
         date,
+        lastBuildDate: '',
         status: 'running',
         strategy: {
             retryAttempts: config.retryAttempts,
@@ -36,6 +37,7 @@ function createInitialScheduleState(
         },
         progress: {
             phase: 'discover',
+            discoverMode: 'full',
             discoverQueue: getInitialKeywords(config.prefixRules),
             discoverProcessed: [],
             enrichCursor: 0,
@@ -133,6 +135,29 @@ function asScheduleFile(value: unknown): ScheduleFile | null {
         return null;
     }
     if (
+        file.progress.phase !== 'discover' &&
+        file.progress.phase !== 'enrich' &&
+        file.progress.phase !== 'done'
+    ) {
+        return null;
+    }
+    if (
+        typeof file.progress.enrichCursor !== 'number' ||
+        !Number.isFinite(file.progress.enrichCursor)
+    ) {
+        return null;
+    }
+    if (
+        typeof file.stats.rawItems !== 'number' ||
+        !Number.isFinite(file.stats.rawItems) ||
+        typeof file.stats.uniqueItems !== 'number' ||
+        !Number.isFinite(file.stats.uniqueItems) ||
+        typeof file.stats.durationMs !== 'number' ||
+        !Number.isFinite(file.stats.durationMs)
+    ) {
+        return null;
+    }
+    if (
         !Array.isArray(file.progress.discoverQueue) ||
         !Array.isArray(file.progress.discoverProcessed) ||
         !Array.isArray(file.progress.failedKeywords) ||
@@ -141,10 +166,67 @@ function asScheduleFile(value: unknown): ScheduleFile | null {
         return null;
     }
 
+    if (typeof file.lastBuildDate !== 'string') {
+        file.lastBuildDate = file.date;
+    }
+    if (
+        file.progress.discoverMode !== 'full' &&
+        file.progress.discoverMode !== 'retry'
+    ) {
+        file.progress.discoverMode = 'full';
+    }
+    if (
+        typeof file.progress.counters !== 'object' ||
+        file.progress.counters === null
+    ) {
+        file.progress.counters = {
+            apiCalls: 0,
+            apiRetries: 0
+        };
+    }
+    if (
+        typeof file.progress.counters.apiCalls !== 'number' ||
+        !Number.isFinite(file.progress.counters.apiCalls)
+    ) {
+        file.progress.counters.apiCalls = 0;
+    }
+    if (
+        typeof file.progress.counters.apiRetries !== 'number' ||
+        !Number.isFinite(file.progress.counters.apiRetries)
+    ) {
+        file.progress.counters.apiRetries = 0;
+    }
+
+    for (const item of file.items) {
+        if (typeof item !== 'object' || item === null) {
+            return null;
+        }
+
+        const row = item as Partial<ScheduleFile['items'][number]>;
+        if (typeof row.code !== 'string' || row.code.length === 0) {
+            return null;
+        }
+        if (typeof row.internalCode !== 'string') {
+            row.internalCode = '';
+        }
+        if (row.startAt !== null && typeof row.startAt !== 'number') {
+            row.startAt = null;
+        }
+        if (row.endAt !== null && typeof row.endAt !== 'number') {
+            row.endAt = null;
+        }
+        if (typeof row.isRunningToday !== 'boolean') {
+            row.isRunningToday = false;
+        }
+    }
+
     return file as ScheduleFile;
 }
 
-function preparePartialRetryState(existing: ScheduleFile): ScheduleFile {
+function preparePartialRetryState(
+    existing: ScheduleFile,
+    config: ScheduleProbeRuntimeConfig
+): ScheduleFile {
     const failedKeywords = Array.from(
         new Set(
             existing.progress.failedKeywords
@@ -162,16 +244,26 @@ function preparePartialRetryState(existing: ScheduleFile): ScheduleFile {
     existing.startedAtMs = Date.now();
     existing.stats.durationMs = 0;
     existing.generatedAt = 0;
+    existing.strategy = {
+        retryAttempts: config.retryAttempts,
+        maxBatchSize: config.maxBatchSize,
+        checkpointFlushEvery: config.checkpointFlushEvery
+    };
+    existing.scope = {
+        prefixRules: config.prefixRules
+    };
 
     if (failedKeywords.length > 0) {
         const failedKeywordSet = new Set(failedKeywords);
         existing.progress.phase = 'discover';
+        existing.progress.discoverMode = 'retry';
         existing.progress.discoverQueue = failedKeywords;
         existing.progress.discoverProcessed = existing.progress.discoverProcessed.filter(
             (item) => !failedKeywordSet.has(item)
         );
     } else {
         existing.progress.phase = 'enrich';
+        existing.progress.discoverMode = 'retry';
         existing.progress.discoverQueue = [];
     }
 
@@ -188,6 +280,49 @@ function preparePartialRetryState(existing: ScheduleFile): ScheduleFile {
         }
     }
 
+    return existing;
+}
+
+function prepareDailyRefreshState(
+    existing: ScheduleFile,
+    date: string,
+    config: ScheduleProbeRuntimeConfig
+): ScheduleFile {
+    existing.date = date;
+    existing.status = 'running';
+    existing.startedAtMs = Date.now();
+    existing.generatedAt = 0;
+    existing.strategy = {
+        retryAttempts: config.retryAttempts,
+        maxBatchSize: config.maxBatchSize,
+        checkpointFlushEvery: config.checkpointFlushEvery
+    };
+    existing.scope = {
+        prefixRules: config.prefixRules
+    };
+    existing.progress = {
+        phase: 'discover',
+        discoverMode: 'full',
+        discoverQueue: getInitialKeywords(config.prefixRules),
+        discoverProcessed: [],
+        enrichCursor: 0,
+        failedKeywords: [],
+        failedEnrichCodes: [],
+        counters: {
+            apiCalls: 0,
+            apiRetries: 0
+        }
+    };
+
+    for (const item of existing.items) {
+        item.isRunningToday = false;
+    }
+
+    existing.stats = {
+        rawItems: 0,
+        uniqueItems: existing.items.length,
+        durationMs: 0
+    };
     return existing;
 }
 
@@ -217,48 +352,49 @@ export function loadOrInitScheduleState(
         }
         if (existing.date !== today) {
             return {
-                state: createInitialScheduleState(today, config),
+                state: prepareDailyRefreshState(existing, today, config),
                 resumed: false,
-                reason: 'reset_cross_day'
-            };
-        }
-
-        if (existing.status === 'done') {
-            return {
-                state: existing,
-                resumed: true,
-                reason: 'skip_done'
+                reason: 'refresh_cross_day'
             };
         }
 
         if (existing.status === 'partial_failed') {
             if (!isSameScopeAndStrategy(existing, config)) {
                 return {
-                    state: createInitialScheduleState(today, config),
+                    state: prepareDailyRefreshState(existing, today, config),
                     resumed: false,
-                    reason: 'reset_scope_or_strategy_changed'
+                    reason: 'refresh_scope_or_strategy_changed'
                 };
             }
 
             return {
-                state: preparePartialRetryState(existing),
+                state: preparePartialRetryState(existing, config),
                 resumed: true,
                 reason: 'retry_partial_failed'
             };
         }
 
-        if (existing.status !== 'running') {
+        if (existing.status === 'done') {
             return {
-                state: createInitialScheduleState(today, config),
-                resumed: false,
-                reason: 'reset_non_running'
+                state: prepareDailyRefreshState(existing, today, config),
+                resumed: true,
+                reason: 'refresh_done'
             };
         }
+
+        if (existing.status !== 'running') {
+            return {
+                state: prepareDailyRefreshState(existing, today, config),
+                resumed: false,
+                reason: 'refresh_non_running'
+            };
+        }
+
         if (!isSameScopeAndStrategy(existing, config)) {
             return {
-                state: createInitialScheduleState(today, config),
+                state: prepareDailyRefreshState(existing, today, config),
                 resumed: false,
-                reason: 'reset_scope_or_strategy_changed'
+                reason: 'refresh_scope_or_strategy_changed'
             };
         }
 

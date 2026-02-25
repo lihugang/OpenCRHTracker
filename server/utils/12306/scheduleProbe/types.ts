@@ -16,14 +16,18 @@ export interface ScheduleItem {
     internalCode: string;
     startAt: number | null;
     endAt: number | null;
+    isRunningToday: boolean;
 }
 
 export type ScheduleStatus = 'running' | 'done' | 'partial_failed';
 
 export type SchedulePhase = 'discover' | 'enrich' | 'done';
 
+export type ScheduleDiscoverMode = 'full' | 'retry';
+
 export interface ScheduleProgress {
     phase: SchedulePhase;
+    discoverMode: ScheduleDiscoverMode;
     discoverQueue: string[];
     discoverProcessed: string[];
     enrichCursor: number;
@@ -44,6 +48,7 @@ export interface ScheduleStats {
 export interface ScheduleFile {
     version: 1;
     date: string;
+    lastBuildDate: string;
     status: ScheduleStatus;
     strategy: {
         retryAttempts: number;

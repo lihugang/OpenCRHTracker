@@ -23,7 +23,8 @@ export function normalizeTrainCodeItems(
             code: match.normalizedCode,
             internalCode: item.route.internalCode,
             startAt: null,
-            endAt: null
+            endAt: null,
+            isRunningToday: false
         });
     }
 
