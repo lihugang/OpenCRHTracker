@@ -1,4 +1,6 @@
-SELECT id, executor, arguments, executionTime
+SELECT id, executor, arguments, executionTime, isIdle
 FROM tasks
-WHERE executionTime <= ?
+WHERE isIdle = ?
+  AND executionTime <= ?
 ORDER BY executionTime ASC, id ASC
+LIMIT ?

@@ -24,6 +24,7 @@ export function normalizeTrainCodeItems(
             internalCode: item.route.internalCode,
             startAt: null,
             endAt: null,
+            lastRouteRefreshAt: null,
             isRunningToday: false
         });
     }

@@ -215,6 +215,15 @@ function asScheduleFile(value: unknown): ScheduleFile | null {
         if (row.endAt !== null && typeof row.endAt !== 'number') {
             row.endAt = null;
         }
+        if (
+            row.lastRouteRefreshAt !== null &&
+            typeof row.lastRouteRefreshAt !== 'number'
+        ) {
+            row.lastRouteRefreshAt = null;
+        }
+        if (typeof row.lastRouteRefreshAt === 'undefined') {
+            row.lastRouteRefreshAt = null;
+        }
         if (typeof row.isRunningToday !== 'boolean') {
             row.isRunningToday = false;
         }
@@ -276,6 +285,7 @@ function preparePartialRetryState(
             if (failedEnrichCodeSet.has(item.code.toUpperCase())) {
                 item.startAt = null;
                 item.endAt = null;
+                item.lastRouteRefreshAt = null;
             }
         }
     }
@@ -409,6 +419,20 @@ export function loadOrInitScheduleState(
             resumed: false,
             reason: 'reset_invalid_file'
         };
+    }
+}
+
+export function loadExistingScheduleState(scheduleFilePath: string): ScheduleFile | null {
+    const absolutePath = path.resolve(scheduleFilePath);
+    if (!fs.existsSync(absolutePath)) {
+        return null;
+    }
+
+    try {
+        const raw = JSON.parse(fs.readFileSync(absolutePath, 'utf8'));
+        return asScheduleFile(raw);
+    } catch {
+        return null;
     }
 }
 

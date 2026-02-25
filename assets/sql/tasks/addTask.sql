@@ -1,1 +1,1 @@
-INSERT INTO tasks (executor, arguments, executionTime) VALUES(?, ?, ?)
+INSERT INTO tasks (executor, arguments, executionTime, isIdle) VALUES(?, ?, ?, ?)

@@ -12,6 +12,11 @@ interface ScheduleProbePrefixRule {
     maxNo: number;
 }
 
+interface ScheduleProbeRefreshConfig {
+    batchSize: number;
+    ttlHours: number;
+}
+
 export interface Config {
     spider: {
         userAgent: string;
@@ -29,6 +34,7 @@ export interface Config {
             maxBatchSize: number;
             checkpointFlushEvery: number;
             prefixRules: ScheduleProbePrefixRule[];
+            refresh: ScheduleProbeRefreshConfig;
         };
     };
     data: {
@@ -73,6 +79,10 @@ export interface Config {
     task: {
         scheduler: {
             pollIntervalMs: number;
+            maxTasksPerQuery: number;
+            idle: {
+                maxTasksPerTick: number;
+            };
         };
     };
     quota: {
@@ -178,6 +188,10 @@ function validateConfig(raw: unknown): Config {
         spider.scheduleProbe,
         'spider.scheduleProbe'
     );
+    const spiderScheduleProbeRefresh = asObject(
+        spiderScheduleProbe.refresh,
+        'spider.scheduleProbe.refresh'
+    );
     const spiderScheduleProbePrefixRules = asArray(
         spiderScheduleProbe.prefixRules,
         'spider.scheduleProbe.prefixRules'
@@ -196,6 +210,7 @@ function validateConfig(raw: unknown): Config {
     const apiDebug = asObject(api.debug, 'api.debug');
     const task = asObject(root.task, 'task');
     const taskScheduler = asObject(task.scheduler, 'task.scheduler');
+    const taskSchedulerIdle = asObject(taskScheduler.idle, 'task.scheduler.idle');
 
     const quota = asObject(root.quota, 'quota');
 
@@ -258,6 +273,18 @@ function validateConfig(raw: unknown): Config {
                     'spider.scheduleProbe.checkpointFlushEvery',
                     1
                 ),
+                refresh: {
+                    batchSize: asInteger(
+                        spiderScheduleProbeRefresh.batchSize,
+                        'spider.scheduleProbe.refresh.batchSize',
+                        1
+                    ),
+                    ttlHours: asInteger(
+                        spiderScheduleProbeRefresh.ttlHours,
+                        'spider.scheduleProbe.refresh.ttlHours',
+                        1
+                    )
+                },
                 prefixRules: spiderScheduleProbePrefixRules.map((ruleRaw, index) => {
                     const rule = asObject(
                         ruleRaw,
@@ -430,7 +457,19 @@ function validateConfig(raw: unknown): Config {
                     taskScheduler.pollIntervalMs,
                     'task.scheduler.pollIntervalMs',
                     1000
-                )
+                ),
+                maxTasksPerQuery: asInteger(
+                    taskScheduler.maxTasksPerQuery,
+                    'task.scheduler.maxTasksPerQuery',
+                    1
+                ),
+                idle: {
+                    maxTasksPerTick: asInteger(
+                        taskSchedulerIdle.maxTasksPerTick,
+                        'task.scheduler.idle.maxTasksPerTick',
+                        1
+                    )
+                }
             }
         },
         quota: {

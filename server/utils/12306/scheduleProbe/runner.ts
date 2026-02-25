@@ -254,9 +254,11 @@ export default async function runScheduleProbe(
             );
 
             if (routeResult.ok) {
+                const refreshedAt = getNowSeconds();
                 for (const groupItem of groupItems) {
                     groupItem.startAt = routeResult.data.route.startAt;
                     groupItem.endAt = routeResult.data.route.endAt;
+                    groupItem.lastRouteRefreshAt = refreshedAt;
                 }
                 enrichedCount += 1;
             } else {

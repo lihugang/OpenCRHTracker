@@ -90,6 +90,24 @@
                             "type": "integer",
                             "minimum": 1
                         },
+                        "refresh": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "batchSize": {
+                                    "type": "integer",
+                                    "minimum": 1
+                                },
+                                "ttlHours": {
+                                    "type": "integer",
+                                    "minimum": 1
+                                }
+                            },
+                            "required": [
+                                "batchSize",
+                                "ttlHours"
+                            ]
+                        },
                         "prefixRules": {
                             "type": "array",
                             "minItems": 1,
@@ -123,6 +141,7 @@
                         "retryAttempts",
                         "maxBatchSize",
                         "checkpointFlushEvery",
+                        "refresh",
                         "prefixRules"
                     ]
                 }
@@ -378,10 +397,29 @@
                         "pollIntervalMs": {
                             "type": "integer",
                             "minimum": 1000
+                        },
+                        "maxTasksPerQuery": {
+                            "type": "integer",
+                            "minimum": 1
+                        },
+                        "idle": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "maxTasksPerTick": {
+                                    "type": "integer",
+                                    "minimum": 1
+                                }
+                            },
+                            "required": [
+                                "maxTasksPerTick"
+                            ]
                         }
                     },
                     "required": [
-                        "pollIntervalMs"
+                        "pollIntervalMs",
+                        "maxTasksPerQuery",
+                        "idle"
                     ]
                 }
             },

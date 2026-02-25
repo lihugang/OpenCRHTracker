@@ -16,6 +16,7 @@ export interface ScheduleItem {
     internalCode: string;
     startAt: number | null;
     endAt: number | null;
+    lastRouteRefreshAt: number | null;
     isRunningToday: boolean;
 }
 

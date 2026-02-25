@@ -19,6 +19,10 @@
             "retryAttempts": 3,
             "maxBatchSize": 200,
             "checkpointFlushEvery": 20,
+            "refresh": {
+                "batchSize": 20,
+                "ttlHours": 24
+            },
             "prefixRules": [
                 {
                     "prefix": "G",
@@ -90,7 +94,11 @@
     },
     "task": {
         "scheduler": {
-            "pollIntervalMs": 300000
+            "pollIntervalMs": 300000,
+            "maxTasksPerQuery": 2147483647,
+            "idle": {
+                "maxTasksPerTick": 4
+            }
         }
     },
     "quota": {

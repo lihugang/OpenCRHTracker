@@ -85,21 +85,33 @@ async function tick(): Promise<void> {
     isChecking = true;
     const startedAt = Date.now();
     try {
+        const config = useConfig();
+        const now = getNowSeconds();
         const db = useTaskDatabase();
         const selectTasksSql = ensureTaskSql('selectTasks');
-        const dueTasks = db
+        const maxTasksPerQuery = config.task.scheduler.maxTasksPerQuery;
+        const dueNormalTasks = db
             .prepare(selectTasksSql)
-            .all(getNowSeconds()) as TaskRecord[];
+            .all(0, now, maxTasksPerQuery) as TaskRecord[];
 
         logger.info(
-            `[task-scheduler] tick_start dueTasks=${dueTasks.length}`
+            `[task-scheduler] tick_start dueNormalTasks=${dueNormalTasks.length}`
         );
-        for (const task of dueTasks) {
+        for (const task of dueNormalTasks) {
+            await runSingleTask(task);
+        }
+
+        const maxIdleTasksPerTick = config.task.scheduler.idle.maxTasksPerTick;
+        const dueIdleTasks = db
+            .prepare(selectTasksSql)
+            .all(1, now, maxIdleTasksPerTick) as TaskRecord[];
+
+        for (const task of dueIdleTasks) {
             await runSingleTask(task);
         }
 
         logger.info(
-            `[task-scheduler] tick_finish dueTasks=${dueTasks.length} durationMs=${Date.now() - startedAt}`
+            `[task-scheduler] tick_finish dueNormalTasks=${dueNormalTasks.length} dueIdleTasks=${dueIdleTasks.length} maxTasksPerQuery=${maxTasksPerQuery} maxIdleTasksPerTick=${maxIdleTasksPerTick} durationMs=${Date.now() - startedAt}`
         );
     } catch (error) {
         const message =

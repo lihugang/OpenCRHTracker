@@ -4,16 +4,29 @@ import {
     BUILD_SCHEDULE_TASK_EXECUTOR,
     registerBuildScheduleTaskExecutor
 } from '~/server/services/taskExecutors/buildScheduleTaskExecutor';
+import {
+    GENERATE_ROUTE_REFRESH_TASKS_EXECUTOR,
+    registerGenerateRouteRefreshTasksExecutor
+} from '~/server/services/taskExecutors/generateRouteRefreshTasksExecutor';
+import { registerRefreshRouteBatchTaskExecutor } from '~/server/services/taskExecutors/refreshRouteBatchTaskExecutor';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
 
 const logger = getLogger('task-schedule-bootstrap');
 
 export default defineNitroPlugin(() => {
     registerBuildScheduleTaskExecutor();
+    registerRefreshRouteBatchTaskExecutor();
+    registerGenerateRouteRefreshTasksExecutor();
 
     const executionTime = getNowSeconds();
-    const taskId = enqueueTask(BUILD_SCHEDULE_TASK_EXECUTOR, {}, executionTime);
+    const buildTaskId = enqueueTask(BUILD_SCHEDULE_TASK_EXECUTOR, {}, executionTime);
+    const generateTaskId = enqueueTask(
+        GENERATE_ROUTE_REFRESH_TASKS_EXECUTOR,
+        {},
+        executionTime,
+        { isIdle: true }
+    );
     logger.info(
-        `[task-schedule-bootstrap] enqueued_startup_task id=${taskId} executor=${BUILD_SCHEDULE_TASK_EXECUTOR} executionTime=${executionTime}`
+        `[task-schedule-bootstrap] enqueued_startup_tasks buildTaskId=${buildTaskId} buildExecutor=${BUILD_SCHEDULE_TASK_EXECUTOR} generateTaskId=${generateTaskId} generateExecutor=${GENERATE_ROUTE_REFRESH_TASKS_EXECUTOR} executionTime=${executionTime}`
     );
 });
