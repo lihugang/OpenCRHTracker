@@ -11,6 +11,7 @@ export interface Config {
         params: {
             // 12306 api
             eKey: string;
+            jsonpCallback: string;
         };
         rateLimit: Record<'search' | 'query', {
             minIntervalMs: number;
@@ -173,7 +174,8 @@ function validateConfig(raw: unknown): Config {
         spider: {
             userAgent: asString(spider.userAgent, 'spider.userAgent'),
             params: {
-                eKey: asString(spiderParams.eKey, 'spider.params.eKey')
+                eKey: asString(spiderParams.eKey, 'spider.params.eKey'),
+                jsonpCallback: asString(spiderParams.jsonpCallback, 'spider.params.jsonpCallback')
             },
             rateLimit: {
                 query: {

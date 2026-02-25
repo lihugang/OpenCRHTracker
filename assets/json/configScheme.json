@@ -23,10 +23,15 @@
                         "eKey": {
                             "type": "string",
                             "minLength": 1
+                        },
+                        "jsonpCallback": {
+                            "type": "string",
+                            "minLength": 1
                         }
                     },
                     "required": [
-                        "eKey"
+                        "eKey",
+                        "jsonpCallback"
                     ]
                 },
                 "rateLimit": {
