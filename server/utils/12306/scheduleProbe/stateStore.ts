@@ -18,11 +18,14 @@ interface LoadedScheduleState {
         | 'reset_invalid_file';
 }
 
+const SCHEDULE_SCHEMA_RELATIVE_PATH = '../assets/json/scheduleScheme.json';
+
 function createInitialScheduleState(
     date: string,
     config: ScheduleProbeRuntimeConfig
 ): ScheduleFile {
     return {
+        $schema: SCHEDULE_SCHEMA_RELATIVE_PATH,
         version: 1,
         date,
         lastBuildDate: '',
@@ -166,6 +169,9 @@ function asScheduleFile(value: unknown): ScheduleFile | null {
         return null;
     }
 
+    if (typeof file.$schema !== 'string' || file.$schema.length === 0) {
+        file.$schema = SCHEDULE_SCHEMA_RELATIVE_PATH;
+    }
     if (typeof file.lastBuildDate !== 'string') {
         file.lastBuildDate = file.date;
     }
@@ -440,6 +446,7 @@ export function saveScheduleState(
     scheduleFilePath: string,
     state: ScheduleFile
 ): void {
+    state.$schema = SCHEDULE_SCHEMA_RELATIVE_PATH;
     const absolutePath = path.resolve(scheduleFilePath);
     const directory = path.dirname(absolutePath);
     fs.mkdirSync(directory, { recursive: true });

@@ -47,6 +47,7 @@ export interface ScheduleStats {
 }
 
 export interface ScheduleFile {
+    $schema: string;
     version: 1;
     date: string;
     lastBuildDate: string;

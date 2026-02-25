@@ -1,0 +1,271 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Schedule Scheme",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+        "$schema": {
+            "type": "string",
+            "const": "../assets/json/scheduleScheme.json"
+        },
+        "version": {
+            "type": "integer",
+            "const": 1
+        },
+        "date": {
+            "type": "string",
+            "minLength": 1
+        },
+        "lastBuildDate": {
+            "type": "string",
+            "minLength": 0
+        },
+        "status": {
+            "type": "string",
+            "enum": [
+                "running",
+                "done",
+                "partial_failed"
+            ]
+        },
+        "strategy": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "retryAttempts": {
+                    "type": "integer",
+                    "minimum": 1
+                },
+                "maxBatchSize": {
+                    "type": "integer",
+                    "minimum": 1
+                },
+                "checkpointFlushEvery": {
+                    "type": "integer",
+                    "minimum": 1
+                }
+            },
+            "required": [
+                "retryAttempts",
+                "maxBatchSize",
+                "checkpointFlushEvery"
+            ]
+        },
+        "scope": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "prefixRules": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/prefixRule"
+                    }
+                }
+            },
+            "required": [
+                "prefixRules"
+            ]
+        },
+        "progress": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "phase": {
+                    "type": "string",
+                    "enum": [
+                        "discover",
+                        "enrich",
+                        "done"
+                    ]
+                },
+                "discoverMode": {
+                    "type": "string",
+                    "enum": [
+                        "full",
+                        "retry"
+                    ]
+                },
+                "discoverQueue": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "discoverProcessed": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "enrichCursor": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "failedKeywords": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "failedEnrichCodes": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "counters": {
+                    "$ref": "#/definitions/progressCounters"
+                }
+            },
+            "required": [
+                "phase",
+                "discoverMode",
+                "discoverQueue",
+                "discoverProcessed",
+                "enrichCursor",
+                "failedKeywords",
+                "failedEnrichCodes",
+                "counters"
+            ]
+        },
+        "items": {
+            "type": "array",
+            "items": {
+                "$ref": "#/definitions/scheduleItem"
+            }
+        },
+        "stats": {
+            "$ref": "#/definitions/scheduleStats"
+        },
+        "startedAtMs": {
+            "type": "integer",
+            "minimum": 0
+        },
+        "generatedAt": {
+            "type": "integer",
+            "minimum": 0
+        }
+    },
+    "definitions": {
+        "prefixRule": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "prefix": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "minNo": {
+                    "type": "integer",
+                    "minimum": 1
+                },
+                "maxNo": {
+                    "type": "integer",
+                    "minimum": 1
+                }
+            },
+            "required": [
+                "prefix",
+                "minNo",
+                "maxNo"
+            ]
+        },
+        "progressCounters": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "apiCalls": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "apiRetries": {
+                    "type": "integer",
+                    "minimum": 0
+                }
+            },
+            "required": [
+                "apiCalls",
+                "apiRetries"
+            ]
+        },
+        "scheduleItem": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "code": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "internalCode": {
+                    "type": "string"
+                },
+                "startAt": {
+                    "type": [
+                        "integer",
+                        "null"
+                    ]
+                },
+                "endAt": {
+                    "type": [
+                        "integer",
+                        "null"
+                    ]
+                },
+                "lastRouteRefreshAt": {
+                    "type": [
+                        "integer",
+                        "null"
+                    ]
+                },
+                "isRunningToday": {
+                    "type": "boolean"
+                }
+            },
+            "required": [
+                "code",
+                "internalCode",
+                "startAt",
+                "endAt",
+                "lastRouteRefreshAt",
+                "isRunningToday"
+            ]
+        },
+        "scheduleStats": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "rawItems": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "uniqueItems": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "durationMs": {
+                    "type": "integer",
+                    "minimum": 0
+                }
+            },
+            "required": [
+                "rawItems",
+                "uniqueItems",
+                "durationMs"
+            ]
+        }
+    },
+    "required": [
+        "$schema",
+        "version",
+        "date",
+        "lastBuildDate",
+        "status",
+        "strategy",
+        "scope",
+        "progress",
+        "items",
+        "stats",
+        "startedAtMs",
+        "generatedAt"
+    ]
+}
