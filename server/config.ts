@@ -5,6 +5,12 @@ interface CostPerRecordRule {
     rounding: 'ceil';
 }
 
+interface ScheduleProbePrefixRule {
+    prefix: string;
+    minNo: number;
+    maxNo: number;
+}
+
 export interface Config {
     spider: {
         userAgent: string;
@@ -16,6 +22,12 @@ export interface Config {
         rateLimit: Record<'search' | 'query', {
             minIntervalMs: number;
         }>;
+        scheduleProbe: {
+            retryAttempts: number;
+            maxBatchSize: number;
+            checkpointFlushEvery: number;
+            prefixRules: ScheduleProbePrefixRule[];
+        };
     };
     data: {
         assets: Record<
@@ -98,6 +110,11 @@ function asObject(value: unknown, name: string): Record<string, unknown> {
     return value as Record<string, unknown>;
 }
 
+function asArray(value: unknown, name: string): Array<unknown> {
+    assert(Array.isArray(value), `${name} must be an array`);
+    return value;
+}
+
 function asString(value: unknown, name: string): string {
     assert(
         typeof value === 'string' && value.length > 0,
@@ -110,6 +127,17 @@ function asNumber(value: unknown, name: string, min: number): number {
     assert(
         typeof value === 'number' && Number.isFinite(value),
         `${name} must be a finite number`
+    );
+    assert(value >= min, `${name} must be >= ${min}`);
+    return value;
+}
+
+function asInteger(value: unknown, name: string, min: number): number {
+    assert(
+        typeof value === 'number' &&
+        Number.isFinite(value) &&
+        Number.isInteger(value),
+        `${name} must be an integer`
     );
     assert(value >= min, `${name} must be >= ${min}`);
     return value;
@@ -138,6 +166,14 @@ function validateConfig(raw: unknown): Config {
     const spiderRateLimitSearch = asObject(
         spiderRateLimit.search,
         'spider.rateLimit.search'
+    );
+    const spiderScheduleProbe = asObject(
+        spider.scheduleProbe,
+        'spider.scheduleProbe'
+    );
+    const spiderScheduleProbePrefixRules = asArray(
+        spiderScheduleProbe.prefixRules,
+        'spider.scheduleProbe.prefixRules'
     );
 
     const data = asObject(root.data, 'data');
@@ -192,6 +228,58 @@ function validateConfig(raw: unknown): Config {
                         0
                     )
                 }
+            },
+            scheduleProbe: {
+                retryAttempts: asInteger(
+                    spiderScheduleProbe.retryAttempts,
+                    'spider.scheduleProbe.retryAttempts',
+                    1
+                ),
+                maxBatchSize: asInteger(
+                    spiderScheduleProbe.maxBatchSize,
+                    'spider.scheduleProbe.maxBatchSize',
+                    1
+                ),
+                checkpointFlushEvery: asInteger(
+                    spiderScheduleProbe.checkpointFlushEvery,
+                    'spider.scheduleProbe.checkpointFlushEvery',
+                    1
+                ),
+                prefixRules: spiderScheduleProbePrefixRules.map((ruleRaw, index) => {
+                    const rule = asObject(
+                        ruleRaw,
+                        `spider.scheduleProbe.prefixRules[${index}]`
+                    );
+                    const prefix = asString(
+                        rule.prefix,
+                        `spider.scheduleProbe.prefixRules[${index}].prefix`
+                    ).trim().toUpperCase();
+                    assert(
+                        /^[A-Z]+$/.test(prefix),
+                        `spider.scheduleProbe.prefixRules[${index}].prefix must contain only uppercase letters`
+                    );
+
+                    const minNo = asInteger(
+                        rule.minNo,
+                        `spider.scheduleProbe.prefixRules[${index}].minNo`,
+                        1
+                    );
+                    const maxNo = asInteger(
+                        rule.maxNo,
+                        `spider.scheduleProbe.prefixRules[${index}].maxNo`,
+                        1
+                    );
+                    assert(
+                        maxNo >= minNo,
+                        `spider.scheduleProbe.prefixRules[${index}].maxNo must be >= minNo`
+                    );
+
+                    return {
+                        prefix,
+                        minNo,
+                        maxNo
+                    };
+                })
             }
         },
         data: {
@@ -423,6 +511,18 @@ function validateConfig(raw: unknown): Config {
         configResult.api.pagination.defaultLimit,
         'api.pagination.maxLimit must be >= defaultLimit'
     );
+    assert(
+        configResult.spider.scheduleProbe.prefixRules.length > 0,
+        'spider.scheduleProbe.prefixRules must not be empty'
+    );
+    const dedupPrefix = new Set<string>();
+    for (const rule of configResult.spider.scheduleProbe.prefixRules) {
+        assert(
+            !dedupPrefix.has(rule.prefix),
+            `spider.scheduleProbe.prefixRules has duplicated prefix: ${rule.prefix}`
+        );
+        dedupPrefix.add(rule.prefix);
+    }
     return configResult;
 }
 

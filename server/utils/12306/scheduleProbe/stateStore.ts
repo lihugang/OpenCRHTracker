@@ -1,0 +1,213 @@
+import fs from 'fs';
+import path from 'path';
+import getCurrentDateString from '../../date/getCurrentDateString';
+import { getInitialKeywords } from './prefixTree';
+import type { ScheduleFile, ScheduleProbeRuntimeConfig } from './types';
+
+interface LoadedScheduleState {
+    state: ScheduleFile;
+    resumed: boolean;
+    reason:
+        | 'resume'
+        | 'init_missing_file'
+        | 'reset_invalid_file'
+        | 'reset_non_running'
+        | 'reset_cross_day'
+        | 'reset_scope_or_strategy_changed';
+}
+
+function createInitialScheduleState(
+    date: string,
+    config: ScheduleProbeRuntimeConfig
+): ScheduleFile {
+    return {
+        version: 1,
+        date,
+        status: 'running',
+        strategy: {
+            retryAttempts: config.retryAttempts,
+            maxBatchSize: config.maxBatchSize,
+            checkpointFlushEvery: config.checkpointFlushEvery
+        },
+        scope: {
+            prefixRules: config.prefixRules
+        },
+        progress: {
+            phase: 'discover',
+            discoverQueue: getInitialKeywords(config.prefixRules),
+            discoverProcessed: [],
+            enrichCursor: 0,
+            failedKeywords: [],
+            failedEnrichCodes: [],
+            counters: {
+                apiCalls: 0,
+                apiRetries: 0
+            }
+        },
+        items: [],
+        stats: {
+            rawItems: 0,
+            uniqueItems: 0,
+            durationMs: 0
+        },
+        startedAtMs: Date.now(),
+        generatedAt: 0
+    };
+}
+
+function isSameScopeAndStrategy(
+    state: ScheduleFile,
+    config: ScheduleProbeRuntimeConfig
+): boolean {
+    const strategyMatched =
+        state.strategy.retryAttempts === config.retryAttempts &&
+        state.strategy.maxBatchSize === config.maxBatchSize &&
+        state.strategy.checkpointFlushEvery === config.checkpointFlushEvery;
+    if (!strategyMatched) {
+        return false;
+    }
+
+    if (state.scope.prefixRules.length !== config.prefixRules.length) {
+        return false;
+    }
+
+    for (let index = 0; index < config.prefixRules.length; index += 1) {
+        const left = state.scope.prefixRules[index]!;
+        const right = config.prefixRules[index]!;
+        if (
+            left.prefix !== right.prefix ||
+            left.minNo !== right.minNo ||
+            left.maxNo !== right.maxNo
+        ) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+function asScheduleFile(value: unknown): ScheduleFile | null {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+        return null;
+    }
+
+    const file = value as Partial<ScheduleFile>;
+    if (file.version !== 1) {
+        return null;
+    }
+    if (typeof file.date !== 'string') {
+        return null;
+    }
+    if (
+        file.status !== 'running' &&
+        file.status !== 'done' &&
+        file.status !== 'partial_failed'
+    ) {
+        return null;
+    }
+    if (
+        typeof file.startedAtMs !== 'number' ||
+        !Number.isFinite(file.startedAtMs)
+    ) {
+        return null;
+    }
+    if (
+        typeof file.generatedAt !== 'number' ||
+        !Number.isFinite(file.generatedAt)
+    ) {
+        return null;
+    }
+    if (
+        typeof file.strategy !== 'object' ||
+        file.strategy === null ||
+        typeof file.scope !== 'object' ||
+        file.scope === null ||
+        typeof file.progress !== 'object' ||
+        file.progress === null ||
+        typeof file.stats !== 'object' ||
+        file.stats === null ||
+        !Array.isArray(file.items)
+    ) {
+        return null;
+    }
+    if (
+        !Array.isArray(file.progress.discoverQueue) ||
+        !Array.isArray(file.progress.discoverProcessed) ||
+        !Array.isArray(file.progress.failedKeywords) ||
+        !Array.isArray(file.progress.failedEnrichCodes)
+    ) {
+        return null;
+    }
+
+    return file as ScheduleFile;
+}
+
+export function loadOrInitScheduleState(
+    scheduleFilePath: string,
+    config: ScheduleProbeRuntimeConfig
+): LoadedScheduleState {
+    const today = getCurrentDateString();
+    const absolutePath = path.resolve(scheduleFilePath);
+    if (!fs.existsSync(absolutePath)) {
+        return {
+            state: createInitialScheduleState(today, config),
+            resumed: false,
+            reason: 'init_missing_file'
+        };
+    }
+
+    try {
+        const raw = JSON.parse(fs.readFileSync(absolutePath, 'utf8'));
+        const existing = asScheduleFile(raw);
+        if (!existing) {
+            return {
+                state: createInitialScheduleState(today, config),
+                resumed: false,
+                reason: 'reset_invalid_file'
+            };
+        }
+        if (existing.status !== 'running') {
+            return {
+                state: createInitialScheduleState(today, config),
+                resumed: false,
+                reason: 'reset_non_running'
+            };
+        }
+        if (existing.date !== today) {
+            return {
+                state: createInitialScheduleState(today, config),
+                resumed: false,
+                reason: 'reset_cross_day'
+            };
+        }
+        if (!isSameScopeAndStrategy(existing, config)) {
+            return {
+                state: createInitialScheduleState(today, config),
+                resumed: false,
+                reason: 'reset_scope_or_strategy_changed'
+            };
+        }
+
+        return {
+            state: existing,
+            resumed: true,
+            reason: 'resume'
+        };
+    } catch {
+        return {
+            state: createInitialScheduleState(today, config),
+            resumed: false,
+            reason: 'reset_invalid_file'
+        };
+    }
+}
+
+export function saveScheduleState(
+    scheduleFilePath: string,
+    state: ScheduleFile
+): void {
+    const absolutePath = path.resolve(scheduleFilePath);
+    const directory = path.dirname(absolutePath);
+    fs.mkdirSync(directory, { recursive: true });
+    fs.writeFileSync(absolutePath, `${JSON.stringify(state, null, 4)}\n`, 'utf8');
+}

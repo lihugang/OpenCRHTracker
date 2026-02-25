@@ -8,11 +8,33 @@
         },
         "rateLimit": {
             "query": {
-                "minIntervalMs": 3000
+                "minIntervalMs": 1500
             },
             "search": {
-                "minIntervalMs": 15000
+                "minIntervalMs": 8000
             }
+        },
+        "scheduleProbe": {
+            "retryAttempts": 3,
+            "maxBatchSize": 200,
+            "checkpointFlushEvery": 20,
+            "prefixRules": [
+                {
+                    "prefix": "G",
+                    "minNo": 1,
+                    "maxNo": 9999
+                },
+                {
+                    "prefix": "D",
+                    "minNo": 1,
+                    "maxNo": 9999
+                },
+                {
+                    "prefix": "C",
+                    "minNo": 1,
+                    "maxNo": 9999
+                }
+            ]
         }
     },
     "data": {
