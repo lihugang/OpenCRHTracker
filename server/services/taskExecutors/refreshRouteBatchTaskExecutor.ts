@@ -37,17 +37,17 @@ function parseTaskArgs(
         throw new Error('task arguments codes must be an array');
     }
 
-    const dedup = new Set<string>();
+    const deduplication = new Set<string>();
     const codes: string[] = [];
     for (const value of maybeCodes) {
         if (typeof value !== 'string') {
             continue;
         }
         const normalized = normalizeCode(value);
-        if (normalized.length === 0 || dedup.has(normalized)) {
+        if (normalized.length === 0 || deduplication.has(normalized)) {
             continue;
         }
-        dedup.add(normalized);
+        deduplication.add(normalized);
         codes.push(normalized);
         if (codes.length >= maxBatchSize) {
             break;

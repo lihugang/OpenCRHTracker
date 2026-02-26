@@ -591,13 +591,13 @@ function validateConfig(raw: unknown): Config {
             `spider.scheduleProbe.dailyTimeHHmm is invalid: ${message}`
         );
     }
-    const dedupPrefix = new Set<string>();
+    const deduplicationPrefix = new Set<string>();
     for (const rule of configResult.spider.scheduleProbe.prefixRules) {
         assert(
-            !dedupPrefix.has(rule.prefix),
+            !deduplicationPrefix.has(rule.prefix),
             `spider.scheduleProbe.prefixRules has duplicated prefix: ${rule.prefix}`
         );
-        dedupPrefix.add(rule.prefix);
+        deduplicationPrefix.add(rule.prefix);
     }
     assert(
         configResult.task.scheduler.idle.emaAlpha > 0 &&

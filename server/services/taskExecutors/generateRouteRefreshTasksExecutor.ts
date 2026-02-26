@@ -61,7 +61,7 @@ async function executeGenerateRouteRefreshTasks() {
 
     const ttlSeconds = config.spider.scheduleProbe.refresh.ttlHours * 60 * 60;
     const batchSize = config.spider.scheduleProbe.refresh.batchSize;
-    const groupDedup = new Set<string>();
+    const groupDeduplication = new Set<string>();
     const staleCodes: string[] = [];
 
     for (const item of state.items) {
@@ -70,7 +70,7 @@ async function executeGenerateRouteRefreshTasks() {
         }
 
         const groupKey = getGroupKey(item);
-        if (groupDedup.has(groupKey)) {
+        if (groupDeduplication.has(groupKey)) {
             continue;
         }
 
@@ -82,7 +82,7 @@ async function executeGenerateRouteRefreshTasks() {
             continue;
         }
 
-        groupDedup.add(groupKey);
+        groupDeduplication.add(groupKey);
         staleCodes.push(item.code);
     }
 
