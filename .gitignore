@@ -23,7 +23,8 @@ logs
 .env.*
 !.env.example
 
-db/*
+data/*.db
+data/*.jsonl
 
 deploy_meta
 code_lines.json

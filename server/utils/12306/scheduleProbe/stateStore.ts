@@ -20,7 +20,7 @@ interface LoadedScheduleState {
 
 const SCHEDULE_SCHEMA_RELATIVE_PATH = '../assets/json/scheduleScheme.json';
 
-function createInitialScheduleState(
+export function createInitialScheduleState(
     date: string,
     config: ScheduleProbeRuntimeConfig
 ): ScheduleFile {

@@ -1,7 +1,10 @@
 import useConfig from '~/server/config';
 import getLogger from '~/server/libs/log4js';
+import { ensureAssetFile } from '~/server/utils/dataAssets/store';
+import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
 import runScheduleProbe from './scheduleProbe/runner';
 import {
+    createInitialScheduleState,
     loadOrInitScheduleState,
     saveScheduleState
 } from './scheduleProbe/stateStore';
@@ -13,13 +16,20 @@ import type {
 export default async function buildTodaySchedule(): Promise<BuildScheduleResult> {
     const logger = getLogger('schedule-probe');
     const config = useConfig();
-    const scheduleFilePath = config.data.assets.schedule.file;
     const runtimeConfig: ScheduleProbeRuntimeConfig = {
         retryAttempts: config.spider.scheduleProbe.retryAttempts,
         maxBatchSize: config.spider.scheduleProbe.maxBatchSize,
         checkpointFlushEvery: config.spider.scheduleProbe.checkpointFlushEvery,
         prefixRules: config.spider.scheduleProbe.prefixRules
     };
+    const defaultState = createInitialScheduleState(
+        getCurrentDateString(),
+        runtimeConfig
+    );
+    const ensuredAsset = await ensureAssetFile('schedule', {
+        defaultContent: `${JSON.stringify(defaultState, null, 4)}\n`
+    });
+    const scheduleFilePath = ensuredAsset.filePath;
 
     const { state, resumed, reason } = loadOrInitScheduleState(
         scheduleFilePath,

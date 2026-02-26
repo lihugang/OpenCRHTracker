@@ -45,12 +45,12 @@
     "data": {
         "assets": {
             "EMUList": {
-                "file": "data/emu_list.json",
-                "provider": "https://storage.lihugang.top/open_crh_tracker/initialized_data/emu_list.json"
+                "file": "data/emu_list.jsonl",
+                "provider": "https://storage.lihugang.top/open_crh_tracker/initialized_data/emu_list.jsonl"
             },
             "QRCode": {
-                "file": "data/qrcode.json",
-                "provider": "https://storage.lihugang.top/open_crh_tracker/initialized_data/qrcode.json"
+                "file": "data/qrcode.jsonl",
+                "provider": "https://storage.lihugang.top/open_crh_tracker/initialized_data/qrcode.jsonl"
             },
             "schedule": {
                 "file": "data/schedule.json",
