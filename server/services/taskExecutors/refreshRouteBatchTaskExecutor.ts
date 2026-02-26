@@ -1,18 +1,18 @@
 import getLogger from '~/server/libs/log4js';
 import useConfig from '~/server/config';
 import { registerTaskExecutor } from '~/server/services/taskExecutorRegistry';
+import { enqueueTask } from '~/server/services/taskQueue';
+import normalizeCode from '~/server/utils/12306/normalizeCode';
 import fetchRouteInfo from '~/server/utils/12306/fetchRouteInfo';
 import queryWithRetry from '~/server/utils/12306/scheduleProbe/queryWithRetry';
 import {
     loadExistingScheduleState,
     saveScheduleState
 } from '~/server/utils/12306/scheduleProbe/stateStore';
-import {
-    getGroupKey,
-    normalizeCode
-} from '~/server/utils/12306/scheduleProbe/taskHelpers';
+import { getGroupKey } from '~/server/utils/12306/scheduleProbe/taskHelpers';
 import type { ScheduleItem } from '~/server/utils/12306/scheduleProbe/types';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
+import { DISPATCH_DAILY_PROBE_TASKS_EXECUTOR } from './dispatchDailyProbeTasksExecutor';
 
 export const REFRESH_ROUTE_BATCH_TASK_EXECUTOR = 'refresh_route_batch';
 
@@ -166,8 +166,13 @@ async function executeRefreshRouteBatchTask(rawArgs: unknown) {
     if (mutated) {
         saveScheduleState(scheduleFilePath, state);
     }
+    const dispatchTaskId = enqueueTask(
+        DISPATCH_DAILY_PROBE_TASKS_EXECUTOR,
+        {},
+        getNowSeconds()
+    );
     logger.info(
-        `[task-executor:refresh-route-batch] done processed=${processed} success=${success} failed=${failed} changed=${changed} apiCalls=${totalAttempts} file=${scheduleFilePath}`
+        `[task-executor:refresh-route-batch] done processed=${processed} success=${success} failed=${failed} changed=${changed} apiCalls=${totalAttempts} file=${scheduleFilePath} dispatchTaskId=${dispatchTaskId} dispatchExecutor=${DISPATCH_DAILY_PROBE_TASKS_EXECUTOR}`
     );
 }
 

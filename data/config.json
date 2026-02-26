@@ -4,7 +4,8 @@
         "userAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 MicroMessenger/7.0.17(0x17001126) NetType/WIFI Language/zh_CN",
         "params": {
             "eKey": "OpenCRHTracker",
-            "jsonpCallback": "OpenCRHTracker"
+            "jsonpCallback": "OpenCRHTracker",
+            "routeProbeCarCode": "CR400AF-C-2214"
         },
         "rateLimit": {
             "query": {
@@ -22,6 +23,14 @@
             "refresh": {
                 "batchSize": 20,
                 "ttlHours": 24
+            },
+            "probe": {
+                "defaultRetry": 5
+            },
+            "coupling": {
+                "candidateCap": 200,
+                "reuseWithinSeconds": 3600,
+                "runningGraceSeconds": 900
             },
             "prefixRules": [
                 {

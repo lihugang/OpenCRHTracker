@@ -1,15 +1,12 @@
+import normalizeTrainCode from '~/server/utils/12306/normalizeCode';
 import type { ScheduleItem } from './types';
-
-export function normalizeCode(code: string): string {
-    return code.trim().toUpperCase();
-}
 
 export function getGroupKey(item: Pick<ScheduleItem, 'code' | 'internalCode'>): string {
     const internalCode = item.internalCode.trim().toUpperCase();
     if (internalCode.length > 0) {
         return `internal:${internalCode}`;
     }
-    return `code:${normalizeCode(item.code)}`;
+    return `code:${normalizeTrainCode(item.code)}`;
 }
 
 export function splitIntoBatches<T>(list: T[], size: number): T[][] {

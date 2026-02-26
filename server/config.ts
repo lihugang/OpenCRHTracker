@@ -17,6 +17,16 @@ interface ScheduleProbeRefreshConfig {
     ttlHours: number;
 }
 
+interface ScheduleProbeProbeConfig {
+    defaultRetry: number;
+}
+
+interface ScheduleProbeCouplingConfig {
+    candidateCap: number;
+    reuseWithinSeconds: number;
+    runningGraceSeconds: number;
+}
+
 export interface Config {
     spider: {
         userAgent: string;
@@ -24,6 +34,7 @@ export interface Config {
             // 12306 api
             eKey: string;
             jsonpCallback: string;
+            routeProbeCarCode: string;
         };
         rateLimit: Record<'search' | 'query', {
             minIntervalMs: number;
@@ -35,6 +46,8 @@ export interface Config {
             checkpointFlushEvery: number;
             prefixRules: ScheduleProbePrefixRule[];
             refresh: ScheduleProbeRefreshConfig;
+            probe: ScheduleProbeProbeConfig;
+            coupling: ScheduleProbeCouplingConfig;
         };
     };
     data: {
@@ -193,6 +206,14 @@ function validateConfig(raw: unknown): Config {
         spiderScheduleProbe.refresh,
         'spider.scheduleProbe.refresh'
     );
+    const spiderScheduleProbeProbe = asObject(
+        spiderScheduleProbe.probe,
+        'spider.scheduleProbe.probe'
+    );
+    const spiderScheduleProbeCoupling = asObject(
+        spiderScheduleProbe.coupling,
+        'spider.scheduleProbe.coupling'
+    );
     const spiderScheduleProbePrefixRules = asArray(
         spiderScheduleProbe.prefixRules,
         'spider.scheduleProbe.prefixRules'
@@ -236,7 +257,11 @@ function validateConfig(raw: unknown): Config {
             userAgent: asString(spider.userAgent, 'spider.userAgent'),
             params: {
                 eKey: asString(spiderParams.eKey, 'spider.params.eKey'),
-                jsonpCallback: asString(spiderParams.jsonpCallback, 'spider.params.jsonpCallback')
+                jsonpCallback: asString(spiderParams.jsonpCallback, 'spider.params.jsonpCallback'),
+                routeProbeCarCode: asString(
+                    spiderParams.routeProbeCarCode,
+                    'spider.params.routeProbeCarCode'
+                )
             },
             rateLimit: {
                 query: {
@@ -284,6 +309,30 @@ function validateConfig(raw: unknown): Config {
                         spiderScheduleProbeRefresh.ttlHours,
                         'spider.scheduleProbe.refresh.ttlHours',
                         1
+                    )
+                },
+                probe: {
+                    defaultRetry: asInteger(
+                        spiderScheduleProbeProbe.defaultRetry,
+                        'spider.scheduleProbe.probe.defaultRetry',
+                        0
+                    )
+                },
+                coupling: {
+                    candidateCap: asInteger(
+                        spiderScheduleProbeCoupling.candidateCap,
+                        'spider.scheduleProbe.coupling.candidateCap',
+                        1
+                    ),
+                    reuseWithinSeconds: asInteger(
+                        spiderScheduleProbeCoupling.reuseWithinSeconds,
+                        'spider.scheduleProbe.coupling.reuseWithinSeconds',
+                        0
+                    ),
+                    runningGraceSeconds: asInteger(
+                        spiderScheduleProbeCoupling.runningGraceSeconds,
+                        'spider.scheduleProbe.coupling.runningGraceSeconds',
+                        0
                     )
                 },
                 prefixRules: spiderScheduleProbePrefixRules.map((ruleRaw, index) => {

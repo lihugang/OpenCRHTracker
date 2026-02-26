@@ -7,6 +7,7 @@ import {
     formatShanghaiDateTime,
     getNextDayExecutionTimeInShanghaiSeconds
 } from '~/server/utils/date/shanghaiDateTime';
+import { DISPATCH_DAILY_PROBE_TASKS_EXECUTOR } from '~/server/services/taskExecutors/dispatchDailyProbeTasksExecutor';
 
 export const BUILD_SCHEDULE_TASK_EXECUTOR = 'build_today_schedule';
 
@@ -28,9 +29,11 @@ function enqueueNextDailyBuildTask() {
 
 async function executeBuildScheduleTask() {
     let caughtError: unknown = null;
+    let buildSucceeded = false;
     logger.info('[task-executor:build-schedule] start');
     try {
         const result = await buildTodaySchedule();
+        buildSucceeded = true;
         logger.info(
             `[task-executor:build-schedule] success ok=${result.ok} date=${result.date} uniqueItems=${result.stats.uniqueItems} failedKeywords=${result.failedKeywords.length} failedEnrichCodes=${result.failedEnrichCodes.length}`
         );
@@ -41,6 +44,16 @@ async function executeBuildScheduleTask() {
         logger.error(`[task-executor:build-schedule] failed error=${message}`);
     } finally {
         try {
+            if (buildSucceeded) {
+                const dispatchTaskId = enqueueTask(
+                    DISPATCH_DAILY_PROBE_TASKS_EXECUTOR,
+                    {},
+                    Math.floor(Date.now() / 1000)
+                );
+                logger.info(
+                    `[task-executor:build-schedule] enqueued_dispatch_daily_probe_task id=${dispatchTaskId} executor=${DISPATCH_DAILY_PROBE_TASKS_EXECUTOR}`
+                );
+            }
             enqueueNextDailyBuildTask();
         } catch (error) {
             const message =

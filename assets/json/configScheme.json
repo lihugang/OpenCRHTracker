@@ -27,11 +27,16 @@
                         "jsonpCallback": {
                             "type": "string",
                             "minLength": 1
+                        },
+                        "routeProbeCarCode": {
+                            "type": "string",
+                            "minLength": 1
                         }
                     },
                     "required": [
                         "eKey",
-                        "jsonpCallback"
+                        "jsonpCallback",
+                        "routeProbeCarCode"
                     ]
                 },
                 "rateLimit": {
@@ -108,6 +113,42 @@
                                 "ttlHours"
                             ]
                         },
+                        "probe": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "defaultRetry": {
+                                    "type": "integer",
+                                    "minimum": 0
+                                }
+                            },
+                            "required": [
+                                "defaultRetry"
+                            ]
+                        },
+                        "coupling": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "candidateCap": {
+                                    "type": "integer",
+                                    "minimum": 1
+                                },
+                                "reuseWithinSeconds": {
+                                    "type": "integer",
+                                    "minimum": 0
+                                },
+                                "runningGraceSeconds": {
+                                    "type": "integer",
+                                    "minimum": 0
+                                }
+                            },
+                            "required": [
+                                "candidateCap",
+                                "reuseWithinSeconds",
+                                "runningGraceSeconds"
+                            ]
+                        },
                         "prefixRules": {
                             "type": "array",
                             "minItems": 1,
@@ -142,6 +183,8 @@
                         "maxBatchSize",
                         "checkpointFlushEvery",
                         "refresh",
+                        "probe",
+                        "coupling",
                         "prefixRules"
                     ]
                 }

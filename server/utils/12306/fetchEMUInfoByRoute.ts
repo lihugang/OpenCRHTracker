@@ -36,11 +36,13 @@ interface EMUInfoResponse {
 
 const config = useConfig();
 
-export default async function fetchEMUInfoBySeatCode(route: string) {
+export default async function fetchEMUInfoByRoute(route: string) {
     try {
         await waitFor12306RequestSlot('query');
+        // 12306 endpoint requires a non-empty carCode placeholder; value does not affect query result.
+        const routeProbeCarCode = config.spider.params.routeProbeCarCode;
         const response = await fetch(
-            `https://mobile.12306.cn/wxxcx/openplatform-inner/miniprogram/wifiapps/appFrontEnd/v2/lounge/open-smooth-common/trainStyleBatch/getCarDetail?carCode=CR400AF-C-2214&trainCode=${route}&runningDay=${getCurrentDateString()}&reqType=form`,
+            `https://mobile.12306.cn/wxxcx/openplatform-inner/miniprogram/wifiapps/appFrontEnd/v2/lounge/open-smooth-common/trainStyleBatch/getCarDetail?carCode=${encodeURIComponent(routeProbeCarCode)}&trainCode=${route}&runningDay=${getCurrentDateString()}&reqType=form`,
             {
                 headers: {
                     'user-agent': config.spider.userAgent

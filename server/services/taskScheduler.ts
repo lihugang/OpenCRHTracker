@@ -45,6 +45,11 @@ interface RunTaskResult {
     executed: boolean;
 }
 
+type TaskExecutedObserver = (
+    task: TaskRecord,
+    result: RunTaskResult
+) => void;
+
 async function runSingleTask(task: TaskRecord): Promise<RunTaskResult> {
     const startedAtMs = Date.now();
 
@@ -90,6 +95,43 @@ async function runSingleTask(task: TaskRecord): Promise<RunTaskResult> {
     };
 }
 
+async function runTaskGroupSequentially(
+    tasks: TaskRecord[],
+    onTaskExecuted?: TaskExecutedObserver
+): Promise<void> {
+    for (const task of tasks) {
+        const result = await runSingleTask(task);
+        if (onTaskExecuted) {
+            onTaskExecuted(task, result);
+        }
+    }
+}
+
+async function runTasksByExecutor(
+    tasks: TaskRecord[],
+    onTaskExecuted?: TaskExecutedObserver
+): Promise<void> {
+    if (tasks.length === 0) {
+        return;
+    }
+
+    const taskGroupsByExecutor = new Map<string, TaskRecord[]>();
+    for (const task of tasks) {
+        const group = taskGroupsByExecutor.get(task.executor);
+        if (group) {
+            group.push(task);
+            continue;
+        }
+        taskGroupsByExecutor.set(task.executor, [task]);
+    }
+
+    await Promise.all(
+        Array.from(taskGroupsByExecutor.values()).map((group) =>
+            runTaskGroupSequentially(group, onTaskExecuted)
+        )
+    );
+}
+
 async function tick(): Promise<void> {
     if (isChecking) {
         logger.info('[task-scheduler] skip_overlapped_tick');
@@ -113,9 +155,7 @@ async function tick(): Promise<void> {
         logger.info(
             `[task-scheduler] tick_start dueNormalTasks=${dueNormalTasks.length}`
         );
-        for (const task of dueNormalTasks) {
-            await runSingleTask(task);
-        }
+        await runTasksByExecutor(dueNormalTasks);
 
         const maxIdleTasksPerTick = config.task.scheduler.idle.maxTasksPerTick;
         const dueIdleTasks = taskStatements.all<TaskRecord>(
@@ -125,6 +165,7 @@ async function tick(): Promise<void> {
             maxIdleTasksPerTick
         );
 
+        const runnableIdleTasks: TaskRecord[] = [];
         let idleExecuted = 0;
         let idleSkippedBudget = 0;
 
@@ -134,11 +175,7 @@ async function tick(): Promise<void> {
                 logger.info(
                     `[task-scheduler] idle_task_run id=${task.id} executor=${task.executor} expectedDurationMs=${task.expectedDurationMs} remainingMs=${remainingMs}`
                 );
-                const result = await runSingleTask(task);
-                idleExecuted += 1;
-                if (result.executed) {
-                    observeIdleTaskDurationMs(task.executor, result.durationMs);
-                }
+                runnableIdleTasks.push(task);
                 continue;
             }
 
@@ -147,9 +184,15 @@ async function tick(): Promise<void> {
                 `[task-scheduler] idle_task_skip_budget id=${task.id} executor=${task.executor} expectedDurationMs=${task.expectedDurationMs} remainingMs=${remainingMs}`
             );
         }
+        await runTasksByExecutor(runnableIdleTasks, (task, result) => {
+            idleExecuted += 1;
+            if (result.executed) {
+                observeIdleTaskDurationMs(task.executor, result.durationMs);
+            }
+        });
 
         logger.info(
-            `[task-scheduler] tick_finish dueNormalTasks=${dueNormalTasks.length} dueIdleTasks=${dueIdleTasks.length} idleExecuted=${idleExecuted} idleSkippedBudget=${idleSkippedBudget} maxTasksPerQuery=${maxTasksPerQuery} maxIdleTasksPerTick=${maxIdleTasksPerTick} durationMs=${Date.now() - startedAt}`
+            `[task-scheduler] tick_finish dueNormalTasks=${dueNormalTasks.length} dueIdleTasks=${dueIdleTasks.length} runnableIdleTasks=${runnableIdleTasks.length} idleExecuted=${idleExecuted} idleSkippedBudget=${idleSkippedBudget} maxTasksPerQuery=${maxTasksPerQuery} maxIdleTasksPerTick=${maxIdleTasksPerTick} durationMs=${Date.now() - startedAt}`
         );
     } catch (error) {
         const message =

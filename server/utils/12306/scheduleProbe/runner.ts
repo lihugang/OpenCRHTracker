@@ -1,11 +1,12 @@
 import getLogger from '~/server/libs/log4js';
+import normalizeCode from '~/server/utils/12306/normalizeCode';
 import fetchRouteInfo from '../fetchRouteInfo';
 import queryTrainCodeThroughPrefix from '../queryTrainCodeThroughPrefix';
 import { expandKeyword } from './prefixTree';
 import { normalizeTrainCodeItems, sortScheduleItems } from './filterAndSort';
 import queryWithRetry from './queryWithRetry';
 import { saveScheduleState } from './stateStore';
-import { getGroupKey, normalizeCode } from './taskHelpers';
+import { getGroupKey } from './taskHelpers';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
 import type { ScheduleFile, ScheduleItem, ScheduleProbeRuntimeConfig } from './types';
 

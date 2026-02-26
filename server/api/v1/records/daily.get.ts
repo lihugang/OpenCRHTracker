@@ -1,8 +1,14 @@
 import { defineEventHandler, getQuery } from 'h3';
+import {
+    buildNextCursor,
+    listDailyRecordsPaged
+} from '~/server/services/emuRoutesStore';
 import getPerRecordCost from '~/server/utils/api/cost/getPerRecordCost';
 import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';
+import parseCursor from '~/server/utils/api/query/parseCursor';
 import parseLimit from '~/server/utils/api/query/parseLimit';
+import getDayTimestampRange from '~/server/utils/date/getDayTimestampRange';
 
 export default defineEventHandler(async (event) => {
     return executeApi(
@@ -21,21 +27,28 @@ export default defineEventHandler(async (event) => {
                 'date 必须是 YYYYMMDD'
             );
 
-            const cursor = typeof query.cursor === 'string' ? query.cursor : '';
+            const cursor = parseCursor(query.cursor, 'cursor');
             const limit = parseLimit(event);
+            const dayRange = getDayTimestampRange(date);
+            const rows = listDailyRecordsPaged(
+                dayRange.startAt,
+                dayRange.endAt,
+                cursor,
+                limit
+            );
 
             return {
                 date,
-                cursor,
+                cursor: typeof query.cursor === 'string' ? query.cursor : '',
                 limit,
-                nextCursor: '',
-                items: [] as Array<{
-                    ts: number;
-                    id: string;
-                    emuCode: string;
-                    trainCode: string;
-                    line: string;
-                }>
+                nextCursor: buildNextCursor(rows, limit),
+                items: rows.map((row) => ({
+                    ts: row.start_at,
+                    id: String(row.id),
+                    emuCode: row.emu_code,
+                    trainCode: row.train_code,
+                    line: ''
+                }))
             };
         }
     );
