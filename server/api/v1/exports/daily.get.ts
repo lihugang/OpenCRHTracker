@@ -43,24 +43,24 @@ export default defineEventHandler(async (event) => {
             const content =
                 format === 'json'
                     ? JSON.stringify(
-                        rows.map((row) => ({
-                            trainCode: row.train_code,
-                            emuCode: row.emu_code,
-                            startAt: row.start_at,
-                            endAt: row.end_at
-                        }))
-                    )
+                          rows.map((row) => ({
+                              trainCode: row.train_code,
+                              emuCode: row.emu_code,
+                              startAt: row.start_at,
+                              endAt: row.end_at
+                          }))
+                      )
                     : [
-                        'trainCode,emuCode,startAt,endAt',
-                        ...rows.map((row) =>
-                            [
-                                toCsvCell(row.train_code),
-                                toCsvCell(row.emu_code),
-                                toCsvCell(row.start_at),
-                                toCsvCell(row.end_at)
-                            ].join(',')
-                        )
-                    ].join('\n');
+                          'trainCode,emuCode,startAt,endAt',
+                          ...rows.map((row) =>
+                              [
+                                  toCsvCell(row.train_code),
+                                  toCsvCell(row.emu_code),
+                                  toCsvCell(row.start_at),
+                                  toCsvCell(row.end_at)
+                              ].join(',')
+                          )
+                      ].join('\n');
 
             return {
                 date,

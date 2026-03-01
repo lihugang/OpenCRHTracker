@@ -58,7 +58,8 @@ export async function loadProbeAssets(): Promise<ProbeAssets> {
         const qrCodeJsonlText = fs.readFileSync(qrCodeAsset.filePath, 'utf8');
 
         const rawEmuRecords = parseJsonlToJson<RawEmuListRecord>(emuJsonlText);
-        const rawQrCodeRecords = parseJsonlToJson<RawQrCodeRecord>(qrCodeJsonlText);
+        const rawQrCodeRecords =
+            parseJsonlToJson<RawQrCodeRecord>(qrCodeJsonlText);
 
         const emuList: EmuListRecord[] = [];
         for (const row of rawEmuRecords) {
@@ -102,7 +103,9 @@ export async function loadProbeAssets(): Promise<ProbeAssets> {
         return cached;
     } catch (error) {
         const message =
-            error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+            error instanceof Error
+                ? `${error.name}: ${error.message}`
+                : String(error);
         logger.warn(`[probe-asset-store] load_failed error=${message}`);
         cached = {
             emuList: [],

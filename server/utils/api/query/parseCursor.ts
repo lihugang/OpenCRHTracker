@@ -5,7 +5,10 @@ export interface CursorPoint {
     id: number;
 }
 
-export default function parseCursor(raw: unknown, label: string): CursorPoint | null {
+export default function parseCursor(
+    raw: unknown,
+    label: string
+): CursorPoint | null {
     if (raw === undefined || raw === null || raw === '') {
         return null;
     }
@@ -41,4 +44,3 @@ export default function parseCursor(raw: unknown, label: string): CursorPoint | 
         id
     };
 }
-

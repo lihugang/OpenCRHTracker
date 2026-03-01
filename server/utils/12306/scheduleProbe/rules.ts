@@ -91,10 +91,7 @@ export function hasOverlapWithRule(
         const scale = 10 ** (digits - prefixLength);
         const minCandidate = prefixValue * scale;
         const maxCandidate = minCandidate + scale - 1;
-        if (
-            minCandidate <= rule.maxNo &&
-            maxCandidate >= rule.minNo
-        ) {
+        if (minCandidate <= rule.maxNo && maxCandidate >= rule.minNo) {
             return true;
         }
     }

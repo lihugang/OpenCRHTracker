@@ -18,7 +18,10 @@ export interface EnsureAssetResult {
     source: 'local' | 'provider' | 'default';
 }
 
-function assertStringContent(content: unknown, label: string): asserts content is string {
+function assertStringContent(
+    content: unknown,
+    label: string
+): asserts content is string {
     if (typeof content !== 'string') {
         throw new Error(`${label} must be a string`);
     }
@@ -72,7 +75,11 @@ export async function ensureAssetFile(
 ): Promise<EnsureAssetResult> {
     assertStringContent(options.defaultContent, 'defaultContent');
 
-    const { forceRefresh = false, allowProvider = true, defaultContent } = options;
+    const {
+        forceRefresh = false,
+        allowProvider = true,
+        defaultContent
+    } = options;
     const config = getAssetConfig(key);
     const filePath = getAssetFilePath(key);
 
@@ -105,7 +112,9 @@ export async function ensureAssetFile(
             );
         } catch (error) {
             const message =
-                error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+                error instanceof Error
+                    ? `${error.name}: ${error.message}`
+                    : String(error);
             logger.warn(
                 `[data-assets] provider_failed key=${key} file=${filePath} provider=${config.provider} error=${message}`
             );

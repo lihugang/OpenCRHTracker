@@ -8,7 +8,11 @@ import queryWithRetry from './queryWithRetry';
 import { saveScheduleState } from './stateStore';
 import { getGroupKey } from './taskHelpers';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
-import type { ScheduleFile, ScheduleItem, ScheduleProbeRuntimeConfig } from './types';
+import type {
+    ScheduleFile,
+    ScheduleItem,
+    ScheduleProbeRuntimeConfig
+} from './types';
 
 function pushUnique(list: string[], value: string): void {
     if (list.includes(value)) {
@@ -60,7 +64,12 @@ export default async function runScheduleProbe(
     }
     state.status = 'running';
     const todayRunningCodeSet = new Set<string>();
-    if (!(state.progress.phase === 'discover' && state.progress.discoverMode === 'full')) {
+    if (
+        !(
+            state.progress.phase === 'discover' &&
+            state.progress.discoverMode === 'full'
+        )
+    ) {
         for (const item of itemsByCode.values()) {
             if (item.isRunningToday) {
                 todayRunningCodeSet.add(item.code);
@@ -217,17 +226,24 @@ export default async function runScheduleProbe(
             }
 
             const groupIndexes = groupIndexByKey.get(groupKey) ?? [index];
-            const groupItems = groupIndexes.map((itemIndex) => state.items[itemIndex]!);
+            const groupItems = groupIndexes.map(
+                (itemIndex) => state.items[itemIndex]!
+            );
             const shouldRetryFailed = pendingRetrySet.has(itemCodeKey);
             const shouldRetryFailedGroup = groupItems.some((groupItem) =>
                 pendingRetrySet.has(normalizeCode(groupItem.code))
             );
-            const shouldBackfillMissing = groupItems.some((groupItem) =>
-                groupItem.isRunningToday &&
-                (groupItem.startAt === null || groupItem.endAt === null)
+            const shouldBackfillMissing = groupItems.some(
+                (groupItem) =>
+                    groupItem.isRunningToday &&
+                    (groupItem.startAt === null || groupItem.endAt === null)
             );
 
-            if (!shouldRetryFailed && !shouldRetryFailedGroup && !shouldBackfillMissing) {
+            if (
+                !shouldRetryFailed &&
+                !shouldRetryFailedGroup &&
+                !shouldBackfillMissing
+            ) {
                 processedGroupKeys.add(groupKey);
                 state.progress.enrichCursor = index + 1;
                 continue;
@@ -253,7 +269,10 @@ export default async function runScheduleProbe(
                 enrichedCount += 1;
             } else {
                 for (const groupItem of groupItems) {
-                    pushUnique(state.progress.failedEnrichCodes, groupItem.code);
+                    pushUnique(
+                        state.progress.failedEnrichCodes,
+                        groupItem.code
+                    );
                 }
                 logger.warn(
                     `[schedule-probe] enrich failed runId=${runId} trainCode=${item.code} attempts=${routeResult.attempts} groupSize=${groupItems.length}`
@@ -285,12 +304,14 @@ export default async function runScheduleProbe(
     state.lastBuildDate = state.date;
     state.status =
         state.progress.failedKeywords.length > 0 ||
-            state.progress.failedEnrichCodes.length > 0
+        state.progress.failedEnrichCodes.length > 0
             ? 'partial_failed'
             : 'done';
 
     saveScheduleState(scheduleFilePath, state);
-    const runningTodayCount = state.items.filter((item) => item.isRunningToday).length;
+    const runningTodayCount = state.items.filter(
+        (item) => item.isRunningToday
+    ).length;
     logger.info(
         `[schedule-probe] done runId=${runId} status=${state.status} durationMs=${state.stats.durationMs} rawItems=${state.stats.rawItems} uniqueItems=${state.stats.uniqueItems} runningToday=${runningTodayCount} newlyAdded=${newlyAddedCount} enriched=${enrichedCount} failedKeywords=${state.progress.failedKeywords.length} failedEnrichCodes=${state.progress.failedEnrichCodes.length} apiCalls=${state.progress.counters.apiCalls} apiRetries=${state.progress.counters.apiRetries}`
     );

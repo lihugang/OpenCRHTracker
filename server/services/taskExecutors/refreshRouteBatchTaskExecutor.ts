@@ -138,7 +138,8 @@ async function executeRefreshRouteBatchTask(rawArgs: unknown) {
         }
 
         const refreshedAt = getNowSeconds();
-        const refreshedInternalCode = routeResult.data.route.internalCode.trim();
+        const refreshedInternalCode =
+            routeResult.data.route.internalCode.trim();
         let groupChanged = false;
         for (const index of groupItemIndexes) {
             const groupItem = state.items[index]!;
@@ -151,7 +152,10 @@ async function executeRefreshRouteBatchTask(rawArgs: unknown) {
             groupItem.startAt = routeResult.data.route.startAt;
             groupItem.endAt = routeResult.data.route.endAt;
             groupItem.lastRouteRefreshAt = refreshedAt;
-            if (groupItem.internalCode.length === 0 && refreshedInternalCode.length > 0) {
+            if (
+                groupItem.internalCode.length === 0 &&
+                refreshedInternalCode.length > 0
+            ) {
                 groupItem.internalCode = refreshedInternalCode;
             }
         }

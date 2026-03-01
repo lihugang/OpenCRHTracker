@@ -1,3 +1,4 @@
+import '~/server/libs/database/task';
 import importSqlBatch from '~/server/utils/sql/importSqlBatch';
 import { createPreparedSqlStore } from '~/server/libs/database/prepared';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
@@ -36,10 +37,15 @@ export function enqueueTask(
         throw new Error('executor must be non-empty');
     }
     if (!Number.isInteger(executionTime) || executionTime < 0) {
-        throw new Error('executionTime must be a non-negative integer timestamp in seconds');
+        throw new Error(
+            'executionTime must be a non-negative integer timestamp in seconds'
+        );
     }
     const normalizedIsIdle = options.isIdle ? 1 : 0;
-    if (normalizedIsIdle === 1 && typeof options.expectedDurationMs === 'undefined') {
+    if (
+        normalizedIsIdle === 1 &&
+        typeof options.expectedDurationMs === 'undefined'
+    ) {
         throw new Error('expectedDurationMs must be provided for idle tasks');
     }
     const normalizedExpectedDurationMs = options.expectedDurationMs ?? 0;

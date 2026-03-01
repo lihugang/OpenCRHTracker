@@ -66,7 +66,9 @@ function enqueueNextDailyDispatchTask(): number {
 
 async function executeDispatchDailyProbeTasks(): Promise<void> {
     const config = useConfig();
-    const scheduleState = loadExistingScheduleState(config.data.assets.schedule.file);
+    const scheduleState = loadExistingScheduleState(
+        config.data.assets.schedule.file
+    );
     const now = getNowSeconds();
 
     if (!scheduleState) {
@@ -111,7 +113,10 @@ async function executeDispatchDailyProbeTasks(): Promise<void> {
     const defaultRetry = config.spider.scheduleProbe.probe.defaultRetry;
     let createdTaskCount = 0;
     for (const group of groupsByKey.values()) {
-        const allCodes = Array.from(group.allCodes).slice(0, MAX_CODES_PER_GROUP);
+        const allCodes = Array.from(group.allCodes).slice(
+            0,
+            MAX_CODES_PER_GROUP
+        );
         const args: ProbeTaskArgs = {
             trainCode: group.trainCode,
             trainInternalCode: group.trainInternalCode,

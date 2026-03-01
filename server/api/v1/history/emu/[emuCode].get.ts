@@ -1,5 +1,8 @@
 import { defineEventHandler, getQuery, getRouterParam } from 'h3';
-import { buildNextCursor, listHistoryByEmuPaged } from '~/server/services/emuRoutesStore';
+import {
+    buildNextCursor,
+    listHistoryByEmuPaged
+} from '~/server/services/emuRoutesStore';
 import getPerRecordCost from '~/server/utils/api/cost/getPerRecordCost';
 import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';

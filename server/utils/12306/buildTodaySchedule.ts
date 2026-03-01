@@ -46,7 +46,9 @@ export default async function buildTodaySchedule(): Promise<BuildScheduleResult>
         await runScheduleProbe(scheduleFilePath, state, runtimeConfig, runId);
     } catch (error) {
         const message =
-            error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+            error instanceof Error
+                ? `${error.name}: ${error.message}`
+                : String(error);
         logger.error(
             `[schedule-probe] fatal runId=${runId} date=${state.date} file=${scheduleFilePath} error=${message}`
         );

@@ -10,4 +10,3 @@ export default function getDayTimestampRange(date: string): {
         endAt: startAt + 24 * 60 * 60 - 1
     };
 }
-

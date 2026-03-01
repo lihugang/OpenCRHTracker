@@ -50,7 +50,10 @@ export function markQueriedTrainKey(trainKey: string): void {
     queriedTodayTrainKeys.add(trainKey);
 }
 
-export function cleanupRunningEmuState(nowSeconds: number, graceSeconds: number): void {
+export function cleanupRunningEmuState(
+    nowSeconds: number,
+    graceSeconds: number
+): void {
     for (const [emuCode, record] of runningEmuState.entries()) {
         if (nowSeconds > record.endAt + graceSeconds) {
             runningEmuState.delete(emuCode);
@@ -110,7 +113,11 @@ export function setLastObservationByMainEmu(
     lastObservationByMainEmu.set(normalizeCode(emuCode), {
         endAt: record.endAt,
         coupledEmuCodes: Array.from(
-            new Set(record.coupledEmuCodes.map((item) => normalizeCode(item)).filter((item) => item.length > 0))
+            new Set(
+                record.coupledEmuCodes
+                    .map((item) => normalizeCode(item))
+                    .filter((item) => item.length > 0)
+            )
         )
     });
 }

@@ -27,7 +27,7 @@
         "workbox-precaching": "^7.3.0"
     },
     "dependencies": {
-        "better-sqlite3": "^12.4.1",
+        "better-sqlite3": "^12.6.2",
         "date-fns": "^4.1.0",
         "log4js": "^6.9.1",
         "nuxt": "^4.1.3",

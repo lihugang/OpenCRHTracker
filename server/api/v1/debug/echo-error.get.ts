@@ -18,7 +18,7 @@ export default defineEventHandler(async (event) => {
                 import.meta.dev && config.api.debug.enableEchoError,
                 404,
                 'not_found',
-                '此接口在当前环境不可用'
+                '此接口在当前环境中不可用'
             );
 
             const query = getQuery(event);

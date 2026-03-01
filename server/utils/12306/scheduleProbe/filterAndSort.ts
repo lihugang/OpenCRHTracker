@@ -55,8 +55,10 @@ export function sortScheduleItems(
             return -1;
         }
 
-        const aPrefixOrder = prefixOrder.get(aMatch.rule.prefix) ?? Number.MAX_SAFE_INTEGER;
-        const bPrefixOrder = prefixOrder.get(bMatch.rule.prefix) ?? Number.MAX_SAFE_INTEGER;
+        const aPrefixOrder =
+            prefixOrder.get(aMatch.rule.prefix) ?? Number.MAX_SAFE_INTEGER;
+        const bPrefixOrder =
+            prefixOrder.get(bMatch.rule.prefix) ?? Number.MAX_SAFE_INTEGER;
         if (aPrefixOrder !== bPrefixOrder) {
             return aPrefixOrder - bPrefixOrder;
         }

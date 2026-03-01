@@ -36,16 +36,18 @@ function initializeDatabase(name: DatabaseKey, db: Database.Database) {
     }
 
     const initializer = initializers.get(name);
-    if (initializer) {
-        initializer(db);
+    if (!initializer) {
+        return;
     }
 
+    initializer(db);
     initialized.add(name);
 }
 
 export default function useDatabase(name: DatabaseKey) {
     const existing = databases.get(name);
     if (existing) {
+        initializeDatabase(name, existing);
         return existing;
     }
 

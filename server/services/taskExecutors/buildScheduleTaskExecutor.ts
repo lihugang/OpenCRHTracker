@@ -40,7 +40,9 @@ async function executeBuildScheduleTask() {
     } catch (error) {
         caughtError = error;
         const message =
-            error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+            error instanceof Error
+                ? `${error.name}: ${error.message}`
+                : String(error);
         logger.error(`[task-executor:build-schedule] failed error=${message}`);
     } finally {
         try {
@@ -57,7 +59,9 @@ async function executeBuildScheduleTask() {
             enqueueNextDailyBuildTask();
         } catch (error) {
             const message =
-                error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+                error instanceof Error
+                    ? `${error.name}: ${error.message}`
+                    : String(error);
             logger.error(
                 `[task-executor:build-schedule] enqueue_next_daily_task_failed error=${message}`
             );

@@ -15,19 +15,21 @@ export default function waitFor12306RequestSlot(
     }
 
     const baseQueue = queueByType[type] ?? Promise.resolve();
-    const task = baseQueue.catch(() => undefined).then(async () => {
-        const now = Date.now();
-        const waitMs = Math.max(
-            0,
-            (lastRequestAtByType[type] ?? 0) + minIntervalMs - now
-        );
+    const task = baseQueue
+        .catch(() => undefined)
+        .then(async () => {
+            const now = Date.now();
+            const waitMs = Math.max(
+                0,
+                (lastRequestAtByType[type] ?? 0) + minIntervalMs - now
+            );
 
-        if (waitMs > 0) {
-            await sleep(waitMs);
-        }
+            if (waitMs > 0) {
+                await sleep(waitMs);
+            }
 
-        lastRequestAtByType[type] = Date.now();
-    });
+            lastRequestAtByType[type] = Date.now();
+        });
 
     queueByType[type] = task;
     return task;

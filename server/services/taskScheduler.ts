@@ -1,3 +1,4 @@
+import '~/server/libs/database/task';
 import getLogger from '~/server/libs/log4js';
 import useConfig from '~/server/config';
 import importSqlBatch from '~/server/utils/sql/importSqlBatch';
@@ -20,13 +21,15 @@ let started = false;
 let isChecking = false;
 let timer: NodeJS.Timeout | null = null;
 
-function parseTaskArguments(rawArguments: string): {
-    ok: true;
-    argumentsValue: unknown;
-} | {
-    ok: false;
-    message: string;
-} {
+function parseTaskArguments(rawArguments: string):
+    | {
+          ok: true;
+          argumentsValue: unknown;
+      }
+    | {
+          ok: false;
+          message: string;
+      } {
     try {
         return {
             ok: true,
@@ -45,10 +48,7 @@ interface RunTaskResult {
     executed: boolean;
 }
 
-type TaskExecutedObserver = (
-    task: TaskRecord,
-    result: RunTaskResult
-) => void;
+type TaskExecutedObserver = (task: TaskRecord, result: RunTaskResult) => void;
 
 async function runSingleTask(task: TaskRecord): Promise<RunTaskResult> {
     const startedAtMs = Date.now();
@@ -81,7 +81,9 @@ async function runSingleTask(task: TaskRecord): Promise<RunTaskResult> {
         await executor(parsedArguments.argumentsValue);
     } catch (error) {
         const message =
-            error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+            error instanceof Error
+                ? `${error.name}: ${error.message}`
+                : String(error);
         logger.error(
             `[task-scheduler] task_failed id=${task.id} executor=${task.executor} error=${message}`
         );
@@ -196,7 +198,9 @@ async function tick(): Promise<void> {
         );
     } catch (error) {
         const message =
-            error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+            error instanceof Error
+                ? `${error.name}: ${error.message}`
+                : String(error);
         logger.error(`[task-scheduler] tick_error error=${message}`);
     } finally {
         isChecking = false;

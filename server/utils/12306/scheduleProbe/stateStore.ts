@@ -273,9 +273,10 @@ function preparePartialRetryState(
         existing.progress.phase = 'discover';
         existing.progress.discoverMode = 'retry';
         existing.progress.discoverQueue = failedKeywords;
-        existing.progress.discoverProcessed = existing.progress.discoverProcessed.filter(
-            (item) => !failedKeywordSet.has(item)
-        );
+        existing.progress.discoverProcessed =
+            existing.progress.discoverProcessed.filter(
+                (item) => !failedKeywordSet.has(item)
+            );
     } else {
         existing.progress.phase = 'enrich';
         existing.progress.discoverMode = 'retry';
@@ -428,7 +429,9 @@ export function loadOrInitScheduleState(
     }
 }
 
-export function loadExistingScheduleState(scheduleFilePath: string): ScheduleFile | null {
+export function loadExistingScheduleState(
+    scheduleFilePath: string
+): ScheduleFile | null {
     const absolutePath = path.resolve(scheduleFilePath);
     if (!fs.existsSync(absolutePath)) {
         return null;
@@ -450,5 +453,9 @@ export function saveScheduleState(
     const absolutePath = path.resolve(scheduleFilePath);
     const directory = path.dirname(absolutePath);
     fs.mkdirSync(directory, { recursive: true });
-    fs.writeFileSync(absolutePath, `${JSON.stringify(state, null, 4)}\n`, 'utf8');
+    fs.writeFileSync(
+        absolutePath,
+        `${JSON.stringify(state, null, 4)}\n`,
+        'utf8'
+    );
 }

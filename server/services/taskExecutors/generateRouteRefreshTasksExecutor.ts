@@ -11,7 +11,8 @@ import {
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
 import { REFRESH_ROUTE_BATCH_TASK_EXECUTOR } from './refreshRouteBatchTaskExecutor';
 
-export const GENERATE_ROUTE_REFRESH_TASKS_EXECUTOR = 'generate_route_refresh_tasks';
+export const GENERATE_ROUTE_REFRESH_TASKS_EXECUTOR =
+    'generate_route_refresh_tasks';
 
 const logger = getLogger('task-executor:generate-route-refresh');
 

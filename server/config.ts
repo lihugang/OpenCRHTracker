@@ -36,9 +36,12 @@ export interface Config {
             jsonpCallback: string;
             routeProbeCarCode: string;
         };
-        rateLimit: Record<'search' | 'query', {
-            minIntervalMs: number;
-        }>;
+        rateLimit: Record<
+            'search' | 'query',
+            {
+                minIntervalMs: number;
+            }
+        >;
         scheduleProbe: {
             dailyTimeHHmm: string;
             retryAttempts: number;
@@ -166,8 +169,8 @@ function asNumber(value: unknown, name: string, min: number): number {
 function asInteger(value: unknown, name: string, min: number): number {
     assert(
         typeof value === 'number' &&
-        Number.isFinite(value) &&
-        Number.isInteger(value),
+            Number.isFinite(value) &&
+            Number.isInteger(value),
         `${name} must be an integer`
     );
     assert(value >= min, `${name} must be >= ${min}`);
@@ -232,7 +235,10 @@ function validateConfig(raw: unknown): Config {
     const apiDebug = asObject(api.debug, 'api.debug');
     const task = asObject(root.task, 'task');
     const taskScheduler = asObject(task.scheduler, 'task.scheduler');
-    const taskSchedulerIdle = asObject(taskScheduler.idle, 'task.scheduler.idle');
+    const taskSchedulerIdle = asObject(
+        taskScheduler.idle,
+        'task.scheduler.idle'
+    );
 
     const quota = asObject(root.quota, 'quota');
 
@@ -257,7 +263,10 @@ function validateConfig(raw: unknown): Config {
             userAgent: asString(spider.userAgent, 'spider.userAgent'),
             params: {
                 eKey: asString(spiderParams.eKey, 'spider.params.eKey'),
-                jsonpCallback: asString(spiderParams.jsonpCallback, 'spider.params.jsonpCallback'),
+                jsonpCallback: asString(
+                    spiderParams.jsonpCallback,
+                    'spider.params.jsonpCallback'
+                ),
                 routeProbeCarCode: asString(
                     spiderParams.routeProbeCarCode,
                     'spider.params.routeProbeCarCode'
@@ -335,41 +344,45 @@ function validateConfig(raw: unknown): Config {
                         0
                     )
                 },
-                prefixRules: spiderScheduleProbePrefixRules.map((ruleRaw, index) => {
-                    const rule = asObject(
-                        ruleRaw,
-                        `spider.scheduleProbe.prefixRules[${index}]`
-                    );
-                    const prefix = asString(
-                        rule.prefix,
-                        `spider.scheduleProbe.prefixRules[${index}].prefix`
-                    ).trim().toUpperCase();
-                    assert(
-                        /^[A-Z]+$/.test(prefix),
-                        `spider.scheduleProbe.prefixRules[${index}].prefix must contain only uppercase letters`
-                    );
+                prefixRules: spiderScheduleProbePrefixRules.map(
+                    (ruleRaw, index) => {
+                        const rule = asObject(
+                            ruleRaw,
+                            `spider.scheduleProbe.prefixRules[${index}]`
+                        );
+                        const prefix = asString(
+                            rule.prefix,
+                            `spider.scheduleProbe.prefixRules[${index}].prefix`
+                        )
+                            .trim()
+                            .toUpperCase();
+                        assert(
+                            /^[A-Z]+$/.test(prefix),
+                            `spider.scheduleProbe.prefixRules[${index}].prefix must contain only uppercase letters`
+                        );
 
-                    const minNo = asInteger(
-                        rule.minNo,
-                        `spider.scheduleProbe.prefixRules[${index}].minNo`,
-                        1
-                    );
-                    const maxNo = asInteger(
-                        rule.maxNo,
-                        `spider.scheduleProbe.prefixRules[${index}].maxNo`,
-                        1
-                    );
-                    assert(
-                        maxNo >= minNo,
-                        `spider.scheduleProbe.prefixRules[${index}].maxNo must be >= minNo`
-                    );
+                        const minNo = asInteger(
+                            rule.minNo,
+                            `spider.scheduleProbe.prefixRules[${index}].minNo`,
+                            1
+                        );
+                        const maxNo = asInteger(
+                            rule.maxNo,
+                            `spider.scheduleProbe.prefixRules[${index}].maxNo`,
+                            1
+                        );
+                        assert(
+                            maxNo >= minNo,
+                            `spider.scheduleProbe.prefixRules[${index}].maxNo must be >= minNo`
+                        );
 
-                    return {
-                        prefix,
-                        minNo,
-                        maxNo
-                    };
-                })
+                        return {
+                            prefix,
+                            minNo,
+                            maxNo
+                        };
+                    }
+                )
             }
         },
         data: {
@@ -624,7 +637,7 @@ function validateConfig(raw: unknown): Config {
 
     assert(
         configResult.api.pagination.maxLimit >=
-        configResult.api.pagination.defaultLimit,
+            configResult.api.pagination.defaultLimit,
         'api.pagination.maxLimit must be >= defaultLimit'
     );
     assert(
@@ -650,7 +663,7 @@ function validateConfig(raw: unknown): Config {
     }
     assert(
         configResult.task.scheduler.idle.emaAlpha > 0 &&
-        configResult.task.scheduler.idle.emaAlpha <= 1,
+            configResult.task.scheduler.idle.emaAlpha <= 1,
         'task.scheduler.idle.emaAlpha must be > 0 and <= 1'
     );
     return configResult;

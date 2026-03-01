@@ -43,9 +43,9 @@ export function createPreparedSqlStore<SqlKey extends string>(
             return cached;
         }
 
-        const statement = useDatabase(options.dbName).prepare(sql) as Database.Statement<
-            unknown[]
-        >;
+        const statement = useDatabase(options.dbName).prepare(
+            sql
+        ) as Database.Statement<unknown[]>;
         preparedStatements.set(cacheKey, statement);
         return statement;
     }

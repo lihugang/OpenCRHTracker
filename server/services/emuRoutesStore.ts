@@ -23,7 +23,10 @@ type EmuRouteSqlKey =
     | 'selectDailyRecordsPaged'
     | 'selectDailyRecordsAll';
 
-const emuRouteSql = importSqlBatch('emu/queries') as Record<EmuRouteSqlKey, string>;
+const emuRouteSql = importSqlBatch('emu/queries') as Record<
+    EmuRouteSqlKey,
+    string
+>;
 const emuRouteStatements = createPreparedSqlStore<EmuRouteSqlKey>({
     dbName: 'EMUTracked',
     scope: 'emu/queries',
@@ -119,7 +122,10 @@ export function listDailyRecordsAll(
     );
 }
 
-export function buildNextCursor(rows: DailyEmuRouteRow[], limit: number): string {
+export function buildNextCursor(
+    rows: DailyEmuRouteRow[],
+    limit: number
+): string {
     if (rows.length < limit || rows.length === 0) {
         return '';
     }

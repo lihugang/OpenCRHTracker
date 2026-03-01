@@ -1,7 +1,9 @@
 import normalizeTrainCode from '~/server/utils/12306/normalizeCode';
 import type { ScheduleItem } from './types';
 
-export function getGroupKey(item: Pick<ScheduleItem, 'code' | 'internalCode'>): string {
+export function getGroupKey(
+    item: Pick<ScheduleItem, 'code' | 'internalCode'>
+): string {
     const internalCode = item.internalCode.trim().toUpperCase();
     if (internalCode.length > 0) {
         return `internal:${internalCode}`;

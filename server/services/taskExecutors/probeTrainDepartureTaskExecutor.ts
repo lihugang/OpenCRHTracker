@@ -1,6 +1,9 @@
 import getLogger from '~/server/libs/log4js';
 import useConfig from '~/server/config';
-import { loadProbeAssets, buildProbeAssetKey } from '~/server/services/probeAssetStore';
+import {
+    loadProbeAssets,
+    buildProbeAssetKey
+} from '~/server/services/probeAssetStore';
 import {
     buildTrainKey,
     cleanupRunningEmuState,
@@ -71,8 +74,10 @@ function parseTaskArgs(raw: unknown): ProbeTrainDepartureTaskArgs {
 
     const allCodes = Array.isArray(body.allCodes)
         ? uniqueNormalizedCodes(
-            body.allCodes.filter((item): item is string => typeof item === 'string')
-        )
+              body.allCodes.filter(
+                  (item): item is string => typeof item === 'string'
+              )
+          )
         : [];
 
     if (
@@ -80,7 +85,9 @@ function parseTaskArgs(raw: unknown): ProbeTrainDepartureTaskArgs {
         !Number.isInteger(body.startAt) ||
         body.startAt < 0
     ) {
-        throw new Error('task arguments startAt must be a non-negative integer');
+        throw new Error(
+            'task arguments startAt must be a non-negative integer'
+        );
     }
     if (
         typeof body.endAt !== 'number' ||
@@ -92,8 +99,8 @@ function parseTaskArgs(raw: unknown): ProbeTrainDepartureTaskArgs {
 
     const retry =
         typeof body.retry === 'number' &&
-            Number.isInteger(body.retry) &&
-            body.retry >= 0
+        Number.isInteger(body.retry) &&
+        body.retry >= 0
             ? body.retry
             : defaultRetry;
 
@@ -159,7 +166,10 @@ async function collectCoupledEmuCodes(
         if (!candidate.multiple) {
             continue;
         }
-        if (candidate.model !== mainRecord.model || candidate.depot !== mainRecord.depot) {
+        if (
+            candidate.model !== mainRecord.model ||
+            candidate.depot !== mainRecord.depot
+        ) {
             continue;
         }
         if (candidate.trainSetNo === mainRecord.trainSetNo) {
@@ -186,7 +196,9 @@ async function collectCoupledEmuCodes(
         }
 
         const routeCode = normalizeCode(seatCodeResult.route.code);
-        const routeInternalCode = normalizeCode(seatCodeResult.route.internalCode);
+        const routeInternalCode = normalizeCode(
+            seatCodeResult.route.internalCode
+        );
         const matchedByInternalCode =
             normalizedTrainInternalCode.length > 0 &&
             routeInternalCode === normalizedTrainInternalCode;
@@ -276,7 +288,9 @@ async function executeProbeTrainDepartureTask(rawArgs: unknown): Promise<void> {
         args.startAt >= lastObservation.endAt &&
         args.startAt - lastObservation.endAt < reuseWithinSeconds
     ) {
-        coupledEmuCodes = uniqueNormalizedCodes(lastObservation.coupledEmuCodes);
+        coupledEmuCodes = uniqueNormalizedCodes(
+            lastObservation.coupledEmuCodes
+        );
     } else {
         coupledEmuCodes = await collectCoupledEmuCodes(
             args,
@@ -285,8 +299,14 @@ async function executeProbeTrainDepartureTask(rawArgs: unknown): Promise<void> {
         );
     }
 
-    const allEmuCodes = uniqueNormalizedCodes([mainEmuCode, ...coupledEmuCodes]);
-    const allTrainCodes = uniqueNormalizedCodes([args.trainCode, ...args.allCodes]);
+    const allEmuCodes = uniqueNormalizedCodes([
+        mainEmuCode,
+        ...coupledEmuCodes
+    ]);
+    const allTrainCodes = uniqueNormalizedCodes([
+        args.trainCode,
+        ...args.allCodes
+    ]);
     persistDailyRoutes(allTrainCodes, allEmuCodes, args.startAt, args.endAt);
 
     markRunningEmuCodes(allEmuCodes, trainKey, args.endAt, nowSeconds);

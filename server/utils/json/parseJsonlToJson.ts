@@ -23,7 +23,9 @@ export default function parseJsonlToJson<
         try {
             parsed = JSON.parse(line);
         } catch {
-            throw new Error(`Invalid JSONL at line ${lineNumber}: not valid JSON.`);
+            throw new Error(
+                `Invalid JSONL at line ${lineNumber}: not valid JSON.`
+            );
         }
 
         if (!isPlainJsonObject(parsed)) {
