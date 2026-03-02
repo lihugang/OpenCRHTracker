@@ -328,10 +328,12 @@ function prepareDailyRefreshState(
             apiRetries: 0
         }
     };
+    // Start each full build round from a clean train list.
+    existing.items = [];
 
     existing.stats = {
         rawItems: 0,
-        uniqueItems: existing.items.length,
+        uniqueItems: 0,
         durationMs: 0
     };
     return existing;
