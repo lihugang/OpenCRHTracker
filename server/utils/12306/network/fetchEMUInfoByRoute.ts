@@ -1,6 +1,6 @@
 import useConfig from '~/server/config';
-import getCurrentDateString from '../date/getCurrentDateString';
-import waitFor12306RequestSlot from './requestLimiter';
+import getCurrentDateString from '../../date/getCurrentDateString';
+import waitFor12306RequestSlot from '../requestLimiter';
 
 interface EMUInfoResponse {
     errMsg: string;

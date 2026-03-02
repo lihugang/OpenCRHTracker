@@ -66,10 +66,6 @@ async function executeGenerateRouteRefreshTasks() {
     const staleCodes: string[] = [];
 
     for (const item of state.items) {
-        if (!item.isRunningToday) {
-            continue;
-        }
-
         const groupKey = getGroupKey(item);
         if (groupDeduplication.has(groupKey)) {
             continue;

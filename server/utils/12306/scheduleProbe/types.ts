@@ -17,7 +17,6 @@ export interface ScheduleItem {
     startAt: number | null;
     endAt: number | null;
     lastRouteRefreshAt: number | null;
-    isRunningToday: boolean;
 }
 
 export type ScheduleStatus = 'running' | 'done' | 'partial_failed';

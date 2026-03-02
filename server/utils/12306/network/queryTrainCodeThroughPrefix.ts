@@ -1,6 +1,6 @@
 import useConfig from '~/server/config';
-import waitFor12306RequestSlot from './requestLimiter';
-import parseJsonpToJson from '../json/parseJsonpToJson';
+import waitFor12306RequestSlot from '../requestLimiter';
+import parseJsonpToJson from '../../json/parseJsonpToJson';
 
 interface TrainCodeResponse {
     data: Array<{

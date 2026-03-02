@@ -3,7 +3,7 @@ import useConfig from '~/server/config';
 import { registerTaskExecutor } from '~/server/services/taskExecutorRegistry';
 import { enqueueTask } from '~/server/services/taskQueue';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
-import fetchRouteInfo from '~/server/utils/12306/fetchRouteInfo';
+import fetchRouteInfo from '~/server/utils/12306/network/fetchRouteInfo';
 import queryWithRetry from '~/server/utils/12306/scheduleProbe/queryWithRetry';
 import {
     loadExistingScheduleState,

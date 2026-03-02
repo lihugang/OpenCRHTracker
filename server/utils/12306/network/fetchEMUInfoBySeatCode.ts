@@ -1,6 +1,6 @@
 import parseDateAsTimestamp from '@/server/utils/date/parseDateAsTimestamp';
 import parseTimeAsTimestamp from '@/server/utils/date/parseTimeAsTimestamp';
-import waitFor12306RequestSlot from './requestLimiter';
+import waitFor12306RequestSlot from '../requestLimiter';
 import useConfig from '~/server/config';
 
 interface EMUInfoResponse {

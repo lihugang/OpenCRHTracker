@@ -81,9 +81,6 @@ async function executeDispatchDailyProbeTasks(): Promise<void> {
 
     const groupsByKey = new Map<string, ProbeTaskGroup>();
     for (const item of scheduleState.items) {
-        if (!item.isRunningToday) {
-            continue;
-        }
         if (item.startAt === null || item.endAt === null) {
             continue;
         }

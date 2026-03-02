@@ -1,8 +1,8 @@
 import parseDateAsTimestamp from '@/server/utils/date/parseDateAsTimestamp';
 import parseTimeAsTimestamp from '@/server/utils/date/parseTimeAsTimestamp';
 import useConfig from '~/server/config';
-import getCurrentDateString from '../date/getCurrentDateString';
-import waitFor12306RequestSlot from './requestLimiter';
+import getCurrentDateString from '../../date/getCurrentDateString';
+import waitFor12306RequestSlot from '../requestLimiter';
 
 interface RouteInfoResponse {
     noLogin: string;

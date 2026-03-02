@@ -230,9 +230,7 @@ function asScheduleFile(value: unknown): ScheduleFile | null {
         if (typeof row.lastRouteRefreshAt === 'undefined') {
             row.lastRouteRefreshAt = null;
         }
-        if (typeof row.isRunningToday !== 'boolean') {
-            row.isRunningToday = false;
-        }
+        delete (row as { isRunningToday?: unknown }).isRunningToday;
     }
 
     return file as ScheduleFile;
@@ -330,10 +328,6 @@ function prepareDailyRefreshState(
             apiRetries: 0
         }
     };
-
-    for (const item of existing.items) {
-        item.isRunningToday = false;
-    }
 
     existing.stats = {
         rawItems: 0,

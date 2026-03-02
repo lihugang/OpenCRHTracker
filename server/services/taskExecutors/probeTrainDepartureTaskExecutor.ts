@@ -18,8 +18,8 @@ import {
 import { insertDailyEmuRoute } from '~/server/services/emuRoutesStore';
 import { registerTaskExecutor } from '~/server/services/taskExecutorRegistry';
 import { enqueueTask } from '~/server/services/taskQueue';
-import fetchEMUInfoByRoute from '~/server/utils/12306/fetchEMUInfoByRoute';
-import fetchEMUInfoBySeatCode from '~/server/utils/12306/fetchEMUInfoBySeatCode';
+import fetchEMUInfoByRoute from '~/server/utils/12306/network/fetchEMUInfoByRoute';
+import fetchEMUInfoBySeatCode from '~/server/utils/12306/network/fetchEMUInfoBySeatCode';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
 import uniqueNormalizedCodes from '~/server/utils/12306/uniqueNormalizedCodes';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
@@ -74,10 +74,10 @@ function parseTaskArgs(raw: unknown): ProbeTrainDepartureTaskArgs {
 
     const allCodes = Array.isArray(body.allCodes)
         ? uniqueNormalizedCodes(
-              body.allCodes.filter(
-                  (item): item is string => typeof item === 'string'
-              )
-          )
+            body.allCodes.filter(
+                (item): item is string => typeof item === 'string'
+            )
+        )
         : [];
 
     if (
@@ -99,8 +99,8 @@ function parseTaskArgs(raw: unknown): ProbeTrainDepartureTaskArgs {
 
     const retry =
         typeof body.retry === 'number' &&
-        Number.isInteger(body.retry) &&
-        body.retry >= 0
+            Number.isInteger(body.retry) &&
+            body.retry >= 0
             ? body.retry
             : defaultRetry;
 

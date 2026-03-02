@@ -216,9 +216,6 @@
                         "integer",
                         "null"
                     ]
-                },
-                "isRunningToday": {
-                    "type": "boolean"
                 }
             },
             "required": [
@@ -226,8 +223,7 @@
                 "internalCode",
                 "startAt",
                 "endAt",
-                "lastRouteRefreshAt",
-                "isRunningToday"
+                "lastRouteRefreshAt"
             ]
         },
         "scheduleStats": {

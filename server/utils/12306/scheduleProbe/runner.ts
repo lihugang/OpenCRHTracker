@@ -1,7 +1,7 @@
 import getLogger from '~/server/libs/log4js';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
-import fetchRouteInfo from '../fetchRouteInfo';
-import queryTrainCodeThroughPrefix from '../queryTrainCodeThroughPrefix';
+import fetchRouteInfo from '../network/fetchRouteInfo';
+import queryTrainCodeThroughPrefix from '../network/queryTrainCodeThroughPrefix';
 import { expandKeyword } from './prefixTree';
 import { normalizeTrainCodeItems, sortScheduleItems } from './filterAndSort';
 import queryWithRetry from './queryWithRetry';
@@ -63,19 +63,6 @@ export default async function runScheduleProbe(
         state.startedAtMs = Date.now();
     }
     state.status = 'running';
-    const todayRunningCodeSet = new Set<string>();
-    if (
-        !(
-            state.progress.phase === 'discover' &&
-            state.progress.discoverMode === 'full'
-        )
-    ) {
-        for (const item of itemsByCode.values()) {
-            if (item.isRunningToday) {
-                todayRunningCodeSet.add(item.code);
-            }
-        }
-    }
 
     let newlyAddedCount = 0;
     let enrichedCount = 0;
@@ -112,10 +99,8 @@ export default async function runScheduleProbe(
                 );
                 state.stats.rawItems += normalizedItems.length;
                 for (const item of normalizedItems) {
-                    todayRunningCodeSet.add(item.code);
                     const existed = itemsByCode.get(item.code);
                     if (!existed) {
-                        item.isRunningToday = true;
                         itemsByCode.set(item.code, item);
                         newlyAddedCount += 1;
                     } else if (
@@ -123,9 +108,6 @@ export default async function runScheduleProbe(
                         item.internalCode.length > 0
                     ) {
                         existed.internalCode = item.internalCode;
-                    }
-                    if (existed) {
-                        existed.isRunningToday = true;
                     }
                 }
 
@@ -151,37 +133,15 @@ export default async function runScheduleProbe(
             processedSinceFlush += 1;
 
             if (processedSinceFlush >= config.checkpointFlushEvery) {
-                if (state.progress.discoverMode === 'full') {
-                    for (const item of itemsByCode.values()) {
-                        item.isRunningToday = false;
-                    }
-                }
-                for (const code of todayRunningCodeSet) {
-                    const current = itemsByCode.get(code);
-                    if (current) {
-                        current.isRunningToday = true;
-                    }
-                }
                 updateItemsFromMap(state, itemsByCode, config);
                 saveScheduleState(scheduleFilePath, state);
                 logger.info(
-                    `[schedule-probe] discover checkpoint runId=${runId} processed=${state.progress.discoverProcessed.length} pending=${state.progress.discoverQueue.length} rawItems=${state.stats.rawItems} uniqueItems=${state.stats.uniqueItems} newlyAdded=${newlyAddedCount} runningToday=${todayRunningCodeSet.size} apiCalls=${state.progress.counters.apiCalls} apiRetries=${state.progress.counters.apiRetries}`
+                    `[schedule-probe] discover checkpoint runId=${runId} processed=${state.progress.discoverProcessed.length} pending=${state.progress.discoverQueue.length} rawItems=${state.stats.rawItems} uniqueItems=${state.stats.uniqueItems} newlyAdded=${newlyAddedCount} apiCalls=${state.progress.counters.apiCalls} apiRetries=${state.progress.counters.apiRetries}`
                 );
                 processedSinceFlush = 0;
             }
         }
 
-        if (state.progress.discoverMode === 'full') {
-            for (const item of itemsByCode.values()) {
-                item.isRunningToday = false;
-            }
-        }
-        for (const code of todayRunningCodeSet) {
-            const current = itemsByCode.get(code);
-            if (current) {
-                current.isRunningToday = true;
-            }
-        }
         updateItemsFromMap(state, itemsByCode, config);
         state.progress.phase = 'enrich';
         state.progress.discoverMode = 'retry';
@@ -191,7 +151,7 @@ export default async function runScheduleProbe(
         );
         saveScheduleState(scheduleFilePath, state);
         logger.info(
-            `[schedule-probe] discover finish runId=${runId} processed=${state.progress.discoverProcessed.length} failedKeywords=${state.progress.failedKeywords.length} uniqueItems=${state.stats.uniqueItems} newlyAdded=${newlyAddedCount} runningToday=${todayRunningCodeSet.size}`
+            `[schedule-probe] discover finish runId=${runId} processed=${state.progress.discoverProcessed.length} failedKeywords=${state.progress.failedKeywords.length} uniqueItems=${state.stats.uniqueItems} newlyAdded=${newlyAddedCount}`
         );
     }
 
@@ -235,7 +195,6 @@ export default async function runScheduleProbe(
             );
             const shouldBackfillMissing = groupItems.some(
                 (groupItem) =>
-                    groupItem.isRunningToday &&
                     (groupItem.startAt === null || groupItem.endAt === null)
             );
 
@@ -304,15 +263,12 @@ export default async function runScheduleProbe(
     state.lastBuildDate = state.date;
     state.status =
         state.progress.failedKeywords.length > 0 ||
-        state.progress.failedEnrichCodes.length > 0
+            state.progress.failedEnrichCodes.length > 0
             ? 'partial_failed'
             : 'done';
 
     saveScheduleState(scheduleFilePath, state);
-    const runningTodayCount = state.items.filter(
-        (item) => item.isRunningToday
-    ).length;
     logger.info(
-        `[schedule-probe] done runId=${runId} status=${state.status} durationMs=${state.stats.durationMs} rawItems=${state.stats.rawItems} uniqueItems=${state.stats.uniqueItems} runningToday=${runningTodayCount} newlyAdded=${newlyAddedCount} enriched=${enrichedCount} failedKeywords=${state.progress.failedKeywords.length} failedEnrichCodes=${state.progress.failedEnrichCodes.length} apiCalls=${state.progress.counters.apiCalls} apiRetries=${state.progress.counters.apiRetries}`
+        `[schedule-probe] done runId=${runId} status=${state.status} durationMs=${state.stats.durationMs} rawItems=${state.stats.rawItems} uniqueItems=${state.stats.uniqueItems} newlyAdded=${newlyAddedCount} enriched=${enrichedCount} failedKeywords=${state.progress.failedKeywords.length} failedEnrichCodes=${state.progress.failedEnrichCodes.length} apiCalls=${state.progress.counters.apiCalls} apiRetries=${state.progress.counters.apiRetries}`
     );
 }
