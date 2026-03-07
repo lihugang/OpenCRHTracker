@@ -12,6 +12,7 @@ import {
 import { getGroupKey } from '~/server/utils/12306/scheduleProbe/taskHelpers';
 import type { ScheduleItem } from '~/server/utils/12306/scheduleProbe/types';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
+import { toShanghaiDayOffsetFromUnixSeconds } from '~/server/utils/date/shanghaiDateTime';
 import { DISPATCH_DAILY_PROBE_TASKS_EXECUTOR } from './dispatchDailyProbeTasksExecutor';
 
 export const REFRESH_ROUTE_BATCH_TASK_EXECUTOR = 'refresh_route_batch';
@@ -137,6 +138,14 @@ async function executeRefreshRouteBatchTask(rawArgs: unknown) {
             continue;
         }
 
+        const nextStartAt = toShanghaiDayOffsetFromUnixSeconds(
+            state.date,
+            routeResult.data.route.startAt
+        );
+        const nextEndAt = toShanghaiDayOffsetFromUnixSeconds(
+            state.date,
+            routeResult.data.route.endAt
+        );
         const refreshedAt = getNowSeconds();
         const refreshedInternalCode =
             routeResult.data.route.internalCode.trim();
@@ -144,13 +153,13 @@ async function executeRefreshRouteBatchTask(rawArgs: unknown) {
         for (const index of groupItemIndexes) {
             const groupItem = state.items[index]!;
             if (
-                groupItem.startAt !== routeResult.data.route.startAt ||
-                groupItem.endAt !== routeResult.data.route.endAt
+                groupItem.startAt !== nextStartAt ||
+                groupItem.endAt !== nextEndAt
             ) {
                 groupChanged = true;
             }
-            groupItem.startAt = routeResult.data.route.startAt;
-            groupItem.endAt = routeResult.data.route.endAt;
+            groupItem.startAt = nextStartAt;
+            groupItem.endAt = nextEndAt;
             groupItem.lastRouteRefreshAt = refreshedAt;
             if (
                 groupItem.internalCode.length === 0 &&

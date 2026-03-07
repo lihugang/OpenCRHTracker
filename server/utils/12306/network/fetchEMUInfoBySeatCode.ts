@@ -1,7 +1,6 @@
-import parseDateAsTimestamp from '@/server/utils/date/parseDateAsTimestamp';
-import parseTimeAsTimestamp from '@/server/utils/date/parseTimeAsTimestamp';
 import waitFor12306RequestSlot from '../requestLimiter';
 import useConfig from '~/server/config';
+import { getShanghaiUnixSecondsFromDateAndTime } from '../../date/shanghaiDateTime';
 
 interface EMUInfoResponse {
     noLogin: string;
@@ -75,12 +74,14 @@ export default async function fetchEMUInfoBySeatCode(code: string) {
             route: {
                 code: json.data.trainCode, // G xxxx
                 internalCode: json.data.trainNo,
-                startAt:
-                    parseDateAsTimestamp(json.data.startDay) +
-                    parseTimeAsTimestamp(json.data.startTime), // second timestamp
-                endAt:
-                    parseDateAsTimestamp(json.data.endDay) +
-                    parseTimeAsTimestamp(json.data.endTime) // second timestamp
+                startAt: getShanghaiUnixSecondsFromDateAndTime(
+                    json.data.startDay,
+                    json.data.startTime
+                ), // second timestamp
+                endAt: getShanghaiUnixSecondsFromDateAndTime(
+                    json.data.endDay,
+                    json.data.endTime
+                ) // second timestamp
             },
             emu: {
                 code: json.data.carCode // like CR400AF-2230

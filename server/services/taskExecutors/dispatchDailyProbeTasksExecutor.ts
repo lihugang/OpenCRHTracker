@@ -5,7 +5,8 @@ import { enqueueTask } from '~/server/services/taskQueue';
 import { loadExistingScheduleState } from '~/server/utils/12306/scheduleProbe/stateStore';
 import {
     formatShanghaiDateTime,
-    getNextDayExecutionTimeInShanghaiSeconds
+    getNextDayExecutionTimeInShanghaiSeconds,
+    toUnixSecondsFromShanghaiDayOffset
 } from '~/server/utils/date/shanghaiDateTime';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
@@ -29,8 +30,8 @@ interface ProbeTaskGroup {
     trainCode: string;
     trainInternalCode: string;
     allCodes: Set<string>;
-    startAt: number;
-    endAt: number;
+    startAtOffset: number;
+    endAtOffset: number;
 }
 
 let registered = false;
@@ -38,13 +39,13 @@ let registered = false;
 function buildProbeTaskGroupKey(
     trainCode: string,
     trainInternalCode: string,
-    startAt: number
+    startAtOffset: number
 ): string {
     const normalizedInternalCode = normalizeCode(trainInternalCode);
     if (normalizedInternalCode.length > 0) {
         return `internal:${normalizedInternalCode}`;
     }
-    return `fallback:${normalizeCode(trainCode)}@${startAt}`;
+    return `fallback:${normalizeCode(trainCode)}@${startAtOffset}`;
 }
 
 function enqueueNextDailyDispatchTask(): number {
@@ -93,8 +94,11 @@ async function executeDispatchDailyProbeTasks(): Promise<void> {
         const existing = groupsByKey.get(groupKey);
         if (existing) {
             existing.allCodes.add(normalizeCode(item.code));
-            existing.startAt = Math.min(existing.startAt, item.startAt);
-            existing.endAt = Math.max(existing.endAt, item.endAt);
+            existing.startAtOffset = Math.min(
+                existing.startAtOffset,
+                item.startAt
+            );
+            existing.endAtOffset = Math.max(existing.endAtOffset, item.endAt);
             continue;
         }
 
@@ -102,14 +106,22 @@ async function executeDispatchDailyProbeTasks(): Promise<void> {
             trainCode: normalizeCode(item.code),
             trainInternalCode: normalizeCode(item.internalCode),
             allCodes: new Set([normalizeCode(item.code)]),
-            startAt: item.startAt,
-            endAt: item.endAt
+            startAtOffset: item.startAt,
+            endAtOffset: item.endAt
         });
     }
 
     const defaultRetry = config.spider.scheduleProbe.probe.defaultRetry;
     let createdTaskCount = 0;
     for (const group of groupsByKey.values()) {
+        const startAt = toUnixSecondsFromShanghaiDayOffset(
+            scheduleState.date,
+            group.startAtOffset
+        );
+        const endAt = toUnixSecondsFromShanghaiDayOffset(
+            scheduleState.date,
+            group.endAtOffset
+        );
         const allCodes = Array.from(group.allCodes).slice(
             0,
             MAX_CODES_PER_GROUP
@@ -118,11 +130,11 @@ async function executeDispatchDailyProbeTasks(): Promise<void> {
             trainCode: group.trainCode,
             trainInternalCode: group.trainInternalCode,
             allCodes,
-            startAt: group.startAt,
-            endAt: group.endAt,
+            startAt,
+            endAt,
             retry: defaultRetry
         };
-        const executionTime = group.startAt > now ? group.startAt : now;
+        const executionTime = startAt > now ? startAt : now;
         enqueueTask(PROBE_TRAIN_DEPARTURE_TASK_EXECUTOR, args, executionTime);
         createdTaskCount += 1;
     }

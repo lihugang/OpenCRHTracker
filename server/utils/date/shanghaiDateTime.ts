@@ -1,3 +1,5 @@
+import parseTimeAsTimestamp from './parseTimeAsTimestamp';
+
 export const SHANGHAI_OFFSET_MS = 8 * 60 * 60 * 1000;
 
 const shanghaiDateTimeFormatter = new Intl.DateTimeFormat('zh-CN', {
@@ -36,6 +38,70 @@ export function parseDailyTimeHHmm(dailyTimeHHmm: string) {
         hour,
         minute
     };
+}
+
+function parseDateYYYYMMDD(dateYYYYMMDD: string) {
+    if (!/^\d{8}$/.test(dateYYYYMMDD)) {
+        throw new Error(
+            `dateYYYYMMDD must be an 8-digit string, got: ${dateYYYYMMDD}`
+        );
+    }
+
+    const year = Number.parseInt(dateYYYYMMDD.slice(0, 4), 10);
+    const month = Number.parseInt(dateYYYYMMDD.slice(4, 6), 10);
+    const day = Number.parseInt(dateYYYYMMDD.slice(6, 8), 10);
+    if (month < 1 || month > 12) {
+        throw new Error(
+            `dateYYYYMMDD month must be between 01 and 12, got: ${dateYYYYMMDD}`
+        );
+    }
+    if (day < 1 || day > 31) {
+        throw new Error(
+            `dateYYYYMMDD day must be between 01 and 31, got: ${dateYYYYMMDD}`
+        );
+    }
+
+    return {
+        year,
+        month,
+        day
+    };
+}
+
+export function getShanghaiDayStartUnixSeconds(dateYYYYMMDD: string): number {
+    const { year, month, day } = parseDateYYYYMMDD(dateYYYYMMDD);
+    const pseudoUtcMs = Date.UTC(year, month - 1, day, 0, 0, 0, 0);
+    return Math.floor((pseudoUtcMs - SHANGHAI_OFFSET_MS) / 1000);
+}
+
+export function toUnixSecondsFromShanghaiDayOffset(
+    dateYYYYMMDD: string,
+    offsetSeconds: number
+): number {
+    if (!Number.isInteger(offsetSeconds) || offsetSeconds < 0) {
+        throw new Error('offsetSeconds must be a non-negative integer');
+    }
+    return getShanghaiDayStartUnixSeconds(dateYYYYMMDD) + offsetSeconds;
+}
+
+export function toShanghaiDayOffsetFromUnixSeconds(
+    dateYYYYMMDD: string,
+    unixSeconds: number
+): number {
+    if (!Number.isInteger(unixSeconds) || unixSeconds < 0) {
+        throw new Error('unixSeconds must be a non-negative integer');
+    }
+    return unixSeconds - getShanghaiDayStartUnixSeconds(dateYYYYMMDD);
+}
+
+export function getShanghaiUnixSecondsFromDateAndTime(
+    dateYYYYMMDD: string,
+    timeHHmm: string
+): number {
+    return (
+        getShanghaiDayStartUnixSeconds(dateYYYYMMDD) +
+        parseTimeAsTimestamp(timeHHmm)
+    );
 }
 
 export function formatShanghaiDateTime(timestampSeconds: number): string {

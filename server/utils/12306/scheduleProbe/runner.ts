@@ -8,6 +8,7 @@ import queryWithRetry from './queryWithRetry';
 import { saveScheduleState } from './stateStore';
 import { getGroupKey } from './taskHelpers';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
+import { toShanghaiDayOffsetFromUnixSeconds } from '~/server/utils/date/shanghaiDateTime';
 import type {
     ScheduleFile,
     ScheduleItem,
@@ -219,10 +220,18 @@ export default async function runScheduleProbe(
             );
 
             if (routeResult.ok) {
+                const nextStartAt = toShanghaiDayOffsetFromUnixSeconds(
+                    state.date,
+                    routeResult.data.route.startAt
+                );
+                const nextEndAt = toShanghaiDayOffsetFromUnixSeconds(
+                    state.date,
+                    routeResult.data.route.endAt
+                );
                 const refreshedAt = getNowSeconds();
                 for (const groupItem of groupItems) {
-                    groupItem.startAt = routeResult.data.route.startAt;
-                    groupItem.endAt = routeResult.data.route.endAt;
+                    groupItem.startAt = nextStartAt;
+                    groupItem.endAt = nextEndAt;
                     groupItem.lastRouteRefreshAt = refreshedAt;
                 }
                 enrichedCount += 1;

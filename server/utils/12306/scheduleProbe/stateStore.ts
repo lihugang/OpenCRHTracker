@@ -26,7 +26,7 @@ export function createInitialScheduleState(
 ): ScheduleFile {
     return {
         $schema: SCHEDULE_SCHEMA_RELATIVE_PATH,
-        version: 1,
+        version: 2,
         date,
         lastBuildDate: '',
         status: 'running',
@@ -99,7 +99,7 @@ function asScheduleFile(value: unknown): ScheduleFile | null {
     }
 
     const file = value as Partial<ScheduleFile>;
-    if (file.version !== 1) {
+    if (file.version !== 2) {
         return null;
     }
     if (typeof file.date !== 'string') {
@@ -215,15 +215,27 @@ function asScheduleFile(value: unknown): ScheduleFile | null {
         if (typeof row.internalCode !== 'string') {
             row.internalCode = '';
         }
-        if (row.startAt !== null && typeof row.startAt !== 'number') {
+        if (
+            row.startAt !== null &&
+            (typeof row.startAt !== 'number' ||
+                !Number.isInteger(row.startAt) ||
+                row.startAt < 0)
+        ) {
             row.startAt = null;
         }
-        if (row.endAt !== null && typeof row.endAt !== 'number') {
+        if (
+            row.endAt !== null &&
+            (typeof row.endAt !== 'number' ||
+                !Number.isInteger(row.endAt) ||
+                row.endAt < 0)
+        ) {
             row.endAt = null;
         }
         if (
             row.lastRouteRefreshAt !== null &&
-            typeof row.lastRouteRefreshAt !== 'number'
+            (typeof row.lastRouteRefreshAt !== 'number' ||
+                !Number.isInteger(row.lastRouteRefreshAt) ||
+                row.lastRouteRefreshAt < 0)
         ) {
             row.lastRouteRefreshAt = null;
         }

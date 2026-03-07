@@ -10,7 +10,7 @@
         },
         "version": {
             "type": "integer",
-            "const": 1
+            "const": 2
         },
         "date": {
             "type": "string",
@@ -200,16 +200,20 @@
                     "type": "string"
                 },
                 "startAt": {
+                    "description": "Second offset from schedule.date 00:00:00 Asia/Shanghai",
                     "type": [
                         "integer",
                         "null"
-                    ]
+                    ],
+                    "minimum": 0
                 },
                 "endAt": {
+                    "description": "Second offset from schedule.date 00:00:00 Asia/Shanghai; cross-day may be > 86399",
                     "type": [
                         "integer",
                         "null"
-                    ]
+                    ],
+                    "minimum": 0
                 },
                 "lastRouteRefreshAt": {
                     "type": [

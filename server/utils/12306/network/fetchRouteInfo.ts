@@ -1,7 +1,6 @@
-import parseDateAsTimestamp from '@/server/utils/date/parseDateAsTimestamp';
-import parseTimeAsTimestamp from '@/server/utils/date/parseTimeAsTimestamp';
 import useConfig from '~/server/config';
 import getCurrentDateString from '../../date/getCurrentDateString';
+import { getShanghaiUnixSecondsFromDateAndTime } from '../../date/shanghaiDateTime';
 import waitFor12306RequestSlot from '../requestLimiter';
 
 interface RouteInfoResponse {
@@ -105,12 +104,14 @@ export default async function fetchRouteInfo(route: string) {
                 code: route,
                 allCodes: json.data.trainDetail.stationTrainCodeAll.split('/'),
                 internalCode: json.data.trainNo,
-                startAt:
-                    parseDateAsTimestamp(startStation.arraiveDate) +
-                    parseTimeAsTimestamp(startStation.arriveTime), // second timestamp
-                endAt:
-                    parseDateAsTimestamp(endStation.arraiveDate) +
-                    parseTimeAsTimestamp(endStation.arriveTime) // second timestamp
+                startAt: getShanghaiUnixSecondsFromDateAndTime(
+                    startStation.arraiveDate,
+                    startStation.arriveTime
+                ), // second timestamp
+                endAt: getShanghaiUnixSecondsFromDateAndTime(
+                    endStation.arraiveDate,
+                    endStation.arriveTime
+                ) // second timestamp
             }
         };
     } catch {
