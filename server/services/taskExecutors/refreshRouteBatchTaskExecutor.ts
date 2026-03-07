@@ -6,14 +6,16 @@ import normalizeCode from '~/server/utils/12306/normalizeCode';
 import fetchRouteInfo from '~/server/utils/12306/network/fetchRouteInfo';
 import queryWithRetry from '~/server/utils/12306/scheduleProbe/queryWithRetry';
 import {
+    buildCodeIndex,
+    buildGroupIndex,
+    getGroupKey
+} from '~/server/utils/12306/scheduleProbe/taskHelpers';
+import {
     loadExistingScheduleState,
     saveScheduleState
 } from '~/server/utils/12306/scheduleProbe/stateStore';
-import { getGroupKey } from '~/server/utils/12306/scheduleProbe/taskHelpers';
-import type { ScheduleItem } from '~/server/utils/12306/scheduleProbe/types';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
 import { toShanghaiDayOffsetFromUnixSeconds } from '~/server/utils/date/shanghaiDateTime';
-import { DISPATCH_DAILY_PROBE_TASKS_EXECUTOR } from './dispatchDailyProbeTasksExecutor';
 
 export const REFRESH_ROUTE_BATCH_TASK_EXECUTOR = 'refresh_route_batch';
 
@@ -39,7 +41,7 @@ function parseTaskArgs(
     }
 
     const deduplication = new Set<string>();
-    const codes: string = [];
+    const codes: string[] = [];
     for (const value of maybeCodes) {
         if (typeof value !== 'string') {
             continue;
@@ -56,28 +58,6 @@ function parseTaskArgs(
     }
 
     return { codes };
-}
-
-function buildGroupIndex(items: ScheduleItem[]): Map<string, number[]> {
-    const map = new Map<string, number[]>();
-    for (const of items.entries()) {
-        const key = getGroupKey(item);
-        const indices = map.get(key);
-        if (indices) {
-            indices.push(index);
-        } else {
-            map.set(key, [index]);
-        }
-    }
-    return map;
-}
-
-function buildCodeIndex(items: ScheduleItem[]): Map<string, number> {
-    const map = new Map<string, number>();
-    for (const of items.entries()) {
-        map.set(normalizeCode(item.code), index);
-    }
-    return map;
 }
 
 async function executeRefreshRouteBatchTask(rawArgs: unknown) {

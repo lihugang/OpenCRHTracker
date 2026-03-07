@@ -22,3 +22,25 @@ export function splitIntoBatches<T>(list: T[], size: number): T[][] {
     }
     return batches;
 }
+
+export function buildGroupIndex(items: ScheduleItem[]): Map<string, number[]> {
+    const indexByGroup = new Map<string, number[]>();
+    for (const [index, item] of items.entries()) {
+        const groupKey = getGroupKey(item);
+        const groupItems = indexByGroup.get(groupKey);
+        if (groupItems) {
+            groupItems.push(index);
+        } else {
+            indexByGroup.set(groupKey, [index]);
+        }
+    }
+    return indexByGroup;
+}
+
+export function buildCodeIndex(items: ScheduleItem[]): Map<string, number> {
+    const indexByCode = new Map<string, number>();
+    for (const [index, item] of items.entries()) {
+        indexByCode.set(normalizeTrainCode(item.code), index);
+    }
+    return indexByCode;
+}

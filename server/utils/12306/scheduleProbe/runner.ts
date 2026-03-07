@@ -6,7 +6,7 @@ import { expandKeyword } from './prefixTree';
 import { normalizeTrainCodeItems, sortScheduleItems } from './filterAndSort';
 import queryWithRetry from './queryWithRetry';
 import { saveScheduleState } from './stateStore';
-import { getGroupKey } from './taskHelpers';
+import { buildGroupIndex, getGroupKey } from './taskHelpers';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
 import { toShanghaiDayOffsetFromUnixSeconds } from '~/server/utils/date/shanghaiDateTime';
 import type {
@@ -20,20 +20,6 @@ function pushUnique(list: string[], value: string): void {
         return;
     }
     list.push(value);
-}
-
-function buildGroupIndex(items: ScheduleItem[]): Map<string, number[]> {
-    const indexByGroup = new Map<string, number[]>();
-    for (const of items.entries()) {
-        const groupKey = getGroupKey(item);
-        const groupItems = indexByGroup.get(groupKey);
-        if (groupItems) {
-            groupItems.push(index);
-        } else {
-            indexByGroup.set(groupKey, [index]);
-        }
-    }
-    return indexByGroup;
 }
 
 function updateItemsFromMap(

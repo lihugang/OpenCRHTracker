@@ -8,7 +8,7 @@ export default function getAnonymousIdentity(event: H3Event): ApiIdentity {
     const ip = getClientIp(event);
     return {
         type: 'anonymous',
-        id: ip,
+        id: ip ?? 'unknown',
         bucketKey: `ip:${ip}`,
         tokenLimit: config.quota.anonymousMaxTokens
     };

@@ -4,14 +4,14 @@ import normalizeCode from '~/server/utils/12306/normalizeCode';
 import { ensureAssetFile } from '~/server/utils/dataAssets/store';
 import parseJsonlToJson from '~/server/utils/json/parseJsonlToJson';
 
-interface RawEmuListRecord {
+interface RawEmuListRecord extends Record<string, unknown> {
     model?: unknown;
     trainSetNo?: unknown;
     depot?: unknown;
     multiple?: unknown;
 }
 
-interface RawQrCodeRecord {
+interface RawQrCodeRecord extends Record<string, unknown> {
     code?: unknown;
     model?: unknown;
     trainSetNo?: unknown;
@@ -109,7 +109,7 @@ export async function loadProbeAssets(): Promise<ProbeAssets> {
         logger.warn(`load_failed error=${message}`);
         cached = {
             emuList: [],
-            qrcodeByModelAndTrainSetNo: new Map()
+            qrcodeByModelAndTrainSetNo: new Map<string, string>()
         };
         return cached;
     }

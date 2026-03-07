@@ -13,7 +13,7 @@ export default function parseJsonlToJson<
 
     for (let index = 0; index < lines.length; index += 1) {
         const lineNumber = index + 1;
-        const line = lines[index].trim();
+        const line = lines[index]?.trim();
 
         if (!line) {
             continue;
