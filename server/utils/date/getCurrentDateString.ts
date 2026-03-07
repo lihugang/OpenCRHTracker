@@ -1,9 +1,11 @@
+import { SHANGHAI_OFFSET_MS } from './shanghaiDateTime';
+
 export default function getCurrentDateString() {
-    const date = new Date();
-    const yearString = date.getFullYear().toString();
-    const monthString = (date.getMonth() + 1) /* month index */
+    const shanghaiNow = new Date(Date.now() + SHANGHAI_OFFSET_MS);
+    const yearString = shanghaiNow.getUTCFullYear().toString();
+    const monthString = (shanghaiNow.getUTCMonth() + 1) /* month index */
         .toString()
         .padStart(2, '0');
-    const dateString = date.getDate().toString().padStart(2, '0');
+    const dateString = shanghaiNow.getUTCDate().toString().padStart(2, '0');
     return `${yearString}${monthString}${dateString}`;
 }
