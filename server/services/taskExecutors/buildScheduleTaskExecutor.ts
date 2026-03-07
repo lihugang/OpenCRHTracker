@@ -23,19 +23,19 @@ function enqueueNextDailyBuildTask() {
     );
     const id = enqueueTask(BUILD_SCHEDULE_TASK_EXECUTOR, {}, nextExecutionTime);
     logger.info(
-        `[task-executor:build-schedule] enqueued_next_daily_task id=${id} executor=${BUILD_SCHEDULE_TASK_EXECUTOR} executionTime=${nextExecutionTime} executionTimeAsiaShanghai=${formatShanghaiDateTime(nextExecutionTime)}`
+        `enqueued_next_daily_task id=${id} executor=${BUILD_SCHEDULE_TASK_EXECUTOR} executionTime=${nextExecutionTime} executionTimeAsiaShanghai=${formatShanghaiDateTime(nextExecutionTime)}`
     );
 }
 
 async function executeBuildScheduleTask() {
     let caughtError: unknown = null;
     let buildSucceeded = false;
-    logger.info('[task-executor:build-schedule] start');
+    logger.info('start');
     try {
         const result = await buildTodaySchedule();
         buildSucceeded = true;
         logger.info(
-            `[task-executor:build-schedule] success ok=${result.ok} date=${result.date} uniqueItems=${result.stats.uniqueItems} failedKeywords=${result.failedKeywords.length} failedEnrichCodes=${result.failedEnrichCodes.length}`
+            `success ok=${result.ok} date=${result.date} uniqueItems=${result.stats.uniqueItems} failedKeywords=${result.failedKeywords.length} failedEnrichCodes=${result.failedEnrichCodes.length}`
         );
     } catch (error) {
         caughtError = error;
@@ -43,7 +43,7 @@ async function executeBuildScheduleTask() {
             error instanceof Error
                 ? `${error.name}: ${error.message}`
                 : String(error);
-        logger.error(`[task-executor:build-schedule] failed error=${message}`);
+        logger.error(`failed error=${message}`);
     } finally {
         try {
             if (buildSucceeded) {
@@ -53,7 +53,7 @@ async function executeBuildScheduleTask() {
                     Math.floor(Date.now() / 1000)
                 );
                 logger.info(
-                    `[task-executor:build-schedule] enqueued_dispatch_daily_probe_task id=${dispatchTaskId} executor=${DISPATCH_DAILY_PROBE_TASKS_EXECUTOR}`
+                    `enqueued_dispatch_daily_probe_task id=${dispatchTaskId} executor=${DISPATCH_DAILY_PROBE_TASKS_EXECUTOR}`
                 );
             }
             enqueueNextDailyBuildTask();
@@ -63,7 +63,7 @@ async function executeBuildScheduleTask() {
                     ? `${error.name}: ${error.message}`
                     : String(error);
             logger.error(
-                `[task-executor:build-schedule] enqueue_next_daily_task_failed error=${message}`
+                `enqueue_next_daily_task_failed error=${message}`
             );
             if (!caughtError) {
                 caughtError = error;
@@ -86,6 +86,6 @@ export function registerBuildScheduleTaskExecutor() {
     });
     registered = true;
     logger.info(
-        `[task-executor:build-schedule] registered executor=${BUILD_SCHEDULE_TASK_EXECUTOR}`
+        `registered executor=${BUILD_SCHEDULE_TASK_EXECUTOR}`
     );
 }

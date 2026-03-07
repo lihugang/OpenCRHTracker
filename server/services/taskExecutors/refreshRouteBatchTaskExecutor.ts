@@ -39,7 +39,7 @@ function parseTaskArgs(
     }
 
     const deduplication = new Set<string>();
-    const codes: string[] = [];
+    const codes: string = [];
     for (const value of maybeCodes) {
         if (typeof value !== 'string') {
             continue;
@@ -60,7 +60,7 @@ function parseTaskArgs(
 
 function buildGroupIndex(items: ScheduleItem[]): Map<string, number[]> {
     const map = new Map<string, number[]>();
-    for (const [index, item] of items.entries()) {
+    for (const of items.entries()) {
         const key = getGroupKey(item);
         const indices = map.get(key);
         if (indices) {
@@ -74,7 +74,7 @@ function buildGroupIndex(items: ScheduleItem[]): Map<string, number[]> {
 
 function buildCodeIndex(items: ScheduleItem[]): Map<string, number> {
     const map = new Map<string, number>();
-    for (const [index, item] of items.entries()) {
+    for (const of items.entries()) {
         map.set(normalizeCode(item.code), index);
     }
     return map;
@@ -86,7 +86,7 @@ async function executeRefreshRouteBatchTask(rawArgs: unknown) {
     const retryAttempts = config.spider.scheduleProbe.retryAttempts;
     const args = parseTaskArgs(rawArgs, batchSize);
     if (args.codes.length === 0) {
-        logger.info('[task-executor:refresh-route-batch] skip empty_codes');
+        logger.info('skip empty_codes');
         return;
     }
 
@@ -94,7 +94,7 @@ async function executeRefreshRouteBatchTask(rawArgs: unknown) {
     const state = loadExistingScheduleState(scheduleFilePath);
     if (!state) {
         logger.warn(
-            `[task-executor:refresh-route-batch] skip schedule_not_found file=${scheduleFilePath}`
+            `skip schedule_not_found file=${scheduleFilePath}`
         );
         return;
     }
@@ -133,7 +133,7 @@ async function executeRefreshRouteBatchTask(rawArgs: unknown) {
         if (!routeResult.ok) {
             failed += 1;
             logger.warn(
-                `[task-executor:refresh-route-batch] refresh_failed code=${item.code} attempts=${routeResult.attempts} groupSize=${groupItemIndexes.length}`
+                `refresh_failed code=${item.code} attempts=${routeResult.attempts} groupSize=${groupItemIndexes.length}`
             );
             continue;
         }
@@ -180,7 +180,7 @@ async function executeRefreshRouteBatchTask(rawArgs: unknown) {
         saveScheduleState(scheduleFilePath, state);
     }
     logger.info(
-        `[task-executor:refresh-route-batch] done processed=${processed} success=${success} failed=${failed} changed=${changed} apiCalls=${totalAttempts} file=${scheduleFilePath}`
+        `done processed=${processed} success=${success} failed=${failed} changed=${changed} apiCalls=${totalAttempts} file=${scheduleFilePath}`
     );
 }
 
@@ -194,6 +194,6 @@ export function registerRefreshRouteBatchTaskExecutor() {
     });
     registered = true;
     logger.info(
-        `[task-executor:refresh-route-batch] registered executor=${REFRESH_ROUTE_BATCH_TASK_EXECUTOR}`
+        `registered executor=${REFRESH_ROUTE_BATCH_TASK_EXECUTOR}`
     );
 }

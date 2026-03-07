@@ -24,7 +24,7 @@ function pushUnique(list: string[], value: string): void {
 
 function buildGroupIndex(items: ScheduleItem[]): Map<string, number[]> {
     const indexByGroup = new Map<string, number[]>();
-    for (const [index, item] of items.entries()) {
+    for (const of items.entries()) {
         const groupKey = getGroupKey(item);
         const groupItems = indexByGroup.get(groupKey);
         if (groupItems) {
@@ -68,12 +68,12 @@ export default async function runScheduleProbe(
     let newlyAddedCount = 0;
     let enrichedCount = 0;
     logger.info(
-        `[schedule-probe] run runId=${runId} phase=${state.progress.phase} existingItems=${state.items.length} discoverQueue=${state.progress.discoverQueue.length} discoverProcessed=${state.progress.discoverProcessed.length} enrichCursor=${state.progress.enrichCursor}`
+        `run runId=${runId} phase=${state.progress.phase} existingItems=${state.items.length} discoverQueue=${state.progress.discoverQueue.length} discoverProcessed=${state.progress.discoverProcessed.length} enrichCursor=${state.progress.enrichCursor}`
     );
 
     if (state.progress.phase === 'discover') {
         logger.info(
-            `[schedule-probe] discover start runId=${runId} mode=${state.progress.discoverMode} queue=${state.progress.discoverQueue.length} processed=${state.progress.discoverProcessed.length} rawItems=${state.stats.rawItems} uniqueItems=${state.stats.uniqueItems}`
+            `discover start runId=${runId} mode=${state.progress.discoverMode} queue=${state.progress.discoverQueue.length} processed=${state.progress.discoverProcessed.length} rawItems=${state.stats.rawItems} uniqueItems=${state.stats.uniqueItems}`
         );
         const processedSet = new Set(state.progress.discoverProcessed);
         const queuedSet = new Set(state.progress.discoverQueue);
@@ -125,7 +125,7 @@ export default async function runScheduleProbe(
             } else {
                 pushUnique(state.progress.failedKeywords, keyword);
                 logger.warn(
-                    `[schedule-probe] discover failed runId=${runId} keyword=${keyword} attempts=${searchResult.attempts}`
+                    `discover failed runId=${runId} keyword=${keyword} attempts=${searchResult.attempts}`
                 );
             }
 
@@ -137,7 +137,7 @@ export default async function runScheduleProbe(
                 updateItemsFromMap(state, itemsByCode, config);
                 saveScheduleState(scheduleFilePath, state);
                 logger.info(
-                    `[schedule-probe] discover checkpoint runId=${runId} processed=${state.progress.discoverProcessed.length} pending=${state.progress.discoverQueue.length} rawItems=${state.stats.rawItems} uniqueItems=${state.stats.uniqueItems} newlyAdded=${newlyAddedCount} apiCalls=${state.progress.counters.apiCalls} apiRetries=${state.progress.counters.apiRetries}`
+                    `discover checkpoint runId=${runId} processed=${state.progress.discoverProcessed.length} pending=${state.progress.discoverQueue.length} rawItems=${state.stats.rawItems} uniqueItems=${state.stats.uniqueItems} newlyAdded=${newlyAddedCount} apiCalls=${state.progress.counters.apiCalls} apiRetries=${state.progress.counters.apiRetries}`
                 );
                 processedSinceFlush = 0;
             }
@@ -152,13 +152,13 @@ export default async function runScheduleProbe(
         );
         saveScheduleState(scheduleFilePath, state);
         logger.info(
-            `[schedule-probe] discover finish runId=${runId} processed=${state.progress.discoverProcessed.length} failedKeywords=${state.progress.failedKeywords.length} uniqueItems=${state.stats.uniqueItems} newlyAdded=${newlyAddedCount}`
+            `discover finish runId=${runId} processed=${state.progress.discoverProcessed.length} failedKeywords=${state.progress.failedKeywords.length} uniqueItems=${state.stats.uniqueItems} newlyAdded=${newlyAddedCount}`
         );
     }
 
     if (state.progress.phase === 'enrich') {
         logger.info(
-            `[schedule-probe] enrich start runId=${runId} totalItems=${state.items.length} fromCursor=${state.progress.enrichCursor}`
+            `enrich start runId=${runId} totalItems=${state.items.length} fromCursor=${state.progress.enrichCursor}`
         );
         const pendingRetrySet = new Set(
             state.progress.failedEnrichCodes.map((code) => normalizeCode(code))
@@ -243,7 +243,7 @@ export default async function runScheduleProbe(
                     );
                 }
                 logger.warn(
-                    `[schedule-probe] enrich failed runId=${runId} trainCode=${item.code} attempts=${routeResult.attempts} groupSize=${groupItems.length}`
+                    `enrich failed runId=${runId} trainCode=${item.code} attempts=${routeResult.attempts} groupSize=${groupItems.length}`
                 );
             }
 
@@ -254,7 +254,7 @@ export default async function runScheduleProbe(
             if (processedSinceFlush >= config.checkpointFlushEvery) {
                 saveScheduleState(scheduleFilePath, state);
                 logger.info(
-                    `[schedule-probe] enrich checkpoint runId=${runId} cursor=${state.progress.enrichCursor} totalItems=${state.items.length} failedEnrichCodes=${state.progress.failedEnrichCodes.length} enriched=${enrichedCount} apiCalls=${state.progress.counters.apiCalls} apiRetries=${state.progress.counters.apiRetries}`
+                    `enrich checkpoint runId=${runId} cursor=${state.progress.enrichCursor} totalItems=${state.items.length} failedEnrichCodes=${state.progress.failedEnrichCodes.length} enriched=${enrichedCount} apiCalls=${state.progress.counters.apiCalls} apiRetries=${state.progress.counters.apiRetries}`
                 );
                 processedSinceFlush = 0;
             }
@@ -262,7 +262,7 @@ export default async function runScheduleProbe(
 
         state.progress.phase = 'done';
         logger.info(
-            `[schedule-probe] enrich finish runId=${runId} cursor=${state.progress.enrichCursor} failedEnrichCodes=${state.progress.failedEnrichCodes.length} enriched=${enrichedCount}`
+            `enrich finish runId=${runId} cursor=${state.progress.enrichCursor} failedEnrichCodes=${state.progress.failedEnrichCodes.length} enriched=${enrichedCount}`
         );
     }
 
@@ -278,6 +278,6 @@ export default async function runScheduleProbe(
 
     saveScheduleState(scheduleFilePath, state);
     logger.info(
-        `[schedule-probe] done runId=${runId} status=${state.status} durationMs=${state.stats.durationMs} rawItems=${state.stats.rawItems} uniqueItems=${state.stats.uniqueItems} newlyAdded=${newlyAddedCount} enriched=${enrichedCount} failedKeywords=${state.progress.failedKeywords.length} failedEnrichCodes=${state.progress.failedEnrichCodes.length} apiCalls=${state.progress.counters.apiCalls} apiRetries=${state.progress.counters.apiRetries}`
+        `done runId=${runId} status=${state.status} durationMs=${state.stats.durationMs} rawItems=${state.stats.rawItems} uniqueItems=${state.stats.uniqueItems} newlyAdded=${newlyAddedCount} enriched=${enrichedCount} failedKeywords=${state.progress.failedKeywords.length} failedEnrichCodes=${state.progress.failedEnrichCodes.length} apiCalls=${state.progress.counters.apiCalls} apiRetries=${state.progress.counters.apiRetries}`
     );
 }

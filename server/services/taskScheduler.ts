@@ -23,13 +23,13 @@ let timer: NodeJS.Timeout | null = null;
 
 function parseTaskArguments(rawArguments: string):
     | {
-          ok: true;
-          argumentsValue: unknown;
-      }
+        ok: true;
+        argumentsValue: unknown;
+    }
     | {
-          ok: false;
-          message: string;
-      } {
+        ok: false;
+        message: string;
+    } {
     try {
         return {
             ok: true,
@@ -56,7 +56,7 @@ async function runSingleTask(task: TaskRecord): Promise<RunTaskResult> {
     const parsedArguments = parseTaskArguments(task.arguments);
     if (!parsedArguments.ok) {
         logger.error(
-            `[task-scheduler] invalid_task_arguments id=${task.id} executor=${task.executor} error=${parsedArguments.message}`
+            `invalid_task_arguments id=${task.id} executor=${task.executor} error=${parsedArguments.message}`
         );
         taskStatements.run('completeTask', task.id);
         return {
@@ -68,7 +68,7 @@ async function runSingleTask(task: TaskRecord): Promise<RunTaskResult> {
     const executor = getTaskExecutor(task.executor);
     if (!executor) {
         logger.error(
-            `[task-scheduler] executor_not_registered id=${task.id} executor=${task.executor}`
+            `executor_not_registered id=${task.id} executor=${task.executor}`
         );
         taskStatements.run('completeTask', task.id);
         return {
@@ -85,7 +85,7 @@ async function runSingleTask(task: TaskRecord): Promise<RunTaskResult> {
                 ? `${error.name}: ${error.message}`
                 : String(error);
         logger.error(
-            `[task-scheduler] task_failed id=${task.id} executor=${task.executor} error=${message}`
+            `task_failed id=${task.id} executor=${task.executor} error=${message}`
         );
     } finally {
         taskStatements.run('completeTask', task.id);
@@ -136,7 +136,7 @@ async function runTasksByExecutor(
 
 async function tick(): Promise<void> {
     if (isChecking) {
-        logger.info('[task-scheduler] skip_overlapped_tick');
+        logger.info('skip_overlapped_tick');
         return;
     }
 
@@ -155,7 +155,7 @@ async function tick(): Promise<void> {
         );
 
         logger.info(
-            `[task-scheduler] tick_start dueNormalTasks=${dueNormalTasks.length}`
+            `tick_start dueNormalTasks=${dueNormalTasks.length}`
         );
         await runTasksByExecutor(dueNormalTasks);
 
@@ -175,7 +175,7 @@ async function tick(): Promise<void> {
             const remainingMs = Math.max(0, nextTickAtMs - Date.now());
             if (task.expectedDurationMs < remainingMs) {
                 logger.info(
-                    `[task-scheduler] idle_task_run id=${task.id} executor=${task.executor} expectedDurationMs=${task.expectedDurationMs} remainingMs=${remainingMs}`
+                    `idle_task_run id=${task.id} executor=${task.executor} expectedDurationMs=${task.expectedDurationMs} remainingMs=${remainingMs}`
                 );
                 runnableIdleTasks.push(task);
                 continue;
@@ -183,7 +183,7 @@ async function tick(): Promise<void> {
 
             idleSkippedBudget += 1;
             logger.info(
-                `[task-scheduler] idle_task_skip_budget id=${task.id} executor=${task.executor} expectedDurationMs=${task.expectedDurationMs} remainingMs=${remainingMs}`
+                `idle_task_skip_budget id=${task.id} executor=${task.executor} expectedDurationMs=${task.expectedDurationMs} remainingMs=${remainingMs}`
             );
         }
         await runTasksByExecutor(runnableIdleTasks, (task, result) => {
@@ -194,14 +194,14 @@ async function tick(): Promise<void> {
         });
 
         logger.info(
-            `[task-scheduler] tick_finish dueNormalTasks=${dueNormalTasks.length} dueIdleTasks=${dueIdleTasks.length} runnableIdleTasks=${runnableIdleTasks.length} idleExecuted=${idleExecuted} idleSkippedBudget=${idleSkippedBudget} maxTasksPerQuery=${maxTasksPerQuery} maxIdleTasksPerTick=${maxIdleTasksPerTick} durationMs=${Date.now() - startedAt}`
+            `tick_finish dueNormalTasks=${dueNormalTasks.length} dueIdleTasks=${dueIdleTasks.length} runnableIdleTasks=${runnableIdleTasks.length} idleExecuted=${idleExecuted} idleSkippedBudget=${idleSkippedBudget} maxTasksPerQuery=${maxTasksPerQuery} maxIdleTasksPerTick=${maxIdleTasksPerTick} durationMs=${Date.now() - startedAt}`
         );
     } catch (error) {
         const message =
             error instanceof Error
                 ? `${error.name}: ${error.message}`
                 : String(error);
-        logger.error(`[task-scheduler] tick_error error=${message}`);
+        logger.error(`tick_error error=${message}`);
     } finally {
         isChecking = false;
     }
@@ -209,7 +209,7 @@ async function tick(): Promise<void> {
 
 export function startTaskScheduler() {
     if (started) {
-        logger.info('[task-scheduler] already_started');
+        logger.info('already_started');
         return;
     }
 
@@ -220,7 +220,7 @@ export function startTaskScheduler() {
     started = true;
 
     logger.info(
-        `[task-scheduler] started pollIntervalMs=${pollIntervalMs} autoStart=true`
+        `started pollIntervalMs=${pollIntervalMs} autoStart=true`
     );
     void tick();
 }
@@ -232,5 +232,5 @@ export function stopTaskScheduler() {
     }
     started = false;
     isChecking = false;
-    logger.info('[task-scheduler] stopped');
+    logger.info('stopped');
 }

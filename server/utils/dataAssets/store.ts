@@ -99,7 +99,7 @@ export async function ensureAssetFile(
                 const content = await response.text();
                 writeTextFileAtomically(filePath, content);
                 logger.info(
-                    `[data-assets] ensured key=${key} source=provider file=${filePath} provider=${config.provider}`
+                    `ensured key=${key} source=provider file=${filePath} provider=${config.provider}`
                 );
                 return {
                     filePath,
@@ -108,7 +108,7 @@ export async function ensureAssetFile(
             }
 
             logger.warn(
-                `[data-assets] provider_failed key=${key} file=${filePath} provider=${config.provider} status=${response.status}`
+                `provider_failed key=${key} file=${filePath} provider=${config.provider} status=${response.status}`
             );
         } catch (error) {
             const message =
@@ -116,14 +116,14 @@ export async function ensureAssetFile(
                     ? `${error.name}: ${error.message}`
                     : String(error);
             logger.warn(
-                `[data-assets] provider_failed key=${key} file=${filePath} provider=${config.provider} error=${message}`
+                `provider_failed key=${key} file=${filePath} provider=${config.provider} error=${message}`
             );
         }
     }
 
     writeTextFileAtomically(filePath, defaultContent);
     logger.warn(
-        `[data-assets] ensured key=${key} source=default file=${filePath}`
+        `ensured key=${key} source=default file=${filePath}`
     );
     return {
         filePath,

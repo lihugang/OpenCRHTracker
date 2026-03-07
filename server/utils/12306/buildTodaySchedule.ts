@@ -37,7 +37,7 @@ export default async function buildTodaySchedule(): Promise<BuildScheduleResult>
     );
     const runId = `${state.date}-${Date.now()}`;
     logger.info(
-        `[schedule-probe] start runId=${runId} resumed=${resumed} reason=${reason} date=${state.date} file=${scheduleFilePath} retryAttempts=${runtimeConfig.retryAttempts} maxBatchSize=${runtimeConfig.maxBatchSize} checkpointFlushEvery=${runtimeConfig.checkpointFlushEvery} prefixRules=${JSON.stringify(runtimeConfig.prefixRules)}`
+        `start runId=${runId} resumed=${resumed} reason=${reason} date=${state.date} file=${scheduleFilePath} retryAttempts=${runtimeConfig.retryAttempts} maxBatchSize=${runtimeConfig.maxBatchSize} checkpointFlushEvery=${runtimeConfig.checkpointFlushEvery} prefixRules=${JSON.stringify(runtimeConfig.prefixRules)}`
     );
 
     saveScheduleState(scheduleFilePath, state);
@@ -50,13 +50,13 @@ export default async function buildTodaySchedule(): Promise<BuildScheduleResult>
                 ? `${error.name}: ${error.message}`
                 : String(error);
         logger.error(
-            `[schedule-probe] fatal runId=${runId} date=${state.date} file=${scheduleFilePath} error=${message}`
+            `fatal runId=${runId} date=${state.date} file=${scheduleFilePath} error=${message}`
         );
         throw error;
     }
 
     logger.info(
-        `[schedule-probe] finish runId=${runId} status=${state.status} date=${state.date} durationMs=${state.stats.durationMs} apiCalls=${state.progress.counters.apiCalls} apiRetries=${state.progress.counters.apiRetries} processedKeywords=${state.progress.discoverProcessed.length} pendingKeywords=${state.progress.discoverQueue.length} rawItems=${state.stats.rawItems} uniqueItems=${state.stats.uniqueItems} failedKeywords=${state.progress.failedKeywords.length} failedEnrichCodes=${state.progress.failedEnrichCodes.length}`
+        `finish runId=${runId} status=${state.status} date=${state.date} durationMs=${state.stats.durationMs} apiCalls=${state.progress.counters.apiCalls} apiRetries=${state.progress.counters.apiRetries} processedKeywords=${state.progress.discoverProcessed.length} pendingKeywords=${state.progress.discoverQueue.length} rawItems=${state.stats.rawItems} uniqueItems=${state.stats.uniqueItems} failedKeywords=${state.progress.failedKeywords.length} failedEnrichCodes=${state.progress.failedEnrichCodes.length}`
     );
 
     return {

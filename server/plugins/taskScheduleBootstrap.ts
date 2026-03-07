@@ -55,7 +55,7 @@ export default defineNitroPlugin(() => {
             executionTime
         );
         logger.info(
-            `[task-schedule-bootstrap] enqueued_startup_tasks buildTaskId=${buildTaskId} buildExecutor=${BUILD_SCHEDULE_TASK_EXECUTOR} generateTaskId=${generateTaskId} generateExecutor=${GENERATE_ROUTE_REFRESH_TASKS_EXECUTOR} dispatchTaskId=${dispatchTaskId} dispatchExecutor=${DISPATCH_DAILY_PROBE_TASKS_EXECUTOR} executionTime=${executionTime}`
+            `enqueued_startup_tasks buildTaskId=${buildTaskId} buildExecutor=${BUILD_SCHEDULE_TASK_EXECUTOR} generateTaskId=${generateTaskId} generateExecutor=${GENERATE_ROUTE_REFRESH_TASKS_EXECUTOR} dispatchTaskId=${dispatchTaskId} dispatchExecutor=${DISPATCH_DAILY_PROBE_TASKS_EXECUTOR} executionTime=${executionTime}`
         );
     } catch (error) {
         const message =
@@ -63,7 +63,7 @@ export default defineNitroPlugin(() => {
                 ? `${error.name}: ${error.message}`
                 : String(error);
         logger.error(
-            `[task-schedule-bootstrap] bootstrap_failed error=${message}`
+            `bootstrap_failed error=${message}`
         );
     }
 });

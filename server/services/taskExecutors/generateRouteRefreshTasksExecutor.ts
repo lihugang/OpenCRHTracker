@@ -55,7 +55,7 @@ async function executeGenerateRouteRefreshTasks() {
     if (!state) {
         const selfTaskId = enqueueSelfTask(now, selfExpectedDurationMs);
         logger.warn(
-            `[task-executor:generate-route-refresh] schedule_not_found file=${scheduleFilePath} selfTaskId=${selfTaskId}`
+            `schedule_not_found file=${scheduleFilePath} selfTaskId=${selfTaskId}`
         );
         return;
     }
@@ -101,7 +101,7 @@ async function executeGenerateRouteRefreshTasks() {
 
     const selfTaskId = enqueueSelfTask(now, selfExpectedDurationMs);
     logger.info(
-        `[task-executor:generate-route-refresh] done staleCodes=${staleCodes.length} createdTasks=${created} batchSize=${batchSize} ttlHours=${config.spider.scheduleProbe.refresh.ttlHours} selfTaskId=${selfTaskId}`
+        `done staleCodes=${staleCodes.length} createdTasks=${created} batchSize=${batchSize} ttlHours=${config.spider.scheduleProbe.refresh.ttlHours} selfTaskId=${selfTaskId}`
     );
 }
 
@@ -115,6 +115,6 @@ export function registerGenerateRouteRefreshTasksExecutor() {
     });
     registered = true;
     logger.info(
-        `[task-executor:generate-route-refresh] registered executor=${GENERATE_ROUTE_REFRESH_TASKS_EXECUTOR}`
+        `registered executor=${GENERATE_ROUTE_REFRESH_TASKS_EXECUTOR}`
     );
 }

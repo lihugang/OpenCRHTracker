@@ -243,7 +243,7 @@ async function executeProbeTrainDepartureTask(rawArgs: unknown): Promise<void> {
     );
     if (hasQueriedTrainKey(trainKey)) {
         logger.info(
-            `[task-executor:probe-train-departure] skip already_queried trainCode=${args.trainCode} trainInternalCode=${args.trainInternalCode} startAt=${args.startAt}`
+            `skip already_queried trainCode=${args.trainCode} trainInternalCode=${args.trainInternalCode} startAt=${args.startAt}`
         );
         return;
     }
@@ -258,13 +258,13 @@ async function executeProbeTrainDepartureTask(rawArgs: unknown): Promise<void> {
                 nowSeconds
             );
             logger.warn(
-                `[task-executor:probe-train-departure] route_probe_failed_requeue trainCode=${args.trainCode} retry=${args.retry} nextRetry=${nextRetry} nextTaskId=${nextTaskId}`
+                `route_probe_failed_requeue trainCode=${args.trainCode} retry=${args.retry} nextRetry=${nextRetry} nextTaskId=${nextTaskId}`
             );
             return;
         }
 
         logger.warn(
-            `[task-executor:probe-train-departure] route_probe_failed_exhausted trainCode=${args.trainCode} retry=${args.retry}`
+            `route_probe_failed_exhausted trainCode=${args.trainCode} retry=${args.retry}`
         );
         return;
     }
@@ -272,7 +272,7 @@ async function executeProbeTrainDepartureTask(rawArgs: unknown): Promise<void> {
     const mainEmuCode = normalizeCode(routeProbeResult.emu.code);
     if (mainEmuCode.length === 0) {
         logger.warn(
-            `[task-executor:probe-train-departure] route_probe_empty_emu_code trainCode=${args.trainCode}`
+            `route_probe_empty_emu_code trainCode=${args.trainCode}`
         );
         return;
     }
@@ -317,7 +317,7 @@ async function executeProbeTrainDepartureTask(rawArgs: unknown): Promise<void> {
     markQueriedTrainKey(trainKey);
 
     logger.info(
-        `[task-executor:probe-train-departure] success trainCode=${args.trainCode} trainInternalCode=${args.trainInternalCode} startAt=${args.startAt} endAt=${args.endAt} mainEmuCode=${mainEmuCode} coupled=${coupledEmuCodes.length} trainCodesPersisted=${allTrainCodes.length}`
+        `success trainCode=${args.trainCode} trainInternalCode=${args.trainInternalCode} startAt=${args.startAt} endAt=${args.endAt} mainEmuCode=${mainEmuCode} coupled=${coupledEmuCodes.length} trainCodesPersisted=${allTrainCodes.length}`
     );
 }
 
@@ -331,6 +331,6 @@ export function registerProbeTrainDepartureTaskExecutor(): void {
     });
     registered = true;
     logger.info(
-        `[task-executor:probe-train-departure] registered executor=${PROBE_TRAIN_DEPARTURE_TASK_EXECUTOR}`
+        `registered executor=${PROBE_TRAIN_DEPARTURE_TASK_EXECUTOR}`
     );
 }

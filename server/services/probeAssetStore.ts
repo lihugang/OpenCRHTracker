@@ -106,7 +106,7 @@ export async function loadProbeAssets(): Promise<ProbeAssets> {
             error instanceof Error
                 ? `${error.name}: ${error.message}`
                 : String(error);
-        logger.warn(`[probe-asset-store] load_failed error=${message}`);
+        logger.warn(`load_failed error=${message}`);
         cached = {
             emuList: [],
             qrcodeByModelAndTrainSetNo: new Map()

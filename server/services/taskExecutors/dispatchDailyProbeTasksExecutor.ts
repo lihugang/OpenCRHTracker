@@ -60,7 +60,7 @@ function enqueueNextDailyDispatchTask(): number {
         nextExecutionTime
     );
     logger.info(
-        `[task-executor:dispatch-daily-probe] enqueued_next_daily_task id=${taskId} executionTime=${nextExecutionTime} executionTimeAsiaShanghai=${formatShanghaiDateTime(nextExecutionTime)}`
+        `enqueued_next_daily_task id=${taskId} executionTime=${nextExecutionTime} executionTimeAsiaShanghai=${formatShanghaiDateTime(nextExecutionTime)}`
     );
     return taskId;
 }
@@ -74,7 +74,7 @@ async function executeDispatchDailyProbeTasks(): Promise<void> {
 
     if (!scheduleState) {
         logger.warn(
-            `[task-executor:dispatch-daily-probe] schedule_not_found file=${config.data.assets.schedule.file}`
+            `schedule_not_found file=${config.data.assets.schedule.file}`
         );
         enqueueNextDailyDispatchTask();
         return;
@@ -141,7 +141,7 @@ async function executeDispatchDailyProbeTasks(): Promise<void> {
 
     const nextDailyTaskId = enqueueNextDailyDispatchTask();
     logger.info(
-        `[task-executor:dispatch-daily-probe] done date=${scheduleState.date} groups=${groupsByKey.size} createdTasks=${createdTaskCount} defaultRetry=${defaultRetry} nextDailyTaskId=${nextDailyTaskId}`
+        `done date=${scheduleState.date} groups=${groupsByKey.size} createdTasks=${createdTaskCount} defaultRetry=${defaultRetry} nextDailyTaskId=${nextDailyTaskId}`
     );
 }
 
@@ -155,6 +155,6 @@ export function registerDispatchDailyProbeTasksExecutor(): void {
     });
     registered = true;
     logger.info(
-        `[task-executor:dispatch-daily-probe] registered executor=${DISPATCH_DAILY_PROBE_TASKS_EXECUTOR}`
+        `registered executor=${DISPATCH_DAILY_PROBE_TASKS_EXECUTOR}`
     );
 }

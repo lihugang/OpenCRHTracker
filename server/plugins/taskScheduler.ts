@@ -13,6 +13,6 @@ export default defineNitroPlugin(() => {
             error instanceof Error
                 ? `${error.name}: ${error.message}`
                 : String(error);
-        logger.error(`[task-scheduler-plugin] start_failed error=${message}`);
+        logger.error(`start_failed error=${message}`);
     }
 });
