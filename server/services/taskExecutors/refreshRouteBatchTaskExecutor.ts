@@ -179,13 +179,8 @@ async function executeRefreshRouteBatchTask(rawArgs: unknown) {
     if (mutated) {
         saveScheduleState(scheduleFilePath, state);
     }
-    const dispatchTaskId = enqueueTask(
-        DISPATCH_DAILY_PROBE_TASKS_EXECUTOR,
-        {},
-        getNowSeconds()
-    );
     logger.info(
-        `[task-executor:refresh-route-batch] done processed=${processed} success=${success} failed=${failed} changed=${changed} apiCalls=${totalAttempts} file=${scheduleFilePath} dispatchTaskId=${dispatchTaskId} dispatchExecutor=${DISPATCH_DAILY_PROBE_TASKS_EXECUTOR}`
+        `[task-executor:refresh-route-batch] done processed=${processed} success=${success} failed=${failed} changed=${changed} apiCalls=${totalAttempts} file=${scheduleFilePath}`
     );
 }
 
