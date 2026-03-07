@@ -2,7 +2,11 @@ import getLogger from '~/server/libs/log4js';
 import useConfig from '~/server/config';
 import { estimateIdleTaskDurationMs } from '~/server/services/idleTaskEstimator';
 import { registerTaskExecutor } from '~/server/services/taskExecutorRegistry';
-import { enqueueTask } from '~/server/services/taskQueue';
+import {
+    enqueueTask,
+    enqueueTasks,
+    type EnqueueTaskInput
+} from '~/server/services/taskQueue';
 import { loadExistingScheduleState } from '~/server/utils/12306/scheduleProbe/stateStore';
 import {
     getGroupKey,
@@ -84,22 +88,33 @@ async function executeGenerateRouteRefreshTasks() {
     }
 
     let created = 0;
+    const tasksToEnqueue: EnqueueTaskInput[] = [];
     for (const batchCodes of splitIntoBatches(staleCodes, batchSize)) {
-        enqueueTask(
-            REFRESH_ROUTE_BATCH_TASK_EXECUTOR,
-            { codes: batchCodes },
-            now,
-            {
+        tasksToEnqueue.push({
+            executor: REFRESH_ROUTE_BATCH_TASK_EXECUTOR,
+            args: { codes: batchCodes },
+            executionTime: now,
+            options: {
                 isIdle: true,
                 expectedDurationMs: estimateRefreshRouteBatchTaskDurationMs(
                     batchCodes.length
                 )
             }
-        );
+        });
         created += 1;
     }
 
-    const selfTaskId = enqueueSelfTask(now, selfExpectedDurationMs);
+    tasksToEnqueue.push({
+        executor: GENERATE_ROUTE_REFRESH_TASKS_EXECUTOR,
+        args: {},
+        executionTime: now,
+        options: {
+            isIdle: true,
+            expectedDurationMs: selfExpectedDurationMs
+        }
+    });
+    const taskIds = enqueueTasks(tasksToEnqueue);
+    const selfTaskId = taskIds[taskIds.length - 1]!;
     logger.info(
         `done staleCodes=${staleCodes.length} createdTasks=${created} batchSize=${batchSize} ttlHours=${config.spider.scheduleProbe.refresh.ttlHours} selfTaskId=${selfTaskId}`
     );

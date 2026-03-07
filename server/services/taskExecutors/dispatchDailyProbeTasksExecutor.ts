@@ -1,7 +1,11 @@
 import getLogger from '~/server/libs/log4js';
 import useConfig from '~/server/config';
 import { registerTaskExecutor } from '~/server/services/taskExecutorRegistry';
-import { enqueueTask } from '~/server/services/taskQueue';
+import {
+    enqueueTask,
+    enqueueTasks,
+    type EnqueueTaskInput
+} from '~/server/services/taskQueue';
 import { loadExistingScheduleState } from '~/server/utils/12306/scheduleProbe/stateStore';
 import {
     formatShanghaiDateTime,
@@ -112,7 +116,7 @@ async function executeDispatchDailyProbeTasks(): Promise<void> {
     }
 
     const defaultRetry = config.spider.scheduleProbe.probe.defaultRetry;
-    let createdTaskCount = 0;
+    const tasksToEnqueue: EnqueueTaskInput[] = [];
     for (const group of groupsByKey.values()) {
         const startAt = toUnixSecondsFromShanghaiDayOffset(
             scheduleState.date,
@@ -135,13 +139,29 @@ async function executeDispatchDailyProbeTasks(): Promise<void> {
             retry: defaultRetry
         };
         const executionTime = startAt > now ? startAt : now;
-        enqueueTask(PROBE_TRAIN_DEPARTURE_TASK_EXECUTOR, args, executionTime);
-        createdTaskCount += 1;
+        tasksToEnqueue.push({
+            executor: PROBE_TRAIN_DEPARTURE_TASK_EXECUTOR,
+            args,
+            executionTime
+        });
     }
 
-    const nextDailyTaskId = enqueueNextDailyDispatchTask();
+    const nextDailyExecutionTime = getNextDayExecutionTimeInShanghaiSeconds(
+        Date.now(),
+        config.spider.scheduleProbe.dailyTimeHHmm
+    );
+    tasksToEnqueue.push({
+        executor: DISPATCH_DAILY_PROBE_TASKS_EXECUTOR,
+        args: {},
+        executionTime: nextDailyExecutionTime
+    });
+    const taskIds = enqueueTasks(tasksToEnqueue);
+    const nextDailyTaskId = taskIds[taskIds.length - 1]!;
     logger.info(
-        `done date=${scheduleState.date} groups=${groupsByKey.size} createdTasks=${createdTaskCount} defaultRetry=${defaultRetry} nextDailyTaskId=${nextDailyTaskId}`
+        `enqueued_next_daily_task id=${nextDailyTaskId} executionTime=${nextDailyExecutionTime} executionTimeAsiaShanghai=${formatShanghaiDateTime(nextDailyExecutionTime)}`
+    );
+    logger.info(
+        `done date=${scheduleState.date} groups=${groupsByKey.size} createdTasks=${tasksToEnqueue.length - 1} defaultRetry=${defaultRetry} nextDailyTaskId=${nextDailyTaskId}`
     );
 }
 
