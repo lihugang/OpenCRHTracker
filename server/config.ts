@@ -140,6 +140,9 @@ export interface Config {
 }
 
 let config: Config | null = null;
+const DEV_CONFIG_PATH = 'data/config.dev.json';
+const PROD_CONFIG_PATH = 'data/config.prod.json';
+const DEFAULT_CONFIG_PATH = 'data/config.json';
 
 function assert(condition: unknown, message: string): asserts condition {
     if (!condition) {
@@ -712,9 +715,26 @@ function validateConfig(raw: unknown): Config {
     return configResult;
 }
 
+function resolveConfigPath(): string {
+    const candidates = import.meta.dev
+        ? [DEV_CONFIG_PATH, DEFAULT_CONFIG_PATH]
+        : [PROD_CONFIG_PATH, DEFAULT_CONFIG_PATH];
+
+    for (const candidate of candidates) {
+        if (fs.existsSync(candidate)) {
+            return candidate;
+        }
+    }
+
+    throw new Error(
+        `Config file not found. Tried: ${candidates.join(', ')}`
+    );
+}
+
 export default function useConfig() {
     if (!config) {
-        const raw = JSON.parse(fs.readFileSync('data/config.json').toString());
+        const configPath = resolveConfigPath();
+        const raw = JSON.parse(fs.readFileSync(configPath, 'utf8'));
         config = validateConfig(raw);
     }
     return config!;
