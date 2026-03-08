@@ -106,11 +106,16 @@
                                 "ttlHours": {
                                     "type": "integer",
                                     "minimum": 1
+                                },
+                                "generateIntervalHours": {
+                                    "type": "integer",
+                                    "minimum": 1
                                 }
                             },
                             "required": [
                                 "batchSize",
-                                "ttlHours"
+                                "ttlHours",
+                                "generateIntervalHours"
                             ]
                         },
                         "probe": {

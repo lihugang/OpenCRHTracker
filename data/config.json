@@ -22,7 +22,8 @@
             "checkpointFlushEvery": 20,
             "refresh": {
                 "batchSize": 20,
-                "ttlHours": 24
+                "ttlHours": 24,
+                "generateIntervalHours": 24
             },
             "probe": {
                 "defaultRetry": 5

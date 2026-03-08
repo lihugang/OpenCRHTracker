@@ -55,11 +55,19 @@ async function executeGenerateRouteRefreshTasks() {
     const state = loadExistingScheduleState(scheduleFilePath);
     const now = getNowSeconds();
     const selfExpectedDurationMs = estimateGenerateRouteRefreshTaskDurationMs();
+    const generateIntervalSeconds =
+        config.spider.scheduleProbe.refresh.generateIntervalHours * 60 * 60;
+    const nextSelfExecutionTime = now + generateIntervalSeconds;
 
     if (!state) {
-        const selfTaskId = enqueueSelfTask(now, selfExpectedDurationMs);
+        const selfTaskId = enqueueSelfTask(
+            nextSelfExecutionTime,
+            selfExpectedDurationMs
+        );
         logger.warn(
-            `schedule_not_found file=${scheduleFilePath} selfTaskId=${selfTaskId}`
+            `schedule_not_found file=${scheduleFilePath} ` +
+                `selfTaskId=${selfTaskId} nextExecutionTime=${nextSelfExecutionTime} ` +
+                `generateIntervalHours=${config.spider.scheduleProbe.refresh.generateIntervalHours}`
         );
         return;
     }
@@ -107,7 +115,7 @@ async function executeGenerateRouteRefreshTasks() {
     tasksToEnqueue.push({
         executor: GENERATE_ROUTE_REFRESH_TASKS_EXECUTOR,
         args: {},
-        executionTime: now,
+        executionTime: nextSelfExecutionTime,
         options: {
             isIdle: true,
             expectedDurationMs: selfExpectedDurationMs
@@ -116,7 +124,10 @@ async function executeGenerateRouteRefreshTasks() {
     const taskIds = enqueueTasks(tasksToEnqueue);
     const selfTaskId = taskIds[taskIds.length - 1]!;
     logger.info(
-        `done staleCodes=${staleCodes.length} createdTasks=${created} batchSize=${batchSize} ttlHours=${config.spider.scheduleProbe.refresh.ttlHours} selfTaskId=${selfTaskId}`
+        `done staleCodes=${staleCodes.length} createdTasks=${created} ` +
+            `batchSize=${batchSize} ttlHours=${config.spider.scheduleProbe.refresh.ttlHours} ` +
+            `generateIntervalHours=${config.spider.scheduleProbe.refresh.generateIntervalHours} ` +
+            `nextExecutionTime=${nextSelfExecutionTime} selfTaskId=${selfTaskId}`
     );
 }
 

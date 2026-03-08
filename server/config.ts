@@ -15,6 +15,7 @@ interface ScheduleProbePrefixRule {
 interface ScheduleProbeRefreshConfig {
     batchSize: number;
     ttlHours: number;
+    generateIntervalHours: number;
 }
 
 interface ScheduleProbeProbeConfig {
@@ -340,6 +341,11 @@ function validateConfig(raw: unknown): Config {
                     ttlHours: asInteger(
                         spiderScheduleProbeRefresh.ttlHours,
                         'spider.scheduleProbe.refresh.ttlHours',
+                        1
+                    ),
+                    generateIntervalHours: asInteger(
+                        spiderScheduleProbeRefresh.generateIntervalHours,
+                        'spider.scheduleProbe.refresh.generateIntervalHours',
                         1
                     )
                 },
