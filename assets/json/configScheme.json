@@ -433,6 +433,27 @@
             "type": "object",
             "additionalProperties": false,
             "properties": {
+                "startup": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "disabledExecutors": {
+                            "type": "array",
+                            "uniqueItems": true,
+                            "items": {
+                                "type": "string",
+                                "enum": [
+                                    "build_today_schedule",
+                                    "generate_route_refresh_tasks",
+                                    "dispatch_daily_probe_tasks"
+                                ]
+                            }
+                        }
+                    },
+                    "required": [
+                        "disabledExecutors"
+                    ]
+                },
                 "scheduler": {
                     "type": "object",
                     "additionalProperties": false,

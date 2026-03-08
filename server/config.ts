@@ -27,6 +27,14 @@ interface ScheduleProbeCouplingConfig {
     runningGraceSeconds: number;
 }
 
+const ALLOWED_STARTUP_TASK_EXECUTORS = [
+    'build_today_schedule',
+    'generate_route_refresh_tasks',
+    'dispatch_daily_probe_tasks'
+] as const;
+
+type StartupTaskExecutor = (typeof ALLOWED_STARTUP_TASK_EXECUTORS)[number];
+
 export interface Config {
     spider: {
         userAgent: string;
@@ -93,6 +101,9 @@ export interface Config {
         };
     };
     task: {
+        startup: {
+            disabledExecutors: StartupTaskExecutor[];
+        };
         scheduler: {
             pollIntervalMs: number;
             maxTasksPerQuery: number;
@@ -234,6 +245,15 @@ function validateConfig(raw: unknown): Config {
     const apiPagination = asObject(api.pagination, 'api.pagination');
     const apiDebug = asObject(api.debug, 'api.debug');
     const task = asObject(root.task, 'task');
+    const taskStartup =
+        task.startup === undefined ? {} : asObject(task.startup, 'task.startup');
+    const taskStartupDisabledExecutors =
+        taskStartup.disabledExecutors === undefined
+            ? []
+            : asArray(
+                  taskStartup.disabledExecutors,
+                  'task.startup.disabledExecutors'
+              );
     const taskScheduler = asObject(task.scheduler, 'task.scheduler');
     const taskSchedulerIdle = asObject(
         taskScheduler.idle,
@@ -515,6 +535,21 @@ function validateConfig(raw: unknown): Config {
             }
         },
         task: {
+            startup: {
+                disabledExecutors: taskStartupDisabledExecutors.map(
+                    (executorRaw, index) => {
+                        const executor = asString(
+                            executorRaw,
+                            `task.startup.disabledExecutors[${index}]`
+                        ) as StartupTaskExecutor;
+                        assert(
+                            ALLOWED_STARTUP_TASK_EXECUTORS.includes(executor),
+                            `task.startup.disabledExecutors[${index}] must be one of ${ALLOWED_STARTUP_TASK_EXECUTORS.join(', ')}`
+                        );
+                        return executor;
+                    }
+                )
+            },
             scheduler: {
                 pollIntervalMs: asInteger(
                     taskScheduler.pollIntervalMs,
@@ -666,6 +701,14 @@ function validateConfig(raw: unknown): Config {
             configResult.task.scheduler.idle.emaAlpha <= 1,
         'task.scheduler.idle.emaAlpha must be > 0 and <= 1'
     );
+    const disabledStartupExecutors = new Set<string>();
+    for (const executor of configResult.task.startup.disabledExecutors) {
+        assert(
+            !disabledStartupExecutors.has(executor),
+            `task.startup.disabledExecutors has duplicated executor: ${executor}`
+        );
+        disabledStartupExecutors.add(executor);
+    }
     return configResult;
 }
 

@@ -102,6 +102,9 @@
         }
     },
     "task": {
+        "startup": {
+            "disabledExecutors": []
+        },
         "scheduler": {
             "pollIntervalMs": 300000,
             "maxTasksPerQuery": 2147483647,

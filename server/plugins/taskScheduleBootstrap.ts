@@ -1,4 +1,5 @@
 import getLogger from '~/server/libs/log4js';
+import useConfig from '~/server/config';
 import { ensureEmuDatabaseSchema } from '~/server/libs/database/emu';
 import { ensureTaskDatabaseSchema } from '~/server/libs/database/task';
 import { estimateIdleTaskDurationMs } from '~/server/services/idleTaskEstimator';
@@ -20,46 +21,11 @@ import { registerProbeTrainDepartureTaskExecutor } from '~/server/services/taskE
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
 
 const logger = getLogger('task-schedule-bootstrap');
-const DISABLE_STARTUP_EXECUTORS_ARG_PREFIX =
-    '--disable-startup-executors=';
 const STARTUP_EXECUTORS = [
     BUILD_SCHEDULE_TASK_EXECUTOR,
     GENERATE_ROUTE_REFRESH_TASKS_EXECUTOR,
     DISPATCH_DAILY_PROBE_TASKS_EXECUTOR
 ] as const;
-const STARTUP_EXECUTOR_SET = new Set<string>(STARTUP_EXECUTORS);
-
-function parseDisabledStartupExecutors(): Set<string> {
-    const rawArg = process.argv.find((item) =>
-        item.startsWith(DISABLE_STARTUP_EXECUTORS_ARG_PREFIX)
-    );
-    if (!rawArg) {
-        return new Set<string>();
-    }
-
-    const rawValue = rawArg
-        .slice(DISABLE_STARTUP_EXECUTORS_ARG_PREFIX.length)
-        .trim();
-    if (rawValue.length === 0) {
-        return new Set<string>();
-    }
-
-    const disabledExecutors = new Set<string>();
-    for (const rawExecutor of rawValue.split(',')) {
-        const executor = rawExecutor.trim();
-        if (executor.length === 0) {
-            continue;
-        }
-        if (!STARTUP_EXECUTOR_SET.has(executor)) {
-            throw new Error(
-                `unsupported disabled startup executor: ${executor}; allowed: ${STARTUP_EXECUTORS.join(', ')}`
-            );
-        }
-        disabledExecutors.add(executor);
-    }
-
-    return disabledExecutors;
-}
 
 export default defineNitroPlugin(() => {
     try {
@@ -72,7 +38,9 @@ export default defineNitroPlugin(() => {
         registerDispatchDailyProbeTasksExecutor();
         registerProbeTrainDepartureTaskExecutor();
 
-        const disabledStartupExecutors = parseDisabledStartupExecutors();
+        const disabledStartupExecutors = new Set<string>(
+            useConfig().task.startup.disabledExecutors
+        );
         const executionTime = getNowSeconds();
         const enqueuedStartupTasks: string[] = [];
         const skippedStartupTasks = STARTUP_EXECUTORS.filter((executor) =>
