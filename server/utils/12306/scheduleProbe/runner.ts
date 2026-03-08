@@ -34,11 +34,37 @@ function updateItemsFromMap(
     state.stats.uniqueItems = state.items.length;
 }
 
+function restorePreservedRouteInfo(
+    item: ScheduleItem,
+    preservedItem: ScheduleItem | undefined
+): boolean {
+    if (!preservedItem) {
+        return false;
+    }
+
+    if (
+        item.internalCode.length === 0 &&
+        preservedItem.internalCode.length > 0
+    ) {
+        item.internalCode = preservedItem.internalCode;
+    }
+
+    if (preservedItem.startAt === null || preservedItem.endAt === null) {
+        return false;
+    }
+
+    item.startAt = preservedItem.startAt;
+    item.endAt = preservedItem.endAt;
+    item.lastRouteRefreshAt = preservedItem.lastRouteRefreshAt;
+    return true;
+}
+
 export default async function runScheduleProbe(
     scheduleFilePath: string,
     state: ScheduleFile,
     config: ScheduleProbeRuntimeConfig,
-    runId: string
+    runId: string,
+    preservedItemsByCode?: Map<string, ScheduleItem>
 ): Promise<void> {
     const logger = getLogger('schedule-probe');
     const itemsByCode = new Map<string, ScheduleItem>();
@@ -53,6 +79,7 @@ export default async function runScheduleProbe(
 
     let newlyAddedCount = 0;
     let enrichedCount = 0;
+    let reusedRouteInfoCount = 0;
     logger.info(
         `run runId=${runId} phase=${state.progress.phase} existingItems=${state.items.length} discoverQueue=${state.progress.discoverQueue.length} discoverProcessed=${state.progress.discoverProcessed.length} enrichCursor=${state.progress.enrichCursor}`
     );
@@ -88,6 +115,16 @@ export default async function runScheduleProbe(
                 for (const item of normalizedItems) {
                     const existed = itemsByCode.get(item.code);
                     if (!existed) {
+                        if (
+                            restorePreservedRouteInfo(
+                                item,
+                                preservedItemsByCode?.get(
+                                    normalizeCode(item.code)
+                                )
+                            )
+                        ) {
+                            reusedRouteInfoCount += 1;
+                        }
                         itemsByCode.set(item.code, item);
                         newlyAddedCount += 1;
                     } else if (
@@ -123,7 +160,7 @@ export default async function runScheduleProbe(
                 updateItemsFromMap(state, itemsByCode, config);
                 saveScheduleState(scheduleFilePath, state);
                 logger.info(
-                    `discover checkpoint runId=${runId} processed=${state.progress.discoverProcessed.length} pending=${state.progress.discoverQueue.length} rawItems=${state.stats.rawItems} uniqueItems=${state.stats.uniqueItems} newlyAdded=${newlyAddedCount} apiCalls=${state.progress.counters.apiCalls} apiRetries=${state.progress.counters.apiRetries}`
+                    `discover checkpoint runId=${runId} processed=${state.progress.discoverProcessed.length} pending=${state.progress.discoverQueue.length} rawItems=${state.stats.rawItems} uniqueItems=${state.stats.uniqueItems} newlyAdded=${newlyAddedCount} reusedRouteInfo=${reusedRouteInfoCount} apiCalls=${state.progress.counters.apiCalls} apiRetries=${state.progress.counters.apiRetries}`
                 );
                 processedSinceFlush = 0;
             }
@@ -138,7 +175,7 @@ export default async function runScheduleProbe(
         );
         saveScheduleState(scheduleFilePath, state);
         logger.info(
-            `discover finish runId=${runId} processed=${state.progress.discoverProcessed.length} failedKeywords=${state.progress.failedKeywords.length} uniqueItems=${state.stats.uniqueItems} newlyAdded=${newlyAddedCount}`
+            `discover finish runId=${runId} processed=${state.progress.discoverProcessed.length} failedKeywords=${state.progress.failedKeywords.length} uniqueItems=${state.stats.uniqueItems} newlyAdded=${newlyAddedCount} reusedRouteInfo=${reusedRouteInfoCount}`
         );
     }
 
@@ -264,6 +301,6 @@ export default async function runScheduleProbe(
 
     saveScheduleState(scheduleFilePath, state);
     logger.info(
-        `done runId=${runId} status=${state.status} durationMs=${state.stats.durationMs} rawItems=${state.stats.rawItems} uniqueItems=${state.stats.uniqueItems} newlyAdded=${newlyAddedCount} enriched=${enrichedCount} failedKeywords=${state.progress.failedKeywords.length} failedEnrichCodes=${state.progress.failedEnrichCodes.length} apiCalls=${state.progress.counters.apiCalls} apiRetries=${state.progress.counters.apiRetries}`
+        `done runId=${runId} status=${state.status} durationMs=${state.stats.durationMs} rawItems=${state.stats.rawItems} uniqueItems=${state.stats.uniqueItems} newlyAdded=${newlyAddedCount} reusedRouteInfo=${reusedRouteInfoCount} enriched=${enrichedCount} failedKeywords=${state.progress.failedKeywords.length} failedEnrichCodes=${state.progress.failedEnrichCodes.length} apiCalls=${state.progress.counters.apiCalls} apiRetries=${state.progress.counters.apiRetries}`
     );
 }

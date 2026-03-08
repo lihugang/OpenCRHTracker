@@ -1,10 +1,12 @@
 import useConfig from '~/server/config';
 import getLogger from '~/server/libs/log4js';
+import normalizeCode from '~/server/utils/12306/normalizeCode';
 import { ensureAssetFile } from '~/server/utils/dataAssets/store';
 import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
 import runScheduleProbe from './scheduleProbe/runner';
 import {
     createInitialScheduleState,
+    loadExistingScheduleState,
     loadOrInitScheduleState,
     saveScheduleState
 } from './scheduleProbe/stateStore';
@@ -30,11 +32,22 @@ export default async function buildTodaySchedule(): Promise<BuildScheduleResult>
         defaultContent: `${JSON.stringify(defaultState, null, 4)}\n`
     });
     const scheduleFilePath = ensuredAsset.filePath;
+    const previousState = loadExistingScheduleState(scheduleFilePath);
 
     const { state, resumed, reason } = loadOrInitScheduleState(
         scheduleFilePath,
         runtimeConfig
     );
+    const shouldReusePreviousRouteInfo =
+        reason === 'refresh_done' ||
+        reason === 'refresh_non_running' ||
+        reason === 'refresh_cross_day' ||
+        reason === 'refresh_scope_or_strategy_changed';
+    const preservedItemsByCode = shouldReusePreviousRouteInfo && previousState
+        ? new Map(
+            previousState.items.map((item) => [normalizeCode(item.code), item])
+        )
+        : undefined;
     const runId = `${state.date}-${Date.now()}`;
     logger.info(
         `start runId=${runId} resumed=${resumed} reason=${reason} date=${state.date} file=${scheduleFilePath} retryAttempts=${runtimeConfig.retryAttempts} maxBatchSize=${runtimeConfig.maxBatchSize} checkpointFlushEvery=${runtimeConfig.checkpointFlushEvery} prefixRules=${JSON.stringify(runtimeConfig.prefixRules)}`
@@ -43,7 +56,13 @@ export default async function buildTodaySchedule(): Promise<BuildScheduleResult>
     saveScheduleState(scheduleFilePath, state);
 
     try {
-        await runScheduleProbe(scheduleFilePath, state, runtimeConfig, runId);
+        await runScheduleProbe(
+            scheduleFilePath,
+            state,
+            runtimeConfig,
+            runId,
+            preservedItemsByCode
+        );
     } catch (error) {
         const message =
             error instanceof Error
