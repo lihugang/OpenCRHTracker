@@ -1,6 +1,8 @@
 import useConfig from '~/server/config';
+import getLogger from '~/server/libs/log4js';
 import getCurrentDateString from '../../date/getCurrentDateString';
 import { getShanghaiUnixSecondsFromDateAndTime } from '../../date/shanghaiDateTime';
+import log12306RequestFailure from './log12306RequestFailure';
 import waitFor12306RequestSlot from '../requestLimiter';
 
 interface RouteInfoResponse {
@@ -78,12 +80,15 @@ interface RouteInfoResponse {
 }
 
 const config = useConfig();
+const logger = getLogger('12306-network:fetch-route-info');
 
 export default async function fetchRouteInfo(route: string) {
+    const url =
+        'https://mobile.12306.cn/wxxcx/wechat/main/travelServiceQrcodeTrainInfo';
     try {
         await waitFor12306RequestSlot('query');
         const response = await fetch(
-            'https://mobile.12306.cn/wxxcx/wechat/main/travelServiceQrcodeTrainInfo',
+            url,
             {
                 headers: {
                     'content-type': 'application/x-www-form-urlencoded',
@@ -93,11 +98,57 @@ export default async function fetchRouteInfo(route: string) {
                 method: 'POST'
             }
         );
-        const json: RouteInfoResponse = await response.json();
-        if (!json.status) return null;
+        if (!response.ok) {
+            log12306RequestFailure({
+                logger,
+                operation: 'http_failed',
+                url,
+                context: {
+                    trainCode: route
+                },
+                responseStatus: response.status,
+                responseOk: response.ok
+            });
+            return null;
+        }
 
-        const startStation = json.data.trainDetail.stopTime.at(0)!,
-            endStation = json.data.trainDetail.stopTime.at(-1)!;
+        const json: RouteInfoResponse = await response.json();
+        if (!json.status) {
+            log12306RequestFailure({
+                logger,
+                operation: 'business_failed',
+                url,
+                context: {
+                    trainCode: route
+                },
+                responseStatus: response.status,
+                responseOk: response.ok,
+                businessStatus: json.status,
+                errorCode: json.errorCode,
+                errorMsg: json.errorMsg
+            });
+            return null;
+        }
+
+        const startStation = json.data?.trainDetail?.stopTime?.at(0);
+        const endStation = json.data?.trainDetail?.stopTime?.at(-1);
+        if (!startStation || !endStation || !json.data?.trainNo) {
+            log12306RequestFailure({
+                logger,
+                operation: 'invalid_response',
+                url,
+                context: {
+                    trainCode: route
+                },
+                responseStatus: response.status,
+                responseOk: response.ok,
+                businessStatus: json.status,
+                errorCode: json.errorCode,
+                errorMsg: json.errorMsg,
+                detail: 'missing train detail stopTime or trainNo'
+            });
+            return null;
+        }
 
         return {
             route: {
@@ -114,7 +165,16 @@ export default async function fetchRouteInfo(route: string) {
                 ) // second timestamp
             }
         };
-    } catch {
+    } catch (error) {
+        log12306RequestFailure({
+            logger,
+            operation: 'request_exception',
+            url,
+            context: {
+                trainCode: route
+            },
+            error
+        });
         return null;
     }
 }

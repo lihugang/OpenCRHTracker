@@ -1,5 +1,7 @@
 import useConfig from '~/server/config';
+import getLogger from '~/server/libs/log4js';
 import getCurrentDateString from '../../date/getCurrentDateString';
+import log12306RequestFailure from './log12306RequestFailure';
 import waitFor12306RequestSlot from '../requestLimiter';
 
 interface EMUInfoResponse {
@@ -35,14 +37,17 @@ interface EMUInfoResponse {
 }
 
 const config = useConfig();
+const logger = getLogger('12306-network:fetch-emu-info-by-route');
 
 export default async function fetchEMUInfoByRoute(route: string) {
+    const url =
+        'https://mobile.12306.cn/wxxcx/openplatform-inner/miniprogram/wifiapps/appFrontEnd/v2/lounge/open-smooth-common/trainStyleBatch/getCarDetail';
     try {
         await waitFor12306RequestSlot('query');
         // 12306 endpoint requires a non-empty carCode placeholder; value does not affect query result.
         const routeProbeCarCode = config.spider.params.routeProbeCarCode;
         const response = await fetch(
-            `https://mobile.12306.cn/wxxcx/openplatform-inner/miniprogram/wifiapps/appFrontEnd/v2/lounge/open-smooth-common/trainStyleBatch/getCarDetail?carCode=${encodeURIComponent(routeProbeCarCode)}&trainCode=${route}&runningDay=${getCurrentDateString()}&reqType=form`,
+            `${url}?carCode=${encodeURIComponent(routeProbeCarCode)}&trainCode=${route}&runningDay=${getCurrentDateString()}&reqType=form`,
             {
                 headers: {
                     'user-agent': config.spider.userAgent
@@ -50,17 +55,58 @@ export default async function fetchEMUInfoByRoute(route: string) {
                 method: 'GET'
             }
         );
+        if (!response.ok) {
+            log12306RequestFailure({
+                logger,
+                operation: 'http_failed',
+                url,
+                context: {
+                    trainCode: route
+                },
+                responseStatus: response.status,
+                responseOk: response.ok
+            });
+            return null;
+        }
+
         const json: EMUInfoResponse = await response.json();
-        if (!json.status) return null;
+        const contentData = json.content?.data;
+        const emuCode = contentData?.carCode?.trim();
+        if (!emuCode) {
+            log12306RequestFailure({
+                logger,
+                operation: 'invalid_response',
+                url,
+                context: {
+                    trainCode: route
+                },
+                responseStatus: response.status,
+                responseOk: response.ok,
+                businessStatus: json.status,
+                errMsg: json.errMsg,
+                detail: 'missing content.data or content.data.carCode'
+            });
+            return null;
+        }
+
         return {
             route: {
                 code: route // G xxxx
             },
             emu: {
-                code: json.content.data.carCode // like CR400AF-2230
+                code: emuCode // like CR400AF-2230
             }
         };
-    } catch {
+    } catch (error) {
+        log12306RequestFailure({
+            logger,
+            operation: 'request_exception',
+            url,
+            context: {
+                trainCode: route
+            },
+            error
+        });
         return null;
     }
 }
