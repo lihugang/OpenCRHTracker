@@ -2,6 +2,7 @@ import type { H3Event } from 'h3';
 import asApiRequestError from '~/server/utils/api/errors/asApiRequestError';
 import getAnonymousIdentity from '~/server/utils/api/identity/getAnonymousIdentity';
 import resolveIdentity from '~/server/utils/api/identity/resolveIdentity';
+import formatRetryAfterMessage from '~/server/utils/api/quota/formatRetryAfterMessage';
 import getRemainTokens from '~/server/utils/api/quota/getRemainTokens';
 import tryConsumeTokens from '~/server/utils/api/quota/tryConsumeTokens';
 import apiFailure from '~/server/utils/api/response/apiFailure';
@@ -41,7 +42,7 @@ export default async function executeApi<TData>(
                 return apiFailure(
                     event,
                     429,
-                    '请求额度不足，请稍后重试',
+                    formatRetryAfterMessage(fixedConsume.retryAfter),
                     'quota_exceeded',
                     {
                         remain: fixedConsume.remain,
@@ -77,7 +78,7 @@ export default async function executeApi<TData>(
                 return apiFailure(
                     event,
                     429,
-                    '请求额度不足，请稍后重试',
+                    formatRetryAfterMessage(dynamicConsume.retryAfter),
                     'quota_exceeded',
                     {
                         remain: dynamicConsume.remain,
