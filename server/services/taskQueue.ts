@@ -3,7 +3,7 @@ import importSqlBatch from '~/server/utils/sql/importSqlBatch';
 import { createPreparedSqlStore } from '~/server/libs/database/prepared';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
 
-type TaskSqlKey = 'addTask';
+type TaskSqlKey = 'addTask' | 'completeTask' | 'selectPendingTasksByExecutor';
 
 const taskSql = importSqlBatch('tasks') as Record<TaskSqlKey, string>;
 const taskStatements = createPreparedSqlStore<TaskSqlKey>({
@@ -33,6 +33,13 @@ export interface EnqueueTaskInput {
     options?: EnqueueTaskOptions;
 }
 
+export interface ReconcileSingletonTaskResult {
+    action: 'created' | 'replaced_overdue' | 'reused_future';
+    taskId: number;
+    removedTaskIds: number[];
+    reusedExecutionTime: number | null;
+}
+
 interface NormalizedTaskInsert {
     executor: string;
     argumentsJson: string;
@@ -43,6 +50,12 @@ interface NormalizedTaskInsert {
 
 let enqueueTasksTransaction:
     | ((tasks: readonly NormalizedTaskInsert[]) => number[])
+    | null = null;
+let reconcileSingletonTaskTransaction:
+    | ((
+          task: NormalizedTaskInsert,
+          nowSeconds: number
+      ) => ReconcileSingletonTaskResult)
     | null = null;
 
 function normalizeTaskInsert(
@@ -112,6 +125,78 @@ function getEnqueueTasksTransaction() {
     return enqueueTasksTransaction;
 }
 
+function getReconcileSingletonTaskTransaction() {
+    if (reconcileSingletonTaskTransaction) {
+        return reconcileSingletonTaskTransaction;
+    }
+
+    const addTaskStatement = taskStatements.getStatement('addTask');
+    const completeTaskStatement = taskStatements.getStatement('completeTask');
+    const selectPendingTasksByExecutorStatement = taskStatements.getStatement(
+        'selectPendingTasksByExecutor'
+    );
+
+    reconcileSingletonTaskTransaction = useTaskDatabase().transaction(
+        (task: NormalizedTaskInsert, nowSeconds: number) => {
+            const existingTasks = selectPendingTasksByExecutorStatement.all(
+                task.executor
+            ) as TaskRecord[];
+
+            if (existingTasks.length === 0) {
+                const inserted = addTaskStatement.run(
+                    task.executor,
+                    task.argumentsJson,
+                    task.executionTime,
+                    task.isIdle,
+                    task.expectedDurationMs
+                );
+                return {
+                    action: 'created',
+                    taskId: Number(inserted.lastInsertRowid),
+                    removedTaskIds: [],
+                    reusedExecutionTime: null
+                };
+            }
+
+            const earliestTask = existingTasks[0]!;
+            if (earliestTask.executionTime <= nowSeconds) {
+                for (const existingTask of existingTasks) {
+                    completeTaskStatement.run(existingTask.id);
+                }
+                const inserted = addTaskStatement.run(
+                    task.executor,
+                    task.argumentsJson,
+                    task.executionTime,
+                    task.isIdle,
+                    task.expectedDurationMs
+                );
+                return {
+                    action: 'replaced_overdue',
+                    taskId: Number(inserted.lastInsertRowid),
+                    removedTaskIds: existingTasks.map(
+                        (existingTask) => existingTask.id
+                    ),
+                    reusedExecutionTime: null
+                };
+            }
+
+            const removedTaskIds: number[] = [];
+            for (const existingTask of existingTasks.slice(1)) {
+                completeTaskStatement.run(existingTask.id);
+                removedTaskIds.push(existingTask.id);
+            }
+            return {
+                action: 'reused_future',
+                taskId: earliestTask.id,
+                removedTaskIds,
+                reusedExecutionTime: earliestTask.executionTime
+            };
+        }
+    );
+
+    return reconcileSingletonTaskTransaction;
+}
+
 export function enqueueTask(
     executor: string,
     args: unknown,
@@ -150,6 +235,24 @@ export function enqueueTasks(tasks: readonly EnqueueTaskInput[]): number[] {
         )
     );
     return getEnqueueTasksTransaction()(normalizedTasks);
+}
+
+export function reconcileSingletonPendingTask(
+    executor: string,
+    args: unknown,
+    executionTime: number,
+    options: EnqueueTaskOptions = {}
+): ReconcileSingletonTaskResult {
+    const normalizedTask = normalizeTaskInsert(
+        executor,
+        args,
+        executionTime,
+        options
+    );
+    return getReconcileSingletonTaskTransaction()(
+        normalizedTask,
+        getNowSeconds()
+    );
 }
 
 export function enqueueTaskAfterDelaySeconds(

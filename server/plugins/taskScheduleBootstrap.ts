@@ -3,7 +3,10 @@ import useConfig from '~/server/config';
 import { ensureEmuDatabaseSchema } from '~/server/libs/database/emu';
 import { ensureTaskDatabaseSchema } from '~/server/libs/database/task';
 import { estimateIdleTaskDurationMs } from '~/server/services/idleTaskEstimator';
-import { enqueueTask } from '~/server/services/taskQueue';
+import {
+    reconcileSingletonPendingTask,
+    type EnqueueTaskOptions
+} from '~/server/services/taskQueue';
 import {
     BUILD_SCHEDULE_TASK_EXECUTOR,
     registerBuildScheduleTaskExecutor
@@ -26,6 +29,25 @@ const STARTUP_EXECUTORS = [
     GENERATE_ROUTE_REFRESH_TASKS_EXECUTOR,
     DISPATCH_DAILY_PROBE_TASKS_EXECUTOR
 ] as const;
+
+function reconcileStartupTask(
+    executor: string,
+    executionTime: number,
+    options: EnqueueTaskOptions = {}
+) {
+    const result = reconcileSingletonPendingTask(
+        executor,
+        {},
+        executionTime,
+        options
+    );
+    logger.info(
+        `startup_task_reconciled executor=${executor} action=${result.action} ` +
+            `taskId=${result.taskId} removedTaskIds=${JSON.stringify(result.removedTaskIds)} ` +
+            `reusedExecutionTime=${result.reusedExecutionTime ?? 'null'}`
+    );
+    return result.taskId;
+}
 
 export default defineNitroPlugin(() => {
     try {
@@ -51,9 +73,8 @@ export default defineNitroPlugin(() => {
         );
 
         if (!disabledStartupExecutors.has(BUILD_SCHEDULE_TASK_EXECUTOR)) {
-            const buildTaskId = enqueueTask(
+            const buildTaskId = reconcileStartupTask(
                 BUILD_SCHEDULE_TASK_EXECUTOR,
-                {},
                 executionTime
             );
             enqueuedStartupTasks.push(
@@ -68,9 +89,8 @@ export default defineNitroPlugin(() => {
                 GENERATE_ROUTE_REFRESH_TASKS_EXECUTOR,
                 0
             );
-            const generateTaskId = enqueueTask(
+            const generateTaskId = reconcileStartupTask(
                 GENERATE_ROUTE_REFRESH_TASKS_EXECUTOR,
-                {},
                 executionTime,
                 {
                     isIdle: true,
@@ -85,9 +105,8 @@ export default defineNitroPlugin(() => {
         if (
             !disabledStartupExecutors.has(DISPATCH_DAILY_PROBE_TASKS_EXECUTOR)
         ) {
-            const dispatchTaskId = enqueueTask(
+            const dispatchTaskId = reconcileStartupTask(
                 DISPATCH_DAILY_PROBE_TASKS_EXECUTOR,
-                {},
                 executionTime
             );
             enqueuedStartupTasks.push(
