@@ -3,6 +3,7 @@ import useConfig from '~/server/config';
 import getLogger from '~/server/libs/log4js';
 import { getShanghaiUnixSecondsFromDateAndTime } from '../../date/shanghaiDateTime';
 import log12306RequestFailure from './log12306RequestFailure';
+import getNowSeconds from '~/server/utils/time/getNowSeconds';
 
 interface EMUInfoResponse {
     noLogin: string;
@@ -57,7 +58,36 @@ interface EMUInfoResponse {
 const config = useConfig();
 const logger = getLogger('12306-network:fetch-emu-info-by-seat-code');
 
+interface CachedSeatCodeResult {
+    expiresAt: number;
+    value: {
+        route: {
+            code: string;
+            internalCode: string;
+            startAt: number;
+            endAt: number;
+        };
+        emu: {
+            code: string;
+        };
+    };
+}
+
+const cachedSeatCodeResults = new Map<string, CachedSeatCodeResult>();
+
 export default async function fetchEMUInfoBySeatCode(code: string) {
+    const normalizedCode = code.trim();
+    const nowSeconds = getNowSeconds();
+
+    const cached = cachedSeatCodeResults.get(normalizedCode);
+    if (cached) {
+        if (cached.expiresAt > nowSeconds) {
+            return cached.value;
+        }
+
+        cachedSeatCodeResults.delete(normalizedCode);
+    }
+
     const url =
         'https://mobile.12306.cn/wxxcx/wechat/main/travelServiceDecodeQrcode';
     try {
@@ -69,7 +99,7 @@ export default async function fetchEMUInfoBySeatCode(code: string) {
                     'content-type': 'application/x-www-form-urlencoded',
                     'user-agent': config.spider.userAgent
                 },
-                body: `c=${code}&w=h&eKey=${config.spider.params.eKey}&cb=function(e)%7Be%26%26t.decodeCallBack()%7D`,
+                body: `c=${normalizedCode}&w=h&eKey=${config.spider.params.eKey}&cb=function(e)%7Be%26%26t.decodeCallBack()%7D`,
                 method: 'POST'
             }
         );
@@ -79,7 +109,7 @@ export default async function fetchEMUInfoBySeatCode(code: string) {
                 operation: 'http_failed',
                 url,
                 context: {
-                    seatCode: code
+                    seatCode: normalizedCode
                 },
                 responseStatus: response.status,
                 responseOk: response.ok
@@ -96,7 +126,7 @@ export default async function fetchEMUInfoBySeatCode(code: string) {
                 operation: 'invalid_response',
                 url,
                 context: {
-                    seatCode: code
+                    seatCode: normalizedCode
                 },
                 responseStatus: response.status,
                 responseOk: response.ok,
@@ -108,7 +138,7 @@ export default async function fetchEMUInfoBySeatCode(code: string) {
             return null;
         }
 
-        return {
+        const result = {
             route: {
                 code: data.trainCode, // G xxxx
                 internalCode: data.trainNo,
@@ -125,13 +155,22 @@ export default async function fetchEMUInfoBySeatCode(code: string) {
                 code: emuCode // like CR400AF-2230
             }
         };
+
+        if (result.route.endAt > nowSeconds) {
+            cachedSeatCodeResults.set(normalizedCode, {
+                expiresAt: result.route.endAt,
+                value: result
+            });
+        }
+
+        return result;
     } catch (error) {
         log12306RequestFailure({
             logger,
             operation: 'request_exception',
             url,
             context: {
-                seatCode: code
+                seatCode: normalizedCode
             },
             error
         });
