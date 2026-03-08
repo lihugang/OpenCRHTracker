@@ -1,4 +1,5 @@
 import getLogger from '~/server/libs/log4js';
+import { ensureEmuDatabaseSchema } from '~/server/libs/database/emu';
 import { ensureTaskDatabaseSchema } from '~/server/libs/database/task';
 import { estimateIdleTaskDurationMs } from '~/server/services/idleTaskEstimator';
 import { enqueueTask } from '~/server/services/taskQueue';
@@ -63,6 +64,7 @@ function parseDisabledStartupExecutors(): Set<string> {
 export default defineNitroPlugin(() => {
     try {
         ensureTaskDatabaseSchema();
+        ensureEmuDatabaseSchema();
 
         registerBuildScheduleTaskExecutor();
         registerRefreshRouteBatchTaskExecutor();

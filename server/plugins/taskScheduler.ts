@@ -1,5 +1,6 @@
 import { startTaskScheduler } from '~/server/services/taskScheduler';
 import { ensureTaskDatabaseSchema } from '~/server/libs/database/task';
+import { ensureEmuDatabaseSchema } from '~/server/libs/database/emu';
 import getLogger from '~/server/libs/log4js';
 
 const logger = getLogger('task-scheduler-plugin');
@@ -7,6 +8,7 @@ const logger = getLogger('task-scheduler-plugin');
 export default defineNitroPlugin(() => {
     try {
         ensureTaskDatabaseSchema();
+        ensureEmuDatabaseSchema();
         startTaskScheduler();
     } catch (error) {
         const message =

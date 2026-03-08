@@ -13,6 +13,17 @@ function ensureEmuTrackedSchema(db: Database.Database) {
 
 registerDatabaseInitializer('EMUTracked', ensureEmuTrackedSchema);
 
+let ensured = false;
+
+export function ensureEmuDatabaseSchema() {
+    if (ensured) {
+        return;
+    }
+    const db = useDatabase('EMUTracked');
+    ensureEmuTrackedSchema(db);
+    ensured = true;
+}
+
 export function useEmuDatabase() {
     return useDatabase('EMUTracked');
 }
