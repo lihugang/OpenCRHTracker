@@ -1,17 +1,10 @@
 import getLogger from '~/server/libs/log4js';
 import useConfig from '~/server/config';
 import { registerTaskExecutor } from '~/server/services/taskExecutorRegistry';
-import {
-    enqueueTask,
-    enqueueTasks,
-    type EnqueueTaskInput
-} from '~/server/services/taskQueue';
+import { enqueueTasks, type EnqueueTaskInput } from '~/server/services/taskQueue';
 import { loadExistingScheduleState } from '~/server/utils/12306/scheduleProbe/stateStore';
-import {
-    formatShanghaiDateTime,
-    getNextDayExecutionTimeInShanghaiSeconds,
-    toUnixSecondsFromShanghaiDayOffset
-} from '~/server/utils/date/shanghaiDateTime';
+import { toUnixSecondsFromShanghaiDayOffset } from '~/server/utils/date/shanghaiDateTime';
+import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
 import { PROBE_TRAIN_DEPARTURE_TASK_EXECUTOR } from '~/server/services/taskExecutors/probeTrainDepartureTaskExecutor';
@@ -52,23 +45,6 @@ function buildProbeTaskGroupKey(
     return `fallback:${normalizeCode(trainCode)}@${startAtOffset}`;
 }
 
-function enqueueNextDailyDispatchTask(): number {
-    const dailyTimeHHmm = useConfig().spider.scheduleProbe.dailyTimeHHmm;
-    const nextExecutionTime = getNextDayExecutionTimeInShanghaiSeconds(
-        Date.now(),
-        dailyTimeHHmm
-    );
-    const taskId = enqueueTask(
-        DISPATCH_DAILY_PROBE_TASKS_EXECUTOR,
-        {},
-        nextExecutionTime
-    );
-    logger.info(
-        `enqueued_next_daily_task id=${taskId} executionTime=${nextExecutionTime} executionTimeAsiaShanghai=${formatShanghaiDateTime(nextExecutionTime)}`
-    );
-    return taskId;
-}
-
 async function executeDispatchDailyProbeTasks(): Promise<void> {
     const config = useConfig();
     const scheduleState = loadExistingScheduleState(
@@ -80,7 +56,14 @@ async function executeDispatchDailyProbeTasks(): Promise<void> {
         logger.warn(
             `schedule_not_found file=${config.data.assets.schedule.file}`
         );
-        enqueueNextDailyDispatchTask();
+        return;
+    }
+
+    const currentDate = getCurrentDateString();
+    if (scheduleState.date !== currentDate) {
+        logger.warn(
+            `skip_non_current_schedule scheduleDate=${scheduleState.date} currentDate=${currentDate} file=${config.data.assets.schedule.file}`
+        );
         return;
     }
 
@@ -146,22 +129,9 @@ async function executeDispatchDailyProbeTasks(): Promise<void> {
         });
     }
 
-    const nextDailyExecutionTime = getNextDayExecutionTimeInShanghaiSeconds(
-        Date.now(),
-        config.spider.scheduleProbe.dailyTimeHHmm
-    );
-    tasksToEnqueue.push({
-        executor: DISPATCH_DAILY_PROBE_TASKS_EXECUTOR,
-        args: {},
-        executionTime: nextDailyExecutionTime
-    });
     const taskIds = enqueueTasks(tasksToEnqueue);
-    const nextDailyTaskId = taskIds[taskIds.length - 1]!;
     logger.info(
-        `enqueued_next_daily_task id=${nextDailyTaskId} executionTime=${nextDailyExecutionTime} executionTimeAsiaShanghai=${formatShanghaiDateTime(nextDailyExecutionTime)}`
-    );
-    logger.info(
-        `done date=${scheduleState.date} groups=${groupsByKey.size} createdTasks=${tasksToEnqueue.length - 1} defaultRetry=${defaultRetry} nextDailyTaskId=${nextDailyTaskId}`
+        `done date=${scheduleState.date} groups=${groupsByKey.size} createdTasks=${tasksToEnqueue.length} defaultRetry=${defaultRetry} firstTaskId=${taskIds[0] ?? 'null'}`
     );
 }
 

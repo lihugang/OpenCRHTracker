@@ -16,18 +16,14 @@ import {
     registerGenerateRouteRefreshTasksExecutor
 } from '~/server/services/taskExecutors/generateRouteRefreshTasksExecutor';
 import { registerRefreshRouteBatchTaskExecutor } from '~/server/services/taskExecutors/refreshRouteBatchTaskExecutor';
-import {
-    DISPATCH_DAILY_PROBE_TASKS_EXECUTOR,
-    registerDispatchDailyProbeTasksExecutor
-} from '~/server/services/taskExecutors/dispatchDailyProbeTasksExecutor';
+import { registerDispatchDailyProbeTasksExecutor } from '~/server/services/taskExecutors/dispatchDailyProbeTasksExecutor';
 import { registerProbeTrainDepartureTaskExecutor } from '~/server/services/taskExecutors/probeTrainDepartureTaskExecutor';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
 
 const logger = getLogger('task-schedule-bootstrap');
 const STARTUP_EXECUTORS = [
     BUILD_SCHEDULE_TASK_EXECUTOR,
-    GENERATE_ROUTE_REFRESH_TASKS_EXECUTOR,
-    DISPATCH_DAILY_PROBE_TASKS_EXECUTOR
+    GENERATE_ROUTE_REFRESH_TASKS_EXECUTOR
 ] as const;
 
 function reconcileStartupTask(
@@ -99,18 +95,6 @@ export default defineNitroPlugin(() => {
             );
             enqueuedStartupTasks.push(
                 `${GENERATE_ROUTE_REFRESH_TASKS_EXECUTOR}:${generateTaskId}`
-            );
-        }
-
-        if (
-            !disabledStartupExecutors.has(DISPATCH_DAILY_PROBE_TASKS_EXECUTOR)
-        ) {
-            const dispatchTaskId = reconcileStartupTask(
-                DISPATCH_DAILY_PROBE_TASKS_EXECUTOR,
-                executionTime
-            );
-            enqueuedStartupTasks.push(
-                `${DISPATCH_DAILY_PROBE_TASKS_EXECUTOR}:${dispatchTaskId}`
             );
         }
 
