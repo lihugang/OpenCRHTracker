@@ -58,6 +58,12 @@ let reconcileSingletonTaskTransaction:
       ) => ReconcileSingletonTaskResult)
     | null = null;
 
+type EnqueueTasksTransaction = (tasks: readonly NormalizedTaskInsert[]) => number[];
+type ReconcileSingletonTaskTransaction = (
+    task: NormalizedTaskInsert,
+    nowSeconds: number
+) => ReconcileSingletonTaskResult;
+
 function normalizeTaskInsert(
     executor: string,
     args: unknown,
@@ -99,14 +105,14 @@ function normalizeTaskInsert(
     };
 }
 
-function getEnqueueTasksTransaction() {
+function getEnqueueTasksTransaction(): EnqueueTasksTransaction {
     if (enqueueTasksTransaction) {
         return enqueueTasksTransaction;
     }
 
     const addTaskStatement = taskStatements.getStatement('addTask');
     enqueueTasksTransaction = useTaskDatabase().transaction(
-        (tasks: readonly NormalizedTaskInsert[]) => {
+        (tasks: readonly NormalizedTaskInsert[]): number[] => {
             const insertedIds: number[] = [];
             for (const task of tasks) {
                 const result = addTaskStatement.run(
@@ -125,7 +131,7 @@ function getEnqueueTasksTransaction() {
     return enqueueTasksTransaction;
 }
 
-function getReconcileSingletonTaskTransaction() {
+function getReconcileSingletonTaskTransaction(): ReconcileSingletonTaskTransaction {
     if (reconcileSingletonTaskTransaction) {
         return reconcileSingletonTaskTransaction;
     }
@@ -137,7 +143,10 @@ function getReconcileSingletonTaskTransaction() {
     );
 
     reconcileSingletonTaskTransaction = useTaskDatabase().transaction(
-        (task: NormalizedTaskInsert, nowSeconds: number) => {
+        (
+            task: NormalizedTaskInsert,
+            nowSeconds: number
+        ): ReconcileSingletonTaskResult => {
             const existingTasks = selectPendingTasksByExecutorStatement.all(
                 task.executor
             ) as TaskRecord[];
