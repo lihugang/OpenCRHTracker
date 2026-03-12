@@ -21,8 +21,8 @@ import {
     listProbeStatusByEmuTrainSetNo,
     listProbeStatusByTrainCode,
     updateProbeStatusByEmuTrainSetNo,
-    type ProbeStatusRow,
-    type ProbeStatusValue
+    ProbeStatusValue,
+    type ProbeStatusRow
 } from '~/server/services/probeStatusStore';
 import { insertDailyEmuRoute } from '~/server/services/emuRoutesStore';
 import { registerTaskExecutor } from '~/server/services/taskExecutorRegistry';
@@ -46,6 +46,8 @@ interface ProbeTrainDepartureTaskArgs {
     trainCode: string;
     trainInternalCode: string;
     allCodes: string[];
+    startStation: string;
+    endStation: string;
     startAt: number;
     endAt: number;
     retry: number;
@@ -76,6 +78,8 @@ function parseTaskArgs(raw: unknown): ProbeTrainDepartureTaskArgs {
         trainCode?: unknown;
         trainInternalCode?: unknown;
         allCodes?: unknown;
+        startStation?: unknown;
+        endStation?: unknown;
         startAt?: unknown;
         endAt?: unknown;
         retry?: unknown;
@@ -99,6 +103,10 @@ function parseTaskArgs(raw: unknown): ProbeTrainDepartureTaskArgs {
             )
         )
         : [];
+    const startStation =
+        typeof body.startStation === 'string' ? body.startStation.trim() : '';
+    const endStation =
+        typeof body.endStation === 'string' ? body.endStation.trim() : '';
 
     if (
         typeof body.startAt !== 'number' ||
@@ -128,6 +136,8 @@ function parseTaskArgs(raw: unknown): ProbeTrainDepartureTaskArgs {
         trainCode,
         trainInternalCode,
         allCodes,
+        startStation,
+        endStation,
         startAt: body.startAt,
         endAt: body.endAt,
         retry
@@ -144,12 +154,21 @@ function isCurrentScheduleTask(startAt: number): boolean {
 function persistDailyRoutes(
     trainCodes: string[],
     emuCodes: string[],
+    startStation: string,
+    endStation: string,
     startAt: number,
     endAt: number
 ): void {
     for (const trainCode of trainCodes) {
         for (const emuCode of emuCodes) {
-            insertDailyEmuRoute(trainCode, emuCode, startAt, endAt);
+            insertDailyEmuRoute(
+                trainCode,
+                emuCode,
+                startStation,
+                endStation,
+                startAt,
+                endAt
+            );
         }
     }
 }
@@ -229,7 +248,14 @@ function applyResolvedResult(
         }
     }
 
-    persistDailyRoutes(allTrainCodes, allEmuCodes, args.startAt, args.endAt);
+    persistDailyRoutes(
+        allTrainCodes,
+        allEmuCodes,
+        args.startStation,
+        args.endStation,
+        args.startAt,
+        args.endAt
+    );
     markRunningEmuCodes(allEmuCodes, trainKey, args.endAt, nowSeconds);
     setLastObservationByMainEmu(mainEmuCode, {
         endAt: args.endAt,
@@ -457,7 +483,14 @@ async function executeProbeTrainDepartureTask(rawArgs: unknown): Promise<void> {
             ProbeStatusValue.PendingCouplingDetection
         );
     }
-    persistDailyRoutes(allTrainCodes, [mainEmuCode], args.startAt, args.endAt);
+    persistDailyRoutes(
+        allTrainCodes,
+        [mainEmuCode],
+        args.startStation,
+        args.endStation,
+        args.startAt,
+        args.endAt
+    );
     markQueriedTrainKey(trainKey);
 
     const detectionTaskId = queueCoupledDetectionTask(mainRecord);

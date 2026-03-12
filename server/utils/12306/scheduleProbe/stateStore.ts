@@ -163,6 +163,12 @@ function asScheduleState(value: unknown): ScheduleState | null {
         if (typeof row.internalCode !== 'string') {
             row.internalCode = '';
         }
+        if (typeof row.startStation !== 'string') {
+            row.startStation = '';
+        }
+        if (typeof row.endStation !== 'string') {
+            row.endStation = '';
+        }
         if (
             row.startAt !== null &&
             (typeof row.startAt !== 'number' ||
@@ -357,6 +363,8 @@ function mergePublishedRouteInfo(
             continue;
         }
 
+        item.startStation = currentItem.startStation;
+        item.endStation = currentItem.endStation;
         item.startAt = currentItem.startAt;
         item.endAt = currentItem.endAt;
         item.lastRouteRefreshAt = currentItem.lastRouteRefreshAt;

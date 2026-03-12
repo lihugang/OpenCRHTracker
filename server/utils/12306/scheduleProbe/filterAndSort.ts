@@ -22,6 +22,8 @@ export function normalizeTrainCodeItems(
         normalized.push({
             code: match.normalizedCode,
             internalCode: item.route.internalCode,
+            startStation: '',
+            endStation: '',
             startAt: null,
             endAt: null,
             lastRouteRefreshAt: null

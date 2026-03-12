@@ -23,9 +23,12 @@ import {
 } from '~/server/services/probeStatusStore';
 import { insertDailyEmuRoute } from '~/server/services/emuRoutesStore';
 import { registerTaskExecutor } from '~/server/services/taskExecutorRegistry';
+import fetchRouteInfo from '~/server/utils/12306/network/fetchRouteInfo';
 import fetchEMUInfoBySeatCode from '~/server/utils/12306/network/fetchEMUInfoBySeatCode';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
 import uniqueNormalizedCodes from '~/server/utils/12306/uniqueNormalizedCodes';
+import { loadPublishedScheduleState } from '~/server/utils/12306/scheduleProbe/stateStore';
+import type { ScheduleState } from '~/server/utils/12306/scheduleProbe/types';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
 
 export const DETECT_COUPLED_EMU_GROUP_TASK_EXECUTOR =
@@ -55,6 +58,11 @@ interface RouteObservationGroup {
 }
 
 let registered = false;
+
+interface RouteStations {
+    startStation: string;
+    endStation: string;
+}
 
 function parseTaskArgs(raw: unknown): DetectCoupledEmuGroupTaskArgs {
     if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
@@ -94,14 +102,101 @@ function buildObservationGroupKey(observation: RouteObservation): string {
 function persistDailyRoutes(
     trainCodes: string[],
     emuCodes: string[],
+    startStation: string,
+    endStation: string,
     startAt: number,
     endAt: number
 ): void {
     for (const trainCode of trainCodes) {
         for (const emuCode of emuCodes) {
-            insertDailyEmuRoute(trainCode, emuCode, startAt, endAt);
+            insertDailyEmuRoute(
+                trainCode,
+                emuCode,
+                startStation,
+                endStation,
+                startAt,
+                endAt
+            );
         }
     }
+}
+
+function buildScheduleRouteStationsMap(
+    scheduleState: ScheduleState | null
+): Map<string, RouteStations> {
+    const stationsByTrainCode = new Map<string, RouteStations>();
+    if (!scheduleState) {
+        return stationsByTrainCode;
+    }
+
+    for (const item of scheduleState.items) {
+        const trainCode = normalizeCode(item.code);
+        if (trainCode.length === 0) {
+            continue;
+        }
+
+        const nextStations = {
+            startStation: item.startStation.trim(),
+            endStation: item.endStation.trim()
+        };
+        const currentStations = stationsByTrainCode.get(trainCode);
+        if (
+            currentStations &&
+            currentStations.startStation.length > 0 &&
+            currentStations.endStation.length > 0
+        ) {
+            continue;
+        }
+
+        stationsByTrainCode.set(trainCode, {
+            startStation:
+                currentStations?.startStation.length
+                    ? currentStations.startStation
+                    : nextStations.startStation,
+            endStation:
+                currentStations?.endStation.length
+                    ? currentStations.endStation
+                    : nextStations.endStation
+        });
+    }
+
+    return stationsByTrainCode;
+}
+
+async function resolveRouteStations(
+    trainCodes: string[],
+    scheduleStationsByTrainCode: Map<string, RouteStations>
+): Promise<RouteStations> {
+    for (const trainCode of trainCodes) {
+        const stations = scheduleStationsByTrainCode.get(normalizeCode(trainCode));
+        if (
+            stations &&
+            (stations.startStation.length > 0 || stations.endStation.length > 0)
+        ) {
+            return stations;
+        }
+    }
+
+    const primaryTrainCode = trainCodes[0] ?? '';
+    if (primaryTrainCode.length === 0) {
+        return {
+            startStation: '',
+            endStation: ''
+        };
+    }
+
+    const routeInfo = await fetchRouteInfo(primaryTrainCode);
+    if (!routeInfo) {
+        return {
+            startStation: '',
+            endStation: ''
+        };
+    }
+
+    return {
+        startStation: routeInfo.route.startStation.trim(),
+        endStation: routeInfo.route.endStation.trim()
+    };
 }
 
 async function collectObservations(
@@ -170,12 +265,19 @@ function groupObservations(
     return Array.from(groups.values());
 }
 
-function persistResolvedGroup(group: RouteObservationGroup): void {
+async function persistResolvedGroup(
+    group: RouteObservationGroup,
+    scheduleStationsByTrainCode: Map<string, RouteStations>
+): Promise<void> {
     const trainCodes = uniqueNormalizedCodes(Array.from(group.trainCodes));
     const emuCodes = uniqueNormalizedCodes(Array.from(group.emuCodes));
     if (trainCodes.length === 0 || emuCodes.length === 0) {
         return;
     }
+    const stations = await resolveRouteStations(
+        trainCodes,
+        scheduleStationsByTrainCode
+    );
 
     const finalStatus: ProbeStatusValue =
         emuCodes.length > 1
@@ -202,7 +304,14 @@ function persistResolvedGroup(group: RouteObservationGroup): void {
         }
     }
 
-    persistDailyRoutes(trainCodes, emuCodes, group.startAt, group.endAt);
+    persistDailyRoutes(
+        trainCodes,
+        emuCodes,
+        stations.startStation,
+        stations.endStation,
+        group.startAt,
+        group.endAt
+    );
     const trainKey = buildTrainKey(
         trainCodes[0]!,
         group.trainInternalCode,
@@ -258,8 +367,11 @@ async function executeDetectCoupledEmuGroupTask(rawArgs: unknown): Promise<void>
         config.spider.scheduleProbe.coupling.runningGraceSeconds
     );
     const groups = groupObservations(observations);
+    const scheduleStationsByTrainCode = buildScheduleRouteStationsMap(
+        loadPublishedScheduleState(config.data.assets.schedule.file)
+    );
     for (const group of groups) {
-        persistResolvedGroup(group);
+        await persistResolvedGroup(group, scheduleStationsByTrainCode);
     }
 
     markCoupledGroupDetected(args.depot, args.model, nowSeconds);

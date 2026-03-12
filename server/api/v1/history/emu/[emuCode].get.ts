@@ -50,6 +50,8 @@ export default defineEventHandler(async (event) => {
                     ts: row.start_at,
                     id: String(row.id),
                     trainCode: row.train_code,
+                    startStation: row.start_station_name,
+                    endStation: row.end_station_name,
                     line: ''
                 }))
             };

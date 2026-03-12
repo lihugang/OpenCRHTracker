@@ -2,6 +2,8 @@ CREATE TABLE IF NOT EXISTS daily_emu_routes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     train_code TEXT NOT NULL,
     emu_code TEXT NOT NULL,
+    start_station_name TEXT NOT NULL,
+    end_station_name TEXT NOT NULL,
     start_at INTEGER NOT NULL,
     end_at INTEGER NOT NULL,
     UNIQUE(train_code, emu_code, start_at)

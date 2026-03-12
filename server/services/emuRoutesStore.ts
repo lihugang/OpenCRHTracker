@@ -12,6 +12,8 @@ export interface DailyEmuRouteRow {
     id: number;
     train_code: string;
     emu_code: string;
+    start_station_name: string;
+    end_station_name: string;
     start_at: number;
     end_at: number;
 }
@@ -41,6 +43,8 @@ const DEFAULT_CURSOR_POINT: CursorPoint = {
 export function insertDailyEmuRoute(
     trainCode: string,
     emuCode: string,
+    startStationName: string,
+    endStationName: string,
     startAt: number,
     endAt: number
 ): void {
@@ -48,6 +52,8 @@ export function insertDailyEmuRoute(
         'insertDailyEmuRoute',
         normalizeCode(trainCode),
         normalizeCode(emuCode),
+        startStationName.trim(),
+        endStationName.trim(),
         startAt,
         endAt
     );

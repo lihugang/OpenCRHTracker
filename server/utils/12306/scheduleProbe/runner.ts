@@ -53,6 +53,8 @@ function restorePreservedRouteInfo(
         return false;
     }
 
+    item.startStation = preservedItem.startStation;
+    item.endStation = preservedItem.endStation;
     item.startAt = preservedItem.startAt;
     item.endAt = preservedItem.endAt;
     item.lastRouteRefreshAt = preservedItem.lastRouteRefreshAt;
@@ -253,6 +255,10 @@ export default async function runScheduleProbe(
                 );
                 const refreshedAt = getNowSeconds();
                 for (const groupItem of groupItems) {
+                    groupItem.startStation =
+                        routeResult.data.route.startStation.trim();
+                    groupItem.endStation =
+                        routeResult.data.route.endStation.trim();
                     groupItem.startAt = nextStartAt;
                     groupItem.endAt = nextEndAt;
                     groupItem.lastRouteRefreshAt = refreshedAt;

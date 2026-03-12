@@ -155,6 +155,8 @@ export default async function fetchRouteInfo(route: string) {
                 code: route,
                 allCodes: json.data.trainDetail.stationTrainCodeAll.split('/'),
                 internalCode: json.data.trainNo,
+                startStation: startStation.stationName.trim(),
+                endStation: endStation.stationName.trim(),
                 startAt: getShanghaiUnixSecondsFromDateAndTime(
                     startStation.arraiveDate,
                     startStation.arriveTime

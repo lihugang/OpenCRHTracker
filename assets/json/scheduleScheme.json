@@ -86,6 +86,12 @@
                 "internalCode": {
                     "type": "string"
                 },
+                "startStation": {
+                    "type": "string"
+                },
+                "endStation": {
+                    "type": "string"
+                },
                 "startAt": {
                     "description": "Second offset from schedule.date 00:00:00 Asia/Shanghai",
                     "type": [
@@ -112,6 +118,8 @@
             "required": [
                 "code",
                 "internalCode",
+                "startStation",
+                "endStation",
                 "startAt",
                 "endAt",
                 "lastRouteRefreshAt"

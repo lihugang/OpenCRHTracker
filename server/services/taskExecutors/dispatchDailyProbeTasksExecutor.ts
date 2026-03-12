@@ -21,6 +21,8 @@ interface ProbeTaskArgs {
     trainCode: string;
     trainInternalCode: string;
     allCodes: string[];
+    startStation: string;
+    endStation: string;
     startAt: number;
     endAt: number;
     retry: number;
@@ -30,6 +32,8 @@ interface ProbeTaskGroup {
     trainCode: string;
     trainInternalCode: string;
     allCodes: Set<string>;
+    startStation: string;
+    endStation: string;
     startAtOffset: number;
     endAtOffset: number;
 }
@@ -84,6 +88,12 @@ async function executeDispatchDailyProbeTasks(): Promise<void> {
         const existing = groupsByKey.get(groupKey);
         if (existing) {
             existing.allCodes.add(normalizeCode(item.code));
+            if (existing.startStation.length === 0 && item.startStation.length > 0) {
+                existing.startStation = item.startStation;
+            }
+            if (existing.endStation.length === 0 && item.endStation.length > 0) {
+                existing.endStation = item.endStation;
+            }
             existing.startAtOffset = Math.min(
                 existing.startAtOffset,
                 item.startAt
@@ -96,6 +106,8 @@ async function executeDispatchDailyProbeTasks(): Promise<void> {
             trainCode: normalizeCode(item.code),
             trainInternalCode: normalizeCode(item.internalCode),
             allCodes: new Set([normalizeCode(item.code)]),
+            startStation: item.startStation.trim(),
+            endStation: item.endStation.trim(),
             startAtOffset: item.startAt,
             endAtOffset: item.endAt
         });
@@ -120,6 +132,8 @@ async function executeDispatchDailyProbeTasks(): Promise<void> {
             trainCode: group.trainCode,
             trainInternalCode: group.trainInternalCode,
             allCodes,
+            startStation: group.startStation,
+            endStation: group.endStation,
             startAt,
             endAt,
             retry: defaultRetry

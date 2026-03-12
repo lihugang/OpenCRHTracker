@@ -14,6 +14,8 @@ export interface ScheduleProbeRuntimeConfig {
 export interface ScheduleItem {
     code: string;
     internalCode: string;
+    startStation: string;
+    endStation: string;
     startAt: number | null;
     endAt: number | null;
     lastRouteRefreshAt: number | null;

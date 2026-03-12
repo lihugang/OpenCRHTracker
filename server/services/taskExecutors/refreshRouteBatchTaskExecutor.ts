@@ -30,6 +30,8 @@ interface RefreshRouteBatchTaskArgs {
 
 interface RefreshRouteGroupUpdate {
     codes: string[];
+    startStation: string;
+    endStation: string;
     startAt: number;
     endAt: number;
     lastRouteRefreshAt: number;
@@ -82,6 +84,8 @@ function applyGroupUpdate(
         }
 
         const item = state.items[itemIndex]!;
+        item.startStation = update.startStation;
+        item.endStation = update.endStation;
         item.startAt = update.startAt;
         item.endAt = update.endAt;
         item.lastRouteRefreshAt = update.lastRouteRefreshAt;
@@ -166,6 +170,8 @@ async function executeRefreshRouteBatchTask(rawArgs: unknown) {
             state.date,
             routeResult.data.route.endAt
         );
+        const nextStartStation = routeResult.data.route.startStation.trim();
+        const nextEndStation = routeResult.data.route.endStation.trim();
         const refreshedAt = getNowSeconds();
         const refreshedInternalCode =
             routeResult.data.route.internalCode.trim();
@@ -173,11 +179,15 @@ async function executeRefreshRouteBatchTask(rawArgs: unknown) {
         for (const index of groupItemIndexes) {
             const groupItem = state.items[index]!;
             if (
+                groupItem.startStation !== nextStartStation ||
+                groupItem.endStation !== nextEndStation ||
                 groupItem.startAt !== nextStartAt ||
                 groupItem.endAt !== nextEndAt
             ) {
                 groupChanged = true;
             }
+            groupItem.startStation = nextStartStation;
+            groupItem.endStation = nextEndStation;
             groupItem.startAt = nextStartAt;
             groupItem.endAt = nextEndAt;
             groupItem.lastRouteRefreshAt = refreshedAt;
@@ -195,6 +205,8 @@ async function executeRefreshRouteBatchTask(rawArgs: unknown) {
             codes: groupItemIndexes.map((index) =>
                 normalizeCode(state.items[index]!.code)
             ),
+            startStation: nextStartStation,
+            endStation: nextEndStation,
             startAt: nextStartAt,
             endAt: nextEndAt,
             lastRouteRefreshAt: refreshedAt,

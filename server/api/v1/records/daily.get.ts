@@ -47,6 +47,8 @@ export default defineEventHandler(async (event) => {
                     id: String(row.id),
                     emuCode: row.emu_code,
                     trainCode: row.train_code,
+                    startStation: row.start_station_name,
+                    endStation: row.end_station_name,
                     line: ''
                 }))
             };
