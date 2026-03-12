@@ -5,12 +5,12 @@ import queryTrainCodeThroughPrefix from '../network/queryTrainCodeThroughPrefix'
 import { expandKeyword } from './prefixTree';
 import { normalizeTrainCodeItems, sortScheduleItems } from './filterAndSort';
 import queryWithRetry from './queryWithRetry';
-import { saveScheduleState } from './stateStore';
+import { saveBuildingScheduleState } from './stateStore';
 import { buildGroupIndex, getGroupKey } from './taskHelpers';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
 import { toShanghaiDayOffsetFromUnixSeconds } from '~/server/utils/date/shanghaiDateTime';
 import type {
-    ScheduleFile,
+    ScheduleState,
     ScheduleItem,
     ScheduleProbeRuntimeConfig
 } from './types';
@@ -23,7 +23,7 @@ function pushUnique(list: string[], value: string): void {
 }
 
 function updateItemsFromMap(
-    state: ScheduleFile,
+    state: ScheduleState,
     itemsByCode: Map<string, ScheduleItem>,
     config: ScheduleProbeRuntimeConfig
 ): void {
@@ -61,7 +61,7 @@ function restorePreservedRouteInfo(
 
 export default async function runScheduleProbe(
     scheduleFilePath: string,
-    state: ScheduleFile,
+    state: ScheduleState,
     config: ScheduleProbeRuntimeConfig,
     runId: string,
     preservedItemsByCode?: Map<string, ScheduleItem>
@@ -158,7 +158,7 @@ export default async function runScheduleProbe(
 
             if (processedSinceFlush >= config.checkpointFlushEvery) {
                 updateItemsFromMap(state, itemsByCode, config);
-                saveScheduleState(scheduleFilePath, state);
+                saveBuildingScheduleState(scheduleFilePath, state);
                 logger.info(
                     `discover checkpoint runId=${runId} processed=${state.progress.discoverProcessed.length} pending=${state.progress.discoverQueue.length} rawItems=${state.stats.rawItems} uniqueItems=${state.stats.uniqueItems} newlyAdded=${newlyAddedCount} reusedRouteInfo=${reusedRouteInfoCount} apiCalls=${state.progress.counters.apiCalls} apiRetries=${state.progress.counters.apiRetries}`
                 );
@@ -173,7 +173,7 @@ export default async function runScheduleProbe(
             Math.max(0, state.progress.enrichCursor),
             state.items.length
         );
-        saveScheduleState(scheduleFilePath, state);
+        saveBuildingScheduleState(scheduleFilePath, state);
         logger.info(
             `discover finish runId=${runId} processed=${state.progress.discoverProcessed.length} failedKeywords=${state.progress.failedKeywords.length} uniqueItems=${state.stats.uniqueItems} newlyAdded=${newlyAddedCount} reusedRouteInfo=${reusedRouteInfoCount}`
         );
@@ -219,7 +219,7 @@ export default async function runScheduleProbe(
             );
             const shouldBackfillMissing = groupItems.some(
                 (groupItem) =>
-                    (groupItem.startAt === null || groupItem.endAt === null)
+                    groupItem.startAt === null || groupItem.endAt === null
             );
 
             if (
@@ -275,7 +275,7 @@ export default async function runScheduleProbe(
             processedSinceFlush += 1;
 
             if (processedSinceFlush >= config.checkpointFlushEvery) {
-                saveScheduleState(scheduleFilePath, state);
+                saveBuildingScheduleState(scheduleFilePath, state);
                 logger.info(
                     `enrich checkpoint runId=${runId} cursor=${state.progress.enrichCursor} totalItems=${state.items.length} failedEnrichCodes=${state.progress.failedEnrichCodes.length} enriched=${enrichedCount} apiCalls=${state.progress.counters.apiCalls} apiRetries=${state.progress.counters.apiRetries}`
                 );
@@ -295,11 +295,11 @@ export default async function runScheduleProbe(
     state.lastBuildDate = state.date;
     state.status =
         state.progress.failedKeywords.length > 0 ||
-            state.progress.failedEnrichCodes.length > 0
+        state.progress.failedEnrichCodes.length > 0
             ? 'partial_failed'
             : 'done';
 
-    saveScheduleState(scheduleFilePath, state);
+    saveBuildingScheduleState(scheduleFilePath, state);
     logger.info(
         `done runId=${runId} status=${state.status} durationMs=${state.stats.durationMs} rawItems=${state.stats.rawItems} uniqueItems=${state.stats.uniqueItems} newlyAdded=${newlyAddedCount} reusedRouteInfo=${reusedRouteInfoCount} enriched=${enrichedCount} failedKeywords=${state.progress.failedKeywords.length} failedEnrichCodes=${state.progress.failedEnrichCodes.length} apiCalls=${state.progress.counters.apiCalls} apiRetries=${state.progress.counters.apiRetries}`
     );

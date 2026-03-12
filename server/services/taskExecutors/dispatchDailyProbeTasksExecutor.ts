@@ -1,8 +1,11 @@
 import getLogger from '~/server/libs/log4js';
 import useConfig from '~/server/config';
 import { registerTaskExecutor } from '~/server/services/taskExecutorRegistry';
-import { enqueueTasks, type EnqueueTaskInput } from '~/server/services/taskQueue';
-import { loadExistingScheduleState } from '~/server/utils/12306/scheduleProbe/stateStore';
+import {
+    enqueueTasks,
+    type EnqueueTaskInput
+} from '~/server/services/taskQueue';
+import { loadPublishedScheduleState } from '~/server/utils/12306/scheduleProbe/stateStore';
 import { toUnixSecondsFromShanghaiDayOffset } from '~/server/utils/date/shanghaiDateTime';
 import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
@@ -47,7 +50,7 @@ function buildProbeTaskGroupKey(
 
 async function executeDispatchDailyProbeTasks(): Promise<void> {
     const config = useConfig();
-    const scheduleState = loadExistingScheduleState(
+    const scheduleState = loadPublishedScheduleState(
         config.data.assets.schedule.file
     );
     const now = getNowSeconds();
@@ -144,7 +147,5 @@ export function registerDispatchDailyProbeTasksExecutor(): void {
         await executeDispatchDailyProbeTasks();
     });
     registered = true;
-    logger.info(
-        `registered executor=${DISPATCH_DAILY_PROBE_TASKS_EXECUTOR}`
-    );
+    logger.info(`registered executor=${DISPATCH_DAILY_PROBE_TASKS_EXECUTOR}`);
 }

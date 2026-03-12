@@ -1,14 +1,22 @@
 import fs from 'fs';
 import path from 'path';
 import getCurrentDateString from '../../date/getCurrentDateString';
+import normalizeCode from '../normalizeCode';
 import { getInitialKeywords } from './prefixTree';
-import type { ScheduleFile, ScheduleProbeRuntimeConfig } from './types';
+import type {
+    ScheduleDocument,
+    ScheduleItem,
+    ScheduleState,
+    ScheduleProbeRuntimeConfig
+} from './types';
 
-interface LoadedScheduleState {
-    state: ScheduleFile;
+interface LoadedBuildingScheduleState {
+    state: ScheduleState;
     resumed: boolean;
+    publishPending: boolean;
     reason:
         | 'resume'
+        | 'publish_pending'
         | 'retry_partial_failed'
         | 'refresh_done'
         | 'refresh_non_running'
@@ -20,198 +28,138 @@ interface LoadedScheduleState {
 
 const SCHEDULE_SCHEMA_RELATIVE_PATH = '../assets/json/scheduleScheme.json';
 
-export function createInitialScheduleState(
-    date: string,
-    config: ScheduleProbeRuntimeConfig
-): ScheduleFile {
-    return {
-        $schema: SCHEDULE_SCHEMA_RELATIVE_PATH,
-        version: 2,
-        date,
-        lastBuildDate: '',
-        status: 'running',
-        strategy: {
-            retryAttempts: config.retryAttempts,
-            maxBatchSize: config.maxBatchSize,
-            checkpointFlushEvery: config.checkpointFlushEvery
-        },
-        scope: {
-            prefixRules: config.prefixRules
-        },
-        progress: {
-            phase: 'discover',
-            discoverMode: 'full',
-            discoverQueue: getInitialKeywords(config.prefixRules),
-            discoverProcessed: [],
-            enrichCursor: 0,
-            failedKeywords: [],
-            failedEnrichCodes: [],
-            counters: {
-                apiCalls: 0,
-                apiRetries: 0
-            }
-        },
-        items: [],
-        stats: {
-            rawItems: 0,
-            uniqueItems: 0,
-            durationMs: 0
-        },
-        startedAtMs: Date.now(),
-        generatedAt: 0
-    };
+function cloneScheduleState(state: ScheduleState): ScheduleState {
+    return JSON.parse(JSON.stringify(state)) as ScheduleState;
 }
 
-function isSameScopeAndStrategy(
-    state: ScheduleFile,
-    config: ScheduleProbeRuntimeConfig
-): boolean {
-    const strategyMatched =
-        state.strategy.retryAttempts === config.retryAttempts &&
-        state.strategy.maxBatchSize === config.maxBatchSize &&
-        state.strategy.checkpointFlushEvery === config.checkpointFlushEvery;
-    if (!strategyMatched) {
-        return false;
-    }
-
-    if (state.scope.prefixRules.length !== config.prefixRules.length) {
-        return false;
-    }
-
-    for (let index = 0; index < config.prefixRules.length; index += 1) {
-        const left = state.scope.prefixRules[index]!;
-        const right = config.prefixRules[index]!;
-        if (
-            left.prefix !== right.prefix ||
-            left.minNo !== right.minNo ||
-            left.maxNo !== right.maxNo
-        ) {
-            return false;
-        }
-    }
-
-    return true;
+function compareRefreshTime(left: number | null, right: number | null): number {
+    const normalizedLeft = left ?? -1;
+    const normalizedRight = right ?? -1;
+    return normalizedLeft - normalizedRight;
 }
 
-function asScheduleFile(value: unknown): ScheduleFile | null {
+function ensureScheduleItem(
+    value: unknown
+): value is Partial<ScheduleItem> & { code: string } {
+    return (
+        typeof value === 'object' &&
+        value !== null &&
+        !Array.isArray(value) &&
+        typeof (value as { code?: unknown }).code === 'string' &&
+        (value as { code: string }).code.length > 0
+    );
+}
+
+function asScheduleState(value: unknown): ScheduleState | null {
     if (typeof value !== 'object' || value === null || Array.isArray(value)) {
         return null;
     }
 
-    const file = value as Partial<ScheduleFile>;
-    if (file.version !== 2) {
-        return null;
-    }
-    if (typeof file.date !== 'string') {
+    const state = value as Partial<ScheduleState>;
+    if (typeof state.date !== 'string') {
         return null;
     }
     if (
-        file.status !== 'running' &&
-        file.status !== 'done' &&
-        file.status !== 'partial_failed'
+        state.status !== 'running' &&
+        state.status !== 'done' &&
+        state.status !== 'partial_failed'
     ) {
         return null;
     }
     if (
-        typeof file.startedAtMs !== 'number' ||
-        !Number.isFinite(file.startedAtMs)
+        typeof state.startedAtMs !== 'number' ||
+        !Number.isFinite(state.startedAtMs)
     ) {
         return null;
     }
     if (
-        typeof file.generatedAt !== 'number' ||
-        !Number.isFinite(file.generatedAt)
+        typeof state.generatedAt !== 'number' ||
+        !Number.isFinite(state.generatedAt)
     ) {
         return null;
     }
     if (
-        typeof file.strategy !== 'object' ||
-        file.strategy === null ||
-        typeof file.scope !== 'object' ||
-        file.scope === null ||
-        typeof file.progress !== 'object' ||
-        file.progress === null ||
-        typeof file.stats !== 'object' ||
-        file.stats === null ||
-        !Array.isArray(file.items)
+        typeof state.strategy !== 'object' ||
+        state.strategy === null ||
+        typeof state.scope !== 'object' ||
+        state.scope === null ||
+        typeof state.progress !== 'object' ||
+        state.progress === null ||
+        typeof state.stats !== 'object' ||
+        state.stats === null ||
+        !Array.isArray(state.items)
     ) {
         return null;
     }
     if (
-        file.progress.phase !== 'discover' &&
-        file.progress.phase !== 'enrich' &&
-        file.progress.phase !== 'done'
+        state.progress.phase !== 'discover' &&
+        state.progress.phase !== 'enrich' &&
+        state.progress.phase !== 'done'
     ) {
         return null;
     }
     if (
-        typeof file.progress.enrichCursor !== 'number' ||
-        !Number.isFinite(file.progress.enrichCursor)
+        typeof state.progress.enrichCursor !== 'number' ||
+        !Number.isFinite(state.progress.enrichCursor)
     ) {
         return null;
     }
     if (
-        typeof file.stats.rawItems !== 'number' ||
-        !Number.isFinite(file.stats.rawItems) ||
-        typeof file.stats.uniqueItems !== 'number' ||
-        !Number.isFinite(file.stats.uniqueItems) ||
-        typeof file.stats.durationMs !== 'number' ||
-        !Number.isFinite(file.stats.durationMs)
+        typeof state.stats.rawItems !== 'number' ||
+        !Number.isFinite(state.stats.rawItems) ||
+        typeof state.stats.uniqueItems !== 'number' ||
+        !Number.isFinite(state.stats.uniqueItems) ||
+        typeof state.stats.durationMs !== 'number' ||
+        !Number.isFinite(state.stats.durationMs)
     ) {
         return null;
     }
     if (
-        !Array.isArray(file.progress.discoverQueue) ||
-        !Array.isArray(file.progress.discoverProcessed) ||
-        !Array.isArray(file.progress.failedKeywords) ||
-        !Array.isArray(file.progress.failedEnrichCodes)
+        !Array.isArray(state.progress.discoverQueue) ||
+        !Array.isArray(state.progress.discoverProcessed) ||
+        !Array.isArray(state.progress.failedKeywords) ||
+        !Array.isArray(state.progress.failedEnrichCodes)
     ) {
         return null;
     }
 
-    if (typeof file.$schema !== 'string' || file.$schema.length === 0) {
-        file.$schema = SCHEDULE_SCHEMA_RELATIVE_PATH;
-    }
-    if (typeof file.lastBuildDate !== 'string') {
-        file.lastBuildDate = file.date;
+    if (typeof state.lastBuildDate !== 'string') {
+        state.lastBuildDate = state.date;
     }
     if (
-        file.progress.discoverMode !== 'full' &&
-        file.progress.discoverMode !== 'retry'
+        state.progress.discoverMode !== 'full' &&
+        state.progress.discoverMode !== 'retry'
     ) {
-        file.progress.discoverMode = 'full';
+        state.progress.discoverMode = 'full';
     }
     if (
-        typeof file.progress.counters !== 'object' ||
-        file.progress.counters === null
+        typeof state.progress.counters !== 'object' ||
+        state.progress.counters === null
     ) {
-        file.progress.counters = {
+        state.progress.counters = {
             apiCalls: 0,
             apiRetries: 0
         };
     }
     if (
-        typeof file.progress.counters.apiCalls !== 'number' ||
-        !Number.isFinite(file.progress.counters.apiCalls)
+        typeof state.progress.counters.apiCalls !== 'number' ||
+        !Number.isFinite(state.progress.counters.apiCalls)
     ) {
-        file.progress.counters.apiCalls = 0;
+        state.progress.counters.apiCalls = 0;
     }
     if (
-        typeof file.progress.counters.apiRetries !== 'number' ||
-        !Number.isFinite(file.progress.counters.apiRetries)
+        typeof state.progress.counters.apiRetries !== 'number' ||
+        !Number.isFinite(state.progress.counters.apiRetries)
     ) {
-        file.progress.counters.apiRetries = 0;
+        state.progress.counters.apiRetries = 0;
     }
 
-    for (const item of file.items) {
-        if (typeof item !== 'object' || item === null) {
+    for (const item of state.items) {
+        if (!ensureScheduleItem(item)) {
             return null;
         }
 
-        const row = item as Partial<ScheduleFile['items'][number]>;
-        if (typeof row.code !== 'string' || row.code.length === 0) {
-            return null;
-        }
+        const row = item as Partial<ScheduleItem>;
         if (typeof row.internalCode !== 'string') {
             row.internalCode = '';
         }
@@ -245,13 +193,84 @@ function asScheduleFile(value: unknown): ScheduleFile | null {
         delete (row as { isRunningToday?: unknown }).isRunningToday;
     }
 
-    return file as ScheduleFile;
+    return state as ScheduleState;
+}
+
+function asScheduleDocument(value: unknown): ScheduleDocument | null {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+        return null;
+    }
+
+    const document = value as Partial<ScheduleDocument>;
+    if (document.version !== 3) {
+        return null;
+    }
+
+    let published: ScheduleState | null = null;
+    if (
+        document.published !== null &&
+        typeof document.published !== 'undefined'
+    ) {
+        published = asScheduleState(document.published);
+        if (!published) {
+            return null;
+        }
+    }
+
+    let building: ScheduleState | null = null;
+    if (
+        document.building !== null &&
+        typeof document.building !== 'undefined'
+    ) {
+        building = asScheduleState(document.building);
+        if (!building) {
+            return null;
+        }
+    }
+
+    return {
+        $schema: SCHEDULE_SCHEMA_RELATIVE_PATH,
+        version: 3,
+        published,
+        building
+    };
+}
+
+function isSameScopeAndStrategy(
+    state: ScheduleState,
+    config: ScheduleProbeRuntimeConfig
+): boolean {
+    const strategyMatched =
+        state.strategy.retryAttempts === config.retryAttempts &&
+        state.strategy.maxBatchSize === config.maxBatchSize &&
+        state.strategy.checkpointFlushEvery === config.checkpointFlushEvery;
+    if (!strategyMatched) {
+        return false;
+    }
+
+    if (state.scope.prefixRules.length !== config.prefixRules.length) {
+        return false;
+    }
+
+    for (let index = 0; index < config.prefixRules.length; index += 1) {
+        const left = state.scope.prefixRules[index]!;
+        const right = config.prefixRules[index]!;
+        if (
+            left.prefix !== right.prefix ||
+            left.minNo !== right.minNo ||
+            left.maxNo !== right.maxNo
+        ) {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 function preparePartialRetryState(
-    existing: ScheduleFile,
+    existing: ScheduleState,
     config: ScheduleProbeRuntimeConfig
-): ScheduleFile {
+): ScheduleState {
     const failedKeywords = Array.from(
         new Set(
             existing.progress.failedKeywords
@@ -310,136 +329,100 @@ function preparePartialRetryState(
     return existing;
 }
 
-function prepareDailyRefreshState(
-    existing: ScheduleFile,
+function mergePublishedRouteInfo(
+    nextPublished: ScheduleState,
+    currentPublished: ScheduleState | null
+): ScheduleState {
+    if (!currentPublished || currentPublished.date !== nextPublished.date) {
+        return nextPublished;
+    }
+
+    const currentItemsByCode = new Map<string, ScheduleItem>();
+    for (const item of currentPublished.items) {
+        currentItemsByCode.set(normalizeCode(item.code), item);
+    }
+
+    for (const item of nextPublished.items) {
+        const currentItem = currentItemsByCode.get(normalizeCode(item.code));
+        if (!currentItem) {
+            continue;
+        }
+
+        if (
+            compareRefreshTime(
+                currentItem.lastRouteRefreshAt,
+                item.lastRouteRefreshAt
+            ) <= 0
+        ) {
+            continue;
+        }
+
+        item.startAt = currentItem.startAt;
+        item.endAt = currentItem.endAt;
+        item.lastRouteRefreshAt = currentItem.lastRouteRefreshAt;
+        if (
+            item.internalCode.length === 0 &&
+            currentItem.internalCode.length > 0
+        ) {
+            item.internalCode = currentItem.internalCode;
+        }
+    }
+
+    return nextPublished;
+}
+
+export function createInitialScheduleState(
     date: string,
     config: ScheduleProbeRuntimeConfig
-): ScheduleFile {
-    existing.date = date;
-    existing.status = 'running';
-    existing.startedAtMs = Date.now();
-    existing.generatedAt = 0;
-    existing.strategy = {
-        retryAttempts: config.retryAttempts,
-        maxBatchSize: config.maxBatchSize,
-        checkpointFlushEvery: config.checkpointFlushEvery
-    };
-    existing.scope = {
-        prefixRules: config.prefixRules
-    };
-    existing.progress = {
-        phase: 'discover',
-        discoverMode: 'full',
-        discoverQueue: getInitialKeywords(config.prefixRules),
-        discoverProcessed: [],
-        enrichCursor: 0,
-        failedKeywords: [],
-        failedEnrichCodes: [],
-        counters: {
-            apiCalls: 0,
-            apiRetries: 0
-        }
-    };
-    // Start each full build round from a clean train list.
-    existing.items = [];
-
-    existing.stats = {
-        rawItems: 0,
-        uniqueItems: 0,
-        durationMs: 0
-    };
-    return existing;
-}
-
-export function loadOrInitScheduleState(
-    scheduleFilePath: string,
-    config: ScheduleProbeRuntimeConfig
-): LoadedScheduleState {
-    const today = getCurrentDateString();
-    const absolutePath = path.resolve(scheduleFilePath);
-    if (!fs.existsSync(absolutePath)) {
-        return {
-            state: createInitialScheduleState(today, config),
-            resumed: false,
-            reason: 'init_missing_file'
-        };
-    }
-
-    try {
-        const raw = JSON.parse(fs.readFileSync(absolutePath, 'utf8'));
-        const existing = asScheduleFile(raw);
-        if (!existing) {
-            return {
-                state: createInitialScheduleState(today, config),
-                resumed: false,
-                reason: 'reset_invalid_file'
-            };
-        }
-        if (existing.date !== today) {
-            return {
-                state: prepareDailyRefreshState(existing, today, config),
-                resumed: false,
-                reason: 'refresh_cross_day'
-            };
-        }
-
-        if (existing.status === 'partial_failed') {
-            if (!isSameScopeAndStrategy(existing, config)) {
-                return {
-                    state: prepareDailyRefreshState(existing, today, config),
-                    resumed: false,
-                    reason: 'refresh_scope_or_strategy_changed'
-                };
+): ScheduleState {
+    return {
+        date,
+        lastBuildDate: '',
+        status: 'running',
+        strategy: {
+            retryAttempts: config.retryAttempts,
+            maxBatchSize: config.maxBatchSize,
+            checkpointFlushEvery: config.checkpointFlushEvery
+        },
+        scope: {
+            prefixRules: config.prefixRules
+        },
+        progress: {
+            phase: 'discover',
+            discoverMode: 'full',
+            discoverQueue: getInitialKeywords(config.prefixRules),
+            discoverProcessed: [],
+            enrichCursor: 0,
+            failedKeywords: [],
+            failedEnrichCodes: [],
+            counters: {
+                apiCalls: 0,
+                apiRetries: 0
             }
-
-            return {
-                state: preparePartialRetryState(existing, config),
-                resumed: true,
-                reason: 'retry_partial_failed'
-            };
-        }
-
-        if (existing.status === 'done') {
-            return {
-                state: prepareDailyRefreshState(existing, today, config),
-                resumed: true,
-                reason: 'refresh_done'
-            };
-        }
-
-        if (existing.status !== 'running') {
-            return {
-                state: prepareDailyRefreshState(existing, today, config),
-                resumed: false,
-                reason: 'refresh_non_running'
-            };
-        }
-
-        if (!isSameScopeAndStrategy(existing, config)) {
-            return {
-                state: prepareDailyRefreshState(existing, today, config),
-                resumed: false,
-                reason: 'refresh_scope_or_strategy_changed'
-            };
-        }
-
-        return {
-            state: existing,
-            resumed: true,
-            reason: 'resume'
-        };
-    } catch {
-        return {
-            state: createInitialScheduleState(today, config),
-            resumed: false,
-            reason: 'reset_invalid_file'
-        };
-    }
+        },
+        items: [],
+        stats: {
+            rawItems: 0,
+            uniqueItems: 0,
+            durationMs: 0
+        },
+        startedAtMs: Date.now(),
+        generatedAt: 0
+    };
 }
 
-export function loadExistingScheduleState(
+export function createInitialScheduleDocument(): ScheduleDocument {
+    return {
+        $schema: SCHEDULE_SCHEMA_RELATIVE_PATH,
+        version: 3,
+        published: null,
+        building: null
+    };
+}
+
+export function loadScheduleDocument(
     scheduleFilePath: string
-): ScheduleFile | null {
+): ScheduleDocument | null {
     const absolutePath = path.resolve(scheduleFilePath);
     if (!fs.existsSync(absolutePath)) {
         return null;
@@ -447,23 +430,204 @@ export function loadExistingScheduleState(
 
     try {
         const raw = JSON.parse(fs.readFileSync(absolutePath, 'utf8'));
-        return asScheduleFile(raw);
+        return asScheduleDocument(raw);
     } catch {
         return null;
     }
 }
 
-export function saveScheduleState(
+export function saveScheduleDocument(
     scheduleFilePath: string,
-    state: ScheduleFile
+    document: ScheduleDocument
 ): void {
-    state.$schema = SCHEDULE_SCHEMA_RELATIVE_PATH;
+    document.$schema = SCHEDULE_SCHEMA_RELATIVE_PATH;
+    document.version = 3;
     const absolutePath = path.resolve(scheduleFilePath);
     const directory = path.dirname(absolutePath);
     fs.mkdirSync(directory, { recursive: true });
     fs.writeFileSync(
         absolutePath,
-        `${JSON.stringify(state, null, 4)}\n`,
+        `${JSON.stringify(document, null, 4)}\n`,
         'utf8'
     );
+}
+
+export function loadPublishedScheduleState(
+    scheduleFilePath: string
+): ScheduleState | null {
+    const document = loadScheduleDocument(scheduleFilePath);
+    return document?.published ? cloneScheduleState(document.published) : null;
+}
+
+export function savePublishedScheduleState(
+    scheduleFilePath: string,
+    state: ScheduleState | null
+): void {
+    const document =
+        loadScheduleDocument(scheduleFilePath) ??
+        createInitialScheduleDocument();
+    document.published = state ? cloneScheduleState(state) : null;
+    saveScheduleDocument(scheduleFilePath, document);
+}
+
+export function loadBuildingScheduleState(
+    scheduleFilePath: string
+): ScheduleState | null {
+    const document = loadScheduleDocument(scheduleFilePath);
+    return document?.building ? cloneScheduleState(document.building) : null;
+}
+
+export function saveBuildingScheduleState(
+    scheduleFilePath: string,
+    state: ScheduleState | null
+): void {
+    const document =
+        loadScheduleDocument(scheduleFilePath) ??
+        createInitialScheduleDocument();
+    document.building = state ? cloneScheduleState(state) : null;
+    saveScheduleDocument(scheduleFilePath, document);
+}
+
+export function promoteBuildingScheduleState(
+    scheduleFilePath: string,
+    fallbackState: ScheduleState
+): ScheduleState {
+    const document =
+        loadScheduleDocument(scheduleFilePath) ??
+        createInitialScheduleDocument();
+    const buildingState = document.building
+        ? cloneScheduleState(document.building)
+        : cloneScheduleState(fallbackState);
+    const promotedState = mergePublishedRouteInfo(
+        buildingState,
+        document.published ? cloneScheduleState(document.published) : null
+    );
+    document.published = promotedState;
+    document.building = null;
+    saveScheduleDocument(scheduleFilePath, document);
+    return cloneScheduleState(promotedState);
+}
+
+export function loadOrInitBuildingScheduleState(
+    scheduleFilePath: string,
+    config: ScheduleProbeRuntimeConfig
+): LoadedBuildingScheduleState {
+    const today = getCurrentDateString();
+    const absolutePath = path.resolve(scheduleFilePath);
+    const fileExists = fs.existsSync(absolutePath);
+    const document = loadScheduleDocument(scheduleFilePath);
+    if (!document) {
+        return {
+            state: createInitialScheduleState(today, config),
+            resumed: false,
+            publishPending: false,
+            reason: fileExists ? 'reset_invalid_file' : 'init_missing_file'
+        };
+    }
+
+    const building = document.building;
+    if (building && building.date === today) {
+        if (
+            building.status === 'done' ||
+            building.status === 'partial_failed'
+        ) {
+            return {
+                state: cloneScheduleState(building),
+                resumed: true,
+                publishPending: true,
+                reason: 'publish_pending'
+            };
+        }
+
+        if (
+            building.status === 'running' &&
+            isSameScopeAndStrategy(building, config)
+        ) {
+            return {
+                state: cloneScheduleState(building),
+                resumed: true,
+                publishPending: false,
+                reason: 'resume'
+            };
+        }
+    }
+
+    const published = document.published;
+    if (
+        published &&
+        published.date === today &&
+        published.status === 'partial_failed' &&
+        isSameScopeAndStrategy(published, config)
+    ) {
+        return {
+            state: preparePartialRetryState(
+                cloneScheduleState(published),
+                config
+            ),
+            resumed: true,
+            publishPending: false,
+            reason: 'retry_partial_failed'
+        };
+    }
+
+    if (
+        building &&
+        building.date === today &&
+        !isSameScopeAndStrategy(building, config)
+    ) {
+        return {
+            state: createInitialScheduleState(today, config),
+            resumed: false,
+            publishPending: false,
+            reason: 'refresh_scope_or_strategy_changed'
+        };
+    }
+
+    if (
+        published &&
+        published.date === today &&
+        published.status === 'partial_failed' &&
+        !isSameScopeAndStrategy(published, config)
+    ) {
+        return {
+            state: createInitialScheduleState(today, config),
+            resumed: false,
+            publishPending: false,
+            reason: 'refresh_scope_or_strategy_changed'
+        };
+    }
+
+    if (published && published.date !== today) {
+        return {
+            state: createInitialScheduleState(today, config),
+            resumed: false,
+            publishPending: false,
+            reason: 'refresh_cross_day'
+        };
+    }
+
+    if (published && published.date === today && published.status === 'done') {
+        return {
+            state: createInitialScheduleState(today, config),
+            resumed: false,
+            publishPending: false,
+            reason: 'refresh_done'
+        };
+    }
+
+    if (published && published.status !== 'running') {
+        return {
+            state: createInitialScheduleState(today, config),
+            resumed: false,
+            publishPending: false,
+            reason: 'refresh_non_running'
+        };
+    }
+
+    return {
+        state: createInitialScheduleState(today, config),
+        resumed: false,
+        publishPending: false,
+        reason: 'refresh_non_running'
+    };
 }

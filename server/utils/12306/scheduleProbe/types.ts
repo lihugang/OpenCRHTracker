@@ -45,9 +45,7 @@ export interface ScheduleStats {
     durationMs: number;
 }
 
-export interface ScheduleFile {
-    $schema: string;
-    version: 2;
+export interface ScheduleState {
     date: string;
     lastBuildDate: string;
     status: ScheduleStatus;
@@ -64,6 +62,13 @@ export interface ScheduleFile {
     stats: ScheduleStats;
     startedAtMs: number;
     generatedAt: number;
+}
+
+export interface ScheduleDocument {
+    $schema: string;
+    version: 3;
+    published: ScheduleState | null;
+    building: ScheduleState | null;
 }
 
 export interface BuildScheduleResult {

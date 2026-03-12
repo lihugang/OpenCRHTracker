@@ -1,7 +1,6 @@
 import getLogger from '~/server/libs/log4js';
 import useConfig from '~/server/config';
 import { registerTaskExecutor } from '~/server/services/taskExecutorRegistry';
-import { enqueueTask } from '~/server/services/taskQueue';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
 import fetchRouteInfo from '~/server/utils/12306/network/fetchRouteInfo';
 import queryWithRetry from '~/server/utils/12306/scheduleProbe/queryWithRetry';
@@ -11,11 +10,13 @@ import {
     getGroupKey
 } from '~/server/utils/12306/scheduleProbe/taskHelpers';
 import {
-    loadExistingScheduleState,
-    saveScheduleState
+    loadPublishedScheduleState,
+    savePublishedScheduleState
 } from '~/server/utils/12306/scheduleProbe/stateStore';
+import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
 import { toShanghaiDayOffsetFromUnixSeconds } from '~/server/utils/date/shanghaiDateTime';
+import type { ScheduleState } from '~/server/utils/12306/scheduleProbe/types';
 
 export const REFRESH_ROUTE_BATCH_TASK_EXECUTOR = 'refresh_route_batch';
 
@@ -25,6 +26,14 @@ let registered = false;
 
 interface RefreshRouteBatchTaskArgs {
     codes: string[];
+}
+
+interface RefreshRouteGroupUpdate {
+    codes: string[];
+    startAt: number;
+    endAt: number;
+    lastRouteRefreshAt: number;
+    internalCode: string;
 }
 
 function parseTaskArgs(
@@ -60,6 +69,31 @@ function parseTaskArgs(
     return { codes };
 }
 
+function applyGroupUpdate(
+    state: ScheduleState,
+    update: RefreshRouteGroupUpdate
+): boolean {
+    const codeIndex = buildCodeIndex(state.items);
+    let applied = false;
+    for (const code of update.codes) {
+        const itemIndex = codeIndex.get(code);
+        if (itemIndex === undefined) {
+            continue;
+        }
+
+        const item = state.items[itemIndex]!;
+        item.startAt = update.startAt;
+        item.endAt = update.endAt;
+        item.lastRouteRefreshAt = update.lastRouteRefreshAt;
+        if (item.internalCode.length === 0 && update.internalCode.length > 0) {
+            item.internalCode = update.internalCode;
+        }
+        applied = true;
+    }
+
+    return applied;
+}
+
 async function executeRefreshRouteBatchTask(rawArgs: unknown) {
     const config = useConfig();
     const batchSize = config.spider.scheduleProbe.refresh.batchSize;
@@ -71,10 +105,15 @@ async function executeRefreshRouteBatchTask(rawArgs: unknown) {
     }
 
     const scheduleFilePath = config.data.assets.schedule.file;
-    const state = loadExistingScheduleState(scheduleFilePath);
+    const state = loadPublishedScheduleState(scheduleFilePath);
     if (!state) {
+        logger.warn(`skip schedule_not_found file=${scheduleFilePath}`);
+        return;
+    }
+    const currentDate = getCurrentDateString();
+    if (state.date !== currentDate) {
         logger.warn(
-            `skip schedule_not_found file=${scheduleFilePath}`
+            `skip_non_current_schedule scheduleDate=${state.date} currentDate=${currentDate} file=${scheduleFilePath}`
         );
         return;
     }
@@ -82,6 +121,7 @@ async function executeRefreshRouteBatchTask(rawArgs: unknown) {
     const groupIndex = buildGroupIndex(state.items);
     const codeIndex = buildCodeIndex(state.items);
     const processedGroups = new Set<string>();
+    const groupUpdates: RefreshRouteGroupUpdate[] = [];
     let processed = 0;
     let success = 0;
     let failed = 0;
@@ -151,13 +191,41 @@ async function executeRefreshRouteBatchTask(rawArgs: unknown) {
 
         success += 1;
         mutated = true;
+        groupUpdates.push({
+            codes: groupItemIndexes.map((index) =>
+                normalizeCode(state.items[index]!.code)
+            ),
+            startAt: nextStartAt,
+            endAt: nextEndAt,
+            lastRouteRefreshAt: refreshedAt,
+            internalCode: refreshedInternalCode
+        });
         if (groupChanged) {
             changed += 1;
         }
     }
 
     if (mutated) {
-        saveScheduleState(scheduleFilePath, state);
+        const latestState = loadPublishedScheduleState(scheduleFilePath);
+        if (!latestState) {
+            logger.warn(
+                `skip_save schedule_not_found_after_refresh file=${scheduleFilePath}`
+            );
+        } else if (latestState.date !== state.date) {
+            logger.warn(
+                `skip_save schedule_date_changed oldDate=${state.date} newDate=${latestState.date} file=${scheduleFilePath}`
+            );
+        } else {
+            let appliedGroups = 0;
+            for (const update of groupUpdates) {
+                if (applyGroupUpdate(latestState, update)) {
+                    appliedGroups += 1;
+                }
+            }
+            if (appliedGroups > 0) {
+                savePublishedScheduleState(scheduleFilePath, latestState);
+            }
+        }
     }
     logger.info(
         `done processed=${processed} success=${success} failed=${failed} changed=${changed} apiCalls=${totalAttempts} file=${scheduleFilePath}`
@@ -173,7 +241,5 @@ export function registerRefreshRouteBatchTaskExecutor() {
         await executeRefreshRouteBatchTask(args);
     });
     registered = true;
-    logger.info(
-        `registered executor=${REFRESH_ROUTE_BATCH_TASK_EXECUTOR}`
-    );
+    logger.info(`registered executor=${REFRESH_ROUTE_BATCH_TASK_EXECUTOR}`);
 }

@@ -7,11 +7,12 @@ import {
     enqueueTasks,
     type EnqueueTaskInput
 } from '~/server/services/taskQueue';
-import { loadExistingScheduleState } from '~/server/utils/12306/scheduleProbe/stateStore';
+import { loadPublishedScheduleState } from '~/server/utils/12306/scheduleProbe/stateStore';
 import {
     getGroupKey,
     splitIntoBatches
 } from '~/server/utils/12306/scheduleProbe/taskHelpers';
+import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
 import { REFRESH_ROUTE_BATCH_TASK_EXECUTOR } from './refreshRouteBatchTaskExecutor';
 
@@ -52,7 +53,7 @@ function enqueueSelfTask(
 async function executeGenerateRouteRefreshTasks() {
     const config = useConfig();
     const scheduleFilePath = config.data.assets.schedule.file;
-    const state = loadExistingScheduleState(scheduleFilePath);
+    const state = loadPublishedScheduleState(scheduleFilePath);
     const now = getNowSeconds();
     const selfExpectedDurationMs = estimateGenerateRouteRefreshTaskDurationMs();
     const generateIntervalSeconds =
@@ -68,6 +69,19 @@ async function executeGenerateRouteRefreshTasks() {
             `schedule_not_found file=${scheduleFilePath} ` +
                 `selfTaskId=${selfTaskId} nextExecutionTime=${nextSelfExecutionTime} ` +
                 `generateIntervalHours=${config.spider.scheduleProbe.refresh.generateIntervalHours}`
+        );
+        return;
+    }
+
+    const currentDate = getCurrentDateString();
+    if (state.date !== currentDate) {
+        const selfTaskId = enqueueSelfTask(
+            nextSelfExecutionTime,
+            selfExpectedDurationMs
+        );
+        logger.warn(
+            `skip_non_current_schedule scheduleDate=${state.date} currentDate=${currentDate} file=${scheduleFilePath} ` +
+                `selfTaskId=${selfTaskId} nextExecutionTime=${nextSelfExecutionTime}`
         );
         return;
     }
@@ -140,7 +154,5 @@ export function registerGenerateRouteRefreshTasksExecutor() {
         await executeGenerateRouteRefreshTasks();
     });
     registered = true;
-    logger.info(
-        `registered executor=${GENERATE_ROUTE_REFRESH_TASKS_EXECUTOR}`
-    );
+    logger.info(`registered executor=${GENERATE_ROUTE_REFRESH_TASKS_EXECUTOR}`);
 }
