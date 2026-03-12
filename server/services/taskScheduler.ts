@@ -10,10 +10,10 @@ import getNowSeconds from '~/server/utils/time/getNowSeconds';
 
 const logger = getLogger('task-scheduler');
 type TaskSqlKey = 'completeTask' | 'selectTasks';
-const taskSql = importSqlBatch('tasks') as Record<TaskSqlKey, string>;
+const taskSql = importSqlBatch('tasks/queries') as Record<TaskSqlKey, string>;
 const taskStatements = createPreparedSqlStore<TaskSqlKey>({
     dbName: 'task',
-    scope: 'tasks',
+    scope: 'tasks/queries',
     sql: taskSql
 });
 

@@ -5,14 +5,10 @@ import useDatabase, {
 import importSqlBatch from '~/server/utils/sql/importSqlBatch';
 
 function ensureTaskSchema(db: Database.Database) {
-    const schemaSql = importSqlBatch('tasks');
-    const createTable = schemaSql.createTable;
-    if (!createTable) {
-        throw new Error(
-            '[task-db] missing schema SQL: assets/sql/tasks/createTable.sql'
-        );
+    const schemaSql = importSqlBatch('tasks/schema');
+    for (const statement of Object.values(schemaSql)) {
+        db.exec(statement);
     }
-    db.exec(createTable);
 }
 
 registerDatabaseInitializer('task', ensureTaskSchema);
