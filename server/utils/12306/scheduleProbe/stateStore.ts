@@ -15,14 +15,14 @@ interface LoadedBuildingScheduleState {
     resumed: boolean;
     publishPending: boolean;
     reason:
-        | 'resume'
-        | 'publish_pending'
-        | 'reuse_published_terminal'
-        | 'refresh_non_running'
-        | 'refresh_cross_day'
-        | 'refresh_scope_or_strategy_changed'
-        | 'init_missing_file'
-        | 'reset_invalid_file';
+    | 'resume'
+    | 'publish_pending'
+    | 'reuse_published_terminal'
+    | 'refresh_non_running'
+    | 'refresh_cross_day'
+    | 'refresh_scope_or_strategy_changed'
+    | 'init_missing_file'
+    | 'reset_invalid_file';
 }
 
 const SCHEDULE_SCHEMA_RELATIVE_PATH = '../assets/json/scheduleScheme.json';

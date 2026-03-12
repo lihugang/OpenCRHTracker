@@ -1,5 +1,5 @@
 INSERT INTO probe_status (
     train_code,
-    emu_train_set_no,
+    emu_code,
     status
 ) VALUES (?, ?, ?);

@@ -17,7 +17,6 @@ import {
 } from '~/server/services/probeAssetStore';
 import {
     ensureProbeStatus,
-    getTrainSetNoFromEmuCode,
     listProbeStatusByTrainCode,
     ProbeStatusValue
 } from '~/server/services/probeStatusStore';
@@ -296,11 +295,7 @@ async function persistResolvedGroup(
         }
 
         for (const emuCode of emuCodes) {
-            const trainSetNo = getTrainSetNoFromEmuCode(emuCode);
-            if (trainSetNo.length === 0) {
-                continue;
-            }
-            ensureProbeStatus(trainCode, trainSetNo, finalStatus);
+            ensureProbeStatus(trainCode, emuCode, finalStatus);
         }
     }
 

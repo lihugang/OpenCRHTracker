@@ -1,7 +1,6 @@
 import '~/server/libs/database/emu';
 import { createPreparedSqlStore } from '~/server/libs/database/prepared';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
-import parseEmuCode from '~/server/utils/12306/parseEmuCode';
 import importSqlBatch from '~/server/utils/sql/importSqlBatch';
 
 export enum ProbeStatusValue {
@@ -16,18 +15,18 @@ export enum ProbeStatusValue {
 export interface ProbeStatusRow {
     id: number;
     train_code: string;
-    emu_train_set_no: string;
+    emu_code: string;
     status: ProbeStatusValue;
 }
 
 type ProbeStatusSqlKey =
     | 'clearProbeStatus'
     | 'insertProbeStatus'
-    | 'selectProbeStatusByEmuTrainSetNo'
+    | 'selectProbeStatusByEmuCode'
     | 'selectProbeStatusByTrainCode'
-    | 'updateProbeStatusByEmuTrainSetNo'
+    | 'updateProbeStatusByEmuCode'
     | 'updateProbeStatusByTrainCode'
-    | 'updateProbeStatusByTrainCodeAndEmuTrainSetNo';
+    | 'updateProbeStatusByTrainCodeAndEmuCode';
 
 const probeStatusSql = importSqlBatch('emu/queries') as Record<
     ProbeStatusSqlKey,
@@ -43,26 +42,19 @@ function normalizeTrainCode(trainCode: string): string {
     return normalizeCode(trainCode);
 }
 
-function normalizeTrainSetNo(emuTrainSetNo: string): string {
-    return normalizeCode(emuTrainSetNo);
+function normalizeEmuCode(emuCode: string): string {
+    return normalizeCode(emuCode);
 }
 
-export function getTrainSetNoFromEmuCode(emuCode: string): string {
-    const parsed = parseEmuCode(emuCode);
-    return parsed?.trainSetNo ?? '';
-}
-
-export function listProbeStatusByEmuTrainSetNo(
-    emuTrainSetNo: string
-): ProbeStatusRow[] {
-    const normalizedTrainSetNo = normalizeTrainSetNo(emuTrainSetNo);
-    if (normalizedTrainSetNo.length === 0) {
+export function listProbeStatusByEmuCode(emuCode: string): ProbeStatusRow[] {
+    const normalizedEmuCode = normalizeEmuCode(emuCode);
+    if (normalizedEmuCode.length === 0) {
         return [];
     }
 
     return probeStatusStatements.all<ProbeStatusRow>(
-        'selectProbeStatusByEmuTrainSetNo',
-        normalizedTrainSetNo
+        'selectProbeStatusByEmuCode',
+        normalizedEmuCode
     );
 }
 
@@ -80,64 +72,41 @@ export function listProbeStatusByTrainCode(trainCode: string): ProbeStatusRow[] 
 
 export function insertProbeStatus(
     trainCode: string,
-    emuTrainSetNo: string,
+    emuCode: string,
     status: ProbeStatusValue
 ): number {
     const normalizedTrainCode = normalizeTrainCode(trainCode);
-    const normalizedTrainSetNo = normalizeTrainSetNo(emuTrainSetNo);
-    if (normalizedTrainCode.length === 0 || normalizedTrainSetNo.length === 0) {
+    const normalizedEmuCode = normalizeEmuCode(emuCode);
+    if (normalizedTrainCode.length === 0 || normalizedEmuCode.length === 0) {
         return 0;
     }
 
     const result = probeStatusStatements.run(
         'insertProbeStatus',
         normalizedTrainCode,
-        normalizedTrainSetNo,
+        normalizedEmuCode,
         status
     );
     return Number(result.lastInsertRowid);
 }
 
-export function insertProbeStatusIfMissing(
-    trainCode: string,
-    emuTrainSetNo: string,
-    status: ProbeStatusValue
-): 'created' | 'existing' {
-    const normalizedTrainCode = normalizeTrainCode(trainCode);
-    const normalizedTrainSetNo = normalizeTrainSetNo(emuTrainSetNo);
-    if (normalizedTrainCode.length === 0 || normalizedTrainSetNo.length === 0) {
-        return 'existing';
-    }
-
-    const existingRows = listProbeStatusByTrainCode(normalizedTrainCode);
-    const existing = existingRows.find(
-        (row) => row.emu_train_set_no === normalizedTrainSetNo
-    );
-    if (existing) {
-        return 'existing';
-    }
-
-    insertProbeStatus(normalizedTrainCode, normalizedTrainSetNo, status);
-    return 'created';
-}
-
 export function ensureProbeStatus(
     trainCode: string,
-    emuTrainSetNo: string,
+    emuCode: string,
     status: ProbeStatusValue
 ): 'created' | 'updated' | 'unchanged' {
     const normalizedTrainCode = normalizeTrainCode(trainCode);
-    const normalizedTrainSetNo = normalizeTrainSetNo(emuTrainSetNo);
-    if (normalizedTrainCode.length === 0 || normalizedTrainSetNo.length === 0) {
+    const normalizedEmuCode = normalizeEmuCode(emuCode);
+    if (normalizedTrainCode.length === 0 || normalizedEmuCode.length === 0) {
         return 'unchanged';
     }
 
     const existingRows = listProbeStatusByTrainCode(normalizedTrainCode);
     const existing = existingRows.find(
-        (row) => row.emu_train_set_no === normalizedTrainSetNo
+        (row) => row.emu_code === normalizedEmuCode
     );
     if (!existing) {
-        insertProbeStatus(normalizedTrainCode, normalizedTrainSetNo, status);
+        insertProbeStatus(normalizedTrainCode, normalizedEmuCode, status);
         return 'created';
     }
 
@@ -145,27 +114,27 @@ export function ensureProbeStatus(
         return 'unchanged';
     }
 
-    updateProbeStatusByTrainCodeAndEmuTrainSetNo(
+    updateProbeStatusByTrainCodeAndEmuCode(
         normalizedTrainCode,
-        normalizedTrainSetNo,
+        normalizedEmuCode,
         status
     );
     return 'updated';
 }
 
-export function updateProbeStatusByEmuTrainSetNo(
-    emuTrainSetNo: string,
+export function updateProbeStatusByEmuCode(
+    emuCode: string,
     status: ProbeStatusValue
 ): number {
-    const normalizedTrainSetNo = normalizeTrainSetNo(emuTrainSetNo);
-    if (normalizedTrainSetNo.length === 0) {
+    const normalizedEmuCode = normalizeEmuCode(emuCode);
+    if (normalizedEmuCode.length === 0) {
         return 0;
     }
 
     const result = probeStatusStatements.run(
-        'updateProbeStatusByEmuTrainSetNo',
+        'updateProbeStatusByEmuCode',
         status,
-        normalizedTrainSetNo
+        normalizedEmuCode
     );
     return result.changes;
 }
@@ -187,22 +156,22 @@ export function updateProbeStatusByTrainCode(
     return result.changes;
 }
 
-export function updateProbeStatusByTrainCodeAndEmuTrainSetNo(
+export function updateProbeStatusByTrainCodeAndEmuCode(
     trainCode: string,
-    emuTrainSetNo: string,
+    emuCode: string,
     status: ProbeStatusValue
 ): number {
     const normalizedTrainCode = normalizeTrainCode(trainCode);
-    const normalizedTrainSetNo = normalizeTrainSetNo(emuTrainSetNo);
-    if (normalizedTrainCode.length === 0 || normalizedTrainSetNo.length === 0) {
+    const normalizedEmuCode = normalizeEmuCode(emuCode);
+    if (normalizedTrainCode.length === 0 || normalizedEmuCode.length === 0) {
         return 0;
     }
 
     const result = probeStatusStatements.run(
-        'updateProbeStatusByTrainCodeAndEmuTrainSetNo',
+        'updateProbeStatusByTrainCodeAndEmuCode',
         status,
         normalizedTrainCode,
-        normalizedTrainSetNo
+        normalizedEmuCode
     );
     return result.changes;
 }

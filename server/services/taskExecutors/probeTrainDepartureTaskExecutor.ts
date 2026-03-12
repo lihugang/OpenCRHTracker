@@ -17,10 +17,9 @@ import {
 } from '~/server/services/probeRuntimeState';
 import {
     ensureProbeStatus,
-    getTrainSetNoFromEmuCode,
-    listProbeStatusByEmuTrainSetNo,
+    listProbeStatusByEmuCode,
     listProbeStatusByTrainCode,
-    updateProbeStatusByEmuTrainSetNo,
+    updateProbeStatusByEmuCode,
     ProbeStatusValue,
     type ProbeStatusRow
 } from '~/server/services/probeStatusStore';
@@ -60,7 +59,7 @@ interface CoupledDetectionTaskArgs {
 
 interface KnownStatusGroup {
     trainCodes: string[];
-    trainSetNos: string[];
+    emuCodes: string[];
     finalStatus: ProbeStatusValue;
 }
 
@@ -188,10 +187,10 @@ function queueCoupledDetectionTask(mainRecord: EmuListRecord): number {
 
 function collectKnownStatusGroup(
     rows: ProbeStatusRow[],
-    currentTrainSetNo: string
+    currentEmuCode: string
 ): KnownStatusGroup {
     const trainCodes = new Set<string>();
-    const trainSetNos = new Set<string>([currentTrainSetNo]);
+    const emuCodes = new Set<string>([currentEmuCode]);
     let finalStatus: ProbeStatusValue = rows.some(
         (row) => row.status === ProbeStatusValue.CoupledFormationResolved
     )
@@ -200,7 +199,7 @@ function collectKnownStatusGroup(
 
     for (const row of rows) {
         trainCodes.add(row.train_code);
-        trainSetNos.add(row.emu_train_set_no);
+        emuCodes.add(row.emu_code);
     }
 
     if (finalStatus === ProbeStatusValue.CoupledFormationResolved) {
@@ -208,25 +207,16 @@ function collectKnownStatusGroup(
             const relatedRows = listProbeStatusByTrainCode(row.train_code);
             for (const relatedRow of relatedRows) {
                 trainCodes.add(relatedRow.train_code);
-                trainSetNos.add(relatedRow.emu_train_set_no);
+                emuCodes.add(relatedRow.emu_code);
             }
         }
     }
 
     return {
         trainCodes: Array.from(trainCodes),
-        trainSetNos: Array.from(trainSetNos),
+        emuCodes: Array.from(emuCodes),
         finalStatus
     };
-}
-
-function buildResolvedEmuCodes(model: string, trainSetNos: string[]): string[] {
-    return uniqueNormalizedCodes(
-        trainSetNos
-            .map((trainSetNo) => normalizeCode(trainSetNo))
-            .filter((trainSetNo) => trainSetNo.length > 0)
-            .map((trainSetNo) => `${normalizeCode(model)}-${trainSetNo}`)
-    );
 }
 
 function applyResolvedResult(
@@ -240,11 +230,7 @@ function applyResolvedResult(
 ): void {
     for (const trainCode of allTrainCodes) {
         for (const emuCode of allEmuCodes) {
-            const trainSetNo = getTrainSetNoFromEmuCode(emuCode);
-            if (trainSetNo.length === 0) {
-                continue;
-            }
-            ensureProbeStatus(trainCode, trainSetNo, status);
+            ensureProbeStatus(trainCode, emuCode, status);
         }
     }
 
@@ -411,7 +397,7 @@ async function executeProbeTrainDepartureTask(rawArgs: unknown): Promise<void> {
         return;
     }
 
-    const existingRows = listProbeStatusByEmuTrainSetNo(currentTrainSetNo);
+    const existingRows = listProbeStatusByEmuCode(mainEmuCode);
     if (
         existingRows.some(
             (row) =>
@@ -419,30 +405,26 @@ async function executeProbeTrainDepartureTask(rawArgs: unknown): Promise<void> {
                 row.status === ProbeStatusValue.CoupledFormationResolved
         )
     ) {
-        const knownGroup = collectKnownStatusGroup(existingRows, currentTrainSetNo);
-        for (const trainSetNo of knownGroup.trainSetNos) {
-            updateProbeStatusByEmuTrainSetNo(trainSetNo, knownGroup.finalStatus);
+        const knownGroup = collectKnownStatusGroup(existingRows, mainEmuCode);
+        for (const emuCode of knownGroup.emuCodes) {
+            updateProbeStatusByEmuCode(emuCode, knownGroup.finalStatus);
         }
 
         const resolvedTrainCodes = uniqueNormalizedCodes([
             ...knownGroup.trainCodes,
             ...allTrainCodes
         ]);
-        const resolvedEmuCodes = buildResolvedEmuCodes(
-            mainRecord.model,
-            knownGroup.trainSetNos
-        );
         applyResolvedResult(
             args,
             trainKey,
             mainEmuCode,
             resolvedTrainCodes,
-            resolvedEmuCodes.length > 0 ? resolvedEmuCodes : [mainEmuCode],
+            knownGroup.emuCodes.length > 0 ? knownGroup.emuCodes : [mainEmuCode],
             knownGroup.finalStatus,
             nowSeconds
         );
         logger.info(
-            `resolved_from_status trainCode=${args.trainCode} mainEmuCode=${mainEmuCode} status=${knownGroup.finalStatus} trainSets=${knownGroup.trainSetNos.length}`
+            `resolved_from_status trainCode=${args.trainCode} mainEmuCode=${mainEmuCode} status=${knownGroup.finalStatus} emuCodes=${knownGroup.emuCodes.length}`
         );
         return;
     }
@@ -479,7 +461,7 @@ async function executeProbeTrainDepartureTask(rawArgs: unknown): Promise<void> {
     for (const trainCode of allTrainCodes) {
         ensureProbeStatus(
             trainCode,
-            currentTrainSetNo,
+            mainEmuCode,
             ProbeStatusValue.PendingCouplingDetection
         );
     }
@@ -495,7 +477,7 @@ async function executeProbeTrainDepartureTask(rawArgs: unknown): Promise<void> {
 
     const detectionTaskId = queueCoupledDetectionTask(mainRecord);
     logger.info(
-        `pending_coupling_detection trainCode=${args.trainCode} mainEmuCode=${mainEmuCode} currentTrainSetNo=${currentTrainSetNo} detectionTaskId=${detectionTaskId}`
+        `pending_coupling_detection trainCode=${args.trainCode} mainEmuCode=${mainEmuCode} detectionTaskId=${detectionTaskId}`
     );
 }
 
