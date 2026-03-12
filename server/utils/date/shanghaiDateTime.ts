@@ -132,3 +132,32 @@ export function getNextDayExecutionTimeInShanghaiSeconds(
 
     return Math.floor((nextDayTargetPseudoUtcMs - SHANGHAI_OFFSET_MS) / 1000);
 }
+
+export function getNextExecutionTimeInShanghaiSeconds(
+    nowMs: number,
+    dailyTimeHHmm: string
+): number {
+    const { hour, minute } = parseDailyTimeHHmm(dailyTimeHHmm);
+    const shanghaiNowPseudoUtcMs = nowMs + SHANGHAI_OFFSET_MS;
+    const shanghaiNow = new Date(shanghaiNowPseudoUtcMs);
+
+    const year = shanghaiNow.getUTCFullYear();
+    const month = shanghaiNow.getUTCMonth();
+    const day = shanghaiNow.getUTCDate();
+
+    const todayTargetPseudoUtcMs = Date.UTC(
+        year,
+        month,
+        day,
+        hour,
+        minute,
+        0,
+        0
+    );
+
+    if (todayTargetPseudoUtcMs > shanghaiNowPseudoUtcMs) {
+        return Math.floor((todayTargetPseudoUtcMs - SHANGHAI_OFFSET_MS) / 1000);
+    }
+
+    return getNextDayExecutionTimeInShanghaiSeconds(nowMs, dailyTimeHHmm);
+}

@@ -26,12 +26,16 @@ interface ScheduleProbeCouplingConfig {
     candidateCap: number;
     reuseWithinSeconds: number;
     runningGraceSeconds: number;
+    statusResetTimeHHmm: string;
+    detectDelaySeconds: number;
+    detectCooldownSeconds: number;
 }
 
 const ALLOWED_STARTUP_TASK_EXECUTORS = [
     'build_today_schedule',
     'generate_route_refresh_tasks',
-    'dispatch_daily_probe_tasks'
+    'dispatch_daily_probe_tasks',
+    'clear_daily_probe_status'
 ] as const;
 
 type StartupTaskExecutor = (typeof ALLOWED_STARTUP_TASK_EXECUTORS)[number];
@@ -371,6 +375,20 @@ function validateConfig(raw: unknown): Config {
                         spiderScheduleProbeCoupling.runningGraceSeconds,
                         'spider.scheduleProbe.coupling.runningGraceSeconds',
                         0
+                    ),
+                    statusResetTimeHHmm: asString(
+                        spiderScheduleProbeCoupling.statusResetTimeHHmm,
+                        'spider.scheduleProbe.coupling.statusResetTimeHHmm'
+                    ),
+                    detectDelaySeconds: asInteger(
+                        spiderScheduleProbeCoupling.detectDelaySeconds,
+                        'spider.scheduleProbe.coupling.detectDelaySeconds',
+                        0
+                    ),
+                    detectCooldownSeconds: asInteger(
+                        spiderScheduleProbeCoupling.detectCooldownSeconds,
+                        'spider.scheduleProbe.coupling.detectCooldownSeconds',
+                        0
                     )
                 },
                 prefixRules: spiderScheduleProbePrefixRules.map(
@@ -695,6 +713,17 @@ function validateConfig(raw: unknown): Config {
         assert(
             false,
             `spider.scheduleProbe.dailyTimeHHmm is invalid: ${message}`
+        );
+    }
+    try {
+        parseDailyTimeHHmm(
+            configResult.spider.scheduleProbe.coupling.statusResetTimeHHmm
+        );
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        assert(
+            false,
+            `spider.scheduleProbe.coupling.statusResetTimeHHmm is invalid: ${message}`
         );
     }
     const deduplicationPrefix = new Set<string>();

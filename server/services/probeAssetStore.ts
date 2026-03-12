@@ -26,6 +26,8 @@ export interface EmuListRecord {
 
 export interface ProbeAssets {
     emuList: EmuListRecord[];
+    emuByModelAndTrainSetNo: Map<string, EmuListRecord>;
+    emuListByDepotAndModel: Map<string, EmuListRecord[]>;
     qrcodeByModelAndTrainSetNo: Map<string, string>;
 }
 
@@ -62,6 +64,8 @@ export async function loadProbeAssets(): Promise<ProbeAssets> {
             parseJsonlToJson<RawQrCodeRecord>(qrCodeJsonlText);
 
         const emuList: EmuListRecord[] = [];
+        const emuByModelAndTrainSetNo = new Map<string, EmuListRecord>();
+        const emuListByDepotAndModel = new Map<string, EmuListRecord[]>();
         for (const row of rawEmuRecords) {
             if (
                 typeof row.model !== 'string' ||
@@ -70,12 +74,25 @@ export async function loadProbeAssets(): Promise<ProbeAssets> {
             ) {
                 continue;
             }
-            emuList.push({
+            const record = {
                 model: normalizeCode(row.model),
                 trainSetNo: normalizeCode(row.trainSetNo),
                 depot: row.depot.trim(),
                 multiple: row.multiple === true
-            });
+            };
+            emuList.push(record);
+            emuByModelAndTrainSetNo.set(
+                buildModelAndTrainSetNoKey(record.model, record.trainSetNo),
+                record
+            );
+
+            const depotAndModelKey = `${record.depot}#${record.model}`;
+            const group = emuListByDepotAndModel.get(depotAndModelKey);
+            if (group) {
+                group.push(record);
+            } else {
+                emuListByDepotAndModel.set(depotAndModelKey, [record]);
+            }
         }
 
         const qrcodeByModelAndTrainSetNo = new Map<string, string>();
@@ -98,6 +115,8 @@ export async function loadProbeAssets(): Promise<ProbeAssets> {
 
         cached = {
             emuList,
+            emuByModelAndTrainSetNo,
+            emuListByDepotAndModel,
             qrcodeByModelAndTrainSetNo
         };
         return cached;
@@ -109,6 +128,8 @@ export async function loadProbeAssets(): Promise<ProbeAssets> {
         logger.warn(`load_failed error=${message}`);
         cached = {
             emuList: [],
+            emuByModelAndTrainSetNo: new Map<string, EmuListRecord>(),
+            emuListByDepotAndModel: new Map<string, EmuListRecord[]>(),
             qrcodeByModelAndTrainSetNo: new Map<string, string>()
         };
         return cached;

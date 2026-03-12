@@ -31,7 +31,10 @@
             "coupling": {
                 "candidateCap": 200,
                 "reuseWithinSeconds": 3600,
-                "runningGraceSeconds": 900
+                "runningGraceSeconds": 900,
+                "statusResetTimeHHmm": "0000",
+                "detectDelaySeconds": 900,
+                "detectCooldownSeconds": 1800
             },
             "prefixRules": [
                 {

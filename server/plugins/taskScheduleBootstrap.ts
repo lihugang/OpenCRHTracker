@@ -18,12 +18,19 @@ import {
 import { registerRefreshRouteBatchTaskExecutor } from '~/server/services/taskExecutors/refreshRouteBatchTaskExecutor';
 import { registerDispatchDailyProbeTasksExecutor } from '~/server/services/taskExecutors/dispatchDailyProbeTasksExecutor';
 import { registerProbeTrainDepartureTaskExecutor } from '~/server/services/taskExecutors/probeTrainDepartureTaskExecutor';
+import {
+    CLEAR_DAILY_PROBE_STATUS_TASK_EXECUTOR,
+    registerClearDailyProbeStatusTaskExecutor
+} from '~/server/services/taskExecutors/clearDailyProbeStatusTaskExecutor';
+import { registerDetectCoupledEmuGroupTaskExecutor } from '~/server/services/taskExecutors/detectCoupledEmuGroupTaskExecutor';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
+import { getNextExecutionTimeInShanghaiSeconds } from '~/server/utils/date/shanghaiDateTime';
 
 const logger = getLogger('task-schedule-bootstrap');
 const STARTUP_EXECUTORS = [
     BUILD_SCHEDULE_TASK_EXECUTOR,
-    GENERATE_ROUTE_REFRESH_TASKS_EXECUTOR
+    GENERATE_ROUTE_REFRESH_TASKS_EXECUTOR,
+    CLEAR_DAILY_PROBE_STATUS_TASK_EXECUTOR
 ] as const;
 
 function reconcileStartupTask(
@@ -55,6 +62,8 @@ export default defineNitroPlugin(() => {
         registerGenerateRouteRefreshTasksExecutor();
         registerDispatchDailyProbeTasksExecutor();
         registerProbeTrainDepartureTaskExecutor();
+        registerClearDailyProbeStatusTaskExecutor();
+        registerDetectCoupledEmuGroupTaskExecutor();
 
         const disabledStartupExecutors = new Set<string>(
             useConfig().task.startup.disabledExecutors
@@ -95,6 +104,22 @@ export default defineNitroPlugin(() => {
             );
             enqueuedStartupTasks.push(
                 `${GENERATE_ROUTE_REFRESH_TASKS_EXECUTOR}:${generateTaskId}`
+            );
+        }
+
+        if (
+            !disabledStartupExecutors.has(CLEAR_DAILY_PROBE_STATUS_TASK_EXECUTOR)
+        ) {
+            const clearExecutionTime = getNextExecutionTimeInShanghaiSeconds(
+                Date.now(),
+                useConfig().spider.scheduleProbe.coupling.statusResetTimeHHmm
+            );
+            const clearTaskId = reconcileStartupTask(
+                CLEAR_DAILY_PROBE_STATUS_TASK_EXECUTOR,
+                clearExecutionTime
+            );
+            enqueuedStartupTasks.push(
+                `${CLEAR_DAILY_PROBE_STATUS_TASK_EXECUTOR}:${clearTaskId}`
             );
         }
 
