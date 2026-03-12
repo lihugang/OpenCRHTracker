@@ -23,13 +23,13 @@ let timer: NodeJS.Timeout | null = null;
 
 function parseTaskArguments(rawArguments: string):
     | {
-        ok: true;
-        argumentsValue: unknown;
-    }
+          ok: true;
+          argumentsValue: unknown;
+      }
     | {
-        ok: false;
-        message: string;
-    } {
+          ok: false;
+          message: string;
+      } {
     try {
         return {
             ok: true,
@@ -154,9 +154,7 @@ async function tick(): Promise<void> {
             maxTasksPerQuery
         );
 
-        logger.info(
-            `tick_start dueNormalTasks=${dueNormalTasks.length}`
-        );
+        logger.info(`tick_start dueNormalTasks=${dueNormalTasks.length}`);
         await runTasksByExecutor(dueNormalTasks);
 
         const maxIdleTasksPerTick = config.task.scheduler.idle.maxTasksPerTick;
@@ -219,9 +217,7 @@ export function startTaskScheduler() {
     }, pollIntervalMs);
     started = true;
 
-    logger.info(
-        `started pollIntervalMs=${pollIntervalMs} autoStart=true`
-    );
+    logger.info(`started pollIntervalMs=${pollIntervalMs} autoStart=true`);
     void tick();
 }
 

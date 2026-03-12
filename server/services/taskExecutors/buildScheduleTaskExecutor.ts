@@ -62,9 +62,7 @@ async function executeBuildScheduleTask() {
                 error instanceof Error
                     ? `${error.name}: ${error.message}`
                     : String(error);
-            logger.error(
-                `enqueue_next_daily_task_failed error=${message}`
-            );
+            logger.error(`enqueue_next_daily_task_failed error=${message}`);
             if (!caughtError) {
                 caughtError = error;
             }
@@ -85,7 +83,5 @@ export function registerBuildScheduleTaskExecutor() {
         await executeBuildScheduleTask();
     });
     registered = true;
-    logger.info(
-        `registered executor=${BUILD_SCHEDULE_TASK_EXECUTOR}`
-    );
+    logger.info(`registered executor=${BUILD_SCHEDULE_TASK_EXECUTOR}`);
 }

@@ -87,17 +87,14 @@ export default async function fetchRouteInfo(route: string) {
         'https://mobile.12306.cn/wxxcx/wechat/main/travelServiceQrcodeTrainInfo';
     try {
         await waitFor12306RequestSlot('query');
-        const response = await fetch(
-            url,
-            {
-                headers: {
-                    'content-type': 'application/x-www-form-urlencoded',
-                    'user-agent': config.spider.userAgent
-                },
-                body: `trainCode=${route}&startDay=${getCurrentDateString()}&startTime=&endDay=&endTime=`,
-                method: 'POST'
-            }
-        );
+        const response = await fetch(url, {
+            headers: {
+                'content-type': 'application/x-www-form-urlencoded',
+                'user-agent': config.spider.userAgent
+            },
+            body: `trainCode=${route}&startDay=${getCurrentDateString()}&startTime=&endDay=&endTime=`,
+            method: 'POST'
+        });
         if (!response.ok) {
             log12306RequestFailure({
                 logger,

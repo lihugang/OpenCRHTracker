@@ -92,17 +92,14 @@ export default async function fetchEMUInfoBySeatCode(code: string) {
         'https://mobile.12306.cn/wxxcx/wechat/main/travelServiceDecodeQrcode';
     try {
         await waitFor12306RequestSlot('query');
-        const response = await fetch(
-            url,
-            {
-                headers: {
-                    'content-type': 'application/x-www-form-urlencoded',
-                    'user-agent': config.spider.userAgent
-                },
-                body: `c=${normalizedCode}&w=h&eKey=${config.spider.params.eKey}&cb=function(e)%7Be%26%26t.decodeCallBack()%7D`,
-                method: 'POST'
-            }
-        );
+        const response = await fetch(url, {
+            headers: {
+                'content-type': 'application/x-www-form-urlencoded',
+                'user-agent': config.spider.userAgent
+            },
+            body: `c=${normalizedCode}&w=h&eKey=${config.spider.params.eKey}&cb=function(e)%7Be%26%26t.decodeCallBack()%7D`,
+            method: 'POST'
+        });
         if (!response.ok) {
             log12306RequestFailure({
                 logger,

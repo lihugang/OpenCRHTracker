@@ -148,14 +148,12 @@ function buildScheduleRouteStationsMap(
         }
 
         stationsByTrainCode.set(trainCode, {
-            startStation:
-                currentStations?.startStation.length
-                    ? currentStations.startStation
-                    : nextStations.startStation,
-            endStation:
-                currentStations?.endStation.length
-                    ? currentStations.endStation
-                    : nextStations.endStation
+            startStation: currentStations?.startStation.length
+                ? currentStations.startStation
+                : nextStations.startStation,
+            endStation: currentStations?.endStation.length
+                ? currentStations.endStation
+                : nextStations.endStation
         });
     }
 
@@ -167,7 +165,9 @@ async function resolveRouteStations(
     scheduleStationsByTrainCode: Map<string, RouteStations>
 ): Promise<RouteStations> {
     for (const trainCode of trainCodes) {
-        const stations = scheduleStationsByTrainCode.get(normalizeCode(trainCode));
+        const stations = scheduleStationsByTrainCode.get(
+            normalizeCode(trainCode)
+        );
         if (
             stations &&
             (stations.startStation.length > 0 || stations.endStation.length > 0)
@@ -322,7 +322,9 @@ async function persistResolvedGroup(
     }
 }
 
-async function executeDetectCoupledEmuGroupTask(rawArgs: unknown): Promise<void> {
+async function executeDetectCoupledEmuGroupTask(
+    rawArgs: unknown
+): Promise<void> {
     const args = parseTaskArgs(rawArgs);
     const config = useConfig();
     const nowSeconds = getNowSeconds();
@@ -380,9 +382,12 @@ export function registerDetectCoupledEmuGroupTaskExecutor(): void {
         return;
     }
 
-    registerTaskExecutor(DETECT_COUPLED_EMU_GROUP_TASK_EXECUTOR, async (args) => {
-        await executeDetectCoupledEmuGroupTask(args);
-    });
+    registerTaskExecutor(
+        DETECT_COUPLED_EMU_GROUP_TASK_EXECUTOR,
+        async (args) => {
+            await executeDetectCoupledEmuGroupTask(args);
+        }
+    );
     registered = true;
     logger.info(
         `registered executor=${DETECT_COUPLED_EMU_GROUP_TASK_EXECUTOR}`

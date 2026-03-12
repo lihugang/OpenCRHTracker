@@ -88,10 +88,16 @@ async function executeDispatchDailyProbeTasks(): Promise<void> {
         const existing = groupsByKey.get(groupKey);
         if (existing) {
             existing.allCodes.add(normalizeCode(item.code));
-            if (existing.startStation.length === 0 && item.startStation.length > 0) {
+            if (
+                existing.startStation.length === 0 &&
+                item.startStation.length > 0
+            ) {
                 existing.startStation = item.startStation;
             }
-            if (existing.endStation.length === 0 && item.endStation.length > 0) {
+            if (
+                existing.endStation.length === 0 &&
+                item.endStation.length > 0
+            ) {
                 existing.endStation = item.endStation;
             }
             existing.startAtOffset = Math.min(

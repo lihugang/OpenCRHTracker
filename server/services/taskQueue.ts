@@ -58,7 +58,9 @@ let reconcileSingletonTaskTransaction:
       ) => ReconcileSingletonTaskResult)
     | null = null;
 
-type EnqueueTasksTransaction = (tasks: readonly NormalizedTaskInsert[]) => number[];
+type EnqueueTasksTransaction = (
+    tasks: readonly NormalizedTaskInsert[]
+) => number[];
 type ReconcileSingletonTaskTransaction = (
     task: NormalizedTaskInsert,
     nowSeconds: number

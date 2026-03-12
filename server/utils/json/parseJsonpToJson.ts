@@ -13,7 +13,9 @@ export default function parseJsonpToJson<T = unknown>(
         throw new Error('Invalid JSONP: missing callback wrapper.');
     }
 
-    const callbackName = input.slice(0, openParenIndex).trim()
+    const callbackName = input
+        .slice(0, openParenIndex)
+        .trim()
         .replace(/\/\*.*?\*\//g, ''); // remove javascript notes
 
     if (!callbackName) {

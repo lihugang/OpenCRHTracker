@@ -43,7 +43,7 @@ export default defineEventHandler(async (event) => {
             const content =
                 format === 'json'
                     ? JSON.stringify(
-                      rows.map((row) => ({
+                          rows.map((row) => ({
                               trainCode: row.train_code,
                               emuCode: row.emu_code,
                               startStation: row.start_station_name,

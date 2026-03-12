@@ -15,16 +15,8 @@ interface Log12306RequestFailureOptions {
     error?: unknown;
 }
 
-function appendField(
-    parts: string[],
-    key: string,
-    value: unknown
-): void {
-    if (
-        typeof value === 'undefined' ||
-        value === null ||
-        value === ''
-    ) {
+function appendField(parts: string[], key: string, value: unknown): void {
+    if (typeof value === 'undefined' || value === null || value === '') {
         return;
     }
 
@@ -43,10 +35,7 @@ function appendField(
 export default function log12306RequestFailure(
     options: Log12306RequestFailureOptions
 ): void {
-    const parts = [
-        `operation=${options.operation}`,
-        `url=${options.url}`
-    ];
+    const parts = [`operation=${options.operation}`, `url=${options.url}`];
 
     if (options.context) {
         for (const [key, value] of Object.entries(options.context)) {

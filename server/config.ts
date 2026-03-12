@@ -254,7 +254,9 @@ function validateConfig(raw: unknown): Config {
     const apiDebug = asObject(api.debug, 'api.debug');
     const task = asObject(root.task, 'task');
     const taskStartup =
-        task.startup === undefined ? {} : asObject(task.startup, 'task.startup');
+        task.startup === undefined
+            ? {}
+            : asObject(task.startup, 'task.startup');
     const taskStartupDisabledExecutors =
         taskStartup.disabledExecutors === undefined
             ? []
@@ -761,9 +763,7 @@ function resolveConfigPath(): string {
         }
     }
 
-    throw new Error(
-        `Config file not found. Tried: ${candidates.join(', ')}`
-    );
+    throw new Error(`Config file not found. Tried: ${candidates.join(', ')}`);
 }
 
 export default function useConfig() {

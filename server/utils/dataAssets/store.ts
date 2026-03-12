@@ -122,9 +122,7 @@ export async function ensureAssetFile(
     }
 
     writeTextFileAtomically(filePath, defaultContent);
-    logger.warn(
-        `ensured key=${key} source=default file=${filePath}`
-    );
+    logger.warn(`ensured key=${key} source=default file=${filePath}`);
     return {
         filePath,
         source: 'default'

@@ -26,9 +26,7 @@ import {
 import { insertDailyEmuRoute } from '~/server/services/emuRoutesStore';
 import { registerTaskExecutor } from '~/server/services/taskExecutorRegistry';
 import { enqueueTask } from '~/server/services/taskQueue';
-import {
-    DETECT_COUPLED_EMU_GROUP_TASK_EXECUTOR
-} from '~/server/services/taskExecutors/detectCoupledEmuGroupTaskExecutor';
+import { DETECT_COUPLED_EMU_GROUP_TASK_EXECUTOR } from '~/server/services/taskExecutors/detectCoupledEmuGroupTaskExecutor';
 import fetchEMUInfoByRoute from '~/server/utils/12306/network/fetchEMUInfoByRoute';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
 import parseEmuCode from '~/server/utils/12306/parseEmuCode';
@@ -97,10 +95,10 @@ function parseTaskArgs(raw: unknown): ProbeTrainDepartureTaskArgs {
 
     const allCodes = Array.isArray(body.allCodes)
         ? uniqueNormalizedCodes(
-            body.allCodes.filter(
-                (item): item is string => typeof item === 'string'
-            )
-        )
+              body.allCodes.filter(
+                  (item): item is string => typeof item === 'string'
+              )
+          )
         : [];
     const startStation =
         typeof body.startStation === 'string' ? body.startStation.trim() : '';
@@ -173,7 +171,8 @@ function persistDailyRoutes(
 }
 
 function queueCoupledDetectionTask(mainRecord: EmuListRecord): number {
-    const delaySeconds = useConfig().spider.scheduleProbe.coupling.detectDelaySeconds;
+    const delaySeconds =
+        useConfig().spider.scheduleProbe.coupling.detectDelaySeconds;
     const taskArgs: CoupledDetectionTaskArgs = {
         depot: mainRecord.depot,
         model: mainRecord.model
@@ -357,7 +356,10 @@ async function executeProbeTrainDepartureTask(rawArgs: unknown): Promise<void> {
         return;
     }
 
-    const allTrainCodes = uniqueNormalizedCodes([args.trainCode, ...args.allCodes]);
+    const allTrainCodes = uniqueNormalizedCodes([
+        args.trainCode,
+        ...args.allCodes
+    ]);
     const assets = await loadProbeAssets();
     const mainRecord = assets.emuByModelAndTrainSetNo.get(
         buildProbeAssetKey(parsedMainEmuCode!.model, currentTrainSetNo)
@@ -419,7 +421,9 @@ async function executeProbeTrainDepartureTask(rawArgs: unknown): Promise<void> {
             trainKey,
             mainEmuCode,
             resolvedTrainCodes,
-            knownGroup.emuCodes.length > 0 ? knownGroup.emuCodes : [mainEmuCode],
+            knownGroup.emuCodes.length > 0
+                ? knownGroup.emuCodes
+                : [mainEmuCode],
             knownGroup.finalStatus,
             nowSeconds
         );

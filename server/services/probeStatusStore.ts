@@ -58,7 +58,9 @@ export function listProbeStatusByEmuCode(emuCode: string): ProbeStatusRow[] {
     );
 }
 
-export function listProbeStatusByTrainCode(trainCode: string): ProbeStatusRow[] {
+export function listProbeStatusByTrainCode(
+    trainCode: string
+): ProbeStatusRow[] {
     const normalizedTrainCode = normalizeTrainCode(trainCode);
     if (normalizedTrainCode.length === 0) {
         return [];

@@ -108,7 +108,9 @@ export default defineNitroPlugin(() => {
         }
 
         if (
-            !disabledStartupExecutors.has(CLEAR_DAILY_PROBE_STATUS_TASK_EXECUTOR)
+            !disabledStartupExecutors.has(
+                CLEAR_DAILY_PROBE_STATUS_TASK_EXECUTOR
+            )
         ) {
             const clearExecutionTime = getNextExecutionTimeInShanghaiSeconds(
                 Date.now(),
@@ -131,8 +133,6 @@ export default defineNitroPlugin(() => {
             error instanceof Error
                 ? `${error.name}: ${error.message}`
                 : String(error);
-        logger.error(
-            `bootstrap_failed error=${message}`
-        );
+        logger.error(`bootstrap_failed error=${message}`);
     }
 });
