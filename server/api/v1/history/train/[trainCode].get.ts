@@ -48,11 +48,12 @@ export default defineEventHandler(async (event) => {
                 nextCursor: buildNextCursor(rows, limit),
                 items: rows.map((row) => ({
                     ts: row.start_at,
+                    endAt: row.end_at,
                     id: String(row.id),
                     emuCode: row.emu_code,
                     startStation: row.start_station_name,
                     endStation: row.end_station_name,
-                    line: ''
+                    line: []
                 }))
             };
         }

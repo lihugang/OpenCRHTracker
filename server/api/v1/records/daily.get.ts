@@ -49,7 +49,7 @@ export default defineEventHandler(async (event) => {
                     trainCode: row.train_code,
                     startStation: row.start_station_name,
                     endStation: row.end_station_name,
-                    line: ''
+                    line: []
                 }))
             };
         }

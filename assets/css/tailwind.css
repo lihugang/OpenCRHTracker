@@ -1,1 +1,193 @@
 @import 'tailwindcss';
+
+@theme {
+    --color-crh-white: #ffffff;
+    --color-crh-blue: #00529b;
+    --color-crh-silver: #a9afb6;
+    --color-crh-slate: #f8fafc;
+    --color-crh-grey-dark: #334155;
+    --color-status-running: #10b981;
+    --color-status-delayed: #ef4444;
+
+    --font-sans:
+        'Inter', 'SF Pro Display', 'Segoe UI', system-ui, sans-serif;
+    --font-mono:
+        'JetBrains Mono', 'Roboto Mono', 'SFMono-Regular', ui-monospace,
+        monospace;
+
+    --shadow-ticket: 0 4px 20px -2px rgba(0, 82, 155, 0.08);
+    --shadow-ticket-hover: 0 10px 26px -8px rgba(0, 82, 155, 0.18);
+}
+
+@layer base {
+    html {
+        background: var(--color-crh-slate);
+    }
+
+    body {
+        min-height: 100vh;
+        background:
+            radial-gradient(
+                circle at top,
+                rgba(0, 82, 155, 0.1),
+                transparent 38%
+            ),
+            linear-gradient(180deg, #f8fbff 0%, #f8fafc 100%);
+        color: var(--color-crh-grey-dark);
+        font-family: var(--font-sans);
+    }
+}
+
+@layer components {
+    .ticket-card {
+        position: relative;
+        overflow: hidden;
+        transition:
+            transform 180ms ease,
+            box-shadow 180ms ease,
+            border-color 180ms ease;
+    }
+
+    .ticket-card::before {
+        content: '';
+        position: absolute;
+        left: 0.75rem;
+        top: 0.9rem;
+        bottom: 0.9rem;
+        width: 0.35rem;
+        border-radius: 999px;
+        background: linear-gradient(
+            180deg,
+            rgba(0, 82, 155, 0.92),
+            rgba(0, 82, 155, 0.28)
+        );
+    }
+
+    .ticket-card::after {
+        content: '';
+        position: absolute;
+        left: 1.75rem;
+        right: 1.5rem;
+        bottom: -0.4rem;
+        height: 2rem;
+        opacity: 0;
+        pointer-events: none;
+        background: linear-gradient(
+            90deg,
+            rgba(0, 82, 155, 0.22),
+            rgba(0, 82, 155, 0)
+        );
+        filter: blur(10px);
+        transition: opacity 180ms ease;
+    }
+
+    .ticket-card:hover {
+        transform: translateX(4px);
+        box-shadow: var(--shadow-ticket-hover);
+    }
+
+    .ticket-card:hover::after {
+        opacity: 1;
+    }
+
+    .ticket-card--accent {
+        background:
+            linear-gradient(135deg, rgba(0, 82, 155, 0.08), transparent 40%),
+            linear-gradient(180deg, #ffffff 0%, #f3f8ff 100%);
+    }
+
+    .ticket-card--subtle {
+        background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+    }
+
+    .motion-divider {
+        height: 1px;
+        background: linear-gradient(
+            90deg,
+            rgba(0, 82, 155, 0.8),
+            rgba(0, 82, 155, 0)
+        );
+    }
+
+    .harmony-input {
+        border-radius: 9999px;
+        border: 1px solid #d7e0ea;
+        background: rgba(255, 255, 255, 0.92);
+        color: var(--color-crh-grey-dark);
+        box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.04);
+        transition:
+            border-color 180ms ease,
+            box-shadow 180ms ease,
+            background-color 180ms ease;
+    }
+
+    .harmony-input:focus {
+        border-color: rgba(0, 82, 155, 0.6);
+        box-shadow:
+            0 0 0 4px rgba(0, 82, 155, 0.08),
+            inset 0 1px 2px rgba(15, 23, 42, 0.04);
+        outline: none;
+    }
+
+    .rail-track {
+        position: relative;
+        min-height: 6rem;
+        padding-left: 2rem;
+    }
+
+    .rail-track::before {
+        content: '';
+        position: absolute;
+        left: 0.58rem;
+        top: 0.45rem;
+        bottom: 0.45rem;
+        width: 2px;
+        background: rgba(0, 82, 155, 0.2);
+    }
+
+    .rail-track::after {
+        content: '';
+        position: absolute;
+        left: 0.58rem;
+        top: 0.45rem;
+        bottom: 0.45rem;
+        width: 2px;
+        background: linear-gradient(
+            180deg,
+            rgba(0, 82, 155, 0.85),
+            rgba(0, 82, 155, 0)
+        );
+        animation: rail-pulse 2.4s ease-in-out infinite;
+    }
+
+    .rail-node {
+        position: absolute;
+        left: 0;
+        width: 1.15rem;
+        height: 1.15rem;
+        border-radius: 9999px;
+        border: 2px solid rgba(0, 82, 155, 0.55);
+        background: #ffffff;
+        box-shadow: 0 0 0 4px rgba(0, 82, 155, 0.06);
+    }
+
+    .rail-node--start {
+        top: 0.1rem;
+    }
+
+    .rail-node--end {
+        bottom: 0.1rem;
+        background: rgba(0, 82, 155, 0.92);
+    }
+}
+
+@keyframes rail-pulse {
+    0%,
+    100% {
+        opacity: 0.45;
+    }
+
+    50% {
+        opacity: 1;
+    }
+}
