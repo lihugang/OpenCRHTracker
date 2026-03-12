@@ -17,8 +17,7 @@ interface LoadedBuildingScheduleState {
     reason:
         | 'resume'
         | 'publish_pending'
-        | 'retry_partial_failed'
-        | 'refresh_done'
+        | 'reuse_published_terminal'
         | 'refresh_non_running'
         | 'refresh_cross_day'
         | 'refresh_scope_or_strategy_changed'
@@ -273,68 +272,6 @@ function isSameScopeAndStrategy(
     return true;
 }
 
-function preparePartialRetryState(
-    existing: ScheduleState,
-    config: ScheduleProbeRuntimeConfig
-): ScheduleState {
-    const failedKeywords = Array.from(
-        new Set(
-            existing.progress.failedKeywords
-                .map((item) => item.trim())
-                .filter((item) => item.length > 0)
-        )
-    );
-    const failedEnrichCodeSet = new Set(
-        existing.progress.failedEnrichCodes
-            .map((item) => item.trim().toUpperCase())
-            .filter((item) => item.length > 0)
-    );
-
-    existing.status = 'running';
-    existing.startedAtMs = Date.now();
-    existing.stats.durationMs = 0;
-    existing.generatedAt = 0;
-    existing.strategy = {
-        retryAttempts: config.retryAttempts,
-        maxBatchSize: config.maxBatchSize,
-        checkpointFlushEvery: config.checkpointFlushEvery
-    };
-    existing.scope = {
-        prefixRules: config.prefixRules
-    };
-
-    if (failedKeywords.length > 0) {
-        const failedKeywordSet = new Set(failedKeywords);
-        existing.progress.phase = 'discover';
-        existing.progress.discoverMode = 'retry';
-        existing.progress.discoverQueue = failedKeywords;
-        existing.progress.discoverProcessed =
-            existing.progress.discoverProcessed.filter(
-                (item) => !failedKeywordSet.has(item)
-            );
-    } else {
-        existing.progress.phase = 'enrich';
-        existing.progress.discoverMode = 'retry';
-        existing.progress.discoverQueue = [];
-    }
-
-    existing.progress.enrichCursor = 0;
-    existing.progress.failedKeywords = [];
-    existing.progress.failedEnrichCodes = [];
-
-    if (failedEnrichCodeSet.size > 0) {
-        for (const item of existing.items) {
-            if (failedEnrichCodeSet.has(item.code.toUpperCase())) {
-                item.startAt = null;
-                item.endAt = null;
-                item.lastRouteRefreshAt = null;
-            }
-        }
-    }
-
-    return existing;
-}
-
 function mergePublishedRouteInfo(
     nextPublished: ScheduleState,
     currentPublished: ScheduleState | null
@@ -564,17 +501,14 @@ export function loadOrInitBuildingScheduleState(
     if (
         published &&
         published.date === today &&
-        published.status === 'partial_failed' &&
-        isSameScopeAndStrategy(published, config)
+        (published.status === 'done' ||
+            published.status === 'partial_failed')
     ) {
         return {
-            state: preparePartialRetryState(
-                cloneScheduleState(published),
-                config
-            ),
-            resumed: true,
+            state: cloneScheduleState(published),
+            resumed: false,
             publishPending: false,
-            reason: 'retry_partial_failed'
+            reason: 'reuse_published_terminal'
         };
     }
 
@@ -591,35 +525,12 @@ export function loadOrInitBuildingScheduleState(
         };
     }
 
-    if (
-        published &&
-        published.date === today &&
-        published.status === 'partial_failed' &&
-        !isSameScopeAndStrategy(published, config)
-    ) {
-        return {
-            state: createInitialScheduleState(today, config),
-            resumed: false,
-            publishPending: false,
-            reason: 'refresh_scope_or_strategy_changed'
-        };
-    }
-
     if (published && published.date !== today) {
         return {
             state: createInitialScheduleState(today, config),
             resumed: false,
             publishPending: false,
             reason: 'refresh_cross_day'
-        };
-    }
-
-    if (published && published.date === today && published.status === 'done') {
-        return {
-            state: createInitialScheduleState(today, config),
-            resumed: false,
-            publishPending: false,
-            reason: 'refresh_done'
         };
     }
 

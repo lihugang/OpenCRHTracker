@@ -58,8 +58,15 @@ export default async function buildTodaySchedule(): Promise<BuildScheduleResult>
 
     const { state, resumed, reason, publishPending } =
         loadOrInitBuildingScheduleState(scheduleFilePath, runtimeConfig);
+    const runId = `${state.date}-${Date.now()}`;
+    if (reason === 'reuse_published_terminal') {
+        logger.info(
+            `skip_reuse_published runId=${runId} status=${state.status} date=${state.date} file=${scheduleFilePath}`
+        );
+        return buildResultFromState(state, resumed, scheduleFilePath);
+    }
+
     const shouldReusePreviousRouteInfo =
-        reason === 'refresh_done' ||
         reason === 'refresh_non_running' ||
         reason === 'refresh_cross_day' ||
         reason === 'refresh_scope_or_strategy_changed';
@@ -72,7 +79,6 @@ export default async function buildTodaySchedule(): Promise<BuildScheduleResult>
                   ])
               )
             : undefined;
-    const runId = `${state.date}-${Date.now()}`;
     logger.info(
         `start runId=${runId} resumed=${resumed} reason=${reason} date=${state.date} file=${scheduleFilePath} retryAttempts=${runtimeConfig.retryAttempts} maxBatchSize=${runtimeConfig.maxBatchSize} checkpointFlushEvery=${runtimeConfig.checkpointFlushEvery} prefixRules=${JSON.stringify(runtimeConfig.prefixRules)}`
     );
