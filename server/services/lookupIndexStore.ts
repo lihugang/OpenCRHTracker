@@ -75,14 +75,16 @@ function normalizeTags(value: unknown): string[] {
 function buildEmuSubtitle(record: {
     bureau: string;
     depot: string;
-    model: string;
 }) {
-    const parts = [record.model];
+    const parts = [];
     if (record.bureau) {
         parts.push(record.bureau);
     }
     if (record.depot) {
-        parts.push(record.depot);
+        const depotLabel = record.depot.endsWith('动车所')
+            ? record.depot
+            : `${record.depot}动车所`;
+        parts.push(depotLabel);
     }
 
     return parts.join(' · ') || DEFAULT_EMU_SUBTITLE;
@@ -138,7 +140,6 @@ function loadEmuItems(emuListFilePath: string) {
             code,
             tags: normalizeTags(row.tags),
             subtitle: buildEmuSubtitle({
-                model,
                 bureau: typeof row.bureau === 'string' ? row.bureau.trim() : '',
                 depot: typeof row.depot === 'string' ? row.depot.trim() : ''
             })
