@@ -590,6 +590,9 @@
                 },
                 "resetToMaxOnRestart": {
                     "type": "boolean"
+                },
+                "consumeTokens": {
+                    "type": "boolean"
                 }
             },
             "required": [
@@ -597,7 +600,8 @@
                 "userMaxTokens",
                 "refillAmount",
                 "refillIntervalSeconds",
-                "resetToMaxOnRestart"
+                "resetToMaxOnRestart",
+                "consumeTokens"
             ]
         },
         "cost": {

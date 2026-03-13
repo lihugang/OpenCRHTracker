@@ -136,7 +136,8 @@
         "userMaxTokens": 1000,
         "refillAmount": 100,
         "refillIntervalSeconds": 3600,
-        "resetToMaxOnRestart": true
+        "resetToMaxOnRestart": true,
+        "consumeTokens": true
     },
     "cost": {
         "fixed": {

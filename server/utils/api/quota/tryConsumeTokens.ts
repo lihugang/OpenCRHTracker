@@ -10,19 +10,18 @@ export default function tryConsumeTokens(
     subject: QuotaSubject,
     rawCost: number
 ): QuotaConsumeResult {
+    const config = useConfig();
     const cost = Math.max(0, Math.floor(rawCost));
+    const now = getNowSeconds();
+    const bucket = hydrateBucket(subject, now);
 
-    if (import.meta.dev) {
+    if (!config.quota.consumeTokens) {
         return {
             ok: true,
-            remain: subject.tokenLimit,
+            remain: bucket.tokens,
             cost
         };
     }
-
-    const config = useConfig();
-    const now = getNowSeconds();
-    const bucket = hydrateBucket(subject, now);
 
     if (cost === 0) {
         return {

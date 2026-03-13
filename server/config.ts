@@ -141,6 +141,7 @@ export interface Config {
         refillAmount: number;
         refillIntervalSeconds: number;
         resetToMaxOnRestart: boolean;
+        consumeTokens: boolean;
     };
     cost: {
         fixed: {
@@ -672,6 +673,10 @@ function validateConfig(raw: unknown): Config {
             resetToMaxOnRestart: asBoolean(
                 quota.resetToMaxOnRestart,
                 'quota.resetToMaxOnRestart'
+            ),
+            consumeTokens: asBoolean(
+                quota.consumeTokens,
+                'quota.consumeTokens'
             )
         },
         cost: {
