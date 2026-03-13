@@ -39,7 +39,9 @@ export const REFRESH_ASSET_TASK_DEFINITIONS: readonly RefreshAssetTaskDefinition
 
 let registered = false;
 
-function getRefreshDefinition(key: RefreshableAssetKey): RefreshAssetTaskDefinition {
+function getRefreshDefinition(
+    key: RefreshableAssetKey
+): RefreshAssetTaskDefinition {
     const definition = REFRESH_ASSET_TASK_DEFINITIONS.find(
         (item) => item.key === key
     );
@@ -49,7 +51,9 @@ function getRefreshDefinition(key: RefreshableAssetKey): RefreshAssetTaskDefinit
     return definition;
 }
 
-function enqueueNextRefreshTask(definition: RefreshAssetTaskDefinition): number {
+function enqueueNextRefreshTask(
+    definition: RefreshAssetTaskDefinition
+): number {
     const refreshAt = useConfig().data.assets[definition.key].refresh.refreshAt;
     const nextExecutionTime = getNextDayExecutionTimeInShanghaiSeconds(
         Date.now(),
@@ -87,7 +91,9 @@ async function executeRefreshAssetTask(
     } catch (error) {
         caughtError = error;
         const message =
-            error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+            error instanceof Error
+                ? `${error.name}: ${error.message}`
+                : String(error);
         definition.logger.error(
             `refresh_failed asset=${definition.key} error=${message}`
         );
@@ -96,7 +102,9 @@ async function executeRefreshAssetTask(
             enqueueNextRefreshTask(definition);
         } catch (error) {
             const message =
-                error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+                error instanceof Error
+                    ? `${error.name}: ${error.message}`
+                    : String(error);
             definition.logger.error(
                 `enqueue_next_daily_task_failed asset=${definition.key} error=${message}`
             );

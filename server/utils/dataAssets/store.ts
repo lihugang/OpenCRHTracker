@@ -112,7 +112,9 @@ export async function refreshAssetFileFromProvider(
         };
     } catch (error) {
         const message =
-            error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+            error instanceof Error
+                ? `${error.name}: ${error.message}`
+                : String(error);
         logger.warn(
             `refresh_failed key=${key} file=${filePath} provider=${config.provider} error=${message}`
         );

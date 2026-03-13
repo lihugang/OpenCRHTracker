@@ -674,10 +674,7 @@ function validateConfig(raw: unknown): Config {
                 quota.resetToMaxOnRestart,
                 'quota.resetToMaxOnRestart'
             ),
-            consumeTokens: asBoolean(
-                quota.consumeTokens,
-                'quota.consumeTokens'
-            )
+            consumeTokens: asBoolean(quota.consumeTokens, 'quota.consumeTokens')
         },
         cost: {
             fixed: {
@@ -793,7 +790,10 @@ function validateConfig(raw: unknown): Config {
         } catch (error) {
             const message =
                 error instanceof Error ? error.message : String(error);
-            assert(false, `data.assets.${key}.refresh.refreshAt is invalid: ${message}`);
+            assert(
+                false,
+                `data.assets.${key}.refresh.refreshAt is invalid: ${message}`
+            );
         }
         if (asset.refresh.enabled) {
             assert(

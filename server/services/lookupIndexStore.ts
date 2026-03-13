@@ -72,10 +72,7 @@ function normalizeTags(value: unknown): string[] {
         );
 }
 
-function buildEmuSubtitle(record: {
-    bureau: string;
-    depot: string;
-}) {
+function buildEmuSubtitle(record: { bureau: string; depot: string }) {
     const parts = [];
     if (record.bureau) {
         parts.push(record.bureau);
