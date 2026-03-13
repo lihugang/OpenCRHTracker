@@ -109,6 +109,10 @@ export default async function executeApi<TData>(
             costApplied += dynamicConsume.cost;
         }
 
+        if (options.successHeaders) {
+            options.successHeaders(event, data);
+        }
+
         return apiSuccess(
             event,
             data,

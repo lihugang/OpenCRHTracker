@@ -105,6 +105,8 @@
             "retryAfter": "Retry-After"
         },
         "cache": {
+            "currentDayMaxAgeSeconds": 300,
+            "historicalMaxAgeSeconds": 31536000,
             "searchIndexMaxAgeSeconds": 1800
         },
         "pagination": {

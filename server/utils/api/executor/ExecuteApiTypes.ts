@@ -5,6 +5,7 @@ export interface ExecuteApiOptions<TData> {
     requireApiKey?: boolean;
     fixedCost?: number;
     dynamicCostFromData?: (data: TData) => number;
+    successHeaders?: (event: H3Event, data: TData) => void;
     successStatusCode?: number;
 }
 

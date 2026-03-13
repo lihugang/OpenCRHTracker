@@ -8,6 +8,8 @@ import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';
 import parseCursor from '~/server/utils/api/query/parseCursor';
 import parseLimit from '~/server/utils/api/query/parseLimit';
+import { getHistoryResponseCacheControlMaxAge } from '~/server/utils/api/response/getResponseCacheControlMaxAge';
+import setCacheControl from '~/server/utils/api/response/setCacheControl';
 import parseOptionalTimestamp from '~/server/utils/api/query/parseOptionalTimestamp';
 
 export default defineEventHandler(async (event) => {
@@ -15,7 +17,16 @@ export default defineEventHandler(async (event) => {
         event,
         {
             dynamicCostFromData: (data) =>
-                getPerRecordCost(data.items.length, 'historyEmu')
+                getPerRecordCost(data.items.length, 'historyEmu'),
+            successHeaders: (successEvent, data) =>
+                setCacheControl(
+                    successEvent,
+                    getHistoryResponseCacheControlMaxAge(
+                        data.items[0]?.startAt,
+                        data.items.length,
+                        data.limit
+                    )
+                )
         },
         async () => {
             const emuCode = getRouterParam(event, 'emuCode');

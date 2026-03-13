@@ -8,6 +8,8 @@ import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';
 import parseCursor from '~/server/utils/api/query/parseCursor';
 import parseLimit from '~/server/utils/api/query/parseLimit';
+import { getDailyResponseCacheControlMaxAge } from '~/server/utils/api/response/getResponseCacheControlMaxAge';
+import setCacheControl from '~/server/utils/api/response/setCacheControl';
 import getDayTimestampRange from '~/server/utils/date/getDayTimestampRange';
 
 export default defineEventHandler(async (event) => {
@@ -15,7 +17,12 @@ export default defineEventHandler(async (event) => {
         event,
         {
             dynamicCostFromData: (data) =>
-                getPerRecordCost(data.items.length, 'recordsDaily')
+                getPerRecordCost(data.items.length, 'recordsDaily'),
+            successHeaders: (successEvent, data) =>
+                setCacheControl(
+                    successEvent,
+                    getDailyResponseCacheControlMaxAge(data.date)
+                )
         },
         async () => {
             const query = getQuery(event);

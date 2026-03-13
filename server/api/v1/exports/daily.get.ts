@@ -3,6 +3,8 @@ import { listDailyRecordsAll } from '~/server/services/emuRoutesStore';
 import getFixedCost from '~/server/utils/api/cost/getFixedCost';
 import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';
+import { getDailyResponseCacheControlMaxAge } from '~/server/utils/api/response/getResponseCacheControlMaxAge';
+import setCacheControl from '~/server/utils/api/response/setCacheControl';
 import getDayTimestampRange from '~/server/utils/date/getDayTimestampRange';
 
 function toCsvCell(value: string | number): string {
@@ -17,7 +19,12 @@ export default defineEventHandler(async (event) => {
     return executeApi(
         event,
         {
-            fixedCost: getFixedCost('exportDaily')
+            fixedCost: getFixedCost('exportDaily'),
+            successHeaders: (successEvent, data) =>
+                setCacheControl(
+                    successEvent,
+                    getDailyResponseCacheControlMaxAge(data.date)
+                )
         },
         async () => {
             const query = getQuery(event);

@@ -109,6 +109,8 @@ export interface Config {
             retryAfter: string;
         };
         cache: {
+            currentDayMaxAgeSeconds: number;
+            historicalMaxAgeSeconds: number;
             searchIndexMaxAgeSeconds: number;
         };
         pagination: {
@@ -566,6 +568,16 @@ function validateConfig(raw: unknown): Config {
                 )
             },
             cache: {
+                currentDayMaxAgeSeconds: asInteger(
+                    apiCache.currentDayMaxAgeSeconds,
+                    'api.cache.currentDayMaxAgeSeconds',
+                    0
+                ),
+                historicalMaxAgeSeconds: asInteger(
+                    apiCache.historicalMaxAgeSeconds,
+                    'api.cache.historicalMaxAgeSeconds',
+                    0
+                ),
                 searchIndexMaxAgeSeconds: asInteger(
                     apiCache.searchIndexMaxAgeSeconds,
                     'api.cache.searchIndexMaxAgeSeconds',

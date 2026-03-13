@@ -433,12 +433,22 @@
                     "type": "object",
                     "additionalProperties": false,
                     "properties": {
+                        "currentDayMaxAgeSeconds": {
+                            "type": "integer",
+                            "minimum": 0
+                        },
+                        "historicalMaxAgeSeconds": {
+                            "type": "integer",
+                            "minimum": 0
+                        },
                         "searchIndexMaxAgeSeconds": {
                             "type": "integer",
                             "minimum": 0
                         }
                     },
                     "required": [
+                        "currentDayMaxAgeSeconds",
+                        "historicalMaxAgeSeconds",
                         "searchIndexMaxAgeSeconds"
                     ]
                 },
