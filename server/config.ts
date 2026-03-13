@@ -96,6 +96,9 @@ export interface Config {
             cost: string;
             retryAfter: string;
         };
+        cache: {
+            searchIndexMaxAgeSeconds: number;
+        };
         pagination: {
             defaultLimit: number;
             maxLimit: number;
@@ -134,6 +137,7 @@ export interface Config {
             authIssueApiKey: number;
             authListApiKeys: number;
             authRevokeApiKey: number;
+            searchIndex: number;
             exportDaily: number;
         };
         perRecord: {
@@ -250,6 +254,7 @@ function validateConfig(raw: unknown): Config {
 
     const api = asObject(root.api, 'api');
     const apiHeaders = asObject(api.headers, 'api.headers');
+    const apiCache = asObject(api.cache, 'api.cache');
     const apiPagination = asObject(api.pagination, 'api.pagination');
     const apiDebug = asObject(api.debug, 'api.debug');
     const task = asObject(root.task, 'task');
@@ -536,6 +541,13 @@ function validateConfig(raw: unknown): Config {
                     'api.headers.retryAfter'
                 )
             },
+            cache: {
+                searchIndexMaxAgeSeconds: asInteger(
+                    apiCache.searchIndexMaxAgeSeconds,
+                    'api.cache.searchIndexMaxAgeSeconds',
+                    0
+                )
+            },
             pagination: {
                 defaultLimit: asNumber(
                     apiPagination.defaultLimit,
@@ -653,6 +665,11 @@ function validateConfig(raw: unknown): Config {
                 authRevokeApiKey: asNumber(
                     costFixed.authRevokeApiKey,
                     'cost.fixed.authRevokeApiKey',
+                    0
+                ),
+                searchIndex: asNumber(
+                    costFixed.searchIndex,
+                    'cost.fixed.searchIndex',
                     0
                 ),
                 exportDaily: asNumber(

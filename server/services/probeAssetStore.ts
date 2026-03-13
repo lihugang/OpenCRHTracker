@@ -9,6 +9,7 @@ interface RawEmuListRecord extends Record<string, unknown> {
     trainSetNo?: unknown;
     depot?: unknown;
     multiple?: unknown;
+    tags?: unknown;
 }
 
 interface RawQrCodeRecord extends Record<string, unknown> {
@@ -22,6 +23,7 @@ export interface EmuListRecord {
     trainSetNo: string;
     depot: string;
     multiple: boolean;
+    tags: string[];
 }
 
 export interface ProbeAssets {
@@ -37,6 +39,20 @@ let cached: ProbeAssets | null = null;
 
 function buildModelAndTrainSetNoKey(model: string, trainSetNo: string): string {
     return `${normalizeCode(model)}#${normalizeCode(trainSetNo)}`;
+}
+
+function normalizeTags(value: unknown): string[] {
+    if (!Array.isArray(value)) {
+        return [];
+    }
+
+    return value
+        .filter((item): item is string => typeof item === 'string')
+        .map((item) => item.trim())
+        .filter(
+            (item, index, array) =>
+                item.length > 0 && array.indexOf(item) === index
+        );
 }
 
 export async function loadProbeAssets(): Promise<ProbeAssets> {
@@ -78,7 +94,8 @@ export async function loadProbeAssets(): Promise<ProbeAssets> {
                 model: normalizeCode(row.model),
                 trainSetNo: normalizeCode(row.trainSetNo),
                 depot: row.depot.trim(),
-                multiple: row.multiple === true
+                multiple: row.multiple === true,
+                tags: normalizeTags(row.tags)
             };
             emuList.push(record);
             emuByModelAndTrainSetNo.set(

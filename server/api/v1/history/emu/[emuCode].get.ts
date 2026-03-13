@@ -47,7 +47,7 @@ export default defineEventHandler(async (event) => {
                 limit,
                 nextCursor: buildNextCursor(rows, limit),
                 items: rows.map((row) => ({
-                    ts: row.start_at,
+                    startAt: row.start_at,
                     endAt: row.end_at,
                     id: String(row.id),
                     trainCode: row.train_code,

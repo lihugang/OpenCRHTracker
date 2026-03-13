@@ -1,7 +1,7 @@
 import ApiRequestError from '~/server/utils/api/errors/ApiRequestError';
 
 export interface CursorPoint {
-    ts: number;
+    startAt: number;
     id: number;
 }
 
@@ -29,9 +29,14 @@ export default function parseCursor(
         );
     }
 
-    const ts = Number(match[1]);
+    const startAt = Number(match[1]);
     const id = Number(match[2]);
-    if (!Number.isInteger(ts) || ts < 0 || !Number.isInteger(id) || id < 0) {
+    if (
+        !Number.isInteger(startAt) ||
+        startAt < 0 ||
+        !Number.isInteger(id) ||
+        id < 0
+    ) {
         throw new ApiRequestError(
             400,
             'invalid_param',
@@ -40,7 +45,7 @@ export default function parseCursor(
     }
 
     return {
-        ts,
+        startAt,
         id
     };
 }

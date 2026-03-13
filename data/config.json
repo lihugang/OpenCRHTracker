@@ -96,6 +96,9 @@
             "cost": "cost",
             "retryAfter": "Retry-After"
         },
+        "cache": {
+            "searchIndexMaxAgeSeconds": 1800
+        },
         "pagination": {
             "defaultLimit": 20,
             "maxLimit": 200
@@ -110,8 +113,8 @@
             "disabledExecutors": []
         },
         "scheduler": {
-            "pollIntervalMs": 300000,
-            "maxTasksPerQuery": 2147483647,
+            "pollIntervalMs": 180000,
+            "maxTasksPerQuery": 50,
             "idle": {
                 "maxTasksPerTick": 4,
                 "emaAlpha": 0.3
@@ -134,6 +137,7 @@
             "authIssueApiKey": 10,
             "authListApiKeys": 2,
             "authRevokeApiKey": 1,
+            "searchIndex": 1,
             "exportDaily": 100
         },
         "perRecord": {

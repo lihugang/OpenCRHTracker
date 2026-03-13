@@ -18,52 +18,69 @@ export default async function executeApi<TData>(
     options: ExecuteApiOptions<TData>,
     handler: (context: ExecuteApiContext) => Promise<TData>
 ) {
+    const minimumRequestCost = 1;
+    const fixedCost = options.fixedCost ?? 0;
     let identity: ApiIdentity | null = null;
     let remain = 0;
     let costApplied = 0;
 
     try {
         identity = resolveIdentity(event, options.requireApiKey ?? false);
-        remain = getRemainTokens(identity);
+        const resolvedIdentity = identity;
+        remain = getRemainTokens(resolvedIdentity);
 
-        if (options.fixedCost !== undefined) {
-            const fixedConsume = tryConsumeTokens(identity, options.fixedCost);
-            if (!fixedConsume.ok) {
-                if (fixedConsume.impossible) {
-                    return apiFailure(
-                        event,
-                        403,
-                        '当前身份额度上限不足，无法调用该接口',
-                        'cost_exceeds_quota_limit',
-                        { remain: fixedConsume.remain, cost: 0 }
-                    );
-                }
+        const consumeToTargetCost = (rawTargetCost: number) => {
+            const targetCost = Math.max(
+                minimumRequestCost,
+                Math.floor(rawTargetCost)
+            );
+            if (targetCost <= costApplied) {
+                return {
+                    ok: true,
+                    remain,
+                    cost: 0
+                };
+            }
 
+            return tryConsumeTokens(resolvedIdentity, targetCost - costApplied);
+        };
+
+        const fixedConsume = consumeToTargetCost(fixedCost);
+        if (!fixedConsume.ok) {
+            if (fixedConsume.impossible) {
                 return apiFailure(
                     event,
-                    429,
-                    formatRetryAfterMessage(fixedConsume.retryAfter),
-                    'quota_exceeded',
-                    {
-                        remain: fixedConsume.remain,
-                        cost: 0,
-                        retryAfter: fixedConsume.retryAfter
-                    }
+                    403,
+                    '当前身份额度上限不足，无法调用该接口',
+                    'cost_exceeds_quota_limit',
+                    { remain: fixedConsume.remain, cost: 0 }
                 );
             }
 
-            remain = fixedConsume.remain;
-            costApplied += fixedConsume.cost;
+            return apiFailure(
+                event,
+                429,
+                formatRetryAfterMessage(fixedConsume.retryAfter),
+                'quota_exceeded',
+                {
+                    remain: fixedConsume.remain,
+                    cost: 0,
+                    retryAfter: fixedConsume.retryAfter
+                }
+            );
         }
+
+        remain = fixedConsume.remain;
+        costApplied += fixedConsume.cost;
 
         const data = await handler({
             event,
-            identity
+            identity: resolvedIdentity
         });
 
         if (options.dynamicCostFromData) {
             const dynamicCost = options.dynamicCostFromData(data);
-            const dynamicConsume = tryConsumeTokens(identity, dynamicCost);
+            const dynamicConsume = consumeToTargetCost(fixedCost + dynamicCost);
             if (!dynamicConsume.ok) {
                 if (dynamicConsume.impossible) {
                     return apiFailure(
@@ -106,7 +123,21 @@ export default async function executeApi<TData>(
         if (!identity) {
             identity = getAnonymousIdentity(event);
         }
-        remain = getRemainTokens(identity);
+
+        if (costApplied < minimumRequestCost) {
+            const minimumConsume = tryConsumeTokens(
+                identity,
+                minimumRequestCost - costApplied
+            );
+            if (minimumConsume.ok) {
+                remain = minimumConsume.remain;
+                costApplied += minimumConsume.cost;
+            } else {
+                remain = minimumConsume.remain;
+            }
+        } else {
+            remain = getRemainTokens(identity);
+        }
 
         return apiFailure(
             event,

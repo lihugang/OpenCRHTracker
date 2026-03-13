@@ -40,7 +40,7 @@ export default defineNuxtConfig({
                 ignored: ['**/db/**']
             }
         },
-        plugins: [tailwindcss()]
+        plugins: [tailwindcss() as any]
     },
     css: ['~/assets/css/tailwind.css'],
     modules: ['nuxt-security', '@vite-pwa/nuxt'],

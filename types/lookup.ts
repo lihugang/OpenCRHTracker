@@ -5,9 +5,20 @@ export interface LookupTarget {
     code: string;
 }
 
+export interface LookupSuggestItem {
+    type: LookupTargetType;
+    code: string;
+    subtitle: string;
+    tags: string[];
+}
+
+export interface LookupIndexResponse {
+    items: LookupSuggestItem[];
+}
+
 export interface TrainHistoryRecord {
     id: string;
-    ts: number;
+    startAt: number;
     endAt: number;
     emuCode: string;
     startStation: string;
@@ -16,7 +27,7 @@ export interface TrainHistoryRecord {
 
 export interface EmuHistoryRecord {
     id: string;
-    ts: number;
+    startAt: number;
     endAt: number;
     trainCode: string;
     startStation: string;
@@ -42,16 +53,13 @@ export interface EmuHistoryResponse extends HistoryResponseBase<EmuHistoryRecord
     end?: number | null;
 }
 
-export interface RecentAssignmentGroup {
+export interface LookupHistoryListItem {
     id: string;
-    dayLabel: string;
-    timeLabel: string;
-    routeLabel: string;
     startAt: number;
     endAt: number;
+    code: string;
     startStation: string;
     endStation: string;
-    primaryCodes: string[];
 }
 
 export type RecentAssignmentsState =

@@ -3,6 +3,8 @@
     "private": true,
     "type": "module",
     "scripts": {
+        "prebuild": "node scripts/write-commit-id.mjs",
+        "predev": "node scripts/write-commit-id.mjs",
         "build": "nuxt build",
         "dev": "nuxt dev",
         "typecheck": "nuxi typecheck",

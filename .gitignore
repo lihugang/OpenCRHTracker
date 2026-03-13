@@ -28,3 +28,7 @@ data
 deploy_meta
 code_lines.json
 page-ssr.zip
+
+# Generated commit id
+utils/meta/commit.ts
+server/utils/meta/commit.ts

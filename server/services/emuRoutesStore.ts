@@ -4,7 +4,7 @@ import normalizeCode from '~/server/utils/12306/normalizeCode';
 import importSqlBatch from '~/server/utils/sql/importSqlBatch';
 
 interface CursorPoint {
-    ts: number;
+    startAt: number;
     id: number;
 }
 
@@ -36,7 +36,7 @@ const emuRouteStatements = createPreparedSqlStore<EmuRouteSqlKey>({
 });
 
 const DEFAULT_CURSOR_POINT: CursorPoint = {
-    ts: Number.MAX_SAFE_INTEGER,
+    startAt: Number.MAX_SAFE_INTEGER,
     id: Number.MAX_SAFE_INTEGER
 };
 
@@ -72,8 +72,8 @@ export function listHistoryByTrainPaged(
         normalizeCode(trainCode),
         startAt,
         endAt,
-        cursorPoint.ts,
-        cursorPoint.ts,
+        cursorPoint.startAt,
+        cursorPoint.startAt,
         cursorPoint.id,
         limit
     );
@@ -92,8 +92,8 @@ export function listHistoryByEmuPaged(
         normalizeCode(emuCode),
         startAt,
         endAt,
-        cursorPoint.ts,
-        cursorPoint.ts,
+        cursorPoint.startAt,
+        cursorPoint.startAt,
         cursorPoint.id,
         limit
     );
@@ -110,8 +110,8 @@ export function listDailyRecordsPaged(
         'selectDailyRecordsPaged',
         startAt,
         endAt,
-        cursorPoint.ts,
-        cursorPoint.ts,
+        cursorPoint.startAt,
+        cursorPoint.startAt,
         cursorPoint.id,
         limit
     );

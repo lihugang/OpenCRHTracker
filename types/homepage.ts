@@ -16,6 +16,8 @@ export interface WorkbenchResultItem {
     id: string;
     title: string;
     subtitle: string;
+    startAt?: number;
+    endAt?: number;
     timestampLabel?: string;
     badges: string[];
     route?: {

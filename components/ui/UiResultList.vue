@@ -16,6 +16,7 @@
             <UiCard
                 v-for="item in items"
                 :key="item.id"
+                :class="isRunningItem(item) ? 'running-result-card' : ''"
                 variant="subtle">
                 <div class="space-y-4">
                     <div
@@ -96,6 +97,17 @@
 
 <script setup lang="ts">
 import type { WorkbenchResultItem } from '~/types/homepage';
+import isTimestampRangeActive from '~/utils/time/isTimestampRangeActive';
+
+const currentUnixSeconds = useCurrentUnixSeconds();
+
+function isRunningItem(item: WorkbenchResultItem) {
+    return isTimestampRangeActive(
+        item.startAt,
+        item.endAt,
+        currentUnixSeconds.value
+    );
+}
 
 defineProps<{
     title: string;

@@ -403,6 +403,19 @@
                         "retryAfter"
                     ]
                 },
+                "cache": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "searchIndexMaxAgeSeconds": {
+                            "type": "integer",
+                            "minimum": 0
+                        }
+                    },
+                    "required": [
+                        "searchIndexMaxAgeSeconds"
+                    ]
+                },
                 "pagination": {
                     "type": "object",
                     "additionalProperties": false,
@@ -444,6 +457,7 @@
                 "versionPrefix",
                 "apiKeyHeader",
                 "headers",
+                "cache",
                 "pagination",
                 "timestampUnit",
                 "debug"
@@ -586,6 +600,10 @@
                             "type": "integer",
                             "minimum": 0
                         },
+                        "searchIndex": {
+                            "type": "integer",
+                            "minimum": 0
+                        },
                         "exportDaily": {
                             "type": "integer",
                             "minimum": 0
@@ -599,6 +617,7 @@
                         "authIssueApiKey",
                         "authListApiKeys",
                         "authRevokeApiKey",
+                        "searchIndex",
                         "exportDaily"
                     ]
                 },

@@ -5,7 +5,7 @@ import type {
     TrackerApiResponse,
     WorkbenchResultItem
 } from '~/types/homepage';
-import getApiErrorMessage from '~/utils/getApiErrorMessage';
+import getApiErrorMessage from '~/utils/api/getApiErrorMessage';
 
 type QueryFormShape = Record<string, string>;
 

@@ -283,7 +283,10 @@ async function persistResolvedGroup(
             ? ProbeStatusValue.CoupledFormationResolved
             : ProbeStatusValue.SingleFormationResolved;
     for (const trainCode of trainCodes) {
-        const existingRows = listProbeStatusByTrainCode(trainCode);
+        const existingRows = listProbeStatusByTrainCode(
+            trainCode,
+            group.startAt
+        );
         if (
             existingRows.some(
                 (row) =>
@@ -295,7 +298,7 @@ async function persistResolvedGroup(
         }
 
         for (const emuCode of emuCodes) {
-            ensureProbeStatus(trainCode, emuCode, finalStatus);
+            ensureProbeStatus(trainCode, emuCode, group.startAt, finalStatus);
         }
     }
 

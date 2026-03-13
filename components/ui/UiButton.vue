@@ -3,7 +3,7 @@
         :type="type"
         :disabled="disabled || loading"
         :class="[
-            'inline-flex items-center justify-center gap-2 rounded-full font-medium transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-crh-blue/30 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-60',
+            'inline-flex items-center justify-center gap-2 rounded-2xl font-medium transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-crh-blue/30 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-60',
             sizeClasses,
             variantClasses,
             block ? 'w-full' : ''
@@ -44,7 +44,7 @@ const variantClasses = computed(() => {
         case 'ghost':
             return 'bg-transparent text-crh-blue hover:bg-blue-50';
         default:
-            return 'bg-crh-blue text-white shadow-[0_8px_20px_-10px_rgba(0,82,155,0.7)] hover:bg-[#00457f]';
+            return 'bg-[linear-gradient(180deg,#00529b_0%,#004c92_100%)] text-white shadow-[0_8px_20px_-10px_rgba(0,82,155,0.7)] hover:bg-[linear-gradient(180deg,#004f96_0%,#00478a_100%)]';
     }
 });
 

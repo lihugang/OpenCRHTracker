@@ -2,6 +2,9 @@
     <div
         :class="[
             'ticket-card rounded-[1.25rem] border border-slate-200 text-crh-grey-dark shadow-ticket',
+            props.showAccentBar ? 'ticket-card--accent-bar' : '',
+            props.allowOverflow ? 'overflow-visible' : 'overflow-hidden',
+            accentBarSpacingClass,
             cardClasses
         ]">
         <slot />
@@ -14,10 +17,18 @@ import { computed } from 'vue';
 const props = withDefaults(
     defineProps<{
         variant?: 'default' | 'accent' | 'subtle';
+        allowOverflow?: boolean;
+        showAccentBar?: boolean;
     }>(),
     {
-        variant: 'default'
+        variant: 'default',
+        allowOverflow: false,
+        showAccentBar: true
     }
+);
+
+const accentBarSpacingClass = computed(() =>
+    props.showAccentBar ? 'pl-8' : ''
 );
 
 const cardClasses = computed(() => {

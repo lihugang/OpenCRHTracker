@@ -2,7 +2,7 @@ import type { TrackerApiFailure } from '~/types/homepage';
 
 export default function getApiErrorMessage(
     error: unknown,
-    fallback = '请求失败，请稍后重试。'
+    fallback = '璇锋眰澶辫触锛岃绋嶅悗閲嶈瘯銆?'
 ) {
     if (typeof error === 'object' && error !== null) {
         const candidate = error as {
