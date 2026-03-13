@@ -40,6 +40,20 @@ const ALLOWED_STARTUP_TASK_EXECUTORS = [
 
 type StartupTaskExecutor = (typeof ALLOWED_STARTUP_TASK_EXECUTORS)[number];
 
+interface RefreshableAssetConfig {
+    file: string;
+    provider?: string;
+    refresh: {
+        enabled: boolean;
+        refreshAt: string;
+    };
+}
+
+interface AssetConfig {
+    file: string;
+    provider?: string;
+}
+
 export interface Config {
     spider: {
         userAgent: string;
@@ -67,13 +81,11 @@ export interface Config {
         };
     };
     data: {
-        assets: Record<
-            'EMUList' | 'QRCode' | 'schedule',
-            {
-                file: string;
-                provider?: string;
-            }
-        >;
+        assets: {
+            EMUList: RefreshableAssetConfig;
+            QRCode: RefreshableAssetConfig;
+            schedule: AssetConfig;
+        };
         databases: Record<'task' | 'EMUTracked' | 'users', string>;
     };
     user: {
@@ -208,6 +220,57 @@ function asBoolean(value: unknown, name: string): boolean {
 function asRounding(value: unknown, name: string): 'ceil' {
     assert(value === 'ceil', `${name} must be 'ceil'`);
     return 'ceil';
+}
+
+function asOptionalObject(
+    value: unknown,
+    name: string
+): Record<string, unknown> | undefined {
+    if (value === undefined) {
+        return undefined;
+    }
+    return asObject(value, name);
+}
+
+function parseRefreshableAssetConfig(
+    value: unknown,
+    name: string
+): RefreshableAssetConfig {
+    const asset = asObject(value, name);
+    const refresh = asOptionalObject(asset.refresh, `${name}.refresh`);
+
+    return {
+        file: asString(asset.file, `${name}.file`),
+        provider: (() => {
+            if (asset.provider === undefined) {
+                return undefined;
+            }
+            return asString(asset.provider, `${name}.provider`);
+        })(),
+        refresh: {
+            enabled:
+                refresh?.enabled === undefined
+                    ? true
+                    : asBoolean(refresh.enabled, `${name}.refresh.enabled`),
+            refreshAt:
+                refresh?.refreshAt === undefined
+                    ? '0000'
+                    : asString(refresh.refreshAt, `${name}.refresh.refreshAt`)
+        }
+    };
+}
+
+function parseAssetConfig(value: unknown, name: string): AssetConfig {
+    const asset = asObject(value, name);
+    return {
+        file: asString(asset.file, `${name}.file`),
+        provider: (() => {
+            if (asset.provider === undefined) {
+                return undefined;
+            }
+            return asString(asset.provider, `${name}.provider`);
+        })()
+    };
 }
 
 function validateConfig(raw: unknown): Config {
@@ -441,57 +504,18 @@ function validateConfig(raw: unknown): Config {
         },
         data: {
             assets: {
-                EMUList: {
-                    file: asString(
-                        asObject(assets.EMUList, 'data.assets.EMUList').file,
-                        'data.assets.EMUList.file'
-                    ),
-                    provider: (() => {
-                        const provider = asObject(
-                            assets.EMUList,
-                            'data.assets.EMUList'
-                        ).provider;
-                        if (provider === undefined) return undefined;
-                        return asString(
-                            provider,
-                            'data.assets.EMUList.provider'
-                        );
-                    })()
-                },
-                QRCode: {
-                    file: asString(
-                        asObject(assets.QRCode, 'data.assets.QRCode').file,
-                        'data.assets.QRCode.file'
-                    ),
-                    provider: (() => {
-                        const provider = asObject(
-                            assets.QRCode,
-                            'data.assets.QRCode'
-                        ).provider;
-                        if (provider === undefined) return undefined;
-                        return asString(
-                            provider,
-                            'data.assets.QRCode.provider'
-                        );
-                    })()
-                },
-                schedule: {
-                    file: asString(
-                        asObject(assets.schedule, 'data.assets.schedule').file,
-                        'data.assets.schedule.file'
-                    ),
-                    provider: (() => {
-                        const provider = asObject(
-                            assets.schedule,
-                            'data.assets.schedule'
-                        ).provider;
-                        if (provider === undefined) return undefined;
-                        return asString(
-                            provider,
-                            'data.assets.schedule.provider'
-                        );
-                    })()
-                }
+                EMUList: parseRefreshableAssetConfig(
+                    assets.EMUList,
+                    'data.assets.EMUList'
+                ),
+                QRCode: parseRefreshableAssetConfig(
+                    assets.QRCode,
+                    'data.assets.QRCode'
+                ),
+                schedule: parseAssetConfig(
+                    assets.schedule,
+                    'data.assets.schedule'
+                )
             },
             databases: {
                 task: asString(databases.task, 'data.databases.task'),
@@ -744,6 +768,22 @@ function validateConfig(raw: unknown): Config {
             false,
             `spider.scheduleProbe.coupling.statusResetTimeHHmm is invalid: ${message}`
         );
+    }
+    for (const key of ['EMUList', 'QRCode'] as const) {
+        const asset = configResult.data.assets[key];
+        try {
+            parseDailyTimeHHmm(asset.refresh.refreshAt);
+        } catch (error) {
+            const message =
+                error instanceof Error ? error.message : String(error);
+            assert(false, `data.assets.${key}.refresh.refreshAt is invalid: ${message}`);
+        }
+        if (asset.refresh.enabled) {
+            assert(
+                typeof asset.provider === 'string' && asset.provider.length > 0,
+                `data.assets.${key}.provider must be configured when refresh.enabled is true`
+            );
+        }
     }
     const deduplicationPrefix = new Set<string>();
     for (const rule of configResult.spider.scheduleProbe.prefixRules) {

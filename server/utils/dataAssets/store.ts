@@ -18,6 +18,13 @@ export interface EnsureAssetResult {
     source: 'local' | 'provider' | 'default';
 }
 
+export interface RefreshAssetResult {
+    filePath: string;
+    refreshed: boolean;
+    status?: number;
+    message?: string;
+}
+
 function assertStringContent(
     content: unknown,
     label: string
@@ -67,6 +74,54 @@ export function writeAssetText(key: AssetKey, content: string): void {
     assertStringContent(content, 'content');
     const filePath = getAssetFilePath(key);
     writeTextFileAtomically(filePath, content);
+}
+
+export async function refreshAssetFileFromProvider(
+    key: AssetKey
+): Promise<RefreshAssetResult> {
+    const config = getAssetConfig(key);
+    const filePath = getAssetFilePath(key);
+
+    if (!config.provider) {
+        throw new Error(`provider is not configured for asset ${key}`);
+    }
+
+    try {
+        const response = await fetch(config.provider, {
+            method: 'GET'
+        });
+        if (!response.ok) {
+            logger.warn(
+                `refresh_failed key=${key} file=${filePath} provider=${config.provider} status=${response.status}`
+            );
+            return {
+                filePath,
+                refreshed: false,
+                status: response.status
+            };
+        }
+
+        const content = await response.text();
+        writeTextFileAtomically(filePath, content);
+        logger.info(
+            `refreshed key=${key} file=${filePath} provider=${config.provider}`
+        );
+        return {
+            filePath,
+            refreshed: true
+        };
+    } catch (error) {
+        const message =
+            error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+        logger.warn(
+            `refresh_failed key=${key} file=${filePath} provider=${config.provider} error=${message}`
+        );
+        return {
+            filePath,
+            refreshed: false,
+            message
+        };
+    }
 }
 
 export async function ensureAssetFile(

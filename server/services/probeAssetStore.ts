@@ -156,3 +156,7 @@ export async function loadProbeAssets(): Promise<ProbeAssets> {
 export function buildProbeAssetKey(model: string, trainSetNo: string): string {
     return buildModelAndTrainSetNoKey(model, trainSetNo);
 }
+
+export function invalidateProbeAssetsCache(): void {
+    cached = null;
+}

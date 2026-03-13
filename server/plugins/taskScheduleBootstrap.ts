@@ -4,6 +4,7 @@ import { ensureEmuDatabaseSchema } from '~/server/libs/database/emu';
 import { ensureTaskDatabaseSchema } from '~/server/libs/database/task';
 import { estimateIdleTaskDurationMs } from '~/server/services/idleTaskEstimator';
 import {
+    removePendingTasksByExecutor,
     reconcileSingletonPendingTask,
     type EnqueueTaskOptions
 } from '~/server/services/taskQueue';
@@ -23,6 +24,10 @@ import {
     registerClearDailyProbeStatusTaskExecutor
 } from '~/server/services/taskExecutors/clearDailyProbeStatusTaskExecutor';
 import { registerDetectCoupledEmuGroupTaskExecutor } from '~/server/services/taskExecutors/detectCoupledEmuGroupTaskExecutor';
+import {
+    REFRESH_ASSET_TASK_DEFINITIONS,
+    registerRefreshAssetFileTaskExecutors
+} from '~/server/services/taskExecutors/refreshAssetFileTaskExecutor';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
 import { getNextExecutionTimeInShanghaiSeconds } from '~/server/utils/date/shanghaiDateTime';
 
@@ -52,6 +57,31 @@ function reconcileStartupTask(
     return result.taskId;
 }
 
+function reconcileRefreshAssetTasks(): string[] {
+    const config = useConfig();
+    const taskSummaries: string[] = [];
+
+    for (const definition of REFRESH_ASSET_TASK_DEFINITIONS) {
+        const assetConfig = config.data.assets[definition.key];
+        if (!assetConfig.refresh.enabled) {
+            const result = removePendingTasksByExecutor(definition.executor);
+            logger.info(
+                `refresh_asset_task_removed asset=${definition.key} executor=${definition.executor} removedTaskIds=${JSON.stringify(result.removedTaskIds)}`
+            );
+            continue;
+        }
+
+        const executionTime = getNextExecutionTimeInShanghaiSeconds(
+            Date.now(),
+            assetConfig.refresh.refreshAt
+        );
+        const taskId = reconcileStartupTask(definition.executor, executionTime);
+        taskSummaries.push(`${definition.executor}:${taskId}`);
+    }
+
+    return taskSummaries;
+}
+
 export default defineNitroPlugin(() => {
     try {
         ensureTaskDatabaseSchema();
@@ -64,6 +94,7 @@ export default defineNitroPlugin(() => {
         registerProbeTrainDepartureTaskExecutor();
         registerClearDailyProbeStatusTaskExecutor();
         registerDetectCoupledEmuGroupTaskExecutor();
+        registerRefreshAssetFileTaskExecutors();
 
         const disabledStartupExecutors = new Set<string>(
             useConfig().task.startup.disabledExecutors
@@ -124,6 +155,8 @@ export default defineNitroPlugin(() => {
                 `${CLEAR_DAILY_PROBE_STATUS_TASK_EXECUTOR}:${clearTaskId}`
             );
         }
+
+        enqueuedStartupTasks.push(...reconcileRefreshAssetTasks());
 
         logger.info(
             `enqueued_startup_tasks executionTime=${executionTime} enqueued=${JSON.stringify(enqueuedStartupTasks)}`

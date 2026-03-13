@@ -40,6 +40,10 @@ export interface ReconcileSingletonTaskResult {
     reusedExecutionTime: number | null;
 }
 
+export interface RemovePendingTasksByExecutorResult {
+    removedTaskIds: number[];
+}
+
 interface NormalizedTaskInsert {
     executor: string;
     argumentsJson: string;
@@ -57,6 +61,9 @@ let reconcileSingletonTaskTransaction:
           nowSeconds: number
       ) => ReconcileSingletonTaskResult)
     | null = null;
+let removePendingTasksByExecutorTransaction:
+    | ((executor: string) => RemovePendingTasksByExecutorResult)
+    | null = null;
 
 type EnqueueTasksTransaction = (
     tasks: readonly NormalizedTaskInsert[]
@@ -65,6 +72,9 @@ type ReconcileSingletonTaskTransaction = (
     task: NormalizedTaskInsert,
     nowSeconds: number
 ) => ReconcileSingletonTaskResult;
+type RemovePendingTasksByExecutorTransaction = (
+    executor: string
+) => RemovePendingTasksByExecutorResult;
 
 function normalizeTaskInsert(
     executor: string,
@@ -208,6 +218,41 @@ function getReconcileSingletonTaskTransaction(): ReconcileSingletonTaskTransacti
     return reconcileSingletonTaskTransaction;
 }
 
+function getRemovePendingTasksByExecutorTransaction(): RemovePendingTasksByExecutorTransaction {
+    if (removePendingTasksByExecutorTransaction) {
+        return removePendingTasksByExecutorTransaction;
+    }
+
+    const completeTaskStatement = taskStatements.getStatement('completeTask');
+    const selectPendingTasksByExecutorStatement = taskStatements.getStatement(
+        'selectPendingTasksByExecutor'
+    );
+
+    removePendingTasksByExecutorTransaction = useTaskDatabase().transaction(
+        (executor: string): RemovePendingTasksByExecutorResult => {
+            const normalizedExecutor = executor.trim();
+            if (normalizedExecutor.length === 0) {
+                throw new Error('executor must be non-empty');
+            }
+
+            const existingTasks = selectPendingTasksByExecutorStatement.all(
+                normalizedExecutor
+            ) as TaskRecord[];
+            const removedTaskIds: number[] = [];
+            for (const existingTask of existingTasks) {
+                completeTaskStatement.run(existingTask.id);
+                removedTaskIds.push(existingTask.id);
+            }
+
+            return {
+                removedTaskIds
+            };
+        }
+    );
+
+    return removePendingTasksByExecutorTransaction;
+}
+
 export function enqueueTask(
     executor: string,
     args: unknown,
@@ -264,6 +309,12 @@ export function reconcileSingletonPendingTask(
         normalizedTask,
         getNowSeconds()
     );
+}
+
+export function removePendingTasksByExecutor(
+    executor: string
+): RemovePendingTasksByExecutorResult {
+    return getRemovePendingTasksByExecutorTransaction()(executor);
 }
 
 export function enqueueTaskAfterDelaySeconds(

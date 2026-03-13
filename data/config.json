@@ -59,11 +59,19 @@
         "assets": {
             "EMUList": {
                 "file": "data/emu_list.jsonl",
-                "provider": "https://storage.lihugang.top/open_crh_tracker/initialized_data/emu_list.jsonl"
+                "provider": "https://storage.lihugang.top/open_crh_tracker/initialized_data/emu_list.jsonl",
+                "refresh": {
+                    "enabled": true,
+                    "refreshAt": "0000"
+                }
             },
             "QRCode": {
                 "file": "data/qrcode.jsonl",
-                "provider": "https://storage.lihugang.top/open_crh_tracker/initialized_data/qrcode.jsonl"
+                "provider": "https://storage.lihugang.top/open_crh_tracker/initialized_data/qrcode.jsonl",
+                "refresh": {
+                    "enabled": true,
+                    "refreshAt": "0000"
+                }
             },
             "schedule": {
                 "file": "data/schedule.json",

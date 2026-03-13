@@ -235,6 +235,19 @@
                                 "provider": {
                                     "type": "string",
                                     "minLength": 1
+                                },
+                                "refresh": {
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "properties": {
+                                        "enabled": {
+                                            "type": "boolean"
+                                        },
+                                        "refreshAt": {
+                                            "type": "string",
+                                            "minLength": 1
+                                        }
+                                    }
                                 }
                             },
                             "required": [
@@ -252,6 +265,19 @@
                                 "provider": {
                                     "type": "string",
                                     "minLength": 1
+                                },
+                                "refresh": {
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "properties": {
+                                        "enabled": {
+                                            "type": "boolean"
+                                        },
+                                        "refreshAt": {
+                                            "type": "string",
+                                            "minLength": 1
+                                        }
+                                    }
                                 }
                             },
                             "required": [
