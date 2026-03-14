@@ -525,6 +525,23 @@
                         "disabledExecutors"
                     ]
                 },
+                "qrcodeProbe": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean"
+                        },
+                        "delaySeconds": {
+                            "type": "integer",
+                            "minimum": 0
+                        }
+                    },
+                    "required": [
+                        "enabled",
+                        "delaySeconds"
+                    ]
+                },
                 "scheduler": {
                     "type": "object",
                     "additionalProperties": false,
@@ -565,6 +582,7 @@
                 }
             },
             "required": [
+                "qrcodeProbe",
                 "scheduler"
             ]
         },

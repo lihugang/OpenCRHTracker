@@ -122,6 +122,10 @@
         "startup": {
             "disabledExecutors": []
         },
+        "qrcodeProbe": {
+            "enabled": true,
+            "delaySeconds": 1800
+        },
         "scheduler": {
             "pollIntervalMs": 180000,
             "maxTasksPerQuery": 50,
