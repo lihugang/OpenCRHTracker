@@ -14,6 +14,7 @@ import getApiErrorMessage from '~/utils/api/getApiErrorMessage';
 const REQUEST_LIMIT = 20;
 
 type HistoryPageResponse = TrainHistoryResponse | EmuHistoryResponse;
+type RequestFetch = typeof $fetch;
 
 function buildHistoryQuery(cursor: string) {
     return {
@@ -22,8 +23,12 @@ function buildHistoryQuery(cursor: string) {
     };
 }
 
-async function fetchTrainHistoryPage(target: LookupTarget, cursor: string) {
-    const response = await $fetch<TrackerApiResponse<TrainHistoryResponse>>(
+async function fetchTrainHistoryPage(
+    requestFetch: RequestFetch,
+    target: LookupTarget,
+    cursor: string
+) {
+    const response = await requestFetch<TrackerApiResponse<TrainHistoryResponse>>(
         `/api/v1/history/train/${encodeURIComponent(target.code)}`,
         {
             query: buildHistoryQuery(cursor)
@@ -39,8 +44,12 @@ async function fetchTrainHistoryPage(target: LookupTarget, cursor: string) {
     return response.data;
 }
 
-async function fetchEmuHistoryPage(target: LookupTarget, cursor: string) {
-    const response = await $fetch<TrackerApiResponse<EmuHistoryResponse>>(
+async function fetchEmuHistoryPage(
+    requestFetch: RequestFetch,
+    target: LookupTarget,
+    cursor: string
+) {
+    const response = await requestFetch<TrackerApiResponse<EmuHistoryResponse>>(
         `/api/v1/history/emu/${encodeURIComponent(target.code)}`,
         {
             query: buildHistoryQuery(cursor)
@@ -78,10 +87,14 @@ function toEmuHistoryListItems(items: EmuHistoryRecord[]) {
     }));
 }
 
-async function fetchPage(target: LookupTarget, cursor: string) {
+async function fetchPage(
+    requestFetch: RequestFetch,
+    target: LookupTarget,
+    cursor: string
+) {
     return target.type === 'train'
-        ? fetchTrainHistoryPage(target, cursor)
-        : fetchEmuHistoryPage(target, cursor);
+        ? fetchTrainHistoryPage(requestFetch, target, cursor)
+        : fetchEmuHistoryPage(requestFetch, target, cursor);
 }
 
 function mapResponseItems(target: LookupTarget, response: HistoryPageResponse) {
@@ -108,6 +121,7 @@ function isResponseForTarget(
 export function useRecentHistoryList(
     targetSource: MaybeRefOrGetter<LookupTarget | null>
 ) {
+    const requestFetch = import.meta.server ? useRequestFetch() : $fetch;
     const extraItems = ref<LookupHistoryListItem[]>([]);
     const manualNextCursor = ref<string | null>(null);
     const isLoadingMore = ref(false);
@@ -135,7 +149,7 @@ export function useRecentHistoryList(
                     return null;
                 }
 
-                return await fetchPage(target, '');
+                return await fetchPage(requestFetch, target, '');
             },
             {
                 watch: [targetKey],
@@ -285,7 +299,7 @@ export function useRecentHistoryList(
         loadMoreErrorMessage.value = '';
 
         try {
-            const response = await fetchPage(target, cursor);
+            const response = await fetchPage(requestFetch, target, cursor);
 
             if (currentRequestVersion !== requestVersion.value) {
                 return;

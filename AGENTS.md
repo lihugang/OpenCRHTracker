@@ -35,6 +35,7 @@ Naming:
 
 Prioritize reusing existing code rather than adding new functions. Place utility classes in either `utils/` (client-side code) or `server/utils` (server-side code). You should check whether the utility function is declared in other places.
 Inline SQL statements are strictly forbidden.
+When SSR code calls this app's own `/api` endpoints, service-side requests must use `useRequestFetch()` in server context so request identity, cookies, and quota bucket resolution stay consistent with direct API access.
 
 ## Testing Guidelines
 
