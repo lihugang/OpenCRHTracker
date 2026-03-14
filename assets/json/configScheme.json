@@ -340,9 +340,23 @@
                     "type": "integer",
                     "minimum": 8
                 },
-                "apiKeyPrefix": {
-                    "type": "string",
-                    "minLength": 1
+                "apiKeyPrefixes": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "webapp": {
+                            "type": "string",
+                            "minLength": 1
+                        },
+                        "api": {
+                            "type": "string",
+                            "minLength": 1
+                        }
+                    },
+                    "required": [
+                        "webapp",
+                        "api"
+                    ]
                 },
                 "apiKeyBytes": {
                     "type": "integer",
@@ -351,6 +365,10 @@
                 "apiKeyTtlSeconds": {
                     "type": "integer",
                     "minimum": 60
+                },
+                "signKey": {
+                    "type": "string",
+                    "minLength": 1
                 },
                 "scrypt": {
                     "type": "object",
@@ -383,7 +401,7 @@
             },
             "required": [
                 "saltLength",
-                "apiKeyPrefix",
+                "apiKeyPrefixes",
                 "apiKeyBytes",
                 "apiKeyTtlSeconds",
                 "scrypt"
@@ -400,6 +418,115 @@
                 "apiKeyHeader": {
                     "type": "string",
                     "minLength": 1
+                },
+                "authCookieName": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "authRateLimit": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "login": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "maxRequests": {
+                                    "type": "integer",
+                                    "minimum": 1
+                                },
+                                "windowSeconds": {
+                                    "type": "integer",
+                                    "minimum": 1
+                                }
+                            },
+                            "required": [
+                                "maxRequests",
+                                "windowSeconds"
+                            ]
+                        },
+                        "register": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "maxRequests": {
+                                    "type": "integer",
+                                    "minimum": 1
+                                },
+                                "windowSeconds": {
+                                    "type": "integer",
+                                    "minimum": 1
+                                }
+                            },
+                            "required": [
+                                "maxRequests",
+                                "windowSeconds"
+                            ]
+                        }
+                    },
+                    "required": [
+                        "login",
+                        "register"
+                    ]
+                },
+                "authCache": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "userRecord": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "maxEntries": {
+                                    "type": "integer",
+                                    "minimum": 1
+                                },
+                                "defaultTtlSeconds": {
+                                    "type": "integer",
+                                    "minimum": 1
+                                }
+                            },
+                            "required": [
+                                "maxEntries",
+                                "defaultTtlSeconds"
+                            ]
+                        },
+                        "apiKeyRecord": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "maxEntries": {
+                                    "type": "integer",
+                                    "minimum": 1
+                                },
+                                "defaultTtlSeconds": {
+                                    "type": "integer",
+                                    "minimum": 1
+                                }
+                            },
+                            "required": [
+                                "maxEntries",
+                                "defaultTtlSeconds"
+                            ]
+                        }
+                    },
+                    "required": [
+                        "userRecord",
+                        "apiKeyRecord"
+                    ]
+                },
+                "payload": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "maxStringLength": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    "required": [
+                        "maxStringLength"
+                    ]
                 },
                 "headers": {
                     "type": "object",
@@ -482,16 +609,53 @@
                     "required": [
                         "enableEchoError"
                     ]
+                },
+                "permissions": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "anonymousScopes": {
+                            "type": "array",
+                            "items": {
+                                "type": "string",
+                                "minLength": 1
+                            }
+                        },
+                        "issuedKeyDefaultScopes": {
+                            "type": "array",
+                            "items": {
+                                "type": "string",
+                                "minLength": 1
+                            }
+                        },
+                        "creatableKeyMaxScopes": {
+                            "type": "array",
+                            "items": {
+                                "type": "string",
+                                "minLength": 1
+                            }
+                        }
+                    },
+                    "required": [
+                        "anonymousScopes",
+                        "issuedKeyDefaultScopes",
+                        "creatableKeyMaxScopes"
+                    ]
                 }
             },
             "required": [
                 "versionPrefix",
                 "apiKeyHeader",
+                "authCookieName",
+                "authRateLimit",
+                "authCache",
+                "payload",
                 "headers",
                 "cache",
                 "pagination",
                 "timestampUnit",
-                "debug"
+                "debug",
+                "permissions"
             ]
         },
         "task": {
@@ -629,15 +793,15 @@
                             "type": "integer",
                             "minimum": 0
                         },
-                        "quotaMe": {
+                        "authMe": {
+                            "type": "integer",
+                            "minimum": 0
+                        },
+                        "authLogout": {
                             "type": "integer",
                             "minimum": 0
                         },
                         "debugEchoError": {
-                            "type": "integer",
-                            "minimum": 0
-                        },
-                        "authLogin": {
                             "type": "integer",
                             "minimum": 0
                         },
@@ -664,9 +828,9 @@
                     },
                     "required": [
                         "health",
-                        "quotaMe",
+                        "authMe",
+                        "authLogout",
                         "debugEchoError",
-                        "authLogin",
                         "authIssueApiKey",
                         "authListApiKeys",
                         "authRevokeApiKey",

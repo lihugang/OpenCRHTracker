@@ -10,12 +10,15 @@ import parseCursor from '~/server/utils/api/query/parseCursor';
 import parseLimit from '~/server/utils/api/query/parseLimit';
 import { getDailyResponseCacheControlMaxAge } from '~/server/utils/api/response/getResponseCacheControlMaxAge';
 import setCacheControl from '~/server/utils/api/response/setCacheControl';
+import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
 import getDayTimestampRange from '~/server/utils/date/getDayTimestampRange';
 
 export default defineEventHandler(async (event) => {
     return executeApi(
         event,
         {
+            cors: true,
+            requiredScopes: [API_SCOPES.records.daily.read],
             dynamicCostFromData: (data) =>
                 getPerRecordCost(data.items.length, 'recordsDaily'),
             successHeaders: (successEvent, data) =>
@@ -27,6 +30,7 @@ export default defineEventHandler(async (event) => {
         async () => {
             const query = getQuery(event);
             const date = typeof query.date === 'string' ? query.date : '';
+
             ensure(
                 /^\d{8}$/.test(date),
                 400,

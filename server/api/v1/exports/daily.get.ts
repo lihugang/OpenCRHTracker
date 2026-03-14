@@ -5,6 +5,7 @@ import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';
 import { getDailyResponseCacheControlMaxAge } from '~/server/utils/api/response/getResponseCacheControlMaxAge';
 import setCacheControl from '~/server/utils/api/response/setCacheControl';
+import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
 import getDayTimestampRange from '~/server/utils/date/getDayTimestampRange';
 
 function toCsvCell(value: string | number): string {
@@ -12,6 +13,7 @@ function toCsvCell(value: string | number): string {
     if (!text.includes(',') && !text.includes('"') && !text.includes('\n')) {
         return text;
     }
+
     return `"${text.replace(/"/g, '""')}"`;
 }
 
@@ -19,6 +21,8 @@ export default defineEventHandler(async (event) => {
     return executeApi(
         event,
         {
+            cors: true,
+            requiredScopes: [API_SCOPES.exports.daily.read],
             fixedCost: getFixedCost('exportDaily'),
             successHeaders: (successEvent, data) =>
                 setCacheControl(

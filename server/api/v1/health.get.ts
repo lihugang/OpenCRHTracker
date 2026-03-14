@@ -7,6 +7,7 @@ export default defineEventHandler(async (event) => {
     return executeApi(
         event,
         {
+            cors: true,
             fixedCost: getFixedCost('health')
         },
         async () => {

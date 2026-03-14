@@ -3,7 +3,7 @@
         :type="type"
         :disabled="disabled || loading"
         :class="[
-            'inline-flex items-center justify-center gap-2 rounded-2xl font-medium transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-crh-blue/30 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-60',
+            'inline-flex items-center justify-center gap-2 rounded-2xl font-medium transition-[box-shadow,background-color,border-color,color] duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-crh-blue/30 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-60',
             sizeClasses,
             variantClasses,
             block ? 'w-full' : ''
@@ -40,11 +40,11 @@ const props = withDefaults(
 const variantClasses = computed(() => {
     switch (props.variant) {
         case 'secondary':
-            return 'border border-slate-200 bg-white text-crh-blue shadow-sm hover:border-crh-blue/25 hover:bg-blue-50';
+            return 'border border-slate-200 bg-white text-crh-blue shadow-sm hover:border-crh-blue/25 hover:bg-blue-50 hover:shadow-[0_10px_22px_-18px_rgba(15,23,42,0.35)]';
         case 'ghost':
-            return 'bg-transparent text-crh-blue hover:bg-blue-50';
+            return 'bg-transparent text-crh-blue hover:bg-blue-50/80';
         default:
-            return 'bg-[linear-gradient(180deg,#00529b_0%,#004c92_100%)] text-white shadow-[0_8px_20px_-10px_rgba(0,82,155,0.7)] hover:bg-[linear-gradient(180deg,#004f96_0%,#00478a_100%)]';
+            return 'bg-[linear-gradient(180deg,#00529b_0%,#004c92_100%)] text-white shadow-[0_8px_20px_-10px_rgba(0,82,155,0.7)] hover:bg-[linear-gradient(180deg,#004f96_0%,#00478a_100%)] hover:shadow-[0_14px_28px_-18px_rgba(0,82,155,0.72)]';
     }
 });
 

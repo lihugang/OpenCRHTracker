@@ -1,27 +1,32 @@
 import { defineEventHandler, readBody } from 'h3';
-import getFixedCost from '~/server/utils/api/cost/getFixedCost';
-import executeApi from '~/server/utils/api/executor/executeApi';
-import ensure from '~/server/utils/api/executor/ensure';
-import ApiRequestError from '~/server/utils/api/errors/ApiRequestError';
 import {
     createApiKey,
     getUserByUsername,
     updateLastLoginAt,
     verifyUserPassword
 } from '~/server/services/authStore';
+import ensureAuthRateLimit from '~/server/utils/api/authRateLimit/ensureAuthRateLimit';
+import executeApi from '~/server/utils/api/executor/executeApi';
+import ensure from '~/server/utils/api/executor/ensure';
+import ApiRequestError from '~/server/utils/api/errors/ApiRequestError';
+import { setAuthCookie } from '~/server/utils/auth/authCookie';
+import toPublicAuthSession from '~/server/utils/auth/toPublicAuthSession';
+import { validatePasswordDigest } from '~/utils/auth/credentials';
 
 interface LoginBody {
     username?: string;
-    password?: string;
+    passwordDigest?: string;
 }
 
 export default defineEventHandler(async (event) => {
     return executeApi(
         event,
         {
-            fixedCost: getFixedCost('authLogin')
+            bypassAnonymousQuota: true
         },
         async () => {
+            ensureAuthRateLimit(event, 'login');
+
             const body = await readBody<LoginBody>(event);
             ensure(
                 body && typeof body === 'object',
@@ -36,14 +41,26 @@ export default defineEventHandler(async (event) => {
                 'username 不能为空'
             );
             ensure(
-                typeof body.password === 'string' && body.password.length > 0,
+                typeof body.passwordDigest === 'string' &&
+                    body.passwordDigest.length > 0,
                 400,
                 'invalid_param',
-                'password 不能为空'
+                'passwordDigest 不能为空'
             );
 
+            const passwordDigestError = validatePasswordDigest(
+                body.passwordDigest
+            );
+            if (passwordDigestError) {
+                throw new ApiRequestError(
+                    400,
+                    'invalid_param',
+                    passwordDigestError
+                );
+            }
+
             const user = getUserByUsername(body.username);
-            if (!user || !verifyUserPassword(user, body.password)) {
+            if (!user || !verifyUserPassword(user, body.passwordDigest)) {
                 throw new ApiRequestError(
                     401,
                     'invalid_credentials',
@@ -52,14 +69,9 @@ export default defineEventHandler(async (event) => {
             }
 
             updateLastLoginAt(user.username);
-            const apiKey = createApiKey(user.username);
-            return {
-                userId: user.username,
-                apiKey: apiKey.key,
-                createdAt: apiKey.createdAt,
-                expiresAt: apiKey.expiresAt,
-                dailyTokenLimit: apiKey.dailyTokenLimit
-            };
+            const session = createApiKey(user.username);
+            setAuthCookie(event, session.apiKey);
+            return toPublicAuthSession(session);
         }
     );
 });

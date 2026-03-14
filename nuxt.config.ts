@@ -69,6 +69,7 @@ export default defineNuxtConfig({
             referrerPolicy: 'strict-origin-when-cross-origin',
             strictTransportSecurity: false
         },
+        corsHandler: false,
         csrf: true,
         requestSizeLimiter: {
             maxRequestSizeInBytes: 1024 * 1024, // 1M

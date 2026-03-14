@@ -37,27 +37,33 @@
                                 class="animate-pulse">
                                 <td
                                     class="border-b border-slate-100 px-4 py-4 last:border-b-0">
-                                    <div class="h-4 w-20 rounded bg-slate-200" />
+                                    <div
+                                        class="h-4 w-20 rounded bg-slate-200" />
                                 </td>
                                 <td
                                     class="border-b border-slate-100 px-4 py-4 last:border-b-0">
-                                    <div class="h-4 w-28 rounded bg-slate-200" />
+                                    <div
+                                        class="h-4 w-28 rounded bg-slate-200" />
                                 </td>
                                 <td
                                     class="border-b border-slate-100 px-4 py-4 last:border-b-0">
-                                    <div class="h-4 w-24 rounded bg-slate-100" />
+                                    <div
+                                        class="h-4 w-24 rounded bg-slate-100" />
                                 </td>
                                 <td
                                     class="border-b border-slate-100 px-4 py-4 last:border-b-0">
-                                    <div class="h-4 w-16 rounded bg-slate-100" />
+                                    <div
+                                        class="h-4 w-16 rounded bg-slate-100" />
                                 </td>
                                 <td
                                     class="border-b border-slate-100 px-4 py-4 last:border-b-0">
-                                    <div class="h-4 w-24 rounded bg-slate-100" />
+                                    <div
+                                        class="h-4 w-24 rounded bg-slate-100" />
                                 </td>
                                 <td
                                     class="border-b border-slate-100 px-4 py-4 last:border-b-0">
-                                    <div class="h-4 w-16 rounded bg-slate-100" />
+                                    <div
+                                        class="h-4 w-16 rounded bg-slate-100" />
                                 </td>
                             </tr>
                         </tbody>
@@ -72,8 +78,10 @@
                         <div class="animate-pulse space-y-3">
                             <div class="flex items-start gap-3">
                                 <div class="min-w-0">
-                                    <div class="h-4 w-20 rounded bg-slate-100" />
-                                    <div class="mt-2 h-4 w-28 rounded bg-slate-200" />
+                                    <div
+                                        class="h-4 w-20 rounded bg-slate-100" />
+                                    <div
+                                        class="mt-2 h-4 w-28 rounded bg-slate-200" />
                                 </div>
                             </div>
 
@@ -81,8 +89,10 @@
                                 class="rounded-[1rem] border border-slate-200 bg-white/90 px-4 py-3">
                                 <div class="flex items-center gap-3">
                                     <div class="min-w-0 flex-1">
-                                        <div class="h-3 w-12 rounded bg-slate-100" />
-                                        <div class="mt-2 h-4 w-20 rounded bg-slate-200" />
+                                        <div
+                                            class="h-3 w-12 rounded bg-slate-100" />
+                                        <div
+                                            class="mt-2 h-4 w-20 rounded bg-slate-200" />
                                     </div>
 
                                     <div
@@ -98,16 +108,20 @@
                                     </div>
 
                                     <div class="min-w-0 flex-1 text-right">
-                                        <div class="ml-auto h-3 w-12 rounded bg-slate-100" />
-                                        <div class="mt-2 ml-auto h-4 w-20 rounded bg-slate-200" />
+                                        <div
+                                            class="ml-auto h-3 w-12 rounded bg-slate-100" />
+                                        <div
+                                            class="mt-2 ml-auto h-4 w-20 rounded bg-slate-200" />
                                     </div>
                                 </div>
 
                                 <div
                                     class="mt-3 flex items-center gap-3 border-t border-slate-100 pt-3">
                                     <div class="min-w-0 flex-1">
-                                        <div class="h-3 w-12 rounded bg-slate-100" />
-                                        <div class="mt-2 h-4 w-16 rounded bg-slate-200" />
+                                        <div
+                                            class="h-3 w-12 rounded bg-slate-100" />
+                                        <div
+                                            class="mt-2 h-4 w-16 rounded bg-slate-200" />
                                     </div>
 
                                     <div
@@ -115,8 +129,10 @@
                                         aria-hidden="true" />
 
                                     <div class="min-w-0 flex-1 text-right">
-                                        <div class="ml-auto h-3 w-12 rounded bg-slate-100" />
-                                        <div class="mt-2 ml-auto h-4 w-16 rounded bg-slate-200" />
+                                        <div
+                                            class="ml-auto h-3 w-12 rounded bg-slate-100" />
+                                        <div
+                                            class="mt-2 ml-auto h-4 w-16 rounded bg-slate-200" />
                                     </div>
                                 </div>
                             </div>
@@ -160,7 +176,7 @@
                                 v-for="item in groupedItems"
                                 :key="item.id"
                                 :class="[
-                                    'group align-top',
+                                    'history-table-row group align-top',
                                     isRunningItem(item)
                                         ? 'running-result-row'
                                         : ''
@@ -656,6 +672,23 @@ function buildCodeLink(code: string) {
 
     .history-panel-card::before {
         display: none;
+    }
+}
+
+@media (hover: hover) {
+    .history-table-row > td {
+        transition:
+            box-shadow 220ms ease,
+            color 220ms ease,
+            border-color 220ms ease;
+    }
+
+    .history-table-row:hover > td {
+        box-shadow: inset 0 0 0 999px rgba(219, 234, 254, 0.92);
+    }
+
+    .running-result-row:hover > td {
+        box-shadow: inset 0 0 0 999px rgba(191, 219, 254, 0.42);
     }
 }
 </style>

@@ -1,5 +1,6 @@
 <template>
     <NuxtPwaManifest />
+    <AppAuthEntry />
     <NuxtLoadingIndicator
         color="#ffc107"
         :height="4" />
@@ -7,4 +8,10 @@
         <NuxtPage />
     </NuxtLayout>
 </template>
-<script lang="ts"></script>
+<script setup lang="ts">
+import AppAuthEntry from '~/components/AppAuthEntry.vue';
+
+const { ensureSession } = useAuthState();
+
+await ensureSession();
+</script>

@@ -4,6 +4,7 @@ import getFixedCost from '~/server/utils/api/cost/getFixedCost';
 import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';
 import ApiRequestError from '~/server/utils/api/errors/ApiRequestError';
+import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
 
 export default defineEventHandler(async (event) => {
     const config = useConfig();
@@ -11,6 +12,7 @@ export default defineEventHandler(async (event) => {
     return executeApi(
         event,
         {
+            requiredScopes: [API_SCOPES.debug.echoError],
             fixedCost: getFixedCost('debugEchoError')
         },
         async () => {
@@ -18,7 +20,7 @@ export default defineEventHandler(async (event) => {
                 import.meta.dev && config.api.debug.enableEchoError,
                 404,
                 'not_found',
-                '此接口在当前环境中不可用'
+                '当前环境不可使用该接口'
             );
 
             const query = getQuery(event);
@@ -40,6 +42,7 @@ export default defineEventHandler(async (event) => {
                 'invalid_param',
                 'status 必须是 400-599 的整数'
             );
+
             throw new ApiRequestError(statusCode, errorCode, message);
         }
     );

@@ -1,0 +1,35 @@
+export const API_SCOPES = {
+    auth: {
+        me: 'api.auth.me.read',
+        logout: 'api.auth.logout',
+        apiKeys: {
+            read: 'api.auth.api-keys.read',
+            create: 'api.auth.api-keys.create',
+            revoke: 'api.auth.api-keys.revoke'
+        }
+    },
+    search: {
+        read: 'api.search.read'
+    },
+    records: {
+        daily: {
+            read: 'api.records.daily.read'
+        }
+    },
+    history: {
+        train: {
+            read: 'api.history.train.read'
+        },
+        emu: {
+            read: 'api.history.emu.read'
+        }
+    },
+    exports: {
+        daily: {
+            read: 'api.exports.daily.read'
+        }
+    },
+    debug: {
+        echoError: 'api.debug.echo-error'
+    }
+} as const;

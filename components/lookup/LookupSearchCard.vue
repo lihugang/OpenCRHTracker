@@ -71,7 +71,7 @@
                         ]">
                         <div
                             ref="rootRef"
-                            class="relative min-w-0">
+                            class="relative min-w-0 space-y-1.5">
                             <input
                                 id="lookup-input"
                                 ref="inputRef"
@@ -82,7 +82,10 @@
                                 :placeholder="props.placeholder"
                                 :class="[
                                     'harmony-input w-full px-5 text-base placeholder:text-slate-400',
-                                    collapsed ? 'py-2.5' : 'py-3'
+                                    collapsed ? 'py-2.5' : 'py-3',
+                                    errorMessage
+                                        ? 'border-rose-300 focus:border-rose-300 focus:ring-rose-200/60'
+                                        : ''
                                 ]"
                                 @focus="handleFocus"
                                 @input="handleInput"
@@ -90,6 +93,17 @@
                                 @keydown.up.prevent="moveActive(-1)"
                                 @keydown.enter.prevent="submitFromEnter"
                                 @keydown.esc.prevent="closeMenu" />
+
+                            <p
+                                v-if="errorMessage"
+                                class="flex items-center gap-1.5 pl-1 text-xs leading-5 text-[#E53E3E]">
+                                <span
+                                    aria-hidden="true"
+                                    class="font-semibold">
+                                    [!]
+                                </span>
+                                <span>{{ errorMessage }}</span>
+                            </p>
 
                             <div
                                 v-if="shouldShowMenu"
@@ -191,12 +205,6 @@
                         </UiButton>
                     </div>
                 </div>
-
-                <p
-                    v-if="errorMessage"
-                    class="rounded-[1rem] border border-status-delayed/15 bg-status-delayed/5 px-4 py-3 text-sm text-status-delayed">
-                    {{ errorMessage }}
-                </p>
             </form>
         </div>
     </UiCard>

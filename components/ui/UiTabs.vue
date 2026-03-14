@@ -1,35 +1,43 @@
 <template>
-    <div
-        class="rounded-[1.25rem] border border-slate-200 bg-white/90 p-2 shadow-ticket">
-        <div class="grid gap-2 md:grid-cols-3">
+    <div class="rounded-xl border border-slate-200 bg-slate-100 p-1">
+        <div
+            class="grid gap-1"
+            :style="gridStyle">
             <button
                 v-for="option in options"
                 :key="option.value"
                 type="button"
-                :class="[
-                    'rounded-[1rem] border px-4 py-3 text-left transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-crh-blue/25 focus-visible:ring-offset-2 focus-visible:ring-offset-white',
+                class="rounded-lg px-4 py-2.5 text-center text-sm font-medium transition duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-crh-blue/20 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+                :class="
                     model === option.value
-                        ? 'border-crh-blue/30 bg-[linear-gradient(135deg,rgba(0,82,155,0.1),rgba(255,255,255,0.95))] text-crh-grey-dark shadow-[inset_0_0_0_1px_rgba(0,82,155,0.05)]'
-                        : 'border-transparent bg-transparent text-slate-500 hover:border-slate-200 hover:bg-slate-50'
-                ]"
+                        ? 'border border-slate-300 bg-white text-slate-900 shadow-sm'
+                        : 'border border-transparent bg-transparent text-slate-500 hover:bg-white/70 hover:text-slate-700'
+                "
                 @click="model = option.value">
-                <p class="text-sm font-semibold">{{ option.label }}</p>
-                <p class="mt-1 text-xs leading-5 text-slate-500">
-                    {{ option.hint }}
-                </p>
+                <span>{{ option.label }}</span>
             </button>
         </div>
     </div>
 </template>
 
 <script setup lang="ts">
-import type { QueryTabOption } from '~/types/homepage';
+import { computed } from 'vue';
 
-defineProps<{
-    options: QueryTabOption[];
+interface TabOption {
+    value: string;
+    label: string;
+    hint?: string;
+}
+
+const props = defineProps<{
+    options: TabOption[];
 }>();
 
 const model = defineModel<string>({
     required: true
 });
+
+const gridStyle = computed(() => ({
+    gridTemplateColumns: `repeat(${props.options.length}, minmax(0, 1fr))`
+}));
 </script>

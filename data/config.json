@@ -85,9 +85,13 @@
     },
     "user": {
         "saltLength": 16,
-        "apiKeyPrefix": "ocrh_",
+        "apiKeyPrefixes": {
+            "webapp": "ocrh_webapp_",
+            "api": "ocrh_api_"
+        },
         "apiKeyBytes": 24,
         "apiKeyTtlSeconds": 2592000,
+        "signKey": "OpenCRHTracker",
         "scrypt": {
             "keyLength": 64,
             "cost": 16384,
@@ -97,10 +101,34 @@
     },
     "api": {
         "versionPrefix": "/api/v1",
-        "apiKeyHeader": "x-api-key",
+        "apiKeyHeader": "authorization",
+        "authCookieName": "token",
+        "authRateLimit": {
+            "login": {
+                "maxRequests": 10,
+                "windowSeconds": 1800
+            },
+            "register": {
+                "maxRequests": 3,
+                "windowSeconds": 86400
+            }
+        },
+        "authCache": {
+            "userRecord": {
+                "maxEntries": 1024,
+                "defaultTtlSeconds": 1800
+            },
+            "apiKeyRecord": {
+                "maxEntries": 4096,
+                "defaultTtlSeconds": 21600
+            }
+        },
+        "payload": {
+            "maxStringLength": 16384
+        },
         "headers": {
-            "remain": "remain",
-            "cost": "cost",
+            "remain": "x-api-remain",
+            "cost": "x-api-cost",
             "retryAfter": "Retry-After"
         },
         "cache": {
@@ -115,6 +143,34 @@
         "timestampUnit": "seconds",
         "debug": {
             "enableEchoError": true
+        },
+        "permissions": {
+            "anonymousScopes": [
+                "api.search.read",
+                "api.records.daily.read",
+                "api.history.train.read",
+                "api.history.emu.read",
+                "api.exports.daily.read"
+            ],
+            "issuedKeyDefaultScopes": [
+                "api.search.read",
+                "api.records.daily.read",
+                "api.history.train.read",
+                "api.history.emu.read",
+                "api.exports.daily.read",
+                "api.auth.me.read",
+                "api.auth.logout",
+                "api.auth.api-keys.read",
+                "api.auth.api-keys.create",
+                "api.auth.api-keys.revoke"
+            ],
+            "creatableKeyMaxScopes": [
+                "api.auth.me.read",
+                "api.records.daily.read",
+                "api.history.train.read",
+                "api.history.emu.read",
+                "api.exports.daily.read"
+            ]
         }
     },
     "task": {
@@ -135,21 +191,21 @@
         }
     },
     "quota": {
-        "anonymousMaxTokens": 20,
+        "anonymousMaxTokens": 25,
         "userMaxTokens": 1000,
-        "refillAmount": 100,
-        "refillIntervalSeconds": 3600,
+        "refillAmount": 5,
+        "refillIntervalSeconds": 300,
         "resetToMaxOnRestart": true,
         "consumeTokens": true
     },
     "cost": {
         "fixed": {
             "health": 0,
-            "quotaMe": 1,
+            "authMe": 1,
+            "authLogout": 1,
             "debugEchoError": 0,
-            "authLogin": 2,
-            "authIssueApiKey": 10,
-            "authListApiKeys": 2,
+            "authIssueApiKey": 2,
+            "authListApiKeys": 1,
             "authRevokeApiKey": 1,
             "searchIndex": 1,
             "exportDaily": 100

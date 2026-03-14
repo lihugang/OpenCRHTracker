@@ -158,7 +158,10 @@ function persistBackfilledCoupledRoutes(
     const currentDate = getCurrentDateString();
     const dayStart = getShanghaiDayStartUnixSeconds(currentDate);
     const nextDayStart = dayStart + 24 * 60 * 60;
-    const candidateRows = new Map<string, { trainCode: string; startAt: number }>();
+    const candidateRows = new Map<
+        string,
+        { trainCode: string; startAt: number }
+    >();
 
     for (const emuCode of emuCodes) {
         const rows = listProbeStatusByEmuCodeInRange(
@@ -187,7 +190,8 @@ function persistBackfilledCoupledRoutes(
             normalizedTrainCode,
             candidate.startAt
         );
-        const scheduleRoute = scheduleRoutesByTrainCode.get(normalizedTrainCode);
+        const scheduleRoute =
+            scheduleRoutesByTrainCode.get(normalizedTrainCode);
 
         if (!scheduleRoute) {
             logger.warn(
@@ -205,7 +209,9 @@ function persistBackfilledCoupledRoutes(
         for (const emuCode of emuCodes) {
             const normalizedEmuCode = normalizeCode(emuCode);
             if (
-                existingRows.some((row) => row.emu_code === normalizedEmuCode) &&
+                existingRows.some(
+                    (row) => row.emu_code === normalizedEmuCode
+                ) &&
                 existingRows.some(
                     (row) =>
                         row.emu_code === normalizedEmuCode &&
@@ -310,7 +316,10 @@ async function persistResolvedGroup(
     if (trainCodes.length === 0 || emuCodes.length === 0) {
         return;
     }
-    const scheduleRoute = resolveScheduleRoute(trainCodes, scheduleRoutesByTrainCode);
+    const scheduleRoute = resolveScheduleRoute(
+        trainCodes,
+        scheduleRoutesByTrainCode
+    );
 
     const finalStatus: ProbeStatusValue =
         emuCodes.length > 1

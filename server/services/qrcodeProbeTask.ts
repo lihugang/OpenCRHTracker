@@ -1,5 +1,6 @@
 import getLogger from '~/server/libs/log4js';
 import useConfig from '~/server/config';
+import { estimateIdleTaskDurationMs } from '~/server/services/idleTaskEstimator';
 import { enqueueTaskAfterDelaySeconds } from '~/server/services/taskQueue';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
 import parseEmuCode from '~/server/utils/12306/parseEmuCode';
@@ -16,6 +17,13 @@ export interface ProbeQrcodeAvailabilityTaskArgs {
 
 export function isQrcodeProbeTaskEnabled(): boolean {
     return import.meta.dev && useConfig().task.qrcodeProbe.enabled;
+}
+
+function estimateQrcodeProbeTaskDurationMs(): number {
+    return estimateIdleTaskDurationMs(
+        PROBE_QRCODE_AVAILABILITY_TASK_EXECUTOR,
+        useConfig().spider.rateLimit.query.minIntervalMs
+    );
 }
 
 export function enqueueQrcodeProbeAvailabilityTask(
@@ -45,7 +53,11 @@ export function enqueueQrcodeProbeAvailabilityTask(
             trainCode: normalizedTrainCode,
             emuCode: normalizedEmuCode
         } satisfies ProbeQrcodeAvailabilityTaskArgs,
-        useConfig().task.qrcodeProbe.delaySeconds
+        useConfig().task.qrcodeProbe.delaySeconds,
+        {
+            isIdle: true,
+            expectedDurationMs: estimateQrcodeProbeTaskDurationMs()
+        }
     );
 
     return taskId;

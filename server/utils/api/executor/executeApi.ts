@@ -1,17 +1,19 @@
 import type { H3Event } from 'h3';
+import applyApiCorsHeaders from '~/server/utils/api/cors/applyApiCorsHeaders';
 import asApiRequestError from '~/server/utils/api/errors/asApiRequestError';
-import getAnonymousIdentity from '~/server/utils/api/identity/getAnonymousIdentity';
-import resolveIdentity from '~/server/utils/api/identity/resolveIdentity';
-import formatRetryAfterMessage from '~/server/utils/api/quota/formatRetryAfterMessage';
-import getRemainTokens from '~/server/utils/api/quota/getRemainTokens';
-import tryConsumeTokens from '~/server/utils/api/quota/tryConsumeTokens';
-import apiFailure from '~/server/utils/api/response/apiFailure';
-import apiSuccess from '~/server/utils/api/response/apiSuccess';
-import type ApiIdentity from '~/server/utils/api/identity/ApiIdentity';
 import type {
     ExecuteApiContext,
     ExecuteApiOptions
 } from '~/server/utils/api/executor/ExecuteApiTypes';
+import getAnonymousIdentity from '~/server/utils/api/identity/getAnonymousIdentity';
+import type ApiIdentity from '~/server/utils/api/identity/ApiIdentity';
+import resolveIdentity from '~/server/utils/api/identity/resolveIdentity';
+import getRemainTokens from '~/server/utils/api/quota/getRemainTokens';
+import formatRetryAfterMessage from '~/server/utils/api/quota/formatRetryAfterMessage';
+import tryConsumeTokens from '~/server/utils/api/quota/tryConsumeTokens';
+import apiFailure from '~/server/utils/api/response/apiFailure';
+import apiSuccess from '~/server/utils/api/response/apiSuccess';
+import assertRequiredScopes from '~/server/utils/api/scopes/assertRequiredScopes';
 
 export default async function executeApi<TData>(
     event: H3Event,
@@ -19,17 +21,42 @@ export default async function executeApi<TData>(
     handler: (context: ExecuteApiContext) => Promise<TData>
 ) {
     const minimumRequestCost = 1;
+    const corsEnabled = options.cors ?? false;
+    const bypassAnonymousQuota = options.bypassAnonymousQuota ?? false;
     const fixedCost = options.fixedCost ?? 0;
     let identity: ApiIdentity | null = null;
     let remain = 0;
     let costApplied = 0;
 
+    if (corsEnabled) {
+        applyApiCorsHeaders(event);
+    }
+
+    const getQuotaExceededMessage = (retryAfter?: number) => {
+        return formatRetryAfterMessage(
+            retryAfter,
+            identity?.type === 'anonymous' ? 'quota_anonymous' : 'quota_user'
+        );
+    };
+
     try {
-        identity = resolveIdentity(event, options.requireApiKey ?? false);
+        identity = resolveIdentity(event);
+        assertRequiredScopes(identity, options.requiredScopes);
+
         const resolvedIdentity = identity;
         remain = getRemainTokens(resolvedIdentity);
+        const shouldBypassQuota =
+            bypassAnonymousQuota && resolvedIdentity.type === 'anonymous';
 
         const consumeToTargetCost = (rawTargetCost: number) => {
+            if (shouldBypassQuota) {
+                return {
+                    ok: true,
+                    remain,
+                    cost: 0
+                };
+            }
+
             const targetCost = Math.max(
                 minimumRequestCost,
                 Math.floor(rawTargetCost)
@@ -60,7 +87,7 @@ export default async function executeApi<TData>(
             return apiFailure(
                 event,
                 429,
-                formatRetryAfterMessage(fixedConsume.retryAfter),
+                getQuotaExceededMessage(fixedConsume.retryAfter),
                 'quota_exceeded',
                 {
                     remain: fixedConsume.remain,
@@ -95,7 +122,7 @@ export default async function executeApi<TData>(
                 return apiFailure(
                     event,
                     429,
-                    formatRetryAfterMessage(dynamicConsume.retryAfter),
+                    getQuotaExceededMessage(dynamicConsume.retryAfter),
                     'quota_exceeded',
                     {
                         remain: dynamicConsume.remain,
@@ -128,7 +155,10 @@ export default async function executeApi<TData>(
             identity = getAnonymousIdentity(event);
         }
 
-        if (costApplied < minimumRequestCost) {
+        if (
+            !(bypassAnonymousQuota && identity.type === 'anonymous') &&
+            costApplied < minimumRequestCost
+        ) {
             const minimumConsume = tryConsumeTokens(
                 identity,
                 minimumRequestCost - costApplied

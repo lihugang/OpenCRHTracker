@@ -1,9 +1,9 @@
 <template>
-    <main class="flex min-h-screen flex-col bg-crh-slate text-crh-grey-dark">
+    <main class="landing-shell flex min-h-screen flex-col text-crh-grey-dark">
         <div
-            class="pointer-events-none absolute inset-x-0 top-0 h-[28rem] bg-[radial-gradient(circle_at_top,_rgba(0,82,155,0.12),_transparent_58%)]" />
+            class="pointer-events-none absolute inset-x-0 top-0 h-[28rem] bg-[radial-gradient(circle_at_top,_rgba(74,124,159,0.08),_transparent_60%)]" />
         <div
-            class="pointer-events-none absolute inset-x-0 top-20 h-40 bg-[linear-gradient(90deg,_rgba(0,82,155,0.14),_rgba(0,82,155,0))] blur-3xl" />
+            class="pointer-events-none absolute inset-x-0 top-20 h-40 bg-[linear-gradient(90deg,_rgba(90,132,162,0.08),_rgba(90,132,162,0))] blur-3xl" />
 
         <div
             class="relative mx-auto flex w-full max-w-7xl flex-1 flex-col gap-8 px-4 py-6 sm:px-6 lg:px-8 lg:py-10">
@@ -22,6 +22,7 @@
                             : 'max-w-[58rem]'
                     ]">
                     <LookupSearchCard
+                        class="landing-hero-card"
                         v-model="draftCode"
                         eyebrow="OpenCRHTracker"
                         title="动车组运用情况查询"
@@ -89,11 +90,11 @@ let mediaQueryHandler: ((event: MediaQueryListEvent) => void) | null = null;
 const detectedTarget = computed(() => resolveLookupTarget(draftCode.value));
 
 useHead({
-    title: 'OpenCRHTracker | 首页查询',
+    title: 'OpenCRHTracker | 首页',
     meta: [
         {
             name: 'description',
-            content: '输入车次号或车组号后查询动车组担当情况'
+            content: '中国动车组担当及交路信息查询网站'
         }
     ]
 });
@@ -134,3 +135,47 @@ async function submitLookup() {
     await navigateTo(buildLookupPath(resolvedTarget));
 }
 </script>
+
+<style scoped>
+.landing-shell {
+    background:
+        radial-gradient(
+            circle at top,
+            rgba(181, 205, 220, 0.18),
+            transparent 34%
+        ),
+        linear-gradient(180deg, #f4f8fb 0%, #edf3f7 100%);
+}
+
+.landing-hero-card :deep(.ticket-card) {
+    border-color: rgba(191, 204, 216, 0.78);
+    box-shadow:
+        0 16px 36px -28px rgba(15, 23, 42, 0.26),
+        0 4px 12px rgba(148, 163, 184, 0.16);
+}
+
+.landing-hero-card :deep(.ticket-card--accent) {
+    background:
+        linear-gradient(135deg, rgba(102, 145, 175, 0.06), transparent 42%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, #f7fafc 100%);
+}
+
+.landing-hero-card :deep(.harmony-input) {
+    border-color: rgba(203, 213, 225, 0.92);
+    background: rgba(255, 255, 255, 0.97);
+}
+
+.landing-hero-card :deep(button[type='submit']) {
+    padding-inline: 1.75rem;
+    font-weight: 600;
+    box-shadow:
+        0 12px 24px -18px rgba(0, 82, 155, 0.55),
+        0 2px 6px rgba(15, 23, 42, 0.08);
+}
+
+@media (min-width: 768px) {
+    .landing-hero-card :deep(.ticket-card--accent) {
+        padding: 2.25rem 2.5rem;
+    }
+}
+</style>

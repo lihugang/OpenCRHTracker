@@ -11,13 +11,12 @@ export default function isTimestampRangeActive(
     endAt: number | undefined,
     currentUnixSeconds: number
 ) {
-    if (
-        !isValidTimestamp(startAt) ||
-        !isValidTimestamp(endAt) ||
-        !Number.isFinite(currentUnixSeconds)
-    ) {
+    const safeStartAt = isValidTimestamp(startAt) ? startAt : null;
+    const safeEndAt = isValidTimestamp(endAt) ? endAt : null;
+
+    if (!safeStartAt || !safeEndAt || !Number.isFinite(currentUnixSeconds)) {
         return false;
     }
 
-    return startAt <= currentUnixSeconds && currentUnixSeconds <= endAt;
+    return safeStartAt <= currentUnixSeconds && currentUnixSeconds <= safeEndAt;
 }

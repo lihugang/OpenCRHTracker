@@ -33,7 +33,9 @@ function parseTaskArgs(raw: unknown): ProbeQrcodeAvailabilityTaskArgs {
     const emuCode =
         typeof body.emuCode === 'string' ? normalizeCode(body.emuCode) : '';
     if (trainCode.length === 0 || emuCode.length === 0) {
-        throw new Error('task arguments trainCode and emuCode must be non-empty');
+        throw new Error(
+            'task arguments trainCode and emuCode must be non-empty'
+        );
     }
 
     return {

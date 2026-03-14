@@ -60,6 +60,15 @@ interface KnownStatusGroup {
     finalStatus: ProbeStatusValue;
 }
 
+type RouteProbeResult = NonNullable<
+    Awaited<ReturnType<typeof fetchEMUInfoByRoute>>
+>;
+
+interface SuccessfulRouteProbe {
+    probedTrainCode: string;
+    routeProbeResult: RouteProbeResult;
+}
+
 let registered = false;
 
 function parseTaskArgs(raw: unknown): ProbeTrainDepartureTaskArgs {
@@ -274,7 +283,8 @@ function tryReuseHistoricalProbeStatus(
     const allEmuCodes =
         knownGroup.emuCodes.length > 0 ? knownGroup.emuCodes : [mainEmuCode];
     if (
-        latestResolvedRow.status === ProbeStatusValue.CoupledFormationResolved &&
+        latestResolvedRow.status ===
+            ProbeStatusValue.CoupledFormationResolved &&
         (knownGroup.finalStatus !== ProbeStatusValue.CoupledFormationResolved ||
             allEmuCodes.length <= 1)
     ) {
@@ -296,6 +306,40 @@ function tryReuseHistoricalProbeStatus(
         `reuse_historical_status trainCode=${args.trainCode} mainEmuCode=${mainEmuCode} historicalStartAt=${latestResolvedRow.start_at} status=${knownGroup.finalStatus} emuCodes=${allEmuCodes.length}`
     );
     return true;
+}
+
+async function probeEmuByTrainCodes(
+    candidateTrainCodes: string[]
+): Promise<SuccessfulRouteProbe | null> {
+    for (const candidateTrainCode of candidateTrainCodes) {
+        const routeProbeResult = await fetchEMUInfoByRoute(candidateTrainCode);
+        if (!routeProbeResult) {
+            continue;
+        }
+
+        const mainEmuCode = normalizeCode(routeProbeResult.emu.code);
+        if (mainEmuCode.length === 0) {
+            logger.warn(
+                `route_probe_empty_emu_code trainCode=${candidateTrainCode}`
+            );
+            continue;
+        }
+
+        const parsedMainEmuCode = parseEmuCode(mainEmuCode);
+        if (!parsedMainEmuCode?.trainSetNo) {
+            logger.warn(
+                `route_probe_invalid_emu_code trainCode=${candidateTrainCode} mainEmuCode=${mainEmuCode}`
+            );
+            continue;
+        }
+
+        return {
+            probedTrainCode: candidateTrainCode,
+            routeProbeResult
+        };
+    }
+
+    return null;
 }
 
 async function executeProbeTrainDepartureTask(rawArgs: unknown): Promise<void> {
@@ -328,8 +372,12 @@ async function executeProbeTrainDepartureTask(rawArgs: unknown): Promise<void> {
         return;
     }
 
-    const routeProbeResult = await fetchEMUInfoByRoute(args.trainCode);
-    if (!routeProbeResult) {
+    const allTrainCodes = uniqueNormalizedCodes([
+        args.trainCode,
+        ...args.allCodes
+    ]);
+    const successfulRouteProbe = await probeEmuByTrainCodes(allTrainCodes);
+    if (!successfulRouteProbe) {
         if (args.retry > 0) {
             const nextRetry = args.retry - 1;
             const nextTaskId = enqueueTask(
@@ -338,38 +386,23 @@ async function executeProbeTrainDepartureTask(rawArgs: unknown): Promise<void> {
                 nowSeconds
             );
             logger.warn(
-                `route_probe_failed_requeue trainCode=${args.trainCode} retry=${args.retry} nextRetry=${nextRetry} nextTaskId=${nextTaskId}`
+                `route_probe_failed_requeue trainCode=${args.trainCode} retry=${args.retry} nextRetry=${nextRetry} nextTaskId=${nextTaskId} attemptedTrainCodes=${allTrainCodes.join(',')}`
             );
             return;
         }
 
         logger.warn(
-            `route_probe_failed_exhausted trainCode=${args.trainCode} retry=${args.retry}`
+            `route_probe_failed_exhausted trainCode=${args.trainCode} retry=${args.retry} attemptedTrainCodes=${allTrainCodes.join(',')}`
         );
         return;
     }
 
+    const { probedTrainCode, routeProbeResult } = successfulRouteProbe;
     const mainEmuCode = normalizeCode(routeProbeResult.emu.code);
-    if (mainEmuCode.length === 0) {
-        logger.warn(`route_probe_empty_emu_code trainCode=${args.trainCode}`);
-        return;
-    }
-
     const parsedMainEmuCode = parseEmuCode(mainEmuCode);
-    const currentTrainSetNo = parsedMainEmuCode?.trainSetNo ?? '';
-    if (currentTrainSetNo.length === 0) {
-        logger.warn(
-            `route_probe_invalid_emu_code trainCode=${args.trainCode} mainEmuCode=${mainEmuCode}`
-        );
-        return;
-    }
+    const currentTrainSetNo = parsedMainEmuCode!.trainSetNo;
 
-    enqueueQrcodeProbeAvailabilityTask(args.trainCode, mainEmuCode);
-
-    const allTrainCodes = uniqueNormalizedCodes([
-        args.trainCode,
-        ...args.allCodes
-    ]);
+    enqueueQrcodeProbeAvailabilityTask(probedTrainCode, mainEmuCode);
     const assets = await loadProbeAssets();
     const mainRecord = assets.emuByModelAndTrainSetNo.get(
         buildProbeAssetKey(parsedMainEmuCode!.model, currentTrainSetNo)
@@ -402,7 +435,7 @@ async function executeProbeTrainDepartureTask(rawArgs: unknown): Promise<void> {
             nowSeconds
         );
         logger.info(
-            `resolved_single_non_multiple trainCode=${args.trainCode} mainEmuCode=${mainEmuCode}`
+            `resolved_single_non_multiple trainCode=${args.trainCode} probedTrainCode=${probedTrainCode} mainEmuCode=${mainEmuCode} attemptedTrainCodes=${allTrainCodes.length}`
         );
         return;
     }
@@ -438,7 +471,7 @@ async function executeProbeTrainDepartureTask(rawArgs: unknown): Promise<void> {
             nowSeconds
         );
         logger.info(
-            `resolved_from_status trainCode=${args.trainCode} mainEmuCode=${mainEmuCode} status=${knownGroup.finalStatus} emuCodes=${knownGroup.emuCodes.length}`
+            `resolved_from_status trainCode=${args.trainCode} probedTrainCode=${probedTrainCode} mainEmuCode=${mainEmuCode} status=${knownGroup.finalStatus} emuCodes=${knownGroup.emuCodes.length} attemptedTrainCodes=${allTrainCodes.length}`
         );
         return;
     }
@@ -475,7 +508,7 @@ async function executeProbeTrainDepartureTask(rawArgs: unknown): Promise<void> {
 
     const detectionTaskId = queueCoupledDetectionTask(mainRecord);
     logger.info(
-        `pending_coupling_detection trainCode=${args.trainCode} mainEmuCode=${mainEmuCode} detectionTaskId=${detectionTaskId}`
+        `pending_coupling_detection trainCode=${args.trainCode} probedTrainCode=${probedTrainCode} mainEmuCode=${mainEmuCode} detectionTaskId=${detectionTaskId} attemptedTrainCodes=${allTrainCodes.length}`
     );
 }
 

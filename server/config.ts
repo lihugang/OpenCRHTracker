@@ -1,4 +1,5 @@
 import fs from 'fs';
+import normalizeScopeList from '~/server/utils/api/scopes/normalizeScopeList';
 import { parseDailyTimeHHmm } from '~/server/utils/date/shanghaiDateTime';
 
 interface CostPerRecordRule {
@@ -33,6 +34,12 @@ interface ScheduleProbeCouplingConfig {
 interface TaskQrcodeProbeConfig {
     enabled: boolean;
     delaySeconds: number;
+}
+
+interface ApiPermissionConfig {
+    anonymousScopes: string[];
+    issuedKeyDefaultScopes: string[];
+    creatableKeyMaxScopes: string[];
 }
 
 const ALLOWED_STARTUP_TASK_EXECUTORS = [
@@ -94,9 +101,13 @@ export interface Config {
     };
     user: {
         saltLength: number;
-        apiKeyPrefix: string;
+        apiKeyPrefixes: {
+            webapp: string;
+            api: string;
+        };
         apiKeyBytes: number;
         apiKeyTtlSeconds: number;
+        signKey: string;
         scrypt: {
             keyLength: number;
             cost: number;
@@ -107,6 +118,30 @@ export interface Config {
     api: {
         versionPrefix: string;
         apiKeyHeader: string;
+        authCookieName: string;
+        authRateLimit: {
+            login: {
+                maxRequests: number;
+                windowSeconds: number;
+            };
+            register: {
+                maxRequests: number;
+                windowSeconds: number;
+            };
+        };
+        authCache: {
+            userRecord: {
+                maxEntries: number;
+                defaultTtlSeconds: number;
+            };
+            apiKeyRecord: {
+                maxEntries: number;
+                defaultTtlSeconds: number;
+            };
+        };
+        payload: {
+            maxStringLength: number;
+        };
         headers: {
             remain: string;
             cost: string;
@@ -125,6 +160,7 @@ export interface Config {
         debug: {
             enableEchoError: boolean;
         };
+        permissions: ApiPermissionConfig;
     };
     task: {
         startup: {
@@ -151,9 +187,9 @@ export interface Config {
     cost: {
         fixed: {
             health: number;
-            quotaMe: number;
+            authMe: number;
+            authLogout: number;
             debugEchoError: number;
-            authLogin: number;
             authIssueApiKey: number;
             authListApiKeys: number;
             authRevokeApiKey: number;
@@ -281,6 +317,14 @@ function parseAssetConfig(value: unknown, name: string): AssetConfig {
     };
 }
 
+function parseScopeList(value: unknown, name: string) {
+    const rawScopes = asArray(value, name).map((scope, index) =>
+        asString(scope, `${name}[${index}]`)
+    );
+
+    return normalizeScopeList(rawScopes);
+}
+
 function validateConfig(raw: unknown): Config {
     const root = asObject(raw, 'root');
 
@@ -322,12 +366,54 @@ function validateConfig(raw: unknown): Config {
 
     const user = asObject(root.user, 'user');
     const userScrypt = asObject(user.scrypt, 'user.scrypt');
+    const userApiKeyPrefixes = asOptionalObject(
+        user.apiKeyPrefixes,
+        'user.apiKeyPrefixes'
+    );
+    const legacyApiKeyPrefix =
+        user.apiKeyPrefix === undefined
+            ? undefined
+            : asString(user.apiKeyPrefix, 'user.apiKeyPrefix');
+    const envSignKey = process.env.OCRH_SIGN_KEY?.trim();
+    const configSignKey =
+        user.signKey === undefined
+            ? ''
+            : asString(user.signKey, 'user.signKey');
+    const signKey =
+        envSignKey && envSignKey.length > 0 ? envSignKey : configSignKey;
+
+    assert(signKey.length > 0, 'user.signKey must be configured');
+    if (!import.meta.dev && (!envSignKey || envSignKey.length === 0)) {
+        console.warn(
+            '[config] WARNING: OCRH signing key was loaded from config instead of process.env.OCRH_SIGN_KEY'
+        );
+    }
 
     const api = asObject(root.api, 'api');
+    const apiAuthRateLimit = asObject(api.authRateLimit, 'api.authRateLimit');
+    const apiAuthRateLimitLogin = asObject(
+        apiAuthRateLimit.login,
+        'api.authRateLimit.login'
+    );
+    const apiAuthRateLimitRegister = asObject(
+        apiAuthRateLimit.register,
+        'api.authRateLimit.register'
+    );
+    const apiAuthCache = asObject(api.authCache, 'api.authCache');
+    const apiAuthCacheUserRecord = asObject(
+        apiAuthCache.userRecord,
+        'api.authCache.userRecord'
+    );
+    const apiAuthCacheApiKeyRecord = asObject(
+        apiAuthCache.apiKeyRecord,
+        'api.authCache.apiKeyRecord'
+    );
+    const apiPayload = asObject(api.payload, 'api.payload');
     const apiHeaders = asObject(api.headers, 'api.headers');
     const apiCache = asObject(api.cache, 'api.cache');
     const apiPagination = asObject(api.pagination, 'api.pagination');
     const apiDebug = asObject(api.debug, 'api.debug');
+    const apiPermissions = asObject(api.permissions, 'api.permissions');
     const task = asObject(root.task, 'task');
     const taskStartup =
         task.startup === undefined
@@ -532,13 +618,29 @@ function validateConfig(raw: unknown): Config {
         },
         user: {
             saltLength: asNumber(user.saltLength, 'user.saltLength', 8),
-            apiKeyPrefix: asString(user.apiKeyPrefix, 'user.apiKeyPrefix'),
+            apiKeyPrefixes: {
+                webapp:
+                    userApiKeyPrefixes === undefined
+                        ? asString(legacyApiKeyPrefix, 'user.apiKeyPrefix')
+                        : asString(
+                              userApiKeyPrefixes.webapp,
+                              'user.apiKeyPrefixes.webapp'
+                          ),
+                api:
+                    userApiKeyPrefixes === undefined
+                        ? asString(legacyApiKeyPrefix, 'user.apiKeyPrefix')
+                        : asString(
+                              userApiKeyPrefixes.api,
+                              'user.apiKeyPrefixes.api'
+                          )
+            },
             apiKeyBytes: asNumber(user.apiKeyBytes, 'user.apiKeyBytes', 16),
             apiKeyTtlSeconds: asNumber(
                 user.apiKeyTtlSeconds,
                 'user.apiKeyTtlSeconds',
                 60
             ),
+            signKey,
             scrypt: {
                 keyLength: asNumber(
                     userScrypt.keyLength,
@@ -561,6 +663,66 @@ function validateConfig(raw: unknown): Config {
         api: {
             versionPrefix: asString(api.versionPrefix, 'api.versionPrefix'),
             apiKeyHeader: asString(api.apiKeyHeader, 'api.apiKeyHeader'),
+            authCookieName: asString(api.authCookieName, 'api.authCookieName'),
+            authRateLimit: {
+                login: {
+                    maxRequests: asInteger(
+                        apiAuthRateLimitLogin.maxRequests,
+                        'api.authRateLimit.login.maxRequests',
+                        1
+                    ),
+                    windowSeconds: asInteger(
+                        apiAuthRateLimitLogin.windowSeconds,
+                        'api.authRateLimit.login.windowSeconds',
+                        1
+                    )
+                },
+                register: {
+                    maxRequests: asInteger(
+                        apiAuthRateLimitRegister.maxRequests,
+                        'api.authRateLimit.register.maxRequests',
+                        1
+                    ),
+                    windowSeconds: asInteger(
+                        apiAuthRateLimitRegister.windowSeconds,
+                        'api.authRateLimit.register.windowSeconds',
+                        1
+                    )
+                }
+            },
+            authCache: {
+                userRecord: {
+                    maxEntries: asInteger(
+                        apiAuthCacheUserRecord.maxEntries,
+                        'api.authCache.userRecord.maxEntries',
+                        1
+                    ),
+                    defaultTtlSeconds: asInteger(
+                        apiAuthCacheUserRecord.defaultTtlSeconds,
+                        'api.authCache.userRecord.defaultTtlSeconds',
+                        1
+                    )
+                },
+                apiKeyRecord: {
+                    maxEntries: asInteger(
+                        apiAuthCacheApiKeyRecord.maxEntries,
+                        'api.authCache.apiKeyRecord.maxEntries',
+                        1
+                    ),
+                    defaultTtlSeconds: asInteger(
+                        apiAuthCacheApiKeyRecord.defaultTtlSeconds,
+                        'api.authCache.apiKeyRecord.defaultTtlSeconds',
+                        1
+                    )
+                }
+            },
+            payload: {
+                maxStringLength: asInteger(
+                    apiPayload.maxStringLength,
+                    'api.payload.maxStringLength',
+                    1
+                )
+            },
             headers: {
                 remain: asString(apiHeaders.remain, 'api.headers.remain'),
                 cost: asString(apiHeaders.cost, 'api.headers.cost'),
@@ -610,6 +772,20 @@ function validateConfig(raw: unknown): Config {
                 enableEchoError: asBoolean(
                     apiDebug.enableEchoError,
                     'api.debug.enableEchoError'
+                )
+            },
+            permissions: {
+                anonymousScopes: parseScopeList(
+                    apiPermissions.anonymousScopes,
+                    'api.permissions.anonymousScopes'
+                ),
+                issuedKeyDefaultScopes: parseScopeList(
+                    apiPermissions.issuedKeyDefaultScopes,
+                    'api.permissions.issuedKeyDefaultScopes'
+                ),
+                creatableKeyMaxScopes: parseScopeList(
+                    apiPermissions.creatableKeyMaxScopes,
+                    'api.permissions.creatableKeyMaxScopes'
                 )
             }
         },
@@ -691,15 +867,15 @@ function validateConfig(raw: unknown): Config {
         cost: {
             fixed: {
                 health: asNumber(costFixed.health, 'cost.fixed.health', 0),
-                quotaMe: asNumber(costFixed.quotaMe, 'cost.fixed.quotaMe', 0),
+                authMe: asNumber(costFixed.authMe, 'cost.fixed.authMe', 0),
+                authLogout: asNumber(
+                    costFixed.authLogout,
+                    'cost.fixed.authLogout',
+                    0
+                ),
                 debugEchoError: asNumber(
                     costFixed.debugEchoError,
                     'cost.fixed.debugEchoError',
-                    0
-                ),
-                authLogin: asNumber(
-                    costFixed.authLogin,
-                    'cost.fixed.authLogin',
                     0
                 ),
                 authIssueApiKey: asNumber(
@@ -826,6 +1002,11 @@ function validateConfig(raw: unknown): Config {
         configResult.task.scheduler.idle.emaAlpha > 0 &&
             configResult.task.scheduler.idle.emaAlpha <= 1,
         'task.scheduler.idle.emaAlpha must be > 0 and <= 1'
+    );
+    const apiKeyPrefixes = Object.values(configResult.user.apiKeyPrefixes);
+    assert(
+        new Set(apiKeyPrefixes).size === apiKeyPrefixes.length,
+        'user.apiKeyPrefixes must not contain duplicated values'
     );
     const disabledStartupExecutors = new Set<string>();
     for (const executor of configResult.task.startup.disabledExecutors) {
