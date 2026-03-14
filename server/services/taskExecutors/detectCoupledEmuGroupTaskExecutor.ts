@@ -92,10 +92,21 @@ function buildDepotAndModelKey(depot: string, model: string): string {
 function buildObservationGroupKey(observation: RouteObservation): string {
     const normalizedInternalCode = normalizeCode(observation.trainInternalCode);
     if (normalizedInternalCode.length > 0) {
-        return `internal:${normalizedInternalCode}`;
+        return `internal:${normalizedInternalCode}@${observation.startAt}`;
     }
 
     return `fallback:${normalizeCode(observation.trainCode)}@${observation.startAt}`;
+}
+
+function isActiveRouteObservation(
+    observation: RouteObservation,
+    nowSeconds: number,
+    runningGraceSeconds: number
+): boolean {
+    return (
+        observation.startAt <= nowSeconds &&
+        observation.endAt + runningGraceSeconds >= nowSeconds
+    );
 }
 
 function persistDailyRoutes(
@@ -233,7 +244,9 @@ async function collectObservations(
         });
     }
 
-    return observations;
+    return observations.filter((observation) =>
+        isActiveRouteObservation(observation, nowSeconds, runningGraceSeconds)
+    );
 }
 
 function groupObservations(
