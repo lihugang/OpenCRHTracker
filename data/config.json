@@ -128,7 +128,7 @@
         },
         "scheduler": {
             "pollIntervalMs": 180000,
-            "maxTasksPerQuery": 50,
+            "maxTasksPerQuery": 65535,
             "idle": {
                 "maxTasksPerTick": 4,
                 "emaAlpha": 0.3

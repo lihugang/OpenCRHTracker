@@ -16,19 +16,113 @@
             <div
                 v-if="state === 'loading'"
                 class="space-y-4">
-                <UiCard
-                    v-for="index in 5"
-                    :key="index"
-                    variant="subtle">
-                    <div class="animate-pulse space-y-4">
-                        <div class="h-5 w-1/3 rounded bg-slate-200" />
-                        <div class="grid gap-3 md:grid-cols-3">
-                            <div class="h-10 rounded-[1rem] bg-slate-100" />
-                            <div class="h-10 rounded-[1rem] bg-slate-100" />
-                            <div class="h-10 rounded-[1rem] bg-slate-100" />
+                <div
+                    class="hidden overflow-hidden rounded-[1.25rem] border border-slate-200 md:block">
+                    <table
+                        class="min-w-full border-separate border-spacing-0 bg-white/90">
+                        <thead>
+                            <tr class="bg-slate-50/80 text-left">
+                                <th
+                                    v-for="column in columns"
+                                    :key="`loading:${column}`"
+                                    class="border-b border-slate-200 px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-slate-300">
+                                    {{ column }}
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr
+                                v-for="index in 5"
+                                :key="`loading:row:${index}`"
+                                class="animate-pulse">
+                                <td
+                                    class="border-b border-slate-100 px-4 py-4 last:border-b-0">
+                                    <div class="h-4 w-20 rounded bg-slate-200" />
+                                </td>
+                                <td
+                                    class="border-b border-slate-100 px-4 py-4 last:border-b-0">
+                                    <div class="h-4 w-28 rounded bg-slate-200" />
+                                </td>
+                                <td
+                                    class="border-b border-slate-100 px-4 py-4 last:border-b-0">
+                                    <div class="h-4 w-24 rounded bg-slate-100" />
+                                </td>
+                                <td
+                                    class="border-b border-slate-100 px-4 py-4 last:border-b-0">
+                                    <div class="h-4 w-16 rounded bg-slate-100" />
+                                </td>
+                                <td
+                                    class="border-b border-slate-100 px-4 py-4 last:border-b-0">
+                                    <div class="h-4 w-24 rounded bg-slate-100" />
+                                </td>
+                                <td
+                                    class="border-b border-slate-100 px-4 py-4 last:border-b-0">
+                                    <div class="h-4 w-16 rounded bg-slate-100" />
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="space-y-2.5 md:hidden">
+                    <UiCard
+                        v-for="index in 5"
+                        :key="`loading:card:${index}`"
+                        variant="subtle">
+                        <div class="animate-pulse space-y-3">
+                            <div class="flex items-start gap-3">
+                                <div class="min-w-0">
+                                    <div class="h-4 w-20 rounded bg-slate-100" />
+                                    <div class="mt-2 h-4 w-28 rounded bg-slate-200" />
+                                </div>
+                            </div>
+
+                            <div
+                                class="rounded-[1rem] border border-slate-200 bg-white/90 px-4 py-3">
+                                <div class="flex items-center gap-3">
+                                    <div class="min-w-0 flex-1">
+                                        <div class="h-3 w-12 rounded bg-slate-100" />
+                                        <div class="mt-2 h-4 w-20 rounded bg-slate-200" />
+                                    </div>
+
+                                    <div
+                                        class="shrink-0 flex min-w-[4.75rem] items-center gap-[0.35rem] text-slate-300"
+                                        aria-hidden="true">
+                                        <span
+                                            class="h-px flex-1 bg-[linear-gradient(90deg,rgb(226_232_240),rgb(203_213_225))]" />
+                                        <span class="text-[0.8rem] leading-none"
+                                            >-&gt;</span
+                                        >
+                                        <span
+                                            class="h-px flex-1 bg-[linear-gradient(90deg,rgb(226_232_240),rgb(203_213_225))]" />
+                                    </div>
+
+                                    <div class="min-w-0 flex-1 text-right">
+                                        <div class="ml-auto h-3 w-12 rounded bg-slate-100" />
+                                        <div class="mt-2 ml-auto h-4 w-20 rounded bg-slate-200" />
+                                    </div>
+                                </div>
+
+                                <div
+                                    class="mt-3 flex items-center gap-3 border-t border-slate-100 pt-3">
+                                    <div class="min-w-0 flex-1">
+                                        <div class="h-3 w-12 rounded bg-slate-100" />
+                                        <div class="mt-2 h-4 w-16 rounded bg-slate-200" />
+                                    </div>
+
+                                    <div
+                                        class="h-px basis-6 bg-[linear-gradient(90deg,rgb(241_245_249),rgb(203_213_225))]"
+                                        aria-hidden="true" />
+
+                                    <div class="min-w-0 flex-1 text-right">
+                                        <div class="ml-auto h-3 w-12 rounded bg-slate-100" />
+                                        <div class="mt-2 ml-auto h-4 w-16 rounded bg-slate-200" />
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                </UiCard>
+                    </UiCard>
+                </div>
             </div>
 
             <UiEmptyState
