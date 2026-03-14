@@ -139,10 +139,6 @@
                                     "type": "integer",
                                     "minimum": 1
                                 },
-                                "reuseWithinSeconds": {
-                                    "type": "integer",
-                                    "minimum": 0
-                                },
                                 "runningGraceSeconds": {
                                     "type": "integer",
                                     "minimum": 0
@@ -162,7 +158,6 @@
                             },
                             "required": [
                                 "candidateCap",
-                                "reuseWithinSeconds",
                                 "runningGraceSeconds",
                                 "statusResetTimeHHmm",
                                 "detectDelaySeconds",

@@ -7,8 +7,7 @@ import {
 import {
     buildTrainKey,
     isEmuRunning,
-    markRunningEmuCodes,
-    setLastObservationByMainEmu
+    markRunningEmuCodes
 } from '~/server/services/probeRuntimeState';
 import {
     buildProbeAssetKey,
@@ -355,12 +354,6 @@ async function persistResolvedGroup(
     );
     const nowSeconds = getNowSeconds();
     markRunningEmuCodes(emuCodes, trainKey, group.endAt, nowSeconds);
-    for (const emuCode of emuCodes) {
-        setLastObservationByMainEmu(emuCode, {
-            endAt: group.endAt,
-            coupledEmuCodes: emuCodes.filter((item) => item !== emuCode)
-        });
-    }
 }
 
 async function executeDetectCoupledEmuGroupTask(

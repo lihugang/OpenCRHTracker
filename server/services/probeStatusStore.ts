@@ -25,6 +25,7 @@ type ProbeStatusSqlKey =
     | 'insertProbeStatus'
     | 'selectProbeStatusByEmuCode'
     | 'selectProbeStatusByEmuCodeInRange'
+    | 'selectLatestResolvedProbeStatusByEmuCodeBefore'
     | 'selectProbeStatusByTrainCode'
     | 'updateProbeStatusByEmuCode'
     | 'updateProbeStatusByTrainCode'
@@ -100,6 +101,28 @@ export function listProbeStatusByTrainCode(
         'selectProbeStatusByTrainCode',
         normalizedTrainCode,
         startAt
+    );
+}
+
+export function getLatestResolvedProbeStatusByEmuCodeBefore(
+    emuCode: string,
+    startAtExclusive: number
+): ProbeStatusRow | null {
+    const normalizedEmuCode = normalizeEmuCode(emuCode);
+    if (
+        normalizedEmuCode.length === 0 ||
+        !Number.isInteger(startAtExclusive) ||
+        startAtExclusive < 0
+    ) {
+        return null;
+    }
+
+    return (
+        probeStatusStatements.get<ProbeStatusRow>(
+            'selectLatestResolvedProbeStatusByEmuCodeBefore',
+            normalizedEmuCode,
+            startAtExclusive
+        ) ?? null
     );
 }
 

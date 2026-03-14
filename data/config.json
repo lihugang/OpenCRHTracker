@@ -30,7 +30,6 @@
             },
             "coupling": {
                 "candidateCap": 200,
-                "reuseWithinSeconds": 3600,
                 "runningGraceSeconds": 900,
                 "statusResetTimeHHmm": "0000",
                 "detectDelaySeconds": 900,
@@ -130,7 +129,7 @@
             "pollIntervalMs": 180000,
             "maxTasksPerQuery": 65535,
             "idle": {
-                "maxTasksPerTick": 4,
+                "maxTasksPerTick": 128,
                 "emaAlpha": 0.3
             }
         }

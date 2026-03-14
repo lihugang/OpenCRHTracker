@@ -1,11 +1,6 @@
 import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
 
-export interface LastObservationRecord {
-    endAt: number;
-    coupledEmuCodes: string[];
-}
-
 interface RunningEmuRecord {
     trainKey: string;
     endAt: number;
@@ -15,7 +10,6 @@ interface RunningEmuRecord {
 let currentDate = getCurrentDateString();
 const queriedTodayTrainKeys = new Set<string>();
 const runningEmuState = new Map<string, RunningEmuRecord>();
-const lastObservationByMainEmu = new Map<string, LastObservationRecord>();
 
 export function ensureProbeStateForToday(): void {
     const today = getCurrentDateString();
@@ -26,7 +20,6 @@ export function ensureProbeStateForToday(): void {
     currentDate = today;
     queriedTodayTrainKeys.clear();
     runningEmuState.clear();
-    lastObservationByMainEmu.clear();
 }
 
 export function buildTrainKey(
@@ -98,26 +91,4 @@ export function markRunningEmuCodes(
             lastSeenAt: nowSeconds
         });
     }
-}
-
-export function getLastObservationByMainEmu(
-    emuCode: string
-): LastObservationRecord | null {
-    return lastObservationByMainEmu.get(normalizeCode(emuCode)) ?? null;
-}
-
-export function setLastObservationByMainEmu(
-    emuCode: string,
-    record: LastObservationRecord
-): void {
-    lastObservationByMainEmu.set(normalizeCode(emuCode), {
-        endAt: record.endAt,
-        coupledEmuCodes: Array.from(
-            new Set(
-                record.coupledEmuCodes
-                    .map((item) => normalizeCode(item))
-                    .filter((item) => item.length > 0)
-            )
-        )
-    });
 }

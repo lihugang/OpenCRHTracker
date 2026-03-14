@@ -9,14 +9,13 @@ import {
     buildTrainKey,
     cleanupRunningEmuState,
     ensureProbeStateForToday,
-    getLastObservationByMainEmu,
     hasQueriedTrainKey,
     markQueriedTrainKey,
-    markRunningEmuCodes,
-    setLastObservationByMainEmu
+    markRunningEmuCodes
 } from '~/server/services/probeRuntimeState';
 import {
     ensureProbeStatus,
+    getLatestResolvedProbeStatusByEmuCodeBefore,
     listProbeStatusByEmuCode,
     listProbeStatusByTrainCode,
     updateProbeStatusByEmuCode,
@@ -221,7 +220,6 @@ function collectKnownStatusGroup(
 function applyResolvedResult(
     args: ProbeTrainDepartureTaskArgs,
     trainKey: string,
-    mainEmuCode: string,
     allTrainCodes: string[],
     allEmuCodes: string[],
     status: ProbeStatusValue,
@@ -242,50 +240,60 @@ function applyResolvedResult(
         args.endAt
     );
     markRunningEmuCodes(allEmuCodes, trainKey, args.endAt, nowSeconds);
-    setLastObservationByMainEmu(mainEmuCode, {
-        endAt: args.endAt,
-        coupledEmuCodes: allEmuCodes.filter((item) => item !== mainEmuCode)
-    });
     markQueriedTrainKey(trainKey);
 }
 
-function tryReuseLastObservation(
+function tryReuseHistoricalProbeStatus(
     args: ProbeTrainDepartureTaskArgs,
     trainKey: string,
     mainEmuCode: string,
     allTrainCodes: string[],
     nowSeconds: number
 ): boolean {
-    const reuseWithinSeconds =
-        useConfig().spider.scheduleProbe.coupling.reuseWithinSeconds;
-    const lastObservation = getLastObservationByMainEmu(mainEmuCode);
-    if (
-        !lastObservation ||
-        args.startAt < lastObservation.endAt ||
-        args.startAt - lastObservation.endAt >= reuseWithinSeconds
-    ) {
+    const latestResolvedRow = getLatestResolvedProbeStatusByEmuCodeBefore(
+        mainEmuCode,
+        args.startAt
+    );
+    if (!latestResolvedRow) {
         return false;
     }
 
-    const allEmuCodes = uniqueNormalizedCodes([
+    const historicalRows = listProbeStatusByEmuCode(
         mainEmuCode,
-        ...lastObservation.coupledEmuCodes
-    ]);
-    const status: ProbeStatusValue =
-        allEmuCodes.length > 1
-            ? ProbeStatusValue.CoupledFormationResolved
-            : ProbeStatusValue.SingleFormationResolved;
+        latestResolvedRow.start_at
+    );
+    if (historicalRows.length === 0) {
+        return false;
+    }
+
+    const knownGroup = collectKnownStatusGroup(
+        historicalRows,
+        mainEmuCode,
+        latestResolvedRow.start_at
+    );
+    const allEmuCodes =
+        knownGroup.emuCodes.length > 0 ? knownGroup.emuCodes : [mainEmuCode];
+    if (
+        latestResolvedRow.status === ProbeStatusValue.CoupledFormationResolved &&
+        (knownGroup.finalStatus !== ProbeStatusValue.CoupledFormationResolved ||
+            allEmuCodes.length <= 1)
+    ) {
+        logger.warn(
+            `reuse_historical_status_incomplete trainCode=${args.trainCode} mainEmuCode=${mainEmuCode} historicalStartAt=${latestResolvedRow.start_at}`
+        );
+        return false;
+    }
+
     applyResolvedResult(
         args,
         trainKey,
-        mainEmuCode,
         allTrainCodes,
         allEmuCodes,
-        status,
+        knownGroup.finalStatus,
         nowSeconds
     );
     logger.info(
-        `reuse_last_observation trainCode=${args.trainCode} mainEmuCode=${mainEmuCode} coupled=${allEmuCodes.length - 1}`
+        `reuse_historical_status trainCode=${args.trainCode} mainEmuCode=${mainEmuCode} historicalStartAt=${latestResolvedRow.start_at} status=${knownGroup.finalStatus} emuCodes=${allEmuCodes.length}`
     );
     return true;
 }
@@ -376,7 +384,6 @@ async function executeProbeTrainDepartureTask(rawArgs: unknown): Promise<void> {
         applyResolvedResult(
             args,
             trainKey,
-            mainEmuCode,
             allTrainCodes,
             [mainEmuCode],
             ProbeStatusValue.SingleFormationResolved,
@@ -389,7 +396,6 @@ async function executeProbeTrainDepartureTask(rawArgs: unknown): Promise<void> {
         applyResolvedResult(
             args,
             trainKey,
-            mainEmuCode,
             allTrainCodes,
             [mainEmuCode],
             ProbeStatusValue.SingleFormationResolved,
@@ -424,7 +430,6 @@ async function executeProbeTrainDepartureTask(rawArgs: unknown): Promise<void> {
         applyResolvedResult(
             args,
             trainKey,
-            mainEmuCode,
             allTrainCodes,
             knownGroup.emuCodes.length > 0
                 ? knownGroup.emuCodes
@@ -439,24 +444,7 @@ async function executeProbeTrainDepartureTask(rawArgs: unknown): Promise<void> {
     }
 
     if (
-        existingRows.length > 0 &&
-        existingRows.every(
-            (row) => row.status === ProbeStatusValue.PendingCouplingDetection
-        ) &&
-        tryReuseLastObservation(
-            args,
-            trainKey,
-            mainEmuCode,
-            allTrainCodes,
-            nowSeconds
-        )
-    ) {
-        return;
-    }
-
-    if (
-        existingRows.length === 0 &&
-        tryReuseLastObservation(
+        tryReuseHistoricalProbeStatus(
             args,
             trainKey,
             mainEmuCode,
