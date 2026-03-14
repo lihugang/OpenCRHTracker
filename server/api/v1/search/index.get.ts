@@ -7,13 +7,18 @@ import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
 
 export default defineEventHandler(async (event) => {
     const cacheMaxAge = useConfig().api.cache.searchIndexMaxAgeSeconds;
-    setHeader(event, 'Cache-Control', `public, max-age=${cacheMaxAge}`);
 
     return executeApi(
         event,
         {
             requiredScopes: [API_SCOPES.search.read],
-            fixedCost: getFixedCost('searchIndex')
+            fixedCost: getFixedCost('searchIndex'),
+            successHeaders: (successEvent) =>
+                setHeader(
+                    successEvent,
+                    'Cache-Control',
+                    `public, max-age=${cacheMaxAge}`
+                )
         },
         async () => {
             return {
