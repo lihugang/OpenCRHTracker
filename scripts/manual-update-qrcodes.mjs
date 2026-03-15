@@ -439,26 +439,13 @@ async function main() {
 
         const baseRecords = parseJsonl(QRCODE_PATH, 'qrcode.jsonl');
         const successfulRecords = Array.from(successfulRecordsByKey.values());
-        const successfulKeys = new Set(successfulRecordsByKey.keys());
-        const filteredBaseRecords = baseRecords.filter((record) => {
-            if (
-                typeof record.model !== 'string' ||
-                typeof record.trainSetNo !== 'string'
-            ) {
-                return true;
-            }
-
-            return !successfulKeys.has(buildKey(record.model, record.trainSetNo));
-        });
-        const removedCount = baseRecords.length - filteredBaseRecords.length;
-        const mergedRecords = filteredBaseRecords.concat(successfulRecords);
+        const mergedRecords = baseRecords.concat(successfulRecords);
 
         writeTextFileAtomically(QRCODE_PATH, renderJsonl(mergedRecords));
         log('info', 'rewrote qrcode.jsonl after manual updates', {
             qrcodePath: QRCODE_PATH,
             baseCount: baseRecords.length,
             successfulUniqueCount: successfulRecords.length,
-            removedCount,
             mergedCount: mergedRecords.length
         });
 
@@ -489,7 +476,6 @@ async function main() {
             successfulRows: stats.successfulRows,
             successfulUniqueCount: successfulRecords.length,
             skippedRows: stats.skippedRows,
-            removedCount,
             mergedCount: mergedRecords.length,
             deletedFailedCodeRows
         });

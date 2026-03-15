@@ -27,7 +27,7 @@
             },
             "probe": {
                 "defaultRetry": 5,
-                "overlapRetryDelaySeconds": 900
+                "overlapRetryDelaySeconds": 3600
             },
             "coupling": {
                 "candidateCap": 200,
