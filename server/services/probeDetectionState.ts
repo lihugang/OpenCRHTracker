@@ -33,3 +33,11 @@ export function markCoupledGroupDetected(
     const groupKey = buildDetectionGroupKey(depot, model);
     lastDetectedAtByGroup.set(groupKey, nowSeconds);
 }
+
+export function clearRecentCoupledGroupDetection(
+    depot: string,
+    model: string
+): void {
+    const groupKey = buildDetectionGroupKey(depot, model);
+    lastDetectedAtByGroup.delete(groupKey);
+}

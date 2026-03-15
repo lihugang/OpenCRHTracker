@@ -22,11 +22,13 @@ export interface ProbeStatusRow {
 
 type ProbeStatusSqlKey =
     | 'clearProbeStatus'
+    | 'deleteProbeStatusByTrainCodeInRange'
     | 'insertProbeStatus'
     | 'selectProbeStatusByEmuCode'
     | 'selectProbeStatusByEmuCodeInRange'
     | 'selectLatestResolvedProbeStatusByEmuCodeBefore'
     | 'selectProbeStatusByTrainCode'
+    | 'selectProbeStatusByTrainCodeInRange'
     | 'updateProbeStatusByEmuCode'
     | 'updateProbeStatusByTrainCode'
     | 'updateProbeStatusByTrainCodeAndEmuCode';
@@ -101,6 +103,29 @@ export function listProbeStatusByTrainCode(
         'selectProbeStatusByTrainCode',
         normalizedTrainCode,
         startAt
+    );
+}
+
+export function listProbeStatusByTrainCodeInRange(
+    trainCode: string,
+    startAt: number,
+    endAtExclusive: number
+): ProbeStatusRow[] {
+    const normalizedTrainCode = normalizeTrainCode(trainCode);
+    if (
+        normalizedTrainCode.length === 0 ||
+        !Number.isInteger(startAt) ||
+        !Number.isInteger(endAtExclusive) ||
+        endAtExclusive <= startAt
+    ) {
+        return [];
+    }
+
+    return probeStatusStatements.all<ProbeStatusRow>(
+        'selectProbeStatusByTrainCodeInRange',
+        normalizedTrainCode,
+        startAt,
+        endAtExclusive
     );
 }
 
@@ -252,5 +277,29 @@ export function updateProbeStatusByTrainCodeAndEmuCode(
 
 export function clearProbeStatus(): number {
     const result = probeStatusStatements.run('clearProbeStatus');
+    return result.changes;
+}
+
+export function deleteProbeStatusByTrainCodeInRange(
+    trainCode: string,
+    startAt: number,
+    endAtExclusive: number
+): number {
+    const normalizedTrainCode = normalizeTrainCode(trainCode);
+    if (
+        normalizedTrainCode.length === 0 ||
+        !Number.isInteger(startAt) ||
+        !Number.isInteger(endAtExclusive) ||
+        endAtExclusive <= startAt
+    ) {
+        return 0;
+    }
+
+    const result = probeStatusStatements.run(
+        'deleteProbeStatusByTrainCodeInRange',
+        normalizedTrainCode,
+        startAt,
+        endAtExclusive
+    );
     return result.changes;
 }

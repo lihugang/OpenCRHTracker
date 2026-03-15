@@ -26,7 +26,8 @@
                 "generateIntervalHours": 24
             },
             "probe": {
-                "defaultRetry": 5
+                "defaultRetry": 5,
+                "overlapRetryDelaySeconds": 900
             },
             "coupling": {
                 "candidateCap": 200,

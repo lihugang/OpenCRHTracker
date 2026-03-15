@@ -19,7 +19,10 @@ export interface DailyEmuRouteRow {
 }
 
 type EmuRouteSqlKey =
+    | 'deleteDailyRoutesByTrainCodeInRange'
     | 'insertDailyEmuRoute'
+    | 'selectDailyRoutesByEmuCodeInRange'
+    | 'selectDailyRoutesByTrainCodeInRange'
     | 'selectHistoryByEmuPaged'
     | 'selectHistoryByTrainPaged'
     | 'selectDailyRecordsPaged'
@@ -79,6 +82,52 @@ export function listHistoryByTrainPaged(
     );
 }
 
+export function listDailyRoutesByEmuCodeInRange(
+    emuCode: string,
+    startAt: number,
+    endAtExclusive: number
+): DailyEmuRouteRow[] {
+    const normalizedEmuCode = normalizeCode(emuCode);
+    if (
+        normalizedEmuCode.length === 0 ||
+        !Number.isInteger(startAt) ||
+        !Number.isInteger(endAtExclusive) ||
+        endAtExclusive <= startAt
+    ) {
+        return [];
+    }
+
+    return emuRouteStatements.all<DailyEmuRouteRow>(
+        'selectDailyRoutesByEmuCodeInRange',
+        normalizedEmuCode,
+        startAt,
+        endAtExclusive
+    );
+}
+
+export function listDailyRoutesByTrainCodeInRange(
+    trainCode: string,
+    startAt: number,
+    endAtExclusive: number
+): DailyEmuRouteRow[] {
+    const normalizedTrainCode = normalizeCode(trainCode);
+    if (
+        normalizedTrainCode.length === 0 ||
+        !Number.isInteger(startAt) ||
+        !Number.isInteger(endAtExclusive) ||
+        endAtExclusive <= startAt
+    ) {
+        return [];
+    }
+
+    return emuRouteStatements.all<DailyEmuRouteRow>(
+        'selectDailyRoutesByTrainCodeInRange',
+        normalizedTrainCode,
+        startAt,
+        endAtExclusive
+    );
+}
+
 export function listHistoryByEmuPaged(
     emuCode: string,
     startAt: number,
@@ -97,6 +146,30 @@ export function listHistoryByEmuPaged(
         cursorPoint.id,
         limit
     );
+}
+
+export function deleteDailyRoutesByTrainCodeInRange(
+    trainCode: string,
+    startAt: number,
+    endAtExclusive: number
+): number {
+    const normalizedTrainCode = normalizeCode(trainCode);
+    if (
+        normalizedTrainCode.length === 0 ||
+        !Number.isInteger(startAt) ||
+        !Number.isInteger(endAtExclusive) ||
+        endAtExclusive <= startAt
+    ) {
+        return 0;
+    }
+
+    const result = emuRouteStatements.run(
+        'deleteDailyRoutesByTrainCodeInRange',
+        normalizedTrainCode,
+        startAt,
+        endAtExclusive
+    );
+    return result.changes;
 }
 
 export function listDailyRecordsPaged(

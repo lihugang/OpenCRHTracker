@@ -21,6 +21,7 @@ interface ScheduleProbeRefreshConfig {
 
 interface ScheduleProbeProbeConfig {
     defaultRetry: number;
+    overlapRetryDelaySeconds: number;
 }
 
 interface ScheduleProbeCouplingConfig {
@@ -522,6 +523,11 @@ function validateConfig(raw: unknown): Config {
                     defaultRetry: asInteger(
                         spiderScheduleProbeProbe.defaultRetry,
                         'spider.scheduleProbe.probe.defaultRetry',
+                        0
+                    ),
+                    overlapRetryDelaySeconds: asInteger(
+                        spiderScheduleProbeProbe.overlapRetryDelaySeconds,
+                        'spider.scheduleProbe.probe.overlapRetryDelaySeconds',
                         0
                     )
                 },

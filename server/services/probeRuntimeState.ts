@@ -43,6 +43,10 @@ export function markQueriedTrainKey(trainKey: string): void {
     queriedTodayTrainKeys.add(trainKey);
 }
 
+export function clearQueriedTrainKey(trainKey: string): void {
+    queriedTodayTrainKeys.delete(trainKey);
+}
+
 export function cleanupRunningEmuState(
     nowSeconds: number,
     graceSeconds: number
@@ -91,4 +95,18 @@ export function markRunningEmuCodes(
             lastSeenAt: nowSeconds
         });
     }
+}
+
+export function clearRunningEmuStateByTrainKey(trainKey: string): string[] {
+    const removedEmuCodes: string[] = [];
+    for (const [emuCode, record] of runningEmuState.entries()) {
+        if (record.trainKey !== trainKey) {
+            continue;
+        }
+
+        runningEmuState.delete(emuCode);
+        removedEmuCodes.push(emuCode);
+    }
+
+    return removedEmuCodes;
 }
