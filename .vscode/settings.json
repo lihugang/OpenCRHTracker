@@ -3,7 +3,8 @@
         "AUTOINCREMENT",
         "CRHRSC",
         "micromessenger",
-        "precaching"
+        "precaching",
+        "pycache"
     ],
     "vim.useSystemClipboard": true,
     "editor.wordWrap": "on",
