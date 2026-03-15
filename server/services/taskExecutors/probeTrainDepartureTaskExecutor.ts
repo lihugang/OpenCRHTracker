@@ -47,7 +47,10 @@ import normalizeCode from '~/server/utils/12306/normalizeCode';
 import parseEmuCode from '~/server/utils/12306/parseEmuCode';
 import uniqueNormalizedCodes from '~/server/utils/12306/uniqueNormalizedCodes';
 import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
-import { getShanghaiDayStartUnixSeconds } from '~/server/utils/date/shanghaiDateTime';
+import {
+    formatShanghaiDateTime,
+    getShanghaiDayStartUnixSeconds
+} from '~/server/utils/date/shanghaiDateTime';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
 
 export const PROBE_TRAIN_DEPARTURE_TASK_EXECUTOR = 'probe_train_departure';
@@ -271,6 +274,32 @@ function buildRequeueTaskArgs(
         endAt: group.endAt,
         retry
     };
+}
+
+function formatTrainCodeGroup(group: TodayScheduleProbeGroup): string {
+    return uniqueNormalizedCodes(group.allCodes).join(' / ');
+}
+
+function formatTrainCodeGroups(groups: TodayScheduleProbeGroup[]): string {
+    return groups.map((group) => formatTrainCodeGroup(group)).join('；');
+}
+
+function formatOverlapTimeRange(
+    currentGroup: TodayScheduleProbeGroup,
+    anotherGroup: TodayScheduleProbeGroup
+): string {
+    const overlapStart = Math.max(currentGroup.startAt, anotherGroup.startAt);
+    const overlapEnd = Math.min(currentGroup.endAt, anotherGroup.endAt);
+    return `${formatShanghaiDateTime(overlapStart)} ~ ${formatShanghaiDateTime(overlapEnd)}`;
+}
+
+function formatOverlapTimeRanges(
+    currentGroup: TodayScheduleProbeGroup,
+    groups: TodayScheduleProbeGroup[]
+): string {
+    return groups
+        .map((group) => formatOverlapTimeRange(currentGroup, group))
+        .join('；');
 }
 
 function collectAffectedDetectionGroups(
@@ -508,7 +537,7 @@ async function tryResolveOverlappingRoutes(
     );
 
     logger.error(
-        `overlap_requeue mainEmuCode=${mainEmuCode} currentTrainKey=${currentGroup.trainKey} conflictingTrainKeys=${overlappingGroups.map((group) => group.trainKey).join(',')} impactedTrainKeys=${Array.from(impactedGroups.keys()).join(',')} clearedTrainKeys=${clearedState.clearedTrainKeys.join(',')} affectedEmuCodes=${clearedState.affectedEmuCodes.join(',')} deletedDailyRouteRows=${clearedState.deletedDailyRouteRows} deletedProbeStatusRows=${clearedState.deletedProbeStatusRows} requeueTaskIds=${taskIds.join(',')}`
+        `overlap_requeue conflictEmuCode=${mainEmuCode} conflictGroups=${formatTrainCodeGroups(overlappingGroups)} conflictTimeRanges=${formatOverlapTimeRanges(currentGroup, overlappingGroups)} requeuedGroups=${formatTrainCodeGroups(Array.from(impactedGroups.values()))} requeuedEmuCodes=${clearedState.affectedEmuCodes.join(',')} deletedDailyRouteRows=${clearedState.deletedDailyRouteRows} deletedProbeStatusRows=${clearedState.deletedProbeStatusRows} requeueTaskIds=${taskIds.join(',')}`
     );
     return true;
 }
