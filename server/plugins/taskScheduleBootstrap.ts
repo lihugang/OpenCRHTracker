@@ -9,6 +9,7 @@ import {
     type EnqueueTaskOptions
 } from '~/server/services/taskQueue';
 import { loadProbeAssets } from '~/server/services/probeAssetStore';
+import { warmYesterdayTrainEmuIndex } from '~/server/services/yesterdayTrainEmuIndexStore';
 import {
     BUILD_SCHEDULE_TASK_EXECUTOR,
     registerBuildScheduleTaskExecutor
@@ -88,6 +89,15 @@ export default defineNitroPlugin(async () => {
         ensureTaskDatabaseSchema();
         ensureEmuDatabaseSchema();
         await loadProbeAssets();
+        try {
+            warmYesterdayTrainEmuIndex();
+        } catch (error) {
+            const message =
+                error instanceof Error
+                    ? `${error.name}: ${error.message}`
+                    : String(error);
+            logger.warn(`warm_yesterday_train_emu_index_failed error=${message}`);
+        }
 
         registerBuildScheduleTaskExecutor();
         registerRefreshRouteBatchTaskExecutor();

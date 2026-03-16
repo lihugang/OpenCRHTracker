@@ -42,6 +42,7 @@ import {
     getTodayScheduleProbeGroupByTrainCode,
     type TodayScheduleProbeGroup
 } from '~/server/services/todayScheduleCache';
+import { getYesterdayEmuCodesByTrainCode } from '~/server/services/yesterdayTrainEmuIndexStore';
 import fetchEMUInfoByRoute from '~/server/utils/12306/network/fetchEMUInfoByRoute';
 import fetchRouteInfo from '~/server/utils/12306/network/fetchRouteInfo';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
@@ -105,6 +106,13 @@ interface ConflictGroupValidationResult {
 
 interface ClearedNotRunningState extends ClearedOverlapState {
     downgradedProbeStatusRows: number;
+}
+
+interface TodayTrainCodesValidationResult {
+    state: 'running' | 'not_running' | 'request_failed';
+    runningTrainCode: string;
+    requestFailedTrainCodes: string[];
+    notRunningTrainCodes: string[];
 }
 
 let registered = false;
@@ -677,6 +685,63 @@ async function validateConflictGroupRunningState(
     };
 }
 
+function collectYesterdayMatchingTrainCodes(
+    trainCodes: string[],
+    mainEmuCode: string
+): string[] {
+    const normalizedMainEmuCode = normalizeCode(mainEmuCode);
+    if (normalizedMainEmuCode.length === 0) {
+        return [];
+    }
+
+    const matchedTrainCodes: string[] = [];
+    for (const trainCode of uniqueNormalizedCodes(trainCodes)) {
+        if (
+            getYesterdayEmuCodesByTrainCode(trainCode).includes(
+                normalizedMainEmuCode
+            )
+        ) {
+            matchedTrainCodes.push(trainCode);
+        }
+    }
+
+    return matchedTrainCodes;
+}
+
+async function validateTodayRunningForTrainCodes(
+    trainCodes: string[]
+): Promise<TodayTrainCodesValidationResult> {
+    const requestFailedTrainCodes: string[] = [];
+    const notRunningTrainCodes: string[] = [];
+
+    for (const trainCode of uniqueNormalizedCodes(trainCodes)) {
+        const routeResult = await fetchRouteInfo(trainCode);
+        if (routeResult.status === 'running') {
+            return {
+                state: 'running',
+                runningTrainCode: trainCode,
+                requestFailedTrainCodes,
+                notRunningTrainCodes
+            };
+        }
+
+        if (routeResult.status === 'request_failed') {
+            requestFailedTrainCodes.push(trainCode);
+            continue;
+        }
+
+        notRunningTrainCodes.push(trainCode);
+    }
+
+    return {
+        state:
+            requestFailedTrainCodes.length > 0 ? 'request_failed' : 'not_running',
+        runningTrainCode: '',
+        requestFailedTrainCodes,
+        notRunningTrainCodes
+    };
+}
+
 async function tryResolveOverlappingRoutes(
     args: ProbeTrainDepartureTaskArgs,
     mainEmuCode: string,
@@ -946,6 +1011,28 @@ async function executeProbeTrainDepartureTask(rawArgs: unknown): Promise<void> {
     const mainEmuCode = normalizeCode(routeProbeResult.emu.code);
     const parsedMainEmuCode = parseEmuCode(mainEmuCode);
     const currentTrainSetNo = parsedMainEmuCode!.trainSetNo;
+    const yesterdayMatchingTrainCodes = collectYesterdayMatchingTrainCodes(
+        allTrainCodes,
+        mainEmuCode
+    );
+
+    if (yesterdayMatchingTrainCodes.length > 0) {
+        const todayTrainCodesValidation = await validateTodayRunningForTrainCodes(
+            allTrainCodes
+        );
+        if (todayTrainCodesValidation.state === 'not_running') {
+            logger.info(
+                `skip_yesterday_same_assignment_not_running trainCode=${args.trainCode} probedTrainCode=${probedTrainCode} mainEmuCode=${mainEmuCode} yesterdayMatchedTrainCodes=${yesterdayMatchingTrainCodes.join(',')} checkedTrainCodes=${allTrainCodes.join(',')} notRunningTrainCodes=${todayTrainCodesValidation.notRunningTrainCodes.join(',')}`
+            );
+            return;
+        }
+
+        if (todayTrainCodesValidation.state === 'request_failed') {
+            logger.info(
+                `continue_yesterday_same_assignment_request_failed trainCode=${args.trainCode} probedTrainCode=${probedTrainCode} mainEmuCode=${mainEmuCode} yesterdayMatchedTrainCodes=${yesterdayMatchingTrainCodes.join(',')} checkedTrainCodes=${allTrainCodes.join(',')} requestFailedTrainCodes=${todayTrainCodesValidation.requestFailedTrainCodes.join(',')} notRunningTrainCodes=${todayTrainCodesValidation.notRunningTrainCodes.join(',')}`
+            );
+        }
+    }
 
     const assets = await loadProbeAssets();
     const mainRecord = assets.emuByModelAndTrainSetNo.get(
