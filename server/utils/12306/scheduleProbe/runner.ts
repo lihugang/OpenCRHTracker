@@ -236,7 +236,8 @@ export default async function runScheduleProbe(
 
             const routeResult = await queryWithRetry(
                 () => fetchRouteInfo(item.code),
-                config.retryAttempts
+                config.retryAttempts,
+                (result) => result.status === 'request_failed'
             );
             state.progress.counters.apiCalls += routeResult.attempts;
             state.progress.counters.apiRetries += Math.max(
@@ -244,7 +245,7 @@ export default async function runScheduleProbe(
                 routeResult.attempts - 1
             );
 
-            if (routeResult.ok) {
+            if (routeResult.ok && routeResult.data.status === 'running') {
                 const nextStartAt = toShanghaiDayOffsetFromUnixSeconds(
                     state.date,
                     routeResult.data.route.startAt

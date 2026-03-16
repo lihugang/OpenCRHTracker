@@ -150,11 +150,12 @@ async function executeRefreshRouteBatchTask(rawArgs: unknown) {
         const groupItemIndexes = groupIndex.get(groupKey) ?? [itemIndex];
         const routeResult = await queryWithRetry(
             () => fetchRouteInfo(item.code),
-            retryAttempts
+            retryAttempts,
+            (result) => result.status === 'request_failed'
         );
         totalAttempts += routeResult.attempts;
 
-        if (!routeResult.ok) {
+        if (!routeResult.ok || routeResult.data.status !== 'running') {
             failed += 1;
             logger.warn(
                 `refresh_failed code=${item.code} attempts=${routeResult.attempts} groupSize=${groupItemIndexes.length}`

@@ -21,6 +21,7 @@ import {
     ensureProbeStatus,
     getLatestResolvedProbeStatusByEmuCodeBefore,
     listProbeStatusByEmuCode,
+    listProbeStatusByEmuCodeInRange,
     listProbeStatusByTrainCode,
     listProbeStatusByTrainCodeInRange,
     updateProbeStatusByEmuCode,
@@ -42,6 +43,7 @@ import {
     type TodayScheduleProbeGroup
 } from '~/server/services/todayScheduleCache';
 import fetchEMUInfoByRoute from '~/server/utils/12306/network/fetchEMUInfoByRoute';
+import fetchRouteInfo from '~/server/utils/12306/network/fetchRouteInfo';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
 import parseEmuCode from '~/server/utils/12306/parseEmuCode';
 import uniqueNormalizedCodes from '~/server/utils/12306/uniqueNormalizedCodes';
@@ -92,6 +94,17 @@ type RouteProbeResult = NonNullable<
 interface SuccessfulRouteProbe {
     probedTrainCode: string;
     routeProbeResult: RouteProbeResult;
+}
+
+type ConflictGroupRouteState = 'running' | 'not_running' | 'request_failed';
+
+interface ConflictGroupValidationResult {
+    group: TodayScheduleProbeGroup;
+    state: ConflictGroupRouteState;
+}
+
+interface ClearedNotRunningState extends ClearedOverlapState {
+    downgradedProbeStatusRows: number;
 }
 
 let registered = false;
@@ -250,6 +263,10 @@ function buildFallbackGroupFromRouteRow(
     };
 }
 
+function getGroupTrainCodes(group: TodayScheduleProbeGroup): string[] {
+    return uniqueNormalizedCodes([group.trainCode, ...group.allCodes]);
+}
+
 function isRouteTimeOverlapping(
     startAt: number,
     endAt: number,
@@ -299,6 +316,26 @@ function formatOverlapTimeRanges(
     return groups
         .map((group) => formatOverlapTimeRange(currentGroup, group))
         .join('；');
+}
+
+function hasGroupTrainKey(
+    groups: TodayScheduleProbeGroup[],
+    trainKey: string
+): boolean {
+    return groups.some((group) => group.trainKey === trainKey);
+}
+
+function areAllGroupsRunning(
+    groups: TodayScheduleProbeGroup[],
+    validationResults: ConflictGroupValidationResult[]
+): boolean {
+    const validationStatesByTrainKey = new Map(
+        validationResults.map((result) => [result.group.trainKey, result.state])
+    );
+
+    return groups.every(
+        (group) => validationStatesByTrainKey.get(group.trainKey) === 'running'
+    );
 }
 
 function collectAffectedDetectionGroups(
@@ -373,6 +410,40 @@ function collectOverlappingGroups(
     return Array.from(overlappingGroups.values());
 }
 
+function downgradeAffectedProbeStatuses(
+    emuCodes: string[],
+    deletedTrainCodes: Set<string>,
+    dayStart: number,
+    nextDayStart: number
+): number {
+    let downgradedProbeStatusRows = 0;
+
+    for (const emuCode of uniqueNormalizedCodes(emuCodes)) {
+        const startAts = new Set<number>();
+        for (const row of listProbeStatusByEmuCodeInRange(
+            emuCode,
+            dayStart,
+            nextDayStart
+        )) {
+            if (deletedTrainCodes.has(normalizeCode(row.train_code))) {
+                continue;
+            }
+
+            startAts.add(row.start_at);
+        }
+
+        for (const startAt of startAts) {
+            downgradedProbeStatusRows += updateProbeStatusByEmuCode(
+                emuCode,
+                startAt,
+                ProbeStatusValue.PendingCouplingDetection
+            );
+        }
+    }
+
+    return downgradedProbeStatusRows;
+}
+
 function clearOverlappingGroups(
     groups: TodayScheduleProbeGroup[],
     dayStart: number,
@@ -431,6 +502,88 @@ function clearOverlappingGroups(
         deletedProbeStatusRows,
         clearedTrainKeys,
         affectedEmuCodes: Array.from(affectedEmuCodes)
+    };
+}
+
+function clearNotRunningGroups(
+    groups: TodayScheduleProbeGroup[],
+    dayStart: number,
+    nextDayStart: number,
+    assets: Awaited<ReturnType<typeof loadProbeAssets>>,
+    extraAffectedEmuCodesByTrainKey: Map<string, string[]> = new Map()
+): ClearedNotRunningState {
+    const affectedEmuCodes = new Set<string>();
+    const deletedTrainCodes = new Set<string>();
+    const clearedTrainKeys: string[] = [];
+    let deletedDailyRouteRows = 0;
+    let deletedProbeStatusRows = 0;
+
+    for (const group of groups) {
+        clearQueriedTrainKey(group.trainKey);
+        clearRunningEmuStateByTrainKey(group.trainKey).forEach((emuCode) =>
+            affectedEmuCodes.add(emuCode)
+        );
+        clearedTrainKeys.push(group.trainKey);
+
+        for (const extraEmuCode of extraAffectedEmuCodesByTrainKey.get(
+            group.trainKey
+        ) ?? []) {
+            const normalizedEmuCode = normalizeCode(extraEmuCode);
+            if (normalizedEmuCode.length > 0) {
+                affectedEmuCodes.add(normalizedEmuCode);
+            }
+        }
+
+        for (const trainCode of getGroupTrainCodes(group)) {
+            deletedTrainCodes.add(trainCode);
+            listDailyRoutesByTrainCodeInRange(
+                trainCode,
+                dayStart,
+                nextDayStart
+            ).forEach((row) => affectedEmuCodes.add(row.emu_code));
+            listProbeStatusByTrainCodeInRange(
+                trainCode,
+                dayStart,
+                nextDayStart
+            ).forEach((row) => affectedEmuCodes.add(row.emu_code));
+
+            deletedDailyRouteRows += deleteDailyRoutesByTrainCodeInRange(
+                trainCode,
+                dayStart,
+                nextDayStart
+            );
+            deletedProbeStatusRows += deleteProbeStatusByTrainCodeInRange(
+                trainCode,
+                dayStart,
+                nextDayStart
+            );
+        }
+    }
+
+    const normalizedAffectedEmuCodes = Array.from(affectedEmuCodes);
+    const downgradedProbeStatusRows = downgradeAffectedProbeStatuses(
+        normalizedAffectedEmuCodes,
+        deletedTrainCodes,
+        dayStart,
+        nextDayStart
+    );
+
+    for (const detectionGroup of collectAffectedDetectionGroups(
+        normalizedAffectedEmuCodes,
+        assets
+    )) {
+        clearRecentCoupledGroupDetection(
+            detectionGroup.bureau,
+            detectionGroup.model
+        );
+    }
+
+    return {
+        deletedDailyRouteRows,
+        deletedProbeStatusRows,
+        clearedTrainKeys,
+        affectedEmuCodes: normalizedAffectedEmuCodes,
+        downgradedProbeStatusRows
     };
 }
 
@@ -499,6 +652,31 @@ function collectKnownStatusGroup(
     };
 }
 
+async function validateConflictGroupRunningState(
+    group: TodayScheduleProbeGroup
+): Promise<ConflictGroupValidationResult> {
+    let sawRequestFailure = false;
+
+    for (const trainCode of getGroupTrainCodes(group)) {
+        const routeResult = await fetchRouteInfo(trainCode);
+        if (routeResult.status === 'running') {
+            return {
+                group,
+                state: 'running'
+            };
+        }
+
+        if (routeResult.status === 'request_failed') {
+            sawRequestFailure = true;
+        }
+    }
+
+    return {
+        group,
+        state: sawRequestFailure ? 'request_failed' : 'not_running'
+    };
+}
+
 async function tryResolveOverlappingRoutes(
     args: ProbeTrainDepartureTaskArgs,
     mainEmuCode: string,
@@ -509,7 +687,7 @@ async function tryResolveOverlappingRoutes(
     const currentGroup =
         getTodayScheduleProbeGroupByTrainCode(args.trainCode) ??
         buildFallbackGroupFromArgs(args);
-    const overlappingGroups = collectOverlappingGroups(
+    let overlappingGroups = collectOverlappingGroups(
         mainEmuCode,
         currentGroup,
         dayStart,
@@ -517,6 +695,49 @@ async function tryResolveOverlappingRoutes(
     );
     if (overlappingGroups.length === 0) {
         return false;
+    }
+
+    const validationResults: ConflictGroupValidationResult[] = [];
+    for (const group of [currentGroup, ...overlappingGroups]) {
+        validationResults.push(await validateConflictGroupRunningState(group));
+    }
+
+    const notRunningGroups = validationResults
+        .filter((result) => result.state === 'not_running')
+        .map((result) => result.group);
+
+    if (notRunningGroups.length > 0) {
+        const extraAffectedEmuCodesByTrainKey = new Map<string, string[]>();
+        if (hasGroupTrainKey(notRunningGroups, currentGroup.trainKey)) {
+            extraAffectedEmuCodesByTrainKey.set(currentGroup.trainKey, [
+                mainEmuCode
+            ]);
+        }
+
+        const clearedNotRunningState = clearNotRunningGroups(
+            notRunningGroups,
+            dayStart,
+            nextDayStart,
+            assets,
+            extraAffectedEmuCodesByTrainKey
+        );
+        logger.info(
+            `overlap_drop_not_running conflictEmuCode=${mainEmuCode} droppedGroups=${formatTrainCodeGroups(notRunningGroups)} affectedEmuCodes=${clearedNotRunningState.affectedEmuCodes.join(',')} deletedDailyRouteRows=${clearedNotRunningState.deletedDailyRouteRows} deletedProbeStatusRows=${clearedNotRunningState.deletedProbeStatusRows} downgradedProbeStatusRows=${clearedNotRunningState.downgradedProbeStatusRows}`
+        );
+
+        if (hasGroupTrainKey(notRunningGroups, currentGroup.trainKey)) {
+            return true;
+        }
+
+        overlappingGroups = collectOverlappingGroups(
+            mainEmuCode,
+            currentGroup,
+            dayStart,
+            nextDayStart
+        );
+        if (overlappingGroups.length === 0) {
+            return false;
+        }
     }
 
     const impactedGroups = new Map<string, TodayScheduleProbeGroup>([
@@ -538,7 +759,13 @@ async function tryResolveOverlappingRoutes(
         useConfig().spider.scheduleProbe.probe.defaultRetry
     );
 
-    logger.error(
+    const overlapRequeueLog = areAllGroupsRunning(
+        Array.from(impactedGroups.values()),
+        validationResults
+    )
+        ? logger.error.bind(logger)
+        : logger.info.bind(logger);
+    overlapRequeueLog(
         `overlap_requeue conflictEmuCode=${mainEmuCode} conflictGroups=${formatTrainCodeGroups(overlappingGroups)} conflictTimeRanges=${formatOverlapTimeRanges(currentGroup, overlappingGroups)} requeuedGroups=${formatTrainCodeGroups(Array.from(impactedGroups.values()))} requeuedEmuCodes=${clearedState.affectedEmuCodes.join(',')} deletedDailyRouteRows=${clearedState.deletedDailyRouteRows} deletedProbeStatusRows=${clearedState.deletedProbeStatusRows} requeueTaskIds=${taskIds.join(',')}`
     );
     return true;

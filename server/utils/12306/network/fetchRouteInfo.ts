@@ -82,7 +82,39 @@ interface RouteInfoResponse {
 const config = useConfig();
 const logger = getLogger('12306-network:fetch-route-info');
 
-export default async function fetchRouteInfo(route: string) {
+export interface RouteInfoData {
+    code: string;
+    allCodes: string[];
+    internalCode: string;
+    startStation: string;
+    endStation: string;
+    startAt: number;
+    endAt: number;
+}
+
+export interface RunningRouteInfoResult {
+    status: 'running';
+    route: RouteInfoData;
+}
+
+export interface NotRunningRouteInfoResult {
+    status: 'not_running';
+    errorCode: string;
+    errorMsg: string;
+}
+
+export interface RequestFailedRouteInfoResult {
+    status: 'request_failed';
+}
+
+export type FetchRouteInfoResult =
+    | RunningRouteInfoResult
+    | NotRunningRouteInfoResult
+    | RequestFailedRouteInfoResult;
+
+export default async function fetchRouteInfo(
+    route: string
+): Promise<FetchRouteInfoResult> {
     const url =
         'https://mobile.12306.cn/wxxcx/wechat/main/travelServiceQrcodeTrainInfo';
     try {
@@ -106,7 +138,9 @@ export default async function fetchRouteInfo(route: string) {
                 responseStatus: response.status,
                 responseOk: response.ok
             });
-            return null;
+            return {
+                status: 'request_failed'
+            };
         }
 
         const json: RouteInfoResponse = await response.json();
@@ -124,7 +158,11 @@ export default async function fetchRouteInfo(route: string) {
                 errorCode: json.errorCode,
                 errorMsg: json.errorMsg
             });
-            return null;
+            return {
+                status: 'not_running',
+                errorCode: json.errorCode ?? '',
+                errorMsg: json.errorMsg ?? ''
+            };
         }
 
         const startStation = json.data?.trainDetail?.stopTime?.at(0);
@@ -144,10 +182,13 @@ export default async function fetchRouteInfo(route: string) {
                 errorMsg: json.errorMsg,
                 detail: 'missing train detail stopTime or trainNo'
             });
-            return null;
+            return {
+                status: 'request_failed'
+            };
         }
 
         return {
+            status: 'running',
             route: {
                 code: route,
                 allCodes: json.data.trainDetail.stationTrainCodeAll.split('/'),
@@ -174,6 +215,8 @@ export default async function fetchRouteInfo(route: string) {
             },
             error
         });
-        return null;
+        return {
+            status: 'request_failed'
+        };
     }
 }
