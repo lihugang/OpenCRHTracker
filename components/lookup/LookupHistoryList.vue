@@ -176,17 +176,20 @@
                                 v-for="item in groupedItems"
                                 :key="item.id"
                                 :class="[
-                                    'history-table-row group align-top',
+                                    'history-table-row align-top',
+                                    item.isTintedDateBand
+                                        ? 'history-table-row--tinted'
+                                        : '',
                                     isRunningItem(item)
                                         ? 'running-result-row'
                                         : ''
                                 ]">
                                 <td
-                                    class="border-b border-slate-100 px-4 py-4 text-sm font-medium text-crh-grey-dark transition-colors group-hover:bg-blue-50/50 last:border-b-0">
+                                    class="border-b border-slate-100 px-4 py-4 text-sm font-medium text-crh-grey-dark last:border-b-0">
                                     {{ formatDateLabel(item.startAt) }}
                                 </td>
                                 <td
-                                    class="border-b border-slate-100 px-4 py-4 font-mono text-sm font-semibold text-crh-blue transition-colors group-hover:bg-blue-50/50 last:border-b-0">
+                                    class="border-b border-slate-100 px-4 py-4 font-mono text-sm font-semibold text-crh-blue last:border-b-0">
                                     <span
                                         class="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
                                         <template
@@ -210,7 +213,7 @@
                                 </td>
                                 <td
                                     :class="[
-                                        'border-b border-slate-100 px-4 py-4 text-sm transition-colors group-hover:bg-blue-50/50 last:border-b-0',
+                                        'border-b border-slate-100 px-4 py-4 text-sm last:border-b-0',
                                         getValueTextClass(
                                             isMissingText(item.startStation)
                                         )
@@ -219,7 +222,7 @@
                                 </td>
                                 <td
                                     :class="[
-                                        'border-b border-slate-100 px-4 py-4 font-mono text-sm transition-colors group-hover:bg-blue-50/50 last:border-b-0',
+                                        'border-b border-slate-100 px-4 py-4 font-mono text-sm last:border-b-0',
                                         getValueTextClass(
                                             isMissingTimestamp(item.startAt),
                                             true
@@ -229,7 +232,7 @@
                                 </td>
                                 <td
                                     :class="[
-                                        'border-b border-slate-100 px-4 py-4 text-sm transition-colors group-hover:bg-blue-50/50 last:border-b-0',
+                                        'border-b border-slate-100 px-4 py-4 text-sm last:border-b-0',
                                         getValueTextClass(
                                             isMissingText(item.endStation)
                                         )
@@ -238,7 +241,7 @@
                                 </td>
                                 <td
                                     :class="[
-                                        'border-b border-slate-100 px-4 py-4 font-mono text-sm transition-colors group-hover:bg-blue-50/50 last:border-b-0',
+                                        'border-b border-slate-100 px-4 py-4 font-mono text-sm last:border-b-0',
                                         getValueTextClass(
                                             isMissingTimestamp(item.endAt),
                                             true
@@ -255,9 +258,13 @@
                     <UiCard
                         v-for="item in groupedItems"
                         :key="item.id"
-                        :class="
+                        :class="[
+                            'history-result-card',
+                            item.isTintedDateBand
+                                ? 'history-result-card--tinted'
+                                : '',
                             isRunningItem(item) ? 'running-result-card' : ''
-                        "
+                        ]"
                         variant="subtle">
                         <div class="space-y-3">
                             <div class="flex items-start gap-3">
@@ -422,7 +429,7 @@
                             重试加载更多
                         </button>
                     </div>
-                    <p v-else-if="canLoadMore">滚动到底部后自动加载更多</p>
+                    <p v-else-if="canLoadMore">正在加载...</p>
                     <p v-else>已加载全部记录</p>
                 </div>
 
@@ -453,6 +460,11 @@ interface GroupedHistoryListItem {
     startStation: string;
     endStation: string;
     codes: string[];
+}
+
+interface DisplayHistoryListItem extends GroupedHistoryListItem {
+    dateKey: string;
+    isTintedDateBand: boolean;
 }
 
 const DATE_FORMATTER = new Intl.DateTimeFormat('zh-CN', {
@@ -511,7 +523,7 @@ const title = computed(() => {
         : `${props.code} 运行历史`;
 });
 
-const groupedItems = computed(() => {
+const groupedItems = computed<DisplayHistoryListItem[]>(() => {
     const groups = new Map<string, GroupedHistoryListItem>();
 
     for (const item of props.items) {
@@ -550,7 +562,24 @@ const groupedItems = computed(() => {
         });
     }
 
-    return Array.from(groups.values());
+    const groupedValues = Array.from(groups.values());
+    let currentDateKey = '';
+    let dateBandIndex = -1;
+
+    return groupedValues.map((item) => {
+        const dateKey = buildDateKey(item.startAt);
+
+        if (dateKey !== currentDateKey) {
+            currentDateKey = dateKey;
+            dateBandIndex += 1;
+        }
+
+        return {
+            ...item,
+            dateKey,
+            isTintedDateBand: dateBandIndex % 2 === 1
+        };
+    });
 });
 
 function disconnectSentinelObserver() {
@@ -620,6 +649,14 @@ function formatDateLabel(timestamp: number) {
     return DATE_FORMATTER.format(new Date(timestamp * 1000));
 }
 
+function buildDateKey(timestamp: number) {
+    if (isMissingTimestamp(timestamp)) {
+        return '__missing__';
+    }
+
+    return DATE_FORMATTER.format(new Date(timestamp * 1000));
+}
+
 function formatTimeLabel(timestamp: number) {
     if (isMissingTimestamp(timestamp)) {
         return '未采集';
@@ -665,6 +702,29 @@ function buildCodeLink(code: string) {
 </script>
 
 <style scoped>
+.history-table-row > td {
+    transition:
+        background-color 220ms ease,
+        box-shadow 220ms ease,
+        color 220ms ease,
+        border-color 220ms ease;
+}
+
+.history-table-row--tinted:not(.running-result-row) > td {
+    background-color: rgba(239, 246, 255, 0.76);
+}
+
+.history-result-card {
+    transition:
+        background-color 220ms ease,
+        border-color 220ms ease;
+}
+
+.history-result-card--tinted:not(.running-result-card) {
+    border-color: rgba(191, 219, 254, 0.85);
+    background: linear-gradient(180deg, #ffffff 0%, #eff6ff 100%);
+}
+
 @media (max-width: 767px) {
     .history-panel-card.history-panel-card {
         padding-left: 1.5rem;
@@ -676,19 +736,17 @@ function buildCodeLink(code: string) {
 }
 
 @media (hover: hover) {
-    .history-table-row > td {
-        transition:
-            box-shadow 220ms ease,
-            color 220ms ease,
-            border-color 220ms ease;
-    }
-
-    .history-table-row:hover > td {
+    .history-table-row:not(.running-result-row):hover > td {
         box-shadow: inset 0 0 0 999px rgba(219, 234, 254, 0.92);
     }
 
-    .running-result-row:hover > td {
-        box-shadow: inset 0 0 0 999px rgba(191, 219, 254, 0.42);
+    .history-table-row--tinted:not(.running-result-row):hover > td {
+        box-shadow: inset 0 0 0 999px rgba(219, 234, 254, 0.48);
+    }
+
+    .history-result-card--tinted:not(.running-result-card):hover {
+        border-color: rgba(147, 197, 253, 0.95);
+        background: linear-gradient(180deg, #f8fbff 0%, #e8f3ff 100%);
     }
 }
 </style>
