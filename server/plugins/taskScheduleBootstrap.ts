@@ -8,6 +8,7 @@ import {
     reconcileSingletonPendingTask,
     type EnqueueTaskOptions
 } from '~/server/services/taskQueue';
+import { loadProbeAssets } from '~/server/services/probeAssetStore';
 import {
     BUILD_SCHEDULE_TASK_EXECUTOR,
     registerBuildScheduleTaskExecutor
@@ -82,10 +83,11 @@ function reconcileRefreshAssetTasks(): string[] {
     return taskSummaries;
 }
 
-export default defineNitroPlugin(() => {
+export default defineNitroPlugin(async () => {
     try {
         ensureTaskDatabaseSchema();
         ensureEmuDatabaseSchema();
+        await loadProbeAssets();
 
         registerBuildScheduleTaskExecutor();
         registerRefreshRouteBatchTaskExecutor();
@@ -167,5 +169,6 @@ export default defineNitroPlugin(() => {
                 ? `${error.name}: ${error.message}`
                 : String(error);
         logger.error(`bootstrap_failed error=${message}`);
+        throw error;
     }
 });

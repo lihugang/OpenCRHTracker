@@ -39,7 +39,8 @@ export const DETECT_COUPLED_EMU_GROUP_TASK_EXECUTOR =
 const logger = getLogger('task-executor:detect-coupled-emu-group');
 
 interface DetectCoupledEmuGroupTaskArgs {
-    depot: string;
+    bureau: string;
+    legacyDepot: string;
     model: string;
 }
 
@@ -67,24 +68,63 @@ function parseTaskArgs(raw: unknown): DetectCoupledEmuGroupTaskArgs {
     }
 
     const body = raw as {
+        bureau?: unknown;
         depot?: unknown;
         model?: unknown;
     };
-    const depot = typeof body.depot === 'string' ? body.depot.trim() : '';
+    const bureau = typeof body.bureau === 'string' ? body.bureau.trim() : '';
+    const legacyDepot = typeof body.depot === 'string' ? body.depot.trim() : '';
     const model =
         typeof body.model === 'string' ? normalizeCode(body.model) : '';
-    if (depot.length === 0 || model.length === 0) {
-        throw new Error('task arguments depot and model must be non-empty');
+    if (
+        (bureau.length === 0 && legacyDepot.length === 0) ||
+        model.length === 0
+    ) {
+        throw new Error(
+            'task arguments bureau or depot, and model must be non-empty'
+        );
     }
 
     return {
-        depot,
+        bureau,
+        legacyDepot,
         model
     };
 }
 
-function buildDepotAndModelKey(depot: string, model: string): string {
-    return `${depot.trim()}#${normalizeCode(model)}`;
+function buildBureauAndModelKey(bureau: string, model: string): string {
+    return `${bureau.trim()}#${normalizeCode(model)}`;
+}
+
+function resolveDetectionBureau(
+    args: DetectCoupledEmuGroupTaskArgs,
+    assets: Awaited<ReturnType<typeof loadProbeAssets>>
+): string {
+    if (args.bureau.length > 0) {
+        return args.bureau;
+    }
+
+    const matchedBureaus = new Set<string>();
+    for (const record of assets.emuList) {
+        if (record.depot !== args.legacyDepot || record.model !== args.model) {
+            continue;
+        }
+        matchedBureaus.add(record.bureau);
+    }
+
+    if (matchedBureaus.size === 1) {
+        return Array.from(matchedBureaus)[0]!;
+    }
+
+    if (matchedBureaus.size === 0) {
+        throw new Error(
+            `legacy detection task bureau resolution failed for depot=${args.legacyDepot} model=${args.model}`
+        );
+    }
+
+    throw new Error(
+        `legacy detection task bureau resolution is ambiguous for depot=${args.legacyDepot} model=${args.model}`
+    );
 }
 
 function buildObservationGroupKey(observation: RouteObservation): string {
@@ -369,6 +409,8 @@ async function executeDetectCoupledEmuGroupTask(
     rawArgs: unknown
 ): Promise<void> {
     const args = parseTaskArgs(rawArgs);
+    const assets = await loadProbeAssets();
+    const bureau = resolveDetectionBureau(args, assets);
     const config = useConfig();
     const nowSeconds = getNowSeconds();
     const cooldownSeconds =
@@ -376,28 +418,27 @@ async function executeDetectCoupledEmuGroupTask(
 
     if (
         hasRecentCoupledGroupDetection(
-            args.depot,
+            bureau,
             args.model,
             nowSeconds,
             cooldownSeconds
         )
     ) {
         logger.info(
-            `skip_recent_detection depot=${args.depot} model=${args.model} cooldownSeconds=${cooldownSeconds}`
+            `skip_recent_detection bureau=${bureau} model=${args.model} cooldownSeconds=${cooldownSeconds}`
         );
         return;
     }
 
-    const assets = await loadProbeAssets();
     const candidates =
-        assets.emuListByDepotAndModel.get(
-            buildDepotAndModelKey(args.depot, args.model)
+        assets.emuListByBureauAndModel.get(
+            buildBureauAndModelKey(bureau, args.model)
         ) ?? [];
     if (candidates.length === 0) {
         logger.warn(
-            `candidate_group_not_found depot=${args.depot} model=${args.model}`
+            `candidate_group_not_found bureau=${bureau} model=${args.model}`
         );
-        markCoupledGroupDetected(args.depot, args.model, nowSeconds);
+        markCoupledGroupDetected(bureau, args.model, nowSeconds);
         return;
     }
 
@@ -412,9 +453,9 @@ async function executeDetectCoupledEmuGroupTask(
         await persistResolvedGroup(group, scheduleRoutesByTrainCode);
     }
 
-    markCoupledGroupDetected(args.depot, args.model, nowSeconds);
+    markCoupledGroupDetected(bureau, args.model, nowSeconds);
     logger.info(
-        `done depot=${args.depot} model=${args.model} candidates=${candidates.length} observations=${observations.length} groups=${groups.length}`
+        `done bureau=${bureau} model=${args.model} candidates=${candidates.length} observations=${observations.length} groups=${groups.length}`
     );
 }
 

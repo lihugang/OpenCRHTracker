@@ -2,21 +2,21 @@ import normalizeCode from '~/server/utils/12306/normalizeCode';
 
 const lastDetectedAtByGroup = new Map<string, number>();
 
-function normalizeDepot(depot: string): string {
-    return depot.trim();
+function normalizeBureau(bureau: string): string {
+    return bureau.trim();
 }
 
-function buildDetectionGroupKey(depot: string, model: string): string {
-    return `${normalizeDepot(depot)}#${normalizeCode(model)}`;
+function buildDetectionGroupKey(bureau: string, model: string): string {
+    return `${normalizeBureau(bureau)}#${normalizeCode(model)}`;
 }
 
 export function hasRecentCoupledGroupDetection(
-    depot: string,
+    bureau: string,
     model: string,
     nowSeconds: number,
     cooldownSeconds: number
 ): boolean {
-    const groupKey = buildDetectionGroupKey(depot, model);
+    const groupKey = buildDetectionGroupKey(bureau, model);
     const lastDetectedAt = lastDetectedAtByGroup.get(groupKey);
     if (typeof lastDetectedAt !== 'number') {
         return false;
@@ -26,18 +26,18 @@ export function hasRecentCoupledGroupDetection(
 }
 
 export function markCoupledGroupDetected(
-    depot: string,
+    bureau: string,
     model: string,
     nowSeconds: number
 ): void {
-    const groupKey = buildDetectionGroupKey(depot, model);
+    const groupKey = buildDetectionGroupKey(bureau, model);
     lastDetectedAtByGroup.set(groupKey, nowSeconds);
 }
 
 export function clearRecentCoupledGroupDetection(
-    depot: string,
+    bureau: string,
     model: string
 ): void {
-    const groupKey = buildDetectionGroupKey(depot, model);
+    const groupKey = buildDetectionGroupKey(bureau, model);
     lastDetectedAtByGroup.delete(groupKey);
 }

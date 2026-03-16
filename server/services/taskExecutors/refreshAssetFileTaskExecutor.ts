@@ -1,6 +1,9 @@
 import getLogger from '~/server/libs/log4js';
 import useConfig from '~/server/config';
-import { invalidateProbeAssetsCache } from '~/server/services/probeAssetStore';
+import {
+    invalidateProbeAssetsCache,
+    parseEmuListAssetText
+} from '~/server/services/probeAssetStore';
 import { registerTaskExecutor } from '~/server/services/taskExecutorRegistry';
 import { enqueueTask } from '~/server/services/taskQueue';
 import {
@@ -72,12 +75,23 @@ async function executeRefreshAssetTask(
     let caughtError: unknown = null;
     try {
         const result = await refreshAssetFileFromProvider(
-            definition.key as AssetKey
+            definition.key as AssetKey,
+            definition.key === 'EMUList'
+                ? {
+                      validateContent: (content) => {
+                          parseEmuListAssetText(content);
+                      }
+                  }
+                : {}
         );
         if (result.refreshed) {
             invalidateProbeAssetsCache();
             definition.logger.info(
                 `refresh_succeeded asset=${definition.key} file=${result.filePath}`
+            );
+        } else if (result.invalidContent) {
+            throw new Error(
+                `asset ${definition.key} validation failed: ${result.message ?? 'unknown'}`
             );
         } else {
             const failureReason =

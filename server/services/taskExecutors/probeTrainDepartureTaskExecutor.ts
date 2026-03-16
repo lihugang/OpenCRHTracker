@@ -69,7 +69,7 @@ interface ProbeTrainDepartureTaskArgs {
 }
 
 interface CoupledDetectionTaskArgs {
-    depot: string;
+    bureau: string;
     model: string;
 }
 
@@ -304,8 +304,11 @@ function formatOverlapTimeRanges(
 function collectAffectedDetectionGroups(
     emuCodes: string[],
     assets: Awaited<ReturnType<typeof loadProbeAssets>>
-): Array<{ depot: string; model: string }> {
-    const detectionGroups = new Map<string, { depot: string; model: string }>();
+): Array<{ bureau: string; model: string }> {
+    const detectionGroups = new Map<
+        string,
+        { bureau: string; model: string }
+    >();
 
     for (const emuCode of emuCodes) {
         const parsedEmuCode = parseEmuCode(emuCode);
@@ -320,10 +323,10 @@ function collectAffectedDetectionGroups(
             continue;
         }
 
-        const detectionKey = `${record.depot}#${record.model}`;
+        const detectionKey = `${record.bureau}#${record.model}`;
         if (!detectionGroups.has(detectionKey)) {
             detectionGroups.set(detectionKey, {
-                depot: record.depot,
+                bureau: record.bureau,
                 model: record.model
             });
         }
@@ -418,7 +421,7 @@ function clearOverlappingGroups(
         assets
     )) {
         clearRecentCoupledGroupDetection(
-            detectionGroup.depot,
+            detectionGroup.bureau,
             detectionGroup.model
         );
     }
@@ -452,7 +455,7 @@ function queueCoupledDetectionTask(mainRecord: EmuListRecord): number {
     const delaySeconds =
         useConfig().spider.scheduleProbe.coupling.detectDelaySeconds;
     const taskArgs: CoupledDetectionTaskArgs = {
-        depot: mainRecord.depot,
+        bureau: mainRecord.bureau,
         model: mainRecord.model
     };
     return enqueueTask(
@@ -723,12 +726,7 @@ async function executeProbeTrainDepartureTask(rawArgs: unknown): Promise<void> {
     );
 
     if (
-        await tryResolveOverlappingRoutes(
-            args,
-            mainEmuCode,
-            assets,
-            nowSeconds
-        )
+        await tryResolveOverlappingRoutes(args, mainEmuCode, assets, nowSeconds)
     ) {
         return;
     }

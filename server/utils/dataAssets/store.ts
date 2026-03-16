@@ -23,6 +23,11 @@ export interface RefreshAssetResult {
     refreshed: boolean;
     status?: number;
     message?: string;
+    invalidContent?: boolean;
+}
+
+export interface RefreshAssetOptions {
+    validateContent?: (content: string) => void;
 }
 
 function assertStringContent(
@@ -77,7 +82,8 @@ export function writeAssetText(key: AssetKey, content: string): void {
 }
 
 export async function refreshAssetFileFromProvider(
-    key: AssetKey
+    key: AssetKey,
+    options: RefreshAssetOptions = {}
 ): Promise<RefreshAssetResult> {
     const config = getAssetConfig(key);
     const filePath = getAssetFilePath(key);
@@ -102,6 +108,25 @@ export async function refreshAssetFileFromProvider(
         }
 
         const content = await response.text();
+        if (options.validateContent) {
+            try {
+                options.validateContent(content);
+            } catch (error) {
+                const message =
+                    error instanceof Error
+                        ? `${error.name}: ${error.message}`
+                        : String(error);
+                logger.warn(
+                    `refresh_validation_failed key=${key} file=${filePath} provider=${config.provider} error=${message}`
+                );
+                return {
+                    filePath,
+                    refreshed: false,
+                    message,
+                    invalidContent: true
+                };
+            }
+        }
         writeTextFileAtomically(filePath, content);
         logger.info(
             `refreshed key=${key} file=${filePath} provider=${config.provider}`

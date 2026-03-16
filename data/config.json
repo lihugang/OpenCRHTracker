@@ -34,7 +34,7 @@
                 "runningGraceSeconds": 900,
                 "statusResetTimeHHmm": "0000",
                 "detectDelaySeconds": 900,
-                "detectCooldownSeconds": 1800
+                "detectCooldownSeconds": 3600
             },
             "prefixRules": [
                 {
