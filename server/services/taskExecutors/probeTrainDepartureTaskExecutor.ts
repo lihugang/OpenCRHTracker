@@ -102,6 +102,9 @@ type ConflictGroupRouteState = 'running' | 'not_running' | 'request_failed';
 interface ConflictGroupValidationResult {
     group: TodayScheduleProbeGroup;
     state: ConflictGroupRouteState;
+    runningTrainCode: string;
+    requestFailedTrainCodes: string[];
+    notRunningTrainCodes: string[];
 }
 
 interface ClearedNotRunningState extends ClearedOverlapState {
@@ -663,25 +666,15 @@ function collectKnownStatusGroup(
 async function validateConflictGroupRunningState(
     group: TodayScheduleProbeGroup
 ): Promise<ConflictGroupValidationResult> {
-    let sawRequestFailure = false;
-
-    for (const trainCode of getGroupTrainCodes(group)) {
-        const routeResult = await fetchRouteInfo(trainCode);
-        if (routeResult.status === 'running') {
-            return {
-                group,
-                state: 'running'
-            };
-        }
-
-        if (routeResult.status === 'request_failed') {
-            sawRequestFailure = true;
-        }
-    }
-
+    const todayValidation = await validateTodayRunningForTrainCodes(
+        getGroupTrainCodes(group)
+    );
     return {
         group,
-        state: sawRequestFailure ? 'request_failed' : 'not_running'
+        state: todayValidation.state,
+        runningTrainCode: todayValidation.runningTrainCode,
+        requestFailedTrainCodes: todayValidation.requestFailedTrainCodes,
+        notRunningTrainCodes: todayValidation.notRunningTrainCodes
     };
 }
 
@@ -770,6 +763,12 @@ async function tryResolveOverlappingRoutes(
     const notRunningGroups = validationResults
         .filter((result) => result.state === 'not_running')
         .map((result) => result.group);
+    const notRunningTrainCodes = validationResults.flatMap(
+        (result) => result.notRunningTrainCodes
+    );
+    const requestFailedTrainCodes = validationResults.flatMap(
+        (result) => result.requestFailedTrainCodes
+    );
 
     if (notRunningGroups.length > 0) {
         const extraAffectedEmuCodesByTrainKey = new Map<string, string[]>();
@@ -787,7 +786,7 @@ async function tryResolveOverlappingRoutes(
             extraAffectedEmuCodesByTrainKey
         );
         logger.info(
-            `overlap_drop_not_running conflictEmuCode=${mainEmuCode} droppedGroups=${formatTrainCodeGroups(notRunningGroups)} affectedEmuCodes=${clearedNotRunningState.affectedEmuCodes.join(',')} deletedDailyRouteRows=${clearedNotRunningState.deletedDailyRouteRows} deletedProbeStatusRows=${clearedNotRunningState.deletedProbeStatusRows} downgradedProbeStatusRows=${clearedNotRunningState.downgradedProbeStatusRows}`
+            `overlap_drop_not_running conflictEmuCode=${mainEmuCode} droppedGroups=${formatTrainCodeGroups(notRunningGroups)} notRunningTrainCodes=${uniqueNormalizedCodes(notRunningTrainCodes).join(',')} requestFailedTrainCodes=${uniqueNormalizedCodes(requestFailedTrainCodes).join(',')} affectedEmuCodes=${clearedNotRunningState.affectedEmuCodes.join(',')} deletedDailyRouteRows=${clearedNotRunningState.deletedDailyRouteRows} deletedProbeStatusRows=${clearedNotRunningState.deletedProbeStatusRows} downgradedProbeStatusRows=${clearedNotRunningState.downgradedProbeStatusRows}`
         );
 
         if (hasGroupTrainKey(notRunningGroups, currentGroup.trainKey)) {
@@ -831,7 +830,7 @@ async function tryResolveOverlappingRoutes(
         ? logger.error.bind(logger)
         : logger.info.bind(logger);
     overlapRequeueLog(
-        `overlap_requeue conflictEmuCode=${mainEmuCode} conflictGroups=${formatTrainCodeGroups(overlappingGroups)} conflictTimeRanges=${formatOverlapTimeRanges(currentGroup, overlappingGroups)} requeuedGroups=${formatTrainCodeGroups(Array.from(impactedGroups.values()))} requeuedEmuCodes=${clearedState.affectedEmuCodes.join(',')} deletedDailyRouteRows=${clearedState.deletedDailyRouteRows} deletedProbeStatusRows=${clearedState.deletedProbeStatusRows} requeueTaskIds=${taskIds.join(',')}`
+        `overlap_requeue conflictEmuCode=${mainEmuCode} conflictGroups=${formatTrainCodeGroups(overlappingGroups)} conflictTimeRanges=${formatOverlapTimeRanges(currentGroup, overlappingGroups)} notRunningTrainCodes=${uniqueNormalizedCodes(notRunningTrainCodes).join(',')} requestFailedTrainCodes=${uniqueNormalizedCodes(requestFailedTrainCodes).join(',')} requeuedGroups=${formatTrainCodeGroups(Array.from(impactedGroups.values()))} requeuedEmuCodes=${clearedState.affectedEmuCodes.join(',')} deletedDailyRouteRows=${clearedState.deletedDailyRouteRows} deletedProbeStatusRows=${clearedState.deletedProbeStatusRows} requeueTaskIds=${taskIds.join(',')}`
     );
     return true;
 }
