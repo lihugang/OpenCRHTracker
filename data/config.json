@@ -178,15 +178,11 @@
         "startup": {
             "disabledExecutors": []
         },
-        "qrcodeProbe": {
-            "enabled": true,
-            "delaySeconds": 1800
-        },
         "scheduler": {
             "pollIntervalMs": 180000,
             "maxTasksPerQuery": 65535,
             "idle": {
-                "maxTasksPerTick": 128,
+                "maxTasksPerTick": 256,
                 "emaAlpha": 0.3
             }
         }

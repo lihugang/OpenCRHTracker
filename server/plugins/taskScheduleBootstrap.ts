@@ -19,7 +19,6 @@ import {
 import { registerRefreshRouteBatchTaskExecutor } from '~/server/services/taskExecutors/refreshRouteBatchTaskExecutor';
 import { registerDispatchDailyProbeTasksExecutor } from '~/server/services/taskExecutors/dispatchDailyProbeTasksExecutor';
 import { registerProbeTrainDepartureTaskExecutor } from '~/server/services/taskExecutors/probeTrainDepartureTaskExecutor';
-import { registerProbeQrcodeAvailabilityTaskExecutor } from '~/server/services/taskExecutors/probeQrcodeAvailabilityTaskExecutor';
 import {
     CLEAR_DAILY_PROBE_STATUS_TASK_EXECUTOR,
     registerClearDailyProbeStatusTaskExecutor
@@ -93,7 +92,6 @@ export default defineNitroPlugin(() => {
         registerGenerateRouteRefreshTasksExecutor();
         registerDispatchDailyProbeTasksExecutor();
         registerProbeTrainDepartureTaskExecutor();
-        registerProbeQrcodeAvailabilityTaskExecutor();
         registerClearDailyProbeStatusTaskExecutor();
         registerDetectCoupledEmuGroupTaskExecutor();
         registerRefreshAssetFileTaskExecutors();

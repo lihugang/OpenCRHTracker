@@ -32,11 +32,6 @@ interface ScheduleProbeCouplingConfig {
     detectCooldownSeconds: number;
 }
 
-interface TaskQrcodeProbeConfig {
-    enabled: boolean;
-    delaySeconds: number;
-}
-
 interface ApiPermissionConfig {
     anonymousScopes: string[];
     issuedKeyDefaultScopes: string[];
@@ -167,7 +162,6 @@ export interface Config {
         startup: {
             disabledExecutors: StartupTaskExecutor[];
         };
-        qrcodeProbe: TaskQrcodeProbeConfig;
         scheduler: {
             pollIntervalMs: number;
             maxTasksPerQuery: number;
@@ -427,7 +421,6 @@ function validateConfig(raw: unknown): Config {
                   taskStartup.disabledExecutors,
                   'task.startup.disabledExecutors'
               );
-    const taskQrcodeProbe = asObject(task.qrcodeProbe, 'task.qrcodeProbe');
     const taskScheduler = asObject(task.scheduler, 'task.scheduler');
     const taskSchedulerIdle = asObject(
         taskScheduler.idle,
@@ -809,17 +802,6 @@ function validateConfig(raw: unknown): Config {
                         );
                         return executor;
                     }
-                )
-            },
-            qrcodeProbe: {
-                enabled: asBoolean(
-                    taskQrcodeProbe.enabled,
-                    'task.qrcodeProbe.enabled'
-                ),
-                delaySeconds: asInteger(
-                    taskQrcodeProbe.delaySeconds,
-                    'task.qrcodeProbe.delaySeconds',
-                    0
                 )
             },
             scheduler: {

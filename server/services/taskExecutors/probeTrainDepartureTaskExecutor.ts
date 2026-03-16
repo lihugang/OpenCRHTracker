@@ -34,7 +34,6 @@ import {
     listDailyRoutesByTrainCodeInRange,
     type DailyEmuRouteRow
 } from '~/server/services/emuRoutesStore';
-import { enqueueQrcodeProbeAvailabilityTask } from '~/server/services/qrcodeProbeTask';
 import { registerTaskExecutor } from '~/server/services/taskExecutorRegistry';
 import { enqueueTask } from '~/server/services/taskQueue';
 import { DETECT_COUPLED_EMU_GROUP_TASK_EXECUTOR } from '~/server/services/taskExecutors/detectCoupledEmuGroupTaskExecutor';
@@ -733,8 +732,6 @@ async function executeProbeTrainDepartureTask(rawArgs: unknown): Promise<void> {
     ) {
         return;
     }
-
-    enqueueQrcodeProbeAvailabilityTask(probedTrainCode, mainEmuCode);
 
     if (!mainRecord) {
         logger.warn(
