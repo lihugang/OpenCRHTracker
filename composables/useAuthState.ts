@@ -6,9 +6,10 @@ function toAuthSession(payload: AuthMeResponse): AuthSession {
     return {
         userId: payload.user.userId,
         keyId: payload.apiKey.keyId,
+        issuer: payload.apiKey.issuer,
         maskedApiKey: payload.apiKey.maskedApiKey,
         scopes: payload.apiKey.scopes,
-        createdAt: payload.apiKey.createdAt,
+        activeFrom: payload.apiKey.activeFrom,
         expiresAt: payload.apiKey.expiresAt,
         dailyTokenLimit: payload.apiKey.dailyTokenLimit
     };

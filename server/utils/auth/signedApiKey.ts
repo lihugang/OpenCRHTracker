@@ -8,9 +8,13 @@ export interface SignedApiKeyPayload {
     kid: string;
     sub: string;
     scopes: string[];
-    iat: number;
+    nbf: number;
     exp: number;
     limit: number;
+}
+
+export interface ParsedSignedApiKeyPayload extends SignedApiKeyPayload {
+    issuer: ApiKeyIssuer;
 }
 
 function toBase64Url(input: Buffer | string) {
@@ -38,10 +42,14 @@ function getApiKeyPrefix(issuer: ApiKeyIssuer) {
     return useConfig().user.apiKeyPrefixes[issuer];
 }
 
-function getMatchingApiKeyPrefix(token: string) {
-    return Object.values(useConfig().user.apiKeyPrefixes)
-        .sort((left, right) => right.length - left.length)
-        .find((prefix) => token.startsWith(prefix));
+function getMatchingApiKeyIssuer(token: string) {
+    const matchedEntry = (Object.entries(
+        useConfig().user.apiKeyPrefixes
+    ) as Array<[ApiKeyIssuer, string]>)
+        .sort((left, right) => right[1].length - left[1].length)
+        .find(([, prefix]) => token.startsWith(prefix));
+
+    return matchedEntry ?? null;
 }
 
 export function createSignedApiKeyToken(
@@ -53,7 +61,7 @@ export function createSignedApiKeyToken(
             kid: payload.kid,
             sub: payload.sub,
             scopes: normalizeScopeList(payload.scopes),
-            iat: payload.iat,
+            nbf: payload.nbf,
             exp: payload.exp,
             limit: payload.limit
         } satisfies SignedApiKeyPayload)
@@ -63,12 +71,13 @@ export function createSignedApiKeyToken(
 }
 
 export function parseSignedApiKeyToken(token: string) {
-    const matchedPrefix = getMatchingApiKeyPrefix(token);
-    if (!matchedPrefix) {
+    const matchedEntry = getMatchingApiKeyIssuer(token);
+    if (!matchedEntry) {
         return null;
     }
 
-    const rawToken = token.slice(matchedPrefix.length);
+    const [issuer, prefix] = matchedEntry;
+    const rawToken = token.slice(prefix.length);
     const dotIndex = rawToken.indexOf('.');
     if (dotIndex <= 0 || dotIndex === rawToken.length - 1) {
         return null;
@@ -101,7 +110,7 @@ export function parseSignedApiKeyToken(token: string) {
         typeof candidate.kid !== 'string' ||
         typeof candidate.sub !== 'string' ||
         !Array.isArray(candidate.scopes) ||
-        typeof candidate.iat !== 'number' ||
+        typeof candidate.nbf !== 'number' ||
         typeof candidate.exp !== 'number' ||
         typeof candidate.limit !== 'number'
     ) {
@@ -110,13 +119,14 @@ export function parseSignedApiKeyToken(token: string) {
 
     try {
         return {
+            issuer,
             kid: candidate.kid,
             sub: candidate.sub,
             scopes: normalizeScopeList(candidate.scopes),
-            iat: candidate.iat,
+            nbf: candidate.nbf,
             exp: candidate.exp,
             limit: candidate.limit
-        } satisfies SignedApiKeyPayload;
+        } satisfies ParsedSignedApiKeyPayload;
     } catch {
         return null;
     }

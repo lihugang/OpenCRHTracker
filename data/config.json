@@ -92,6 +92,7 @@
         },
         "apiKeyBytes": 24,
         "apiKeyTtlSeconds": 2592000,
+        "apiKeyMaxLifetimeSeconds": 157680000,
         "signKey": "OpenCRHTracker",
         "scrypt": {
             "keyLength": 64,

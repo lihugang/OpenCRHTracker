@@ -371,6 +371,10 @@
                     "type": "integer",
                     "minimum": 60
                 },
+                "apiKeyMaxLifetimeSeconds": {
+                    "type": "integer",
+                    "minimum": 60
+                },
                 "signKey": {
                     "type": "string",
                     "minLength": 1

@@ -33,11 +33,19 @@ interface ApiKeyScopeRecord {
 export interface ApiKeyRecord {
     key: string;
     user_id: string;
-    created_at: number;
+    issuer: ApiKeyIssuer;
+    active_from: number;
     revoked_at: number | null;
     expires_at: number;
     daily_token_limit: number;
     scopes: string[];
+}
+
+export interface CreateApiKeyOptions {
+    scopes?: string[];
+    issuer?: ApiKeyIssuer;
+    activeFrom?: number;
+    expiresAt?: number;
 }
 
 type AuthSqlKey =
@@ -101,24 +109,54 @@ function createKeyId() {
         .toString('base64url');
 }
 
+function resolveApiKeyWindow(
+    activeFrom = getNowSeconds(),
+    expiresAt = activeFrom + useConfig().user.apiKeyTtlSeconds
+) {
+    const config = useConfig();
+
+    if (!Number.isInteger(activeFrom) || activeFrom <= 0) {
+        throw new Error('activeFrom must be a positive integer unix timestamp');
+    }
+
+    if (!Number.isInteger(expiresAt) || expiresAt <= 0) {
+        throw new Error('expiresAt must be a positive integer unix timestamp');
+    }
+
+    const lifetimeSeconds = expiresAt - activeFrom;
+    if (lifetimeSeconds <= 0) {
+        throw new Error('expiresAt must be greater than activeFrom');
+    }
+
+    if (lifetimeSeconds > config.user.apiKeyMaxLifetimeSeconds) {
+        throw new Error('api key lifetime exceeds configured maximum');
+    }
+
+    return {
+        activeFrom,
+        expiresAt
+    };
+}
+
 function buildApiKeySession(
     userId: string,
     keyId: string,
     scopes: string[],
     issuer: ApiKeyIssuer,
-    createdAt = getNowSeconds()
+    activeFrom = getNowSeconds(),
+    expiresAt = activeFrom + useConfig().user.apiKeyTtlSeconds
 ): IssuedAuthSession {
     const config = useConfig();
     const normalizedScopes = normalizeScopeList(scopes);
-    const expiresAt = createdAt + config.user.apiKeyTtlSeconds;
+    const resolvedWindow = resolveApiKeyWindow(activeFrom, expiresAt);
     const dailyTokenLimit = config.quota.userMaxTokens;
     const apiKey = createSignedApiKeyToken(
         {
             kid: keyId,
             sub: userId,
             scopes: normalizedScopes,
-            iat: createdAt,
-            exp: expiresAt,
+            nbf: resolvedWindow.activeFrom,
+            exp: resolvedWindow.expiresAt,
             limit: dailyTokenLimit
         },
         issuer
@@ -127,11 +165,12 @@ function buildApiKeySession(
     return {
         userId,
         keyId,
+        issuer,
         apiKey,
         maskedApiKey: maskApiKey(apiKey),
         scopes: normalizedScopes,
-        createdAt,
-        expiresAt,
+        activeFrom: resolvedWindow.activeFrom,
+        expiresAt: resolvedWindow.expiresAt,
         dailyTokenLimit
     };
 }
@@ -174,7 +213,8 @@ function matchesPayload(record: ApiKeyRecord, payload: AuthSession) {
     return (
         record.key === payload.keyId &&
         record.user_id === payload.userId &&
-        record.created_at === payload.createdAt &&
+        record.issuer === payload.issuer &&
+        record.active_from === payload.activeFrom &&
         record.expires_at === payload.expiresAt &&
         record.daily_token_limit === payload.dailyTokenLimit &&
         sameScopeSet(record.scopes, payload.scopes)
@@ -188,10 +228,11 @@ function buildAuthSessionFromRecord(
     return {
         userId: record.user_id,
         keyId: record.key,
+        issuer: record.issuer,
         apiKey,
         maskedApiKey: maskApiKey(apiKey),
         scopes: record.scopes,
-        createdAt: record.created_at,
+        activeFrom: record.active_from,
         expiresAt: record.expires_at,
         dailyTokenLimit: record.daily_token_limit
     };
@@ -202,7 +243,9 @@ function getStoredApiKeyRecord(keyId: string, now: number) {
     if (cached !== undefined) {
         if (
             cached !== MISSING_API_KEY_RECORD &&
-            (cached.revoked_at !== null || cached.expires_at <= now)
+            (cached.revoked_at !== null ||
+                cached.active_from > now ||
+                cached.expires_at <= now)
         ) {
             apiKeyRecordCache.set(keyId, MISSING_API_KEY_RECORD, {
                 ttl: 5 * 1000
@@ -216,6 +259,7 @@ function getStoredApiKeyRecord(keyId: string, now: number) {
     const record = authStatements.get<Omit<ApiKeyRecord, 'scopes'>>(
         'selectValidApiKey',
         keyId,
+        now,
         now
     );
     if (!record) {
@@ -267,18 +311,27 @@ export function updateLastLoginAt(username: string) {
 
 export function createApiKey(
     userId: string,
-    scopes = useConfig().api.permissions.issuedKeyDefaultScopes,
-    issuer: ApiKeyIssuer = 'webapp'
+    options: CreateApiKeyOptions = {}
 ) {
-    const createdAt = getNowSeconds();
+    const issuer = options.issuer ?? 'webapp';
+    const scopes =
+        options.scopes ?? useConfig().api.permissions.issuedKeyDefaultScopes;
     const keyId = createKeyId();
-    const apiKey = buildApiKeySession(userId, keyId, scopes, issuer, createdAt);
+    const apiKey = buildApiKeySession(
+        userId,
+        keyId,
+        scopes,
+        issuer,
+        options.activeFrom,
+        options.expiresAt
+    );
     const insert = useUsersDatabase().transaction(() => {
         authStatements.run(
             'insertApiKey',
             apiKey.keyId,
             userId,
-            apiKey.createdAt,
+            apiKey.issuer,
+            apiKey.activeFrom,
             apiKey.expiresAt,
             apiKey.dailyTokenLimit
         );
@@ -289,7 +342,8 @@ export function createApiKey(
     apiKeyRecordCache.set(apiKey.keyId, {
         key: apiKey.keyId,
         user_id: userId,
-        created_at: apiKey.createdAt,
+        issuer: apiKey.issuer,
+        active_from: apiKey.activeFrom,
         revoked_at: null,
         expires_at: apiKey.expiresAt,
         daily_token_limit: apiKey.dailyTokenLimit,
@@ -302,19 +356,22 @@ export function createApiKey(
 export function createUserWithApiKey(
     username: string,
     password: string,
-    scopes = useConfig().api.permissions.issuedKeyDefaultScopes,
-    issuer: ApiKeyIssuer = 'webapp'
+    options: CreateApiKeyOptions = {}
 ) {
     const createdAt = getNowSeconds();
     const salt = createSalt();
     const passwordHash = createPasswordHash(password, salt);
     const keyId = createKeyId();
+    const issuer = options.issuer ?? 'webapp';
+    const scopes =
+        options.scopes ?? useConfig().api.permissions.issuedKeyDefaultScopes;
     const apiKey = buildApiKeySession(
         username,
         keyId,
         scopes,
         issuer,
-        createdAt
+        options.activeFrom,
+        options.expiresAt
     );
     const insert = useUsersDatabase().transaction(() => {
         authStatements.run(
@@ -329,7 +386,8 @@ export function createUserWithApiKey(
             'insertApiKey',
             apiKey.keyId,
             username,
-            apiKey.createdAt,
+            apiKey.issuer,
+            apiKey.activeFrom,
             apiKey.expiresAt,
             apiKey.dailyTokenLimit
         );
@@ -347,7 +405,8 @@ export function createUserWithApiKey(
     apiKeyRecordCache.set(apiKey.keyId, {
         key: apiKey.keyId,
         user_id: username,
-        created_at: apiKey.createdAt,
+        issuer: apiKey.issuer,
+        active_from: apiKey.activeFrom,
         revoked_at: null,
         expires_at: apiKey.expiresAt,
         daily_token_limit: apiKey.dailyTokenLimit,
@@ -401,7 +460,7 @@ export function getValidApiKey(apiKey: string) {
         payload.kid.length === 0 ||
         payload.sub.length === 0 ||
         payload.exp <= now ||
-        payload.iat > payload.exp
+        payload.nbf > payload.exp
     ) {
         return undefined;
     }
@@ -414,9 +473,10 @@ export function getValidApiKey(apiKey: string) {
     const hydratedPayload: AuthSession = {
         userId: payload.sub,
         keyId: payload.kid,
+        issuer: payload.issuer,
         maskedApiKey: maskApiKey(apiKey),
         scopes: payload.scopes,
-        createdAt: payload.iat,
+        activeFrom: payload.nbf,
         expiresAt: payload.exp,
         dailyTokenLimit: payload.limit
     };

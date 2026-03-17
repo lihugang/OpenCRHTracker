@@ -24,8 +24,9 @@ export default defineEventHandler(async (event) => {
                 },
                 apiKey: {
                     keyId: identity.keyId ?? '',
+                    issuer: identity.issuer ?? 'webapp',
                     maskedApiKey: maskApiKey(identity.apiKey ?? ''),
-                    createdAt: identity.createdAt ?? 0,
+                    activeFrom: identity.activeFrom ?? 0,
                     expiresAt: identity.expiresAt ?? 0,
                     dailyTokenLimit:
                         identity.dailyTokenLimit ?? identity.tokenLimit,

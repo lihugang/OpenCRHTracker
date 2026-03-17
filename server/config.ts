@@ -103,6 +103,7 @@ export interface Config {
         };
         apiKeyBytes: number;
         apiKeyTtlSeconds: number;
+        apiKeyMaxLifetimeSeconds: number;
         signKey: string;
         scrypt: {
             keyLength: number;
@@ -639,6 +640,14 @@ function validateConfig(raw: unknown): Config {
                 'user.apiKeyTtlSeconds',
                 60
             ),
+            apiKeyMaxLifetimeSeconds:
+                user.apiKeyMaxLifetimeSeconds === undefined
+                    ? 157680000
+                    : asNumber(
+                          user.apiKeyMaxLifetimeSeconds,
+                          'user.apiKeyMaxLifetimeSeconds',
+                          60
+                      ),
             signKey,
             scrypt: {
                 keyLength: asNumber(
@@ -995,6 +1004,11 @@ function validateConfig(raw: unknown): Config {
     assert(
         new Set(apiKeyPrefixes).size === apiKeyPrefixes.length,
         'user.apiKeyPrefixes must not contain duplicated values'
+    );
+    assert(
+        configResult.user.apiKeyTtlSeconds <=
+            configResult.user.apiKeyMaxLifetimeSeconds,
+        'user.apiKeyTtlSeconds must be <= user.apiKeyMaxLifetimeSeconds'
     );
     const disabledStartupExecutors = new Set<string>();
     for (const executor of configResult.task.startup.disabledExecutors) {

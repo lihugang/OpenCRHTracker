@@ -14,7 +14,13 @@ import getApiErrorMessage from '~/utils/api/getApiErrorMessage';
 const REQUEST_LIMIT = 20;
 
 type HistoryPageResponse = TrainHistoryResponse | EmuHistoryResponse;
-type RequestFetch = typeof $fetch;
+type HistoryRequestOptions = {
+    query?: ReturnType<typeof buildHistoryQuery>;
+};
+type RequestFetch = <T>(
+    request: string,
+    options?: HistoryRequestOptions
+) => Promise<T>;
 
 function buildHistoryQuery(cursor: string) {
     return {

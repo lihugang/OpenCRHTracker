@@ -97,11 +97,12 @@ export default function resolveIdentity(event: H3Event): ApiIdentity {
         type: 'user',
         id: apiKeyRecord.userId,
         keyId: apiKeyRecord.keyId,
+        issuer: apiKeyRecord.issuer,
         apiKey: resolvedApiKey.key,
         bucketKey: `user:${apiKeyRecord.userId}`,
         tokenLimit: apiKeyRecord.dailyTokenLimit,
         scopes: apiKeyRecord.scopes,
-        createdAt: apiKeyRecord.createdAt,
+        activeFrom: apiKeyRecord.activeFrom,
         expiresAt: apiKeyRecord.expiresAt,
         dailyTokenLimit: apiKeyRecord.dailyTokenLimit
     };

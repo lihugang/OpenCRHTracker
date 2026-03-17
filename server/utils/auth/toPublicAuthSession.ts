@@ -4,9 +4,10 @@ import type { AuthSession } from '~/types/auth';
 interface AuthSessionLike {
     userId: string;
     keyId: string;
+    issuer: AuthSession['issuer'];
     apiKey: string;
     scopes: string[];
-    createdAt: number;
+    activeFrom: number;
     expiresAt: number;
     dailyTokenLimit: number;
 }
@@ -17,9 +18,10 @@ export default function toPublicAuthSession(
     return {
         userId: session.userId,
         keyId: session.keyId,
+        issuer: session.issuer,
         maskedApiKey: maskApiKey(session.apiKey),
         scopes: session.scopes,
-        createdAt: session.createdAt,
+        activeFrom: session.activeFrom,
         expiresAt: session.expiresAt,
         dailyTokenLimit: session.dailyTokenLimit
     };

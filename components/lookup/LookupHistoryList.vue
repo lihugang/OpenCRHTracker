@@ -419,7 +419,7 @@
                         v-else-if="errorMessage"
                         class="space-y-3">
                         <p class="text-rose-600">
-                            {{ errorMessage }}
+                            无法加载更多数据：{{ errorMessage }}
                         </p>
                         <button
                             v-if="canLoadMore"

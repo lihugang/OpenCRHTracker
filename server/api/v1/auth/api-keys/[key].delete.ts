@@ -20,7 +20,7 @@ export default defineEventHandler(async (event) => {
                 typeof keyId === 'string' && keyId.length > 0,
                 400,
                 'invalid_param',
-                '需要提供要撤销的 keyId'
+                'A keyId is required'
             );
 
             const revoked = revokeApiKeyByUser(keyId, identity.id);
@@ -28,7 +28,7 @@ export default defineEventHandler(async (event) => {
                 throw new ApiRequestError(
                     404,
                     'not_found',
-                    '未找到可撤销的 keyId'
+                    'No revocable key was found for this keyId'
                 );
             }
 

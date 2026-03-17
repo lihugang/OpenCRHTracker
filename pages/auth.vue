@@ -215,11 +215,12 @@ const statusMarker = computed(() =>
 );
 
 useHead({
-    title: '登录 / 注册 | EMU-Track',
+    title: 'OpenCRHTracker | 登录 / 注册',
     meta: [
         {
             name: 'description',
-            content: '登录或注册 EMU-Track 账户以获得浏览器认证会话。'
+            content:
+                '登录或注册 Open CRH Tracker 账户以获得更多配额和 API 使用权限'
         }
     ]
 });
