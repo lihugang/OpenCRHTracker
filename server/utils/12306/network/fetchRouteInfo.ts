@@ -183,7 +183,9 @@ export default async function fetchRouteInfo(
                 detail: 'missing train detail stopTime or trainNo'
             });
             return {
-                status: 'request_failed'
+                status: 'not_running',
+                errorCode: 'invalid_response',
+                errorMsg: 'missing train detail stopTime or trainNo'
             };
         }
 
