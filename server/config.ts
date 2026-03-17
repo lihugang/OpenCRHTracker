@@ -38,11 +38,17 @@ interface ApiPermissionConfig {
     creatableKeyMaxScopes: string[];
 }
 
+interface ApiKeyCleanupConfig {
+    retentionDays: number;
+    dailyTimeHHmm: string;
+}
+
 const ALLOWED_STARTUP_TASK_EXECUTORS = [
     'build_today_schedule',
     'generate_route_refresh_tasks',
     'dispatch_daily_probe_tasks',
-    'clear_daily_probe_status'
+    'clear_daily_probe_status',
+    'cleanup_revoked_api_keys'
 ] as const;
 
 type StartupTaskExecutor = (typeof ALLOWED_STARTUP_TASK_EXECUTORS)[number];
@@ -163,6 +169,7 @@ export interface Config {
         startup: {
             disabledExecutors: StartupTaskExecutor[];
         };
+        apiKeyCleanup: ApiKeyCleanupConfig;
         scheduler: {
             pollIntervalMs: number;
             maxTasksPerQuery: number;
@@ -422,6 +429,10 @@ function validateConfig(raw: unknown): Config {
                   taskStartup.disabledExecutors,
                   'task.startup.disabledExecutors'
               );
+    const taskApiKeyCleanup = asObject(
+        task.apiKeyCleanup,
+        'task.apiKeyCleanup'
+    );
     const taskScheduler = asObject(task.scheduler, 'task.scheduler');
     const taskSchedulerIdle = asObject(
         taskScheduler.idle,
@@ -813,6 +824,17 @@ function validateConfig(raw: unknown): Config {
                     }
                 )
             },
+            apiKeyCleanup: {
+                retentionDays: asInteger(
+                    taskApiKeyCleanup.retentionDays,
+                    'task.apiKeyCleanup.retentionDays',
+                    1
+                ),
+                dailyTimeHHmm: asString(
+                    taskApiKeyCleanup.dailyTimeHHmm,
+                    'task.apiKeyCleanup.dailyTimeHHmm'
+                )
+            },
             scheduler: {
                 pollIntervalMs: asInteger(
                     taskScheduler.pollIntervalMs,
@@ -966,6 +988,15 @@ function validateConfig(raw: unknown): Config {
         assert(
             false,
             `spider.scheduleProbe.coupling.statusResetTimeHHmm is invalid: ${message}`
+        );
+    }
+    try {
+        parseDailyTimeHHmm(configResult.task.apiKeyCleanup.dailyTimeHHmm);
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        assert(
+            false,
+            `task.apiKeyCleanup.dailyTimeHHmm is invalid: ${message}`
         );
     }
     for (const key of ['EMUList', 'QRCode'] as const) {

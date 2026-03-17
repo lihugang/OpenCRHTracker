@@ -179,6 +179,10 @@
         "startup": {
             "disabledExecutors": []
         },
+        "apiKeyCleanup": {
+            "retentionDays": 7,
+            "dailyTimeHHmm": "0000"
+        },
         "scheduler": {
             "pollIntervalMs": 180000,
             "maxTasksPerQuery": 65535,

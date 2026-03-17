@@ -49,6 +49,7 @@ export interface CreateApiKeyOptions {
 }
 
 type AuthSqlKey =
+    | 'deleteRevokedApiKeysBefore'
     | 'insertUser'
     | 'insertApiKey'
     | 'insertApiKeyScope'
@@ -447,6 +448,14 @@ export function revokeApiKeyByUser(keyId: string, userId: string) {
         });
     }
     return result.changes > 0;
+}
+
+export function deleteRevokedApiKeysBefore(cutoffTimestamp: number) {
+    const result = authStatements.run(
+        'deleteRevokedApiKeysBefore',
+        cutoffTimestamp
+    );
+    return result.changes;
 }
 
 export function getValidApiKey(apiKey: string) {

@@ -25,6 +25,10 @@ import {
     CLEAR_DAILY_PROBE_STATUS_TASK_EXECUTOR,
     registerClearDailyProbeStatusTaskExecutor
 } from '~/server/services/taskExecutors/clearDailyProbeStatusTaskExecutor';
+import {
+    CLEANUP_REVOKED_API_KEYS_TASK_EXECUTOR,
+    registerCleanupRevokedApiKeysTaskExecutor
+} from '~/server/services/taskExecutors/cleanupRevokedApiKeysTaskExecutor';
 import { registerDetectCoupledEmuGroupTaskExecutor } from '~/server/services/taskExecutors/detectCoupledEmuGroupTaskExecutor';
 import {
     REFRESH_ASSET_TASK_DEFINITIONS,
@@ -37,7 +41,8 @@ const logger = getLogger('task-schedule-bootstrap');
 const STARTUP_EXECUTORS = [
     BUILD_SCHEDULE_TASK_EXECUTOR,
     GENERATE_ROUTE_REFRESH_TASKS_EXECUTOR,
-    CLEAR_DAILY_PROBE_STATUS_TASK_EXECUTOR
+    CLEAR_DAILY_PROBE_STATUS_TASK_EXECUTOR,
+    CLEANUP_REVOKED_API_KEYS_TASK_EXECUTOR
 ] as const;
 
 function reconcileStartupTask(
@@ -105,6 +110,7 @@ export default defineNitroPlugin(async () => {
         registerDispatchDailyProbeTasksExecutor();
         registerProbeTrainDepartureTaskExecutor();
         registerClearDailyProbeStatusTaskExecutor();
+        registerCleanupRevokedApiKeysTaskExecutor();
         registerDetectCoupledEmuGroupTaskExecutor();
         registerRefreshAssetFileTaskExecutors();
 
@@ -165,6 +171,24 @@ export default defineNitroPlugin(async () => {
             );
             enqueuedStartupTasks.push(
                 `${CLEAR_DAILY_PROBE_STATUS_TASK_EXECUTOR}:${clearTaskId}`
+            );
+        }
+
+        if (
+            !disabledStartupExecutors.has(
+                CLEANUP_REVOKED_API_KEYS_TASK_EXECUTOR
+            )
+        ) {
+            const cleanupExecutionTime = getNextExecutionTimeInShanghaiSeconds(
+                Date.now(),
+                useConfig().task.apiKeyCleanup.dailyTimeHHmm
+            );
+            const cleanupTaskId = reconcileStartupTask(
+                CLEANUP_REVOKED_API_KEYS_TASK_EXECUTOR,
+                cleanupExecutionTime
+            );
+            enqueuedStartupTasks.push(
+                `${CLEANUP_REVOKED_API_KEYS_TASK_EXECUTOR}:${cleanupTaskId}`
             );
         }
 

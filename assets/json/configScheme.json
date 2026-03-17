@@ -684,13 +684,32 @@
                                     "build_today_schedule",
                                     "generate_route_refresh_tasks",
                                     "dispatch_daily_probe_tasks",
-                                    "clear_daily_probe_status"
+                                    "clear_daily_probe_status",
+                                    "cleanup_revoked_api_keys"
                                 ]
                             }
                         }
                     },
                     "required": [
                         "disabledExecutors"
+                    ]
+                },
+                "apiKeyCleanup": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "retentionDays": {
+                            "type": "integer",
+                            "minimum": 1
+                        },
+                        "dailyTimeHHmm": {
+                            "type": "string",
+                            "pattern": "^\\d{4}$"
+                        }
+                    },
+                    "required": [
+                        "retentionDays",
+                        "dailyTimeHHmm"
                     ]
                 },
                 "scheduler": {
@@ -733,6 +752,7 @@
                 }
             },
             "required": [
+                "apiKeyCleanup",
                 "scheduler"
             ]
         },
