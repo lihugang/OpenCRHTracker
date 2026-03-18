@@ -576,11 +576,32 @@ const groupedItems = computed<DisplayHistoryListItem[]>(() => {
 
         return {
             ...item,
+            codes: normalizeDisplayCodes(item.codes),
             dateKey,
             isTintedDateBand: dateBandIndex % 2 === 1
         };
     });
 });
+
+function normalizeDisplayCodes(codes: string[]): string[] {
+    const normalizedCodes = Array.from(
+        new Set(
+            codes
+                .map((code) => code.trim())
+                .filter((code) => code.length > 0)
+        )
+    );
+
+    if (normalizedCodes.length < 2) {
+        return normalizedCodes;
+    }
+
+    const leftCode = normalizedCodes[0]!;
+    const rightCode = normalizedCodes[1]!;
+    return leftCode.localeCompare(rightCode) <= 0
+        ? normalizedCodes
+        : [rightCode, leftCode];
+}
 
 function disconnectSentinelObserver() {
     sentinelObserver?.disconnect();
