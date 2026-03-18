@@ -3,7 +3,7 @@ import type { AuthSession } from '~/types/auth';
 
 interface AuthSessionLike {
     userId: string;
-    keyId: string;
+    revokeId: string;
     issuer: AuthSession['issuer'];
     apiKey: string;
     scopes: string[];
@@ -17,7 +17,7 @@ export default function toPublicAuthSession(
 ): AuthSession {
     return {
         userId: session.userId,
-        keyId: session.keyId,
+        revokeId: session.revokeId,
         issuer: session.issuer,
         maskedApiKey: maskApiKey(session.apiKey),
         scopes: session.scopes,

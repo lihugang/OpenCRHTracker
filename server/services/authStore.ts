@@ -11,9 +11,20 @@ import {
     type ApiKeyIssuer
 } from '~/server/utils/auth/signedApiKey';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
-import type { AuthSession } from '~/types/auth';
 
-export interface IssuedAuthSession extends AuthSession {
+interface ApiKeyPayload {
+    userId: string;
+    keyId: string;
+    issuer: ApiKeyIssuer;
+    scopes: string[];
+    activeFrom: number;
+    expiresAt: number;
+    dailyTokenLimit: number;
+}
+
+export interface IssuedAuthSession extends ApiKeyPayload {
+    revokeId: string;
+    maskedApiKey: string;
     apiKey: string;
 }
 
@@ -32,6 +43,7 @@ interface ApiKeyScopeRecord {
 
 export interface ApiKeyRecord {
     key: string;
+    revoke_id: string;
     user_id: string;
     issuer: ApiKeyIssuer;
     active_from: number;
@@ -54,6 +66,7 @@ type AuthSqlKey =
     | 'insertApiKey'
     | 'insertApiKeyScope'
     | 'revokeApiKeyByUser'
+    | 'revokeApiKeyByRevokeId'
     | 'selectApiKeysByUser'
     | 'selectApiKeyScopesByKey'
     | 'selectApiKeyScopesByUser'
@@ -110,6 +123,12 @@ function createKeyId() {
         .toString('base64url');
 }
 
+function createRevokeId() {
+    return crypto
+        .randomBytes(useConfig().user.apiKeyBytes)
+        .toString('base64url');
+}
+
 function resolveApiKeyWindow(
     activeFrom = getNowSeconds(),
     expiresAt = activeFrom + useConfig().user.apiKeyTtlSeconds
@@ -142,6 +161,7 @@ function resolveApiKeyWindow(
 function buildApiKeySession(
     userId: string,
     keyId: string,
+    revokeId: string,
     scopes: string[],
     issuer: ApiKeyIssuer,
     activeFrom = getNowSeconds(),
@@ -166,6 +186,7 @@ function buildApiKeySession(
     return {
         userId,
         keyId,
+        revokeId,
         issuer,
         apiKey,
         maskedApiKey: maskApiKey(apiKey),
@@ -210,7 +231,7 @@ function sameScopeSet(left: string[], right: string[]) {
     );
 }
 
-function matchesPayload(record: ApiKeyRecord, payload: AuthSession) {
+function matchesPayload(record: ApiKeyRecord, payload: ApiKeyPayload) {
     return (
         record.key === payload.keyId &&
         record.user_id === payload.userId &&
@@ -229,6 +250,7 @@ function buildAuthSessionFromRecord(
     return {
         userId: record.user_id,
         keyId: record.key,
+        revokeId: record.revoke_id,
         issuer: record.issuer,
         apiKey,
         maskedApiKey: maskApiKey(apiKey),
@@ -318,9 +340,11 @@ export function createApiKey(
     const scopes =
         options.scopes ?? useConfig().api.permissions.issuedKeyDefaultScopes;
     const keyId = createKeyId();
+    const revokeId = createRevokeId();
     const apiKey = buildApiKeySession(
         userId,
         keyId,
+        revokeId,
         scopes,
         issuer,
         options.activeFrom,
@@ -330,6 +354,7 @@ export function createApiKey(
         authStatements.run(
             'insertApiKey',
             apiKey.keyId,
+            apiKey.revokeId,
             userId,
             apiKey.issuer,
             apiKey.activeFrom,
@@ -342,6 +367,7 @@ export function createApiKey(
     insert();
     apiKeyRecordCache.set(apiKey.keyId, {
         key: apiKey.keyId,
+        revoke_id: apiKey.revokeId,
         user_id: userId,
         issuer: apiKey.issuer,
         active_from: apiKey.activeFrom,
@@ -363,12 +389,14 @@ export function createUserWithApiKey(
     const salt = createSalt();
     const passwordHash = createPasswordHash(password, salt);
     const keyId = createKeyId();
+    const revokeId = createRevokeId();
     const issuer = options.issuer ?? 'webapp';
     const scopes =
         options.scopes ?? useConfig().api.permissions.issuedKeyDefaultScopes;
     const apiKey = buildApiKeySession(
         username,
         keyId,
+        revokeId,
         scopes,
         issuer,
         options.activeFrom,
@@ -386,6 +414,7 @@ export function createUserWithApiKey(
         authStatements.run(
             'insertApiKey',
             apiKey.keyId,
+            apiKey.revokeId,
             username,
             apiKey.issuer,
             apiKey.activeFrom,
@@ -405,6 +434,7 @@ export function createUserWithApiKey(
     });
     apiKeyRecordCache.set(apiKey.keyId, {
         key: apiKey.keyId,
+        revoke_id: apiKey.revokeId,
         user_id: username,
         issuer: apiKey.issuer,
         active_from: apiKey.activeFrom,
@@ -450,6 +480,22 @@ export function revokeApiKeyByUser(keyId: string, userId: string) {
     return result.changes > 0;
 }
 
+export function revokeApiKeyByRevokeIdAndUser(revokeId: string, userId: string) {
+    const now = getNowSeconds();
+    const result = authStatements.run(
+        'revokeApiKeyByRevokeId',
+        now,
+        revokeId,
+        userId
+    );
+
+    if (result.changes > 0) {
+        apiKeyRecordCache.clear();
+    }
+
+    return result.changes > 0;
+}
+
 export function deleteRevokedApiKeysBefore(cutoffTimestamp: number) {
     const result = authStatements.run(
         'deleteRevokedApiKeysBefore',
@@ -479,11 +525,10 @@ export function getValidApiKey(apiKey: string) {
         return undefined;
     }
 
-    const hydratedPayload: AuthSession = {
+    const hydratedPayload: ApiKeyPayload = {
         userId: payload.sub,
         keyId: payload.kid,
         issuer: payload.issuer,
-        maskedApiKey: maskApiKey(apiKey),
         scopes: payload.scopes,
         activeFrom: payload.nbf,
         expiresAt: payload.exp,

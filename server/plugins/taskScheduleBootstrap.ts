@@ -3,6 +3,8 @@ import useConfig from '~/server/config';
 import { ensureEmuDatabaseSchema } from '~/server/libs/database/emu';
 import { ensureTaskDatabaseSchema } from '~/server/libs/database/task';
 import { estimateIdleTaskDurationMs } from '~/server/services/idleTaskEstimator';
+import { listDailyRecordsAll } from '~/server/services/emuRoutesStore';
+import { rehydrateProbeRuntimeState } from '~/server/services/probeRuntimeState';
 import {
     removePendingTasksByExecutor,
     reconcileSingletonPendingTask,
@@ -29,20 +31,30 @@ import {
     CLEANUP_REVOKED_API_KEYS_TASK_EXECUTOR,
     registerCleanupRevokedApiKeysTaskExecutor
 } from '~/server/services/taskExecutors/cleanupRevokedApiKeysTaskExecutor';
+import {
+    EXPORT_DAILY_RECORDS_TASK_EXECUTOR,
+    registerExportDailyRecordsTaskExecutor
+} from '~/server/services/taskExecutors/exportDailyRecordsTaskExecutor';
 import { registerDetectCoupledEmuGroupTaskExecutor } from '~/server/services/taskExecutors/detectCoupledEmuGroupTaskExecutor';
 import {
     REFRESH_ASSET_TASK_DEFINITIONS,
     registerRefreshAssetFileTaskExecutors
 } from '~/server/services/taskExecutors/refreshAssetFileTaskExecutor';
+import { getTodayScheduleProbeGroups } from '~/server/services/todayScheduleCache';
+import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
-import { getNextExecutionTimeInShanghaiSeconds } from '~/server/utils/date/shanghaiDateTime';
+import {
+    getNextExecutionTimeInShanghaiSeconds,
+    getShanghaiDayStartUnixSeconds
+} from '~/server/utils/date/shanghaiDateTime';
 
 const logger = getLogger('task-schedule-bootstrap');
 const STARTUP_EXECUTORS = [
     BUILD_SCHEDULE_TASK_EXECUTOR,
     GENERATE_ROUTE_REFRESH_TASKS_EXECUTOR,
     CLEAR_DAILY_PROBE_STATUS_TASK_EXECUTOR,
-    CLEANUP_REVOKED_API_KEYS_TASK_EXECUTOR
+    CLEANUP_REVOKED_API_KEYS_TASK_EXECUTOR,
+    EXPORT_DAILY_RECORDS_TASK_EXECUTOR
 ] as const;
 
 function reconcileStartupTask(
@@ -89,6 +101,44 @@ function reconcileRefreshAssetTasks(): string[] {
     return taskSummaries;
 }
 
+function rehydrateProbeRuntimeCache(): void {
+    const config = useConfig();
+    const currentDate = getCurrentDateString();
+    const dayStart = getShanghaiDayStartUnixSeconds(currentDate);
+    const nextDayStart = dayStart + 24 * 60 * 60;
+    const rows = listDailyRecordsAll(dayStart, nextDayStart - 1);
+    const scheduleGroupsByTrainCode = new Map<
+        string,
+        { trainKey: string; trainInternalCode: string }
+    >();
+
+    for (const group of getTodayScheduleProbeGroups().values()) {
+        for (const trainCode of new Set([group.trainCode, ...group.allCodes])) {
+            scheduleGroupsByTrainCode.set(trainCode, {
+                trainKey: group.trainKey,
+                trainInternalCode: group.trainInternalCode
+            });
+        }
+    }
+
+    const summary = rehydrateProbeRuntimeState({
+        rows: rows.map((row) => ({
+            trainCode: row.train_code,
+            emuCode: row.emu_code,
+            startAt: row.start_at,
+            endAt: row.end_at
+        })),
+        nowSeconds: getNowSeconds(),
+        graceSeconds: config.spider.scheduleProbe.coupling.runningGraceSeconds,
+        resolveGroupByTrainCode: (trainCode) =>
+            scheduleGroupsByTrainCode.get(trainCode) ?? null
+    });
+
+    logger.info(
+        `rehydrate_probe_runtime done routeRows=${summary.routeRows} restoredRunningEmuCodes=${summary.restoredRunningEmuCodes} restoredTrainKeys=${summary.restoredTrainKeys} expiredRows=${summary.expiredRows} fallbackKeys=${summary.fallbackKeys}`
+    );
+}
+
 export default defineNitroPlugin(async () => {
     try {
         ensureTaskDatabaseSchema();
@@ -111,8 +161,19 @@ export default defineNitroPlugin(async () => {
         registerProbeTrainDepartureTaskExecutor();
         registerClearDailyProbeStatusTaskExecutor();
         registerCleanupRevokedApiKeysTaskExecutor();
+        registerExportDailyRecordsTaskExecutor();
         registerDetectCoupledEmuGroupTaskExecutor();
         registerRefreshAssetFileTaskExecutors();
+
+        try {
+            rehydrateProbeRuntimeCache();
+        } catch (error) {
+            const message =
+                error instanceof Error
+                    ? `${error.name}: ${error.message}`
+                    : String(error);
+            logger.warn(`rehydrate_probe_runtime_failed error=${message}`);
+        }
 
         const disabledStartupExecutors = new Set<string>(
             useConfig().task.startup.disabledExecutors
@@ -133,6 +194,16 @@ export default defineNitroPlugin(async () => {
             );
             enqueuedStartupTasks.push(
                 `${BUILD_SCHEDULE_TASK_EXECUTOR}:${buildTaskId}`
+            );
+        }
+
+        if (!disabledStartupExecutors.has(EXPORT_DAILY_RECORDS_TASK_EXECUTOR)) {
+            const exportTaskId = reconcileStartupTask(
+                EXPORT_DAILY_RECORDS_TASK_EXECUTOR,
+                executionTime
+            );
+            enqueuedStartupTasks.push(
+                `${EXPORT_DAILY_RECORDS_TASK_EXECUTOR}:${exportTaskId}`
             );
         }
 

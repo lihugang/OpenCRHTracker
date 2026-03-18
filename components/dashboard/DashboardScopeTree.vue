@@ -1,21 +1,20 @@
-<template>
+﻿<template>
     <div class="space-y-4">
         <div class="flex flex-wrap items-center gap-2">
             <button
                 type="button"
                 class="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
                 @click="selectAll">
-                Select all
+                全选
             </button>
             <button
                 type="button"
                 class="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
                 @click="clearAll">
-                Clear
+                清空
             </button>
             <p class="text-xs text-slate-500">
-                Selected {{ modelValue.length }} / {{ scopes.length }} leaf
-                scope(s)
+                已选择 {{ modelValue.length }} / {{ scopes.length }} 个叶子权限
             </p>
         </div>
 

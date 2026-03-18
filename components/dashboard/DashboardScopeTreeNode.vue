@@ -1,4 +1,4 @@
-<template>
+﻿<template>
     <div class="space-y-2">
         <label
             :class="[
@@ -22,7 +22,7 @@
                     class="block text-xs uppercase tracking-[0.16em] text-slate-400">
                     {{
                         node.fullScope ??
-                        `${node.leafScopes.length} Permissions`
+                        `${node.leafScopes.length} 项权限`
                     }}
                 </span>
             </span>

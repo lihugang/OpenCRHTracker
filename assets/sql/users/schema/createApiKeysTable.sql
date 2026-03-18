@@ -1,5 +1,6 @@
 CREATE TABLE IF NOT EXISTS api_keys (
     key TEXT PRIMARY KEY,
+    revoke_id TEXT NOT NULL UNIQUE,
     user_id TEXT NOT NULL,
     issuer TEXT NOT NULL,
     active_from INTEGER NOT NULL,

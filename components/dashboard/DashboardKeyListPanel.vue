@@ -1,20 +1,18 @@
 <template>
-    <UiCard class="min-h-[32rem]">
+    <UiCard
+        :show-accent-bar="false"
+        class="min-h-[32rem]">
         <div class="space-y-6">
             <div
                 class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                 <div class="space-y-2">
                     <p
                         class="text-xs font-semibold uppercase tracking-[0.28em] text-crh-blue/80">
-                        API Keys
+                        API KEYS
                     </p>
                     <h2 class="text-2xl font-semibold text-slate-900">
-                        Issued credentials
+                        密钥列表
                     </h2>
-                    <p class="text-sm leading-6 text-slate-600">
-                        All `webapp` and `api` keys for the current account are
-                        listed here.
-                    </p>
                 </div>
 
                 <UiButton
@@ -22,7 +20,7 @@
                     variant="secondary"
                     :disabled="isLoading"
                     @click="emit('refresh')">
-                    Refresh
+                    刷新
                 </UiButton>
             </div>
 
@@ -46,23 +44,23 @@
 
             <UiEmptyState
                 v-else-if="errorMessage"
-                eyebrow="Load Failed"
-                title="Failed to load API key list"
+                eyebrow="加载失败"
+                title="API 密钥列表加载失败"
                 :description="errorMessage"
                 tone="danger">
                 <UiButton
                     type="button"
                     variant="secondary"
                     @click="emit('refresh')">
-                    Retry
+                    重试
                 </UiButton>
             </UiEmptyState>
 
             <UiEmptyState
                 v-else-if="groups.length === 0"
-                eyebrow="Empty"
-                title="No API keys found"
-                description="WebApp session keys and manually issued API keys will appear here." />
+                eyebrow="空状态"
+                title="暂无 API 密钥"
+                description="网页端会话密钥和手动签发的 API 密钥会显示在这里。" />
 
             <div
                 v-else
@@ -81,14 +79,14 @@
                             </h3>
                         </div>
                         <p class="text-sm text-slate-500">
-                            {{ group.items.length }} item(s)
+                            {{ group.items.length }} 项
                         </p>
                     </div>
 
                     <div class="grid gap-3">
                         <div
                             v-for="item in group.items"
-                            :key="item.keyId"
+                            :key="item.revokeId"
                             class="rounded-[1.15rem] border border-slate-200 bg-white/85 px-5 py-4 shadow-[0_16px_32px_-26px_rgba(15,23,42,0.28)]">
                             <div
                                 class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -100,16 +98,16 @@
                                             {{ getStatusLabel(item) }}
                                         </span>
                                         <span
-                                            v-if="currentKeyId === item.keyId"
-                                            class="inline-flex items-center rounded-full bg-slate-900 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-white">
-                                            Current session
+                                            v-if="item.isCurrent"
+                                            class="inline-flex shrink-0 whitespace-nowrap items-center rounded-full bg-slate-900 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-white">
+                                            当前会话
                                         </span>
                                     </div>
 
                                     <div class="space-y-1.5">
                                         <p
                                             class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
-                                            Key ID
+                                            密钥标识
                                         </p>
                                         <p
                                             class="font-mono text-sm font-semibold text-crh-blue">
@@ -122,18 +120,18 @@
                                         <div class="space-y-1">
                                             <dt
                                                 class="text-xs uppercase tracking-[0.18em] text-slate-400">
-                                                Active from
+                                                生效时间
                                             </dt>
-                                            <dd class="font-medium text-slate-900">
+                                            <dd class="text-base font-semibold text-slate-900">
                                                 {{ formatTimestamp(item.activeFrom) }}
                                             </dd>
                                         </div>
                                         <div class="space-y-1">
                                             <dt
                                                 class="text-xs uppercase tracking-[0.18em] text-slate-400">
-                                                Expires at
+                                                失效时间
                                             </dt>
-                                            <dd class="font-medium text-slate-900">
+                                            <dd class="text-base font-semibold text-slate-900">
                                                 {{ formatTimestamp(item.expiresAt) }}
                                             </dd>
                                         </div>
@@ -142,36 +140,21 @@
                                             class="space-y-1">
                                             <dt
                                                 class="text-xs uppercase tracking-[0.18em] text-slate-400">
-                                                Revoked at
+                                                吊销时间
                                             </dt>
-                                            <dd class="font-medium text-slate-900">
+                                            <dd class="text-base font-semibold text-slate-900">
                                                 {{ formatTimestamp(item.revokedAt) }}
-                                            </dd>
-                                        </div>
-                                        <div class="space-y-1">
-                                            <dt
-                                                class="text-xs uppercase tracking-[0.18em] text-slate-400">
-                                                Scope count
-                                            </dt>
-                                            <dd class="font-medium text-slate-900">
-                                                {{ item.scopes.length }}
                                             </dd>
                                         </div>
                                     </dl>
 
-                                    <div class="space-y-2">
+                                    <div class="space-y-3">
                                         <p
                                             class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
-                                            Scopes
+                                            权限
                                         </p>
-                                        <div class="flex flex-wrap gap-2">
-                                            <span
-                                                v-for="scope in item.scopes"
-                                                :key="`${item.keyId}:${scope}`"
-                                                class="inline-flex items-center rounded-full bg-blue-600/8 px-2.5 py-1 text-[11px] font-semibold text-blue-700">
-                                                {{ scope }}
-                                            </span>
-                                        </div>
+                                        <DashboardScopeDisclosure
+                                            :scopes="item.scopes" />
                                     </div>
                                 </div>
 
@@ -179,12 +162,13 @@
                                     <UiButton
                                         type="button"
                                         variant="secondary"
+                                        class="border-rose-200 bg-white text-rose-700 hover:border-rose-300 hover:bg-rose-50 hover:text-rose-800"
                                         :disabled="
                                             !canRevoke ||
                                             item.revokedAt !== null
                                         "
                                         @click="emit('revoke', item)">
-                                        Revoke
+                                        吊销
                                     </UiButton>
                                 </div>
                             </div>
@@ -210,7 +194,6 @@ defineProps<{
     isLoading: boolean;
     errorMessage: string;
     canRevoke: boolean;
-    currentKeyId: string | null;
     formatTimestamp: (timestamp: number) => string;
     getIssuerLabel: (issuer: AuthApiKeyIssuer) => string;
     getIssuerSectionTitle: (issuer: AuthApiKeyIssuer) => string;

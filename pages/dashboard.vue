@@ -1,5 +1,6 @@
-<template>
-    <main class="flex min-h-screen flex-col bg-crh-slate text-crh-grey-dark">
+﻿<template>
+    <main
+        class="flex min-h-screen flex-col bg-[linear-gradient(180deg,#f8fafc_0%,#f3f8ff_100%)] text-crh-grey-dark">
         <div
             class="pointer-events-none absolute inset-x-0 top-0 h-[24rem] bg-[radial-gradient(circle_at_top,_rgba(0,82,155,0.14),_transparent_58%)]" />
         <div
@@ -7,43 +8,264 @@
 
         <div
             class="relative mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
-            <div
-                class="grid gap-6 lg:grid-cols-[minmax(18rem,24rem)_minmax(0,1fr)]">
-                <DashboardAccountCard
-                    :session="session"
-                    :is-logging-out="isLoggingOut"
-                    :logout-error-message="logoutErrorMessage"
-                    :max-lifetime-seconds="maxLifetimeSeconds"
-                    :creatable-scope-count="creatableScopes.length"
-                    :can-issue-api-keys="canIssueApiKeys"
-                    :format-timestamp="formatTimestamp"
-                    :format-duration="formatDuration"
-                    :get-issuer-label="getIssuerLabel"
-                    :get-issuer-badge-class="getIssuerBadgeClass"
-                    @logout="logout"
-                    @open-issue="openIssueModal" />
+            <div class="grid gap-6 lg:grid-cols-[15rem_minmax(0,1fr)]">
+                <aside class="hidden lg:block">
+                    <UiCard
+                        :show-accent-bar="false"
+                        class="sticky top-24">
+                        <div class="space-y-5">
+                            <div
+                                class="flex items-center justify-between gap-3">
+                                <UiButton
+                                    type="button"
+                                    variant="secondary"
+                                    size="sm"
+                                    @click="goHome">
+                                    <svg
+                                        aria-hidden="true"
+                                        viewBox="0 0 20 20"
+                                        fill="none"
+                                        class="h-4 w-4">
+                                        <path
+                                            d="M11.5 5.5L7 10L11.5 14.5"
+                                            stroke="currentColor"
+                                            stroke-width="1.8"
+                                            stroke-linecap="round"
+                                            stroke-linejoin="round" />
+                                    </svg>
+                                    {{ dashboardPageCopy.backHomeLabel }}
+                                </UiButton>
+                            </div>
 
-                <DashboardKeyListPanel
-                    :groups="issuerGroups"
-                    :is-loading="isApiKeysLoading"
-                    :error-message="apiKeysErrorMessage"
-                    :can-revoke="canRevokeApiKeys"
-                    :current-key-id="session?.keyId ?? null"
-                    :format-timestamp="formatTimestamp"
-                    :get-issuer-label="getIssuerLabel"
-                    :get-issuer-section-title="getIssuerSectionTitle"
-                    :get-issuer-badge-class="getIssuerBadgeClass"
-                    :get-status-label="getStatusLabel"
-                    :get-status-badge-class="getStatusBadgeClass"
-                    @refresh="refreshApiKeys()"
-                    @revoke="openRevokeModal" />
+                            <div class="space-y-2">
+                                <p
+                                    class="text-xs font-semibold uppercase tracking-[0.28em] text-crh-blue/80">
+                                    {{ dashboardPageCopy.eyebrow }}
+                                </p>
+                                <h1
+                                    class="text-2xl font-semibold text-slate-900">
+                                    {{ dashboardPageCopy.navTitle }}
+                                </h1>
+                            </div>
+
+                            <div class="motion-divider" />
+
+                            <nav class="space-y-1.5">
+                                <button
+                                    v-for="panel in dashboardPanels"
+                                    :key="panel.id"
+                                    type="button"
+                                    :class="getPanelButtonClass(panel.id)"
+                                    @click="setPanel(panel.id)">
+                                    <span class="flex items-center gap-3">
+                                        <span
+                                            aria-hidden="true"
+                                            class="h-5 w-1 rounded-full transition"
+                                            :class="
+                                                panel.id === currentPanelId
+                                                    ? 'bg-crh-blue'
+                                                    : 'bg-slate-300/80 group-hover:bg-slate-400/90'
+                                            " />
+                                        <span
+                                            class="text-left text-sm font-semibold">
+                                            {{ panel.label }}
+                                        </span>
+                                    </span>
+                                </button>
+                            </nav>
+                        </div>
+                    </UiCard>
+                </aside>
+
+                <div class="space-y-6">
+                    <UiCard
+                        :show-accent-bar="false"
+                        class="lg:hidden">
+                        <div class="space-y-4">
+                            <div
+                                class="flex items-center justify-between gap-3">
+                                <UiButton
+                                    type="button"
+                                    variant="secondary"
+                                    size="sm"
+                                    @click="goHome">
+                                    <svg
+                                        aria-hidden="true"
+                                        viewBox="0 0 20 20"
+                                        fill="none"
+                                        class="h-4 w-4">
+                                        <path
+                                            d="M11.5 5.5L7 10L11.5 14.5"
+                                            stroke="currentColor"
+                                            stroke-width="1.8"
+                                            stroke-linecap="round"
+                                            stroke-linejoin="round" />
+                                    </svg>
+                                    {{ dashboardPageCopy.backHomeLabel }}
+                                </UiButton>
+                            </div>
+
+                            <div class="space-y-2">
+                                <p
+                                    class="text-xs font-semibold uppercase tracking-[0.28em] text-crh-blue/80">
+                                    {{ dashboardPageCopy.eyebrow }}
+                                </p>
+                                <h1
+                                    class="text-2xl font-semibold text-slate-900">
+                                    {{ dashboardPageCopy.navTitle }}
+                                </h1>
+                            </div>
+
+                            <button
+                                type="button"
+                                class="harmony-input flex w-full items-center justify-between gap-4 px-4 py-3 text-left focus-visible:outline-none"
+                                :aria-label="
+                                    dashboardPageCopy.currentPanelLabel
+                                "
+                                aria-haspopup="dialog"
+                                :aria-expanded="
+                                    isPanelSheetOpen ? 'true' : 'false'
+                                "
+                                @click="openPanelSheet">
+                                <span
+                                    class="block min-w-0 text-sm font-semibold text-slate-900">
+                                    {{ currentPanelDefinition.label }}
+                                </span>
+                                <span
+                                    class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white/90 text-crh-blue transition"
+                                    :class="
+                                        isPanelSheetOpen
+                                            ? 'border-crh-blue/25 bg-blue-50/80'
+                                            : ''
+                                    ">
+                                    <svg
+                                        aria-hidden="true"
+                                        viewBox="0 0 20 20"
+                                        fill="none"
+                                        class="h-4 w-4 transition-transform duration-200 ease-out"
+                                        :class="
+                                            isPanelSheetOpen ? 'rotate-180' : ''
+                                        ">
+                                        <path
+                                            d="M5 7.5L10 12.5L15 7.5"
+                                            stroke="currentColor"
+                                            stroke-width="1.8"
+                                            stroke-linecap="round"
+                                            stroke-linejoin="round" />
+                                    </svg>
+                                </span>
+                            </button>
+                        </div>
+                    </UiCard>
+
+                    <div class="hidden px-1 lg:block">
+                        <h2
+                            class="text-3xl font-semibold tracking-tight text-slate-900">
+                            {{ currentPanelDefinition.headerTitle }}
+                        </h2>
+                    </div>
+
+                    <Transition
+                        mode="out-in"
+                        enter-active-class="transition duration-200 ease-out"
+                        enter-from-class="translate-y-2 opacity-0"
+                        leave-active-class="transition duration-180 ease-out"
+                        leave-to-class="-translate-y-1 opacity-0">
+                        <div
+                            v-if="currentPanelId === 'general'"
+                            key="general"
+                            class="max-w-3xl">
+                            <DashboardGeneralCard
+                                :session="session"
+                                :is-logging-out="isLoggingOut"
+                                :logout-error-message="logoutErrorMessage"
+                                @logout="logout" />
+                        </div>
+
+                        <div
+                            v-else
+                            key="developer"
+                            class="grid gap-6 xl:grid-cols-[minmax(18rem,24rem)_minmax(0,1fr)]">
+                            <DashboardDeveloperOverview
+                                :session="session"
+                                :current-masked-key-id="currentMaskedKeyId"
+                                :max-lifetime-seconds="maxLifetimeSeconds"
+                                :creatable-scope-count="creatableScopes.length"
+                                :can-issue-api-keys="canIssueApiKeys"
+                                :format-timestamp="formatTimestamp"
+                                :format-duration="formatDuration"
+                                :get-issuer-label="getIssuerLabel"
+                                :get-issuer-badge-class="getIssuerBadgeClass"
+                                @open-issue="openIssueModal" />
+
+                            <DashboardKeyListPanel
+                                :groups="issuerGroups"
+                                :is-loading="isApiKeysLoading"
+                                :error-message="apiKeysErrorMessage"
+                                :can-revoke="canRevokeApiKeys"
+                                :format-timestamp="formatTimestamp"
+                                :get-issuer-label="getIssuerLabel"
+                                :get-issuer-section-title="
+                                    getIssuerSectionTitle
+                                "
+                                :get-issuer-badge-class="getIssuerBadgeClass"
+                                :get-status-label="getStatusLabel"
+                                :get-status-badge-class="getStatusBadgeClass"
+                                @refresh="refreshApiKeys()"
+                                @revoke="openRevokeModal" />
+                        </div>
+                    </Transition>
+                </div>
             </div>
         </div>
 
+        <UiBottomSheet
+            :model-value="isPanelSheetOpen"
+            :eyebrow="dashboardPageCopy.panelSheetEyebrow"
+            :title="dashboardPageCopy.panelSheetTitle"
+            @update:model-value="handlePanelSheetVisibilityChange">
+            <div class="space-y-3">
+                <button
+                    v-for="panel in dashboardPanels"
+                    :key="`sheet:${panel.id}`"
+                    type="button"
+                    :class="getPanelSheetOptionClass(panel.id)"
+                    :aria-pressed="
+                        panel.id === currentPanelId ? 'true' : 'false'
+                    "
+                    @click="selectPanel(panel.id)">
+                    <span class="text-left text-sm font-semibold">
+                        {{ panel.label }}
+                    </span>
+                    <span
+                        class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-[11px] font-semibold transition"
+                        :class="
+                            panel.id === currentPanelId
+                                ? 'border-crh-blue/25 bg-blue-50 text-crh-blue'
+                                : 'border-slate-200 bg-white text-transparent'
+                        ">
+                        <svg
+                            v-if="panel.id === currentPanelId"
+                            aria-hidden="true"
+                            viewBox="0 0 20 20"
+                            fill="none"
+                            class="h-4 w-4">
+                            <path
+                                d="M5 10.5L8.5 14L15 7.5"
+                                stroke="currentColor"
+                                stroke-width="1.8"
+                                stroke-linecap="round"
+                                stroke-linejoin="round" />
+                        </svg>
+                        <span v-else>·</span>
+                    </span>
+                </button>
+            </div>
+        </UiBottomSheet>
+
         <UiModal
             :model-value="revokeTarget !== null"
-            title="Revoke API Key"
-            description="This action invalidates the selected key immediately."
+            title="吊销 API 密钥"
             :close-on-backdrop="!isRevoking"
             @update:model-value="handleRevokeModalVisibilityChange">
             <div
@@ -57,21 +279,19 @@
                             {{ getIssuerLabel(revokeTarget.issuer) }}
                         </span>
                         <span
-                            v-if="session?.keyId === revokeTarget.keyId"
-                            class="inline-flex items-center rounded-full bg-slate-900 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-white">
-                            Current session
+                            v-if="session?.revokeId === revokeTarget.revokeId"
+                            class="inline-flex shrink-0 whitespace-nowrap items-center rounded-full bg-slate-900 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-white">
+                            当前会话
                         </span>
                     </div>
                     <p
                         class="mt-3 font-mono text-sm font-semibold text-crh-blue">
                         {{ revokeTarget.maskedKeyId }}
                     </p>
-                    <p class="mt-2 text-sm leading-6 text-slate-600">
-                        {{
-                            session?.keyId === revokeTarget.keyId
-                                ? 'You are revoking the key used by the current session. You will be signed out immediately after confirmation.'
-                                : 'Confirm revocation for this key.'
-                        }}
+                    <p
+                        v-if="session?.revokeId === revokeTarget.revokeId"
+                        class="mt-2 text-sm leading-6 text-slate-600">
+                        将吊销当前会话密钥，确认后会退出登录。
                     </p>
                 </div>
 
@@ -88,19 +308,20 @@
             </div>
 
             <template #footer>
-                <div class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                <div
+                    class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
                     <UiButton
                         type="button"
                         variant="secondary"
                         :disabled="isRevoking"
                         @click="closeRevokeModal">
-                        Cancel
+                        取消
                     </UiButton>
                     <UiButton
                         type="button"
                         :loading="isRevoking"
                         @click="confirmRevoke">
-                        Confirm revoke
+                        确认吊销
                     </UiButton>
                 </div>
             </template>
@@ -108,12 +329,8 @@
 
         <UiModal
             :model-value="isIssueModalOpen"
-            title="Issue API Key"
-            :description="
-                issuedKeyResult
-                    ? 'Copy the secret now. It will only be shown once.'
-                    : 'Choose the active window and leaf scopes for the new API key.'
-            "
+            eyebrow="OPERATION"
+            title="签发 API 密钥"
             size="lg"
             :close-on-backdrop="!isIssuing"
             @update:model-value="handleIssueModalVisibilityChange">
@@ -124,47 +341,50 @@
                     class="rounded-[1rem] border border-emerald-200/80 bg-emerald-50/80 px-4 py-4">
                     <p
                         class="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700">
-                        One-Time Secret
+                        一次性明文
                     </p>
                     <p
                         class="mt-3 break-all font-mono text-sm font-semibold text-emerald-800">
                         {{ issuedKeyResult.apiKey }}
                     </p>
                     <p class="mt-2 text-sm leading-6 text-emerald-700/90">
-                        After this dialog closes, only the masked key ID will
-                        remain visible in the list.
+                        此秘钥只会显示一次，请及时复制并保存。
                     </p>
                 </div>
 
                 <div
                     class="grid gap-4 rounded-[1rem] border border-slate-200 bg-slate-50/80 px-4 py-4 sm:grid-cols-2">
                     <div class="space-y-1">
-                        <p class="text-xs uppercase tracking-[0.18em] text-slate-400">
-                            Type
+                        <p
+                            class="text-xs uppercase tracking-[0.18em] text-slate-400">
+                            类型
                         </p>
                         <p class="font-medium text-slate-900">
                             {{ getIssuerLabel(issuedKeyResult.issuer) }}
                         </p>
                     </div>
                     <div class="space-y-1">
-                        <p class="text-xs uppercase tracking-[0.18em] text-slate-400">
-                            Active from
+                        <p
+                            class="text-xs uppercase tracking-[0.18em] text-slate-400">
+                            生效时间
                         </p>
                         <p class="font-medium text-slate-900">
                             {{ formatTimestamp(issuedKeyResult.activeFrom) }}
                         </p>
                     </div>
                     <div class="space-y-1">
-                        <p class="text-xs uppercase tracking-[0.18em] text-slate-400">
-                            Expires at
+                        <p
+                            class="text-xs uppercase tracking-[0.18em] text-slate-400">
+                            失效时间
                         </p>
                         <p class="font-medium text-slate-900">
                             {{ formatTimestamp(issuedKeyResult.expiresAt) }}
                         </p>
                     </div>
                     <div class="space-y-1">
-                        <p class="text-xs uppercase tracking-[0.18em] text-slate-400">
-                            Scope count
+                        <p
+                            class="text-xs uppercase tracking-[0.18em] text-slate-400">
+                            权限数量
                         </p>
                         <p class="font-medium text-slate-900">
                             {{ issuedKeyResult.scopes.length }}
@@ -173,8 +393,9 @@
                 </div>
 
                 <div class="space-y-2">
-                    <p class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
-                        Scopes
+                    <p
+                        class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                        权限
                     </p>
                     <div class="flex flex-wrap gap-2">
                         <span
@@ -205,7 +426,7 @@
                         <label
                             for="issue-active-from"
                             class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
-                            Active from
+                            生效时间
                         </label>
                         <input
                             id="issue-active-from"
@@ -218,7 +439,7 @@
                         <label
                             for="issue-expires-at"
                             class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
-                            Expires at
+                            失效时间
                         </label>
                         <input
                             id="issue-expires-at"
@@ -231,13 +452,13 @@
 
                 <div
                     class="rounded-[1rem] border border-dashed border-slate-200 bg-slate-50/80 px-4 py-4 text-sm leading-6 text-slate-600">
-                    Maximum allowed lifetime:
+                    最长存活时间：
                     <span class="font-semibold text-slate-900">
                         {{ formatDuration(maxLifetimeSeconds) }}
                     </span>
                     <template v-if="issueActiveFromTimestamp !== null">
-                        <br>
-                        Latest allowed expiry for this start time:
+                        <br />
+                        最晚失效时间：
                         <span class="font-semibold text-slate-900">
                             {{ formatTimestamp(issueMaxExpiresAtTimestamp) }}
                         </span>
@@ -246,16 +467,14 @@
 
                 <div class="space-y-3">
                     <div class="space-y-1">
-                        <p class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
-                            Scope tree
-                        </p>
-                        <p class="text-sm leading-6 text-slate-600">
-                            Parent nodes toggle all child scopes. Only leaf
-                            scopes are submitted.
+                        <p
+                            class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                            权限树
                         </p>
                     </div>
 
-                    <div class="rounded-[1.1rem] border border-slate-200 bg-slate-50/70 px-4 py-4">
+                    <div
+                        class="rounded-[1.1rem] border border-slate-200 bg-slate-50/70 px-4 py-4">
                         <DashboardScopeTree
                             v-model="issueForm.scopes"
                             :scopes="creatableScopes"
@@ -283,12 +502,12 @@
                         type="button"
                         variant="secondary"
                         @click="closeIssueModal">
-                        Close
+                        关闭
                     </UiButton>
                     <UiButton
                         type="button"
                         @click="copyIssuedKey">
-                        Copy API Key
+                        复制 API 密钥
                     </UiButton>
                 </div>
 
@@ -300,13 +519,14 @@
                         variant="secondary"
                         :disabled="isIssuing"
                         @click="closeIssueModal">
-                        Cancel
+                        取消
                     </UiButton>
                     <UiButton
                         type="button"
                         :loading="isIssuing"
+                        :disabled="issueForm.scopes.length === 0"
                         @click="issueApiKey">
-                        Issue key
+                        签发密钥
                     </UiButton>
                 </div>
             </template>
@@ -317,7 +537,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
+import {
+    computed,
+    onBeforeUnmount,
+    onMounted,
+    reactive,
+    ref,
+    watch
+} from 'vue';
 import type {
     AuthApiKeyIssuer,
     AuthApiKeyListItem,
@@ -336,39 +563,69 @@ const ISSUE_SCOPE = 'api.auth.api-keys.create';
 const REVOKE_SCOPE = 'api.auth.api-keys.revoke';
 const DEFAULT_ISSUE_LIFETIME_SECONDS = 30 * 24 * 60 * 60;
 
+const dashboardPageCopy = {
+    eyebrow: 'SETTINGS',
+    navTitle: '设置',
+    backHomeLabel: '返回主页',
+    currentPanelLabel: '当前面板',
+    panelSheetEyebrow: 'SWITCH',
+    panelSheetTitle: '切换选项卡',
+    pageTitle: 'OpenCRHTracker | 设置',
+    pageDescription: '管理会话和 API 密钥。'
+} as const;
+
+const dashboardPanels = [
+    {
+        id: 'general',
+        label: '常规',
+        headerTitle: '常规',
+        title: '账户与基础操作',
+        description: '查看账户和登录状态。'
+    },
+    {
+        id: 'developer',
+        label: '开发',
+        headerTitle: '开发',
+        title: '会话与 API 密钥',
+        description: '查看会话和 API 密钥。'
+    }
+] as const;
+
+type DashboardPanelId = (typeof dashboardPanels)[number]['id'];
+
 const scopeLabelMap: Record<string, string> = {
     api: 'API',
-    auth: 'Auth',
-    me: 'Session',
-    logout: 'Logout',
-    search: 'Search',
-    read: 'Read',
-    records: 'Records',
-    daily: 'Daily',
-    history: 'History',
-    train: 'Train',
-    emu: 'EMU',
-    exports: 'Exports',
-    'api.auth': 'Auth',
-    'api.auth.me': 'Current session',
-    'api.auth.api-keys': 'API keys',
-    'api.auth.api-keys.read': 'Read keys',
-    'api.auth.api-keys.create': 'Issue keys',
-    'api.auth.api-keys.revoke': 'Revoke keys',
-    'api.auth.logout': 'Logout',
-    'api.search': 'Search',
-    'api.search.read': 'Read search',
-    'api.records': 'Records',
-    'api.records.daily': 'Daily records',
-    'api.records.daily.read': 'Read daily records',
-    'api.history': 'History',
-    'api.history.train': 'Train history',
-    'api.history.train.read': 'Read train history',
-    'api.history.emu': 'EMU history',
-    'api.history.emu.read': 'Read EMU history',
-    'api.exports': 'Exports',
-    'api.exports.daily': 'Daily exports',
-    'api.exports.daily.read': 'Read daily exports'
+    auth: '鉴权',
+    me: '当前会话',
+    logout: '退出登录',
+    search: '搜索',
+    read: '读取',
+    records: '记录',
+    daily: '日报',
+    history: '历史记录',
+    train: '车次',
+    emu: '动车组',
+    exports: '导出',
+    'api.auth': '鉴权',
+    'api.auth.me': '当前会话',
+    'api.auth.api-keys': 'API 密钥',
+    'api.auth.api-keys.read': '读取密钥',
+    'api.auth.api-keys.create': '签发密钥',
+    'api.auth.api-keys.revoke': '吊销密钥',
+    'api.auth.logout': '退出登录',
+    'api.search': '搜索',
+    'api.search.read': '读取搜索',
+    'api.records': '记录',
+    'api.records.daily': '今日记录',
+    'api.records.daily.read': '读取今日记录',
+    'api.history': '历史记录',
+    'api.history.train': '车次历史记录',
+    'api.history.train.read': '读取车次历史记录',
+    'api.history.emu': '动车组历史记录',
+    'api.history.emu.read': '读取动车组历史记录',
+    'api.exports': '导出',
+    'api.exports.daily': '按日导出',
+    'api.exports.daily.read': '导出某日所有数据'
 };
 
 interface DashboardMutationOptions {
@@ -376,11 +633,14 @@ interface DashboardMutationOptions {
     body?: Record<string, unknown>;
 }
 
+const route = useRoute();
+const router = useRouter();
 const { session, clearSession } = useAuthState();
 const requestFetch = import.meta.server ? useRequestFetch() : $fetch;
 
 const logoutErrorMessage = ref('');
 const isLoggingOut = ref(false);
+const isPanelSheetOpen = ref(false);
 const revokeTarget = ref<AuthApiKeyListItem | null>(null);
 const revokeErrorMessage = ref('');
 const isRevoking = ref(false);
@@ -399,13 +659,95 @@ const issueForm = reactive({
 
 let nowTimer: number | null = null;
 
-async function fetchApiKeys() {
-    const response = await requestFetch<TrackerApiResponse<AuthApiKeyListResponse>>(
-        '/api/v1/auth/api-keys',
+function readPanelQuery(value: unknown) {
+    if (Array.isArray(value)) {
+        return typeof value[0] === 'string' ? value[0] : '';
+    }
+
+    return typeof value === 'string' ? value : '';
+}
+
+function normalizePanelId(value: string): DashboardPanelId {
+    return value === 'developer' ? 'developer' : 'general';
+}
+
+const currentPanelId = computed<DashboardPanelId>(() =>
+    normalizePanelId(readPanelQuery(route.query.panel))
+);
+
+const currentPanelDefinition = computed(() => {
+    return (
+        dashboardPanels.find((panel) => panel.id === currentPanelId.value) ??
+        dashboardPanels[0]
+    );
+});
+
+async function syncPanelQuery(panelId: DashboardPanelId) {
+    await router.replace({
+        query: {
+            ...route.query,
+            panel: panelId
+        }
+    });
+}
+
+function setPanel(panelId: DashboardPanelId) {
+    if (panelId === currentPanelId.value) {
+        return;
+    }
+
+    void syncPanelQuery(panelId);
+}
+
+async function goHome() {
+    await navigateTo('/');
+}
+
+function openPanelSheet() {
+    isPanelSheetOpen.value = true;
+}
+
+function closePanelSheet() {
+    isPanelSheetOpen.value = false;
+}
+
+function handlePanelSheetVisibilityChange(nextValue: boolean) {
+    isPanelSheetOpen.value = nextValue;
+}
+
+async function selectPanel(panelId: DashboardPanelId) {
+    closePanelSheet();
+
+    if (panelId === currentPanelId.value) {
+        return;
+    }
+
+    await syncPanelQuery(panelId);
+}
+
+if (import.meta.client) {
+    watch(
+        () => route.query.panel,
+        (value) => {
+            const rawPanel = readPanelQuery(value);
+            const normalizedPanel = normalizePanelId(rawPanel);
+
+            if (rawPanel !== normalizedPanel) {
+                void syncPanelQuery(normalizedPanel);
+            }
+        },
         {
-            retry: 0
+            immediate: true
         }
     );
+}
+
+async function fetchApiKeys() {
+    const response = await requestFetch<
+        TrackerApiResponse<AuthApiKeyListResponse>
+    >('/api/v1/auth/api-keys', {
+        retry: 0
+    });
 
     if (!response.ok) {
         throw {
@@ -424,7 +766,9 @@ const {
 } = await useAsyncData('dashboard-api-keys', fetchApiKeys);
 
 const apiKeyItems = computed(() => apiKeysData.value?.items ?? []);
-const creatableScopes = computed(() => apiKeysData.value?.creatableScopes ?? []);
+const creatableScopes = computed(
+    () => apiKeysData.value?.creatableScopes ?? []
+);
 const defaultScopes = computed(() => apiKeysData.value?.defaultScopes ?? []);
 const maxLifetimeSeconds = computed(
     () => apiKeysData.value?.maxLifetimeSeconds ?? 157680000
@@ -432,7 +776,7 @@ const maxLifetimeSeconds = computed(
 const isApiKeysLoading = computed(() => apiKeysStatus.value === 'pending');
 const apiKeysErrorMessage = computed(() =>
     apiKeysError.value
-        ? getApiErrorMessage(apiKeysError.value, 'Failed to load API key list.')
+        ? getApiErrorMessage(apiKeysError.value, '加载 API 密钥列表失败。')
         : ''
 );
 
@@ -452,6 +796,11 @@ const issuerGroups = computed(() => {
     ];
 
     return groups.filter((group) => group.items.length > 0);
+});
+
+const currentMaskedKeyId = computed(() => {
+    const currentItem = apiKeyItems.value.find((item) => item.isCurrent);
+    return currentItem?.maskedKeyId ?? '--';
 });
 
 const canIssueApiKeys = computed(() =>
@@ -482,21 +831,20 @@ const issueExpiresAtMax = computed(() =>
 const copyMessage = computed(() => {
     switch (copyState.value) {
         case 'success':
-            return 'API key copied to clipboard.';
+            return 'API 密钥已复制到剪贴板。';
         case 'error':
-            return 'Copy failed. Please copy it manually.';
+            return '复制失败，请手动复制。';
         default:
             return '';
     }
 });
 
 useHead({
-    title: 'Dashboard | OpenCRHTracker',
+    title: dashboardPageCopy.pageTitle,
     meta: [
         {
             name: 'description',
-            content:
-                'Manage the current account session and issue or revoke API keys.'
+            content: dashboardPageCopy.pageDescription
         }
     ]
 });
@@ -541,25 +889,35 @@ function hasClientScope(grantedScopes: string[], requiredScope: string) {
 
         return (
             normalizedGrantedScope === normalizedRequiredScope ||
-            normalizedRequiredScope.startsWith(
-                `${normalizedGrantedScope}.`
-            )
+            normalizedRequiredScope.startsWith(`${normalizedGrantedScope}.`)
         );
     });
 }
 
+function getPanelButtonClass(panelId: DashboardPanelId) {
+    return panelId === currentPanelId.value
+        ? 'group w-full rounded-[0.95rem] border border-crh-blue/15 bg-blue-50/70 px-3.5 py-3 text-crh-blue transition'
+        : 'group w-full rounded-[0.95rem] border border-transparent bg-transparent px-3.5 py-3 text-slate-600 transition hover:border-slate-200/80 hover:bg-white/70 hover:text-slate-900';
+}
+
+function getPanelSheetOptionClass(panelId: DashboardPanelId) {
+    return panelId === currentPanelId.value
+        ? 'flex w-full items-center justify-between gap-4 rounded-[1rem] border border-crh-blue/20 bg-blue-50/80 px-4 py-4 text-crh-blue transition'
+        : 'flex w-full items-center justify-between gap-4 rounded-[1rem] border border-slate-200 bg-white/90 px-4 py-4 text-slate-700 transition hover:border-slate-300 hover:bg-slate-50/80';
+}
+
 function getIssuerLabel(issuer: AuthApiKeyIssuer) {
-    return issuer === 'webapp' ? 'WebApp' : 'API';
+    return issuer === 'webapp' ? '网页端' : 'API';
 }
 
 function getIssuerSectionTitle(issuer: AuthApiKeyIssuer) {
-    return issuer === 'webapp' ? 'WebApp sessions' : 'API keys';
+    return issuer === 'webapp' ? '网页端会话' : 'API 密钥';
 }
 
 function getIssuerBadgeClass(issuer: AuthApiKeyIssuer) {
     return issuer === 'webapp'
-        ? 'inline-flex items-center rounded-full bg-slate-900 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-white'
-        : 'inline-flex items-center rounded-full bg-crh-blue/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-crh-blue';
+        ? 'inline-flex shrink-0 whitespace-nowrap items-center rounded-full bg-slate-900 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-white'
+        : 'inline-flex shrink-0 whitespace-nowrap items-center rounded-full bg-crh-blue/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-crh-blue';
 }
 
 function formatTimestamp(timestamp: number) {
@@ -577,20 +935,20 @@ function formatDuration(seconds: number) {
 
     const years = seconds / (365 * 24 * 60 * 60);
     if (Number.isInteger(years) && years >= 1) {
-        return `${years} year${years === 1 ? '' : 's'}`;
+        return `${years} 年`;
     }
 
     const days = seconds / (24 * 60 * 60);
     if (Number.isInteger(days) && days >= 1) {
-        return `${days} day${days === 1 ? '' : 's'}`;
+        return `${days} 天`;
     }
 
     const hours = seconds / (60 * 60);
     if (Number.isInteger(hours) && hours >= 1) {
-        return `${hours} hour${hours === 1 ? '' : 's'}`;
+        return `${hours} 小时`;
     }
 
-    return `${seconds} second${seconds === 1 ? '' : 's'}`;
+    return `${seconds} 秒`;
 }
 
 function getStatusKey(item: AuthApiKeyListItem) {
@@ -612,26 +970,26 @@ function getStatusKey(item: AuthApiKeyListItem) {
 function getStatusLabel(item: AuthApiKeyListItem) {
     switch (getStatusKey(item)) {
         case 'pending':
-            return 'Pending';
+            return '待生效';
         case 'expired':
-            return 'Expired';
+            return '已失效';
         case 'revoked':
-            return 'Revoked';
+            return '已吊销';
         default:
-            return 'Active';
+            return '生效中';
     }
 }
 
 function getStatusBadgeClass(item: AuthApiKeyListItem) {
     switch (getStatusKey(item)) {
         case 'pending':
-            return 'inline-flex items-center rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-amber-700';
+            return 'inline-flex items-center rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-amber-800';
         case 'expired':
-            return 'inline-flex items-center rounded-full bg-slate-200 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-600';
+            return 'inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-700';
         case 'revoked':
-            return 'inline-flex items-center rounded-full bg-rose-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-rose-700';
+            return 'inline-flex items-center rounded-full bg-rose-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-rose-800';
         default:
-            return 'inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-emerald-700';
+            return 'inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-emerald-800';
     }
 }
 
@@ -734,12 +1092,15 @@ async function executeMutation<TData>(
     path: string,
     options: DashboardMutationOptions
 ) {
-    const { data, error } = await useCsrfFetch<TrackerApiResponse<TData>>(path, {
-        ...options,
-        key: `dashboard:${path}:${Date.now()}`,
-        watch: false,
-        server: false
-    });
+    const { data, error } = await useCsrfFetch<TrackerApiResponse<TData>>(
+        path,
+        {
+            ...options,
+            key: `dashboard:${path}:${Date.now()}`,
+            watch: false,
+            server: false
+        }
+    );
 
     if (error.value) {
         throw error.value;
@@ -747,7 +1108,7 @@ async function executeMutation<TData>(
 
     const response = data.value;
     if (!response) {
-        throw new Error('Missing API response');
+        throw new Error('API 响应缺失');
     }
 
     if (!response.ok) {
@@ -776,7 +1137,7 @@ async function logout() {
     } catch (error) {
         logoutErrorMessage.value = getApiErrorMessage(
             error,
-            'Sign out failed. Please try again.'
+            '退出登录失败，请稍后重试。'
         );
     } finally {
         isLoggingOut.value = false;
@@ -794,11 +1155,11 @@ async function confirmRevoke() {
     const target = revokeTarget.value;
 
     try {
-        await executeMutation(`/api/v1/auth/api-keys/${target.keyId}`, {
+        await executeMutation(`/api/v1/auth/api-keys/${target.revokeId}`, {
             method: 'DELETE'
         });
 
-        if (session.value?.keyId === target.keyId) {
+        if (session.value?.revokeId === target.revokeId) {
             clearSession();
             revokeTarget.value = null;
             await navigateTo('/login');
@@ -810,7 +1171,7 @@ async function confirmRevoke() {
     } catch (error) {
         revokeErrorMessage.value = getApiErrorMessage(
             error,
-            'Revoking this API key failed. Please try again.'
+            '吊销 API 密钥失败，请稍后重试。'
         );
     } finally {
         isRevoking.value = false;
@@ -819,26 +1180,26 @@ async function confirmRevoke() {
 
 function validateIssueForm() {
     if (issueActiveFromTimestamp.value === null) {
-        return 'Please provide a valid active-from timestamp.';
+        return '请提供有效的生效时间。';
     }
 
     if (issueExpiresAtTimestamp.value === null) {
-        return 'Please provide a valid expiry timestamp.';
+        return '请提供有效的失效时间。';
     }
 
     if (issueActiveFromTimestamp.value >= issueExpiresAtTimestamp.value) {
-        return 'Expiry must be later than active-from.';
+        return '失效时间必须晚于生效时间。';
     }
 
     if (
         issueExpiresAtTimestamp.value - issueActiveFromTimestamp.value >
         maxLifetimeSeconds.value
     ) {
-        return 'The requested lifetime exceeds the configured maximum.';
+        return '请求的存活时间超过了配置上限。';
     }
 
     if (issueForm.scopes.length === 0) {
-        return 'Select at least one leaf scope.';
+        return '请至少选择一个叶子权限。';
     }
 
     return '';
@@ -875,7 +1236,7 @@ async function issueApiKey() {
     } catch (error) {
         issueErrorMessage.value = getApiErrorMessage(
             error,
-            'Issuing the API key failed. Please try again.'
+            '签发 API 密钥失败，请稍后重试。'
         );
     } finally {
         isIssuing.value = false;

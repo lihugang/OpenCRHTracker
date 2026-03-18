@@ -1,5 +1,5 @@
 import { defineEventHandler, getRouterParam } from 'h3';
-import { revokeApiKeyByUser } from '~/server/services/authStore';
+import { revokeApiKeyByRevokeIdAndUser } from '~/server/services/authStore';
 import getFixedCost from '~/server/utils/api/cost/getFixedCost';
 import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';
@@ -14,28 +14,31 @@ export default defineEventHandler(async (event) => {
             fixedCost: getFixedCost('authRevokeApiKey')
         },
         async ({ identity }) => {
-            const keyId = getRouterParam(event, 'key');
+            const revokeId = getRouterParam(event, 'revokeId');
 
             ensure(
-                typeof keyId === 'string' && keyId.length > 0,
+                typeof revokeId === 'string' && revokeId.length > 0,
                 400,
                 'invalid_param',
-                'A keyId is required'
+                'A revokeId is required'
             );
 
-            const revoked = revokeApiKeyByUser(keyId, identity.id);
+            const revoked = revokeApiKeyByRevokeIdAndUser(
+                revokeId,
+                identity.id
+            );
             if (!revoked) {
                 throw new ApiRequestError(
                     404,
                     'not_found',
-                    'No revocable key was found for this keyId'
+                    'No revocable key was found for this revokeId'
                 );
             }
 
             return {
                 userId: identity.id,
                 revoked: true,
-                keyId
+                revokeId
             };
         }
     );

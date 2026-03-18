@@ -5,7 +5,7 @@ import type { TrackerApiResponse } from '~/types/homepage';
 function toAuthSession(payload: AuthMeResponse): AuthSession {
     return {
         userId: payload.user.userId,
-        keyId: payload.apiKey.keyId,
+        revokeId: payload.apiKey.revokeId,
         issuer: payload.apiKey.issuer,
         maskedApiKey: payload.apiKey.maskedApiKey,
         scopes: payload.apiKey.scopes,

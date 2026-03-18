@@ -1,5 +1,6 @@
 INSERT INTO api_keys (
     key,
+    revoke_id,
     user_id,
     issuer,
     active_from,
@@ -7,4 +8,4 @@ INSERT INTO api_keys (
     expires_at,
     daily_token_limit
 )
-VALUES (?, ?, ?, ?, NULL, ?, ?);
+VALUES (?, ?, ?, ?, ?, NULL, ?, ?);

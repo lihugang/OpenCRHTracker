@@ -2,7 +2,7 @@ export type AuthApiKeyIssuer = 'webapp' | 'api';
 
 export interface AuthSession {
     userId: string;
-    keyId: string;
+    revokeId: string;
     issuer: AuthApiKeyIssuer;
     maskedApiKey: string;
     scopes: string[];
@@ -16,7 +16,7 @@ export interface AuthMeResponse {
         userId: string;
     };
     apiKey: {
-        keyId: string;
+        revokeId: string;
         issuer: AuthApiKeyIssuer;
         maskedApiKey: string;
         activeFrom: number;
@@ -33,7 +33,7 @@ export interface AuthMeResponse {
 }
 
 export interface AuthApiKeyListItem {
-    keyId: string;
+    revokeId: string;
     maskedKeyId: string;
     issuer: AuthApiKeyIssuer;
     activeFrom: number;
@@ -41,6 +41,7 @@ export interface AuthApiKeyListItem {
     expiresAt: number;
     dailyTokenLimit: number;
     scopes: string[];
+    isCurrent: boolean;
 }
 
 export interface AuthApiKeyListResponse {
@@ -53,7 +54,7 @@ export interface AuthApiKeyListResponse {
 
 export interface AuthIssueApiKeyResponse {
     userId: string;
-    keyId: string;
+    revokeId: string;
     issuer: AuthApiKeyIssuer;
     apiKey: string;
     maskedApiKey: string;

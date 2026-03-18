@@ -1,9 +1,9 @@
-<template>
+﻿<template>
     <button
         :type="type"
         :disabled="disabled || loading"
         :class="[
-            'inline-flex items-center justify-center gap-2 rounded-2xl font-medium transition-[box-shadow,background-color,border-color,color] duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-crh-blue/30 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-60',
+            'inline-flex cursor-pointer items-center justify-center gap-2 rounded-2xl font-medium transition-[box-shadow,background-color,border-color,color] duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-crh-blue/30 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-60',
             sizeClasses,
             variantClasses,
             block ? 'w-full' : ''
@@ -52,3 +52,4 @@ const sizeClasses = computed(() => {
     return props.size === 'sm' ? 'px-3.5 py-2 text-sm' : 'px-5 py-3 text-sm';
 });
 </script>
+

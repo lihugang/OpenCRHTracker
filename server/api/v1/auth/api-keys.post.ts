@@ -19,6 +19,7 @@ interface CreateApiKeyBody {
     dailyTokenLimit?: unknown;
     userId?: unknown;
     keyId?: unknown;
+    revokeId?: unknown;
     apiKey?: unknown;
 }
 
@@ -66,6 +67,7 @@ export default defineEventHandler(async (event) => {
                     body.dailyTokenLimit === undefined &&
                     body.userId === undefined &&
                     body.keyId === undefined &&
+                    body.revokeId === undefined &&
                     body.apiKey === undefined,
                 400,
                 'invalid_param',
@@ -151,7 +153,7 @@ export default defineEventHandler(async (event) => {
             });
             const response: AuthIssueApiKeyResponse = {
                 userId: identity.id,
-                keyId: apiKey.keyId,
+                revokeId: apiKey.revokeId,
                 issuer: apiKey.issuer,
                 apiKey: apiKey.apiKey,
                 maskedApiKey: maskApiKey(apiKey.apiKey),

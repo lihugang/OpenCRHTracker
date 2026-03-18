@@ -97,6 +97,7 @@ export default function resolveIdentity(event: H3Event): ApiIdentity {
         type: 'user',
         id: apiKeyRecord.userId,
         keyId: apiKeyRecord.keyId,
+        revokeId: apiKeyRecord.revokeId,
         issuer: apiKeyRecord.issuer,
         apiKey: resolvedApiKey.key,
         bucketKey: `user:${apiKeyRecord.userId}`,

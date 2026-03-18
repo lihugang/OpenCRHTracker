@@ -30,7 +30,7 @@ export default defineEventHandler(async (event) => {
             return {
                 loggedOut: true,
                 revoked: true,
-                keyId: identity.keyId
+                revokeId: identity.revokeId ?? ''
             };
         }
     );

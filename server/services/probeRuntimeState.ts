@@ -8,9 +8,44 @@ interface RunningEmuRecord {
     lastSeenAt: number;
 }
 
+interface ProbeRuntimeSnapshotRow {
+    trainCode: string;
+    emuCode: string;
+    startAt: number;
+    endAt: number;
+}
+
+interface ProbeRuntimeResolvedTrainGroup {
+    trainKey: string;
+    trainInternalCode: string;
+}
+
+interface RehydrateProbeRuntimeStateOptions {
+    rows: ProbeRuntimeSnapshotRow[];
+    nowSeconds: number;
+    graceSeconds: number;
+    resolveGroupByTrainCode: (
+        trainCode: string
+    ) => ProbeRuntimeResolvedTrainGroup | null;
+}
+
+interface RehydrateProbeRuntimeStateResult {
+    routeRows: number;
+    restoredRunningEmuCodes: number;
+    restoredTrainKeys: number;
+    expiredRows: number;
+    fallbackKeys: number;
+}
+
 let currentDate = getCurrentDateString();
 const queriedTodayTrainKeys = new Set<string>();
 const runningEmuState = new Map<string, RunningEmuRecord>();
+
+function resetProbeState(today: string): void {
+    currentDate = today;
+    queriedTodayTrainKeys.clear();
+    runningEmuState.clear();
+}
 
 export function ensureProbeStateForToday(): void {
     const today = getCurrentDateString();
@@ -18,9 +53,7 @@ export function ensureProbeStateForToday(): void {
         return;
     }
 
-    currentDate = today;
-    queriedTodayTrainKeys.clear();
-    runningEmuState.clear();
+    resetProbeState(today);
 }
 
 export function buildTrainKey(
@@ -59,6 +92,77 @@ export function markQueriedTrainKey(trainKey: string): void {
 
 export function clearQueriedTrainKey(trainKey: string): void {
     queriedTodayTrainKeys.delete(trainKey);
+}
+
+export function rehydrateProbeRuntimeState(
+    options: RehydrateProbeRuntimeStateOptions
+): RehydrateProbeRuntimeStateResult {
+    const today = getCurrentDateString();
+    resetProbeState(today);
+
+    const restoredTrainKeys = new Set<string>();
+    const restoredRunningEmuCodes = new Set<string>();
+    let expiredRows = 0;
+    let fallbackKeys = 0;
+
+    for (const row of options.rows) {
+        const normalizedTrainCode = normalizeCode(row.trainCode);
+        const normalizedEmuCode = normalizeCode(row.emuCode);
+        if (
+            normalizedTrainCode.length === 0 ||
+            normalizedEmuCode.length === 0 ||
+            !Number.isInteger(row.startAt) ||
+            row.startAt < 0 ||
+            !Number.isInteger(row.endAt) ||
+            row.endAt < 0
+        ) {
+            continue;
+        }
+
+        const resolvedGroup = options.resolveGroupByTrainCode(
+            normalizedTrainCode
+        );
+        const trainKey =
+            resolvedGroup?.trainKey ??
+            buildTrainKey(normalizedTrainCode, '', row.startAt);
+        const trainInternalCode = resolvedGroup?.trainInternalCode ?? '';
+
+        if (!resolvedGroup) {
+            fallbackKeys += 1;
+        }
+
+        queriedTodayTrainKeys.add(trainKey);
+        restoredTrainKeys.add(trainKey);
+
+        if (options.nowSeconds > row.endAt + options.graceSeconds) {
+            expiredRows += 1;
+            continue;
+        }
+
+        if (runningEmuState.has(normalizedEmuCode)) {
+            continue;
+        }
+
+        runningEmuState.set(normalizedEmuCode, {
+            trainKey,
+            groupKey: buildRunningEmuGroupKey(
+                normalizedTrainCode,
+                trainInternalCode,
+                row.startAt
+            ),
+            endAt: row.endAt,
+            lastSeenAt: options.nowSeconds
+        });
+        restoredRunningEmuCodes.add(normalizedEmuCode);
+    }
+
+    return {
+        routeRows: options.rows.length,
+        restoredRunningEmuCodes: restoredRunningEmuCodes.size,
+        restoredTrainKeys: restoredTrainKeys.size,
+        expiredRows,
+        fallbackKeys
+    };
 }
 
 export function cleanupRunningEmuState(

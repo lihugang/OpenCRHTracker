@@ -43,14 +43,15 @@ export default defineEventHandler(async (event) => {
             const response: AuthApiKeyListResponse = {
                 userId: identity.id,
                 items: records.map((record) => ({
-                    keyId: record.key,
+                    revokeId: record.revoke_id,
                     maskedKeyId: maskApiKey(record.key),
                     issuer: record.issuer,
                     activeFrom: record.active_from,
                     revokedAt: record.revoked_at,
                     expiresAt: record.expires_at,
                     dailyTokenLimit: record.daily_token_limit,
-                    scopes: record.scopes
+                    scopes: record.scopes,
+                    isCurrent: record.key === identity.keyId
                 })),
                 creatableScopes: resolveCreatableScopes(identity.scopes),
                 defaultScopes: resolveDefaultScopes(identity.scopes),
