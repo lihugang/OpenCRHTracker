@@ -183,6 +183,9 @@
             "retentionDays": 7,
             "dailyTimeHHmm": "0000"
         },
+        "dailyExport": {
+            "dailyTimeHHmm": "0000"
+        },
         "scheduler": {
             "pollIntervalMs": 180000,
             "maxTasksPerQuery": 65535,
@@ -210,7 +213,7 @@
             "authListApiKeys": 1,
             "authRevokeApiKey": 1,
             "searchIndex": 1,
-            "exportDaily": 100
+            "exportDaily": 50
         },
         "perRecord": {
             "historyEmu": {

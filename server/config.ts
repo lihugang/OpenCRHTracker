@@ -43,12 +43,17 @@ interface ApiKeyCleanupConfig {
     dailyTimeHHmm: string;
 }
 
+interface DailyExportTaskConfig {
+    dailyTimeHHmm: string;
+}
+
 const ALLOWED_STARTUP_TASK_EXECUTORS = [
     'build_today_schedule',
     'generate_route_refresh_tasks',
     'dispatch_daily_probe_tasks',
     'clear_daily_probe_status',
-    'cleanup_revoked_api_keys'
+    'cleanup_revoked_api_keys',
+    'export_daily_records'
 ] as const;
 
 type StartupTaskExecutor = (typeof ALLOWED_STARTUP_TASK_EXECUTORS)[number];
@@ -170,6 +175,7 @@ export interface Config {
             disabledExecutors: StartupTaskExecutor[];
         };
         apiKeyCleanup: ApiKeyCleanupConfig;
+        dailyExport: DailyExportTaskConfig;
         scheduler: {
             pollIntervalMs: number;
             maxTasksPerQuery: number;
@@ -433,6 +439,7 @@ function validateConfig(raw: unknown): Config {
         task.apiKeyCleanup,
         'task.apiKeyCleanup'
     );
+    const taskDailyExport = asObject(task.dailyExport, 'task.dailyExport');
     const taskScheduler = asObject(task.scheduler, 'task.scheduler');
     const taskSchedulerIdle = asObject(
         taskScheduler.idle,
@@ -835,6 +842,12 @@ function validateConfig(raw: unknown): Config {
                     'task.apiKeyCleanup.dailyTimeHHmm'
                 )
             },
+            dailyExport: {
+                dailyTimeHHmm: asString(
+                    taskDailyExport.dailyTimeHHmm,
+                    'task.dailyExport.dailyTimeHHmm'
+                )
+            },
             scheduler: {
                 pollIntervalMs: asInteger(
                     taskScheduler.pollIntervalMs,
@@ -997,6 +1010,15 @@ function validateConfig(raw: unknown): Config {
         assert(
             false,
             `task.apiKeyCleanup.dailyTimeHHmm is invalid: ${message}`
+        );
+    }
+    try {
+        parseDailyTimeHHmm(configResult.task.dailyExport.dailyTimeHHmm);
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        assert(
+            false,
+            `task.dailyExport.dailyTimeHHmm is invalid: ${message}`
         );
     }
     for (const key of ['EMUList', 'QRCode'] as const) {

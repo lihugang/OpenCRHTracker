@@ -685,7 +685,8 @@
                                     "generate_route_refresh_tasks",
                                     "dispatch_daily_probe_tasks",
                                     "clear_daily_probe_status",
-                                    "cleanup_revoked_api_keys"
+                                    "cleanup_revoked_api_keys",
+                                    "export_daily_records"
                                 ]
                             }
                         }
@@ -709,6 +710,19 @@
                     },
                     "required": [
                         "retentionDays",
+                        "dailyTimeHHmm"
+                    ]
+                },
+                "dailyExport": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "dailyTimeHHmm": {
+                            "type": "string",
+                            "pattern": "^\\d{4}$"
+                        }
+                    },
+                    "required": [
                         "dailyTimeHHmm"
                     ]
                 },
@@ -753,6 +767,7 @@
             },
             "required": [
                 "apiKeyCleanup",
+                "dailyExport",
                 "scheduler"
             ]
         },

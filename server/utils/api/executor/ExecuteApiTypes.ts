@@ -8,6 +8,10 @@ export interface ExecuteApiOptions<TData> {
     fixedCost?: number;
     dynamicCostFromData?: (data: TData) => number;
     successHeaders?: (event: H3Event, data: TData) => void;
+    rawSuccessResponse?: (
+        event: H3Event,
+        data: TData
+    ) => unknown | null | undefined;
     successStatusCode?: number;
 }
 

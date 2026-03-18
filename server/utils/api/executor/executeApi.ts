@@ -1,4 +1,4 @@
-import type { H3Event } from 'h3';
+import { setResponseStatus, type H3Event } from 'h3';
 import applyApiCorsHeaders from '~/server/utils/api/cors/applyApiCorsHeaders';
 import asApiRequestError from '~/server/utils/api/errors/asApiRequestError';
 import type {
@@ -13,6 +13,7 @@ import formatRetryAfterMessage from '~/server/utils/api/quota/formatRetryAfterMe
 import tryConsumeTokens from '~/server/utils/api/quota/tryConsumeTokens';
 import apiFailure from '~/server/utils/api/response/apiFailure';
 import apiSuccess from '~/server/utils/api/response/apiSuccess';
+import setCommonHeaders from '~/server/utils/api/response/setCommonHeaders';
 import assertRequiredScopes from '~/server/utils/api/scopes/assertRequiredScopes';
 
 export default async function executeApi<TData>(
@@ -138,6 +139,16 @@ export default async function executeApi<TData>(
 
         if (options.successHeaders) {
             options.successHeaders(event, data);
+        }
+
+        const rawSuccessResponse = options.rawSuccessResponse?.(event, data);
+        if (rawSuccessResponse !== null && rawSuccessResponse !== undefined) {
+            setCommonHeaders(event, {
+                remain,
+                cost: costApplied
+            });
+            setResponseStatus(event, options.successStatusCode ?? 200);
+            return rawSuccessResponse;
         }
 
         return apiSuccess(

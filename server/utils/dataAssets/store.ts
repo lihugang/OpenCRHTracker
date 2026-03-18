@@ -43,7 +43,10 @@ function getAssetConfig(key: AssetKey) {
     return useConfig().data.assets[key];
 }
 
-function writeTextFileAtomically(filePath: string, content: string): void {
+export function writeTextFileAtomically(
+    filePath: string,
+    content: string
+): void {
     const directory = path.dirname(filePath);
     fs.mkdirSync(directory, { recursive: true });
 

@@ -1,20 +1,38 @@
-import { defineEventHandler, getQuery } from 'h3';
-import { listDailyRecordsAll } from '~/server/services/emuRoutesStore';
+import { defineEventHandler, getQuery, setHeader } from 'h3';
+import {
+    countDailyExportItems,
+    getDailyExportContentType,
+    getDailyExportFilePath,
+    readDailyExportText,
+    type DailyExportFormat
+} from '~/server/services/dailyExportStore';
 import getFixedCost from '~/server/utils/api/cost/getFixedCost';
 import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';
 import { getDailyResponseCacheControlMaxAge } from '~/server/utils/api/response/getResponseCacheControlMaxAge';
 import setCacheControl from '~/server/utils/api/response/setCacheControl';
 import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
-import getDayTimestampRange from '~/server/utils/date/getDayTimestampRange';
+import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
 
-function toCsvCell(value: string | number): string {
-    const text = String(value);
-    if (!text.includes(',') && !text.includes('"') && !text.includes('\n')) {
-        return text;
+interface DailyExportResponseData {
+    date: string;
+    format: DailyExportFormat;
+    total: number;
+    content: string;
+}
+
+function parseBinaryFlag(value: unknown): boolean {
+    if (value === undefined) {
+        return false;
+    }
+    if (value === '1' || value === 'true') {
+        return true;
+    }
+    if (value === '0' || value === 'false') {
+        return false;
     }
 
-    return `"${text.replace(/"/g, '""')}"`;
+    throw new Error('binary');
 }
 
 export default defineEventHandler(async (event) => {
@@ -24,17 +42,45 @@ export default defineEventHandler(async (event) => {
             cors: true,
             requiredScopes: [API_SCOPES.exports.daily.read],
             fixedCost: getFixedCost('exportDaily'),
+            rawSuccessResponse: (successEvent, data) => {
+                const successQuery = getQuery(successEvent);
+                const binaryRequested =
+                    successQuery.binary === '1' || successQuery.binary === 'true';
+                if (!binaryRequested) {
+                    return null;
+                }
+
+                setHeader(
+                    successEvent,
+                    'Content-Type',
+                    getDailyExportContentType(data.format)
+                );
+                setHeader(
+                    successEvent,
+                    'Content-Disposition',
+                    `attachment; filename="${data.date}.${data.format}"`
+                );
+                return data.content;
+            },
             successHeaders: (successEvent, data) =>
                 setCacheControl(
                     successEvent,
                     getDailyResponseCacheControlMaxAge(data.date)
                 )
         },
-        async () => {
+        async (): Promise<DailyExportResponseData> => {
             const query = getQuery(event);
             const date = typeof query.date === 'string' ? query.date : '';
-            const format =
-                typeof query.format === 'string' ? query.format : 'json';
+            const format = (
+                typeof query.format === 'string' ? query.format : 'csv'
+            ) as DailyExportFormat;
+
+            let binary = false;
+            try {
+                binary = parseBinaryFlag(query.binary);
+            } catch {
+                ensure(false, 400, 'invalid_param', 'binary 必须是 true/false');
+            }
 
             ensure(
                 /^\d{8}$/.test(date),
@@ -43,44 +89,30 @@ export default defineEventHandler(async (event) => {
                 'date 必须是 YYYYMMDD'
             );
             ensure(
-                format === 'csv' || format === 'json',
+                format === 'csv' || format === 'jsonl',
                 400,
                 'invalid_param',
-                'format 必须是 csv 或 json'
+                'format 必须是 csv 或 jsonl'
+            );
+            ensure(
+                date < getCurrentDateString(),
+                400,
+                'invalid_param',
+                'export daily 不允许导出今日记录'
             );
 
-            const dayRange = getDayTimestampRange(date);
-            const rows = listDailyRecordsAll(dayRange.startAt, dayRange.endAt);
-            const content =
-                format === 'json'
-                    ? JSON.stringify(
-                          rows.map((row) => ({
-                              trainCode: row.train_code,
-                              emuCode: row.emu_code,
-                              startStation: row.start_station_name,
-                              endStation: row.end_station_name,
-                              startAt: row.start_at,
-                              endAt: row.end_at
-                          }))
-                      )
-                    : [
-                          'trainCode,emuCode,startStation,endStation,startAt,endAt',
-                          ...rows.map((row) =>
-                              [
-                                  toCsvCell(row.train_code),
-                                  toCsvCell(row.emu_code),
-                                  toCsvCell(row.start_station_name),
-                                  toCsvCell(row.end_station_name),
-                                  toCsvCell(row.start_at),
-                                  toCsvCell(row.end_at)
-                              ].join(',')
-                          )
-                      ].join('\n');
+            const content = readDailyExportText(date, format);
+            ensure(
+                content !== null,
+                404,
+                'not_found',
+                `导出文件不存在: ${getDailyExportFilePath(date, format)}`
+            );
 
             return {
                 date,
                 format,
-                total: rows.length,
+                total: countDailyExportItems(format, content),
                 content
             };
         }
