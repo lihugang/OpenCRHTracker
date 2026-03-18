@@ -421,6 +421,9 @@ async function persistResolvedGroup(
         group.endAt
     );
     if (finalStatus === ProbeStatusValue.CoupledFormationResolved) {
+        logger.info(
+            `coupled_group_detected trainCodes=${trainCodes.join('/')} trainInternalCode=${group.trainInternalCode} emuCodes=${emuCodes.join('/')} startAt=${group.startAt} endAt=${group.endAt} groupKey=${groupKey}`
+        );
         persistBackfilledCoupledRoutes(emuCodes, scheduleRoutesByTrainCode);
     }
     const trainKey = buildTrainKey(
