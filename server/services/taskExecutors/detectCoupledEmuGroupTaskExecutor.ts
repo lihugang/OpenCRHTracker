@@ -5,8 +5,10 @@ import {
     markCoupledGroupDetected
 } from '~/server/services/probeDetectionState';
 import {
+    buildRunningEmuGroupKey,
     buildTrainKey,
     isEmuRunning,
+    listActiveRunningEmuCodesByGroupKey,
     markRunningEmuCodes
 } from '~/server/services/probeRuntimeState';
 import {
@@ -128,12 +130,11 @@ function resolveDetectionBureau(
 }
 
 function buildObservationGroupKey(observation: RouteObservation): string {
-    const normalizedInternalCode = normalizeCode(observation.trainInternalCode);
-    if (normalizedInternalCode.length > 0) {
-        return `internal:${normalizedInternalCode}@${observation.startAt}`;
-    }
-
-    return `fallback:${normalizeCode(observation.trainCode)}@${observation.startAt}`;
+    return buildRunningEmuGroupKey(
+        observation.trainCode,
+        observation.trainInternalCode,
+        observation.startAt
+    );
 }
 
 function isActiveRouteObservation(
@@ -361,10 +362,24 @@ function groupObservations(
 
 async function persistResolvedGroup(
     group: RouteObservationGroup,
-    scheduleRoutesByTrainCode: Map<string, TodayScheduleRoute>
+    scheduleRoutesByTrainCode: Map<string, TodayScheduleRoute>,
+    nowSeconds: number,
+    runningGraceSeconds: number
 ): Promise<void> {
     const trainCodes = uniqueNormalizedCodes(Array.from(group.trainCodes));
-    const emuCodes = uniqueNormalizedCodes(Array.from(group.emuCodes));
+    const groupKey = buildRunningEmuGroupKey(
+        trainCodes[0] ?? '',
+        group.trainInternalCode,
+        group.startAt
+    );
+    const emuCodes = uniqueNormalizedCodes([
+        ...Array.from(group.emuCodes),
+        ...listActiveRunningEmuCodesByGroupKey(
+            groupKey,
+            nowSeconds,
+            runningGraceSeconds
+        )
+    ]);
     if (trainCodes.length === 0 || emuCodes.length === 0) {
         return;
     }
@@ -413,8 +428,13 @@ async function persistResolvedGroup(
         group.trainInternalCode,
         group.startAt
     );
-    const nowSeconds = getNowSeconds();
-    markRunningEmuCodes(emuCodes, trainKey, group.endAt, nowSeconds);
+    markRunningEmuCodes(
+        emuCodes,
+        trainKey,
+        groupKey,
+        group.endAt,
+        nowSeconds
+    );
 }
 
 async function executeDetectCoupledEmuGroupTask(
@@ -462,7 +482,12 @@ async function executeDetectCoupledEmuGroupTask(
     const groups = groupObservations(observations);
     const scheduleRoutesByTrainCode = getTodayScheduleCache();
     for (const group of groups) {
-        await persistResolvedGroup(group, scheduleRoutesByTrainCode);
+        await persistResolvedGroup(
+            group,
+            scheduleRoutesByTrainCode,
+            nowSeconds,
+            config.spider.scheduleProbe.coupling.runningGraceSeconds
+        );
     }
 
     markCoupledGroupDetected(bureau, args.model, nowSeconds);

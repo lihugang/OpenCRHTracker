@@ -3,6 +3,7 @@ import normalizeCode from '~/server/utils/12306/normalizeCode';
 
 interface RunningEmuRecord {
     trainKey: string;
+    groupKey: string;
     endAt: number;
     lastSeenAt: number;
 }
@@ -30,6 +31,19 @@ export function buildTrainKey(
     const normalizedInternalCode = normalizeCode(trainInternalCode);
     if (normalizedInternalCode.length > 0) {
         return `internal:${normalizedInternalCode}`;
+    }
+
+    return `fallback:${normalizeCode(trainCode)}@${startAt}`;
+}
+
+export function buildRunningEmuGroupKey(
+    trainCode: string,
+    trainInternalCode: string,
+    startAt: number
+): string {
+    const normalizedInternalCode = normalizeCode(trainInternalCode);
+    if (normalizedInternalCode.length > 0) {
+        return `internal:${normalizedInternalCode}@${startAt}`;
     }
 
     return `fallback:${normalizeCode(trainCode)}@${startAt}`;
@@ -80,6 +94,7 @@ export function isEmuRunning(
 export function markRunningEmuCodes(
     emuCodes: string[],
     trainKey: string,
+    groupKey: string,
     endAt: number,
     nowSeconds: number
 ): void {
@@ -91,10 +106,38 @@ export function markRunningEmuCodes(
 
         runningEmuState.set(normalizedCode, {
             trainKey,
+            groupKey,
             endAt,
             lastSeenAt: nowSeconds
         });
     }
+}
+
+export function listActiveRunningEmuCodesByGroupKey(
+    groupKey: string,
+    nowSeconds: number,
+    graceSeconds: number
+): string[] {
+    const normalizedGroupKey = groupKey.trim();
+    if (normalizedGroupKey.length === 0) {
+        return [];
+    }
+
+    const emuCodes: string[] = [];
+    for (const [emuCode, record] of runningEmuState.entries()) {
+        if (nowSeconds > record.endAt + graceSeconds) {
+            runningEmuState.delete(emuCode);
+            continue;
+        }
+
+        if (record.groupKey !== normalizedGroupKey) {
+            continue;
+        }
+
+        emuCodes.push(emuCode);
+    }
+
+    return emuCodes;
 }
 
 export function clearRunningEmuStateByTrainKey(trainKey: string): string[] {

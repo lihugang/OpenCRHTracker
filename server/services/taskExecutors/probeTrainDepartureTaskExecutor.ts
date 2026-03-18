@@ -7,6 +7,7 @@ import {
     type EmuListRecord
 } from '~/server/services/probeAssetStore';
 import {
+    buildRunningEmuGroupKey,
     buildTrainKey,
     clearQueriedTrainKey,
     clearRunningEmuStateByTrainKey,
@@ -843,6 +844,11 @@ function applyResolvedResult(
     status: ProbeStatusValue,
     nowSeconds: number
 ): void {
+    const groupKey = buildRunningEmuGroupKey(
+        args.trainCode,
+        args.trainInternalCode,
+        args.startAt
+    );
     for (const trainCode of allTrainCodes) {
         for (const emuCode of allEmuCodes) {
             ensureProbeStatus(trainCode, emuCode, args.startAt, status);
@@ -857,7 +863,13 @@ function applyResolvedResult(
         args.startAt,
         args.endAt
     );
-    markRunningEmuCodes(allEmuCodes, trainKey, args.endAt, nowSeconds);
+    markRunningEmuCodes(
+        allEmuCodes,
+        trainKey,
+        groupKey,
+        args.endAt,
+        nowSeconds
+    );
     markQueriedTrainKey(trainKey);
 }
 
@@ -1138,7 +1150,17 @@ async function executeProbeTrainDepartureTask(rawArgs: unknown): Promise<void> {
         args.startAt,
         args.endAt
     );
-    markRunningEmuCodes([mainEmuCode], trainKey, args.endAt, nowSeconds);
+    markRunningEmuCodes(
+        [mainEmuCode],
+        trainKey,
+        buildRunningEmuGroupKey(
+            args.trainCode,
+            args.trainInternalCode,
+            args.startAt
+        ),
+        args.endAt,
+        nowSeconds
+    );
     markQueriedTrainKey(trainKey);
 
     if (args.endAt < nowSeconds) {
