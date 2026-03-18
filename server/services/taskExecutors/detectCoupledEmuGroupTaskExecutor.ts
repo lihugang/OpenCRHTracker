@@ -283,13 +283,18 @@ async function collectObservations(
     candidates: EmuListRecord[],
     nowSeconds: number,
     runningGraceSeconds: number
-): Promise<RouteObservation[]> {
+): Promise<{
+    observations: RouteObservation[];
+    runningCount: number;
+}> {
     const assets = await loadProbeAssets();
     const observations: RouteObservation[] = [];
+    let runningCount = 0;
 
     for (const candidate of candidates) {
         const emuCode = `${candidate.model}-${candidate.trainSetNo}`;
         if (isEmuRunning(emuCode, nowSeconds, runningGraceSeconds)) {
+            runningCount += 1;
             continue;
         }
 
@@ -314,9 +319,16 @@ async function collectObservations(
         });
     }
 
-    return observations.filter((observation) =>
-        isActiveRouteObservation(observation, nowSeconds, runningGraceSeconds)
-    );
+    return {
+        observations: observations.filter((observation) =>
+            isActiveRouteObservation(
+                observation,
+                nowSeconds,
+                runningGraceSeconds
+            )
+        ),
+        runningCount
+    };
 }
 
 function groupObservations(
@@ -442,7 +454,7 @@ async function executeDetectCoupledEmuGroupTask(
         return;
     }
 
-    const observations = await collectObservations(
+    const { observations, runningCount } = await collectObservations(
         candidates,
         nowSeconds,
         config.spider.scheduleProbe.coupling.runningGraceSeconds
@@ -455,7 +467,7 @@ async function executeDetectCoupledEmuGroupTask(
 
     markCoupledGroupDetected(bureau, args.model, nowSeconds);
     logger.info(
-        `done bureau=${bureau} model=${args.model} candidates=${candidates.length} observations=${observations.length} groups=${groups.length}`
+        `done bureau=${bureau} model=${args.model} candidates=${candidates.length} observations=${observations.length} groups=${groups.length} running=${runningCount}`
     );
 }
 
