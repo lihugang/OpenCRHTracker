@@ -711,7 +711,7 @@ function buildCodeLink(code: string) {
 }
 
 .history-table-row--tinted:not(.running-result-row) > td {
-    background-color: rgba(239, 246, 255, 0.76);
+    background-color: rgba(219, 234, 254, 0.68);
 }
 
 .history-result-card {
@@ -721,8 +721,8 @@ function buildCodeLink(code: string) {
 }
 
 .history-result-card--tinted:not(.running-result-card) {
-    border-color: rgba(191, 219, 254, 0.85);
-    background: linear-gradient(180deg, #ffffff 0%, #eff6ff 100%);
+    border-color: rgba(147, 197, 253, 0.95);
+    background: linear-gradient(180deg, #f6faff 0%, #dbeafe 100%);
 }
 
 @media (max-width: 767px) {
@@ -741,12 +741,12 @@ function buildCodeLink(code: string) {
     }
 
     .history-table-row--tinted:not(.running-result-row):hover > td {
-        box-shadow: inset 0 0 0 999px rgba(219, 234, 254, 0.48);
+        box-shadow: inset 0 0 0 999px rgba(191, 219, 254, 0.74);
     }
 
     .history-result-card--tinted:not(.running-result-card):hover {
         border-color: rgba(147, 197, 253, 0.95);
-        background: linear-gradient(180deg, #f8fbff 0%, #e8f3ff 100%);
+        background: linear-gradient(180deg, #eff6ff 0%, #bfdbfe 100%);
     }
 }
 </style>
