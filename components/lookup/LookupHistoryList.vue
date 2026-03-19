@@ -444,7 +444,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
+import {
+    computed,
+    nextTick,
+    onBeforeUnmount,
+    onMounted,
+    ref,
+    watch
+} from 'vue';
 import type {
     LookupHistoryListItem,
     LookupTargetType,
@@ -631,6 +638,15 @@ function connectSentinelObserver() {
     sentinelObserver.observe(sentinelRef.value);
 }
 
+async function reconnectSentinelObserver() {
+    if (!import.meta.client) {
+        return;
+    }
+
+    await nextTick();
+    connectSentinelObserver();
+}
+
 watch(
     () => [
         props.canLoadMore,
@@ -639,14 +655,17 @@ watch(
         props.state,
         props.errorMessage
     ],
-    async () => {
-        await nextTick();
-        connectSentinelObserver();
-    },
+    reconnectSentinelObserver,
     {
         immediate: true
     }
 );
+
+watch(sentinelRef, reconnectSentinelObserver);
+
+onMounted(() => {
+    void reconnectSentinelObserver();
+});
 
 onBeforeUnmount(() => {
     disconnectSentinelObserver();
