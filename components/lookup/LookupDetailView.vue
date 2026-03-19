@@ -137,9 +137,7 @@ const searchTitle = computed(() => {
 });
 
 const searchDescription = computed(() => {
-    return props.targetType === 'train'
-        ? '查看该车次的担当历史，并继续检索其他车次或车组。'
-        : '查看该车组的运行历史，并继续检索其他车次或车组。';
+    return '';
 });
 
 function syncHeaderCollapsedState() {
