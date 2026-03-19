@@ -1,8 +1,13 @@
-import { defineEventHandler, getQuery, setHeader } from 'h3';
+import {
+    defineEventHandler,
+    getQuery,
+    getRouterParam,
+    setHeader
+} from 'h3';
 import {
     countDailyExportItems,
     getDailyExportContentType,
-    getDailyExportFilePath,
+    getDailyExportFileName,
     readDailyExportText,
     type DailyExportFormat
 } from '~/server/services/dailyExportStore';
@@ -70,21 +75,20 @@ export default defineEventHandler(async (event) => {
                 )
         },
         async (): Promise<DailyExportResponseData> => {
+            const date = getRouterParam(event, 'date');
             const query = getQuery(event);
-            const date = typeof query.date === 'string' ? query.date : '';
             const format = (
                 typeof query.format === 'string' ? query.format : 'csv'
             ) as DailyExportFormat;
 
-            let binary = false;
             try {
-                binary = parseBinaryFlag(query.binary);
+                parseBinaryFlag(query.binary);
             } catch {
                 ensure(false, 400, 'invalid_param', 'binary 必须是 true/false');
             }
 
             ensure(
-                /^\d{8}$/.test(date),
+                typeof date === 'string' && /^\d{8}$/.test(date),
                 400,
                 'invalid_param',
                 'date 必须是 YYYYMMDD'
@@ -95,20 +99,18 @@ export default defineEventHandler(async (event) => {
                 'invalid_param',
                 'format 必须是 csv 或 jsonl'
             );
+
+            const missingMessage = `${getDailyExportFileName(date, format)} 未生成`;
+
             ensure(
                 date < getCurrentDateString(),
-                400,
-                'invalid_param',
-                'export daily 不允许导出今日记录'
+                404,
+                'not_found',
+                missingMessage
             );
 
             const content = readDailyExportText(date, format);
-            ensure(
-                content !== null,
-                404,
-                'not_found',
-                `导出文件不存在: ${getDailyExportFilePath(date, format)}`
-            );
+            ensure(content !== null, 404, 'not_found', missingMessage);
 
             return {
                 date,

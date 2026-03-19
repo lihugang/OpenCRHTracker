@@ -4,6 +4,7 @@ import type { DailyEmuRouteRow } from '~/server/services/emuRoutesStore';
 import { writeTextFileAtomically } from '~/server/utils/dataAssets/store';
 
 export const DAILY_EXPORT_FORMATS = ['csv', 'jsonl'] as const;
+const UTF8_BOM = '\uFEFF';
 
 export type DailyExportFormat = (typeof DAILY_EXPORT_FORMATS)[number];
 
@@ -43,19 +44,22 @@ function toCsvCell(value: string | number): string {
 }
 
 function serializeCsv(records: readonly DailyExportRecord[]): string {
-    return [
-        'trainCode,emuCode,startStation,endStation,startAt,endAt',
-        ...records.map((row) =>
-            [
-                toCsvCell(row.trainCode),
-                toCsvCell(row.emuCode),
-                toCsvCell(row.startStation),
-                toCsvCell(row.endStation),
-                toCsvCell(row.startAt),
-                toCsvCell(row.endAt)
-            ].join(',')
-        )
-    ].join('\n');
+    return (
+        UTF8_BOM +
+        [
+            'trainCode,emuCode,startStation,endStation,startAt,endAt',
+            ...records.map((row) =>
+                [
+                    toCsvCell(row.trainCode),
+                    toCsvCell(row.emuCode),
+                    toCsvCell(row.startStation),
+                    toCsvCell(row.endStation),
+                    toCsvCell(row.startAt),
+                    toCsvCell(row.endAt)
+                ].join(',')
+            )
+        ].join('\n')
+    );
 }
 
 function serializeJsonl(records: readonly DailyExportRecord[]): string {
@@ -67,6 +71,13 @@ export function getDailyExportFilePath(
     format: DailyExportFormat
 ): string {
     return path.resolve('data/exports', `${date}.${format}`);
+}
+
+export function getDailyExportFileName(
+    date: string,
+    format: DailyExportFormat
+): string {
+    return `${date}.${format}`;
 }
 
 export function getDailyExportContentType(format: DailyExportFormat): string {
