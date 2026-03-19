@@ -33,7 +33,8 @@
                             'relative flex max-h-[min(86vh,48rem)] w-full flex-col overflow-hidden rounded-[1.5rem] border border-slate-200/90 bg-white/98 shadow-[0_28px_80px_-28px_rgba(15,23,42,0.38)]',
                             sizeClass
                         ]">
-                        <div class="flex items-start justify-between gap-4 px-6 py-5">
+                        <div
+                            class="flex items-start justify-between gap-4 px-6 py-5">
                             <div class="space-y-2">
                                 <p
                                     class="text-xs font-semibold uppercase tracking-[0.28em] text-crh-blue/80">
@@ -63,7 +64,8 @@
 
                         <div class="motion-divider" />
 
-                        <div class="harmony-scrollbar overflow-y-auto px-6 py-5">
+                        <div
+                            class="harmony-scrollbar overflow-y-auto px-6 py-5">
                             <slot />
                         </div>
 

@@ -125,7 +125,9 @@ export default defineEventHandler(async (event) => {
                 throw new ApiRequestError(
                     400,
                     'invalid_param',
-                    error instanceof Error ? error.message : 'scopes are invalid'
+                    error instanceof Error
+                        ? error.message
+                        : 'scopes are invalid'
                 );
             }
 

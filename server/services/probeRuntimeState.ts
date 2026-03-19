@@ -119,9 +119,8 @@ export function rehydrateProbeRuntimeState(
             continue;
         }
 
-        const resolvedGroup = options.resolveGroupByTrainCode(
-            normalizedTrainCode
-        );
+        const resolvedGroup =
+            options.resolveGroupByTrainCode(normalizedTrainCode);
         const trainKey =
             resolvedGroup?.trainKey ??
             buildTrainKey(normalizedTrainCode, '', row.startAt);

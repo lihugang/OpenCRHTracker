@@ -14,7 +14,8 @@
                     class="absolute inset-0 bg-slate-950/35 backdrop-blur-[2px]"
                     @click="handleBackdropClick" />
 
-                <div class="absolute inset-x-0 bottom-0 flex justify-center p-3 sm:p-6">
+                <div
+                    class="absolute inset-x-0 bottom-0 flex justify-center p-3 sm:p-6">
                     <Transition
                         appear
                         enter-active-class="transition duration-200 ease-out"
@@ -35,7 +36,8 @@
                                     class="h-1.5 w-12 rounded-full bg-slate-300/90" />
                             </div>
 
-                            <div class="flex items-start justify-between gap-4 px-6 pb-5 pt-4">
+                            <div
+                                class="flex items-start justify-between gap-4 px-6 pb-5 pt-4">
                                 <div class="space-y-2">
                                     <p
                                         class="text-xs font-semibold uppercase tracking-[0.28em] text-crh-blue/80">
@@ -65,7 +67,8 @@
 
                             <div class="motion-divider" />
 
-                            <div class="harmony-scrollbar max-h-[min(70vh,36rem)] overflow-y-auto px-6 py-5">
+                            <div
+                                class="harmony-scrollbar max-h-[min(70vh,36rem)] overflow-y-auto px-6 py-5">
                                 <slot />
                             </div>
 

@@ -97,7 +97,10 @@ function rebuildCache(): TodayScheduleCache {
                 if (!existingGroup.allCodes.includes(trainCode)) {
                     existingGroup.allCodes.push(trainCode);
                 }
-                existingGroup.startAt = Math.min(existingGroup.startAt, startAt);
+                existingGroup.startAt = Math.min(
+                    existingGroup.startAt,
+                    startAt
+                );
                 existingGroup.endAt = Math.max(existingGroup.endAt, endAt);
                 if (
                     existingGroup.startStation.length === 0 &&

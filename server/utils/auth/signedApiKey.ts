@@ -43,9 +43,11 @@ function getApiKeyPrefix(issuer: ApiKeyIssuer) {
 }
 
 function getMatchingApiKeyIssuer(token: string) {
-    const matchedEntry = (Object.entries(
-        useConfig().user.apiKeyPrefixes
-    ) as Array<[ApiKeyIssuer, string]>)
+    const matchedEntry = (
+        Object.entries(useConfig().user.apiKeyPrefixes) as Array<
+            [ApiKeyIssuer, string]
+        >
+    )
         .sort((left, right) => right[1].length - left[1].length)
         .find(([, prefix]) => token.startsWith(prefix));
 

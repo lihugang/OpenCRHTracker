@@ -45,7 +45,8 @@ export default defineEventHandler(async (event) => {
             rawSuccessResponse: (successEvent, data) => {
                 const successQuery = getQuery(successEvent);
                 const binaryRequested =
-                    successQuery.binary === '1' || successQuery.binary === 'true';
+                    successQuery.binary === '1' ||
+                    successQuery.binary === 'true';
                 if (!binaryRequested) {
                     return null;
                 }

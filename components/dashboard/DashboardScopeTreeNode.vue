@@ -20,10 +20,7 @@
                 </span>
                 <span
                     class="block text-xs uppercase tracking-[0.16em] text-slate-400">
-                    {{
-                        node.fullScope ??
-                        `${node.leafScopes.length} 项权限`
-                    }}
+                    {{ node.fullScope ?? `${node.leafScopes.length} 项权限` }}
                 </span>
             </span>
         </label>
@@ -60,9 +57,11 @@ const emit = defineEmits<{
 
 const selectedScopeSet = computed(() => new Set(props.selectedScopes));
 
-const selectedLeafCount = computed(() =>
-    props.node.leafScopes.filter((scope) => selectedScopeSet.value.has(scope))
-        .length
+const selectedLeafCount = computed(
+    () =>
+        props.node.leafScopes.filter((scope) =>
+            selectedScopeSet.value.has(scope)
+        ).length
 );
 
 const isChecked = computed(

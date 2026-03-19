@@ -1016,10 +1016,7 @@ function validateConfig(raw: unknown): Config {
         parseDailyTimeHHmm(configResult.task.dailyExport.dailyTimeHHmm);
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        assert(
-            false,
-            `task.dailyExport.dailyTimeHHmm is invalid: ${message}`
-        );
+        assert(false, `task.dailyExport.dailyTimeHHmm is invalid: ${message}`);
     }
     for (const key of ['EMUList', 'QRCode'] as const) {
         const asset = configResult.data.assets[key];

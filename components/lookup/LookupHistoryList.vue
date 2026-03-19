@@ -586,9 +586,7 @@ const groupedItems = computed<DisplayHistoryListItem[]>(() => {
 function normalizeDisplayCodes(codes: string[]): string[] {
     const normalizedCodes = Array.from(
         new Set(
-            codes
-                .map((code) => code.trim())
-                .filter((code) => code.length > 0)
+            codes.map((code) => code.trim()).filter((code) => code.length > 0)
         )
     );
 

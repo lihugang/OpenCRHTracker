@@ -52,4 +52,3 @@ const sizeClasses = computed(() => {
     return props.size === 'sm' ? 'px-3.5 py-2 text-sm' : 'px-5 py-3 text-sm';
 });
 </script>
-

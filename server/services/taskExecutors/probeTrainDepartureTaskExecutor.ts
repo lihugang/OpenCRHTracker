@@ -729,7 +729,9 @@ async function validateTodayRunningForTrainCodes(
 
     return {
         state:
-            requestFailedTrainCodes.length > 0 ? 'request_failed' : 'not_running',
+            requestFailedTrainCodes.length > 0
+                ? 'request_failed'
+                : 'not_running',
         runningTrainCode: '',
         requestFailedTrainCodes,
         notRunningTrainCodes
@@ -1028,9 +1030,8 @@ async function executeProbeTrainDepartureTask(rawArgs: unknown): Promise<void> {
     );
 
     if (yesterdayMatchingTrainCodes.length > 0) {
-        const todayTrainCodesValidation = await validateTodayRunningForTrainCodes(
-            allTrainCodes
-        );
+        const todayTrainCodesValidation =
+            await validateTodayRunningForTrainCodes(allTrainCodes);
         if (todayTrainCodesValidation.state === 'not_running') {
             logger.info(
                 `skip_yesterday_same_assignment_not_running trainCode=${args.trainCode} probedTrainCode=${probedTrainCode} mainEmuCode=${mainEmuCode} yesterdayMatchedTrainCodes=${yesterdayMatchingTrainCodes.join(',')} checkedTrainCodes=${allTrainCodes.join(',')} notRunningTrainCodes=${todayTrainCodesValidation.notRunningTrainCodes.join(',')}`

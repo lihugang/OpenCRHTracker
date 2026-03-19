@@ -480,7 +480,10 @@ export function revokeApiKeyByUser(keyId: string, userId: string) {
     return result.changes > 0;
 }
 
-export function revokeApiKeyByRevokeIdAndUser(revokeId: string, userId: string) {
+export function revokeApiKeyByRevokeIdAndUser(
+    revokeId: string,
+    userId: string
+) {
     const now = getNowSeconds();
     const result = authStatements.run(
         'revokeApiKeyByRevokeId',

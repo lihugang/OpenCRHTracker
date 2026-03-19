@@ -22,7 +22,8 @@
                                 class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
                                 密钥标识
                             </p>
-                            <p class="font-mono text-sm font-semibold text-crh-blue">
+                            <p
+                                class="font-mono text-sm font-semibold text-crh-blue">
                                 {{ currentMaskedKeyId }}
                             </p>
                         </div>

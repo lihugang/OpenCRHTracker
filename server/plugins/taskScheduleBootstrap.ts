@@ -151,7 +151,9 @@ export default defineNitroPlugin(async () => {
                 error instanceof Error
                     ? `${error.name}: ${error.message}`
                     : String(error);
-            logger.warn(`warm_yesterday_train_emu_index_failed error=${message}`);
+            logger.warn(
+                `warm_yesterday_train_emu_index_failed error=${message}`
+            );
         }
 
         registerBuildScheduleTaskExecutor();

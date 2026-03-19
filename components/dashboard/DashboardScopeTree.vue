@@ -75,7 +75,9 @@ const tree = computed<DashboardScopeTreeNodeItem[]>(() => {
 
         for (const segment of segments) {
             currentPath = currentPath ? `${currentPath}.${segment}` : segment;
-            const existingNode = siblings.find((node) => node.segment === segment);
+            const existingNode = siblings.find(
+                (node) => node.segment === segment
+            );
 
             if (existingNode) {
                 currentNode = existingNode;
@@ -92,7 +94,9 @@ const tree = computed<DashboardScopeTreeNodeItem[]>(() => {
             };
 
             siblings.push(nextNode);
-            siblings.sort((left, right) => left.segment.localeCompare(right.segment));
+            siblings.sort((left, right) =>
+                left.segment.localeCompare(right.segment)
+            );
 
             currentNode = nextNode;
             siblings = nextNode.children;

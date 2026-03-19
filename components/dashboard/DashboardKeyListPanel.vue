@@ -122,8 +122,13 @@
                                                 class="text-xs uppercase tracking-[0.18em] text-slate-400">
                                                 生效时间
                                             </dt>
-                                            <dd class="text-base font-semibold text-slate-900">
-                                                {{ formatTimestamp(item.activeFrom) }}
+                                            <dd
+                                                class="text-base font-semibold text-slate-900">
+                                                {{
+                                                    formatTimestamp(
+                                                        item.activeFrom
+                                                    )
+                                                }}
                                             </dd>
                                         </div>
                                         <div class="space-y-1">
@@ -131,8 +136,13 @@
                                                 class="text-xs uppercase tracking-[0.18em] text-slate-400">
                                                 失效时间
                                             </dt>
-                                            <dd class="text-base font-semibold text-slate-900">
-                                                {{ formatTimestamp(item.expiresAt) }}
+                                            <dd
+                                                class="text-base font-semibold text-slate-900">
+                                                {{
+                                                    formatTimestamp(
+                                                        item.expiresAt
+                                                    )
+                                                }}
                                             </dd>
                                         </div>
                                         <div
@@ -142,8 +152,13 @@
                                                 class="text-xs uppercase tracking-[0.18em] text-slate-400">
                                                 吊销时间
                                             </dt>
-                                            <dd class="text-base font-semibold text-slate-900">
-                                                {{ formatTimestamp(item.revokedAt) }}
+                                            <dd
+                                                class="text-base font-semibold text-slate-900">
+                                                {{
+                                                    formatTimestamp(
+                                                        item.revokedAt
+                                                    )
+                                                }}
                                             </dd>
                                         </div>
                                     </dl>
@@ -181,10 +196,7 @@
 </template>
 
 <script setup lang="ts">
-import type {
-    AuthApiKeyIssuer,
-    AuthApiKeyListItem
-} from '~/types/auth';
+import type { AuthApiKeyIssuer, AuthApiKeyListItem } from '~/types/auth';
 
 defineProps<{
     groups: Array<{

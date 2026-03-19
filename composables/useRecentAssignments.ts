@@ -34,12 +34,11 @@ async function fetchTrainHistoryPage(
     target: LookupTarget,
     cursor: string
 ) {
-    const response = await requestFetch<TrackerApiResponse<TrainHistoryResponse>>(
-        `/api/v1/history/train/${encodeURIComponent(target.code)}`,
-        {
-            query: buildHistoryQuery(cursor)
-        }
-    );
+    const response = await requestFetch<
+        TrackerApiResponse<TrainHistoryResponse>
+    >(`/api/v1/history/train/${encodeURIComponent(target.code)}`, {
+        query: buildHistoryQuery(cursor)
+    });
 
     if (!response.ok) {
         throw {

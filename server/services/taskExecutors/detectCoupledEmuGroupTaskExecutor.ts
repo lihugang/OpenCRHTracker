@@ -431,13 +431,7 @@ async function persistResolvedGroup(
         group.trainInternalCode,
         group.startAt
     );
-    markRunningEmuCodes(
-        emuCodes,
-        trainKey,
-        groupKey,
-        group.endAt,
-        nowSeconds
-    );
+    markRunningEmuCodes(emuCodes, trainKey, groupKey, group.endAt, nowSeconds);
 }
 
 async function executeDetectCoupledEmuGroupTask(
