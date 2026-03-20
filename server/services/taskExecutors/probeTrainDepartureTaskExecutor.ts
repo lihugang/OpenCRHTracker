@@ -11,11 +11,10 @@ import {
     buildTrainKey,
     clearQueriedTrainKey,
     clearRunningEmuStateByTrainKey,
-    cleanupRunningEmuState,
     ensureProbeStateForToday,
     hasQueriedTrainKey,
     markQueriedTrainKey,
-    markRunningEmuCodes
+    markEmuCodesAssignedToday
 } from '~/server/services/probeRuntimeState';
 import {
     deleteProbeStatusByTrainCodeInRange,
@@ -865,11 +864,11 @@ function applyResolvedResult(
         args.startAt,
         args.endAt
     );
-    markRunningEmuCodes(
+    markEmuCodesAssignedToday(
         allEmuCodes,
         trainKey,
         groupKey,
-        args.endAt,
+        args.startAt,
         nowSeconds
     );
     markQueriedTrainKey(trainKey);
@@ -967,14 +966,8 @@ async function probeEmuByTrainCodes(
 
 async function executeProbeTrainDepartureTask(rawArgs: unknown): Promise<void> {
     ensureProbeStateForToday();
-    const config = useConfig();
     const args = parseTaskArgs(rawArgs);
     const nowSeconds = getNowSeconds();
-
-    cleanupRunningEmuState(
-        nowSeconds,
-        config.spider.scheduleProbe.coupling.runningGraceSeconds
-    );
 
     const trainKey = buildTrainKey(
         args.trainCode,
@@ -1151,7 +1144,7 @@ async function executeProbeTrainDepartureTask(rawArgs: unknown): Promise<void> {
         args.startAt,
         args.endAt
     );
-    markRunningEmuCodes(
+    markEmuCodesAssignedToday(
         [mainEmuCode],
         trainKey,
         buildRunningEmuGroupKey(
@@ -1159,17 +1152,10 @@ async function executeProbeTrainDepartureTask(rawArgs: unknown): Promise<void> {
             args.trainInternalCode,
             args.startAt
         ),
-        args.endAt,
+        args.startAt,
         nowSeconds
     );
     markQueriedTrainKey(trainKey);
-
-    if (args.endAt < nowSeconds) {
-        logger.info(
-            `skip_coupling_detection_past_end trainCode=${args.trainCode} probedTrainCode=${probedTrainCode} mainEmuCode=${mainEmuCode} endAt=${args.endAt} now=${nowSeconds}`
-        );
-        return;
-    }
 
     const detectionTaskId = queueCoupledDetectionTask(mainRecord);
     logger.info(

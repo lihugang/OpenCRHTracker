@@ -41,7 +41,7 @@
                             </p>
                             <p>
                                 个别记录可能会因为车底临时更换、12306
-                                数据异常、网络波动而延迟出现，或与实际情况不一致，仅供参考。
+                                数据异常、网络波动而延迟出现，或与实际情况不一致。
                             </p>
                             <p>
                                 这是一个非官方项目，查询结果仅供参考，请以实际运行情况和官方信息为准。
@@ -53,14 +53,14 @@
 
                         <div class="flex flex-wrap gap-3">
                             <NuxtLink
-                                to="/feedback"
-                                class="inline-flex items-center justify-center rounded-2xl bg-crh-blue px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-900">
-                                前往反馈
-                            </NuxtLink>
-                            <NuxtLink
                                 to="/"
                                 class="inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-900 hover:text-slate-900">
                                 返回首页
+                            </NuxtLink>
+                            <NuxtLink
+                                to="/feedback"
+                                class="inline-flex items-center justify-center rounded-2xl bg-crh-blue px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-900">
+                                前往反馈
                             </NuxtLink>
                         </div>
                     </div>

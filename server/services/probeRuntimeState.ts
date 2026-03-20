@@ -4,7 +4,7 @@ import normalizeCode from '~/server/utils/12306/normalizeCode';
 interface RunningEmuRecord {
     trainKey: string;
     groupKey: string;
-    endAt: number;
+    startAt: number;
     lastSeenAt: number;
 }
 
@@ -12,7 +12,6 @@ interface ProbeRuntimeSnapshotRow {
     trainCode: string;
     emuCode: string;
     startAt: number;
-    endAt: number;
 }
 
 interface ProbeRuntimeResolvedTrainGroup {
@@ -22,8 +21,6 @@ interface ProbeRuntimeResolvedTrainGroup {
 
 interface RehydrateProbeRuntimeStateOptions {
     rows: ProbeRuntimeSnapshotRow[];
-    nowSeconds: number;
-    graceSeconds: number;
     resolveGroupByTrainCode: (
         trainCode: string
     ) => ProbeRuntimeResolvedTrainGroup | null;
@@ -31,20 +28,20 @@ interface RehydrateProbeRuntimeStateOptions {
 
 interface RehydrateProbeRuntimeStateResult {
     routeRows: number;
-    restoredRunningEmuCodes: number;
+    restoredAssignedEmuCodes: number;
     restoredTrainKeys: number;
-    expiredRows: number;
+    skippedOlderRows: number;
     fallbackKeys: number;
 }
 
 let currentDate = getCurrentDateString();
 const queriedTodayTrainKeys = new Set<string>();
-const runningEmuState = new Map<string, RunningEmuRecord>();
+const assignedTodayEmuState = new Map<string, RunningEmuRecord>();
 
 function resetProbeState(today: string): void {
     currentDate = today;
     queriedTodayTrainKeys.clear();
-    runningEmuState.clear();
+    assignedTodayEmuState.clear();
 }
 
 export function ensureProbeStateForToday(): void {
@@ -101,8 +98,8 @@ export function rehydrateProbeRuntimeState(
     resetProbeState(today);
 
     const restoredTrainKeys = new Set<string>();
-    const restoredRunningEmuCodes = new Set<string>();
-    let expiredRows = 0;
+    const restoredAssignedEmuCodes = new Set<string>();
+    let skippedOlderRows = 0;
     let fallbackKeys = 0;
 
     for (const row of options.rows) {
@@ -112,9 +109,7 @@ export function rehydrateProbeRuntimeState(
             normalizedTrainCode.length === 0 ||
             normalizedEmuCode.length === 0 ||
             !Number.isInteger(row.startAt) ||
-            row.startAt < 0 ||
-            !Number.isInteger(row.endAt) ||
-            row.endAt < 0
+            row.startAt < 0
         ) {
             continue;
         }
@@ -133,72 +128,43 @@ export function rehydrateProbeRuntimeState(
         queriedTodayTrainKeys.add(trainKey);
         restoredTrainKeys.add(trainKey);
 
-        if (options.nowSeconds > row.endAt + options.graceSeconds) {
-            expiredRows += 1;
+        if (assignedTodayEmuState.has(normalizedEmuCode)) {
+            skippedOlderRows += 1;
             continue;
         }
 
-        if (runningEmuState.has(normalizedEmuCode)) {
-            continue;
-        }
-
-        runningEmuState.set(normalizedEmuCode, {
+        assignedTodayEmuState.set(normalizedEmuCode, {
             trainKey,
             groupKey: buildRunningEmuGroupKey(
                 normalizedTrainCode,
                 trainInternalCode,
                 row.startAt
             ),
-            endAt: row.endAt,
-            lastSeenAt: options.nowSeconds
+            startAt: row.startAt,
+            lastSeenAt: row.startAt
         });
-        restoredRunningEmuCodes.add(normalizedEmuCode);
+        restoredAssignedEmuCodes.add(normalizedEmuCode);
     }
 
     return {
         routeRows: options.rows.length,
-        restoredRunningEmuCodes: restoredRunningEmuCodes.size,
+        restoredAssignedEmuCodes: restoredAssignedEmuCodes.size,
         restoredTrainKeys: restoredTrainKeys.size,
-        expiredRows,
+        skippedOlderRows,
         fallbackKeys
     };
 }
 
-export function cleanupRunningEmuState(
-    nowSeconds: number,
-    graceSeconds: number
-): void {
-    for (const [emuCode, record] of runningEmuState.entries()) {
-        if (nowSeconds > record.endAt + graceSeconds) {
-            runningEmuState.delete(emuCode);
-        }
-    }
-}
-
-export function isEmuRunning(
-    emuCode: string,
-    nowSeconds: number,
-    graceSeconds: number
-): boolean {
+export function isEmuAssignedToday(emuCode: string): boolean {
     const normalizedEmuCode = normalizeCode(emuCode);
-    const record = runningEmuState.get(normalizedEmuCode);
-    if (!record) {
-        return false;
-    }
-
-    if (nowSeconds > record.endAt + graceSeconds) {
-        runningEmuState.delete(normalizedEmuCode);
-        return false;
-    }
-
-    return true;
+    return assignedTodayEmuState.has(normalizedEmuCode);
 }
 
-export function markRunningEmuCodes(
+export function markEmuCodesAssignedToday(
     emuCodes: string[],
     trainKey: string,
     groupKey: string,
-    endAt: number,
+    startAt: number,
     nowSeconds: number
 ): void {
     for (const rawCode of emuCodes) {
@@ -207,32 +173,23 @@ export function markRunningEmuCodes(
             continue;
         }
 
-        runningEmuState.set(normalizedCode, {
+        assignedTodayEmuState.set(normalizedCode, {
             trainKey,
             groupKey,
-            endAt,
+            startAt,
             lastSeenAt: nowSeconds
         });
     }
 }
 
-export function listActiveRunningEmuCodesByGroupKey(
-    groupKey: string,
-    nowSeconds: number,
-    graceSeconds: number
-): string[] {
+export function listAssignedEmuCodesByGroupKey(groupKey: string): string[] {
     const normalizedGroupKey = groupKey.trim();
     if (normalizedGroupKey.length === 0) {
         return [];
     }
 
     const emuCodes: string[] = [];
-    for (const [emuCode, record] of runningEmuState.entries()) {
-        if (nowSeconds > record.endAt + graceSeconds) {
-            runningEmuState.delete(emuCode);
-            continue;
-        }
-
+    for (const [emuCode, record] of assignedTodayEmuState.entries()) {
         if (record.groupKey !== normalizedGroupKey) {
             continue;
         }
@@ -245,12 +202,12 @@ export function listActiveRunningEmuCodesByGroupKey(
 
 export function clearRunningEmuStateByTrainKey(trainKey: string): string[] {
     const removedEmuCodes: string[] = [];
-    for (const [emuCode, record] of runningEmuState.entries()) {
+    for (const [emuCode, record] of assignedTodayEmuState.entries()) {
         if (record.trainKey !== trainKey) {
             continue;
         }
 
-        runningEmuState.delete(emuCode);
+        assignedTodayEmuState.delete(emuCode);
         removedEmuCodes.push(emuCode);
     }
 

@@ -30,8 +30,6 @@
                 "overlapRetryDelaySeconds": 3600
             },
             "coupling": {
-                "candidateCap": 200,
-                "runningGraceSeconds": 900,
                 "statusResetTimeHHmm": "0000",
                 "detectDelaySeconds": 900,
                 "detectCooldownSeconds": 3600

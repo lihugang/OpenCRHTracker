@@ -67,3 +67,4 @@ PRs should include:
 - Do not commit secrets or environment-specific credentials.
 - Treat `data/config.json` as operational config; keep schema-compatible with `assets/json/configScheme.json`.
 - Review `nuxt.config.ts` security settings carefully before relaxing headers or CSRF protections.
+- If apply patch tool cannot work, please use js_repl to make commits on file. Never using PowerShell Script to edit file, which will cause file encoding fault.

@@ -125,17 +125,14 @@ function rehydrateProbeRuntimeCache(): void {
         rows: rows.map((row) => ({
             trainCode: row.train_code,
             emuCode: row.emu_code,
-            startAt: row.start_at,
-            endAt: row.end_at
+            startAt: row.start_at
         })),
-        nowSeconds: getNowSeconds(),
-        graceSeconds: config.spider.scheduleProbe.coupling.runningGraceSeconds,
         resolveGroupByTrainCode: (trainCode) =>
             scheduleGroupsByTrainCode.get(trainCode) ?? null
     });
 
     logger.info(
-        `rehydrate_probe_runtime done routeRows=${summary.routeRows} restoredRunningEmuCodes=${summary.restoredRunningEmuCodes} restoredTrainKeys=${summary.restoredTrainKeys} expiredRows=${summary.expiredRows} fallbackKeys=${summary.fallbackKeys}`
+        `rehydrate_probe_runtime done routeRows=${summary.routeRows} restoredAssignedEmuCodes=${summary.restoredAssignedEmuCodes} restoredTrainKeys=${summary.restoredTrainKeys} skippedOlderRows=${summary.skippedOlderRows} fallbackKeys=${summary.fallbackKeys}`
     );
 }
 

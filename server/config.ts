@@ -25,8 +25,6 @@ interface ScheduleProbeProbeConfig {
 }
 
 interface ScheduleProbeCouplingConfig {
-    candidateCap: number;
-    runningGraceSeconds: number;
     statusResetTimeHHmm: string;
     detectDelaySeconds: number;
     detectCooldownSeconds: number;
@@ -544,16 +542,6 @@ function validateConfig(raw: unknown): Config {
                     )
                 },
                 coupling: {
-                    candidateCap: asInteger(
-                        spiderScheduleProbeCoupling.candidateCap,
-                        'spider.scheduleProbe.coupling.candidateCap',
-                        1
-                    ),
-                    runningGraceSeconds: asInteger(
-                        spiderScheduleProbeCoupling.runningGraceSeconds,
-                        'spider.scheduleProbe.coupling.runningGraceSeconds',
-                        0
-                    ),
                     statusResetTimeHHmm: asString(
                         spiderScheduleProbeCoupling.statusResetTimeHHmm,
                         'spider.scheduleProbe.coupling.statusResetTimeHHmm'

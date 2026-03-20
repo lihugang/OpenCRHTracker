@@ -140,14 +140,6 @@
                             "type": "object",
                             "additionalProperties": false,
                             "properties": {
-                                "candidateCap": {
-                                    "type": "integer",
-                                    "minimum": 1
-                                },
-                                "runningGraceSeconds": {
-                                    "type": "integer",
-                                    "minimum": 0
-                                },
                                 "statusResetTimeHHmm": {
                                     "type": "string",
                                     "pattern": "^\\d{4}$"
@@ -162,8 +154,6 @@
                                 }
                             },
                             "required": [
-                                "candidateCap",
-                                "runningGraceSeconds",
                                 "statusResetTimeHHmm",
                                 "detectDelaySeconds",
                                 "detectCooldownSeconds"
