@@ -49,6 +49,11 @@
                     "prefix": "C",
                     "minNo": 1,
                     "maxNo": 9999
+                },
+                {
+                    "prefix": "S",
+                    "minNo": 5500,
+                    "maxNo": 5600
                 }
             ]
         }
