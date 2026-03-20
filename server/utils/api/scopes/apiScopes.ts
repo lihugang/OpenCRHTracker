@@ -1,4 +1,7 @@
 export const API_SCOPES = {
+    config: {
+        read: 'api.config.read'
+    },
     auth: {
         me: 'api.auth.me.read',
         logout: 'api.auth.logout',

@@ -148,6 +148,7 @@
         },
         "permissions": {
             "anonymousScopes": [
+                "api.config.read",
                 "api.search.read",
                 "api.records.daily.read",
                 "api.history.train.read",
@@ -155,6 +156,7 @@
                 "api.exports.daily.read"
             ],
             "issuedKeyDefaultScopes": [
+                "api.config.read",
                 "api.search.read",
                 "api.records.daily.read",
                 "api.history.train.read",
