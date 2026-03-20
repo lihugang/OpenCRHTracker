@@ -41,9 +41,8 @@ When SSR code calls this app's own `/api` endpoints, service-side requests must 
 
 There is no automated test framework configured yet. Required validation for changes:
 
-1. Run `pnpm dev` and verify affected pages/API behavior.
-2. Run `pnpm build` to catch compile/runtime integration issues.
-3. Run `pnpm generate` when routes or static behavior change.
+1. Run `pnpm typecheck:server` if you only modify the code in server.
+2. Run `pnpm typecheck` after you change the code.
 
 In each PR, include clear manual verification steps and expected outcomes.
 
@@ -68,3 +67,4 @@ PRs should include:
 - Treat `data/config.json` as operational config; keep schema-compatible with `assets/json/configScheme.json`.
 - Review `nuxt.config.ts` security settings carefully before relaxing headers or CSRF protections.
 - If apply patch tool cannot work, please use js_repl to make commits on file. Never using PowerShell Script to edit file, which will cause file encoding fault.
+- Please do not output any LF or CRLF when you are chatting with users.

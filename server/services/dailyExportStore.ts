@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import type { DailyEmuRouteRow } from '~/server/services/emuRoutesStore';
 import { writeTextFileAtomically } from '~/server/utils/dataAssets/store';
+import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
 
 export const DAILY_EXPORT_FORMATS = ['csv', 'jsonl'] as const;
 const UTF8_BOM = '\uFEFF';
@@ -21,6 +22,19 @@ export interface DailyExportFiles {
     csvFilePath: string;
     jsonlFilePath: string;
     total: number;
+}
+
+export interface DailyExportIndexItem {
+    date: string;
+    formats: DailyExportFormat[];
+}
+
+export interface DailyExportIndex {
+    selectedYear: number;
+    selectedMonth: number;
+    availableYears: number[];
+    availableMonths: number[];
+    items: DailyExportIndexItem[];
 }
 
 function toDailyExportRecord(row: DailyEmuRouteRow): DailyExportRecord {
@@ -137,4 +151,147 @@ export function countDailyExportItems(
     }
 
     return Math.max(0, lines.length - 1);
+}
+
+function parseDailyExportFileName(fileName: string): {
+    date: string;
+    format: DailyExportFormat;
+} | null {
+    const match = /^(\d{8})\.(csv|jsonl)$/.exec(fileName);
+    if (!match) {
+        return null;
+    }
+
+    return {
+        date: match[1]!,
+        format: match[2]! as DailyExportFormat
+    };
+}
+
+function getCurrentShanghaiYearMonth() {
+    const currentDate = getCurrentDateString();
+
+    return {
+        year: Number.parseInt(currentDate.slice(0, 4), 10),
+        month: Number.parseInt(currentDate.slice(4, 6), 10)
+    };
+}
+
+function pickNearestValue(
+    target: number | undefined,
+    candidates: readonly number[]
+): number {
+    if (candidates.length === 0) {
+        throw new Error('pickNearestValue requires at least one candidate');
+    }
+
+    if (target === undefined) {
+        return candidates[0]!;
+    }
+
+    return candidates.reduce((best, candidate) => {
+        const bestDistance = Math.abs(best - target);
+        const candidateDistance = Math.abs(candidate - target);
+
+        if (candidateDistance < bestDistance) {
+            return candidate;
+        }
+
+        if (candidateDistance === bestDistance && candidate > best) {
+            return candidate;
+        }
+
+        return best;
+    });
+}
+
+export function listDailyExportIndex(
+    requestedYear?: number,
+    requestedMonth?: number
+): DailyExportIndex {
+    const exportsDirectory = path.resolve('data/exports');
+
+    if (!fs.existsSync(exportsDirectory)) {
+        const current = getCurrentShanghaiYearMonth();
+
+        return {
+            selectedYear: current.year,
+            selectedMonth: current.month,
+            availableYears: [],
+            availableMonths: [],
+            items: []
+        };
+    }
+
+    const formatsByDate = new Map<string, Set<DailyExportFormat>>();
+    const monthsByYear = new Map<number, Set<number>>();
+
+    for (const entry of fs.readdirSync(exportsDirectory, {
+        withFileTypes: true
+    })) {
+        if (!entry.isFile()) {
+            continue;
+        }
+
+        const parsed = parseDailyExportFileName(entry.name);
+        if (!parsed) {
+            continue;
+        }
+
+        const year = Number.parseInt(parsed.date.slice(0, 4), 10);
+        const month = Number.parseInt(parsed.date.slice(4, 6), 10);
+        const formats = formatsByDate.get(parsed.date) ?? new Set();
+
+        formats.add(parsed.format);
+        formatsByDate.set(parsed.date, formats);
+
+        const months = monthsByYear.get(year) ?? new Set<number>();
+        months.add(month);
+        monthsByYear.set(year, months);
+    }
+
+    const availableYears = [...monthsByYear.keys()].sort((left, right) => {
+        return right - left;
+    });
+
+    if (availableYears.length === 0) {
+        const current = getCurrentShanghaiYearMonth();
+
+        return {
+            selectedYear: current.year,
+            selectedMonth: current.month,
+            availableYears: [],
+            availableMonths: [],
+            items: []
+        };
+    }
+
+    const selectedYear = pickNearestValue(requestedYear, availableYears);
+    const monthsForYear = [...(monthsByYear.get(selectedYear) ?? [])].sort(
+        (left, right) => right - left
+    );
+    const selectedMonth = pickNearestValue(requestedMonth, monthsForYear);
+
+    const items = [...formatsByDate.entries()]
+        .filter(([date]) => {
+            return (
+                Number.parseInt(date.slice(0, 4), 10) === selectedYear &&
+                Number.parseInt(date.slice(4, 6), 10) === selectedMonth
+            );
+        })
+        .sort(([leftDate], [rightDate]) => rightDate.localeCompare(leftDate))
+        .map(([date, formats]) => ({
+            date,
+            formats: DAILY_EXPORT_FORMATS.filter((format) =>
+                formats.has(format)
+            )
+        }));
+
+    return {
+        selectedYear,
+        selectedMonth,
+        availableYears,
+        availableMonths: monthsForYear,
+        items
+    };
 }

@@ -9,6 +9,20 @@ export function getDailyResponseCacheControlMaxAge(date: string): number {
         : cache.historicalMaxAgeSeconds;
 }
 
+export function getMonthlyResponseCacheControlMaxAge(
+    year: number,
+    month: number
+): number {
+    const cache = useConfig().api.cache;
+    const currentDate = getCurrentDateString();
+    const currentYear = Number.parseInt(currentDate.slice(0, 4), 10);
+    const currentMonth = Number.parseInt(currentDate.slice(4, 6), 10);
+
+    return year === currentYear && month === currentMonth
+        ? cache.currentDayMaxAgeSeconds
+        : cache.historicalMaxAgeSeconds;
+}
+
 export function getHistoryResponseCacheControlMaxAge(
     latestStartAt: number | undefined,
     itemsLength: number,

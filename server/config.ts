@@ -201,6 +201,7 @@ export interface Config {
             authListApiKeys: number;
             authRevokeApiKey: number;
             searchIndex: number;
+            exportDailyIndex: number;
             exportDaily: number;
         };
         perRecord: {
@@ -916,6 +917,11 @@ function validateConfig(raw: unknown): Config {
                 searchIndex: asNumber(
                     costFixed.searchIndex,
                     'cost.fixed.searchIndex',
+                    0
+                ),
+                exportDailyIndex: asNumber(
+                    costFixed.exportDailyIndex,
+                    'cost.fixed.exportDailyIndex',
                     0
                 ),
                 exportDaily: asNumber(

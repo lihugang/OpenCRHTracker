@@ -218,6 +218,7 @@
             "authListApiKeys": 1,
             "authRevokeApiKey": 1,
             "searchIndex": 1,
+            "exportDailyIndex": 2,
             "exportDaily": 50
         },
         "perRecord": {

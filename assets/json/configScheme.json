@@ -837,6 +837,10 @@
                             "type": "integer",
                             "minimum": 0
                         },
+                        "exportDailyIndex": {
+                            "type": "integer",
+                            "minimum": 0
+                        },
                         "exportDaily": {
                             "type": "integer",
                             "minimum": 0
@@ -851,6 +855,7 @@
                         "authListApiKeys",
                         "authRevokeApiKey",
                         "searchIndex",
+                        "exportDailyIndex",
                         "exportDaily"
                     ]
                 },
