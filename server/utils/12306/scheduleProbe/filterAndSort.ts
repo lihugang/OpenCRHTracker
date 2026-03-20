@@ -39,7 +39,9 @@ export function sortScheduleItems(
 ): ScheduleItem[] {
     const prefixOrder = new Map<string, number>();
     for (const [index, rule] of rules.entries()) {
-        prefixOrder.set(rule.prefix, index);
+        if (!prefixOrder.has(rule.prefix)) {
+            prefixOrder.set(rule.prefix, index);
+        }
     }
 
     return [...items].sort((a, b) => {

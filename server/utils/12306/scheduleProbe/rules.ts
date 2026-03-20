@@ -17,10 +17,11 @@ function sortRulesByPrefixLengthDesc(
     return [...rules].sort((a, b) => b.prefix.length - a.prefix.length);
 }
 
-export function getRuleByKeyword(
+export function getRulesByKeyword(
     keyword: string,
     rules: ScheduleProbePrefixRule[]
-): RuleByKeywordMatch | null {
+): RuleByKeywordMatch[] {
+    const matches: RuleByKeywordMatch[] = [];
     for (const rule of sortRulesByPrefixLengthDesc(rules)) {
         if (!keyword.startsWith(rule.prefix)) {
             continue;
@@ -34,12 +35,12 @@ export function getRuleByKeyword(
             continue;
         }
 
-        return {
+        matches.push({
             rule,
             digitPrefix
-        };
+        });
     }
-    return null;
+    return matches;
 }
 
 export function getRuleByCode(

@@ -1025,13 +1025,27 @@ function validateConfig(raw: unknown): Config {
             );
         }
     }
-    const deduplicationPrefix = new Set<string>();
+    const groupedPrefixRules = new Map<string, ScheduleProbePrefixRule[]>();
     for (const rule of configResult.spider.scheduleProbe.prefixRules) {
-        assert(
-            !deduplicationPrefix.has(rule.prefix),
-            `spider.scheduleProbe.prefixRules has duplicated prefix: ${rule.prefix}`
-        );
-        deduplicationPrefix.add(rule.prefix);
+        const rules = groupedPrefixRules.get(rule.prefix) ?? [];
+        rules.push(rule);
+        groupedPrefixRules.set(rule.prefix, rules);
+    }
+    for (const [prefix, rules] of groupedPrefixRules) {
+        const sortedRules = [...rules].sort((left, right) => {
+            if (left.minNo !== right.minNo) {
+                return left.minNo - right.minNo;
+            }
+            return left.maxNo - right.maxNo;
+        });
+        for (let index = 1; index < sortedRules.length; index += 1) {
+            const previous = sortedRules[index - 1]!;
+            const current = sortedRules[index]!;
+            assert(
+                current.minNo > previous.maxNo,
+                `spider.scheduleProbe.prefixRules has overlapping ranges for prefix ${prefix}: ${previous.minNo}-${previous.maxNo} and ${current.minNo}-${current.maxNo}`
+            );
+        }
     }
     assert(
         configResult.task.scheduler.idle.emaAlpha > 0 &&
