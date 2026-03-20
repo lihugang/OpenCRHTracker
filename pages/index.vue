@@ -90,7 +90,7 @@ let mediaQueryHandler: ((event: MediaQueryListEvent) => void) | null = null;
 const detectedTarget = computed(() => resolveLookupTarget(draftCode.value));
 
 useHead({
-    title: 'OpenCRHTracker | 首页',
+    title: '首页 | Open CRH Tracker',
     meta: [
         {
             name: 'description',

@@ -217,7 +217,7 @@ const statusMarker = computed(() =>
 );
 
 useHead({
-    title: 'OpenCRHTracker | 登录 / 注册',
+    title: '登录 / 注册 | Open CRH Tracker',
     meta: [
         {
             name: 'description',

@@ -113,7 +113,7 @@ const timingDescription = computed(() => {
 });
 
 useHead({
-    title: '关于 | OpenCRHTracker',
+    title: '关于 | Open CRH Tracker',
     meta: [
         {
             name: 'description',

@@ -570,7 +570,7 @@ const dashboardPageCopy = {
     currentPanelLabel: '当前面板',
     panelSheetEyebrow: 'SWITCH',
     panelSheetTitle: '切换选项卡',
-    pageTitle: 'OpenCRHTracker | 设置',
+    pageTitle: '设置 | Open CRH Tracker',
     pageDescription: '管理会话和 API 密钥。'
 } as const;
 

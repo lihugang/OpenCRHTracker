@@ -77,11 +77,11 @@
 const { shouldShowUnofficialWarning } = useOfficialInstance();
 
 useHead({
-    title: '反馈 | OpenCRHTracker',
+    title: '反馈 | Open CRH Tracker',
     meta: [
         {
             name: 'description',
-            content: '向 OpenCRHTracker 提交建议或问题反馈。'
+            content: '向 Open CRH Tracker 提交建议或问题反馈。'
         }
     ]
 });
