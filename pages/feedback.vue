@@ -21,6 +21,8 @@
                             </h1>
                         </div>
 
+                        <AppUnofficialInstanceNotice page="feedback" />
+
                         <p class="text-base leading-7 text-slate-600">
                             如果你在查询过程中遇到问题，或希望补充功能与页面内容，可以通过项目仓库提交
                             issue 或反馈建议。

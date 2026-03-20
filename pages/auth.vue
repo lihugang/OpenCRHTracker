@@ -33,6 +33,8 @@
 
                             <div class="motion-divider" />
 
+                            <AppUnofficialInstanceNotice page="auth" />
+
                             <form
                                 class="space-y-5"
                                 @submit.prevent="submitAuth">
