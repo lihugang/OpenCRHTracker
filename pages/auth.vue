@@ -33,7 +33,7 @@
 
                             <div class="motion-divider" />
 
-                            <AppUnofficialInstanceNotice page="auth" />
+                            <AppUnofficialInstanceNotice />
 
                             <form
                                 class="space-y-5"

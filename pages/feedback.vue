@@ -21,20 +21,49 @@
                             </h1>
                         </div>
 
-                        <AppUnofficialInstanceNotice page="feedback" />
+                        <template v-if="shouldShowUnofficialWarning">
+                            <p class="text-base leading-7 text-[#E53E3E]">
+                                <span class="font-semibold">[!]</span>
+                                当前网站非 Open CRH Tracker 官方站点，如需反馈问题或提出建议，请前往
+                                <a
+                                    href="https://crh.lihugang.top/feedback"
+                                    class="font-semibold underline underline-offset-4 transition hover:text-[#C53030]"
+                                    rel="noreferrer"
+                                    target="_blank">
+                                    官方站点
+                                </a>
+                                或
+                                <a
+                                    href="https://github.com/lihugang/OpenCRHTracker"
+                                    class="font-semibold underline underline-offset-4 transition hover:text-[#C53030]"
+                                    rel="noreferrer"
+                                    target="_blank">
+                                    GitHub 项目
+                                </a>
+                                。
+                            </p>
+                        </template>
 
-                        <p class="text-base leading-7 text-slate-600">
-                            如果你在查询过程中遇到问题，或希望补充功能与页面内容，可以通过项目仓库提交
-                            issue 或反馈建议。
-                        </p>
+                        <template v-else>
+                            <p class="text-base leading-7 text-slate-600">
+                                如果你在查询过程中遇到问题，或希望补充功能与页面内容，可以通过项目仓库提交
+                                issue 或反馈建议。
+                            </p>
 
-                        <a
-                            href="https://github.com/lihugang/OpenCRHTracker/issues"
-                            class="inline-flex items-center text-sm font-medium text-crh-blue underline underline-offset-4 transition hover:text-slate-900"
-                            rel="noreferrer"
-                            target="_blank">
-                            前往 GitHub Issues
-                        </a>
+                            <a
+                                href="https://github.com/lihugang/OpenCRHTracker/issues"
+                                class="inline-flex items-center text-sm font-medium text-crh-blue underline underline-offset-4 transition hover:text-slate-900"
+                                rel="noreferrer"
+                                target="_blank">
+                                前往 GitHub Issues
+                            </a>
+                        </template>
+
+                        <NuxtLink
+                            to="/"
+                            class="inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-900 hover:text-slate-900">
+                            返回主页
+                        </NuxtLink>
                     </div>
                 </UiCard>
             </section>
@@ -45,6 +74,8 @@
 </template>
 
 <script setup lang="ts">
+const { shouldShowUnofficialWarning } = useOfficialInstance();
+
 useHead({
     title: '反馈 | OpenCRHTracker',
     meta: [

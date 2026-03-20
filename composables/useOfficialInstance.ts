@@ -10,12 +10,15 @@ const OFFICIAL_HOSTNAME = new TextDecoder()
 export default function useOfficialInstance() {
     const requestUrl = useRequestURL();
     const currentHostname = (requestUrl.hostname || '').toLowerCase();
-    const isOfficialInstance = currentHostname === OFFICIAL_HOSTNAME;
+    const isDevelopment = import.meta.dev;
+    const isOfficialInstance =
+        isDevelopment || currentHostname === OFFICIAL_HOSTNAME;
 
     return {
         currentHostname,
         officialHostname: OFFICIAL_HOSTNAME,
         officialOrigin: `https://${OFFICIAL_HOSTNAME}`,
+        isDevelopment,
         isOfficialInstance,
         shouldShowUnofficialWarning: !isOfficialInstance
     };
