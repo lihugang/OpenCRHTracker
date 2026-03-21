@@ -9,7 +9,7 @@ export default function ensurePayloadStringLength(
         throw new ApiRequestError(
             400,
             'invalid_param',
-            `${fieldName} length exceeds limit`
+            `${fieldName} 长度超出限制`
         );
     }
 }

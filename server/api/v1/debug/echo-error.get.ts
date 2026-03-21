@@ -29,10 +29,7 @@ export default defineEventHandler(async (event) => {
                 typeof query.code === 'string' && query.code.length > 0
                     ? query.code
                     : 'debug_error';
-            const message =
-                typeof query.message === 'string' && query.message.length > 0
-                    ? query.message
-                    : '这是调试错误返回';
+            const message = '这是调试错误返回';
 
             ensure(
                 Number.isInteger(statusCode) &&

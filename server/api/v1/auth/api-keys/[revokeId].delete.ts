@@ -20,7 +20,7 @@ export default defineEventHandler(async (event) => {
                 typeof revokeId === 'string' && revokeId.length > 0,
                 400,
                 'invalid_param',
-                'A revokeId is required'
+                'revokeId 不能为空'
             );
 
             const revoked = revokeApiKeyByRevokeIdAndUser(
@@ -31,7 +31,7 @@ export default defineEventHandler(async (event) => {
                 throw new ApiRequestError(
                     404,
                     'not_found',
-                    'No revocable key was found for this revokeId'
+                    '未找到该 revokeId 对应的可撤销 API Key'
                 );
             }
 

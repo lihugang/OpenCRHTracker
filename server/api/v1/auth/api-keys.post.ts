@@ -34,7 +34,7 @@ function ensureIntegerTimestamp(
             value > 0,
         400,
         'invalid_param',
-        `${field} must be a positive integer Unix timestamp`
+        `${field} 必须是正整数 Unix 时间戳`
     );
 
     return value;
@@ -59,7 +59,7 @@ export default defineEventHandler(async (event) => {
                     !Array.isArray(body),
                 400,
                 'invalid_param',
-                'Request body must be a JSON object'
+                '请求体必须是 JSON 对象'
             );
 
             ensure(
@@ -71,7 +71,7 @@ export default defineEventHandler(async (event) => {
                     body.apiKey === undefined,
                 400,
                 'invalid_param',
-                'Request body includes fields that clients are not allowed to send'
+                '请求体包含客户端不允许传入的字段'
             );
 
             const activeFrom = ensureIntegerTimestamp(
@@ -87,20 +87,20 @@ export default defineEventHandler(async (event) => {
                 activeFrom < expiresAt,
                 400,
                 'invalid_param',
-                'expiresAt must be greater than activeFrom'
+                'expiresAt 必须大于 activeFrom'
             );
             ensure(
                 expiresAt - activeFrom <= config.user.apiKeyMaxLifetimeSeconds,
                 400,
                 'invalid_param',
-                'API key lifetime exceeds the configured maximum'
+                'API Key 有效期超过服务端配置上限'
             );
 
             ensure(
                 Array.isArray(body.scopes) && body.scopes.length > 0,
                 400,
                 'invalid_param',
-                'scopes must be a non-empty string array'
+                'scopes 必须是非空字符串数组'
             );
 
             const rawScopes = body.scopes.map((scope, index) => {
@@ -108,7 +108,7 @@ export default defineEventHandler(async (event) => {
                     typeof scope === 'string',
                     400,
                     'invalid_param',
-                    `scopes[${index}] must be a string`
+                    `scopes[${index}] 必须是字符串`
                 );
                 ensurePayloadStringLength(
                     scope,
@@ -127,7 +127,7 @@ export default defineEventHandler(async (event) => {
                     'invalid_param',
                     error instanceof Error
                         ? error.message
-                        : 'scopes are invalid'
+                        : 'scopes 无效'
                 );
             }
 
@@ -135,7 +135,7 @@ export default defineEventHandler(async (event) => {
                 throw new ApiRequestError(
                     403,
                     'forbidden_scope',
-                    'scopes must be a subset of the current API key scopes'
+                    'scopes 必须是当前 API Key 权限范围的子集'
                 );
             }
 
@@ -143,7 +143,7 @@ export default defineEventHandler(async (event) => {
                 throw new ApiRequestError(
                     403,
                     'forbidden_scope',
-                    'scopes exceed the server-side creatable scope limit'
+                    'scopes 超出服务端允许创建的权限范围'
                 );
             }
 

@@ -36,7 +36,7 @@ export function validatePassword(password: string) {
 
 export function validatePasswordDigest(passwordDigest: string) {
     if (!passwordDigestPattern.test(passwordDigest)) {
-        return 'passwordDigest 格式无效';
+        return 'passwordDigest 格式不正确';
     }
 
     return '';
