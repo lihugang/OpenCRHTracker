@@ -21,7 +21,13 @@
             @keydown.home.prevent="setBoundaryIndex('start')"
             @keydown.end.prevent="setBoundaryIndex('end')">
             <span class="block min-w-0">
-                <span class="block truncate font-medium text-slate-900">
+                <span
+                    class="block truncate font-medium"
+                    :class="
+                        hasSelectedOption || !props.placeholder
+                            ? 'text-slate-900'
+                            : 'text-slate-400'
+                    ">
                     {{ selectedLabel }}
                 </span>
             </span>
@@ -180,11 +186,15 @@ const props = withDefaults(
         disabled?: boolean;
         mobileSheetTitle?: string;
         mobileSheetEyebrow?: string;
+        mobilePresentation?: 'sheet' | 'dropdown';
+        placeholder?: string;
     }>(),
     {
         disabled: false,
         mobileSheetTitle: '选择选项',
-        mobileSheetEyebrow: 'SELECT'
+        mobileSheetEyebrow: 'SELECT',
+        mobilePresentation: 'sheet',
+        placeholder: ''
     }
 );
 
@@ -202,19 +212,27 @@ const buttonId = `ui-select-button-${useId()}`;
 const listboxId = `ui-select-listbox-${useId()}`;
 const mediaQuery = ref<MediaQueryList | null>(null);
 
-const usesBottomSheet = computed(() => isPortraitViewport.value);
+const usesBottomSheet = computed(
+    () =>
+        props.mobilePresentation === 'sheet' && isPortraitViewport.value
+);
 const mobileSheetTitle = computed(() => props.mobileSheetTitle);
 const mobileSheetEyebrow = computed(() => props.mobileSheetEyebrow);
 
 const selectedIndex = computed(() =>
     props.options.findIndex((option) => option.value === model.value)
 );
+const hasSelectedOption = computed(() => selectedIndex.value >= 0);
 
 const selectedLabel = computed(() => {
     const selectedOption = props.options[selectedIndex.value];
 
     if (selectedOption) {
         return selectedOption.label;
+    }
+
+    if (props.placeholder) {
+        return props.placeholder;
     }
 
     return props.options[0]?.label ?? '';
@@ -360,7 +378,7 @@ function handleBottomSheetVisibilityChange(nextValue: boolean) {
 
 function handleMediaQueryChange(event: MediaQueryListEvent) {
     isPortraitViewport.value = event.matches;
-    if (!event.matches) {
+    if (!event.matches || props.mobilePresentation !== 'sheet') {
         return;
     }
 

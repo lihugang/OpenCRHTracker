@@ -46,7 +46,6 @@ const logger = getLogger('task-executor:detect-coupled-emu-group');
 
 interface DetectCoupledEmuGroupTaskArgs {
     bureau: string;
-    legacyDepot: string;
     model: string;
 }
 
@@ -67,15 +66,13 @@ function parseTaskArgs(raw: unknown): DetectCoupledEmuGroupTaskArgs {
 
     const body = raw as {
         bureau?: unknown;
-        depot?: unknown;
         model?: unknown;
     };
     const bureau = typeof body.bureau === 'string' ? body.bureau.trim() : '';
-    const legacyDepot = typeof body.depot === 'string' ? body.depot.trim() : '';
     const model =
         typeof body.model === 'string' ? normalizeCode(body.model) : '';
     if (
-        (bureau.length === 0 && legacyDepot.length === 0) ||
+        (bureau.length === 0) ||
         model.length === 0
     ) {
         throw new Error(
@@ -85,44 +82,12 @@ function parseTaskArgs(raw: unknown): DetectCoupledEmuGroupTaskArgs {
 
     return {
         bureau,
-        legacyDepot,
         model
     };
 }
 
 function buildBureauAndModelKey(bureau: string, model: string): string {
     return `${bureau.trim()}#${normalizeCode(model)}`;
-}
-
-function resolveDetectionBureau(
-    args: DetectCoupledEmuGroupTaskArgs,
-    assets: Awaited<ReturnType<typeof loadProbeAssets>>
-): string {
-    if (args.bureau.length > 0) {
-        return args.bureau;
-    }
-
-    const matchedBureaus = new Set<string>();
-    for (const record of assets.emuList) {
-        if (record.depot !== args.legacyDepot || record.model !== args.model) {
-            continue;
-        }
-        matchedBureaus.add(record.bureau);
-    }
-
-    if (matchedBureaus.size === 1) {
-        return Array.from(matchedBureaus)[0]!;
-    }
-
-    if (matchedBureaus.size === 0) {
-        throw new Error(
-            `legacy detection task bureau resolution failed for depot=${args.legacyDepot} model=${args.model}`
-        );
-    }
-
-    throw new Error(
-        `legacy detection task bureau resolution is ambiguous for depot=${args.legacyDepot} model=${args.model}`
-    );
 }
 
 function getCurrentDayWindow(): {
@@ -379,7 +344,7 @@ function collectPendingTrackedGroups(
             if (
                 !trackedGroup ||
                 trackedGroup.finalStatus !==
-                    ProbeStatusValue.PendingCouplingDetection
+                ProbeStatusValue.PendingCouplingDetection
             ) {
                 continue;
             }
@@ -493,7 +458,7 @@ async function persistResolvedTrackedGroup(
     const previousStatus = trackedGroup.finalStatus;
     const finalStatus =
         previousStatus === ProbeStatusValue.CoupledFormationResolved ||
-        emuCodes.length > 1
+            emuCodes.length > 1
             ? ProbeStatusValue.CoupledFormationResolved
             : ProbeStatusValue.SingleFormationResolved;
     const scheduleRoute = resolveScheduleRoute(
@@ -557,7 +522,7 @@ async function executeDetectCoupledEmuGroupTask(
     ensureProbeStateForToday();
     const args = parseTaskArgs(rawArgs);
     const assets = await loadProbeAssets();
-    const bureau = resolveDetectionBureau(args, assets);
+    const bureau = args.bureau;
     const config = useConfig();
     const nowSeconds = getNowSeconds();
     const cooldownSeconds =

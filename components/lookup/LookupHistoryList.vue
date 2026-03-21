@@ -186,7 +186,15 @@
                                 ]">
                                 <td
                                     class="border-b border-slate-100 px-4 py-4 text-sm font-medium text-crh-grey-dark last:border-b-0">
-                                    {{ formatDateLabel(item.startAt) }}
+                                    <NuxtLink
+                                        v-if="shouldShowExportDateLink(item.startAt)"
+                                        :to="buildExportDateLink(item.startAt)"
+                                        class="history-date-link">
+                                        {{ formatDateLabel(item.startAt) }}
+                                    </NuxtLink>
+                                    <span v-else>
+                                        {{ formatDateLabel(item.startAt) }}
+                                    </span>
                                 </td>
                                 <td
                                     class="border-b border-slate-100 px-4 py-4 font-mono text-sm font-semibold text-crh-blue last:border-b-0">
@@ -269,10 +277,17 @@
                         <div class="space-y-3">
                             <div class="flex items-start gap-3">
                                 <div class="min-w-0">
-                                    <p
-                                        class="text-xs font-medium text-slate-500">
-                                        {{ formatDateLabel(item.startAt) }}
-                                    </p>
+                                    <div class="text-xs font-medium text-slate-500">
+                                        <NuxtLink
+                                            v-if="shouldShowExportDateLink(item.startAt)"
+                                            :to="buildExportDateLink(item.startAt)"
+                                            class="history-date-link">
+                                            {{ formatDateLabel(item.startAt) }}
+                                        </NuxtLink>
+                                        <span v-else>
+                                            {{ formatDateLabel(item.startAt) }}
+                                        </span>
+                                    </div>
                                     <div
                                         class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-sm font-semibold text-crh-blue">
                                         <template
@@ -458,6 +473,7 @@ import type {
     RecentAssignmentsState
 } from '~/types/lookup';
 import isTimestampRangeActive from '~/utils/time/isTimestampRangeActive';
+import formatShanghaiDateString from '~/utils/time/formatShanghaiDateString';
 import { buildLookupPath } from '~/utils/lookup/lookupTarget';
 
 interface GroupedHistoryListItem {
@@ -504,6 +520,7 @@ const emit = defineEmits<{
 }>();
 
 const currentUnixSeconds = useCurrentUnixSeconds();
+const { isAuthenticated } = useAuthState();
 const sentinelRef = ref<HTMLElement | null>(null);
 let sentinelObserver: IntersectionObserver | null = null;
 
@@ -731,6 +748,28 @@ function getValueTextClass(isMissing: boolean, monospace = false) {
         : 'text-slate-400 italic';
 }
 
+function shouldShowExportDateLink(timestamp: number) {
+    return (
+        isAuthenticated.value &&
+        !isMissingTimestamp(timestamp) &&
+        formatShanghaiDateString(timestamp) !==
+            formatShanghaiDateString(currentUnixSeconds.value)
+    );
+}
+
+function buildExportDateLink(timestamp: number) {
+    const date = formatShanghaiDateString(timestamp);
+
+    return {
+        path: '/exports/daily',
+        query: {
+            year: date.slice(0, 4),
+            month: String(Number.parseInt(date.slice(4, 6), 10)),
+            date
+        }
+    };
+}
+
 function buildCodeLink(code: string) {
     return buildLookupPath({
         type: props.type === 'train' ? 'emu' : 'train',
@@ -750,6 +789,25 @@ function buildCodeLink(code: string) {
 
 .history-table-row--tinted:not(.running-result-row) > td {
     background-color: rgba(219, 234, 254, 0.68);
+}
+
+.history-date-link {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    color: inherit;
+    text-decoration: none;
+    transition:
+        color 180ms ease,
+        background-color 180ms ease,
+        box-shadow 180ms ease;
+}
+
+.history-date-link:hover {
+    color: inherit;
+    text-decoration: underline;
+    text-decoration-color: rgba(0, 82, 155, 0.42);
+    text-underline-offset: 0.2em;
 }
 
 .history-result-card {

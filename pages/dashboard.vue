@@ -625,7 +625,12 @@ const scopeLabelMap: Record<string, string> = {
     'api.history.emu.read': '读取动车组历史记录',
     'api.exports': '导出',
     'api.exports.daily': '按日导出',
-    'api.exports.daily.read': '导出某日所有数据'
+    'api.exports.daily.read': '导出某日所有数据',
+    'api.feedback': '反馈',
+    'api.feedback.read': '读取反馈',
+    'api.feedback.create': '提交反馈',
+    'api.feedback.reply': '回复反馈',
+    'api.feedback.manage': '管理反馈'
 };
 
 interface DashboardMutationOptions {

@@ -30,6 +30,8 @@ deploy_meta
 code_lines.json
 page-ssr.zip
 scripts/*-local.mjs
+deploy.sh
+setup.sh
 
 # Generated commit id
 utils/meta/commit.ts

@@ -36,6 +36,19 @@ interface ApiPermissionConfig {
     creatableKeyMaxScopes: string[];
 }
 
+interface FeedbackValidationLengthConfig {
+    minLength: number;
+    maxLength: number;
+}
+
+interface ApiFeedbackConfig {
+    validation: {
+        createBody: FeedbackValidationLengthConfig;
+        replyBody: FeedbackValidationLengthConfig;
+        title: FeedbackValidationLengthConfig;
+    };
+}
+
 interface ApiKeyCleanupConfig {
     retentionDays: number;
     dailyTimeHHmm: string;
@@ -102,7 +115,7 @@ export interface Config {
             QRCode: RefreshableAssetConfig;
             schedule: AssetConfig;
         };
-        databases: Record<'task' | 'EMUTracked' | 'users', string>;
+        databases: Record<'task' | 'EMUTracked' | 'users' | 'feedback', string>;
     };
     user: {
         saltLength: number;
@@ -148,6 +161,7 @@ export interface Config {
         payload: {
             maxStringLength: number;
         };
+        feedback: ApiFeedbackConfig;
         headers: {
             remain: string;
             cost: string;
@@ -417,6 +431,23 @@ function validateConfig(raw: unknown): Config {
         'api.authCache.apiKeyRecord'
     );
     const apiPayload = asObject(api.payload, 'api.payload');
+    const apiFeedback = asObject(api.feedback, 'api.feedback');
+    const apiFeedbackValidation = asObject(
+        apiFeedback.validation,
+        'api.feedback.validation'
+    );
+    const apiFeedbackValidationCreateBody = asObject(
+        apiFeedbackValidation.createBody,
+        'api.feedback.validation.createBody'
+    );
+    const apiFeedbackValidationReplyBody = asObject(
+        apiFeedbackValidation.replyBody,
+        'api.feedback.validation.replyBody'
+    );
+    const apiFeedbackValidationTitle = asObject(
+        apiFeedbackValidation.title,
+        'api.feedback.validation.title'
+    );
     const apiHeaders = asObject(api.headers, 'api.headers');
     const apiCache = asObject(api.cache, 'api.cache');
     const apiPagination = asObject(api.pagination, 'api.pagination');
@@ -620,7 +651,11 @@ function validateConfig(raw: unknown): Config {
                     databases.EMUTracked,
                     'data.databases.EMUTracked'
                 ),
-                users: asString(databases.users, 'data.databases.users')
+                users: asString(databases.users, 'data.databases.users'),
+                feedback: asString(
+                    databases.feedback,
+                    'data.databases.feedback'
+                )
             }
         },
         user: {
@@ -737,6 +772,46 @@ function validateConfig(raw: unknown): Config {
                     'api.payload.maxStringLength',
                     1
                 )
+            },
+            feedback: {
+                validation: {
+                    createBody: {
+                        minLength: asInteger(
+                            apiFeedbackValidationCreateBody.minLength,
+                            'api.feedback.validation.createBody.minLength',
+                            0
+                        ),
+                        maxLength: asInteger(
+                            apiFeedbackValidationCreateBody.maxLength,
+                            'api.feedback.validation.createBody.maxLength',
+                            1
+                        )
+                    },
+                    replyBody: {
+                        minLength: asInteger(
+                            apiFeedbackValidationReplyBody.minLength,
+                            'api.feedback.validation.replyBody.minLength',
+                            0
+                        ),
+                        maxLength: asInteger(
+                            apiFeedbackValidationReplyBody.maxLength,
+                            'api.feedback.validation.replyBody.maxLength',
+                            1
+                        )
+                    },
+                    title: {
+                        minLength: asInteger(
+                            apiFeedbackValidationTitle.minLength,
+                            'api.feedback.validation.title.minLength',
+                            0
+                        ),
+                        maxLength: asInteger(
+                            apiFeedbackValidationTitle.maxLength,
+                            'api.feedback.validation.title.maxLength',
+                            1
+                        )
+                    }
+                }
             },
             headers: {
                 remain: asString(apiHeaders.remain, 'api.headers.remain'),
@@ -972,6 +1047,21 @@ function validateConfig(raw: unknown): Config {
         configResult.api.pagination.maxLimit >=
             configResult.api.pagination.defaultLimit,
         'api.pagination.maxLimit must be >= defaultLimit'
+    );
+    assert(
+        configResult.api.feedback.validation.createBody.maxLength >=
+            configResult.api.feedback.validation.createBody.minLength,
+        'api.feedback.validation.createBody.maxLength must be >= minLength'
+    );
+    assert(
+        configResult.api.feedback.validation.replyBody.maxLength >=
+            configResult.api.feedback.validation.replyBody.minLength,
+        'api.feedback.validation.replyBody.maxLength must be >= minLength'
+    );
+    assert(
+        configResult.api.feedback.validation.title.maxLength >=
+            configResult.api.feedback.validation.title.minLength,
+        'api.feedback.validation.title.maxLength must be >= minLength'
     );
     assert(
         configResult.spider.scheduleProbe.prefixRules.length > 0,

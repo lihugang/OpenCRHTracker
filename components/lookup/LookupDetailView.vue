@@ -87,6 +87,7 @@ import {
     normalizeLookupCode,
     resolveLookupTarget
 } from '~/utils/lookup/lookupTarget';
+import { buildFeedbackSourceQuery } from '~/utils/feedback/source';
 
 const MOBILE_QUERY = '(max-width: 767px)';
 const MOBILE_COLLAPSE_OFFSET = 28;
@@ -139,6 +140,19 @@ const searchTitle = computed(() => {
 const searchDescription = computed(() => {
     return '';
 });
+
+const feedbackLink = computed(() => ({
+    path: '/feedback',
+    query: buildFeedbackSourceQuery({
+        sourcePath: route.path,
+        sourceFullPath: route.fullPath,
+        sourceTitle:
+            props.targetType === 'train' ? '车次详情查询' : '车组详情查询',
+        sourceType: props.targetType,
+        sourceCode: normalizedCode.value,
+        sourceSummary: summary.value
+    })
+}));
 
 function syncHeaderCollapsedState() {
     if (!import.meta.client) {

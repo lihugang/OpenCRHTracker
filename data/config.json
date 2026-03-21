@@ -84,7 +84,8 @@
         "databases": {
             "task": "data/task.db",
             "EMUTracked": "data/emu.db",
-            "users": "data/users.db"
+            "users": "data/users.db",
+            "feedback": "data/feedback.db"
         }
     },
     "user": {
@@ -131,6 +132,22 @@
         "payload": {
             "maxStringLength": 16384
         },
+        "feedback": {
+            "validation": {
+                "createBody": {
+                    "minLength": 2,
+                    "maxLength": 12000
+                },
+                "replyBody": {
+                    "minLength": 2,
+                    "maxLength": 2000
+                },
+                "title": {
+                    "minLength": 4,
+                    "maxLength": 80
+                }
+            }
+        },
         "headers": {
             "remain": "x-api-remain",
             "cost": "x-api-cost",
@@ -156,7 +173,9 @@
                 "api.records.daily.read",
                 "api.history.train.read",
                 "api.history.emu.read",
-                "api.exports.daily.read"
+                "api.exports.daily.read",
+                "api.feedback.read",
+                "api.feedback.create"
             ],
             "issuedKeyDefaultScopes": [
                 "api.config.read",
@@ -165,6 +184,9 @@
                 "api.history.train.read",
                 "api.history.emu.read",
                 "api.exports.daily.read",
+                "api.feedback.read",
+                "api.feedback.create",
+                "api.feedback.reply",
                 "api.auth.me.read",
                 "api.auth.logout",
                 "api.auth.api-keys.read",

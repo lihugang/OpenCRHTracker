@@ -120,11 +120,16 @@
 
                         <div
                             v-else
+                            ref="exportListRef"
                             class="space-y-3">
                             <div
                                 v-for="item in items"
                                 :key="item.date"
-                                class="rounded-[1rem] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] px-4 py-4 shadow-[0_10px_24px_-22px_rgba(15,23,42,0.3)]">
+                                :data-export-date="item.date"
+                                :class="[
+                                    'rounded-[1rem] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] px-4 py-4 shadow-[0_10px_24px_-22px_rgba(15,23,42,0.3)]',
+                                    isTargetDate(item.date) ? 'export-item--target' : ''
+                                ]">
                                 <div
                                     class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                                     <div class="min-w-0 space-y-2">
@@ -166,7 +171,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, watch } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 import type {
     DailyExportFormat,
     DailyExportIndexResponse
@@ -181,6 +186,8 @@ definePageMeta({
 const route = useRoute();
 const router = useRouter();
 const requestFetch = import.meta.server ? useRequestFetch() : $fetch;
+const exportListRef = ref<HTMLElement | null>(null);
+const lastScrolledTargetDate = ref('');
 
 function readSingleQueryValue(value: unknown): string {
     if (Array.isArray(value)) {
@@ -200,8 +207,14 @@ function parsePositiveInteger(value: unknown): number | null {
     return parsed > 0 ? parsed : null;
 }
 
+function parseDateQuery(value: unknown): string {
+    const rawValue = readSingleQueryValue(value);
+    return /^\d{8}$/.test(rawValue) ? rawValue : '';
+}
+
 const queryYear = computed(() => parsePositiveInteger(route.query.year));
 const queryMonth = computed(() => parsePositiveInteger(route.query.month));
+const targetDateQuery = computed(() => parseDateQuery(route.query.date));
 
 const {
     data: exportIndexResponse,
@@ -242,6 +255,14 @@ const availableMonths = computed(
     () => exportIndexData.value?.availableMonths ?? []
 );
 const items = computed(() => exportIndexData.value?.items ?? []);
+const scrollTargetDate = computed(() => {
+    const targetDate = targetDateQuery.value;
+    if (!targetDate) {
+        return '';
+    }
+
+    return items.value.some((item) => item.date === targetDate) ? targetDate : '';
+});
 const yearOptions = computed(() =>
     availableYears.value.map((year) => ({
         value: String(year),
@@ -333,6 +354,45 @@ if (import.meta.client) {
             immediate: true
         }
     );
+
+    watch(targetDateQuery, (nextValue, previousValue) => {
+        if (nextValue !== previousValue) {
+            lastScrolledTargetDate.value = '';
+        }
+    });
+
+    watch(
+        scrollTargetDate,
+        async (targetDate) => {
+            if (!targetDate || targetDate === lastScrolledTargetDate.value) {
+                return;
+            }
+
+            await nextTick();
+
+            const targetElement = exportListRef.value?.querySelector<HTMLElement>(
+                `[data-export-date="${targetDate}"]`
+            );
+
+            if (!targetElement) {
+                return;
+            }
+
+            const prefersReducedMotion = window.matchMedia(
+                '(prefers-reduced-motion: reduce)'
+            ).matches;
+
+            targetElement.scrollIntoView({
+                block: 'center',
+                behavior: prefersReducedMotion ? 'auto' : 'smooth'
+            });
+            lastScrolledTargetDate.value = targetDate;
+        },
+        {
+            flush: 'post',
+            immediate: true
+        }
+    );
 }
 
 useHead({
@@ -372,6 +432,10 @@ function formatDateLabel(date: string) {
     return `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}`;
 }
 
+function isTargetDate(date: string) {
+    return targetDateQuery.value === date;
+}
+
 function getDownloadHref(date: string, format: DailyExportFormat) {
     return `/api/v1/exports/daily/${date}?format=${format}&binary=1`;
 }
@@ -383,5 +447,35 @@ function getDownloadHref(date: string, format: DailyExportFormat) {
     box-shadow:
         0 18px 40px -30px rgba(15, 23, 42, 0.28),
         0 8px 20px rgba(148, 163, 184, 0.14);
+}
+
+.export-item--target {
+    border-color: rgba(0, 82, 155, 0.28);
+    background:
+        linear-gradient(135deg, rgba(0, 82, 155, 0.12), transparent 46%),
+        linear-gradient(180deg, #f8fbff 0%, #edf6ff 100%);
+    box-shadow:
+        0 0 0 1px rgba(0, 82, 155, 0.12),
+        0 18px 40px -28px rgba(0, 82, 155, 0.34);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .export-item--target {
+        animation: export-item-target-pulse 1.4s ease-out 1;
+    }
+}
+
+@keyframes export-item-target-pulse {
+    0% {
+        box-shadow:
+            0 0 0 0 rgba(0, 82, 155, 0.24),
+            0 18px 40px -28px rgba(0, 82, 155, 0.34);
+    }
+
+    100% {
+        box-shadow:
+            0 0 0 1px rgba(0, 82, 155, 0.12),
+            0 18px 40px -28px rgba(0, 82, 155, 0.34);
+    }
 }
 </style>

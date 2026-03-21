@@ -32,6 +32,12 @@ export const API_SCOPES = {
             read: 'api.exports.daily.read'
         }
     },
+    feedback: {
+        read: 'api.feedback.read',
+        create: 'api.feedback.create',
+        reply: 'api.feedback.reply',
+        manage: 'api.feedback.manage'
+    },
     debug: {
         echoError: 'api.debug.echo-error'
     }

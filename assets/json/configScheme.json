@@ -313,12 +313,17 @@
                         "users": {
                             "type": "string",
                             "minLength": 1
+                        },
+                        "feedback": {
+                            "type": "string",
+                            "minLength": 1
                         }
                     },
                     "required": [
                         "task",
                         "EMUTracked",
-                        "users"
+                        "users",
+                        "feedback"
                     ]
                 }
             },
@@ -527,6 +532,35 @@
                         "maxStringLength"
                     ]
                 },
+                "feedback": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "validation": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "createBody": {
+                                    "$ref": "#/definitions/lengthRange"
+                                },
+                                "replyBody": {
+                                    "$ref": "#/definitions/lengthRange"
+                                },
+                                "title": {
+                                    "$ref": "#/definitions/lengthRange"
+                                }
+                            },
+                            "required": [
+                                "createBody",
+                                "replyBody",
+                                "title"
+                            ]
+                        }
+                    },
+                    "required": [
+                        "validation"
+                    ]
+                },
                 "headers": {
                     "type": "object",
                     "additionalProperties": false,
@@ -649,6 +683,7 @@
                 "authRateLimit",
                 "authCache",
                 "payload",
+                "feedback",
                 "headers",
                 "cache",
                 "pagination",
@@ -887,6 +922,24 @@
         }
     },
     "definitions": {
+        "lengthRange": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "minLength": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "maxLength": {
+                    "type": "integer",
+                    "minimum": 1
+                }
+            },
+            "required": [
+                "minLength",
+                "maxLength"
+            ]
+        },
         "perRecordRule": {
             "type": "object",
             "additionalProperties": false,
