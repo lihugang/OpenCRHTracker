@@ -20,6 +20,12 @@
         </a>
 
         <NuxtLink
+            to="/docs"
+            class="text-[13px] text-[#94A3B8] transition hover:cursor-pointer hover:text-crh-blue hover:underline hover:underline-offset-4">
+            文档
+        </NuxtLink>
+
+        <NuxtLink
             to="/about"
             class="text-[13px] text-[#94A3B8] transition hover:cursor-pointer hover:text-crh-blue hover:underline hover:underline-offset-4">
             关于
@@ -38,5 +44,6 @@ import githubIcon from '~/assets/svg/github.svg';
 import commitId from '~/utils/meta/commit';
 
 const shortCommitId = commitId.slice(0, 7);
-const commitUrl = `https://github.com/lihugang/OpenCRHTracker/commit/${commitId}`;
+const commitUrl =
+    'https://github.com/lihugang/OpenCRHTracker/commit/' + commitId;
 </script>

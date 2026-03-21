@@ -278,3 +278,29 @@
     opacity: 0;
     transform: translateY(12px);
 }
+
+.docs-page-enter-active,
+.docs-page-leave-active {
+    transition:
+        opacity 220ms ease,
+        transform 220ms ease;
+}
+
+.docs-page-enter-from,
+.docs-page-leave-to {
+    opacity: 0;
+    transform: translateY(10px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .docs-page-enter-active,
+    .docs-page-leave-active {
+        transition: opacity 140ms linear;
+    }
+
+    .docs-page-enter-from,
+    .docs-page-leave-to {
+        opacity: 0;
+        transform: none;
+    }
+}

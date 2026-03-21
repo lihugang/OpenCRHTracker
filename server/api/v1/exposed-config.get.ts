@@ -28,6 +28,21 @@ export default defineEventHandler(async (event) => {
                     schedulerPollIntervalMs,
                     schedulerPollIntervalMinutes:
                         schedulerPollIntervalMs / 60_000
+                },
+                api: {
+                    versionPrefix: config.api.versionPrefix,
+                    apiKeyHeader: config.api.apiKeyHeader,
+                    authCookieName: config.api.authCookieName,
+                    timestampUnit: config.api.timestampUnit,
+                    headers: {
+                        remain: config.api.headers.remain,
+                        cost: config.api.headers.cost,
+                        retryAfter: config.api.headers.retryAfter
+                    },
+                    pagination: {
+                        defaultLimit: config.api.pagination.defaultLimit,
+                        maxLimit: config.api.pagination.maxLimit
+                    }
                 }
             };
 

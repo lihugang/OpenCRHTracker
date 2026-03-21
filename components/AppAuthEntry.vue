@@ -1,9 +1,14 @@
 <template>
     <div
-        v-if="!hiddenPaths.has(route.path)"
+        v-if="!hiddenPaths.has(route.path) && !route.path.startsWith('/docs')"
         class="pointer-events-none fixed right-4 top-4 z-40 sm:right-6 sm:top-5">
         <div
             class="pointer-events-auto flex items-center gap-1 rounded-full border border-white/55 bg-white/30 p-1.5 shadow-[0_20px_48px_-28px_rgba(15,23,42,0.45)] ring-1 ring-slate-200/35 backdrop-blur-md">
+            <NuxtLink
+                to="/docs"
+                class="inline-flex items-center gap-2 rounded-full border border-slate-200/70 bg-white/80 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-white hover:text-slate-950">
+                文档
+            </NuxtLink>
             <NuxtLink
                 v-if="isAuthenticated && route.path !== '/exports/daily'"
                 to="/exports/daily"
