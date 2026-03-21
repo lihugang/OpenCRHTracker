@@ -605,6 +605,10 @@ function buildExecutionHeaders() {
     return headers;
 }
 
+function getExecutionCredentials(): RequestCredentials {
+    return authMode.value === 'apiKey' ? 'omit' : 'same-origin';
+}
+
 function getResponseHeader(name: string) {
     return (
         responseState.value?.headers.find(
@@ -633,6 +637,7 @@ async function sendRequest() {
     try {
         const response = await fetch(requestUrl.value, {
             method: props.endpoint.method.toUpperCase(),
+            credentials: getExecutionCredentials(),
             headers: buildExecutionHeaders(),
             body:
                 supportsRequestBody.value && requestBodyText.value.trim()
