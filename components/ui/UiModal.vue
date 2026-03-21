@@ -13,11 +13,13 @@
                 leave-to-class="opacity-0">
                 <div
                     v-if="modelValue"
-                    class="absolute inset-0 bg-slate-950/35 backdrop-blur-[2px]"
+                    class="absolute inset-0 bg-slate-950/35"
                     @click="handleBackdropClick" />
             </Transition>
 
-            <div class="relative flex h-full items-center justify-center">
+            <div
+                class="relative flex h-full items-center justify-center"
+                @click.self="handleBackdropClick">
                 <Transition
                     appear
                     enter-active-class="transition duration-200 ease-out"
@@ -30,8 +32,8 @@
                     <div
                         v-if="modelValue"
                         :class="[
-                            'relative flex max-h-[min(86vh,48rem)] w-full flex-col overflow-hidden rounded-[1.5rem] border border-slate-200/90 bg-white/98 shadow-[0_28px_80px_-28px_rgba(15,23,42,0.38)]',
-                            sizeClass
+                            'relative flex w-full flex-col overflow-hidden rounded-[1.5rem] border border-slate-200/90 bg-white/98 shadow-[0_28px_80px_-28px_rgba(15,23,42,0.38)]',
+                            panelClass
                         ]">
                         <div
                             class="flex items-start justify-between gap-4 px-6 py-5">
@@ -91,12 +93,14 @@ const props = withDefaults(
         eyebrow?: string;
         description?: string;
         size?: 'md' | 'lg';
+        height?: 'default' | 'tall';
         closeOnBackdrop?: boolean;
     }>(),
     {
         eyebrow: '操作',
         description: '',
         size: 'md',
+        height: 'default',
         closeOnBackdrop: true
     }
 );
@@ -108,6 +112,12 @@ const emit = defineEmits<{
 const sizeClass = computed(() =>
     props.size === 'lg' ? 'max-w-4xl' : 'max-w-2xl'
 );
+const heightClass = computed(() =>
+    props.height === 'tall'
+        ? 'max-h-[min(92vh,64rem)]'
+        : 'max-h-[min(86vh,48rem)]'
+);
+const panelClass = computed(() => [sizeClass.value, heightClass.value]);
 const isRendered = ref(props.modelValue);
 
 function applyGlobalModalState() {
