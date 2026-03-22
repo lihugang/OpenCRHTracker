@@ -11,7 +11,7 @@ export default defineNuxtConfig({
             link: [
                 {
                     rel: 'apple-touch-icon',
-                    href: '/icons/icon-180x180-maskable.png'
+                    href: '/icons/apple-touch-icon-180x180.png'
                 }
             ],
             meta: [
