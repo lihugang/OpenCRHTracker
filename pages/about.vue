@@ -112,14 +112,15 @@ const timingDescription = computed(() => {
     return `在常规情况下，车组担当情况会按约 ${minutes} 分钟的任务调度周期执行抓取。`;
 });
 
-useHead({
+useSiteSeo({
     title: '关于 | Open CRH Tracker',
-    meta: [
-        {
-            name: 'description',
-            content:
-                '了解 Open CRH Tracker 的定位、数据来源、时效说明与反馈方式。'
-        }
-    ]
+    description: '了解 Open CRH Tracker 的定位、数据来源、时效说明与反馈方式',
+    path: '/about',
+    jsonLd: {
+        '@context': 'https://schema.org',
+        '@type': 'AboutPage',
+        name: 'Open CRH Tracker 关于页',
+        url: '/about'
+    }
 });
 </script>

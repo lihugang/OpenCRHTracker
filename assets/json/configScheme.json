@@ -599,12 +599,17 @@
                         "searchIndexMaxAgeSeconds": {
                             "type": "integer",
                             "minimum": 0
+                        },
+                        "sitemapMaxAgeSeconds": {
+                            "type": "integer",
+                            "minimum": 0
                         }
                     },
                     "required": [
                         "currentDayMaxAgeSeconds",
                         "historicalMaxAgeSeconds",
-                        "searchIndexMaxAgeSeconds"
+                        "searchIndexMaxAgeSeconds",
+                        "sitemapMaxAgeSeconds"
                     ]
                 },
                 "pagination": {

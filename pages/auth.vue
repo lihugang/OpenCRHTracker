@@ -216,15 +216,12 @@ const statusMarker = computed(() =>
     statusTone.value === 'error' ? '[!]' : '[+]'
 );
 
-useHead({
+useSiteSeo({
     title: '登录 / 注册 | Open CRH Tracker',
-    meta: [
-        {
-            name: 'description',
-            content:
-                '登录或注册 Open CRH Tracker 账户以获得更多配额和 API 使用权限'
-        }
-    ]
+    description:
+        '登录或注册您的 Open CRH Tracker 账户以获得更高的配额和 API 使用权限',
+    path: '/auth',
+    noindex: true
 });
 
 watch(

@@ -367,13 +367,10 @@ definePageMeta({
     }
 });
 
-useHead({
+useSiteSeo({
     title: endpoint.summary + ' | API 文档 | Open CRH Tracker',
-    meta: [
-        {
-            name: 'description',
-            content: endpoint.description
-        }
-    ]
+    description: endpoint.description,
+    path: '/docs/api/' + endpoint.slug,
+    type: 'article'
 });
 </script>

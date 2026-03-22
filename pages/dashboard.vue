@@ -844,14 +844,11 @@ const copyMessage = computed(() => {
     }
 });
 
-useHead({
-    title: dashboardPageCopy.pageTitle,
-    meta: [
-        {
-            name: 'description',
-            content: dashboardPageCopy.pageDescription
-        }
-    ]
+useSiteSeo({
+    title: () => dashboardPageCopy.pageTitle,
+    description: () => dashboardPageCopy.pageDescription,
+    path: '/dashboard',
+    noindex: true
 });
 
 watch(issueActiveFromTimestamp, (nextActiveFrom) => {

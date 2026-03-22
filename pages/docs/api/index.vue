@@ -175,14 +175,10 @@ definePageMeta({
     }
 });
 
-useHead({
+useSiteSeo({
     title: 'API 文档 | Open CRH Tracker',
-    meta: [
-        {
-            name: 'description',
-            content:
-                'OpenCRHTracker API 文档，提供会话、记录、历史和导出接口的同源实时在线调试。'
-        }
-    ]
+    description:
+        'OpenCRHTracker API 文档，提供会话、记录、历史和导出接口的文档和实时调试功能。',
+    path: '/docs/api'
 });
 </script>

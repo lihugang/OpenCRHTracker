@@ -89,10 +89,13 @@
                                 class="animate-pulse rounded-[1rem] border border-slate-200 bg-slate-50/80 px-4 py-4">
                                 <div
                                     class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                                    <div class="h-5 w-32 rounded bg-slate-200/80" />
+                                    <div
+                                        class="h-5 w-32 rounded bg-slate-200/80" />
                                     <div class="flex gap-2">
-                                        <div class="h-9 w-20 rounded-2xl bg-slate-200/80" />
-                                        <div class="h-9 w-24 rounded-2xl bg-slate-200/80" />
+                                        <div
+                                            class="h-9 w-20 rounded-2xl bg-slate-200/80" />
+                                        <div
+                                            class="h-9 w-24 rounded-2xl bg-slate-200/80" />
                                     </div>
                                 </div>
                             </div>
@@ -128,7 +131,9 @@
                                 :data-export-date="item.date"
                                 :class="[
                                     'rounded-[1rem] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] px-4 py-4 shadow-[0_10px_24px_-22px_rgba(15,23,42,0.3)]',
-                                    isTargetDate(item.date) ? 'export-item--target' : ''
+                                    isTargetDate(item.date)
+                                        ? 'export-item--target'
+                                        : ''
                                 ]">
                                 <div
                                     class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -147,13 +152,25 @@
                                         class="flex flex-wrap items-center gap-2">
                                         <a
                                             v-if="item.formats.includes('csv')"
-                                            :href="getDownloadHref(item.date, 'csv')"
+                                            :href="
+                                                getDownloadHref(
+                                                    item.date,
+                                                    'csv'
+                                                )
+                                            "
                                             class="inline-flex items-center justify-center rounded-2xl bg-[linear-gradient(180deg,#00529b_0%,#004c92_100%)] px-4 py-2.5 text-sm font-semibold text-white shadow-[0_8px_20px_-12px_rgba(0,82,155,0.7)] transition hover:brightness-105">
                                             下载 CSV
                                         </a>
                                         <a
-                                            v-if="item.formats.includes('jsonl')"
-                                            :href="getDownloadHref(item.date, 'jsonl')"
+                                            v-if="
+                                                item.formats.includes('jsonl')
+                                            "
+                                            :href="
+                                                getDownloadHref(
+                                                    item.date,
+                                                    'jsonl'
+                                                )
+                                            "
                                             class="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-crh-blue transition hover:border-crh-blue/20 hover:bg-blue-50">
                                             下载 JSONL
                                         </a>
@@ -250,7 +267,9 @@ const exportIndexData = computed(() => {
 });
 
 const isPending = computed(() => status.value === 'pending');
-const availableYears = computed(() => exportIndexData.value?.availableYears ?? []);
+const availableYears = computed(
+    () => exportIndexData.value?.availableYears ?? []
+);
 const availableMonths = computed(
     () => exportIndexData.value?.availableMonths ?? []
 );
@@ -261,7 +280,9 @@ const scrollTargetDate = computed(() => {
         return '';
     }
 
-    return items.value.some((item) => item.date === targetDate) ? targetDate : '';
+    return items.value.some((item) => item.date === targetDate)
+        ? targetDate
+        : '';
 });
 const yearOptions = computed(() =>
     availableYears.value.map((year) => ({
@@ -370,9 +391,10 @@ if (import.meta.client) {
 
             await nextTick();
 
-            const targetElement = exportListRef.value?.querySelector<HTMLElement>(
-                `[data-export-date="${targetDate}"]`
-            );
+            const targetElement =
+                exportListRef.value?.querySelector<HTMLElement>(
+                    `[data-export-date="${targetDate}"]`
+                );
 
             if (!targetElement) {
                 return;
@@ -395,14 +417,10 @@ if (import.meta.client) {
     );
 }
 
-useHead({
-    title: '每日全量记录导出 | Open CRH Tracker',
-    meta: [
-        {
-            name: 'description',
-            content: '按年和月筛选 Open CRH Tracker 已生成的每日全量记录导出文件。'
-        }
-    ]
+useSiteSeo({
+    title: '每日数据导出 | Open CRH Tracker',
+    description: '按年和月筛选 Open CRH Tracker 已生成的每日全量记录导出文件。',
+    path: '/exports/daily'
 });
 
 async function syncQuery(year: string, month: string) {

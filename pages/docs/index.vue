@@ -97,14 +97,16 @@ definePageMeta({
     }
 });
 
-useHead({
+useSiteSeo({
     title: '开发者文档 | Open CRH Tracker',
-    meta: [
-        {
-            name: 'description',
-            content:
-                'Open CRH Tracker 的开发者文档，包含私有部署说明和 API 使用说明。'
-        }
-    ]
+    description:
+        'Open CRH Tracker 的开发者文档，包含私有部署说明和 API 使用说明。',
+    path: '/docs',
+    jsonLd: {
+        '@context': 'https://schema.org',
+        '@type': 'CollectionPage',
+        name: 'Open CRH Tracker 开发者文档',
+        url: '/docs'
+    }
 });
 </script>

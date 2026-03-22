@@ -171,6 +171,7 @@ export interface Config {
             currentDayMaxAgeSeconds: number;
             historicalMaxAgeSeconds: number;
             searchIndexMaxAgeSeconds: number;
+            sitemapMaxAgeSeconds: number;
         };
         pagination: {
             defaultLimit: number;
@@ -835,6 +836,11 @@ function validateConfig(raw: unknown): Config {
                 searchIndexMaxAgeSeconds: asInteger(
                     apiCache.searchIndexMaxAgeSeconds,
                     'api.cache.searchIndexMaxAgeSeconds',
+                    0
+                ),
+                sitemapMaxAgeSeconds: asInteger(
+                    apiCache.sitemapMaxAgeSeconds,
+                    'api.cache.sitemapMaxAgeSeconds',
                     0
                 )
             },

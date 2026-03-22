@@ -156,7 +156,8 @@
         "cache": {
             "currentDayMaxAgeSeconds": 300,
             "historicalMaxAgeSeconds": 31536000,
-            "searchIndexMaxAgeSeconds": 1800
+            "searchIndexMaxAgeSeconds": 1800,
+            "sitemapMaxAgeSeconds": 86400
         },
         "pagination": {
             "defaultLimit": 20,

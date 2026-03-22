@@ -276,7 +276,9 @@
                                         option.value
                                     )
                                 "
-                                @click="selectComposerSecondaryType(option.value)">
+                                @click="
+                                    selectComposerSecondaryType(option.value)
+                                ">
                                 {{ option.label }}
                             </button>
                         </div>
@@ -320,8 +322,14 @@
                                 type="text"
                                 maxlength="32"
                                 class="harmony-input w-full px-4 py-3 text-sm"
-                                @keydown.enter.prevent="focusNextComposerField($event)"
-                                @keydown.backspace="focusPreviousComposerFieldOnBackspace($event)"
+                                @keydown.enter.prevent="
+                                    focusNextComposerField($event)
+                                "
+                                @keydown.backspace="
+                                    focusPreviousComposerFieldOnBackspace(
+                                        $event
+                                    )
+                                "
                                 placeholder="请输入车次" />
                         </UiField>
 
@@ -333,8 +341,14 @@
                                 type="text"
                                 maxlength="120"
                                 class="harmony-input w-full px-4 py-3 text-sm"
-                                @keydown.enter.prevent="focusNextComposerField($event)"
-                                @keydown.backspace="focusPreviousComposerFieldOnBackspace($event)"
+                                @keydown.enter.prevent="
+                                    focusNextComposerField($event)
+                                "
+                                @keydown.backspace="
+                                    focusPreviousComposerFieldOnBackspace(
+                                        $event
+                                    )
+                                "
                                 placeholder="例如 CRH380A-2501 / CRH380A-2502" />
                         </UiField>
                     </div>
@@ -348,12 +362,20 @@
                                 required
                                 help="例如 G1234。">
                                 <input
-                                    v-model.trim="composerForm.details.trainCode"
+                                    v-model.trim="
+                                        composerForm.details.trainCode
+                                    "
                                     type="text"
                                     maxlength="32"
                                     class="harmony-input w-full px-4 py-3 text-sm"
-                                    @keydown.enter.prevent="focusNextComposerField($event)"
-                                    @keydown.backspace="focusPreviousComposerFieldOnBackspace($event)"
+                                    @keydown.enter.prevent="
+                                        focusNextComposerField($event)
+                                    "
+                                    @keydown.backspace="
+                                        focusPreviousComposerFieldOnBackspace(
+                                            $event
+                                        )
+                                    "
                                     placeholder="请输入车次" />
                             </UiField>
 
@@ -367,8 +389,14 @@
                                     type="text"
                                     maxlength="120"
                                     class="harmony-input w-full px-4 py-3 text-sm"
-                                    @keydown.enter.prevent="focusNextComposerField($event)"
-                                    @keydown.backspace="focusPreviousComposerFieldOnBackspace($event)"
+                                    @keydown.enter.prevent="
+                                        focusNextComposerField($event)
+                                    "
+                                    @keydown.backspace="
+                                        focusPreviousComposerFieldOnBackspace(
+                                            $event
+                                        )
+                                    "
                                     placeholder="例如 CR400BF-5033" />
                             </UiField>
                         </div>
@@ -377,7 +405,9 @@
                             v-if="showTravelCodeQuestion"
                             type="button"
                             role="checkbox"
-                            :aria-checked="composerForm.details.hasTravelCodeImage"
+                            :aria-checked="
+                                composerForm.details.hasTravelCodeImage
+                            "
                             class="flex w-full cursor-pointer items-start gap-3 rounded-[1rem] border px-4 py-4 text-sm leading-6 transition"
                             :class="
                                 composerForm.details.hasTravelCodeImage
@@ -408,9 +438,7 @@
                                         stroke-linejoin="round" />
                                 </svg>
                             </span>
-                            <span class="min-w-0">
-                                是否有畅行码照片
-                            </span>
+                            <span class="min-w-0"> 是否有畅行码照片 </span>
                         </button>
 
                         <div
@@ -477,8 +505,12 @@
                             class="harmony-input min-h-[10rem] w-full resize-y px-4 py-3 text-sm"
                             placeholder="补充你希望管理员看到的具体信息。"
                             @keydown.ctrl.enter.prevent="submitTopic"
-                            @keydown.enter.prevent="focusNextComposerField($event)"
-                            @keydown.backspace="focusPreviousComposerFieldOnBackspace($event)" />
+                            @keydown.enter.prevent="
+                                focusNextComposerField($event)
+                            "
+                            @keydown.backspace="
+                                focusPreviousComposerFieldOnBackspace($event)
+                            " />
                     </UiField>
 
                     <div
@@ -559,7 +591,8 @@
                                     stroke-linejoin="round" />
                             </svg>
                         </span>
-                        <div class="flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 gap-y-1">
+                        <div
+                            class="flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 gap-y-1">
                             <span class="min-w-0 text-left"> 我已经阅读 </span>
                             <span
                                 role="button"
@@ -923,9 +956,14 @@ function getComposerFocusableElements() {
     ).filter((element) => element.getClientRects().length > 0);
 }
 
-function focusComposerFieldByOffset(currentElement: HTMLElement, offset: 1 | -1) {
+function focusComposerFieldByOffset(
+    currentElement: HTMLElement,
+    offset: 1 | -1
+) {
     const elements = getComposerFocusableElements();
-    const currentIndex = elements.findIndex((element) => element === currentElement);
+    const currentIndex = elements.findIndex(
+        (element) => element === currentElement
+    );
 
     if (currentIndex < 0) {
         return;
@@ -1013,7 +1051,10 @@ function handleComposerFieldKeydown(event: KeyboardEvent) {
     }
 
     const target = event.target;
-    if (!(target instanceof HTMLElement) || !isComposerFocusableElement(target)) {
+    if (
+        !(target instanceof HTMLElement) ||
+        !isComposerFocusableElement(target)
+    ) {
         return;
     }
 
@@ -1120,9 +1161,7 @@ function ensureTravelCodeQrWorker() {
     return travelCodeQrWorker;
 }
 
-function decodeTravelCodeWithWorker(
-    imageData: ImageData
-): Promise<string> {
+function decodeTravelCodeWithWorker(imageData: ImageData): Promise<string> {
     const worker = ensureTravelCodeQrWorker();
     const id = ++travelCodeQrWorkerTaskId;
 
@@ -1165,10 +1204,7 @@ function decodeTravelCodeWithWorker(
     });
 }
 
-function drawImageBitmapToCanvas(
-    imageBitmap: ImageBitmap,
-    maxEdge = 1600
-) {
+function drawImageBitmapToCanvas(imageBitmap: ImageBitmap, maxEdge = 1600) {
     const longestEdge = Math.max(imageBitmap.width, imageBitmap.height);
     const scale =
         longestEdge > maxEdge && longestEdge > 0 ? maxEdge / longestEdge : 1;
@@ -1513,14 +1549,10 @@ async function submitTopic() {
     }
 }
 
-useHead({
+useSiteSeo({
     title: '反馈 | Open CRH Tracker',
-    meta: [
-        {
-            name: 'description',
-            content:
-                '站内反馈入口，可查看公开反馈，并按类型向导提交网站、数据、API、文档和其他反馈。'
-        }
-    ]
+    description:
+        '站内反馈入口，可查看公开反馈，并按类型向导提交网站、数据、API、文档和其他反馈。',
+    path: '/feedback'
 });
 </script>

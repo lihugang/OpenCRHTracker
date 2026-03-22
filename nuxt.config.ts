@@ -4,11 +4,10 @@ export default defineNuxtConfig({
     compatibilityDate: '2025-05-15',
     devtools: { enabled: false },
     app: {
-        layoutTransition: {
-            name: 'layout',
-            mode: 'out-in'
-        },
         head: {
+            htmlAttrs: {
+                lang: 'zh-CN'
+            },
             link: [
                 {
                     rel: 'apple-touch-icon',
@@ -23,8 +22,21 @@ export default defineNuxtConfig({
                 {
                     name: 'apple-mobile-web-app-status-bar-style',
                     content: 'black-translucent'
+                },
+                {
+                    name: 'theme-color',
+                    content: '#fff8e1'
                 }
             ]
+        },
+        layoutTransition: {
+            name: 'layout',
+            mode: 'out-in'
+        }
+    },
+    runtimeConfig: {
+        public: {
+            siteUrl: process.env.NUXT_PUBLIC_SITE_URL || ''
         }
     },
     nitro: {

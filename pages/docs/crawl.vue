@@ -206,14 +206,10 @@ definePageMeta({
     }
 });
 
-useHead({
+useSiteSeo({
     title: '数据抓取流程 | Open CRH Tracker',
-    meta: [
-        {
-            name: 'description',
-            content:
-                'OpenCRHTracker 数据抓取流程文档，覆盖启动引导、时刻表构建、线路补刷、发车探测、担当落盘与排障方向。'
-        }
-    ]
+    description:
+        'OpenCRHTracker 数据抓取流程文档，覆盖启动引导、时刻表构建、线路补刷、发车探测、担当落盘与排障方向。',
+    path: '/docs/crawl'
 });
 </script>

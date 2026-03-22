@@ -887,14 +887,12 @@ onBeforeUnmount(() => {
     mediaQueryList.value?.removeEventListener('change', handleViewportChange);
 });
 
-useHead(() => ({
-    title: (topic.value?.title ?? '反馈详情') + ' | Open CRH Tracker',
-    meta: [
-        {
-            name: 'description',
-            content:
-                topic.value?.body.slice(0, 80) || '站内反馈详情与交流记录。'
-        }
-    ]
-}));
+useSiteSeo({
+    title: () => (topic.value?.title ?? '反馈详情') + ' | Open CRH Tracker',
+    description: () =>
+        topic.value?.body.slice(0, 80) || '站内反馈详情与交流记录。',
+    path: () => '/feedback/' + route.params.id,
+    type: 'article',
+    noindex: () => topic.value?.visibility === 'private'
+});
 </script>

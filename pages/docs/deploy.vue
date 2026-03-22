@@ -167,14 +167,10 @@ definePageMeta({
     }
 });
 
-useHead({
+useSiteSeo({
     title: '私有部署 | Open CRH Tracker',
-    meta: [
-        {
-            name: 'description',
-            content:
-                'Open CRH Tracker 私有部署文档，覆盖 config.json 配置、构建、运行与排障说明。'
-        }
-    ]
+    description:
+        'Open CRH Tracker 私有部署文档，覆盖 config.json 配置、构建、运行与排障说明。',
+    path: '/docs/deploy'
 });
 </script>

@@ -89,14 +89,16 @@ let mediaQueryHandler: ((event: MediaQueryListEvent) => void) | null = null;
 
 const detectedTarget = computed(() => resolveLookupTarget(draftCode.value));
 
-useHead({
-    title: '首页 | Open CRH Tracker',
-    meta: [
-        {
-            name: 'description',
-            content: '中国动车组担当及交路信息查询网站'
-        }
-    ]
+useSiteSeo({
+    title: '主页 | Open CRH Tracker',
+    description: '查询中国动车组担当及交路信息',
+    path: '/',
+    jsonLd: {
+        '@context': 'https://schema.org',
+        '@type': 'WebSite',
+        name: 'Open CRH Tracker',
+        url: '/'
+    }
 });
 
 onMounted(() => {

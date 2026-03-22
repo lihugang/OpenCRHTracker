@@ -233,21 +233,21 @@ onBeforeUnmount(() => {
     window.removeEventListener('scroll', handleScroll);
 });
 
-useHead(() => ({
-    title:
+useSiteSeo({
+    title: () =>
         props.targetType === 'train'
-            ? `${normalizedCode.value} | 车次历史`
-            : `${normalizedCode.value} | 车组历史`,
-    meta: [
-        {
-            name: 'description',
-            content:
-                props.targetType === 'train'
-                    ? `${normalizedCode.value} 由哪些车组担当。`
-                    : `${normalizedCode.value} 担当了哪些车次。`
-        }
-    ]
-}));
+            ? `${normalizedCode.value} | 车次历史记录`
+            : `${normalizedCode.value} | 动车组历史记录`,
+    description: () =>
+        props.targetType === 'train'
+            ? `${normalizedCode.value} 由哪些动车组担当`
+            : `${normalizedCode.value} 最近担当过哪些车次`,
+    path: () =>
+        props.targetType === 'train'
+            ? '/train/' + normalizedCode.value
+            : '/emu/' + normalizedCode.value,
+    noindex: true
+});
 
 async function submitSearch() {
     const resolvedTarget = resolveLookupTarget(draftCode.value);
