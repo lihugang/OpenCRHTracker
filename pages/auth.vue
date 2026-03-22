@@ -10,8 +10,7 @@
             <section class="w-full max-w-[32rem]">
                 <Transition
                     name="fade"
-                    mode="out-in"
-                    @after-enter="handlePanelAfterEnter">
+                    mode="out-in">
                     <UiCard
                         :key="isLogin ? 'login' : 'register'"
                         variant="accent"
@@ -164,11 +163,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import type { AuthSession } from '~/types/auth';
 import type { TrackerApiResponse } from '~/types/homepage';
 import getApiErrorMessage from '~/utils/api/getApiErrorMessage';
 import hashPasswordDigest from '~/utils/auth/hashPasswordDigest';
+import safeFocus from '~/utils/safeFocus';
 import { validatePassword, validateUsername } from '~/utils/auth/credentials';
 
 definePageMeta({
@@ -240,10 +240,7 @@ watch(isLogin, (nextValue) => {
     clearStatus();
     password.value = '';
     confirmPassword.value = '';
-    void focusUsernameField();
 });
-
-void focusUsernameField();
 
 function getFieldOrder(): AuthFieldKey[] {
     return isLogin.value
@@ -263,24 +260,11 @@ function getFieldRef(field: AuthFieldKey) {
 }
 
 function focusField(field: AuthFieldKey) {
-    const input = getFieldRef(field).value;
-    if (!input) {
-        return;
-    }
-
-    input.focus({ preventScroll: true });
-
-    const valueLength = input.value.length;
-    input.setSelectionRange(valueLength, valueLength);
-}
-
-async function focusUsernameField() {
-    await nextTick();
-    focusField('username');
-}
-
-function handlePanelAfterEnter() {
-    void focusUsernameField();
+    safeFocus(getFieldRef(field).value, {
+        preventScroll: true,
+        source: 'keyboard-nav',
+        selection: 'end'
+    });
 }
 
 function clearStatus() {

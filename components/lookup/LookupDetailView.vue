@@ -31,7 +31,6 @@
                             eyebrow="Quick Lookup"
                             :detected-type="detectedTarget?.type ?? null"
                             :error-message="inputError"
-                            auto-focus
                             submit-label="重新查询"
                             @submit="submitSearch" />
                     </div>

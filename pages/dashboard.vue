@@ -583,7 +583,6 @@
 <script setup lang="ts">
 import {
     computed,
-    nextTick,
     onBeforeUnmount,
     onMounted,
     reactive,
@@ -976,14 +975,6 @@ watch(issueActiveFromTimestamp, (nextActiveFrom) => {
     }
 });
 
-watch(isIssueModalOpen, (isOpen) => {
-    if (!isOpen || issuedKeyResult.value) {
-        return;
-    }
-
-    void focusIssueNameInput();
-});
-
 onMounted(() => {
     nowTimer = window.setInterval(() => {
         nowSeconds.value = Math.floor(Date.now() / 1000);
@@ -1193,19 +1184,6 @@ function resetIssueForm() {
     issueErrorMessage.value = '';
     issuedKeyResult.value = null;
     copyState.value = 'idle';
-}
-
-async function focusIssueNameInput() {
-    await nextTick();
-
-    const input = issueNameInputRef.value;
-    if (!input) {
-        return;
-    }
-
-    input.focus({ preventScroll: true });
-    const valueLength = input.value.length;
-    input.setSelectionRange(valueLength, valueLength);
 }
 
 function openIssueModal() {

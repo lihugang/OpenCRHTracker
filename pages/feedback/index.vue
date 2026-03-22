@@ -685,6 +685,7 @@ import UiSelect from '~/components/ui/UiSelect.vue';
 import UiStatusBadge from '~/components/ui/UiStatusBadge.vue';
 import UiTabs from '~/components/ui/UiTabs.vue';
 import getApiErrorMessage from '~/utils/api/getApiErrorMessage';
+import safeFocus from '~/utils/safeFocus';
 import {
     feedbackPrimaryTypeSelectOptions,
     feedbackStatusSelectOptions,
@@ -970,12 +971,17 @@ function focusComposerFieldByOffset(
     }
 
     const nextElement = elements[currentIndex + offset];
-    nextElement?.focus();
+    safeFocus(nextElement, {
+        source: 'keyboard-nav'
+    });
 }
 
-async function focusFirstComposerField() {
+async function prepareFirstComposerField() {
     await nextTick();
-    getComposerFocusableElements()[0]?.focus();
+    getComposerFocusableElements()[0]?.scrollIntoView({
+        block: 'nearest',
+        inline: 'nearest'
+    });
 }
 
 async function scrollComposerSectionIntoView(section: 'secondary' | 'fields') {
@@ -1113,17 +1119,22 @@ function handleViewportChange(event: MediaQueryListEvent) {
 function openComposer() {
     resetComposerForm();
     isComposerOpen.value = true;
-    void focusFirstComposerField();
+    void prepareFirstComposerField();
 }
 
 function handleComposerVisibilityChange(value: boolean) {
-    isComposerOpen.value = value;
-
     if (value) {
-        void focusFirstComposerField();
+        if (!isComposerOpen.value) {
+            isComposerOpen.value = true;
+            void prepareFirstComposerField();
+        }
+
+        return;
     }
 
-    if (!value && !isSubmitting.value) {
+    isComposerOpen.value = false;
+
+    if (!isSubmitting.value) {
         resetComposerForm();
     }
 }

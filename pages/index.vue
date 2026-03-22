@@ -31,7 +31,6 @@
                         :detected-type="detectedTarget?.type ?? null"
                         :loading="isNavigating"
                         :error-message="inputError"
-                        auto-focus
                         :submit-label="'查询'"
                         @submit="submitLookup" />
                 </div>

@@ -220,6 +220,7 @@ import {
     watch
 } from 'vue';
 import type { LookupSuggestItem, LookupTargetType } from '~/types/lookup';
+import safeFocus from '~/utils/safeFocus';
 
 const props = withDefaults(
     defineProps<{
@@ -386,7 +387,10 @@ onMounted(() => {
     document.addEventListener('pointerdown', handleDocumentPointerDown);
 
     if (props.autoFocus) {
-        inputRef.value?.focus({ preventScroll: true });
+        safeFocus(inputRef.value, {
+            preventScroll: true,
+            source: 'mount'
+        });
     }
 });
 
