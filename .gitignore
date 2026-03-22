@@ -36,3 +36,5 @@ setup.sh
 # Generated commit id
 utils/meta/commit.ts
 server/utils/meta/commit.ts
+public/fonts/curated/source-han-sans-sc/charset.txt
+public/fonts/curated/source-han-sans-sc/report.json
