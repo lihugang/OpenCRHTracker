@@ -74,6 +74,7 @@
                     <UiCard
                         v-for="index in 5"
                         :key="`loading:card:${index}`"
+                        :show-accent-bar="false"
                         variant="subtle">
                         <div class="animate-pulse space-y-3">
                             <div class="flex items-start gap-3">
@@ -273,6 +274,7 @@
                                 : '',
                             isRunningItem(item) ? 'running-result-card' : ''
                         ]"
+                        :show-accent-bar="false"
                         variant="subtle">
                         <div class="space-y-3">
                             <div class="flex items-start gap-3">
