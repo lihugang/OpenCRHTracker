@@ -91,6 +91,11 @@
                         class="rounded-[1rem] border border-slate-200 bg-white/80 px-4 py-3">
                         最长存活时间：{{ formatDuration(maxLifetimeSeconds) }}
                     </div>
+                    <NuxtLink
+                        to="/docs/api"
+                        class="inline-flex items-center text-sm font-medium text-crh-blue transition hover:text-slate-900 hover:underline hover:underline-offset-4">
+                        查看 API 文档
+                    </NuxtLink>
                 </div>
 
                 <UiButton
