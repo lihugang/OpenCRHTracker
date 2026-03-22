@@ -1,64 +1,78 @@
 <template>
-    <main class="landing-shell flex min-h-screen flex-col text-crh-grey-dark">
-        <div
-            class="pointer-events-none absolute inset-x-0 top-0 h-[28rem] bg-[radial-gradient(circle_at_top,_rgba(74,124,159,0.08),_transparent_60%)]" />
-        <div
-            class="pointer-events-none absolute inset-x-0 top-20 h-40 bg-[linear-gradient(90deg,_rgba(90,132,162,0.08),_rgba(90,132,162,0))] blur-3xl" />
+    <Transition
+        mode="out-in"
+        enter-active-class="transition duration-[320ms] ease-out"
+        enter-from-class="translate-y-3 opacity-0"
+        leave-active-class="transition duration-[320ms] ease-in"
+        leave-to-class="-translate-y-3 opacity-0">
+        <LookupDetailShell
+            v-if="splitPreviewVisible && transitionTarget"
+            key="preview-shell">
+            <template #search>
+                <LookupSearchCard
+                    v-model="draftCode"
+                    compact
+                    :title="previewSearchTitle"
+                    :description="previewSearchDescription"
+                    eyebrow="Quick Lookup"
+                    :detected-type="detectedTarget?.type ?? null"
+                    :loading="isNavigating"
+                    :error-message="inputError"
+                    submit-label="查询"
+                    @submit="submitLookup" />
+            </template>
 
-        <div
-            class="relative mx-auto flex w-full max-w-7xl flex-1 flex-col gap-8 px-4 py-6 sm:px-6 lg:px-8 lg:py-10">
-            <div
-                :class="[
-                    'grid min-h-[calc(100vh-8rem)] gap-6',
-                    splitPreviewVisible
-                        ? 'min-[960px]:landscape:grid-cols-[minmax(18rem,20%)_minmax(0,1fr)] min-[960px]:landscape:items-start'
-                        : 'justify-items-center content-center'
-                ]">
-                <div
-                    :class="[
-                        'w-full transition-[width,transform,opacity] duration-[320ms] ease-out',
-                        splitPreviewVisible
-                            ? 'min-[960px]:landscape:min-w-[18rem]'
-                            : 'max-w-[58rem]'
-                    ]">
-                    <LookupSearchCard
-                        class="landing-hero-card"
-                        v-model="draftCode"
-                        eyebrow="OpenCRHTracker"
-                        title="动车组运用情况查询"
-                        description="输入车次号或车组号可查询列车担当情况"
-                        placeholder="D2212 或 CR400AF-C-2214"
-                        :detected-type="detectedTarget?.type ?? null"
-                        :loading="isNavigating"
-                        :error-message="inputError"
-                        :submit-label="'查询'"
-                        @submit="submitLookup" />
+            <Transition
+                appear
+                enter-active-class="transition duration-[320ms] ease-out"
+                enter-from-class="translate-x-6 opacity-0">
+                <div class="landing-preview">
+                    <LookupHistoryList
+                        :type="transitionTarget.type"
+                        :code="transitionTarget.code"
+                        state="loading"
+                        :items="[]"
+                        summary="正在加载历史记录，并准备跳转到对应详情页…"
+                        :is-loading-more="false"
+                        :can-load-more="false"
+                        error-message="" />
                 </div>
+            </Transition>
+        </LookupDetailShell>
 
-                <Transition
-                    enter-active-class="transition duration-200 ease-out"
-                    enter-from-class="translate-x-6 opacity-0"
-                    leave-active-class="transition duration-200 ease-in"
-                    leave-to-class="translate-x-6 opacity-0">
-                    <div
-                        v-if="splitPreviewVisible && transitionTarget"
-                        class="landing-preview">
-                        <LookupHistoryList
-                            :type="transitionTarget.type"
-                            :code="transitionTarget.code"
-                            state="loading"
-                            :items="[]"
-                            summary="正在加载历史记录，并准备跳转到对应详情页…"
-                            :is-loading-more="false"
-                            :can-load-more="false"
-                            error-message="" />
+        <main
+            v-else
+            key="landing-shell"
+            class="landing-shell flex min-h-screen flex-col text-crh-grey-dark">
+            <div
+                class="pointer-events-none absolute inset-x-0 top-0 h-[28rem] bg-[radial-gradient(circle_at_top,_rgba(74,124,159,0.08),_transparent_60%)]" />
+            <div
+                class="pointer-events-none absolute inset-x-0 top-20 h-40 bg-[linear-gradient(90deg,_rgba(90,132,162,0.08),_rgba(90,132,162,0))] blur-3xl" />
+
+            <div
+                class="relative mx-auto flex w-full max-w-7xl flex-1 flex-col gap-8 px-4 py-6 sm:px-6 lg:px-8 lg:py-10">
+                <div
+                    class="grid min-h-[calc(100vh-8rem)] justify-items-center content-center gap-6">
+                    <div class="w-full max-w-[58rem]">
+                        <LookupSearchCard
+                            class="landing-hero-card"
+                            v-model="draftCode"
+                            eyebrow="OpenCRHTracker"
+                            title="动车组运用情况查询"
+                            description="输入车次号或车组号可查询列车担当情况"
+                            placeholder="D2212 或 CR400AF-C-2214"
+                            :detected-type="detectedTarget?.type ?? null"
+                            :loading="isNavigating"
+                            :error-message="inputError"
+                            :submit-label="'查询'"
+                            @submit="submitLookup" />
                     </div>
-                </Transition>
+                </div>
             </div>
-        </div>
 
-        <AppFooter />
-    </main>
+            <AppFooter />
+        </main>
+    </Transition>
 </template>
 
 <script setup lang="ts">
@@ -87,9 +101,15 @@ let mediaQueryList: MediaQueryList | null = null;
 let mediaQueryHandler: ((event: MediaQueryListEvent) => void) | null = null;
 
 const detectedTarget = computed(() => resolveLookupTarget(draftCode.value));
+const previewSearchTitle = computed(() =>
+    transitionTarget.value?.type === 'train'
+        ? '车次详情查询'
+        : '车组详情查询'
+);
+const previewSearchDescription = computed(() => '');
 
 useSiteSeo({
-    title: '主页 | Open CRH Tracker',
+    title: '首页 | Open CRH Tracker',
     description: '查询中国动车组担当及交路信息',
     path: '/',
     jsonLd: {
