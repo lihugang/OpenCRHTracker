@@ -10,7 +10,12 @@ import {
     parseSignedApiKeyToken,
     type ApiKeyIssuer
 } from '~/server/utils/auth/signedApiKey';
+import { formatShanghaiDateTime } from '~/server/utils/date/shanghaiDateTime';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
+import {
+    normalizeApiKeyName,
+    validateApiKeyName
+} from '~/utils/auth/apiKeyName';
 
 interface ApiKeyPayload {
     userId: string;
@@ -23,6 +28,7 @@ interface ApiKeyPayload {
 }
 
 export interface IssuedAuthSession extends ApiKeyPayload {
+    name: string;
     revokeId: string;
     maskedApiKey: string;
     apiKey: string;
@@ -46,6 +52,7 @@ export interface ApiKeyRecord {
     revoke_id: string;
     user_id: string;
     issuer: ApiKeyIssuer;
+    name: string;
     active_from: number;
     revoked_at: number | null;
     expires_at: number;
@@ -54,6 +61,7 @@ export interface ApiKeyRecord {
 }
 
 export interface CreateApiKeyOptions {
+    name?: string;
     scopes?: string[];
     issuer?: ApiKeyIssuer;
     activeFrom?: number;
@@ -158,10 +166,34 @@ function resolveApiKeyWindow(
     };
 }
 
+function resolveApiKeyName(
+    name: string | undefined,
+    issuer: ApiKeyIssuer,
+    activeFrom: number
+) {
+    const config = useConfig();
+    const fallbackName =
+        issuer === 'webapp'
+            ? `网页端会话 ${formatShanghaiDateTime(activeFrom)}`
+            : '';
+    const normalizedName = normalizeApiKeyName(name ?? fallbackName);
+    const validationError = validateApiKeyName(
+        normalizedName,
+        config.user.apiKeyNameLength
+    );
+
+    if (validationError) {
+        throw new Error(validationError);
+    }
+
+    return normalizedName;
+}
+
 function buildApiKeySession(
     userId: string,
     keyId: string,
     revokeId: string,
+    name: string | undefined,
     scopes: string[],
     issuer: ApiKeyIssuer,
     activeFrom = getNowSeconds(),
@@ -170,6 +202,11 @@ function buildApiKeySession(
     const config = useConfig();
     const normalizedScopes = normalizeScopeList(scopes);
     const resolvedWindow = resolveApiKeyWindow(activeFrom, expiresAt);
+    const resolvedName = resolveApiKeyName(
+        name,
+        issuer,
+        resolvedWindow.activeFrom
+    );
     const dailyTokenLimit = config.quota.userMaxTokens;
     const apiKey = createSignedApiKeyToken(
         {
@@ -188,6 +225,7 @@ function buildApiKeySession(
         keyId,
         revokeId,
         issuer,
+        name: resolvedName,
         apiKey,
         maskedApiKey: maskApiKey(apiKey),
         scopes: normalizedScopes,
@@ -252,6 +290,7 @@ function buildAuthSessionFromRecord(
         keyId: record.key,
         revokeId: record.revoke_id,
         issuer: record.issuer,
+        name: record.name,
         apiKey,
         maskedApiKey: maskApiKey(apiKey),
         scopes: record.scopes,
@@ -345,6 +384,7 @@ export function createApiKey(
         userId,
         keyId,
         revokeId,
+        options.name,
         scopes,
         issuer,
         options.activeFrom,
@@ -357,6 +397,7 @@ export function createApiKey(
             apiKey.revokeId,
             userId,
             apiKey.issuer,
+            apiKey.name,
             apiKey.activeFrom,
             apiKey.expiresAt,
             apiKey.dailyTokenLimit
@@ -370,6 +411,7 @@ export function createApiKey(
         revoke_id: apiKey.revokeId,
         user_id: userId,
         issuer: apiKey.issuer,
+        name: apiKey.name,
         active_from: apiKey.activeFrom,
         revoked_at: null,
         expires_at: apiKey.expiresAt,
@@ -397,6 +439,7 @@ export function createUserWithApiKey(
         username,
         keyId,
         revokeId,
+        options.name,
         scopes,
         issuer,
         options.activeFrom,
@@ -417,6 +460,7 @@ export function createUserWithApiKey(
             apiKey.revokeId,
             username,
             apiKey.issuer,
+            apiKey.name,
             apiKey.activeFrom,
             apiKey.expiresAt,
             apiKey.dailyTokenLimit
@@ -437,6 +481,7 @@ export function createUserWithApiKey(
         revoke_id: apiKey.revokeId,
         user_id: username,
         issuer: apiKey.issuer,
+        name: apiKey.name,
         active_from: apiKey.activeFrom,
         revoked_at: null,
         expires_at: apiKey.expiresAt,

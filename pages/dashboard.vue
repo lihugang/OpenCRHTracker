@@ -354,6 +354,15 @@
 
                 <div
                     class="grid gap-4 rounded-[1rem] border border-slate-200 bg-slate-50/80 px-4 py-4 sm:grid-cols-2">
+                    <div class="space-y-1 sm:col-span-2">
+                        <p
+                            class="text-xs uppercase tracking-[0.18em] text-slate-400">
+                            名称
+                        </p>
+                        <p class="font-medium text-slate-900">
+                            {{ issuedKeyResult.name }}
+                        </p>
+                    </div>
                     <div class="space-y-1">
                         <p
                             class="text-xs uppercase tracking-[0.18em] text-slate-400">
@@ -421,6 +430,25 @@
             <div
                 v-else
                 class="space-y-6">
+                <div class="space-y-2">
+                    <label
+                        for="issue-name"
+                        class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                        秘钥名称
+                    </label>
+                    <input
+                        id="issue-name"
+                        v-model.trim="issueForm.name"
+                        type="text"
+                        class="harmony-input w-full px-4 py-3 text-sm text-crh-grey-dark"
+                        :maxlength="apiKeyNameLength.maxLength"
+                        placeholder="例如：本地脚本、CI 部署、临时调试" />
+                    <p class="text-xs leading-5 text-slate-500">
+                        名称长度 {{ apiKeyNameLength.minLength }} -
+                        {{ apiKeyNameLength.maxLength }} 个字符。
+                    </p>
+                </div>
+
                 <div class="grid gap-4 md:grid-cols-2">
                     <div class="space-y-2">
                         <label
@@ -549,10 +577,15 @@ import type {
     AuthApiKeyIssuer,
     AuthApiKeyListItem,
     AuthApiKeyListResponse,
+    AuthApiKeyNameLength,
     AuthIssueApiKeyResponse
 } from '~/types/auth';
 import type { TrackerApiResponse } from '~/types/homepage';
 import getApiErrorMessage from '~/utils/api/getApiErrorMessage';
+import {
+    normalizeApiKeyName,
+    validateApiKeyName
+} from '~/utils/auth/apiKeyName';
 import formatTrackerTimestamp from '~/utils/time/formatTrackerTimestamp';
 
 definePageMeta({
@@ -657,6 +690,7 @@ const copyState = ref<'idle' | 'success' | 'error'>('idle');
 const nowSeconds = ref(Math.floor(Date.now() / 1000));
 
 const issueForm = reactive({
+    name: '',
     activeFrom: '',
     expiresAt: '',
     scopes: [] as string[]
@@ -777,6 +811,13 @@ const creatableScopes = computed(
 const defaultScopes = computed(() => apiKeysData.value?.defaultScopes ?? []);
 const maxLifetimeSeconds = computed(
     () => apiKeysData.value?.maxLifetimeSeconds ?? 157680000
+);
+const apiKeyNameLength = computed<AuthApiKeyNameLength>(
+    () =>
+        apiKeysData.value?.apiKeyNameLength ?? {
+            minLength: 1,
+            maxLength: 64
+        }
 );
 const isApiKeysLoading = computed(() => apiKeysStatus.value === 'pending');
 const apiKeysErrorMessage = computed(() =>
@@ -1030,6 +1071,7 @@ function resetIssueForm() {
         nextActiveFrom + maxLifetimeSeconds.value
     );
 
+    issueForm.name = '';
     issueForm.activeFrom = toDateTimeLocalValue(nextActiveFrom);
     issueForm.expiresAt = toDateTimeLocalValue(nextExpiresAt);
     issueForm.scopes = [...defaultScopes.value];
@@ -1181,6 +1223,15 @@ async function confirmRevoke() {
 }
 
 function validateIssueForm() {
+    const normalizedName = normalizeApiKeyName(issueForm.name);
+    const nameError = validateApiKeyName(
+        normalizedName,
+        apiKeyNameLength.value
+    );
+    if (nameError) {
+        return nameError;
+    }
+
     if (issueActiveFromTimestamp.value === null) {
         return '请提供有效的生效时间。';
     }
@@ -1227,6 +1278,7 @@ async function issueApiKey() {
             {
                 method: 'POST',
                 body: {
+                    name: normalizeApiKeyName(issueForm.name),
                     activeFrom: issueActiveFromTimestamp.value!,
                     expiresAt: issueExpiresAtTimestamp.value!,
                     scopes: issueForm.scopes

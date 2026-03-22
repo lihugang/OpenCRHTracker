@@ -1,5 +1,10 @@
 export type AuthApiKeyIssuer = 'webapp' | 'api';
 
+export interface AuthApiKeyNameLength {
+    minLength: number;
+    maxLength: number;
+}
+
 export interface AuthSession {
     userId: string;
     revokeId: string;
@@ -33,6 +38,7 @@ export interface AuthMeResponse {
 }
 
 export interface AuthApiKeyListItem {
+    name: string;
     revokeId: string;
     maskedKeyId: string;
     issuer: AuthApiKeyIssuer;
@@ -50,10 +56,12 @@ export interface AuthApiKeyListResponse {
     creatableScopes: string[];
     defaultScopes: string[];
     maxLifetimeSeconds: number;
+    apiKeyNameLength: AuthApiKeyNameLength;
 }
 
 export interface AuthIssueApiKeyResponse {
     userId: string;
+    name: string;
     revokeId: string;
     issuer: AuthApiKeyIssuer;
     apiKey: string;

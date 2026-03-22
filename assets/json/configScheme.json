@@ -401,9 +401,13 @@
                         "blockSize",
                         "parallelization"
                     ]
+                },
+                "apiKeyNameLength": {
+                    "$ref": "#/definitions/lengthRange"
                 }
             },
             "required": [
+                "apiKeyNameLength",
                 "saltLength",
                 "apiKeyPrefixes",
                 "apiKeyBytes",

@@ -41,6 +41,11 @@ interface FeedbackValidationLengthConfig {
     maxLength: number;
 }
 
+interface ApiKeyNameLengthConfig {
+    minLength: number;
+    maxLength: number;
+}
+
 interface ApiFeedbackConfig {
     validation: {
         createBody: FeedbackValidationLengthConfig;
@@ -126,6 +131,7 @@ export interface Config {
         apiKeyBytes: number;
         apiKeyTtlSeconds: number;
         apiKeyMaxLifetimeSeconds: number;
+        apiKeyNameLength: ApiKeyNameLengthConfig;
         signKey: string;
         scrypt: {
             keyLength: number;
@@ -393,6 +399,13 @@ function validateConfig(raw: unknown): Config {
         user.apiKeyPrefixes,
         'user.apiKeyPrefixes'
     );
+    const userApiKeyNameLength =
+        user.apiKeyNameLength === undefined
+            ? {
+                  minLength: 1,
+                  maxLength: 64
+              }
+            : asObject(user.apiKeyNameLength, 'user.apiKeyNameLength');
     const legacyApiKeyPrefix =
         user.apiKeyPrefix === undefined
             ? undefined
@@ -691,6 +704,18 @@ function validateConfig(raw: unknown): Config {
                           'user.apiKeyMaxLifetimeSeconds',
                           60
                       ),
+            apiKeyNameLength: {
+                minLength: asInteger(
+                    userApiKeyNameLength.minLength,
+                    'user.apiKeyNameLength.minLength',
+                    1
+                ),
+                maxLength: asInteger(
+                    userApiKeyNameLength.maxLength,
+                    'user.apiKeyNameLength.maxLength',
+                    1
+                )
+            },
             signKey,
             scrypt: {
                 keyLength: asNumber(
@@ -1068,6 +1093,11 @@ function validateConfig(raw: unknown): Config {
         configResult.api.feedback.validation.title.maxLength >=
             configResult.api.feedback.validation.title.minLength,
         'api.feedback.validation.title.maxLength must be >= minLength'
+    );
+    assert(
+        configResult.user.apiKeyNameLength.maxLength >=
+            configResult.user.apiKeyNameLength.minLength,
+        'user.apiKeyNameLength.maxLength must be >= minLength'
     );
     assert(
         configResult.spider.scheduleProbe.prefixRules.length > 0,

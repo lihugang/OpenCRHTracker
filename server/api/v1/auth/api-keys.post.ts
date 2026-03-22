@@ -1,6 +1,6 @@
 import { defineEventHandler, readBody } from 'h3';
 import useConfig from '~/server/config';
-import { createApiKey, maskApiKey } from '~/server/services/authStore';
+import { createApiKey } from '~/server/services/authStore';
 import getFixedCost from '~/server/utils/api/cost/getFixedCost';
 import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';
@@ -10,8 +10,13 @@ import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
 import isScopeSubset from '~/server/utils/api/scopes/isScopeSubset';
 import normalizeScopeList from '~/server/utils/api/scopes/normalizeScopeList';
 import type { AuthIssueApiKeyResponse } from '~/types/auth';
+import {
+    normalizeApiKeyName,
+    validateApiKeyName
+} from '~/utils/auth/apiKeyName';
 
 interface CreateApiKeyBody {
+    name?: unknown;
     activeFrom?: number;
     expiresAt?: number;
     scopes?: string[];
@@ -74,6 +79,27 @@ export default defineEventHandler(async (event) => {
                 '请求体包含客户端不允许传入的字段'
             );
 
+            ensure(
+                typeof body.name === 'string',
+                400,
+                'invalid_param',
+                'name 不能为空'
+            );
+            ensurePayloadStringLength(
+                body.name,
+                'name',
+                config.api.payload.maxStringLength
+            );
+
+            const normalizedName = normalizeApiKeyName(body.name);
+            const nameError = validateApiKeyName(
+                normalizedName,
+                config.user.apiKeyNameLength
+            );
+            if (nameError) {
+                throw new ApiRequestError(400, 'invalid_param', nameError);
+            }
+
             const activeFrom = ensureIntegerTimestamp(
                 body.activeFrom,
                 'activeFrom'
@@ -125,9 +151,7 @@ export default defineEventHandler(async (event) => {
                 throw new ApiRequestError(
                     400,
                     'invalid_param',
-                    error instanceof Error
-                        ? error.message
-                        : 'scopes 无效'
+                    error instanceof Error ? error.message : 'scopes 无效'
                 );
             }
 
@@ -148,6 +172,7 @@ export default defineEventHandler(async (event) => {
             }
 
             const apiKey = createApiKey(identity.id, {
+                name: normalizedName,
                 issuer: 'api',
                 scopes: requestedScopes,
                 activeFrom,
@@ -155,10 +180,11 @@ export default defineEventHandler(async (event) => {
             });
             const response: AuthIssueApiKeyResponse = {
                 userId: identity.id,
+                name: apiKey.name,
                 revokeId: apiKey.revokeId,
                 issuer: apiKey.issuer,
                 apiKey: apiKey.apiKey,
-                maskedApiKey: maskApiKey(apiKey.apiKey),
+                maskedApiKey: apiKey.maskedApiKey,
                 activeFrom: apiKey.activeFrom,
                 expiresAt: apiKey.expiresAt,
                 dailyTokenLimit: apiKey.dailyTokenLimit,

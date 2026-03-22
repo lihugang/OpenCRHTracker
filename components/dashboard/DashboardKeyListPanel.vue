@@ -106,8 +106,12 @@
 
                                     <div class="space-y-1.5">
                                         <p
+                                            class="truncate text-lg font-semibold text-slate-900">
+                                            {{ item.name }}
+                                        </p>
+                                        <p
                                             class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
-                                            密钥标识
+                                            密钥名称
                                         </p>
                                         <p
                                             class="font-mono text-sm font-semibold text-crh-blue">

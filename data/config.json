@@ -103,6 +103,10 @@
             "cost": 16384,
             "blockSize": 8,
             "parallelization": 1
+        },
+        "apiKeyNameLength": {
+            "minLength": 1,
+            "maxLength": 64
         }
     },
     "api": {

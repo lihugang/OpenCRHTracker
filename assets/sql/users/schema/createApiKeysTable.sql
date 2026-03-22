@@ -3,6 +3,7 @@ CREATE TABLE IF NOT EXISTS api_keys (
     revoke_id TEXT NOT NULL UNIQUE,
     user_id TEXT NOT NULL,
     issuer TEXT NOT NULL,
+    name TEXT NOT NULL,
     active_from INTEGER NOT NULL,
     revoked_at INTEGER,
     expires_at INTEGER NOT NULL,

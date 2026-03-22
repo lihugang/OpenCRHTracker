@@ -43,6 +43,7 @@ export default defineEventHandler(async (event) => {
             const response: AuthApiKeyListResponse = {
                 userId: identity.id,
                 items: records.map((record) => ({
+                    name: record.name,
                     revokeId: record.revoke_id,
                     maskedKeyId: maskApiKey(record.key),
                     issuer: record.issuer,
@@ -55,7 +56,8 @@ export default defineEventHandler(async (event) => {
                 })),
                 creatableScopes: resolveCreatableScopes(identity.scopes),
                 defaultScopes: resolveDefaultScopes(identity.scopes),
-                maxLifetimeSeconds: config.user.apiKeyMaxLifetimeSeconds
+                maxLifetimeSeconds: config.user.apiKeyMaxLifetimeSeconds,
+                apiKeyNameLength: config.user.apiKeyNameLength
             };
 
             return response;
