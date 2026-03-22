@@ -17,27 +17,29 @@
                 <div
                     :class="[
                         shouldUseMobileStickyHeader
-                            ? 'max-[767px]:sticky max-[767px]:top-3 max-[767px]:z-20'
+                            ? 'relative max-[767px]:sticky max-[767px]:top-3 max-[767px]:z-20 max-[767px]:isolate'
                             : '',
                         'min-[960px]:landscape:sticky min-[960px]:landscape:top-6 min-[960px]:landscape:min-w-[18rem]'
                     ]">
-                    <LookupSearchCard
-                        v-model="draftCode"
-                        compact
-                        :collapsed="isMobileHeaderCollapsed"
-                        :title="searchTitle"
-                        :description="searchDescription"
-                        eyebrow="Quick Lookup"
-                        :detected-type="detectedTarget?.type ?? null"
-                        :error-message="inputError"
-                        auto-focus
-                        submit-label="重新查询"
-                        @submit="submitSearch" />
+                    <div class="relative max-[767px]:z-10">
+                        <LookupSearchCard
+                            v-model="draftCode"
+                            compact
+                            :collapsed="isMobileHeaderCollapsed"
+                            :title="searchTitle"
+                            :description="searchDescription"
+                            eyebrow="Quick Lookup"
+                            :detected-type="detectedTarget?.type ?? null"
+                            :error-message="inputError"
+                            auto-focus
+                            submit-label="重新查询"
+                            @submit="submitSearch" />
+                    </div>
 
                     <UiCard
                         :show-accent-bar="false"
                         :class="[
-                            'mt-4 transition-[opacity,transform,max-height,margin-top] duration-200 ease-out',
+                            'relative z-0 mt-4 transition-[opacity,transform,max-height,margin-top] duration-200 ease-out',
                             isMobileHeaderCollapsed
                                 ? 'max-[767px]:mt-2 max-[767px]:max-h-0 max-[767px]:overflow-hidden max-[767px]:opacity-0 max-[767px]:pointer-events-none max-[767px]:-translate-y-2'
                                 : ''
