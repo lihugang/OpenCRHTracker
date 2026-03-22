@@ -8,7 +8,7 @@
             <UiCard :show-accent-bar="false">
                 <div class="space-y-3">
                     <p
-                        class="text-xs font-semibold uppercase tracking-[0.22em] text-crh-blue/80">
+                        class="text-xs font-medium uppercase tracking-[0.18em] text-crh-blue/80">
                         BASE PATH
                     </p>
                     <p class="text-sm leading-6 text-slate-600">
@@ -28,7 +28,7 @@
             <UiCard :show-accent-bar="false">
                 <div class="space-y-3">
                     <p
-                        class="text-xs font-semibold uppercase tracking-[0.22em] text-crh-blue/80">
+                        class="text-xs font-medium uppercase tracking-[0.18em] text-crh-blue/80">
                         AUTH
                     </p>
                     <p class="text-sm leading-6 text-slate-600">
@@ -44,7 +44,7 @@
             <UiCard :show-accent-bar="false">
                 <div class="space-y-3">
                     <p
-                        class="text-xs font-semibold uppercase tracking-[0.22em] text-crh-blue/80">
+                        class="text-xs font-medium uppercase tracking-[0.18em] text-crh-blue/80">
                         API TOKEN
                     </p>
                     <p class="text-sm leading-6 text-slate-600">
@@ -65,7 +65,7 @@
             <div class="space-y-4">
                 <div class="space-y-2">
                     <p
-                        class="text-xs font-semibold uppercase tracking-[0.24em] text-crh-blue/80">
+                        class="text-xs font-medium uppercase tracking-[0.2em] text-crh-blue/80">
                         AGREEMENT
                     </p>
                     <h2 class="text-2xl font-semibold text-slate-900">
@@ -106,7 +106,7 @@
                             <div class="space-y-2">
                                 <div class="flex flex-wrap items-center gap-2">
                                     <span
-                                        class="inline-flex rounded-full border border-crh-blue/20 bg-blue-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-crh-blue">
+                                        class="inline-flex rounded-full border border-crh-blue/20 bg-blue-50 px-3 py-1 text-xs font-medium uppercase tracking-[0.14em] text-crh-blue">
                                         {{ endpoint.method }}
                                     </span>
                                     <code
@@ -137,7 +137,7 @@
                             <span
                                 v-for="mode in endpoint.authModes"
                                 :key="endpoint.slug + ':mode:' + mode"
-                                class="inline-flex rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600">
+                                class="inline-flex rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600">
                                 {{ mode }}
                             </span>
                             <span

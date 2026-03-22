@@ -41,7 +41,7 @@
                 <span
                     v-for="scope in scopes"
                     :key="scope"
-                    class="inline-flex items-center rounded-full bg-blue-600/8 px-2.5 py-1 text-[11px] font-semibold text-blue-700">
+                    class="inline-flex items-center rounded-full bg-blue-600/8 px-2.5 py-1 text-[11px] font-medium text-blue-700">
                     {{ scope }}
                 </span>
             </div>

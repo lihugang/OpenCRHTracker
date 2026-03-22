@@ -14,7 +14,7 @@
                     <div class="space-y-6">
                         <div class="space-y-3">
                             <p
-                                class="text-xs font-semibold uppercase tracking-[0.28em] text-crh-blue/80">
+                                class="text-xs font-medium uppercase tracking-[0.26em] text-crh-blue/80">
                                 About
                             </p>
                             <h1

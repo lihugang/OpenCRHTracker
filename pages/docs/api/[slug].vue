@@ -10,7 +10,7 @@
                     <div class="min-w-0 space-y-4">
                         <NuxtLink
                             to="/docs/api"
-                            class="inline-flex items-center gap-2 text-sm font-semibold text-crh-blue transition hover:text-slate-900">
+                            class="inline-flex items-center gap-2 text-sm font-medium text-crh-blue transition hover:text-slate-900">
                             <span aria-hidden="true">&larr;</span>
                             返回 API 列表
                         </NuxtLink>
@@ -18,7 +18,7 @@
                         <div class="space-y-3">
                             <div class="flex flex-wrap items-center gap-2">
                                 <span
-                                    class="inline-flex rounded-full border border-crh-blue/20 bg-blue-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-crh-blue">
+                                    class="inline-flex rounded-full border border-crh-blue/20 bg-blue-50 px-3 py-1 text-xs font-medium uppercase tracking-[0.14em] text-crh-blue">
                                     {{ endpoint.method }}
                                 </span>
                                 <code
@@ -33,7 +33,7 @@
                                 <span
                                     v-for="mode in endpoint.authModes"
                                     :key="endpoint.slug + ':mode:' + mode"
-                                    class="inline-flex rounded-full border border-white/70 bg-white/80 px-3 py-1 text-xs font-semibold text-slate-700">
+                                    class="inline-flex rounded-full border border-white/70 bg-white/80 px-3 py-1 text-xs font-medium text-slate-700">
                                     {{ mode }}
                                 </span>
                                 <span
@@ -60,7 +60,7 @@
                 <div class="space-y-5">
                     <div class="space-y-2">
                         <p
-                            class="text-xs font-semibold uppercase tracking-[0.24em] text-crh-blue/80">
+                            class="text-xs font-medium uppercase tracking-[0.2em] text-crh-blue/80">
                             请求说明
                         </p>
                         <h2 class="text-2xl font-semibold text-slate-900">
@@ -70,7 +70,7 @@
 
                     <template v-if="parameterGroups.path.length > 0">
                         <div class="space-y-3">
-                            <h3 class="text-sm font-semibold text-slate-900">
+                            <h3 class="text-sm font-medium text-slate-900">
                                 路径参数
                             </h3>
                             <div
@@ -94,7 +94,7 @@
                                     </span>
                                     <span
                                         v-if="parameter.required"
-                                        class="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-crh-blue">
+                                        class="rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-crh-blue">
                                         必填
                                     </span>
                                 </div>
@@ -212,7 +212,7 @@
                 <div class="space-y-5">
                     <div class="space-y-2">
                         <p
-                            class="text-xs font-semibold uppercase tracking-[0.24em] text-crh-blue/80">
+                            class="text-xs font-medium uppercase tracking-[0.2em] text-crh-blue/80">
                             响应说明
                         </p>
                         <h2 class="text-2xl font-semibold text-slate-900">
@@ -226,7 +226,7 @@
                         class="space-y-4 rounded-[1rem] border border-slate-200 bg-white/80 px-4 py-4">
                         <div class="flex flex-wrap items-center gap-3">
                             <span
-                                class="inline-flex rounded-full border px-3 py-1 text-xs font-semibold"
+                                class="inline-flex rounded-full border px-3 py-1 text-xs font-medium"
                                 :class="
                                     Number(response.statusCode) >= 200 &&
                                     Number(response.statusCode) < 300
@@ -235,7 +235,7 @@
                                 ">
                                 {{ response.statusCode }}
                             </span>
-                            <p class="text-sm font-semibold text-slate-900">
+                            <p class="text-sm font-medium text-slate-900">
                                 {{ response.description }}
                             </p>
                         </div>

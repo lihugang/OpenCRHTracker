@@ -20,7 +20,7 @@
                         <div class="space-y-6">
                             <div class="space-y-3">
                                 <p
-                                    class="text-xs font-semibold uppercase tracking-[0.3em] text-crh-blue/70">
+                                    class="text-xs font-medium uppercase tracking-[0.28em] text-crh-blue/70">
                                     ACCESS
                                 </p>
                                 <div class="space-y-2">
@@ -41,7 +41,7 @@
                                 <div class="space-y-2">
                                     <label
                                         for="auth-username"
-                                        class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+                                        class="text-xs font-medium uppercase tracking-[0.2em] text-slate-500">
                                         用户名
                                     </label>
                                     <input
@@ -68,7 +68,7 @@
                                 <div class="space-y-2">
                                     <label
                                         for="auth-password"
-                                        class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+                                        class="text-xs font-medium uppercase tracking-[0.2em] text-slate-500">
                                         密码
                                     </label>
                                     <input
@@ -100,7 +100,7 @@
                                     class="space-y-2">
                                     <label
                                         for="auth-confirm-password"
-                                        class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+                                        class="text-xs font-medium uppercase tracking-[0.2em] text-slate-500">
                                         确认密码
                                     </label>
                                     <input
@@ -147,7 +147,7 @@
                                     {{ switchPrompt }}
                                     <button
                                         type="button"
-                                        class="font-semibold text-crh-blue transition hover:text-slate-900"
+                                        class="font-medium text-crh-blue transition hover:text-slate-900"
                                         @click="switchMode(!isLogin)">
                                         {{ switchLabel }}
                                     </button>

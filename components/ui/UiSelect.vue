@@ -89,7 +89,7 @@
                             {{ option.label }}
                         </span>
                         <span
-                            class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-[11px] font-semibold transition"
+                            class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-[11px] font-medium transition"
                             :class="
                                 option.value === model
                                     ? 'border-crh-blue/25 bg-blue-50 text-crh-blue'
@@ -133,11 +133,11 @@
                     "
                     :aria-pressed="option.value === model ? 'true' : 'false'"
                     @click="selectOption(option.value)">
-                    <span class="text-sm font-semibold">
+                    <span class="text-sm font-medium">
                         {{ option.label }}
                     </span>
                     <span
-                        class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-[11px] font-semibold transition"
+                        class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-[11px] font-medium transition"
                         :class="
                             option.value === model
                                 ? 'border-crh-blue/25 bg-blue-50 text-crh-blue'

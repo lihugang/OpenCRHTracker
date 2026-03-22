@@ -46,7 +46,7 @@
                         ]">
                         <div class="space-y-3">
                             <p
-                                class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+                                class="text-xs font-medium uppercase tracking-[0.2em] text-slate-400">
                                 Quick Links
                             </p>
                             <AppFooterLinks

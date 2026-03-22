@@ -30,7 +30,7 @@
                             <div class="space-y-4">
                                 <div class="space-y-2">
                                     <p
-                                        class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+                                        class="text-xs font-medium uppercase tracking-[0.2em] text-slate-400">
                                         OVERVIEW
                                     </p>
                                     <h2
@@ -100,7 +100,7 @@
                             <div class="space-y-4">
                                 <div class="space-y-2">
                                     <p
-                                        class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+                                        class="text-xs font-medium uppercase tracking-[0.2em] text-slate-400">
                                         ACTIONS
                                     </p>
                                     <h2
@@ -188,7 +188,7 @@
                                 <div class="space-y-4">
                                     <div class="space-y-2">
                                         <p
-                                            class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+                                            class="text-xs font-medium uppercase tracking-[0.2em] text-slate-400">
                                             MODERATION
                                         </p>
                                         <h2
@@ -308,7 +308,7 @@
                                 <div
                                     class="rounded-[1.2rem] border border-slate-200 bg-white/90 px-5 py-5">
                                     <p
-                                        class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+                                        class="text-xs font-medium uppercase tracking-[0.2em] text-slate-400">
                                         TOPIC
                                     </p>
                                     <p
@@ -324,7 +324,7 @@
                                 <div class="space-y-5">
                                     <div class="space-y-2">
                                         <p
-                                            class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+                                            class="text-xs font-medium uppercase tracking-[0.2em] text-slate-400">
                                             DISCUSSION
                                         </p>
                                         <div

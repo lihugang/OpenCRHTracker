@@ -4,7 +4,7 @@
             <div class="space-y-6">
                 <div class="space-y-2">
                     <p
-                        class="text-xs font-semibold uppercase tracking-[0.28em] text-crh-blue/80">
+                        class="text-xs font-medium uppercase tracking-[0.26em] text-crh-blue/80">
                         Account
                     </p>
                     <h2 class="text-2xl font-semibold text-slate-900">账户</h2>
@@ -17,7 +17,7 @@
                     <dl class="grid gap-3 text-sm text-slate-600">
                         <div class="space-y-1.5">
                             <dt
-                                class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                                class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
                                 用户名
                             </dt>
                             <dd class="text-xl font-semibold text-slate-900">
@@ -35,7 +35,7 @@
             <div class="space-y-5">
                 <div class="space-y-2">
                     <p
-                        class="text-xs font-semibold uppercase tracking-[0.28em] text-rose-600/80">
+                        class="text-xs font-medium uppercase tracking-[0.26em] text-rose-600/80">
                         Danger Zone
                     </p>
                     <h3 class="text-xl font-semibold text-slate-900">

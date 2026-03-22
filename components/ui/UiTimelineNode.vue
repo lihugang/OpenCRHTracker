@@ -6,7 +6,7 @@
         <div class="space-y-5">
             <div>
                 <p
-                    class="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">
+                    class="text-[11px] font-medium uppercase tracking-[0.2em] text-slate-400">
                     始发
                 </p>
                 <p class="mt-1 text-sm font-medium text-crh-grey-dark">
@@ -16,7 +16,7 @@
 
             <div>
                 <p
-                    class="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">
+                    class="text-[11px] font-medium uppercase tracking-[0.2em] text-slate-400">
                     终到
                 </p>
                 <p class="mt-1 text-sm font-medium text-crh-grey-dark">

@@ -37,7 +37,7 @@
                 <div
                     v-if="pathParameters.length > 0"
                     class="space-y-3 rounded-[1rem] border border-slate-200 bg-white/80 p-4">
-                    <h4 class="text-sm font-semibold text-slate-900">
+                    <h4 class="text-sm font-medium text-slate-900">
                         路径参数
                     </h4>
                     <div
@@ -61,7 +61,7 @@
                 <div
                     v-if="queryParameters.length > 0"
                     class="space-y-3 rounded-[1rem] border border-slate-200 bg-white/80 p-4">
-                    <h4 class="text-sm font-semibold text-slate-900">
+                    <h4 class="text-sm font-medium text-slate-900">
                         查询参数
                     </h4>
                     <div
@@ -85,7 +85,7 @@
                 <div
                     v-if="headerParameters.length > 0"
                     class="space-y-3 rounded-[1rem] border border-slate-200 bg-white/80 p-4">
-                    <h4 class="text-sm font-semibold text-slate-900">
+                    <h4 class="text-sm font-medium text-slate-900">
                         请求头参数
                     </h4>
                     <div
@@ -119,7 +119,7 @@
                 <div
                     class="rounded-[1rem] border border-slate-200 bg-slate-50/90 p-4">
                     <p
-                        class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                        class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
                         请求地址
                     </p>
                     <p class="mt-2 break-all font-mono text-sm text-slate-700">
@@ -152,7 +152,7 @@
                 <div
                     class="rounded-[1rem] border border-slate-200 bg-white/85 p-4">
                     <p
-                        class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                        class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
                         cURL
                     </p>
                     <DocsCodeBlock
@@ -164,7 +164,7 @@
                 <div
                     class="rounded-[1rem] border border-slate-200 bg-white/85 p-4">
                     <p
-                        class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                        class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
                         fetch()
                     </p>
                     <DocsCodeBlock
@@ -178,19 +178,19 @@
                     <div class="flex min-w-0 items-start justify-between gap-4">
                         <div class="min-w-0">
                             <p
-                                class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                                class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
                                 响应结果
                             </p>
                             <p
                                 v-if="responseState"
-                                class="mt-2 text-sm font-semibold text-slate-900">
+                                class="mt-2 text-sm font-medium text-slate-900">
                                 {{ responseState.status }}
                                 {{ responseState.statusText }}
                             </p>
                         </div>
                         <span
                             v-if="responseState"
-                            class="inline-flex max-w-full break-all rounded-full border px-3 py-1 text-xs font-semibold"
+                            class="inline-flex max-w-full break-all rounded-full border px-3 py-1 text-xs font-medium"
                             :class="
                                 responseState.status >= 200 &&
                                 responseState.status < 300
@@ -258,7 +258,7 @@
                         <div
                             class="rounded-[1rem] border border-slate-200 bg-white">
                             <div class="border-b border-slate-200 px-4 py-3">
-                                <p class="text-sm font-semibold text-slate-900">
+                                <p class="text-sm font-medium text-slate-900">
                                     响应头
                                 </p>
                             </div>
@@ -281,7 +281,7 @@
 
                         <div
                             class="min-w-0 rounded-[1rem] border border-slate-200 bg-white/95 p-4">
-                            <p class="text-sm font-semibold text-slate-900">
+                            <p class="text-sm font-medium text-slate-900">
                                 响应体
                             </p>
                             <DocsCodeBlock

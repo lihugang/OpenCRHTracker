@@ -12,7 +12,7 @@
                     <div class="flex items-start justify-between gap-3">
                         <div class="space-y-3">
                             <p
-                                class="text-xs font-semibold uppercase tracking-[0.28em] text-crh-blue/80">
+                                class="text-xs font-medium uppercase tracking-[0.26em] text-crh-blue/80">
                                 FEEDBACK
                             </p>
                             <div class="space-y-2">
@@ -50,7 +50,7 @@
                             <div
                                 class="flex min-w-[10rem] flex-1 flex-col gap-2 xl:max-w-[12rem]">
                                 <span
-                                    class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                                    class="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">
                                     类型
                                 </span>
                                 <UiSelect
@@ -63,7 +63,7 @@
                             <div
                                 class="flex min-w-[10rem] flex-1 flex-col gap-2 xl:max-w-[13rem]">
                                 <span
-                                    class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                                    class="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">
                                     细分
                                 </span>
                                 <UiSelect
@@ -77,7 +77,7 @@
                             <div
                                 class="flex min-w-[10rem] flex-1 flex-col gap-2 xl:max-w-[12rem]">
                                 <span
-                                    class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                                    class="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">
                                     状态
                                 </span>
                                 <UiSelect
@@ -107,7 +107,7 @@
                         class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                         <div class="space-y-2">
                             <p
-                                class="text-xs font-semibold uppercase tracking-[0.28em] text-slate-400">
+                                class="text-xs font-medium uppercase tracking-[0.26em] text-slate-400">
                                 TOPICS
                             </p>
                             <h2 class="text-2xl font-semibold text-slate-900">

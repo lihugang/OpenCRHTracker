@@ -8,7 +8,7 @@
                 <div class="space-y-5">
                     <div class="space-y-2">
                         <p
-                            class="text-xs font-semibold uppercase tracking-[0.24em] text-crh-blue/80">
+                            class="text-xs font-medium uppercase tracking-[0.2em] text-crh-blue/80">
                             DEPLOY
                         </p>
                         <h2 class="text-2xl font-semibold text-slate-900">
@@ -38,7 +38,7 @@
                 <div class="space-y-5">
                     <div class="space-y-2">
                         <p
-                            class="text-xs font-semibold uppercase tracking-[0.24em] text-crh-blue/80">
+                            class="text-xs font-medium uppercase tracking-[0.2em] text-crh-blue/80">
                             API
                         </p>
                         <h2 class="text-2xl font-semibold text-slate-900">

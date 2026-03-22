@@ -17,7 +17,7 @@
                             class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                             <div class="space-y-3">
                                 <p
-                                    class="text-xs font-semibold uppercase tracking-[0.28em] text-crh-blue/80">
+                                    class="text-xs font-medium uppercase tracking-[0.26em] text-crh-blue/80">
                                     EXPORTS
                                 </p>
                                 <div class="space-y-2">
@@ -65,7 +65,7 @@
                             class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                             <div class="space-y-1">
                                 <p
-                                    class="text-xs font-semibold uppercase tracking-[0.26em] text-slate-400">
+                                    class="text-xs font-medium uppercase tracking-[0.2em] text-slate-400">
                                     Daily Files
                                 </p>
                                 <h2
@@ -139,7 +139,7 @@
                                     class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                                     <div class="min-w-0 space-y-2">
                                         <p
-                                            class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                                            class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
                                             Export Date
                                         </p>
                                         <p

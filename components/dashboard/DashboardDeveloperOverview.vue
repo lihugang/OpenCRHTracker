@@ -4,7 +4,7 @@
             <div class="space-y-6">
                 <div class="space-y-2">
                     <p
-                        class="text-xs font-semibold uppercase tracking-[0.28em] text-crh-blue/80">
+                        class="text-xs font-medium uppercase tracking-[0.26em] text-crh-blue/80">
                         SESSION
                     </p>
                     <h2 class="text-2xl font-semibold text-slate-900">
@@ -20,16 +20,16 @@
                         <div class="min-w-0 space-y-3">
                             <div class="space-y-1">
                                 <p
-                                    class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                                    class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
                                     密钥名称
                                 </p>
-                                <p class="truncate text-sm font-semibold text-slate-900">
+                                <p class="truncate text-sm font-medium text-slate-900">
                                     {{ currentKeyName }}
                                 </p>
                             </div>
                             <div class="space-y-1">
                                 <p
-                                    class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                                    class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
                                     密钥标识
                                 </p>
                                 <p
@@ -89,7 +89,7 @@
             <div class="space-y-5">
                 <div class="space-y-2">
                     <p
-                        class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                        class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
                         ACCOUNT QUOTA
                     </p>
                     <h3 class="text-lg font-semibold text-slate-900">
@@ -105,7 +105,7 @@
                         class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                         <div class="space-y-1.5">
                             <p
-                                class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                                class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
                                 当前剩余
                             </p>
                             <p class="text-3xl font-semibold text-slate-900">
@@ -136,7 +136,7 @@
             <div class="space-y-4">
                 <div class="space-y-2">
                     <p
-                        class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                        class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
                         ISSUE API KEYS
                     </p>
                     <h3 class="text-lg font-semibold text-slate-900">

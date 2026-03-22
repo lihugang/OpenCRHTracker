@@ -7,7 +7,7 @@
                 : 'border-slate-200 bg-white/80'
         ]">
         <p
-            class="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">
+            class="text-xs font-medium uppercase tracking-[0.26em] text-slate-400">
             {{ eyebrow }}
         </p>
         <h3 class="mt-3 text-lg font-semibold text-crh-grey-dark">

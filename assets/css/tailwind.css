@@ -1,5 +1,88 @@
 @import 'tailwindcss';
 
+@font-face {
+    font-family: 'Inter';
+    src: url('/fonts/curated/inter/Inter-Regular.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Inter';
+    src: url('/fonts/curated/inter/Inter-Medium.woff2') format('woff2');
+    font-weight: 500;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Inter';
+    src: url('/fonts/curated/inter/Inter-SemiBold.woff2') format('woff2');
+    font-weight: 600;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Source Han Sans SC';
+    src:
+        url('/fonts/curated/source-han-sans-sc/SourceHanSansSC-Regular.woff2')
+            format('woff2');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Source Han Sans SC';
+    src:
+        url('/fonts/curated/source-han-sans-sc/SourceHanSansSC-Medium.woff2')
+            format('woff2');
+    font-weight: 500;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Source Han Sans SC';
+    src:
+        url('/fonts/curated/source-han-sans-sc/SourceHanSansSC-Bold.woff2')
+            format('woff2');
+    font-weight: 600 700;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'JetBrains Mono';
+    src:
+        url('/fonts/curated/jetbrains-mono/JetBrainsMono-Regular.woff2')
+            format('woff2');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'JetBrains Mono';
+    src:
+        url('/fonts/curated/jetbrains-mono/JetBrainsMono-Medium.woff2')
+            format('woff2');
+    font-weight: 500;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'JetBrains Mono';
+    src: url('/fonts/curated/jetbrains-mono/JetBrainsMono-Bold.woff2')
+        format('woff2');
+    font-weight: 600 700;
+    font-style: normal;
+    font-display: swap;
+}
+
 @theme {
     --color-crh-white: #ffffff;
     --color-crh-blue: #00529b;
@@ -10,10 +93,12 @@
     --color-status-delayed: #ef4444;
 
     --font-sans:
-        'Inter', 'SF Pro Display', 'Segoe UI', system-ui, sans-serif;
+        'Inter', 'Source Han Sans SC', 'SF Pro Display', 'Segoe UI',
+        'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei UI',
+        'Microsoft YaHei', system-ui, sans-serif;
     --font-mono:
-        'JetBrains Mono', 'Roboto Mono', 'SFMono-Regular', ui-monospace,
-        monospace;
+        'JetBrains Mono', 'SFMono-Regular', 'Roboto Mono', 'Cascadia Mono',
+        ui-monospace, monospace;
 
     --shadow-ticket: 0 4px 20px -2px rgba(0, 82, 155, 0.08);
     --shadow-ticket-hover: 0 10px 26px -8px rgba(0, 82, 155, 0.18);
@@ -22,6 +107,8 @@
 @layer base {
     html {
         background: var(--color-crh-slate);
+        font-family: var(--font-sans);
+        font-synthesis: none;
     }
 
     body {

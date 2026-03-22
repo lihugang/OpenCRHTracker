@@ -39,7 +39,7 @@
                             class="flex items-start justify-between gap-4 px-6 py-5">
                             <div class="space-y-2">
                                 <p
-                                    class="text-xs font-semibold uppercase tracking-[0.28em] text-crh-blue/80">
+                                    class="text-xs font-medium uppercase tracking-[0.26em] text-crh-blue/80">
                                     {{ eyebrow }}
                                 </p>
                                 <div class="space-y-1.5">

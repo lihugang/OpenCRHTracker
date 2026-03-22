@@ -21,7 +21,7 @@
                 <div class="space-y-2">
                     <p
                         v-if="!collapsed && eyebrow"
-                        class="text-xs font-semibold uppercase tracking-[0.3em] text-crh-blue/70">
+                        class="text-xs font-medium uppercase tracking-[0.28em] text-crh-blue/70">
                         {{ eyebrow }}
                     </p>
                     <h1
@@ -180,7 +180,7 @@
                                                             item
                                                         )"
                                                         :key="tag"
-                                                        class="inline-flex items-center rounded-full bg-blue-600/8 px-2 py-0.5 text-[11px] font-semibold leading-none text-blue-600">
+                                                        class="inline-flex items-center rounded-full bg-blue-600/8 px-2 py-0.5 text-[11px] font-medium leading-none text-blue-600">
                                                         {{ tag }}
                                                     </span>
                                                 </span>

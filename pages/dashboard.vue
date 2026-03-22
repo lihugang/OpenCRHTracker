@@ -39,7 +39,7 @@
 
                             <div class="space-y-2">
                                 <p
-                                    class="text-xs font-semibold uppercase tracking-[0.28em] text-crh-blue/80">
+                                    class="text-xs font-medium uppercase tracking-[0.26em] text-crh-blue/80">
                                     {{ dashboardPageCopy.eyebrow }}
                                 </p>
                                 <h1
@@ -107,7 +107,7 @@
 
                             <div class="space-y-2">
                                 <p
-                                    class="text-xs font-semibold uppercase tracking-[0.28em] text-crh-blue/80">
+                                    class="text-xs font-medium uppercase tracking-[0.26em] text-crh-blue/80">
                                     {{ dashboardPageCopy.eyebrow }}
                                 </p>
                                 <h1
@@ -243,7 +243,7 @@
                         {{ panel.label }}
                     </span>
                     <span
-                        class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-[11px] font-semibold transition"
+                        class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-[11px] font-medium transition"
                         :class="
                             panel.id === currentPanelId
                                 ? 'border-crh-blue/25 bg-blue-50 text-crh-blue'
@@ -285,7 +285,7 @@
                         </span>
                         <span
                             v-if="session?.revokeId === revokeTarget.revokeId"
-                            class="inline-flex shrink-0 whitespace-nowrap items-center rounded-full bg-slate-900 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-white">
+                            class="inline-flex shrink-0 whitespace-nowrap items-center rounded-full bg-slate-900 px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.1em] text-white">
                             当前会话
                         </span>
                     </div>
@@ -345,7 +345,7 @@
                 <div
                     class="rounded-[1rem] border border-emerald-200/80 bg-emerald-50/80 px-4 py-4">
                     <p
-                        class="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700">
+                        class="text-xs font-medium uppercase tracking-[0.18em] text-emerald-700">
                         一次性明文
                     </p>
                     <p
@@ -408,14 +408,14 @@
 
                 <div class="space-y-2">
                     <p
-                        class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                        class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
                         权限
                     </p>
                     <div class="flex flex-wrap gap-2">
                         <span
                             v-for="scope in issuedKeyResult.scopes"
                             :key="`issued:${scope}`"
-                            class="inline-flex items-center rounded-full bg-blue-600/8 px-2.5 py-1 text-[11px] font-semibold text-blue-700">
+                            class="inline-flex items-center rounded-full bg-blue-600/8 px-2.5 py-1 text-[11px] font-medium text-blue-700">
                             {{ scope }}
                         </span>
                     </div>
@@ -438,7 +438,7 @@
                 <div class="space-y-2">
                     <label
                         for="issue-name"
-                        class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                        class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
                         密钥名称
                     </label>
                     <input
@@ -469,7 +469,7 @@
                     <div class="space-y-2">
                         <label
                             for="issue-active-from"
-                            class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                            class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
                             生效时间
                         </label>
                         <input
@@ -482,7 +482,7 @@
                     <div class="space-y-2">
                         <label
                             for="issue-expires-at"
-                            class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                            class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
                             失效时间
                         </label>
                         <input
@@ -512,7 +512,7 @@
                 <div class="space-y-3">
                     <div class="space-y-1">
                         <p
-                            class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                            class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
                             权限树
                         </p>
                     </div>
@@ -1031,8 +1031,8 @@ function getIssuerSectionTitle(issuer: AuthApiKeyIssuer) {
 
 function getIssuerBadgeClass(issuer: AuthApiKeyIssuer) {
     return issuer === 'webapp'
-        ? 'inline-flex shrink-0 whitespace-nowrap items-center rounded-full bg-slate-900 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-white'
-        : 'inline-flex shrink-0 whitespace-nowrap items-center rounded-full bg-crh-blue/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-crh-blue';
+        ? 'inline-flex shrink-0 whitespace-nowrap items-center rounded-full bg-slate-900 px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.1em] text-white'
+        : 'inline-flex shrink-0 whitespace-nowrap items-center rounded-full bg-crh-blue/10 px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.1em] text-crh-blue';
 }
 
 function formatTimestamp(timestamp: number) {
@@ -1141,13 +1141,13 @@ function getStatusLabel(item: AuthApiKeyListItem) {
 function getStatusBadgeClass(item: AuthApiKeyListItem) {
     switch (getStatusKey(item)) {
         case 'pending':
-            return 'inline-flex items-center rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-amber-800';
+            return 'inline-flex items-center rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.1em] text-amber-800';
         case 'expired':
-            return 'inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-700';
+            return 'inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.1em] text-slate-700';
         case 'revoked':
-            return 'inline-flex items-center rounded-full bg-rose-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-rose-800';
+            return 'inline-flex items-center rounded-full bg-rose-50 px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.1em] text-rose-800';
         default:
-            return 'inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-emerald-800';
+            return 'inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.1em] text-emerald-800';
     }
 }
 

@@ -94,7 +94,7 @@ export default defineNuxtConfig({
         registerType: 'autoUpdate',
         manifest: {
             name: 'Open China Railway HighSpeed Train Tracker',
-            short_name: 'OpenCRHTracker',
+            short_name: 'Open CRH Tracker',
             description: '查询中国动车组担当及交路信息',
             lang: 'zh-CN',
             icons: [

@@ -3,7 +3,7 @@
         <div class="space-y-6">
             <div class="space-y-2">
                 <p
-                    class="text-xs font-semibold uppercase tracking-[0.3em] text-crh-blue/70">
+                    class="text-xs font-medium uppercase tracking-[0.28em] text-crh-blue/70">
                     RECENT RECORDS
                 </p>
                 <h2 class="text-2xl font-semibold text-crh-grey-dark">
@@ -25,7 +25,7 @@
                                 <th
                                     v-for="column in columns"
                                     :key="`loading:${column}`"
-                                    class="border-b border-slate-200 px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-slate-300">
+                                    class="border-b border-slate-200 px-4 py-3 text-xs font-medium uppercase tracking-[0.16em] text-slate-300">
                                     {{ column }}
                                 </th>
                             </tr>
@@ -167,7 +167,7 @@
                                 <th
                                     v-for="column in columns"
                                     :key="column"
-                                    class="border-b border-slate-200 px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                                    class="border-b border-slate-200 px-4 py-3 text-xs font-medium uppercase tracking-[0.16em] text-slate-400">
                                     {{ column }}
                                 </th>
                             </tr>
@@ -318,7 +318,7 @@
                                 <div class="flex items-center gap-3">
                                     <div class="min-w-0 flex-1">
                                         <p
-                                            class="text-[11px] uppercase tracking-[0.18em] text-slate-400">
+                                            class="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">
                                             出发站
                                         </p>
                                         <p

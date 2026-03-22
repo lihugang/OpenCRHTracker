@@ -9,7 +9,7 @@
 
         <a
             :href="commitUrl"
-            class="inline-flex items-center gap-1 font-mono text-[13px] text-[#94A3B8] underline underline-offset-4 transition hover:text-crh-blue"
+            class="inline-flex items-center gap-1 text-[13px] text-[#94A3B8] underline underline-offset-4 transition hover:text-crh-blue"
             rel="noreferrer"
             target="_blank">
             <img

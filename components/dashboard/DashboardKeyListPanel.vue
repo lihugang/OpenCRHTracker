@@ -7,7 +7,7 @@
                 class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                 <div class="space-y-2">
                     <p
-                        class="text-xs font-semibold uppercase tracking-[0.28em] text-crh-blue/80">
+                        class="text-xs font-medium uppercase tracking-[0.26em] text-crh-blue/80">
                         API KEYS
                     </p>
                     <h2 class="text-2xl font-semibold text-slate-900">
@@ -99,7 +99,7 @@
                                         </span>
                                         <span
                                             v-if="item.isCurrent"
-                                            class="inline-flex shrink-0 whitespace-nowrap items-center rounded-full bg-slate-900 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-white">
+                                            class="inline-flex shrink-0 whitespace-nowrap items-center rounded-full bg-slate-900 px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.1em] text-white">
                                             当前会话
                                         </span>
                                     </div>
@@ -107,17 +107,17 @@
                                     <div class="min-w-0 space-y-3">
                                         <div class="space-y-1">
                                             <p
-                                                class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                                                class="text-xs font-medium uppercase tracking-[0.16em] text-slate-400">
                                                 密钥名称
                                             </p>
                                             <p
-                                                class="truncate text-sm font-semibold text-slate-900">
+                                                class="truncate text-sm font-medium text-slate-900">
                                                 {{ item.name }}
                                             </p>
                                         </div>
                                         <div class="space-y-1">
                                             <p
-                                                class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                                                class="text-xs font-medium uppercase tracking-[0.16em] text-slate-400">
                                                 密钥标识
                                             </p>
                                             <p
@@ -179,7 +179,7 @@
                                         v-if="item.usage"
                                         class="space-y-3">
                                         <p
-                                            class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                                            class="text-xs font-medium uppercase tracking-[0.16em] text-slate-400">
                                             最近消耗
                                         </p>
 
@@ -234,7 +234,7 @@
 
                                     <div class="space-y-3">
                                         <p
-                                            class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                                            class="text-xs font-medium uppercase tracking-[0.16em] text-slate-400">
                                             权限
                                         </p>
                                         <DashboardScopeDisclosure

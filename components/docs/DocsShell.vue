@@ -38,7 +38,7 @@
 
                             <div class="space-y-2">
                                 <p
-                                    class="text-xs font-semibold uppercase tracking-[0.28em] text-crh-blue/80">
+                                    class="text-xs font-medium uppercase tracking-[0.26em] text-crh-blue/80">
                                     DOCS
                                 </p>
                                 <h2
@@ -65,7 +65,7 @@
                                                     : 'bg-slate-300/80 group-hover:bg-slate-400/90'
                                             " />
                                         <span
-                                            class="text-left text-sm font-semibold">
+                                            class="text-left text-sm font-medium">
                                             {{ item.label }}
                                         </span>
                                     </span>
@@ -81,7 +81,7 @@
                         class="rounded-[1.5rem]">
                         <div class="space-y-4">
                             <p
-                                class="text-xs font-semibold uppercase tracking-[0.28em] text-crh-blue/80">
+                                class="text-xs font-medium uppercase tracking-[0.26em] text-crh-blue/80">
                                 {{ eyebrow }}
                             </p>
                             <div class="space-y-3">
@@ -184,7 +184,7 @@ function getNavClass(target: string) {
 
 function getMobileNavClass(target: string) {
     return [
-        'rounded-[1rem] border px-4 py-3 text-sm font-semibold transition',
+        'rounded-[1rem] border px-4 py-3 text-sm font-medium transition',
         isActive(target)
             ? 'border-crh-blue/20 bg-blue-50/90 text-crh-blue'
             : 'border-slate-200 bg-white/90 text-slate-700 hover:border-slate-300 hover:text-slate-900'

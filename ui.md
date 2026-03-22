@@ -133,8 +133,8 @@ Additional neutral values already used in the codebase such as `slate-400`, `sla
 
 Primary fonts:
 
-- sans-serif: `Inter`, `SF Pro Display`, `Segoe UI`, `system-ui`, `sans-serif`
-- mono: `JetBrains Mono`, `Roboto Mono`, `SFMono-Regular`, `ui-monospace`, `monospace`
+- sans-serif: `Inter`, `Source Han Sans SC`, `SF Pro Display`, `Segoe UI`, `PingFang SC`, `Microsoft YaHei UI`, `system-ui`, `sans-serif`
+- mono: `JetBrains Mono`, `SFMono-Regular`, `Roboto Mono`, `Cascadia Mono`, `ui-monospace`, `monospace`
 
 Usage rules:
 
@@ -142,6 +142,7 @@ Usage rules:
 - train codes, EMU codes, timestamps, and system-like values use mono where emphasis helps scanning
 - eyebrow labels use uppercase with expanded tracking
 - large text should be semibold rather than bold-heavy
+- Chinese labels and helper headings should prefer medium before semibold
 
 ### 4.4 Typography Scale Guidance
 
