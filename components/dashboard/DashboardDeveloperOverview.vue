@@ -17,15 +17,26 @@
                 <div
                     class="rounded-[1rem] border border-white/70 bg-white/85 px-4 py-4 shadow-[0_18px_40px_rgba(15,23,42,0.06)]">
                     <div class="flex items-start justify-between gap-3">
-                        <div class="space-y-1.5">
-                            <p
-                                class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
-                                密钥标识
-                            </p>
-                            <p
-                                class="font-mono text-sm font-semibold text-crh-blue">
-                                {{ currentMaskedKeyId }}
-                            </p>
+                        <div class="min-w-0 space-y-3">
+                            <div class="space-y-1">
+                                <p
+                                    class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                                    密钥名称
+                                </p>
+                                <p class="truncate text-sm font-semibold text-slate-900">
+                                    {{ currentKeyName }}
+                                </p>
+                            </div>
+                            <div class="space-y-1">
+                                <p
+                                    class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                                    密钥标识
+                                </p>
+                                <p
+                                    class="font-mono text-sm font-semibold text-crh-blue">
+                                    {{ currentMaskedKeyId }}
+                                </p>
+                            </div>
                         </div>
                         <span :class="issuerBadgeClass">
                             {{ issuerLabel }}
@@ -170,6 +181,7 @@ import type { AuthQuotaSummary, AuthSession } from '~/types/auth';
 const props = defineProps<{
     session: AuthSession | null;
     quota: AuthQuotaSummary | null;
+    currentKeyName: string;
     currentMaskedKeyId: string;
     maxLifetimeSeconds: number;
     creatableScopeCount: number;

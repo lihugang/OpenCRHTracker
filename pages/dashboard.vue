@@ -189,6 +189,7 @@
                             <DashboardDeveloperOverview
                                 :session="session"
                                 :quota="liveQuotaSummary"
+                                :current-key-name="currentKeyName"
                                 :current-masked-key-id="currentMaskedKeyId"
                                 :max-lifetime-seconds="maxLifetimeSeconds"
                                 :creatable-scope-count="creatableScopes.length"
@@ -352,7 +353,7 @@
                         {{ issuedKeyResult.apiKey }}
                     </p>
                     <p class="mt-2 text-sm leading-6 text-emerald-700/90">
-                        此秘钥只会显示一次，请及时复制并保存。
+                        此密钥只会显示一次，请及时复制并保存。
                     </p>
                 </div>
 
@@ -438,7 +439,7 @@
                     <label
                         for="issue-name"
                         class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
-                        秘钥名称
+                        密钥名称
                     </label>
                     <input
                         id="issue-name"
@@ -882,6 +883,10 @@ const issuerGroups = computed(() => {
 const currentMaskedKeyId = computed(() => {
     const currentItem = apiKeyItems.value.find((item) => item.isCurrent);
     return currentItem?.maskedKeyId ?? '--';
+});
+const currentKeyName = computed(() => {
+    const currentItem = apiKeyItems.value.find((item) => item.isCurrent);
+    return currentItem?.name ?? '--';
 });
 
 const canIssueApiKeys = computed(() =>
