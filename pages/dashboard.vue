@@ -188,12 +188,15 @@
                             class="grid gap-6 xl:grid-cols-[minmax(18rem,24rem)_minmax(0,1fr)]">
                             <DashboardDeveloperOverview
                                 :session="session"
+                                :quota="liveQuotaSummary"
                                 :current-masked-key-id="currentMaskedKeyId"
                                 :max-lifetime-seconds="maxLifetimeSeconds"
                                 :creatable-scope-count="creatableScopes.length"
                                 :can-issue-api-keys="canIssueApiKeys"
                                 :format-timestamp="formatTimestamp"
                                 :format-duration="formatDuration"
+                                :format-token-count="formatTokenCount"
+                                :quota-status-label="quotaStatusLabel"
                                 :get-issuer-label="getIssuerLabel"
                                 :get-issuer-badge-class="getIssuerBadgeClass"
                                 @open-issue="openIssueModal" />
@@ -204,6 +207,7 @@
                                 :error-message="apiKeysErrorMessage"
                                 :can-revoke="canRevokeApiKeys"
                                 :format-timestamp="formatTimestamp"
+                                :format-token-count="formatTokenCount"
                                 :get-issuer-label="getIssuerLabel"
                                 :get-issuer-section-title="
                                     getIssuerSectionTitle
@@ -578,6 +582,7 @@ import type {
     AuthApiKeyListItem,
     AuthApiKeyListResponse,
     AuthApiKeyNameLength,
+    AuthQuotaSummary,
     AuthIssueApiKeyResponse
 } from '~/types/auth';
 import type { TrackerApiResponse } from '~/types/homepage';
@@ -809,6 +814,36 @@ const creatableScopes = computed(
     () => apiKeysData.value?.creatableScopes ?? []
 );
 const defaultScopes = computed(() => apiKeysData.value?.defaultScopes ?? []);
+const quotaSummary = computed<AuthQuotaSummary | null>(
+    () => apiKeysData.value?.quota ?? null
+);
+const liveQuotaSummary = computed<AuthQuotaSummary | null>(() => {
+    const quota = quotaSummary.value;
+    if (!quota) {
+        return null;
+    }
+
+    let remain = quota.remain;
+    let nextRefillAt = quota.nextRefillAt;
+
+    while (
+        nextRefillAt !== null &&
+        nextRefillAt <= nowSeconds.value &&
+        remain < quota.tokenLimit
+    ) {
+        remain = Math.min(quota.tokenLimit, remain + quota.refillAmount);
+        nextRefillAt =
+            remain >= quota.tokenLimit
+                ? null
+                : nextRefillAt + quota.refillIntervalSeconds;
+    }
+
+    return {
+        ...quota,
+        remain,
+        nextRefillAt
+    };
+});
 const maxLifetimeSeconds = computed(
     () => apiKeysData.value?.maxLifetimeSeconds ?? 157680000
 );
@@ -885,6 +920,8 @@ const copyMessage = computed(() => {
     }
 });
 
+const tokenCountFormatter = new Intl.NumberFormat('zh-CN');
+
 useSiteSeo({
     title: () => dashboardPageCopy.pageTitle,
     description: () => dashboardPageCopy.pageDescription,
@@ -915,7 +952,7 @@ watch(issueActiveFromTimestamp, (nextActiveFrom) => {
 onMounted(() => {
     nowTimer = window.setInterval(() => {
         nowSeconds.value = Math.floor(Date.now() / 1000);
-    }, 60 * 1000);
+    }, 1000);
 });
 
 onBeforeUnmount(() => {
@@ -993,6 +1030,49 @@ function formatDuration(seconds: number) {
 
     return `${seconds} 秒`;
 }
+
+function formatTokenCount(value: number) {
+    if (!Number.isFinite(value) || value < 0) {
+        return '--';
+    }
+
+    return tokenCountFormatter.format(Math.floor(value));
+}
+
+function formatQuotaCountdown(seconds: number) {
+    if (!Number.isFinite(seconds) || seconds <= 0) {
+        return '0 分 0 秒';
+    }
+
+    const wholeSeconds = Math.floor(seconds);
+    const minutes = Math.floor(wholeSeconds / 60);
+    const remainSeconds = wholeSeconds % 60;
+
+    return minutes + ' 分 ' + remainSeconds + ' 秒';
+}
+
+const quotaStatusLabel = computed(() => {
+    const quota = liveQuotaSummary.value;
+    if (!quota) {
+        return '--';
+    }
+
+    if (quota.remain >= quota.tokenLimit) {
+        return '额度已满';
+    }
+
+    if (quota.nextRefillAt === null) {
+        return '等待下一次额度补充';
+    }
+
+    return (
+        '额度将在 ' +
+        formatQuotaCountdown(quota.nextRefillAt - nowSeconds.value) +
+        ' 后恢复 ' +
+        formatTokenCount(quota.refillAmount) +
+        ' 点'
+    );
+});
 
 function getStatusKey(item: AuthApiKeyListItem) {
     if (item.revokedAt !== null) {

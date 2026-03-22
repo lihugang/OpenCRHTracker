@@ -303,7 +303,8 @@ export const developerDocsOpenApi = {
                                     'tokenLimit',
                                     'remain',
                                     'refillAmount',
-                                    'refillIntervalSeconds'
+                                    'refillIntervalSeconds',
+                                    'nextRefillAt'
                                 ],
                                 properties: {
                                     tokenLimit: {
@@ -321,6 +322,11 @@ export const developerDocsOpenApi = {
                                     refillIntervalSeconds: {
                                         type: 'integer',
                                         example: 300
+                                    },
+                                    nextRefillAt: {
+                                        type: 'integer',
+                                        nullable: true,
+                                        example: 1744560300
                                     }
                                 }
                             }

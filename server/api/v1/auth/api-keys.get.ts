@@ -3,6 +3,8 @@ import useConfig from '~/server/config';
 import { listApiKeysByUser, maskApiKey } from '~/server/services/authStore';
 import getFixedCost from '~/server/utils/api/cost/getFixedCost';
 import executeApi from '~/server/utils/api/executor/executeApi';
+import getApiKeyUsageSummary from '~/server/utils/api/keyUsage/getApiKeyUsageSummary';
+import getQuotaSummary from '~/server/utils/api/quota/getQuotaSummary';
 import hasScope from '~/server/utils/api/scopes/hasScope';
 import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
 import normalizeScopeList from '~/server/utils/api/scopes/normalizeScopeList';
@@ -42,6 +44,7 @@ export default defineEventHandler(async (event) => {
             const records = listApiKeysByUser(identity.id);
             const response: AuthApiKeyListResponse = {
                 userId: identity.id,
+                quota: getQuotaSummary(identity),
                 items: records.map((record) => ({
                     name: record.name,
                     revokeId: record.revoke_id,
@@ -52,7 +55,8 @@ export default defineEventHandler(async (event) => {
                     expiresAt: record.expires_at,
                     dailyTokenLimit: record.daily_token_limit,
                     scopes: record.scopes,
-                    isCurrent: record.key === identity.keyId
+                    isCurrent: record.key === identity.keyId,
+                    usage: getApiKeyUsageSummary(record.key)
                 })),
                 creatableScopes: resolveCreatableScopes(identity.scopes),
                 defaultScopes: resolveDefaultScopes(identity.scopes),

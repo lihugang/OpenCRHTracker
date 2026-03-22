@@ -75,6 +75,53 @@
         </UiCard>
 
         <UiCard :show-accent-bar="false">
+            <div class="space-y-5">
+                <div class="space-y-2">
+                    <p
+                        class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                        ACCOUNT QUOTA
+                    </p>
+                    <h3 class="text-lg font-semibold text-slate-900">
+                        账户配额
+                    </h3>
+                </div>
+
+                <div class="motion-divider opacity-70" />
+
+                <div
+                    class="rounded-[1rem] border border-slate-200 bg-[linear-gradient(180deg,rgba(239,246,255,0.78)_0%,rgba(255,255,255,0.95)_100%)] px-4 py-4">
+                    <div
+                        class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                        <div class="space-y-1.5">
+                            <p
+                                class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                                当前剩余
+                            </p>
+                            <p class="text-3xl font-semibold text-slate-900">
+                                {{ quotaRemainLabel }}
+                            </p>
+                        </div>
+                        <p class="text-sm text-slate-500">
+                            总额度 {{ quotaLimitLabel }}
+                        </p>
+                    </div>
+
+                    <div
+                        class="mt-4 h-2 overflow-hidden rounded-full bg-slate-200/80">
+                        <div
+                            class="h-full rounded-full bg-[linear-gradient(90deg,#00529b_0%,#5f9fd6_100%)] transition-[width] duration-300 ease-out"
+                            :style="{ width: quotaBarWidth }" />
+                    </div>
+
+                    <p class="mt-4 text-sm font-medium text-slate-600">
+                        {{ quotaStatusLabel }}
+                    </p>
+
+                </div>
+            </div>
+        </UiCard>
+
+        <UiCard :show-accent-bar="false">
             <div class="space-y-4">
                 <div class="space-y-2">
                     <p
@@ -118,16 +165,19 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import type { AuthSession } from '~/types/auth';
+import type { AuthQuotaSummary, AuthSession } from '~/types/auth';
 
 const props = defineProps<{
     session: AuthSession | null;
+    quota: AuthQuotaSummary | null;
     currentMaskedKeyId: string;
     maxLifetimeSeconds: number;
     creatableScopeCount: number;
     canIssueApiKeys: boolean;
     formatTimestamp: (timestamp: number) => string;
     formatDuration: (seconds: number) => string;
+    formatTokenCount: (value: number) => string;
+    quotaStatusLabel: string;
     getIssuerLabel: (issuer: AuthSession['issuer']) => string;
     getIssuerBadgeClass: (issuer: AuthSession['issuer']) => string;
 }>();
@@ -151,4 +201,25 @@ const activeFromLabel = computed(() =>
 const expiresAtLabel = computed(() =>
     props.formatTimestamp(props.session?.expiresAt ?? 0)
 );
+
+const quotaRemainLabel = computed(() =>
+    props.quota ? props.formatTokenCount(props.quota.remain) : '--'
+);
+
+const quotaLimitLabel = computed(() =>
+    props.quota ? props.formatTokenCount(props.quota.tokenLimit) : '--'
+);
+
+const quotaBarWidth = computed(() => {
+    if (!props.quota || props.quota.tokenLimit <= 0) {
+        return '0%';
+    }
+
+    const progress = Math.min(
+        100,
+        Math.max(0, (props.quota.remain / props.quota.tokenLimit) * 100)
+    );
+
+    return `${progress}%`;
+});
 </script>

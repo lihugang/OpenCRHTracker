@@ -8,6 +8,7 @@ import type {
 import getAnonymousIdentity from '~/server/utils/api/identity/getAnonymousIdentity';
 import type ApiIdentity from '~/server/utils/api/identity/ApiIdentity';
 import resolveIdentity from '~/server/utils/api/identity/resolveIdentity';
+import recordApiKeyUsage from '~/server/utils/api/keyUsage/recordApiKeyUsage';
 import getRemainTokens from '~/server/utils/api/quota/getRemainTokens';
 import formatRetryAfterMessage from '~/server/utils/api/quota/formatRetryAfterMessage';
 import tryConsumeTokens from '~/server/utils/api/quota/tryConsumeTokens';
@@ -38,6 +39,19 @@ export default async function executeApi<TData>(
             retryAfter,
             identity?.type === 'anonymous' ? 'quota_anonymous' : 'quota_user'
         );
+    };
+
+    const recordChargedUsage = () => {
+        if (
+            !identity ||
+            identity.type !== 'user' ||
+            !identity.keyId ||
+            costApplied <= 0
+        ) {
+            return;
+        }
+
+        recordApiKeyUsage(identity.keyId, costApplied);
     };
 
     try {
@@ -111,6 +125,7 @@ export default async function executeApi<TData>(
             const dynamicConsume = consumeToTargetCost(fixedCost + dynamicCost);
             if (!dynamicConsume.ok) {
                 if (dynamicConsume.impossible) {
+                    recordChargedUsage();
                     return apiFailure(
                         event,
                         403,
@@ -120,6 +135,7 @@ export default async function executeApi<TData>(
                     );
                 }
 
+                recordChargedUsage();
                 return apiFailure(
                     event,
                     429,
@@ -143,6 +159,7 @@ export default async function executeApi<TData>(
 
         const rawSuccessResponse = options.rawSuccessResponse?.(event, data);
         if (rawSuccessResponse !== null && rawSuccessResponse !== undefined) {
+            recordChargedUsage();
             setCommonHeaders(event, {
                 remain,
                 cost: costApplied
@@ -151,6 +168,7 @@ export default async function executeApi<TData>(
             return rawSuccessResponse;
         }
 
+        recordChargedUsage();
         return apiSuccess(
             event,
             data,
@@ -184,6 +202,7 @@ export default async function executeApi<TData>(
             remain = getRemainTokens(identity);
         }
 
+        recordChargedUsage();
         return apiFailure(
             event,
             apiError.statusCode,

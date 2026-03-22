@@ -167,6 +167,63 @@
                                         </div>
                                     </dl>
 
+                                    <div
+                                        v-if="item.usage"
+                                        class="space-y-3">
+                                        <p
+                                            class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                                            最近消耗
+                                        </p>
+
+                                        <dl class="grid gap-3 sm:grid-cols-3">
+                                            <div
+                                                class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-4 py-3">
+                                                <dt
+                                                    class="text-xs uppercase tracking-[0.18em] text-slate-400">
+                                                    1 小时
+                                                </dt>
+                                                <dd
+                                                    class="mt-1 text-lg font-semibold text-slate-900">
+                                                    {{
+                                                        formatTokenCount(
+                                                            item.usage.last1Hour
+                                                        )
+                                                    }}
+                                                </dd>
+                                            </div>
+                                            <div
+                                                class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-4 py-3">
+                                                <dt
+                                                    class="text-xs uppercase tracking-[0.18em] text-slate-400">
+                                                    8 小时
+                                                </dt>
+                                                <dd
+                                                    class="mt-1 text-lg font-semibold text-slate-900">
+                                                    {{
+                                                        formatTokenCount(
+                                                            item.usage.last8Hours
+                                                        )
+                                                    }}
+                                                </dd>
+                                            </div>
+                                            <div
+                                                class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-4 py-3">
+                                                <dt
+                                                    class="text-xs uppercase tracking-[0.18em] text-slate-400">
+                                                    1 天
+                                                </dt>
+                                                <dd
+                                                    class="mt-1 text-lg font-semibold text-slate-900">
+                                                    {{
+                                                        formatTokenCount(
+                                                            item.usage.last1Day
+                                                        )
+                                                    }}
+                                                </dd>
+                                            </div>
+                                        </dl>
+                                    </div>
+
                                     <div class="space-y-3">
                                         <p
                                             class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
@@ -211,6 +268,7 @@ defineProps<{
     errorMessage: string;
     canRevoke: boolean;
     formatTimestamp: (timestamp: number) => string;
+    formatTokenCount: (value: number) => string;
     getIssuerLabel: (issuer: AuthApiKeyIssuer) => string;
     getIssuerSectionTitle: (issuer: AuthApiKeyIssuer) => string;
     getIssuerBadgeClass: (issuer: AuthApiKeyIssuer) => string;

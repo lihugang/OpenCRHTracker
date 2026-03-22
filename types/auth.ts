@@ -16,6 +16,21 @@ export interface AuthSession {
     dailyTokenLimit: number;
 }
 
+export interface AuthQuotaSummary {
+    tokenLimit: number;
+    remain: number;
+    refillAmount: number;
+    refillIntervalSeconds: number;
+    nextRefillAt: number | null;
+}
+
+export interface AuthApiKeyUsageSummary {
+    last1Hour: number;
+    last8Hours: number;
+    last1Day: number;
+    bucketSeconds: number;
+}
+
 export interface AuthMeResponse {
     user: {
         userId: string;
@@ -29,12 +44,7 @@ export interface AuthMeResponse {
         dailyTokenLimit: number;
         scopes: string[];
     };
-    quota: {
-        tokenLimit: number;
-        remain: number;
-        refillAmount: number;
-        refillIntervalSeconds: number;
-    };
+    quota: AuthQuotaSummary;
 }
 
 export interface AuthApiKeyListItem {
@@ -48,10 +58,12 @@ export interface AuthApiKeyListItem {
     dailyTokenLimit: number;
     scopes: string[];
     isCurrent: boolean;
+    usage: AuthApiKeyUsageSummary | null;
 }
 
 export interface AuthApiKeyListResponse {
     userId: string;
+    quota: AuthQuotaSummary;
     items: AuthApiKeyListItem[];
     creatableScopes: string[];
     defaultScopes: string[];
