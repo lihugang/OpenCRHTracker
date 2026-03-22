@@ -443,6 +443,7 @@
                     </label>
                     <input
                         id="issue-name"
+                        ref="issueNameInputRef"
                         v-model.trim="issueForm.name"
                         type="text"
                         class="harmony-input w-full px-4 py-3 text-sm text-crh-grey-dark"
@@ -451,6 +452,16 @@
                     <p class="text-xs leading-5 text-slate-500">
                         名称长度 {{ apiKeyNameLength.minLength }} -
                         {{ apiKeyNameLength.maxLength }} 个字符。
+                    </p>
+                    <p
+                        v-if="issueNameError"
+                        class="flex items-center gap-1.5 pl-1 text-xs leading-5 text-[#E53E3E]">
+                        <span
+                            aria-hidden="true"
+                            class="font-semibold">
+                            [!]
+                        </span>
+                        {{ issueNameError }}
                     </p>
                 </div>
 
@@ -557,7 +568,7 @@
                     <UiButton
                         type="button"
                         :loading="isIssuing"
-                        :disabled="issueForm.scopes.length === 0"
+                        :disabled="!canSubmitIssueForm"
                         @click="issueApiKey">
                         签发密钥
                     </UiButton>
@@ -572,6 +583,7 @@
 <script setup lang="ts">
 import {
     computed,
+    nextTick,
     onBeforeUnmount,
     onMounted,
     reactive,
@@ -694,6 +706,7 @@ const issueErrorMessage = ref('');
 const issuedKeyResult = ref<AuthIssueApiKeyResponse | null>(null);
 const copyState = ref<'idle' | 'success' | 'error'>('idle');
 const nowSeconds = ref(Math.floor(Date.now() / 1000));
+const issueNameInputRef = ref<HTMLInputElement | null>(null);
 
 const issueForm = reactive({
     name: '',
@@ -855,6 +868,15 @@ const apiKeyNameLength = computed<AuthApiKeyNameLength>(
             maxLength: 64
         }
 );
+const issueNameError = computed(() =>
+    validateApiKeyName(
+        normalizeApiKeyName(issueForm.name),
+        apiKeyNameLength.value
+    )
+);
+const canSubmitIssueForm = computed(
+    () => !isIssuing.value && !issueNameError.value && issueForm.scopes.length > 0
+);
 const isApiKeysLoading = computed(() => apiKeysStatus.value === 'pending');
 const apiKeysErrorMessage = computed(() =>
     apiKeysError.value
@@ -952,6 +974,14 @@ watch(issueActiveFromTimestamp, (nextActiveFrom) => {
     ) {
         issueForm.expiresAt = toDateTimeLocalValue(defaultExpiresAt);
     }
+});
+
+watch(isIssueModalOpen, (isOpen) => {
+    if (!isOpen || issuedKeyResult.value) {
+        return;
+    }
+
+    void focusIssueNameInput();
 });
 
 onMounted(() => {
@@ -1163,6 +1193,19 @@ function resetIssueForm() {
     issueErrorMessage.value = '';
     issuedKeyResult.value = null;
     copyState.value = 'idle';
+}
+
+async function focusIssueNameInput() {
+    await nextTick();
+
+    const input = issueNameInputRef.value;
+    if (!input) {
+        return;
+    }
+
+    input.focus({ preventScroll: true });
+    const valueLength = input.value.length;
+    input.setSelectionRange(valueLength, valueLength);
 }
 
 function openIssueModal() {
