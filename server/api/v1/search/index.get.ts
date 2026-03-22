@@ -1,8 +1,9 @@
-import { defineEventHandler, setHeader } from 'h3';
+import { defineEventHandler } from 'h3';
 import useConfig from '~/server/config';
 import { getLookupIndex } from '~/server/services/lookupIndexStore';
 import getFixedCost from '~/server/utils/api/cost/getFixedCost';
 import executeApi from '~/server/utils/api/executor/executeApi';
+import setCacheControl from '~/server/utils/api/response/setCacheControl';
 import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
 
 export default defineEventHandler(async (event) => {
@@ -14,11 +15,7 @@ export default defineEventHandler(async (event) => {
             requiredScopes: [API_SCOPES.search.read],
             fixedCost: getFixedCost('searchIndex'),
             successHeaders: (successEvent) =>
-                setHeader(
-                    successEvent,
-                    'Cache-Control',
-                    `public, max-age=${cacheMaxAge}`
-                )
+                setCacheControl(successEvent, cacheMaxAge)
         },
         async () => {
             return {
