@@ -336,6 +336,7 @@ export const developerDocsOpenApi = {
                 type: 'object',
                 required: [
                     'startAt',
+                    'endAt',
                     'id',
                     'emuCode',
                     'trainCode',
@@ -347,6 +348,10 @@ export const developerDocsOpenApi = {
                     startAt: {
                         type: 'integer',
                         example: 1774060020
+                    },
+                    endAt: {
+                        type: 'integer',
+                        example: 1774089060
                     },
                     id: {
                         type: 'string',
@@ -731,7 +736,7 @@ export const developerDocsOpenApi = {
                             content: {
                                 type: 'string',
                                 example:
-                                    'id,startAt,emuCode,trainCode,startStation,endStation\\n5201314,1774076820,CR400AF-C-2214,C2724,雄安,北京西'
+                                    'trainCode,emuCode,startStation,endStation,startAt,endAt\\nC2724,CR400AF-C-2214,雄安,北京西,1774076820,1774091220'
                             }
                         }
                     },
@@ -1227,14 +1232,14 @@ export const developerDocsOpenApi = {
                                     type: 'string'
                                 },
                                 example:
-                                    'id,startAt,emuCode,trainCode,startStation,endStation\n15231,1741996800,CR400AF-2149,G1,Beijing South,Shanghai Hongqiao'
+                                    'trainCode,emuCode,startStation,endStation,startAt,endAt\nG1,CR400AF-2149,Beijing South,Shanghai Hongqiao,1741996800,1742019960'
                             },
                             'application/x-ndjson': {
                                 schema: {
                                     type: 'string'
                                 },
                                 example:
-                                    '{"id":"15231","startAt":1741996800,"emuCode":"CR400AF-2149","trainCode":"G1"}'
+                                    '{"trainCode":"G1","emuCode":"CR400AF-2149","startStation":"Beijing South","endStation":"Shanghai Hongqiao","startAt":1741996800,"endAt":1742019960}'
                             }
                         }
                     },
