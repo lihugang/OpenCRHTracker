@@ -94,6 +94,7 @@
             "webapp": "ocrh_webapp_",
             "api": "ocrh_api_"
         },
+        "adminUserIds": [],
         "apiKeyBytes": 24,
         "apiKeyTtlSeconds": 2592000,
         "apiKeyMaxLifetimeSeconds": 157680000,

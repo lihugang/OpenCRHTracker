@@ -1,4 +1,5 @@
 export const API_SCOPES = {
+    admin: 'api.admin',
     config: {
         read: 'api.config.read'
     },

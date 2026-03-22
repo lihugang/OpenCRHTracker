@@ -54,6 +54,8 @@ Use Conventional Commits:
 - `fix: handle empty schedule payload`
 - `chore: format server utils`
 
+The commit must be signed with gpg keys.
+
 PRs should include:
 
 - concise change summary and scope

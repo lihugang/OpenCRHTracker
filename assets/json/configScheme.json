@@ -370,6 +370,13 @@
                     "type": "integer",
                     "minimum": 60
                 },
+                "adminUserIds": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "minLength": 1
+                    }
+                },
                 "signKey": {
                     "type": "string",
                     "minLength": 1

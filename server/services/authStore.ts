@@ -3,6 +3,7 @@ import { LRUCache } from 'lru-cache';
 import useConfig from '~/server/config';
 import { useUsersDatabase } from '~/server/libs/database/users';
 import { createPreparedSqlStore } from '~/server/libs/database/prepared';
+import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
 import normalizeScopeList from '~/server/utils/api/scopes/normalizeScopeList';
 import importSqlBatch from '~/server/utils/sql/importSqlBatch';
 import {
@@ -281,6 +282,16 @@ function matchesPayload(record: ApiKeyRecord, payload: ApiKeyPayload) {
     );
 }
 
+function resolveDefaultSessionScopes(userId: string, issuer: ApiKeyIssuer) {
+    const defaultScopes = [...useConfig().api.permissions.issuedKeyDefaultScopes];
+
+    if (issuer === 'webapp' && useConfig().user.adminUserIds.includes(userId)) {
+        defaultScopes.push(API_SCOPES.admin);
+    }
+
+    return normalizeScopeList(defaultScopes);
+}
+
 function buildAuthSessionFromRecord(
     apiKey: string,
     record: ApiKeyRecord
@@ -376,8 +387,7 @@ export function createApiKey(
     options: CreateApiKeyOptions = {}
 ) {
     const issuer = options.issuer ?? 'webapp';
-    const scopes =
-        options.scopes ?? useConfig().api.permissions.issuedKeyDefaultScopes;
+    const scopes = options.scopes ?? resolveDefaultSessionScopes(userId, issuer);
     const keyId = createKeyId();
     const revokeId = createRevokeId();
     const apiKey = buildApiKeySession(
@@ -434,7 +444,7 @@ export function createUserWithApiKey(
     const revokeId = createRevokeId();
     const issuer = options.issuer ?? 'webapp';
     const scopes =
-        options.scopes ?? useConfig().api.permissions.issuedKeyDefaultScopes;
+        options.scopes ?? resolveDefaultSessionScopes(username, issuer);
     const apiKey = buildApiKeySession(
         username,
         keyId,

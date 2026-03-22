@@ -128,6 +128,7 @@ export interface Config {
             webapp: string;
             api: string;
         };
+        adminUserIds: string[];
         apiKeyBytes: number;
         apiKeyTtlSeconds: number;
         apiKeyMaxLifetimeSeconds: number;
@@ -305,6 +306,39 @@ function asOptionalObject(
     return asObject(value, name);
 }
 
+function normalizeUniqueStringList(values: Iterable<string>) {
+    const deduped = new Set<string>();
+    const result: string[] = [];
+
+    for (const value of values) {
+        const normalized = value.trim();
+        if (normalized.length === 0 || deduped.has(normalized)) {
+            continue;
+        }
+
+        deduped.add(normalized);
+        result.push(normalized);
+    }
+
+    return result;
+}
+
+function parseNonEmptyStringList(value: unknown, name: string) {
+    return normalizeUniqueStringList(
+        asArray(value, name).map((item, index) =>
+            asString(item, `${name}[${index}]`)
+        )
+    );
+}
+
+function parseEnvList(rawValue: string | undefined) {
+    if (!rawValue) {
+        return [];
+    }
+
+    return normalizeUniqueStringList(rawValue.split(','));
+}
+
 function parseRefreshableAssetConfig(
     value: unknown,
     name: string
@@ -410,6 +444,12 @@ function validateConfig(raw: unknown): Config {
         user.apiKeyPrefix === undefined
             ? undefined
             : asString(user.apiKeyPrefix, 'user.apiKeyPrefix');
+    const configAdminUserIds =
+        user.adminUserIds === undefined
+            ? []
+            : parseNonEmptyStringList(user.adminUserIds, 'user.adminUserIds');
+    const envAdminUserIdsRaw = process.env.OCRH_ADMIN_USERS?.trim();
+    const envAdminUserIds = parseEnvList(envAdminUserIdsRaw);
     const envSignKey = process.env.OCRH_SIGN_KEY?.trim();
     const configSignKey =
         user.signKey === undefined
@@ -417,8 +457,21 @@ function validateConfig(raw: unknown): Config {
             : asString(user.signKey, 'user.signKey');
     const signKey =
         envSignKey && envSignKey.length > 0 ? envSignKey : configSignKey;
+    const adminUserIds =
+        envAdminUserIdsRaw && envAdminUserIdsRaw.length > 0
+            ? envAdminUserIds
+            : configAdminUserIds;
 
     assert(signKey.length > 0, 'user.signKey must be configured');
+    if (
+        !import.meta.dev &&
+        (!envAdminUserIdsRaw || envAdminUserIdsRaw.length === 0) &&
+        configAdminUserIds.length > 0
+    ) {
+        console.warn(
+            '[config] WARNING: OCRH admin users were loaded from config instead of process.env.OCRH_ADMIN_USERS'
+        );
+    }
     if (!import.meta.dev && (!envSignKey || envSignKey.length === 0)) {
         console.warn(
             '[config] WARNING: OCRH signing key was loaded from config instead of process.env.OCRH_SIGN_KEY'
@@ -690,6 +743,7 @@ function validateConfig(raw: unknown): Config {
                               'user.apiKeyPrefixes.api'
                           )
             },
+            adminUserIds,
             apiKeyBytes: asNumber(user.apiKeyBytes, 'user.apiKeyBytes', 16),
             apiKeyTtlSeconds: asNumber(
                 user.apiKeyTtlSeconds,
