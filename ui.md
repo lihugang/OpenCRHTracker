@@ -350,6 +350,7 @@ All text inputs should follow the shared `harmony-input` language:
 - large radius
 - subtle inset shadow
 - clear blue focus ring
+- text-entry controls should use at least `16px` font size to avoid iOS Safari focus zoom
 
 ### 8.2 Focus State
 

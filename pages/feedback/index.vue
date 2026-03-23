@@ -321,7 +321,7 @@
                                 v-model.trim="composerForm.details.trainCode"
                                 type="text"
                                 maxlength="32"
-                                class="harmony-input w-full px-4 py-3 text-sm"
+                                class="harmony-input w-full px-4 py-3 text-base"
                                 @keydown.enter.prevent="
                                     focusNextComposerField($event)
                                 "
@@ -340,7 +340,7 @@
                                 v-model.trim="composerForm.details.emuCodesRaw"
                                 type="text"
                                 maxlength="120"
-                                class="harmony-input w-full px-4 py-3 text-sm"
+                                class="harmony-input w-full px-4 py-3 text-base"
                                 @keydown.enter.prevent="
                                     focusNextComposerField($event)
                                 "
@@ -367,7 +367,7 @@
                                     "
                                     type="text"
                                     maxlength="32"
-                                    class="harmony-input w-full px-4 py-3 text-sm"
+                                    class="harmony-input w-full px-4 py-3 text-base"
                                     @keydown.enter.prevent="
                                         focusNextComposerField($event)
                                     "
@@ -388,7 +388,7 @@
                                     "
                                     type="text"
                                     maxlength="120"
-                                    class="harmony-input w-full px-4 py-3 text-sm"
+                                    class="harmony-input w-full px-4 py-3 text-base"
                                     @keydown.enter.prevent="
                                         focusNextComposerField($event)
                                     "
@@ -502,7 +502,7 @@
                             v-model="composerForm.details.customText"
                             rows="6"
                             maxlength="4000"
-                            class="harmony-input min-h-[10rem] w-full resize-y px-4 py-3 text-sm"
+                            class="harmony-input min-h-[10rem] w-full resize-y px-4 py-3 text-base"
                             placeholder="补充你希望管理员看到的具体信息。"
                             @keydown.ctrl.enter.prevent="submitTopic"
                             @keydown.enter.prevent="

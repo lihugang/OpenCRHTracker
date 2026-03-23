@@ -446,7 +446,7 @@
                         ref="issueNameInputRef"
                         v-model.trim="issueForm.name"
                         type="text"
-                        class="harmony-input w-full px-4 py-3 text-sm text-crh-grey-dark"
+                        class="harmony-input w-full px-4 py-3 text-base text-crh-grey-dark"
                         :maxlength="apiKeyNameLength.maxLength"
                         placeholder="例如：本地脚本、CI 部署、临时调试" />
                     <p class="text-xs leading-5 text-slate-500">
@@ -476,7 +476,7 @@
                             id="issue-active-from"
                             v-model="issueForm.activeFrom"
                             type="datetime-local"
-                            class="harmony-input w-full px-4 py-3 text-sm text-crh-grey-dark" />
+                            class="harmony-input w-full px-4 py-3 text-base text-crh-grey-dark" />
                     </div>
 
                     <div class="space-y-2">
@@ -490,7 +490,7 @@
                             v-model="issueForm.expiresAt"
                             type="datetime-local"
                             :max="issueExpiresAtMax"
-                            class="harmony-input w-full px-4 py-3 text-sm text-crh-grey-dark" />
+                            class="harmony-input w-full px-4 py-3 text-base text-crh-grey-dark" />
                     </div>
                 </div>
 

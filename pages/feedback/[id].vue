@@ -204,7 +204,7 @@
                                             v-model.trim="manageForm.title"
                                             type="text"
                                             maxlength="80"
-                                            class="harmony-input w-full px-4 py-3 text-sm"
+                                            class="harmony-input w-full px-4 py-3 text-base"
                                             placeholder="请输入反馈标题" />
                                     </UiField>
 
@@ -418,7 +418,7 @@
                                                 v-model="replyBody"
                                                 rows="5"
                                                 maxlength="2000"
-                                                class="harmony-input min-h-[9rem] w-full resize-y px-4 py-3 text-sm"
+                                                class="harmony-input min-h-[9rem] w-full resize-y px-4 py-3 text-base"
                                                 placeholder="补充更多信息、确认处理结果，或继续和管理员交流。"
                                                 @keydown.ctrl.enter.prevent="
                                                     submitReply

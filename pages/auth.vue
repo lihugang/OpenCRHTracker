@@ -204,7 +204,7 @@ const switchPrompt = computed(() =>
 );
 const switchLabel = computed(() => (isLogin.value ? '在此注册' : '返回登录'));
 const inputClasses =
-    'harmony-input w-full px-5 py-3 text-sm text-crh-grey-dark placeholder:text-slate-400';
+    'harmony-input w-full px-5 py-3 text-base text-crh-grey-dark placeholder:text-slate-400';
 
 const statusClasses = computed(() =>
     statusTone.value === 'error'

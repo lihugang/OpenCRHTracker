@@ -28,7 +28,7 @@
                     <input
                         v-model="sharedApiKey"
                         type="password"
-                        class="harmony-input w-full px-4 py-3 text-sm"
+                        class="harmony-input w-full px-4 py-3 text-base"
                         autocomplete="off"
                         spellcheck="false"
                         placeholder="请输入你的 API Key" />
@@ -50,7 +50,7 @@
                             <input
                                 v-model="pathValues[parameter.name]"
                                 type="text"
-                                class="harmony-input w-full px-4 py-3 text-sm"
+                                class="harmony-input w-full px-4 py-3 text-base"
                                 :placeholder="
                                     stringifyFieldExample(parameter.example)
                                 " />
@@ -74,7 +74,7 @@
                             <input
                                 v-model="queryValues[parameter.name]"
                                 type="text"
-                                class="harmony-input w-full px-4 py-3 text-sm"
+                                class="harmony-input w-full px-4 py-3 text-base"
                                 :placeholder="
                                     stringifyFieldExample(parameter.example)
                                 " />
@@ -98,7 +98,7 @@
                             <input
                                 v-model="headerValues[parameter.name]"
                                 type="text"
-                                class="harmony-input w-full px-4 py-3 text-sm"
+                                class="harmony-input w-full px-4 py-3 text-base"
                                 :placeholder="
                                     stringifyFieldExample(parameter.example)
                                 " />
@@ -112,7 +112,7 @@
                     help="">
                     <textarea
                         v-model="requestBodyText"
-                        class="harmony-input min-h-48 w-full px-4 py-3 font-mono text-sm"
+                        class="harmony-input min-h-48 w-full px-4 py-3 font-mono text-base"
                         spellcheck="false" />
                 </UiField>
 
