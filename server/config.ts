@@ -218,6 +218,7 @@ export interface Config {
             health: number;
             authMe: number;
             authLogout: number;
+            authChangePassword: number;
             debugEchoError: number;
             authIssueApiKey: number;
             authListApiKeys: number;
@@ -1052,6 +1053,11 @@ function validateConfig(raw: unknown): Config {
                 authLogout: asNumber(
                     costFixed.authLogout,
                     'cost.fixed.authLogout',
+                    0
+                ),
+                authChangePassword: asNumber(
+                    costFixed.authChangePassword,
+                    'cost.fixed.authChangePassword',
                     0
                 ),
                 debugEchoError: asNumber(

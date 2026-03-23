@@ -195,6 +195,7 @@
                 "api.feedback.reply",
                 "api.auth.me.read",
                 "api.auth.logout",
+                "api.auth.password.update",
                 "api.auth.api-keys.read",
                 "api.auth.api-keys.create",
                 "api.auth.api-keys.revoke"
@@ -242,12 +243,13 @@
             "authMe": 1,
             "authLogout": 1,
             "debugEchoError": 0,
-            "authIssueApiKey": 2,
+            "authIssueApiKey": 5,
             "authListApiKeys": 1,
             "authRevokeApiKey": 1,
             "searchIndex": 1,
             "exportDailyIndex": 2,
-            "exportDaily": 50
+            "exportDaily": 50,
+            "authChangePassword": 5
         },
         "perRecord": {
             "historyEmu": {

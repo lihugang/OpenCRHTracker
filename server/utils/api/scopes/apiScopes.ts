@@ -6,6 +6,9 @@ export const API_SCOPES = {
     auth: {
         me: 'api.auth.me.read',
         logout: 'api.auth.logout',
+        password: {
+            update: 'api.auth.password.update'
+        },
         apiKeys: {
             read: 'api.auth.api-keys.read',
             create: 'api.auth.api-keys.create',

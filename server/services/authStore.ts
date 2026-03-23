@@ -74,6 +74,7 @@ type AuthSqlKey =
     | 'insertUser'
     | 'insertApiKey'
     | 'insertApiKeyScope'
+    | 'revokeApiKeysByUserAndIssuer'
     | 'revokeApiKeyByUser'
     | 'revokeApiKeyByRevokeId'
     | 'selectApiKeysByUser'
@@ -81,6 +82,7 @@ type AuthSqlKey =
     | 'selectApiKeyScopesByUser'
     | 'selectUserByUsername'
     | 'selectValidApiKey'
+    | 'updateUserPassword'
     | 'updateUserLastLogin';
 
 const authSql = importSqlBatch('users/queries') as Record<AuthSqlKey, string>;
@@ -251,6 +253,21 @@ function insertApiKeyScopes(keyId: string, scopes: string[]) {
     }
 }
 
+function cacheIssuedApiKey(apiKey: IssuedAuthSession) {
+    apiKeyRecordCache.set(apiKey.keyId, {
+        key: apiKey.keyId,
+        revoke_id: apiKey.revokeId,
+        user_id: apiKey.userId,
+        issuer: apiKey.issuer,
+        name: apiKey.name,
+        active_from: apiKey.activeFrom,
+        revoked_at: null,
+        expires_at: apiKey.expiresAt,
+        daily_token_limit: apiKey.dailyTokenLimit,
+        scopes: apiKey.scopes
+    });
+}
+
 function hydrateApiKeyScopesByKey(keyId: string) {
     return authStatements
         .all<ApiKeyScopeRecord>('selectApiKeyScopesByKey', keyId)
@@ -283,7 +300,9 @@ function matchesPayload(record: ApiKeyRecord, payload: ApiKeyPayload) {
 }
 
 function resolveDefaultSessionScopes(userId: string, issuer: ApiKeyIssuer) {
-    const defaultScopes = [...useConfig().api.permissions.issuedKeyDefaultScopes];
+    const defaultScopes = [
+        ...useConfig().api.permissions.issuedKeyDefaultScopes
+    ];
 
     if (issuer === 'webapp' && useConfig().user.adminUserIds.includes(userId)) {
         defaultScopes.push(API_SCOPES.admin);
@@ -387,7 +406,8 @@ export function createApiKey(
     options: CreateApiKeyOptions = {}
 ) {
     const issuer = options.issuer ?? 'webapp';
-    const scopes = options.scopes ?? resolveDefaultSessionScopes(userId, issuer);
+    const scopes =
+        options.scopes ?? resolveDefaultSessionScopes(userId, issuer);
     const keyId = createKeyId();
     const revokeId = createRevokeId();
     const apiKey = buildApiKeySession(
@@ -416,18 +436,7 @@ export function createApiKey(
     });
 
     insert();
-    apiKeyRecordCache.set(apiKey.keyId, {
-        key: apiKey.keyId,
-        revoke_id: apiKey.revokeId,
-        user_id: userId,
-        issuer: apiKey.issuer,
-        name: apiKey.name,
-        active_from: apiKey.activeFrom,
-        revoked_at: null,
-        expires_at: apiKey.expiresAt,
-        daily_token_limit: apiKey.dailyTokenLimit,
-        scopes: apiKey.scopes
-    });
+    cacheIssuedApiKey(apiKey);
 
     return apiKey;
 }
@@ -486,18 +495,70 @@ export function createUserWithApiKey(
         created_at: createdAt,
         last_login_at: createdAt
     });
-    apiKeyRecordCache.set(apiKey.keyId, {
-        key: apiKey.keyId,
-        revoke_id: apiKey.revokeId,
-        user_id: username,
-        issuer: apiKey.issuer,
-        name: apiKey.name,
-        active_from: apiKey.activeFrom,
-        revoked_at: null,
-        expires_at: apiKey.expiresAt,
-        daily_token_limit: apiKey.dailyTokenLimit,
-        scopes: apiKey.scopes
+    cacheIssuedApiKey(apiKey);
+    return apiKey;
+}
+
+export function changeUserPasswordWithApiKey(
+    username: string,
+    currentPassword: string,
+    nextPassword: string
+) {
+    const user = getUserByUsername(username);
+    if (!user || !verifyUserPassword(user, currentPassword)) {
+        return undefined;
+    }
+
+    const nextSalt = createSalt();
+    const nextPasswordHash = createPasswordHash(nextPassword, nextSalt);
+    const issuer: ApiKeyIssuer = 'webapp';
+    const scopes = resolveDefaultSessionScopes(username, issuer);
+    const keyId = createKeyId();
+    const revokeId = createRevokeId();
+    const apiKey = buildApiKeySession(
+        username,
+        keyId,
+        revokeId,
+        undefined,
+        scopes,
+        issuer
+    );
+    const now = getNowSeconds();
+    const update = useUsersDatabase().transaction(() => {
+        authStatements.run(
+            'updateUserPassword',
+            nextSalt,
+            nextPasswordHash,
+            username
+        );
+        authStatements.run(
+            'revokeApiKeysByUserAndIssuer',
+            now,
+            username,
+            issuer
+        );
+        authStatements.run(
+            'insertApiKey',
+            apiKey.keyId,
+            apiKey.revokeId,
+            username,
+            apiKey.issuer,
+            apiKey.name,
+            apiKey.activeFrom,
+            apiKey.expiresAt,
+            apiKey.dailyTokenLimit
+        );
+        insertApiKeyScopes(apiKey.keyId, apiKey.scopes);
     });
+
+    update();
+    userRecordCache.set(username, {
+        ...user,
+        salt: nextSalt,
+        password_hash: nextPasswordHash
+    });
+    apiKeyRecordCache.clear();
+    cacheIssuedApiKey(apiKey);
     return apiKey;
 }
 

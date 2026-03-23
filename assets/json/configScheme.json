@@ -895,12 +895,17 @@
                         "exportDaily": {
                             "type": "integer",
                             "minimum": 0
+                        },
+                        "authChangePassword": {
+                            "type": "integer",
+                            "minimum": 0
                         }
                     },
                     "required": [
                         "health",
                         "authMe",
                         "authLogout",
+                        "authChangePassword",
                         "debugEchoError",
                         "authIssueApiKey",
                         "authListApiKeys",

@@ -177,8 +177,22 @@
                             class="max-w-3xl">
                             <DashboardGeneralCard
                                 :session="session"
+                                :can-change-password="canChangePassword"
+                                v-model:current-password="
+                                    changePasswordForm.currentPassword
+                                "
+                                v-model:new-password="
+                                    changePasswordForm.newPassword
+                                "
+                                v-model:confirm-new-password="
+                                    changePasswordForm.confirmNewPassword
+                                "
+                                :is-changing-password="isChangingPassword"
+                                :change-password-message="changePasswordMessage"
+                                :change-password-tone="changePasswordTone"
                                 :is-logging-out="isLoggingOut"
                                 :logout-error-message="logoutErrorMessage"
+                                @change-password="changePassword"
                                 @logout="logout" />
                         </div>
 
@@ -595,7 +609,8 @@ import type {
     AuthApiKeyListResponse,
     AuthApiKeyNameLength,
     AuthQuotaSummary,
-    AuthIssueApiKeyResponse
+    AuthIssueApiKeyResponse,
+    AuthSession
 } from '~/types/auth';
 import type { TrackerApiResponse } from '~/types/homepage';
 import getApiErrorMessage from '~/utils/api/getApiErrorMessage';
@@ -603,12 +618,15 @@ import {
     normalizeApiKeyName,
     validateApiKeyName
 } from '~/utils/auth/apiKeyName';
+import hashPasswordDigest from '~/utils/auth/hashPasswordDigest';
+import { validatePassword } from '~/utils/auth/credentials';
 import formatTrackerTimestamp from '~/utils/time/formatTrackerTimestamp';
 
 definePageMeta({
     middleware: 'auth-required'
 });
 
+const PASSWORD_SCOPE = 'api.auth.password.update';
 const ISSUE_SCOPE = 'api.auth.api-keys.create';
 const REVOKE_SCOPE = 'api.auth.api-keys.revoke';
 const DEFAULT_ISSUE_LIFETIME_SECONDS = 30 * 24 * 60 * 60;
@@ -621,7 +639,7 @@ const dashboardPageCopy = {
     panelSheetEyebrow: 'SWITCH',
     panelSheetTitle: '切换选项卡',
     pageTitle: '设置 | Open CRH Tracker',
-    pageDescription: '管理会话和 API 密钥。'
+    pageDescription: '管理账户安全、会话和 API 密钥。'
 } as const;
 
 const dashboardPanels = [
@@ -658,6 +676,8 @@ const scopeLabelMap: Record<string, string> = {
     exports: '导出',
     'api.auth': '鉴权',
     'api.auth.me': '当前会话',
+    'api.auth.password': '密码',
+    'api.auth.password.update': '修改密码',
     'api.auth.api-keys': 'API 密钥',
     'api.auth.api-keys.read': '读取密钥',
     'api.auth.api-keys.create': '签发密钥',
@@ -684,17 +704,20 @@ const scopeLabelMap: Record<string, string> = {
 };
 
 interface DashboardMutationOptions {
-    method: 'POST' | 'DELETE';
+    method: 'POST' | 'PATCH' | 'DELETE';
     body?: Record<string, unknown>;
 }
 
 const route = useRoute();
 const router = useRouter();
-const { session, clearSession } = useAuthState();
+const { session, clearSession, setSession } = useAuthState();
 const requestFetch = import.meta.server ? useRequestFetch() : $fetch;
 
 const logoutErrorMessage = ref('');
 const isLoggingOut = ref(false);
+const changePasswordMessage = ref('');
+const changePasswordTone = ref<'success' | 'error'>('success');
+const isChangingPassword = ref(false);
 const isPanelSheetOpen = ref(false);
 const revokeTarget = ref<AuthApiKeyListItem | null>(null);
 const revokeErrorMessage = ref('');
@@ -712,6 +735,11 @@ const issueForm = reactive({
     activeFrom: '',
     expiresAt: '',
     scopes: [] as string[]
+});
+const changePasswordForm = reactive({
+    currentPassword: '',
+    newPassword: '',
+    confirmNewPassword: ''
 });
 
 let nowTimer: number | null = null;
@@ -874,7 +902,8 @@ const issueNameError = computed(() =>
     )
 );
 const canSubmitIssueForm = computed(
-    () => !isIssuing.value && !issueNameError.value && issueForm.scopes.length > 0
+    () =>
+        !isIssuing.value && !issueNameError.value && issueForm.scopes.length > 0
 );
 const isApiKeysLoading = computed(() => apiKeysStatus.value === 'pending');
 const apiKeysErrorMessage = computed(() =>
@@ -910,6 +939,9 @@ const currentKeyName = computed(() => {
     return currentItem?.name ?? '--';
 });
 
+const canChangePassword = computed(() =>
+    hasClientScope(session.value?.scopes ?? [], PASSWORD_SCOPE)
+);
 const canIssueApiKeys = computed(() =>
     hasClientScope(session.value?.scopes ?? [], ISSUE_SCOPE)
 );
@@ -1268,6 +1300,93 @@ async function executeMutation<TData>(
     }
 
     return response.data;
+}
+
+function clearChangePasswordState() {
+    changePasswordMessage.value = '';
+    changePasswordTone.value = 'success';
+}
+
+function setChangePasswordState(message: string, tone: 'success' | 'error') {
+    changePasswordMessage.value = message;
+    changePasswordTone.value = tone;
+}
+
+function resetChangePasswordForm() {
+    changePasswordForm.currentPassword = '';
+    changePasswordForm.newPassword = '';
+    changePasswordForm.confirmNewPassword = '';
+}
+
+function validateChangePasswordForm() {
+    if (
+        !changePasswordForm.currentPassword ||
+        !changePasswordForm.newPassword ||
+        !changePasswordForm.confirmNewPassword
+    ) {
+        return '请完整填写当前密码和新密码。';
+    }
+
+    const passwordError = validatePassword(changePasswordForm.newPassword);
+    if (passwordError) {
+        return passwordError;
+    }
+
+    if (
+        changePasswordForm.newPassword !== changePasswordForm.confirmNewPassword
+    ) {
+        return '两次输入的新密码不一致。';
+    }
+
+    if (changePasswordForm.currentPassword === changePasswordForm.newPassword) {
+        return '新密码不能与旧密码相同。';
+    }
+
+    return '';
+}
+
+async function changePassword() {
+    if (isChangingPassword.value || !canChangePassword.value) {
+        return;
+    }
+
+    const validationError = validateChangePasswordForm();
+    if (validationError) {
+        setChangePasswordState(validationError, 'error');
+        return;
+    }
+
+    isChangingPassword.value = true;
+    clearChangePasswordState();
+
+    try {
+        const [currentPasswordDigest, newPasswordDigest] = await Promise.all([
+            hashPasswordDigest(changePasswordForm.currentPassword),
+            hashPasswordDigest(changePasswordForm.newPassword)
+        ]);
+        const nextSession = await executeMutation<AuthSession>(
+            '/api/v1/auth/password',
+            {
+                method: 'PATCH',
+                body: {
+                    currentPasswordDigest,
+                    newPasswordDigest
+                }
+            }
+        );
+
+        setSession(nextSession);
+        resetChangePasswordForm();
+        setChangePasswordState('密码已更新，其他网页端会话已失效。', 'success');
+        void refreshApiKeys();
+    } catch (error) {
+        setChangePasswordState(
+            getApiErrorMessage(error, '修改密码失败，请稍后重试。'),
+            'error'
+        );
+    } finally {
+        isChangingPassword.value = false;
+    }
 }
 
 async function logout() {
