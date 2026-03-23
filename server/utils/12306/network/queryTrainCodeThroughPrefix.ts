@@ -1,6 +1,7 @@
 import useConfig from '~/server/config';
 import waitFor12306RequestSlot from '../requestLimiter';
 import parseJsonpToJson from '../../json/parseJsonpToJson';
+import log12306RequestMetric from './log12306RequestMetric';
 
 interface TrainCodeResponse {
     data: Array<{
@@ -38,15 +39,23 @@ const config = useConfig();
 export default async function queryTrainCodeThroughPrefix(prefix: string) {
     try {
         await waitFor12306RequestSlot('search');
-        const response = await fetch(
-            `https://search.12306.cn/search/v1/h5/search?callback=${config.spider.params.jsonpCallback}&keyword=${prefix}&suorce=&action=&_=${Date.now()}`,
-            {
-                headers: {
-                    'user-agent': config.spider.userAgent
-                },
-                method: 'GET'
+        const url =
+            `https://search.12306.cn/search/v1/h5/search?callback=${config.spider.params.jsonpCallback}` +
+            `&keyword=${prefix}&suorce=&action=&_=${Date.now()}`;
+        log12306RequestMetric({
+            operation: 'query_train_code_through_prefix',
+            type: 'search',
+            url,
+            context: {
+                keyword: prefix
             }
-        );
+        });
+        const response = await fetch(url, {
+            headers: {
+                'user-agent': config.spider.userAgent
+            },
+            method: 'GET'
+        });
         const json = parseJsonpToJson<TrainCodeResponse>(
             await response.text(),
             config.spider.params.jsonpCallback

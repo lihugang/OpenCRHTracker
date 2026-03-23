@@ -2,6 +2,7 @@ import useConfig from '~/server/config';
 import getLogger from '~/server/libs/log4js';
 import getCurrentDateString from '../../date/getCurrentDateString';
 import log12306RequestFailure from './log12306RequestFailure';
+import log12306RequestMetric from './log12306RequestMetric';
 import waitFor12306RequestSlot from '../requestLimiter';
 
 interface EMUInfoResponse {
@@ -46,6 +47,14 @@ export default async function fetchEMUInfoByRoute(route: string) {
         await waitFor12306RequestSlot('query');
         // 12306 endpoint requires a non-empty carCode placeholder; value does not affect query result.
         const routeProbeCarCode = config.spider.params.routeProbeCarCode;
+        log12306RequestMetric({
+            operation: 'fetch_emu_info_by_route',
+            type: 'query',
+            url,
+            context: {
+                trainCode: route
+            }
+        });
         const response = await fetch(
             `${url}?carCode=${encodeURIComponent(routeProbeCarCode)}&trainCode=${route}&runningDay=${getCurrentDateString()}&reqType=form`,
             {

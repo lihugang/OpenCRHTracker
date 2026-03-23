@@ -3,6 +3,7 @@ import useConfig from '~/server/config';
 import getLogger from '~/server/libs/log4js';
 import { getShanghaiUnixSecondsFromDateAndTime } from '../../date/shanghaiDateTime';
 import log12306RequestFailure from './log12306RequestFailure';
+import log12306RequestMetric from './log12306RequestMetric';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
 
 interface EMUInfoResponse {
@@ -92,6 +93,14 @@ export default async function fetchEMUInfoBySeatCode(code: string) {
         'https://mobile.12306.cn/wxxcx/wechat/main/travelServiceDecodeQrcode';
     try {
         await waitFor12306RequestSlot('query');
+        log12306RequestMetric({
+            operation: 'fetch_emu_info_by_seat_code',
+            type: 'query',
+            url,
+            context: {
+                seatCode: normalizedCode
+            }
+        });
         const response = await fetch(url, {
             headers: {
                 'content-type': 'application/x-www-form-urlencoded',

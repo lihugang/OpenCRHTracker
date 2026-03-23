@@ -3,6 +3,7 @@ import getLogger from '~/server/libs/log4js';
 import getCurrentDateString from '../../date/getCurrentDateString';
 import { getShanghaiUnixSecondsFromDateAndTime } from '../../date/shanghaiDateTime';
 import log12306RequestFailure from './log12306RequestFailure';
+import log12306RequestMetric from './log12306RequestMetric';
 import waitFor12306RequestSlot from '../requestLimiter';
 
 interface RouteInfoResponse {
@@ -119,6 +120,14 @@ export default async function fetchRouteInfo(
         'https://mobile.12306.cn/wxxcx/wechat/main/travelServiceQrcodeTrainInfo';
     try {
         await waitFor12306RequestSlot('query');
+        log12306RequestMetric({
+            operation: 'fetch_route_info',
+            type: 'query',
+            url,
+            context: {
+                trainCode: route
+            }
+        });
         const response = await fetch(url, {
             headers: {
                 'content-type': 'application/x-www-form-urlencoded',
