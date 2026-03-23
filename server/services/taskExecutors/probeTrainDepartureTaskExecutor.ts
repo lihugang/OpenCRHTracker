@@ -118,6 +118,22 @@ interface TodayTrainCodesValidationResult {
     notRunningTrainCodes: string[];
 }
 
+interface SeatCodeVerificationResult {
+    state: 'matched' | 'mismatch' | 'unavailable';
+    reason:
+        | 'matched_internal_code'
+        | 'matched_train_code'
+        | 'main_emu_code_invalid'
+        | 'seat_code_missing'
+        | 'seat_code_request_failed'
+        | 'seat_route_not_current_day'
+        | 'seat_internal_code_mismatch'
+        | 'seat_train_code_mismatch';
+    seatTrainCode: string;
+    seatInternalCode: string;
+    seatStartAt: number;
+}
+
 let registered = false;
 
 function parseTaskArgs(raw: unknown): ProbeTrainDepartureTaskArgs {
@@ -615,6 +631,20 @@ function requeueOverlappingGroups(
     );
 }
 
+function requeueCurrentProbeTaskWithOverlapDelay(
+    args: ProbeTrainDepartureTaskArgs,
+    nowSeconds: number,
+    retry: number
+): number {
+    const overlapRetryDelaySeconds =
+        useConfig().spider.scheduleProbe.probe.overlapRetryDelaySeconds;
+    return enqueueTask(
+        PROBE_TRAIN_DEPARTURE_TASK_EXECUTOR,
+        { ...args, retry },
+        nowSeconds + overlapRetryDelaySeconds
+    );
+}
+
 function queueCoupledDetectionTask(mainRecord: EmuListRecord): number {
     const delaySeconds =
         useConfig().spider.scheduleProbe.coupling.detectDelaySeconds;
@@ -734,6 +764,94 @@ async function validateTodayRunningForTrainCodes(
         runningTrainCode: '',
         requestFailedTrainCodes,
         notRunningTrainCodes
+    };
+}
+
+async function verifySeatCodeAgainstCurrentTask(
+    assets: Awaited<ReturnType<typeof loadProbeAssets>>,
+    trainInternalCode: string,
+    trainCodes: string[],
+    mainEmuCode: string
+): Promise<SeatCodeVerificationResult> {
+    const parsedMainEmuCode = parseEmuCode(mainEmuCode);
+    if (!parsedMainEmuCode?.trainSetNo) {
+        return {
+            state: 'unavailable',
+            reason: 'main_emu_code_invalid',
+            seatTrainCode: '',
+            seatInternalCode: '',
+            seatStartAt: 0
+        };
+    }
+
+    const seatCode = assets.qrcodeByModelAndTrainSetNo.get(
+        buildProbeAssetKey(
+            parsedMainEmuCode.model,
+            parsedMainEmuCode.trainSetNo
+        )
+    );
+    if (!seatCode) {
+        return {
+            state: 'unavailable',
+            reason: 'seat_code_missing',
+            seatTrainCode: '',
+            seatInternalCode: '',
+            seatStartAt: 0
+        };
+    }
+
+    const seatCodeResult = await fetchEMUInfoBySeatCode(seatCode);
+    if (!seatCodeResult) {
+        return {
+            state: 'unavailable',
+            reason: 'seat_code_request_failed',
+            seatTrainCode: '',
+            seatInternalCode: '',
+            seatStartAt: 0
+        };
+    }
+
+    const seatTrainCode = normalizeCode(seatCodeResult.route.code);
+    const seatInternalCode = normalizeCode(seatCodeResult.route.internalCode);
+    const seatStartAt = seatCodeResult.route.startAt;
+    if (!isCurrentScheduleTask(seatStartAt)) {
+        return {
+            state: 'mismatch',
+            reason: 'seat_route_not_current_day',
+            seatTrainCode,
+            seatInternalCode,
+            seatStartAt
+        };
+    }
+
+    const normalizedTrainInternalCode = normalizeCode(trainInternalCode);
+    if (normalizedTrainInternalCode.length > 0) {
+        return {
+            state:
+                seatInternalCode === normalizedTrainInternalCode
+                    ? 'matched'
+                    : 'mismatch',
+            reason:
+                seatInternalCode === normalizedTrainInternalCode
+                    ? 'matched_internal_code'
+                    : 'seat_internal_code_mismatch',
+            seatTrainCode,
+            seatInternalCode,
+            seatStartAt
+        };
+    }
+
+    const normalizedTrainCodes = uniqueNormalizedCodes(trainCodes);
+    return {
+        state: normalizedTrainCodes.includes(seatTrainCode)
+            ? 'matched'
+            : 'mismatch',
+        reason: normalizedTrainCodes.includes(seatTrainCode)
+            ? 'matched_train_code'
+            : 'seat_train_code_mismatch',
+        seatTrainCode,
+        seatInternalCode,
+        seatStartAt
     };
 }
 
@@ -1017,6 +1135,10 @@ async function executeProbeTrainDepartureTask(rawArgs: unknown): Promise<void> {
     const mainEmuCode = normalizeCode(routeProbeResult.emu.code);
     const parsedMainEmuCode = parseEmuCode(mainEmuCode);
     const currentTrainSetNo = parsedMainEmuCode!.trainSetNo;
+    const assets = await loadProbeAssets();
+    const mainRecord = assets.emuByModelAndTrainSetNo.get(
+        buildProbeAssetKey(parsedMainEmuCode!.model, currentTrainSetNo)
+    );
     const yesterdayMatchingTrainCodes = collectYesterdayMatchingTrainCodes(
         allTrainCodes,
         mainEmuCode
@@ -1032,17 +1154,49 @@ async function executeProbeTrainDepartureTask(rawArgs: unknown): Promise<void> {
             return;
         }
 
+        if (todayTrainCodesValidation.state === 'running') {
+            const seatCodeVerification = await verifySeatCodeAgainstCurrentTask(
+                assets,
+                args.trainInternalCode,
+                allTrainCodes,
+                mainEmuCode
+            );
+            if (seatCodeVerification.state === 'matched') {
+                logger.info(
+                    `seat_verify_pass trainCode=${args.trainCode} probedTrainCode=${probedTrainCode} mainEmuCode=${mainEmuCode} runningTrainCode=${todayTrainCodesValidation.runningTrainCode} reason=${seatCodeVerification.reason} seatTrainCode=${seatCodeVerification.seatTrainCode} seatInternalCode=${seatCodeVerification.seatInternalCode} seatStartAt=${seatCodeVerification.seatStartAt} yesterdayMatchedTrainCodes=${yesterdayMatchingTrainCodes.join(',')}`
+                );
+            } else if (seatCodeVerification.state === 'unavailable') {
+                logger.info(
+                    `seat_verify_unavailable_continue trainCode=${args.trainCode} probedTrainCode=${probedTrainCode} mainEmuCode=${mainEmuCode} runningTrainCode=${todayTrainCodesValidation.runningTrainCode} reason=${seatCodeVerification.reason} yesterdayMatchedTrainCodes=${yesterdayMatchingTrainCodes.join(',')}`
+                );
+            } else if (args.retry > 0) {
+                const nextRetry = args.retry - 1;
+                const overlapRetryDelaySeconds =
+                    useConfig().spider.scheduleProbe.probe
+                        .overlapRetryDelaySeconds;
+                const nextTaskId = requeueCurrentProbeTaskWithOverlapDelay(
+                    args,
+                    nowSeconds,
+                    nextRetry
+                );
+                logger.warn(
+                    `seat_verify_mismatch_requeue trainCode=${args.trainCode} probedTrainCode=${probedTrainCode} mainEmuCode=${mainEmuCode} runningTrainCode=${todayTrainCodesValidation.runningTrainCode} retry=${args.retry} nextRetry=${nextRetry} nextTaskId=${nextTaskId} delaySeconds=${overlapRetryDelaySeconds} reason=${seatCodeVerification.reason} seatTrainCode=${seatCodeVerification.seatTrainCode} seatInternalCode=${seatCodeVerification.seatInternalCode} seatStartAt=${seatCodeVerification.seatStartAt} yesterdayMatchedTrainCodes=${yesterdayMatchingTrainCodes.join(',')}`
+                );
+                return;
+            } else {
+                logger.warn(
+                    `seat_verify_mismatch_exhausted trainCode=${args.trainCode} probedTrainCode=${probedTrainCode} mainEmuCode=${mainEmuCode} runningTrainCode=${todayTrainCodesValidation.runningTrainCode} retry=${args.retry} reason=${seatCodeVerification.reason} seatTrainCode=${seatCodeVerification.seatTrainCode} seatInternalCode=${seatCodeVerification.seatInternalCode} seatStartAt=${seatCodeVerification.seatStartAt} yesterdayMatchedTrainCodes=${yesterdayMatchingTrainCodes.join(',')}`
+                );
+                return;
+            }
+        }
+
         if (todayTrainCodesValidation.state === 'request_failed') {
             logger.info(
                 `continue_yesterday_same_assignment_request_failed trainCode=${args.trainCode} probedTrainCode=${probedTrainCode} mainEmuCode=${mainEmuCode} yesterdayMatchedTrainCodes=${yesterdayMatchingTrainCodes.join(',')} checkedTrainCodes=${allTrainCodes.join(',')} requestFailedTrainCodes=${todayTrainCodesValidation.requestFailedTrainCodes.join(',')} notRunningTrainCodes=${todayTrainCodesValidation.notRunningTrainCodes.join(',')}`
             );
         }
     }
-
-    const assets = await loadProbeAssets();
-    const mainRecord = assets.emuByModelAndTrainSetNo.get(
-        buildProbeAssetKey(parsedMainEmuCode!.model, currentTrainSetNo)
-    );
 
     if (
         await tryResolveOverlappingRoutes(args, mainEmuCode, assets, nowSeconds)

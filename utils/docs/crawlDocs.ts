@@ -165,7 +165,7 @@ export const crawlDocsSections: DocsContentSection[] = [
         blocks: [
             {
                 type: 'paragraph',
-                text: 'probe_train_departure 先校验任务参数中的时刻表信息是否仍属于当天，如果不是当天则直接跳过，再用列车所有的车次号（上下行车次号）扫描 12306 根据车次号查车组号的接口。只要其中一个车次号能成功拿到车组号信息，就会进入担当识别流程。通过动车组资产判断是否可能重联，如果可能重联，根据车组号反查这趟车今天是否存在已有的重联检测状况，如果有，就直接复用；如果没有，就延迟添加重联检测任务，检测范围为同一铁路局同一车型。'
+                text: 'probe_train_departure 先校验任务参数中的时刻表信息是否仍属于当天，如果不是当天则直接跳过，再用列车所有的车次号（上下行车次号）扫描 12306 根据车次号查车组号的接口。只要其中一个车次号能成功拿到车组号信息，就会进入担当识别流程。命中“昨日同一班次仍由同一车组担当”的情况下，会额外用该主车组对应的畅行码复核当前返回的车次与日期；如果畅行码结果与本次任务不一致，就不会采信当前探测结果，而是按 overlapRetryDelaySeconds 延迟重试。通过动车组资产判断是否可能重联，如果可能重联，根据车组号反查这趟车今天是否存在已有的重联检测状况，如果有，就直接复用；如果没有，就延迟添加重联检测任务，检测范围为同一铁路局同一车型。'
             },
             {
                 type: 'list',
@@ -182,6 +182,7 @@ export const crawlDocsSections: DocsContentSection[] = [
                 title: '异常与补偿',
                 items: [
                     '抓取信息失败但还有重试机会时，会立即重入 probe_train_departure，直到重试机会耗尽。',
+                    '如果命中昨日同担当，但畅行码复核结果显示当前返回的车次或日期不一致，会按 overlapRetryDelaySeconds 延迟重排当前车次组，等待 12306 数据刷新后再探测。',
                     '如果发现多个车次组对同一编组的探测结果产生重叠，会按 overlapRetryDelaySeconds 延迟重排相关车次组。',
                     '识别出可能需要耦合编组补全时，会延迟添加 detect_coupled_emu_group 任务，负责重联检测，由单独执行器继续扩展。'
                 ]
@@ -195,6 +196,7 @@ export const crawlDocsSections: DocsContentSection[] = [
                     '  -> validate current schedule window',
                     '  -> probeEmuByTrainCodes(allCodes)',
                     '  -> compare yesterday index / runtime state',
+                    '  -> verify seat code for yesterday-matched running trains',
                     '  -> persist probe status',
                     '  -> insertDailyEmuRoute',
                     '  -> requeue overlap or queue detect_coupled_emu_group when needed'
