@@ -62,6 +62,30 @@ export interface LookupHistoryListItem {
     endStation: string;
 }
 
+export interface CurrentTrainTimetableStop {
+    stationNo: number;
+    stationName: string;
+    arriveAt: number | null;
+    departAt: number | null;
+    stationTrainCode: string;
+    wicket: string;
+    isStart: boolean;
+    isEnd: boolean;
+}
+
+export interface CurrentTrainTimetableData {
+    date: string;
+    requestTrainCode: string;
+    trainCode: string;
+    internalCode: string;
+    allCodes: string[];
+    startStation: string;
+    endStation: string;
+    startAt: number;
+    endAt: number;
+    stops: CurrentTrainTimetableStop[];
+}
+
 export type RecentAssignmentsState =
     | 'idle'
     | 'loading'

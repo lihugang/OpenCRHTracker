@@ -29,6 +29,10 @@ export const developerDocsOpenApi = {
             description: '查询车次和车组的担当历史。'
         },
         {
+            name: 'Timetable',
+            description: '读取当前日期下的完整车次时刻表。'
+        },
+        {
             name: '导出',
             description: '列出并下载已生成的每日数据导出文件。'
         }
@@ -705,6 +709,133 @@ export const developerDocsOpenApi = {
                     }
                 }
             },
+            CurrentTrainTimetableStop: {
+                type: 'object',
+                required: [
+                    'stationNo',
+                    'stationName',
+                    'arriveAt',
+                    'departAt',
+                    'stationTrainCode',
+                    'wicket',
+                    'isStart',
+                    'isEnd'
+                ],
+                properties: {
+                    stationNo: {
+                        type: 'integer',
+                        example: 1
+                    },
+                    stationName: {
+                        type: 'string',
+                        example: '北京南'
+                    },
+                    arriveAt: {
+                        type: 'integer',
+                        nullable: true,
+                        example: null
+                    },
+                    departAt: {
+                        type: 'integer',
+                        nullable: true,
+                        example: 1774060020
+                    },
+                    stationTrainCode: {
+                        type: 'string',
+                        nullable: true,
+                        example: 'G8388'
+                    },
+                    wicket: {
+                        type: 'string',
+                        nullable: true,
+                        example: '检票口 12A'
+                    },
+                    isStart: {
+                        type: 'boolean',
+                        example: true
+                    },
+                    isEnd: {
+                        type: 'boolean',
+                        example: false
+                    }
+                }
+            },
+            CurrentTrainTimetableResponse: {
+                type: 'object',
+                required: ['ok', 'data', 'error'],
+                properties: {
+                    ok: {
+                        type: 'boolean',
+                        example: true
+                    },
+                    data: {
+                        type: 'object',
+                        required: [
+                            'date',
+                            'requestTrainCode',
+                            'trainCode',
+                            'internalCode',
+                            'allCodes',
+                            'startStation',
+                            'endStation',
+                            'startAt',
+                            'endAt',
+                            'stops'
+                        ],
+                        properties: {
+                            date: {
+                                type: 'string',
+                                example: '20260324'
+                            },
+                            requestTrainCode: {
+                                type: 'string',
+                                example: 'G8388'
+                            },
+                            trainCode: {
+                                type: 'string',
+                                example: 'G8388'
+                            },
+                            internalCode: {
+                                type: 'string',
+                                example: '2400000G8388B'
+                            },
+                            allCodes: {
+                                type: 'array',
+                                items: {
+                                    type: 'string'
+                                },
+                                example: ['G8388', 'G8385']
+                            },
+                            startStation: {
+                                type: 'string',
+                                example: '北京南'
+                            },
+                            endStation: {
+                                type: 'string',
+                                example: '上海虹桥'
+                            },
+                            startAt: {
+                                type: 'integer',
+                                example: 1774060020
+                            },
+                            endAt: {
+                                type: 'integer',
+                                example: 1774076820
+                            },
+                            stops: {
+                                type: 'array',
+                                items: {
+                                    $ref: '#/components/schemas/CurrentTrainTimetableStop'
+                                }
+                            }
+                        }
+                    },
+                    error: {
+                        type: 'string',
+                        example: ''
+                    }
+                }
+            },
             DailyExportIndexItem: {
                 type: 'object',
                 required: ['date', 'formats'],
@@ -1151,6 +1282,104 @@ export const developerDocsOpenApi = {
                             date: '20260321',
                             limit: '20',
                             cursor: '1741996800:15231'
+                        }
+                    }
+                ]
+            }
+        },
+        '/timetable/train/{trainCode}': {
+            get: {
+                operationId: 'currentTrainTimetable',
+                tags: ['Timetable'],
+                summary: '按车次读取当前完整时刻表',
+                description:
+                    '返回当天可用的当前完整时刻表，包含全部经停站、当前站车次与检票口信息。固定成本为 1，并按 currentDayMaxAgeSeconds 进行缓存。只要具备对应公开权限，也可以匿名访问。',
+                parameters: [
+                    {
+                        $ref: '#/components/parameters/TrainCodeParam'
+                    }
+                ],
+                security: [{}, { bearerAuth: [] }, { cookieAuth: [] }],
+                responses: {
+                    '200': {
+                        description: '当前日期下的完整车次时刻表。',
+                        headers: {
+                            'x-api-remain': {
+                                $ref: '#/components/headers/ApiRemain'
+                            },
+                            'x-api-cost': {
+                                $ref: '#/components/headers/ApiCost'
+                            }
+                        },
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    $ref: '#/components/schemas/CurrentTrainTimetableResponse'
+                                }
+                            }
+                        }
+                    },
+                    '400': {
+                        description: 'Invalid path parameters.',
+                        headers: {
+                            'x-api-remain': {
+                                $ref: '#/components/headers/ApiRemain'
+                            },
+                            'x-api-cost': {
+                                $ref: '#/components/headers/ApiCost'
+                            }
+                        },
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    $ref: '#/components/schemas/ApiFailureResponse'
+                                },
+                                example: {
+                                    ok: false,
+                                    data: 'trainCode 不能为空。',
+                                    error: 'invalid_param'
+                                }
+                            }
+                        }
+                    },
+                    '404': {
+                        description: '当前时刻表暂不可用。',
+                        headers: {
+                            'x-api-remain': {
+                                $ref: '#/components/headers/ApiRemain'
+                            },
+                            'x-api-cost': {
+                                $ref: '#/components/headers/ApiCost'
+                            }
+                        },
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    $ref: '#/components/schemas/ApiFailureResponse'
+                                },
+                                example: {
+                                    ok: false,
+                                    data: '当前暂无时刻表。',
+                                    error: 'not_found'
+                                }
+                            }
+                        }
+                    }
+                },
+                'x-slug': 'timetable-train',
+                'x-group': '时刻表',
+                'x-sort-order': 25,
+                'x-auth-modes': ['anonymous', 'cookie', 'apiKey'],
+                'x-required-scopes': ['api.timetable.train.read'],
+                'x-examples': [
+                    {
+                        id: 'timetable-by-train-code',
+                        label: '当前时刻表',
+                        summary:
+                            '读取当天一趟车次的完整经停表，可用于详情页弹窗展示。',
+                        authMode: 'anonymous',
+                        pathParams: {
+                            trainCode: 'G8388'
                         }
                     }
                 ]

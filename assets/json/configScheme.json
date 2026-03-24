@@ -888,6 +888,10 @@
                             "type": "integer",
                             "minimum": 0
                         },
+                        "timetableTrain": {
+                            "type": "integer",
+                            "minimum": 0
+                        },
                         "exportDailyIndex": {
                             "type": "integer",
                             "minimum": 0
@@ -911,6 +915,7 @@
                         "authListApiKeys",
                         "authRevokeApiKey",
                         "searchIndex",
+                        "timetableTrain",
                         "exportDailyIndex",
                         "exportDaily"
                     ]

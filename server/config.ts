@@ -224,6 +224,7 @@ export interface Config {
             authListApiKeys: number;
             authRevokeApiKey: number;
             searchIndex: number;
+            timetableTrain: number;
             exportDailyIndex: number;
             exportDaily: number;
         };
@@ -1083,6 +1084,11 @@ function validateConfig(raw: unknown): Config {
                 searchIndex: asNumber(
                     costFixed.searchIndex,
                     'cost.fixed.searchIndex',
+                    0
+                ),
+                timetableTrain: asNumber(
+                    costFixed.timetableTrain,
+                    'cost.fixed.timetableTrain',
                     0
                 ),
                 exportDailyIndex: asNumber(

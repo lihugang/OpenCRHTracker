@@ -7,6 +7,7 @@ import { normalizeTrainCodeItems, sortScheduleItems } from './filterAndSort';
 import queryWithRetry from './queryWithRetry';
 import { saveBuildingScheduleState } from './stateStore';
 import { buildGroupIndex, getGroupKey } from './taskHelpers';
+import { toScheduleStops } from './mapRouteStops';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
 import { toShanghaiDayOffsetFromUnixSeconds } from '~/server/utils/date/shanghaiDateTime';
 import type {
@@ -58,6 +59,10 @@ function restorePreservedRouteInfo(
     item.startAt = preservedItem.startAt;
     item.endAt = preservedItem.endAt;
     item.lastRouteRefreshAt = preservedItem.lastRouteRefreshAt;
+    item.allCodes = [...preservedItem.allCodes];
+    item.stops = preservedItem.stops.map((stop) => ({
+        ...stop
+    }));
     return true;
 }
 
@@ -255,14 +260,22 @@ export default async function runScheduleProbe(
                     routeResult.data.route.endAt
                 );
                 const refreshedAt = getNowSeconds();
+                const nextStops = toScheduleStops(
+                    state.date,
+                    routeResult.data.route.stops
+                );
                 for (const groupItem of groupItems) {
                     groupItem.startStation =
                         routeResult.data.route.startStation.trim();
                     groupItem.endStation =
                         routeResult.data.route.endStation.trim();
+                    groupItem.allCodes = [...routeResult.data.route.allCodes];
                     groupItem.startAt = nextStartAt;
                     groupItem.endAt = nextEndAt;
                     groupItem.lastRouteRefreshAt = refreshedAt;
+                    groupItem.stops = nextStops.map((stop) => ({
+                        ...stop
+                    }));
                 }
                 enrichedCount += 1;
             } else {

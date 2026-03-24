@@ -11,14 +11,27 @@ export interface ScheduleProbeRuntimeConfig {
     prefixRules: ScheduleProbePrefixRule[];
 }
 
+export interface ScheduleStop {
+    stationNo: number;
+    stationName: string;
+    arriveAt: number | null;
+    departAt: number | null;
+    stationTrainCode: string;
+    wicket: string;
+    isStart: boolean;
+    isEnd: boolean;
+}
+
 export interface ScheduleItem {
     code: string;
     internalCode: string;
+    allCodes: string[];
     startStation: string;
     endStation: string;
     startAt: number | null;
     endAt: number | null;
     lastRouteRefreshAt: number | null;
+    stops: ScheduleStop[];
 }
 
 export type ScheduleStatus = 'running' | 'done' | 'partial_failed';
@@ -68,7 +81,7 @@ export interface ScheduleState {
 
 export interface ScheduleDocument {
     $schema: string;
-    version: 3;
+    version: 4;
     published: ScheduleState | null;
     building: ScheduleState | null;
 }

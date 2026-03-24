@@ -2,10 +2,12 @@ import fs from 'fs';
 import path from 'path';
 import getCurrentDateString from '../../date/getCurrentDateString';
 import normalizeCode from '../normalizeCode';
+import uniqueNormalizedCodes from '../uniqueNormalizedCodes';
 import { getInitialKeywords } from './prefixTree';
 import type {
     ScheduleDocument,
     ScheduleItem,
+    ScheduleStop,
     ScheduleState,
     ScheduleProbeRuntimeConfig
 } from './types';
@@ -26,6 +28,7 @@ interface LoadedBuildingScheduleState {
 }
 
 const SCHEDULE_SCHEMA_RELATIVE_PATH = '../assets/json/scheduleScheme.json';
+const CURRENT_SCHEDULE_DOCUMENT_VERSION = 4;
 
 function cloneScheduleState(state: ScheduleState): ScheduleState {
     return JSON.parse(JSON.stringify(state)) as ScheduleState;
@@ -47,6 +50,55 @@ function ensureScheduleItem(
         typeof (value as { code?: unknown }).code === 'string' &&
         (value as { code: string }).code.length > 0
     );
+}
+
+function normalizeScheduleStop(
+    value: unknown,
+    fallbackStationNo: number
+): ScheduleStop | null {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+        return null;
+    }
+
+    const stop = value as Partial<ScheduleStop>;
+    const stationNo =
+        typeof stop.stationNo === 'number' &&
+        Number.isInteger(stop.stationNo) &&
+        stop.stationNo > 0
+            ? stop.stationNo
+            : fallbackStationNo;
+    const stationName =
+        typeof stop.stationName === 'string' ? stop.stationName.trim() : '';
+    if (stationName.length === 0) {
+        return null;
+    }
+
+    const arriveAt =
+        typeof stop.arriveAt === 'number' &&
+        Number.isInteger(stop.arriveAt) &&
+        stop.arriveAt >= 0
+            ? stop.arriveAt
+            : null;
+    const departAt =
+        typeof stop.departAt === 'number' &&
+        Number.isInteger(stop.departAt) &&
+        stop.departAt >= 0
+            ? stop.departAt
+            : null;
+
+    return {
+        stationNo,
+        stationName,
+        arriveAt,
+        departAt,
+        stationTrainCode:
+            typeof stop.stationTrainCode === 'string'
+                ? stop.stationTrainCode.trim().toUpperCase()
+                : '',
+        wicket: typeof stop.wicket === 'string' ? stop.wicket.trim() : '',
+        isStart: stop.isStart === true,
+        isEnd: stop.isEnd === true
+    };
 }
 
 function asScheduleState(value: unknown): ScheduleState | null {
@@ -195,21 +247,52 @@ function asScheduleState(value: unknown): ScheduleState | null {
         if (typeof row.lastRouteRefreshAt === 'undefined') {
             row.lastRouteRefreshAt = null;
         }
+        const normalizedCode = normalizeCode(String(row.code ?? ''));
+        row.allCodes = uniqueNormalizedCodes(
+            Array.isArray(row.allCodes)
+                ? [
+                      normalizedCode,
+                      ...row.allCodes.filter(
+                          (code): code is string => typeof code === 'string'
+                      )
+                  ]
+                : [normalizedCode]
+        );
+        row.stops = Array.isArray(row.stops)
+            ? row.stops
+                  .map((stop, index) => normalizeScheduleStop(stop, index + 1))
+                  .filter((stop): stop is ScheduleStop => stop !== null)
+            : [];
         delete (row as { isRunningToday?: unknown }).isRunningToday;
     }
 
     return state as ScheduleState;
 }
 
-function asScheduleDocument(value: unknown): ScheduleDocument | null {
+function parseScheduleDocument(value: unknown): {
+    document: ScheduleDocument | null;
+    migrated: boolean;
+} {
     if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-        return null;
+        return {
+            document: null,
+            migrated: false
+        };
     }
 
-    const document = value as Partial<ScheduleDocument>;
-    if (document.version !== 3) {
-        return null;
+    const document = value as Record<string, unknown>;
+    const version =
+        typeof document.version === 'number' ? document.version : undefined;
+    if (
+        version !== 3 &&
+        version !== CURRENT_SCHEDULE_DOCUMENT_VERSION
+    ) {
+        return {
+            document: null,
+            migrated: false
+        };
     }
+    const migrated = version !== CURRENT_SCHEDULE_DOCUMENT_VERSION;
 
     let published: ScheduleState | null = null;
     if (
@@ -218,7 +301,10 @@ function asScheduleDocument(value: unknown): ScheduleDocument | null {
     ) {
         published = asScheduleState(document.published);
         if (!published) {
-            return null;
+            return {
+                document: null,
+                migrated: false
+            };
         }
     }
 
@@ -229,15 +315,21 @@ function asScheduleDocument(value: unknown): ScheduleDocument | null {
     ) {
         building = asScheduleState(document.building);
         if (!building) {
-            return null;
+            return {
+                document: null,
+                migrated: false
+            };
         }
     }
 
     return {
-        $schema: SCHEDULE_SCHEMA_RELATIVE_PATH,
-        version: 3,
-        published,
-        building
+        document: {
+            $schema: SCHEDULE_SCHEMA_RELATIVE_PATH,
+            version: CURRENT_SCHEDULE_DOCUMENT_VERSION,
+            published,
+            building
+        },
+        migrated
     };
 }
 
@@ -305,6 +397,10 @@ function mergePublishedRouteInfo(
         item.startAt = currentItem.startAt;
         item.endAt = currentItem.endAt;
         item.lastRouteRefreshAt = currentItem.lastRouteRefreshAt;
+        item.allCodes = [...currentItem.allCodes];
+        item.stops = currentItem.stops.map((stop) => ({
+            ...stop
+        }));
         if (
             item.internalCode.length === 0 &&
             currentItem.internalCode.length > 0
@@ -359,7 +455,7 @@ export function createInitialScheduleState(
 export function createInitialScheduleDocument(): ScheduleDocument {
     return {
         $schema: SCHEDULE_SCHEMA_RELATIVE_PATH,
-        version: 3,
+        version: CURRENT_SCHEDULE_DOCUMENT_VERSION,
         published: null,
         building: null
     };
@@ -375,7 +471,16 @@ export function loadScheduleDocument(
 
     try {
         const raw = JSON.parse(fs.readFileSync(absolutePath, 'utf8'));
-        return asScheduleDocument(raw);
+        const parsed = parseScheduleDocument(raw);
+        if (!parsed.document) {
+            return null;
+        }
+
+        if (parsed.migrated) {
+            saveScheduleDocument(scheduleFilePath, parsed.document);
+        }
+
+        return parsed.document;
     } catch {
         return null;
     }
@@ -386,7 +491,7 @@ export function saveScheduleDocument(
     document: ScheduleDocument
 ): void {
     document.$schema = SCHEDULE_SCHEMA_RELATIVE_PATH;
-    document.version = 3;
+    document.version = CURRENT_SCHEDULE_DOCUMENT_VERSION;
     const absolutePath = path.resolve(scheduleFilePath);
     const directory = path.dirname(absolutePath);
     fs.mkdirSync(directory, { recursive: true });

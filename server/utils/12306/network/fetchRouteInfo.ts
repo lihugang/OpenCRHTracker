@@ -1,5 +1,6 @@
 import useConfig from '~/server/config';
 import getLogger from '~/server/libs/log4js';
+import uniqueNormalizedCodes from '~/server/utils/12306/uniqueNormalizedCodes';
 import getCurrentDateString from '../../date/getCurrentDateString';
 import { getShanghaiUnixSecondsFromDateAndTime } from '../../date/shanghaiDateTime';
 import log12306RequestFailure from './log12306RequestFailure';
@@ -91,6 +92,18 @@ export interface RouteInfoData {
     endStation: string;
     startAt: number;
     endAt: number;
+    stops: RouteStopData[];
+}
+
+export interface RouteStopData {
+    stationNo: number;
+    stationName: string;
+    arriveAt: number | null;
+    departAt: number | null;
+    stationTrainCode: string;
+    wicket: string;
+    isStart: boolean;
+    isEnd: boolean;
 }
 
 export interface RunningRouteInfoResult {
@@ -174,8 +187,33 @@ export default async function fetchRouteInfo(
             };
         }
 
-        const startStation = json.data?.trainDetail?.stopTime?.at(0);
-        const endStation = json.data?.trainDetail?.stopTime?.at(-1);
+        const rawStops = json.data?.trainDetail?.stopTime ?? [];
+        const stops = rawStops
+            .map((stop, index) => {
+                const stationNo = Number.parseInt(stop.stationNo, 10);
+                const arriveAt = parseOptionalUnixSeconds(
+                    stop.arraiveDate,
+                    stop.arriveTime
+                );
+                const departAt = parseOptionalUnixSeconds(
+                    stop.arraiveDate,
+                    stop.startTime
+                );
+
+                return {
+                    stationNo: Number.isInteger(stationNo) ? stationNo : index + 1,
+                    stationName: stop.stationName.trim(),
+                    arriveAt,
+                    departAt,
+                    stationTrainCode: stop.stationTrainCode.trim().toUpperCase(),
+                    wicket: normalizeOptionalField(stop.wicket),
+                    isStart: index === 0,
+                    isEnd: index === rawStops.length - 1
+                };
+            })
+            .filter((stop) => stop.stationName.length > 0);
+        const startStation = stops.at(0);
+        const endStation = stops.at(-1);
         if (!startStation || !endStation || !json.data?.trainNo) {
             log12306RequestFailure({
                 logger,
@@ -198,22 +236,44 @@ export default async function fetchRouteInfo(
             };
         }
 
+        const startAt = startStation.departAt ?? startStation.arriveAt;
+        const endAt = endStation.arriveAt ?? endStation.departAt;
+        if (startAt === null || endAt === null) {
+            log12306RequestFailure({
+                logger,
+                operation: 'invalid_response',
+                url,
+                context: {
+                    trainCode: route
+                },
+                responseStatus: response.status,
+                responseOk: response.ok,
+                businessStatus: json.status,
+                errorCode: json.errorCode,
+                errorMsg: json.errorMsg,
+                detail: 'missing parsed startAt or endAt'
+            });
+            return {
+                status: 'not_running',
+                errorCode: 'invalid_response',
+                errorMsg: 'missing parsed startAt or endAt'
+            };
+        }
+
         return {
             status: 'running',
             route: {
                 code: route,
-                allCodes: json.data.trainDetail.stationTrainCodeAll.split('/'),
+                allCodes: uniqueNormalizedCodes([
+                    route,
+                    ...json.data.trainDetail.stationTrainCodeAll.split('/')
+                ]),
                 internalCode: json.data.trainNo,
-                startStation: startStation.stationName.trim(),
-                endStation: endStation.stationName.trim(),
-                startAt: getShanghaiUnixSecondsFromDateAndTime(
-                    startStation.arraiveDate,
-                    startStation.arriveTime
-                ), // second timestamp
-                endAt: getShanghaiUnixSecondsFromDateAndTime(
-                    endStation.arraiveDate,
-                    endStation.arriveTime
-                ) // second timestamp
+                startStation: startStation.stationName,
+                endStation: endStation.stationName,
+                startAt,
+                endAt,
+                stops
             }
         };
     } catch (error) {
@@ -230,4 +290,32 @@ export default async function fetchRouteInfo(
             status: 'request_failed'
         };
     }
+}
+
+function parseOptionalUnixSeconds(
+    dateYYYYMMDD: string,
+    timeHHmm: string
+): number | null {
+    if (!/^\d{8}$/.test(dateYYYYMMDD) || !/^\d{2}:\d{2}$/.test(timeHHmm)) {
+        return null;
+    }
+
+    return getShanghaiUnixSecondsFromDateAndTime(dateYYYYMMDD, timeHHmm);
+}
+
+function normalizeOptionalField(value: string | undefined): string {
+    if (typeof value !== 'string') {
+        return '';
+    }
+
+    const normalized = value.trim();
+    if (
+        normalized.length === 0 ||
+        normalized === '--' ||
+        normalized === '----'
+    ) {
+        return '';
+    }
+
+    return normalized;
 }

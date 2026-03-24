@@ -31,6 +31,11 @@ export const API_SCOPES = {
             read: 'api.history.emu.read'
         }
     },
+    timetable: {
+        train: {
+            read: 'api.timetable.train.read'
+        }
+    },
     exports: {
         daily: {
             read: 'api.exports.daily.read'

@@ -1,0 +1,60 @@
+import { defineEventHandler, getRouterParam } from 'h3';
+import useConfig from '~/server/config';
+import { getTodayScheduleTimetableByTrainCode } from '~/server/services/todayScheduleCache';
+import getFixedCost from '~/server/utils/api/cost/getFixedCost';
+import executeApi from '~/server/utils/api/executor/executeApi';
+import ensure from '~/server/utils/api/executor/ensure';
+import setCacheControl from '~/server/utils/api/response/setCacheControl';
+import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
+import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
+import type { CurrentTrainTimetableData } from '~/types/lookup';
+
+export default defineEventHandler(async (event) => {
+    const cacheMaxAge = useConfig().api.cache.currentDayMaxAgeSeconds;
+
+    return executeApi(
+        event,
+        {
+            cors: true,
+            requiredScopes: [API_SCOPES.timetable.train.read],
+            fixedCost: getFixedCost('timetableTrain'),
+            successHeaders: (successEvent) =>
+                setCacheControl(successEvent, cacheMaxAge)
+        },
+        async () => {
+            const trainCode = getRouterParam(event, 'trainCode');
+
+            ensure(
+                typeof trainCode === 'string' && trainCode.length > 0,
+                400,
+                'invalid_param',
+                'trainCode 不能为空'
+            );
+
+            const timetable = getTodayScheduleTimetableByTrainCode(trainCode);
+            ensure(
+                timetable && timetable.stops.length > 0,
+                404,
+                'not_found',
+                '当前暂无时刻表'
+            );
+
+            const response: CurrentTrainTimetableData = {
+                date: getCurrentDateString(),
+                requestTrainCode: trainCode,
+                trainCode: timetable.trainCode,
+                internalCode: timetable.trainInternalCode,
+                allCodes: [...timetable.allCodes],
+                startStation: timetable.startStation,
+                endStation: timetable.endStation,
+                startAt: timetable.startAt,
+                endAt: timetable.endAt,
+                stops: timetable.stops.map((stop) => ({
+                    ...stop
+                }))
+            };
+
+            return response;
+        }
+    );
+});

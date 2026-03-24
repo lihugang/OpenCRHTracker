@@ -10,10 +10,26 @@ import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
 export interface TodayScheduleRoute {
     trainCode: string;
     trainInternalCode: string;
+    allCodes: string[];
     startAt: number;
     endAt: number;
     startStation: string;
     endStation: string;
+}
+
+export interface TodayScheduleStop {
+    stationNo: number;
+    stationName: string;
+    arriveAt: number | null;
+    departAt: number | null;
+    stationTrainCode: string;
+    wicket: string;
+    isStart: boolean;
+    isEnd: boolean;
+}
+
+export interface TodayScheduleTimetable extends TodayScheduleRoute {
+    stops: TodayScheduleStop[];
 }
 
 export interface TodayScheduleProbeGroup extends TodayScheduleRoute {
@@ -26,6 +42,7 @@ interface TodayScheduleCache {
     scheduleFilePath: string;
     scheduleMtimeMs: number;
     routesByTrainCode: Map<string, TodayScheduleRoute>;
+    timetablesByTrainCode: Map<string, TodayScheduleTimetable>;
     groupsByTrainKey: Map<string, TodayScheduleProbeGroup>;
     groupKeysByTrainCode: Map<string, string>;
 }
@@ -51,6 +68,7 @@ function rebuildCache(): TodayScheduleCache {
     const scheduleMtimeMs = getFileMtimeMs(scheduleFilePath);
     const state = loadPublishedScheduleState(scheduleFilePath);
     const routesByTrainCode = new Map<string, TodayScheduleRoute>();
+    const timetablesByTrainCode = new Map<string, TodayScheduleTimetable>();
     const groupsByTrainKey = new Map<string, TodayScheduleProbeGroup>();
     const groupKeysByTrainCode = new Map<string, string>();
 
@@ -79,23 +97,66 @@ function rebuildCache(): TodayScheduleCache {
                 trainInternalCode,
                 startAt
             );
+            const allCodes = normalizeAliasCodes(item.allCodes, trainCode);
+            const timetable: TodayScheduleTimetable = {
+                trainCode,
+                trainInternalCode,
+                allCodes,
+                startAt,
+                endAt,
+                startStation: item.startStation.trim(),
+                endStation: item.endStation.trim(),
+                stops: item.stops.map((stop) => ({
+                    stationNo: stop.stationNo,
+                    stationName: stop.stationName.trim(),
+                    arriveAt:
+                        stop.arriveAt === null
+                            ? null
+                            : toUnixSecondsFromShanghaiDayOffset(
+                                  state.date,
+                                  stop.arriveAt
+                              ),
+                    departAt:
+                        stop.departAt === null
+                            ? null
+                            : toUnixSecondsFromShanghaiDayOffset(
+                                  state.date,
+                                  stop.departAt
+                              ),
+                    stationTrainCode: stop.stationTrainCode.trim(),
+                    wicket: stop.wicket.trim(),
+                    isStart: stop.isStart,
+                    isEnd: stop.isEnd
+                }))
+            };
 
-            if (!routesByTrainCode.has(trainCode)) {
-                routesByTrainCode.set(trainCode, {
-                    trainCode,
-                    trainInternalCode,
-                    startAt,
-                    endAt,
-                    startStation: item.startStation.trim(),
-                    endStation: item.endStation.trim()
-                });
+            for (const aliasCode of timetable.allCodes) {
+                if (!routesByTrainCode.has(aliasCode)) {
+                    routesByTrainCode.set(aliasCode, {
+                        trainCode,
+                        trainInternalCode,
+                        allCodes: timetable.allCodes,
+                        startAt,
+                        endAt,
+                        startStation: timetable.startStation,
+                        endStation: timetable.endStation
+                    });
+                }
+
+                if (!timetablesByTrainCode.has(aliasCode)) {
+                    timetablesByTrainCode.set(aliasCode, timetable);
+                }
             }
 
-            groupKeysByTrainCode.set(trainCode, trainKey);
+            for (const aliasCode of timetable.allCodes) {
+                groupKeysByTrainCode.set(aliasCode, trainKey);
+            }
             const existingGroup = groupsByTrainKey.get(trainKey);
             if (existingGroup) {
-                if (!existingGroup.allCodes.includes(trainCode)) {
-                    existingGroup.allCodes.push(trainCode);
+                for (const aliasCode of timetable.allCodes) {
+                    if (!existingGroup.allCodes.includes(aliasCode)) {
+                        existingGroup.allCodes.push(aliasCode);
+                    }
                 }
                 existingGroup.startAt = Math.min(
                     existingGroup.startAt,
@@ -121,11 +182,11 @@ function rebuildCache(): TodayScheduleCache {
                 trainKey,
                 trainCode,
                 trainInternalCode,
-                allCodes: [trainCode],
+                allCodes: [...timetable.allCodes],
                 startAt,
                 endAt,
-                startStation: item.startStation.trim(),
-                endStation: item.endStation.trim()
+                startStation: timetable.startStation,
+                endStation: timetable.endStation
             });
         }
     }
@@ -135,6 +196,7 @@ function rebuildCache(): TodayScheduleCache {
         scheduleFilePath,
         scheduleMtimeMs,
         routesByTrainCode,
+        timetablesByTrainCode,
         groupsByTrainKey,
         groupKeysByTrainCode
     };
@@ -165,6 +227,18 @@ export function getTodayScheduleProbeGroups(): Map<
 > {
     const activeCache = getActiveCache();
     return activeCache.groupsByTrainKey;
+}
+
+export function getTodayScheduleTimetableByTrainCode(
+    trainCode: string
+): TodayScheduleTimetable | null {
+    const activeCache = getActiveCache();
+    const normalizedTrainCode = normalizeCode(trainCode);
+    if (normalizedTrainCode.length === 0) {
+        return null;
+    }
+
+    return activeCache.timetablesByTrainCode.get(normalizedTrainCode) ?? null;
 }
 
 export function getTodayScheduleProbeGroupByTrainCode(
@@ -200,4 +274,18 @@ function getActiveCache(): TodayScheduleCache {
     }
 
     return rebuildCache();
+}
+
+function normalizeAliasCodes(allCodes: string[], trainCode: string): string[] {
+    const codes = new Set<string>();
+    codes.add(trainCode);
+
+    for (const value of allCodes) {
+        const normalized = normalizeCode(value);
+        if (normalized.length > 0) {
+            codes.add(normalized);
+        }
+    }
+
+    return [...codes];
 }

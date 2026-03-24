@@ -244,7 +244,11 @@ export const deployDocsSections: DocsContentSection[] = [
                         valueType: 'object',
                         required: true,
                         description: '时刻表文件路径与来源地址。',
-                        notes: ['file 路径必须可读写；provider 建议保持可用。']
+                        notes: [
+                            'file 路径必须可读写；provider 建议保持可用。',
+                            'schedule.json 会在旧版格式下自动升级，无需手工删除旧文件。',
+                            '当前格式会持久化完整经停站、当前站车次与检票口信息。'
+                        ]
                     },
                     {
                         path: 'data.databases.task',
@@ -455,20 +459,25 @@ export const deployDocsSections: DocsContentSection[] = [
                         valueType: 'array<string>',
                         required: true,
                         description: '匿名访问允许拥有的 scopes。',
-                        notes: ['这组配置直接决定公开可匿名调用的接口范围。']
+                        notes: [
+                            '这组配置直接决定公开可匿名调用的接口范围。',
+                            '如果要公开详情页时刻表弹窗，需要包含 api.timetable.train.read。'
+                        ]
                     },
                     {
                         path: 'api.permissions.issuedKeyDefaultScopes',
                         valueType: 'array<string>',
                         required: true,
-                        description: '新签发 API Key 的默认权限集合。'
+                        description: '新签发 API Key 的默认权限集合。',
+                        notes: ['如需默认允许当前时刻表接口，请包含 api.timetable.train.read。']
                     },
                     {
                         path: 'api.permissions.creatableKeyMaxScopes',
                         valueType: 'array<string>',
                         required: true,
                         description:
-                            '前端可签发 API Key 时允许选择的最大权限范围。'
+                            '前端可签发 API Key 时允许选择的最大权限范围。',
+                        notes: ['若希望外部调用方可勾选当前时刻表接口，这里也要包含 api.timetable.train.read。']
                     }
                 ]
             },
@@ -594,10 +603,10 @@ export const deployDocsSections: DocsContentSection[] = [
                         description: 'API Key 管理接口的固定成本。'
                     },
                     {
-                        path: 'cost.fixed.searchIndex / exportDailyIndex / exportDaily',
+                        path: 'cost.fixed.searchIndex / timetableTrain / exportDailyIndex / exportDaily',
                         valueType: 'integer',
                         required: true,
-                        description: '搜索与导出接口的固定成本。'
+                        description: '搜索、当前时刻表与导出接口的固定成本。'
                     },
                     {
                         path: 'cost.perRecord.historyEmu',

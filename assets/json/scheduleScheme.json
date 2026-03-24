@@ -10,7 +10,7 @@
         },
         "version": {
             "type": "integer",
-            "const": 3
+            "const": 4
         },
         "published": {
             "anyOf": [
@@ -75,6 +75,58 @@
                 "apiRetries"
             ]
         },
+        "scheduleStop": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "stationNo": {
+                    "type": "integer",
+                    "minimum": 1
+                },
+                "stationName": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "arriveAt": {
+                    "description": "Second offset from schedule.date 00:00:00 Asia/Shanghai",
+                    "type": [
+                        "integer",
+                        "null"
+                    ],
+                    "minimum": 0
+                },
+                "departAt": {
+                    "description": "Second offset from schedule.date 00:00:00 Asia/Shanghai",
+                    "type": [
+                        "integer",
+                        "null"
+                    ],
+                    "minimum": 0
+                },
+                "stationTrainCode": {
+                    "type": "string"
+                },
+                "wicket": {
+                    "type": "string"
+                },
+                "isStart": {
+                    "type": "boolean"
+                },
+                "isEnd": {
+                    "type": "boolean"
+                }
+            },
+            "required": [
+                "stationNo",
+                "stationName",
+                "arriveAt",
+                "departAt",
+                "stationTrainCode",
+                "wicket",
+                "isStart",
+                "isEnd"
+            ]
+        },
         "scheduleItem": {
             "type": "object",
             "additionalProperties": false,
@@ -85,6 +137,14 @@
                 },
                 "internalCode": {
                     "type": "string"
+                },
+                "allCodes": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "minLength": 1
+                    },
+                    "minItems": 1
                 },
                 "startStation": {
                     "type": "string"
@@ -113,16 +173,24 @@
                         "integer",
                         "null"
                     ]
+                },
+                "stops": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/scheduleStop"
+                    }
                 }
             },
             "required": [
                 "code",
                 "internalCode",
+                "allCodes",
                 "startStation",
                 "endStation",
                 "startAt",
                 "endAt",
-                "lastRouteRefreshAt"
+                "lastRouteRefreshAt",
+                "stops"
             ]
         },
         "scheduleStats": {

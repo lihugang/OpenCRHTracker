@@ -241,7 +241,13 @@
                                             true
                                         )
                                     ]">
-                                    {{ formatTimeLabel(item.startAt) }}
+                                    <button
+                                        type="button"
+                                        :disabled="!canOpenTimetable(item)"
+                                        class="inline-flex cursor-pointer items-center rounded-md transition enabled:hover:text-crh-blue enabled:hover:underline disabled:cursor-default"
+                                        @click="openTimetable(item)">
+                                        {{ formatTimeLabel(item.startAt) }}
+                                    </button>
                                 </td>
                                 <td
                                     :class="[
@@ -260,7 +266,13 @@
                                             true
                                         )
                                     ]">
-                                    {{ formatTimeLabel(item.endAt) }}
+                                    <button
+                                        type="button"
+                                        :disabled="!canOpenTimetable(item)"
+                                        class="inline-flex cursor-pointer items-center rounded-md transition enabled:hover:text-crh-blue enabled:hover:underline disabled:cursor-default"
+                                        @click="openTimetable(item)">
+                                        {{ formatTimeLabel(item.endAt) }}
+                                    </button>
                                 </td>
                             </tr>
                         </tbody>
@@ -351,17 +363,24 @@
                                         </p>
                                     </div>
 
-                                    <div
-                                        class="shrink-0 flex min-w-[4.75rem] items-center gap-[0.35rem] text-slate-400"
-                                        aria-hidden="true">
+                                    <button
+                                        type="button"
+                                        class="shrink-0 flex min-w-[4.75rem] items-center gap-[0.35rem] text-slate-400 transition enabled:cursor-pointer enabled:hover:text-crh-blue disabled:cursor-default"
+                                        :disabled="!canOpenTimetable(item)"
+                                        :aria-label="'查看当前时刻表'"
+                                        @click="openTimetable(item)">
                                         <span
-                                            class="h-px flex-1 bg-[linear-gradient(90deg,rgb(203_213_225),rgb(148_163_184))]" />
-                                        <span class="text-[0.8rem] leading-none"
-                                            >-&gt;</span
-                                        >
+                                            class="h-px flex-1 bg-[linear-gradient(90deg,rgb(203_213_225),rgb(148_163_184))]"
+                                            aria-hidden="true" />
                                         <span
-                                            class="h-px flex-1 bg-[linear-gradient(90deg,rgb(203_213_225),rgb(148_163_184))]" />
-                                    </div>
+                                            class="text-[0.8rem] leading-none"
+                                            aria-hidden="true">
+                                            ->
+                                        </span>
+                                        <span
+                                            class="h-px flex-1 bg-[linear-gradient(90deg,rgb(203_213_225),rgb(148_163_184))]"
+                                            aria-hidden="true" />
+                                    </button>
 
                                     <div class="min-w-0 flex-1 text-right">
                                         <p
@@ -388,7 +407,11 @@
 
                                 <div
                                     class="mt-3 flex items-center gap-3 border-t border-slate-100 pt-3">
-                                    <div class="min-w-0 flex-1">
+                                    <button
+                                        type="button"
+                                        class="min-w-0 flex-1 cursor-pointer text-left transition enabled:hover:text-crh-blue disabled:cursor-default"
+                                        :disabled="!canOpenTimetable(item)"
+                                        @click="openTimetable(item)">
                                         <p
                                             class="text-[11px] uppercase tracking-[0.18em] text-slate-400">
                                             出发时间
@@ -405,13 +428,32 @@
                                             ]">
                                             {{ formatTimeLabel(item.startAt) }}
                                         </p>
-                                    </div>
+                                    </button>
 
-                                    <div
-                                        class="h-px basis-6 bg-[linear-gradient(90deg,rgb(226_232_240),rgb(148_163_184))]"
-                                        aria-hidden="true" />
+                                    <button
+                                        type="button"
+                                        class="flex basis-6 cursor-pointer items-center justify-center text-slate-400 transition enabled:hover:text-crh-blue disabled:cursor-default"
+                                        :disabled="!canOpenTimetable(item)"
+                                        :aria-label="'查看当前时刻表'"
+                                        @click="openTimetable(item)">
+                                        <span
+                                            class="h-px flex-1 bg-[linear-gradient(90deg,rgb(226_232_240),rgb(148_163_184))]"
+                                            aria-hidden="true" />
+                                        <span
+                                            class="px-1 text-[0.8rem] leading-none"
+                                            aria-hidden="true">
+                                            ->
+                                        </span>
+                                        <span
+                                            class="h-px flex-1 bg-[linear-gradient(90deg,rgb(226_232_240),rgb(148_163_184))]"
+                                            aria-hidden="true" />
+                                    </button>
 
-                                    <div class="min-w-0 flex-1 text-right">
+                                    <button
+                                        type="button"
+                                        class="min-w-0 flex-1 cursor-pointer text-right transition enabled:hover:text-crh-blue disabled:cursor-default"
+                                        :disabled="!canOpenTimetable(item)"
+                                        @click="openTimetable(item)">
                                         <p
                                             class="text-[11px] uppercase tracking-[0.18em] text-slate-400">
                                             终到时间
@@ -428,7 +470,7 @@
                                             ]">
                                             {{ formatTimeLabel(item.endAt) }}
                                         </p>
-                                    </div>
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -471,6 +513,12 @@
             </div>
         </div>
     </UiCard>
+
+    <LookupCurrentTimetableModal
+        :model-value="isTimetableModalOpen"
+        :train-code="selectedTimetableTrainCode"
+        :display-codes="selectedTimetableDisplayCodes"
+        @update:model-value="isTimetableModalOpen = $event" />
 </template>
 
 <script setup lang="ts">
@@ -537,6 +585,9 @@ const emit = defineEmits<{
 const currentUnixSeconds = useCurrentUnixSeconds();
 const { isAuthenticated } = useAuthState();
 const sentinelRef = ref<HTMLElement | null>(null);
+const isTimetableModalOpen = ref(false);
+const selectedTimetableTrainCode = ref('');
+const selectedTimetableDisplayCodes = ref<string[]>([]);
 let sentinelObserver: IntersectionObserver | null = null;
 
 const codeColumnLabel = computed(() => {
@@ -625,7 +676,9 @@ const groupedItems = computed<DisplayHistoryListItem[]>(() => {
 function normalizeDisplayCodes(codes: string[]): string[] {
     const normalizedCodes = Array.from(
         new Set(
-            codes.map((code) => code.trim()).filter((code) => code.length > 0)
+            codes
+                .map((code) => code.trim().toUpperCase())
+                .filter((code) => code.length > 0)
         )
     );
 
@@ -638,6 +691,32 @@ function normalizeDisplayCodes(codes: string[]): string[] {
     return leftCode.localeCompare(rightCode) <= 0
         ? normalizedCodes
         : [rightCode, leftCode];
+}
+
+function resolveTimetableTrainCode(item: DisplayHistoryListItem) {
+    if (props.type === 'train') {
+        return props.code.trim().toUpperCase();
+    }
+
+    return item.codes[0]?.trim().toUpperCase() ?? '';
+}
+
+function canOpenTimetable(item: DisplayHistoryListItem) {
+    return resolveTimetableTrainCode(item).length > 0;
+}
+
+function openTimetable(item: DisplayHistoryListItem) {
+    const trainCode = resolveTimetableTrainCode(item);
+    if (trainCode.length === 0) {
+        return;
+    }
+
+    selectedTimetableTrainCode.value = trainCode;
+    selectedTimetableDisplayCodes.value =
+        props.type === 'train'
+            ? [props.code.trim().toUpperCase()]
+            : [...item.codes];
+    isTimetableModalOpen.value = true;
 }
 
 function disconnectSentinelObserver() {

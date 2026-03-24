@@ -179,6 +179,7 @@
                 "api.records.daily.read",
                 "api.history.train.read",
                 "api.history.emu.read",
+                "api.timetable.train.read",
                 "api.exports.daily.read",
                 "api.feedback.read",
                 "api.feedback.create"
@@ -189,6 +190,7 @@
                 "api.records.daily.read",
                 "api.history.train.read",
                 "api.history.emu.read",
+                "api.timetable.train.read",
                 "api.exports.daily.read",
                 "api.feedback.read",
                 "api.feedback.create",
@@ -205,6 +207,7 @@
                 "api.records.daily.read",
                 "api.history.train.read",
                 "api.history.emu.read",
+                "api.timetable.train.read",
                 "api.exports.daily.read"
             ]
         }
@@ -247,6 +250,7 @@
             "authListApiKeys": 1,
             "authRevokeApiKey": 1,
             "searchIndex": 1,
+            "timetableTrain": 1,
             "exportDailyIndex": 2,
             "exportDaily": 50,
             "authChangePassword": 5

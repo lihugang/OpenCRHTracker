@@ -22,11 +22,13 @@ export function normalizeTrainCodeItems(
         normalized.push({
             code: match.normalizedCode,
             internalCode: item.route.internalCode,
+            allCodes: [match.normalizedCode],
             startStation: '',
             endStation: '',
             startAt: null,
             endAt: null,
-            lastRouteRefreshAt: null
+            lastRouteRefreshAt: null,
+            stops: []
         });
     }
 

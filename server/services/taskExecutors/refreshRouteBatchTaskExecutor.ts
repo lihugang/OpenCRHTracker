@@ -9,6 +9,7 @@ import {
     buildGroupIndex,
     getGroupKey
 } from '~/server/utils/12306/scheduleProbe/taskHelpers';
+import { toScheduleStops } from '~/server/utils/12306/scheduleProbe/mapRouteStops';
 import {
     loadPublishedScheduleState,
     savePublishedScheduleState
@@ -30,12 +31,14 @@ interface RefreshRouteBatchTaskArgs {
 
 interface RefreshRouteGroupUpdate {
     codes: string[];
+    allCodes: string[];
     startStation: string;
     endStation: string;
     startAt: number;
     endAt: number;
     lastRouteRefreshAt: number;
     internalCode: string;
+    stops: ScheduleState['items'][number]['stops'];
 }
 
 function parseTaskArgs(
@@ -84,11 +87,15 @@ function applyGroupUpdate(
         }
 
         const item = state.items[itemIndex]!;
+        item.allCodes = [...update.allCodes];
         item.startStation = update.startStation;
         item.endStation = update.endStation;
         item.startAt = update.startAt;
         item.endAt = update.endAt;
         item.lastRouteRefreshAt = update.lastRouteRefreshAt;
+        item.stops = update.stops.map((stop) => ({
+            ...stop
+        }));
         if (item.internalCode.length === 0 && update.internalCode.length > 0) {
             item.internalCode = update.internalCode;
         }
@@ -176,22 +183,30 @@ async function executeRefreshRouteBatchTask(rawArgs: unknown) {
         const refreshedAt = getNowSeconds();
         const refreshedInternalCode =
             routeResult.data.route.internalCode.trim();
+        const nextAllCodes = [...routeResult.data.route.allCodes];
+        const nextStops = toScheduleStops(state.date, routeResult.data.route.stops);
         let groupChanged = false;
         for (const index of groupItemIndexes) {
             const groupItem = state.items[index]!;
             if (
+                groupItem.allCodes.join('/') !== nextAllCodes.join('/') ||
                 groupItem.startStation !== nextStartStation ||
                 groupItem.endStation !== nextEndStation ||
                 groupItem.startAt !== nextStartAt ||
-                groupItem.endAt !== nextEndAt
+                groupItem.endAt !== nextEndAt ||
+                JSON.stringify(groupItem.stops) !== JSON.stringify(nextStops)
             ) {
                 groupChanged = true;
             }
+            groupItem.allCodes = [...nextAllCodes];
             groupItem.startStation = nextStartStation;
             groupItem.endStation = nextEndStation;
             groupItem.startAt = nextStartAt;
             groupItem.endAt = nextEndAt;
             groupItem.lastRouteRefreshAt = refreshedAt;
+            groupItem.stops = nextStops.map((stop) => ({
+                ...stop
+            }));
             if (
                 groupItem.internalCode.length === 0 &&
                 refreshedInternalCode.length > 0
@@ -206,12 +221,14 @@ async function executeRefreshRouteBatchTask(rawArgs: unknown) {
             codes: groupItemIndexes.map((index) =>
                 normalizeCode(state.items[index]!.code)
             ),
+            allCodes: nextAllCodes,
             startStation: nextStartStation,
             endStation: nextEndStation,
             startAt: nextStartAt,
             endAt: nextEndAt,
             lastRouteRefreshAt: refreshedAt,
-            internalCode: refreshedInternalCode
+            internalCode: refreshedInternalCode,
+            stops: nextStops
         });
         if (groupChanged) {
             changed += 1;
