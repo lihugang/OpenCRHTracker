@@ -34,7 +34,8 @@ export default defineEventHandler(async (event) => {
             requiredScopes: [API_SCOPES.feedback.create]
         },
         async ({ identity }) => {
-            const body = (await readBody<CreateFeedbackTopicBody | null>(event)) ?? {};
+            const body =
+                (await readBody<CreateFeedbackTopicBody | null>(event)) ?? {};
 
             ensure(
                 typeof body === 'object' &&

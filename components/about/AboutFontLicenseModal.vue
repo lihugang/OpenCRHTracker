@@ -10,13 +10,16 @@
             <div
                 class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-4 py-4 text-sm leading-6 text-slate-700">
                 <p class="font-semibold text-slate-900">
-                    以下为 {{ licenseEntry.name }} 随站点分发时附带的 OFL 许可文本。
+                    以下为 {{ licenseEntry.name }} 随站点分发时附带的 OFL
+                    许可文本。
                 </p>
             </div>
 
             <div class="rounded-[1.2rem] border border-slate-200 bg-white/90">
                 <pre
-                    class="harmony-scrollbar max-h-[min(58vh,34rem)] overflow-auto px-5 py-5 text-xs leading-6 whitespace-pre-wrap text-slate-700">{{ licenseEntry.licenseText }}</pre>
+                    class="harmony-scrollbar max-h-[min(58vh,34rem)] overflow-auto px-5 py-5 text-xs leading-6 whitespace-pre-wrap text-slate-700"
+                    >{{ licenseEntry.licenseText }}</pre
+                >
             </div>
         </div>
     </component>

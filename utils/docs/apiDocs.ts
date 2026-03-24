@@ -112,16 +112,18 @@ function resolveResponse(
     return {
         statusCode,
         description: response.description,
-        headers: Object.entries(response.headers ?? {}).map(([name, header]) => {
-            const resolvedHeader = resolveHeader(header);
+        headers: Object.entries(response.headers ?? {}).map(
+            ([name, header]) => {
+                const resolvedHeader = resolveHeader(header);
 
-            return {
-                name,
-                description: resolvedHeader.description ?? '',
-                schema: resolveSchema(resolvedHeader.schema),
-                example: resolvedHeader.example
-            };
-        }),
+                return {
+                    name,
+                    description: resolvedHeader.description ?? '',
+                    schema: resolveSchema(resolvedHeader.schema),
+                    example: resolvedHeader.example
+                };
+            }
+        ),
         content: Object.entries(response.content ?? {}).map(
             ([contentType, mediaType]) => ({
                 contentType,
@@ -131,7 +133,9 @@ function resolveResponse(
                         return mediaType.example;
                     }
 
-                    return extractSchemaExample(resolveSchema(mediaType.schema));
+                    return extractSchemaExample(
+                        resolveSchema(mediaType.schema)
+                    );
                 })()
             })
         )
@@ -160,7 +164,10 @@ function createEndpoint(
             .map(([statusCode, response]) =>
                 resolveResponse(statusCode, response)
             )
-            .sort((left, right) => Number(left.statusCode) - Number(right.statusCode)),
+            .sort(
+                (left, right) =>
+                    Number(left.statusCode) - Number(right.statusCode)
+            ),
         examples: operation['x-examples']
     };
 }
@@ -185,7 +192,9 @@ const endpointList = Object.entries(developerDocsOpenApi.paths)
         return (['get', 'post', 'put', 'patch', 'delete'] as const).flatMap(
             (method) => {
                 const operation = readOperation(pathItem, method);
-                return operation ? [createEndpoint(method, path, operation)] : [];
+                return operation
+                    ? [createEndpoint(method, path, operation)]
+                    : [];
             }
         );
     })
@@ -202,7 +211,10 @@ const endpointMap = new Map(
 );
 
 const tagDescriptionMap = new Map(
-    (developerDocsOpenApi.tags ?? []).map((tag) => [tag.name, tag.description ?? ''])
+    (developerDocsOpenApi.tags ?? []).map((tag) => [
+        tag.name,
+        tag.description ?? ''
+    ])
 );
 
 export function listDocsApiEndpoints() {
@@ -286,10 +298,10 @@ function extractSchemaExample(schema?: OpenApiSchema): unknown {
     if (schema.type === 'object') {
         const properties = Object.entries(schema.properties ?? {});
         const exampleEntries = properties
-            .map(([name, value]) => [
-                name,
-                extractSchemaExample(resolveSchema(value))
-            ] as const)
+            .map(
+                ([name, value]) =>
+                    [name, extractSchemaExample(resolveSchema(value))] as const
+            )
             .filter((entry) => entry[1] !== undefined);
 
         if (exampleEntries.length === 0) {
@@ -318,7 +330,9 @@ function describeResolvedSchema(schema?: OpenApiSchema): unknown {
 
     if (schema.oneOf && schema.oneOf.length > 0) {
         return {
-            oneOf: schema.oneOf.map((item) => describeResolvedSchema(resolveSchema(item)))
+            oneOf: schema.oneOf.map((item) =>
+                describeResolvedSchema(resolveSchema(item))
+            )
         };
     }
 
@@ -331,14 +345,18 @@ function describeResolvedSchema(schema?: OpenApiSchema): unknown {
                 };
 
                 if (resolvedProperty?.description) {
-                    propertyDescription.description = resolvedProperty.description;
+                    propertyDescription.description =
+                        resolvedProperty.description;
                 }
 
                 if (schema.required?.includes(name)) {
                     propertyDescription.required = true;
                 }
 
-                if (resolvedProperty?.enum && resolvedProperty.enum.length > 0) {
+                if (
+                    resolvedProperty?.enum &&
+                    resolvedProperty.enum.length > 0
+                ) {
                     propertyDescription.enum = resolvedProperty.enum;
                 }
 
@@ -352,7 +370,8 @@ function describeResolvedSchema(schema?: OpenApiSchema): unknown {
                         resolvedProperty.type === 'array' ||
                         (resolvedProperty.oneOf?.length ?? 0) > 0)
                 ) {
-                    propertyDescription.shape = describeResolvedSchema(resolvedProperty);
+                    propertyDescription.shape =
+                        describeResolvedSchema(resolvedProperty);
                 }
 
                 return [name, propertyDescription];
@@ -387,8 +406,9 @@ function describeResolvedSchema(schema?: OpenApiSchema): unknown {
             description.description = schema.description;
         }
 
-        description.items =
-            describeResolvedSchema(resolveSchema(schema.items)) ?? { type: 'any' };
+        description.items = describeResolvedSchema(
+            resolveSchema(schema.items)
+        ) ?? { type: 'any' };
 
         return description;
     }
@@ -430,8 +450,14 @@ export function stringifyExample(value: unknown) {
 
 export function getDocsParameterGroups(endpoint: DocsApiEndpoint) {
     return {
-        path: endpoint.parameters.filter((parameter) => parameter.in === 'path'),
-        query: endpoint.parameters.filter((parameter) => parameter.in === 'query'),
-        header: endpoint.parameters.filter((parameter) => parameter.in === 'header')
+        path: endpoint.parameters.filter(
+            (parameter) => parameter.in === 'path'
+        ),
+        query: endpoint.parameters.filter(
+            (parameter) => parameter.in === 'query'
+        ),
+        header: endpoint.parameters.filter(
+            (parameter) => parameter.in === 'header'
+        )
     };
 }

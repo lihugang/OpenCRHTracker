@@ -32,9 +32,7 @@ export function canViewFeedbackTopic(
         return true;
     }
 
-    return (
-        canManageFeedback(identity) || isFeedbackOwner(identity, topic)
-    );
+    return canManageFeedback(identity) || isFeedbackOwner(identity, topic);
 }
 
 export function canReplyFeedbackTopic(

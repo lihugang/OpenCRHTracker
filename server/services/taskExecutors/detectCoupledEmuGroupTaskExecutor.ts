@@ -71,10 +71,7 @@ function parseTaskArgs(raw: unknown): DetectCoupledEmuGroupTaskArgs {
     const bureau = typeof body.bureau === 'string' ? body.bureau.trim() : '';
     const model =
         typeof body.model === 'string' ? normalizeCode(body.model) : '';
-    if (
-        (bureau.length === 0) ||
-        model.length === 0
-    ) {
+    if (bureau.length === 0 || model.length === 0) {
         throw new Error(
             'task arguments bureau or depot, and model must be non-empty'
         );
@@ -278,7 +275,10 @@ function resolveTrackedGroupByTrainCode(
         return null;
     }
 
-    const trainCodes = uniqueNormalizedCodes([group.trainCode, ...group.allCodes]);
+    const trainCodes = uniqueNormalizedCodes([
+        group.trainCode,
+        ...group.allCodes
+    ]);
     const rowsByKey = new Map<string, ProbeStatusRow>();
     for (const code of trainCodes) {
         const rows = listProbeStatusByTrainCode(code, group.startAt);
@@ -344,7 +344,7 @@ function collectPendingTrackedGroups(
             if (
                 !trackedGroup ||
                 trackedGroup.finalStatus !==
-                ProbeStatusValue.PendingCouplingDetection
+                    ProbeStatusValue.PendingCouplingDetection
             ) {
                 continue;
             }
@@ -458,7 +458,7 @@ async function persistResolvedTrackedGroup(
     const previousStatus = trackedGroup.finalStatus;
     const finalStatus =
         previousStatus === ProbeStatusValue.CoupledFormationResolved ||
-            emuCodes.length > 1
+        emuCodes.length > 1
             ? ProbeStatusValue.CoupledFormationResolved
             : ProbeStatusValue.SingleFormationResolved;
     const scheduleRoute = resolveScheduleRoute(

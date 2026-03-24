@@ -30,7 +30,8 @@ export default defineEventHandler(async (event) => {
         },
         async ({ identity }) => {
             const query = getQuery(event);
-            const rawView = typeof query.view === 'string' ? query.view : 'public';
+            const rawView =
+                typeof query.view === 'string' ? query.view : 'public';
             const rawPrimaryType =
                 typeof query.primaryType === 'string'
                     ? query.primaryType.trim()
@@ -51,7 +52,8 @@ export default defineEventHandler(async (event) => {
                 'view 只能是 public、mine 或 all'
             );
             ensure(
-                rawPrimaryType === '' || isValidFeedbackPrimaryType(rawPrimaryType),
+                rawPrimaryType === '' ||
+                    isValidFeedbackPrimaryType(rawPrimaryType),
                 400,
                 'invalid_param',
                 'primaryType 无效'

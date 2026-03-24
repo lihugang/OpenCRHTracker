@@ -1,6 +1,5 @@
 const OFFICIAL_HOSTNAME_BYTES = new Uint8Array([
-    99, 114, 104, 46, 108, 105, 104, 117, 103, 97, 110, 103, 46, 116, 111,
-    112
+    99, 114, 104, 46, 108, 105, 104, 117, 103, 97, 110, 103, 46, 116, 111, 112
 ]);
 
 const OFFICIAL_HOSTNAME = new TextDecoder()

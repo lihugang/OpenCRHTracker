@@ -102,9 +102,7 @@ let mediaQueryHandler: ((event: MediaQueryListEvent) => void) | null = null;
 
 const detectedTarget = computed(() => resolveLookupTarget(draftCode.value));
 const previewSearchTitle = computed(() =>
-    transitionTarget.value?.type === 'train'
-        ? '车次详情查询'
-        : '车组详情查询'
+    transitionTarget.value?.type === 'train' ? '车次详情查询' : '车组详情查询'
 );
 const previewSearchDescription = computed(() => '');
 

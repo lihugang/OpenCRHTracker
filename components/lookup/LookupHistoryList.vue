@@ -188,7 +188,11 @@
                                 <td
                                     class="border-b border-slate-100 px-4 py-4 text-sm font-medium text-crh-grey-dark last:border-b-0">
                                     <NuxtLink
-                                        v-if="shouldShowExportDateLink(item.startAt)"
+                                        v-if="
+                                            shouldShowExportDateLink(
+                                                item.startAt
+                                            )
+                                        "
                                         :to="buildExportDateLink(item.startAt)"
                                         class="history-date-link">
                                         {{ formatDateLabel(item.startAt) }}
@@ -279,10 +283,19 @@
                         <div class="space-y-3">
                             <div class="flex items-start gap-3">
                                 <div class="min-w-0">
-                                    <div class="text-xs font-medium text-slate-500">
+                                    <div
+                                        class="text-xs font-medium text-slate-500">
                                         <NuxtLink
-                                            v-if="shouldShowExportDateLink(item.startAt)"
-                                            :to="buildExportDateLink(item.startAt)"
+                                            v-if="
+                                                shouldShowExportDateLink(
+                                                    item.startAt
+                                                )
+                                            "
+                                            :to="
+                                                buildExportDateLink(
+                                                    item.startAt
+                                                )
+                                            "
                                             class="history-date-link">
                                             {{ formatDateLabel(item.startAt) }}
                                         </NuxtLink>

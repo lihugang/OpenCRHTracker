@@ -72,7 +72,9 @@
                         :key="option.value"
                         type="button"
                         role="option"
-                        :aria-selected="option.value === model ? 'true' : 'false'"
+                        :aria-selected="
+                            option.value === model ? 'true' : 'false'
+                        "
                         :data-option-index="index"
                         class="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm transition"
                         :class="
@@ -213,8 +215,7 @@ const listboxId = `ui-select-listbox-${useId()}`;
 const mediaQuery = ref<MediaQueryList | null>(null);
 
 const usesBottomSheet = computed(
-    () =>
-        props.mobilePresentation === 'sheet' && isPortraitViewport.value
+    () => props.mobilePresentation === 'sheet' && isPortraitViewport.value
 );
 const mobileSheetTitle = computed(() => props.mobileSheetTitle);
 const mobileSheetEyebrow = computed(() => props.mobileSheetEyebrow);

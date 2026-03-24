@@ -200,12 +200,11 @@ const sourceUrl =
 .feedback-smart-questions :deep(blockquote) {
     border: 1px solid rgb(191 219 254);
     border-left: 5px solid rgb(0 82 155);
-    background:
-        linear-gradient(
-            135deg,
-            rgb(239 246 255 / 0.96),
-            rgb(248 250 252 / 0.98)
-        );
+    background: linear-gradient(
+        135deg,
+        rgb(239 246 255 / 0.96),
+        rgb(248 250 252 / 0.98)
+    );
     border-radius: 0 1rem 1rem 0.95rem;
     padding: 0.95rem 1.1rem 0.95rem 1.2rem;
     color: rgb(51 65 85);

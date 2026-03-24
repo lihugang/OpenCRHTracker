@@ -23,7 +23,8 @@
                                     class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
                                     密钥名称
                                 </p>
-                                <p class="truncate text-sm font-medium text-slate-900">
+                                <p
+                                    class="truncate text-sm font-medium text-slate-900">
                                     {{ currentKeyName }}
                                 </p>
                             </div>
@@ -127,7 +128,6 @@
                     <p class="mt-4 text-sm font-medium text-slate-600">
                         {{ quotaStatusLabel }}
                     </p>
-
                 </div>
             </div>
         </UiCard>

@@ -11,7 +11,11 @@ interface UseSiteSeoInput {
     image?: string | (() => string);
     type?: 'website' | 'article';
     noindex?: boolean | (() => boolean);
-    jsonLd?: JsonLdNode | JsonLdNode[] | null | (() => JsonLdNode | JsonLdNode[] | null);
+    jsonLd?:
+        | JsonLdNode
+        | JsonLdNode[]
+        | null
+        | (() => JsonLdNode | JsonLdNode[] | null);
 }
 
 const DEFAULT_SITE_NAME = 'Open CRH Tracker';
@@ -78,7 +82,9 @@ export function useSiteSeo(input: UseSiteSeoInput) {
 
         return '';
     });
-    const canonicalUrl = computed(() => joinUrl(origin.value, resolvedPath.value));
+    const canonicalUrl = computed(() =>
+        joinUrl(origin.value, resolvedPath.value)
+    );
     const imageUrl = computed(() =>
         joinUrl(origin.value, toValue(input.image) || DEFAULT_OG_IMAGE_PATH)
     );

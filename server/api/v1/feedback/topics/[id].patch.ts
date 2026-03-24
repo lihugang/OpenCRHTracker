@@ -47,7 +47,8 @@ export default defineEventHandler(async (event) => {
                 throw new ApiRequestError(404, 'not_found', '反馈不存在');
             }
 
-            const body = (await readBody<UpdateFeedbackTopicBody | null>(event)) ?? {};
+            const body =
+                (await readBody<UpdateFeedbackTopicBody | null>(event)) ?? {};
 
             ensure(
                 typeof body === 'object' &&
@@ -69,7 +70,8 @@ export default defineEventHandler(async (event) => {
                 '反馈分类无效'
             );
             ensure(
-                typeof body.status === 'string' && isValidFeedbackStatus(body.status),
+                typeof body.status === 'string' &&
+                    isValidFeedbackStatus(body.status),
                 400,
                 'invalid_param',
                 '反馈状态无效'

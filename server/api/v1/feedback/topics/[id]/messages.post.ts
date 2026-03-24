@@ -56,7 +56,8 @@ export default defineEventHandler(async (event) => {
                 '当前身份无法在该反馈下回复'
             );
 
-            const body = (await readBody<CreateFeedbackMessageBody | null>(event)) ?? {};
+            const body =
+                (await readBody<CreateFeedbackMessageBody | null>(event)) ?? {};
             ensure(
                 typeof body === 'object' &&
                     body !== null &&

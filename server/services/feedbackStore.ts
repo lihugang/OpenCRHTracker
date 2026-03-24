@@ -266,7 +266,9 @@ export function buildFeedbackTopicCursor(
     return `${last.last_replied_at}:${last.id}`;
 }
 
-function normalizeFilters(filters: Partial<FeedbackTopicFilters>): FeedbackTopicFilters {
+function normalizeFilters(
+    filters: Partial<FeedbackTopicFilters>
+): FeedbackTopicFilters {
     return {
         primaryType: filters.primaryType ?? '',
         secondaryType: filters.secondaryType ?? '',
@@ -371,8 +373,10 @@ export function listAllFeedbackTopics(
 
 export function getFeedbackTopicById(topicId: number) {
     const row =
-        feedbackStatements.get<FeedbackTopicRow>('selectFeedbackTopicById', topicId) ??
-        null;
+        feedbackStatements.get<FeedbackTopicRow>(
+            'selectFeedbackTopicById',
+            topicId
+        ) ?? null;
 
     if (!row) {
         return null;
@@ -452,7 +456,9 @@ export function createFeedbackMessage(input: CreateFeedbackMessageInput) {
     return insertMessage();
 }
 
-export function updateFeedbackTopicFields(input: UpdateFeedbackTopicFieldsInput) {
+export function updateFeedbackTopicFields(
+    input: UpdateFeedbackTopicFieldsInput
+) {
     feedbackStatements.run(
         'updateFeedbackTopicFields',
         input.primaryType,

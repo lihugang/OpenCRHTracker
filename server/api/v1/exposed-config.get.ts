@@ -21,7 +21,8 @@ export default defineEventHandler(async (event) => {
                 )
         },
         async () => {
-            const schedulerPollIntervalMs = config.task.scheduler.pollIntervalMs;
+            const schedulerPollIntervalMs =
+                config.task.scheduler.pollIntervalMs;
 
             const response: AboutExposedConfigData = {
                 about: {

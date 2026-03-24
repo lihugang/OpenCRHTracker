@@ -7,7 +7,8 @@
 
         <div
             class="relative mx-auto flex w-full max-w-7xl flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-10">
-            <div class="grid w-full gap-6 lg:grid-cols-[17rem_minmax(0,1fr)] lg:items-start">
+            <div
+                class="grid w-full gap-6 lg:grid-cols-[17rem_minmax(0,1fr)] lg:items-start">
                 <aside class="space-y-4">
                     <UiCard
                         :show-accent-bar="false"

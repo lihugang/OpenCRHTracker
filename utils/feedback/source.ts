@@ -69,17 +69,15 @@ export function readFeedbackSourceQuery(
         sourceCode:
             readQueryString(query.sourceCode) || fallback.sourceCode || '',
         sourceSummary:
-            readQueryString(query.sourceSummary) ||
-            fallback.sourceSummary ||
-            ''
+            readQueryString(query.sourceSummary) || fallback.sourceSummary || ''
     };
 }
 
 export function hasFeedbackSource(context: FeedbackSourceContext) {
     return Boolean(
         context.sourcePath ||
-            context.sourceCode ||
-            context.sourceSummary ||
-            context.sourceTitle
+        context.sourceCode ||
+        context.sourceSummary ||
+        context.sourceTitle
     );
 }

@@ -5,23 +5,27 @@ import { DEFAULT_DOCS_API_RUNTIME_CONFIG } from '~/utils/docs/apiDocs';
 export default function useDocsApiRuntimeConfig() {
     const requestFetch = import.meta.server ? useRequestFetch() : $fetch;
 
-    return useAsyncData('docs-api-runtime-config', async () => {
-        try {
-            const response = await requestFetch<
-                TrackerApiResponse<AboutExposedConfigData>
-            >('/api/v1/exposed-config', {
-                retry: 0
-            });
+    return useAsyncData(
+        'docs-api-runtime-config',
+        async () => {
+            try {
+                const response = await requestFetch<
+                    TrackerApiResponse<AboutExposedConfigData>
+                >('/api/v1/exposed-config', {
+                    retry: 0
+                });
 
-            if (!response.ok) {
+                if (!response.ok) {
+                    return DEFAULT_DOCS_API_RUNTIME_CONFIG;
+                }
+
+                return response.data.api;
+            } catch {
                 return DEFAULT_DOCS_API_RUNTIME_CONFIG;
             }
-
-            return response.data.api;
-        } catch {
-            return DEFAULT_DOCS_API_RUNTIME_CONFIG;
+        },
+        {
+            default: () => DEFAULT_DOCS_API_RUNTIME_CONFIG
         }
-    }, {
-        default: () => DEFAULT_DOCS_API_RUNTIME_CONFIG
-    });
+    );
 }

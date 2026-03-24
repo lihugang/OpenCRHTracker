@@ -8,9 +8,7 @@ export default function normalizeScopeNode(scope: string) {
     if (
         segments.some((segment) => !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(segment))
     ) {
-        throw new Error(
-            `scope "${scope}" 必须使用点分隔的小写片段`
-        );
+        throw new Error(`scope "${scope}" 必须使用点分隔的小写片段`);
     }
 
     return normalized;

@@ -209,7 +209,8 @@
                                                     class="mt-1 text-lg font-semibold text-slate-900">
                                                     {{
                                                         formatTokenCount(
-                                                            item.usage.last8Hours
+                                                            item.usage
+                                                                .last8Hours
                                                         )
                                                     }}
                                                 </dd>

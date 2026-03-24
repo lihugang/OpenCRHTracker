@@ -73,7 +73,10 @@ function applySelection(
 ) {
     if (
         !selection ||
-        !(element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement)
+        !(
+            element instanceof HTMLInputElement ||
+            element instanceof HTMLTextAreaElement
+        )
     ) {
         return;
     }
@@ -117,7 +120,8 @@ export default function safeFocus(
         isIosWebKitEnvironment() &&
         BLOCKED_PROGRAMMATIC_SOURCES.has(source)
     ) {
-        options.scrollIntoView && element.scrollIntoView(options.scrollIntoView);
+        options.scrollIntoView &&
+            element.scrollIntoView(options.scrollIntoView);
         return false;
     }
 

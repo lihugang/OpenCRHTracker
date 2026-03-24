@@ -79,13 +79,11 @@ export function getFeedbackCategoryKey(
     primaryType: FeedbackPrimaryType,
     secondaryType: FeedbackSecondaryType
 ) {
-    return (
-        FEEDBACK_CATEGORY_OPTIONS.find(
-            (option) =>
-                option.primaryType === primaryType &&
-                option.secondaryType === secondaryType
-        )?.key ?? primaryType
-    ) as FeedbackCategoryKey;
+    return (FEEDBACK_CATEGORY_OPTIONS.find(
+        (option) =>
+            option.primaryType === primaryType &&
+            option.secondaryType === secondaryType
+    )?.key ?? primaryType) as FeedbackCategoryKey;
 }
 
 export function getFeedbackPrimaryTypeLabel(primaryType: FeedbackPrimaryType) {
@@ -142,7 +140,9 @@ export function getFeedbackCategoryShortLabel(
 }
 
 export function getFeedbackCategoryByKey(key: string) {
-    return FEEDBACK_CATEGORY_OPTIONS.find((option) => option.key === key) ?? null;
+    return (
+        FEEDBACK_CATEGORY_OPTIONS.find((option) => option.key === key) ?? null
+    );
 }
 
 export function isSecurityFeedbackCategory(

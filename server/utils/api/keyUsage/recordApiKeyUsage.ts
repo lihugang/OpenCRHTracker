@@ -53,7 +53,8 @@ export default function recordApiKeyUsage(
     }
 
     const currentBucketValue = usageState.bucketValues[bucketIndex] ?? 0;
-    usageState.bucketValues[bucketIndex] = currentBucketValue + normalizedTokens;
+    usageState.bucketValues[bucketIndex] =
+        currentBucketValue + normalizedTokens;
     usageState.lastSeenAt = timestamp;
     byKeyId.set(keyId, usageState);
 }

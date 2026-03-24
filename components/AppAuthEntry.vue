@@ -10,7 +10,9 @@
                         文档
                     </NuxtLink>
                     <NuxtLink
-                        v-if="isAuthenticated && route.path !== '/exports/daily'"
+                        v-if="
+                            isAuthenticated && route.path !== '/exports/daily'
+                        "
                         to="/exports/daily"
                         class="inline-flex items-center gap-2 rounded-full border border-crh-blue/12 bg-blue-50/85 px-4 py-2 text-sm font-semibold text-crh-blue transition hover:border-crh-blue/20 hover:bg-blue-100/80 hover:text-slate-950">
                         导出每日数据
@@ -37,7 +39,8 @@
             </div>
         </div>
 
-        <div class="pointer-events-none fixed right-4 top-4 z-40 hidden sm:block sm:right-6 sm:top-5">
+        <div
+            class="pointer-events-none fixed right-4 top-4 z-40 hidden sm:block sm:right-6 sm:top-5">
             <div
                 class="pointer-events-auto flex items-center gap-1 rounded-full border border-white/55 bg-white/30 p-1.5 shadow-[0_20px_48px_-28px_rgba(15,23,42,0.45)] ring-1 ring-slate-200/35 backdrop-blur-md">
                 <NuxtLink

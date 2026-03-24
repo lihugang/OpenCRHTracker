@@ -1,9 +1,4 @@
-import {
-    defineEventHandler,
-    getQuery,
-    getRouterParam,
-    setHeader
-} from 'h3';
+import { defineEventHandler, getQuery, getRouterParam, setHeader } from 'h3';
 import {
     countDailyExportItems,
     getDailyExportContentType,

@@ -65,8 +65,7 @@ export const crawlDocsSections: DocsContentSection[] = [
     {
         id: 'build-schedule',
         title: '构建今日车次时刻表',
-        summary:
-            '今日时刻表生成分成“发现车次”和“回填线路信息”两个阶段。',
+        summary: '今日时刻表生成分成“发现车次”和“回填线路信息”两个阶段。',
         blocks: [
             {
                 type: 'paragraph',
@@ -284,60 +283,77 @@ export const crawlDocsSections: DocsContentSection[] = [
                         path: 'data.assets.schedule.file',
                         valueType: 'string',
                         required: true,
-                        description: 'published schedule 和 building schedule 都围绕这个资产文件读写，todayScheduleCache 也会观察它的修改时间。',
-                        notes: ['文件路径必须可读写，私有部署时建议放在持久化 data 目录内。']
+                        description:
+                            'published schedule 和 building schedule 都围绕这个资产文件读写，todayScheduleCache 也会观察它的修改时间。',
+                        notes: [
+                            '文件路径必须可读写，私有部署时建议放在持久化 data 目录内。'
+                        ]
                     },
                     {
                         path: 'spider.scheduleProbe.dailyTimeHHmm',
                         valueType: 'string(HHmm)',
                         required: true,
-                        description: '决定 build_today_schedule 的每日执行时间，构建成功后才会补发 dispatch_daily_probe_tasks。',
-                        notes: ['如果这个时间点太晚，当天部分列车可能已经发车。']
+                        description:
+                            '决定 build_today_schedule 的每日执行时间，构建成功后才会补发 dispatch_daily_probe_tasks。',
+                        notes: [
+                            '如果这个时间点太晚，当天部分列车可能已经发车。'
+                        ]
                     },
                     {
                         path: 'spider.scheduleProbe.prefixRules',
                         valueType: 'array<object>',
                         required: true,
-                        description: '决定车次探测阶段会覆盖哪些前缀和号段，直接影响当天时刻表的覆盖范围。',
+                        description:
+                            '决定车次探测阶段会覆盖哪些前缀和号段，直接影响当天时刻表的覆盖范围。',
                         notes: ['prefix 号段有重叠时，服务启动校验会直接失败。']
                     },
                     {
                         path: 'spider.scheduleProbe.retryAttempts / maxBatchSize / checkpointFlushEvery',
                         valueType: 'integer',
                         required: true,
-                        description: '分别影响列车时刻表信息更新的重试次数、搜索扩展阈值和车次探测信息的断点落盘频率。'
+                        description:
+                            '分别影响列车时刻表信息更新的重试次数、搜索扩展阈值和车次探测信息的断点落盘频率。'
                     },
                     {
                         path: 'spider.rateLimit.query.minIntervalMs / search.minIntervalMs',
                         valueType: 'integer',
                         required: true,
-                        description: '决定 12306 查询和搜索节流速度，间接影响时刻表信息更新、列车发车任务的完成时长。'
+                        description:
+                            '决定 12306 查询和搜索节流速度，间接影响时刻表信息更新、列车发车任务的完成时长。'
                     },
                     {
                         path: 'spider.scheduleProbe.refresh.*',
                         valueType: 'object',
                         required: true,
-                        description: '控制路线补刷任务的批大小、TTL 和重新生成周期。'
+                        description:
+                            '控制路线补刷任务的批大小、TTL 和重新生成周期。'
                     },
                     {
                         path: 'spider.scheduleProbe.probe.defaultRetry / overlapRetryDelaySeconds',
                         valueType: 'integer',
                         required: true,
-                        description: '控制 probe_train_departure 的默认重试预算以及重叠冲突后的延迟重排时间。'
+                        description:
+                            '控制 probe_train_departure 的默认重试预算以及重叠冲突后的延迟重排时间。'
                     },
                     {
                         path: 'spider.scheduleProbe.coupling.*',
                         valueType: 'object',
                         required: true,
-                        description: '控制耦合编组状态清理、延迟检测和冷却周期。',
-                        notes: ['detect_coupled_emu_group 的排队延迟来自 detectDelaySeconds。']
+                        description:
+                            '控制耦合编组状态清理、延迟检测和冷却周期。',
+                        notes: [
+                            'detect_coupled_emu_group 的排队延迟来自 detectDelaySeconds。'
+                        ]
                     },
                     {
                         path: 'task.startup.disabledExecutors',
                         valueType: 'array<string>',
                         required: false,
-                        description: '可以在启动时跳过 build_today_schedule、generate_route_refresh_tasks 等关键任务。',
-                        notes: ['排查“为什么启动后不抓取”时，先检查这里是否禁用了对应 executor。']
+                        description:
+                            '可以在启动时跳过 build_today_schedule、generate_route_refresh_tasks 等关键任务。',
+                        notes: [
+                            '排查“为什么启动后不抓取”时，先检查这里是否禁用了对应 executor。'
+                        ]
                     }
                 ]
             }
