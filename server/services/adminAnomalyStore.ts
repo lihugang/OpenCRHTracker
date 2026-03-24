@@ -28,6 +28,13 @@ function sortRoutesAscending(left: DailyEmuRouteRow, right: DailyEmuRouteRow) {
     return left.start_at - right.start_at || left.id - right.id;
 }
 
+function countItemsByType(
+    items: AdminAnomalyItem[],
+    type: AdminAnomalyItem['type']
+) {
+    return items.filter((item) => item.type === type).length;
+}
+
 export function scanDailyAnomalies(date: string): AdminAnomalyScanResponse {
     const dayRange = getDayTimestampRange(date);
     const rows = listDailyRecordsAll(dayRange.startAt, dayRange.endAt).sort(
@@ -65,10 +72,10 @@ export function scanDailyAnomalies(date: string): AdminAnomalyScanResponse {
         items.push({
             type: 'train_multi_emu',
             subjectCode: trainCode,
-            title: '同日车次关联车组超过 2 组',
+            title: '同日同车次关联车组超过 2 组',
             summary:
-                `车次 ${trainCode} 在 ${date} 关联了 ${uniqueEmuCodes.length} 组车，` +
-                `已超过允许范围。`,
+                `车次 ${trainCode} 在 ${date} 关联了 ${uniqueEmuCodes.length} 组车组，` +
+                '已超过允许阈值。',
             trainCodes: [trainCode],
             emuCodes: uniqueEmuCodes,
             durationSeconds: null,
@@ -77,11 +84,11 @@ export function scanDailyAnomalies(date: string): AdminAnomalyScanResponse {
     }
 
     for (const [emuCode, emuRows] of rowsByEmuCode.entries()) {
-        if (emuRows.length !== 1) {
+        if (emuRows.length !== 1 || !emuRows[0]) {
             continue;
         }
 
-        const [route] = emuRows;
+        const route = emuRows[0];
         const durationSeconds = Math.max(0, route.end_at - route.start_at);
         if (durationSeconds >= SIX_HOURS_SECONDS) {
             continue;
@@ -93,7 +100,7 @@ export function scanDailyAnomalies(date: string): AdminAnomalyScanResponse {
             title: '单日仅 1 条交路且运行时长小于 6 小时',
             summary:
                 `车组 ${emuCode} 在 ${date} 仅执行 1 条交路，` +
-                `运行时长约 ${Math.floor(durationSeconds / 60)} 分钟。`,
+                `总运行时长约 ${Math.floor(durationSeconds / 60)} 分钟。`,
             trainCodes: [route.train_code],
             emuCodes: [emuCode],
             durationSeconds,
@@ -122,15 +129,12 @@ export function scanDailyAnomalies(date: string): AdminAnomalyScanResponse {
             {
                 type: 'train_multi_emu',
                 label: '车次重联异常',
-                count: items.filter((item) => item.type === 'train_multi_emu')
-                    .length
+                count: countItemsByType(items, 'train_multi_emu')
             },
             {
                 type: 'emu_single_short_route',
                 label: '车组短交路异常',
-                count: items.filter(
-                    (item) => item.type === 'emu_single_short_route'
-                ).length
+                count: countItemsByType(items, 'emu_single_short_route')
             }
         ],
         items

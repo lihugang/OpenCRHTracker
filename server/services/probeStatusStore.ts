@@ -22,6 +22,7 @@ export interface ProbeStatusRow {
 
 type ProbeStatusSqlKey =
     | 'clearProbeStatus'
+    | 'deleteProbeStatusByTrainCodeAndEmuCodeAtStartAt'
     | 'deleteProbeStatusByTrainCodeInRange'
     | 'insertProbeStatus'
     | 'selectProbeStatusByEmuCode'
@@ -300,6 +301,31 @@ export function deleteProbeStatusByTrainCodeInRange(
         normalizedTrainCode,
         startAt,
         endAtExclusive
+    );
+    return result.changes;
+}
+
+export function deleteProbeStatusByTrainCodeAndEmuCodeAtStartAt(
+    trainCode: string,
+    emuCode: string,
+    startAt: number
+): number {
+    const normalizedTrainCode = normalizeTrainCode(trainCode);
+    const normalizedEmuCode = normalizeEmuCode(emuCode);
+    if (
+        normalizedTrainCode.length === 0 ||
+        normalizedEmuCode.length === 0 ||
+        !Number.isInteger(startAt) ||
+        startAt < 0
+    ) {
+        return 0;
+    }
+
+    const result = probeStatusStatements.run(
+        'deleteProbeStatusByTrainCodeAndEmuCodeAtStartAt',
+        normalizedTrainCode,
+        normalizedEmuCode,
+        startAt
     );
     return result.changes;
 }
