@@ -17,15 +17,15 @@ export const developerDocsOpenApi = {
     ],
     tags: [
         {
-            name: '身份',
+            name: 'Auth',
             description: '查看当前鉴权会话的信息。'
         },
         {
-            name: '记录',
+            name: 'Records',
             description: '分页读取每日运行记录。'
         },
         {
-            name: '历史',
+            name: 'History',
             description: '查询车次和车组的担当历史。'
         },
         {
@@ -33,7 +33,7 @@ export const developerDocsOpenApi = {
             description: '读取当前日期下的完整车次时刻表。'
         },
         {
-            name: '导出',
+            name: 'Exports',
             description: '列出并下载已生成的每日数据导出文件。'
         }
     ],
@@ -953,9 +953,9 @@ export const developerDocsOpenApi = {
             get: {
                 operationId: 'authMe',
                 tags: ['Auth'],
-                summary: '璇诲彇褰撳墠閴存潈浼氳瘽',
+                summary: '读取当前鉴权会话',
                 description:
-                    '杩斿洖褰撳墠鐢ㄦ埛銆佹鍦ㄤ娇鐢ㄧ殑 API Key 鎽樿浠ュ強褰撳墠棰濆害妗剁姸鎬併€?',
+                    '返回当前用户、正在使用的 API Key 摘要以及当前额度桶状态。',
                 security: [
                     {
                         bearerAuth: []
@@ -966,7 +966,7 @@ export const developerDocsOpenApi = {
                 ],
                 responses: {
                     '200': {
-                        description: '褰撳墠閴存潈浼氳瘽璇︽儏銆?',
+                        description: '当前鉴权会话信息。',
                         headers: {
                             'x-api-remain': {
                                 $ref: '#/components/headers/ApiRemain'
@@ -985,7 +985,7 @@ export const developerDocsOpenApi = {
                     },
                     '401': {
                         description:
-                            '缂哄皯鍑嵁锛屾垨鍑嵁鏃犳晥銆佸凡杩囨湡銆?',
+                            '请求未携带有效的认证信息，或提供的 API Key 已失效。',
                         headers: {
                             'x-api-remain': {
                                 $ref: '#/components/headers/ApiRemain'
@@ -1001,7 +1001,7 @@ export const developerDocsOpenApi = {
                                 },
                                 example: {
                                     ok: false,
-                                    data: 'API Key 鏃犳晥鎴栧凡杩囨湡銆?',
+                                    data: 'API Key 无效或已过期。',
                                     error: 'invalid_api_key'
                                 }
                             }
@@ -1009,7 +1009,7 @@ export const developerDocsOpenApi = {
                     }
                 },
                 'x-slug': 'auth-me',
-                'x-group': '韬唤',
+                'x-group': '身份',
                 'x-sort-order': 10,
                 'x-auth-modes': ['cookie', 'apiKey'],
                 'x-required-scopes': ['api.auth.me.read'],
@@ -1017,178 +1017,8 @@ export const developerDocsOpenApi = {
                     {
                         id: 'auth-me-cookie',
                         label: 'cookie',
-                        summary: '浣跨敤褰撳墠鐧诲綍浼氳瘽璇诲彇浼氳瘽淇℃伅銆?',
+                        summary: '使用当前登录会话读取会话信息。',
                         authMode: 'cookie'
-                    }
-                ]
-            }
-        },
-        '/auth/password': {
-            patch: {
-                operationId: 'authChangePassword',
-                tags: ['Auth'],
-                summary: '淇敼褰撳墠璐﹀彿瀵嗙爜',
-                description:
-                    '楠岃瘉褰撳墠瀵嗙爜鎽樿锛屽悗绔洿鏂板瘑鐮佸苟鍚婇攢鍚屼竴璐﹀彿鐨勫叾浠?webapp 浼氳瘽锛岀劧鍚庤繑鍥炴柊鐨勫叕寮€浼氳瘽淇℃伅銆?',
-                security: [
-                    {
-                        bearerAuth: []
-                    },
-                    {
-                        cookieAuth: []
-                    }
-                ],
-                requestBody: {
-                    required: true,
-                    content: {
-                        'application/json': {
-                            schema: {
-                                type: 'object',
-                                required: [
-                                    'currentPasswordDigest',
-                                    'newPasswordDigest'
-                                ],
-                                properties: {
-                                    currentPasswordDigest: {
-                                        type: 'string',
-                                        pattern: '^[a-f0-9]{64}$',
-                                        example:
-                                            '8d969eef6ecad3c29a3a629280e686cff8fabdcbf6dc2c5d20d6f7d9d4b5f9f1'
-                                    },
-                                    newPasswordDigest: {
-                                        type: 'string',
-                                        pattern: '^[a-f0-9]{64}$',
-                                        example:
-                                            '5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8'
-                                    }
-                                }
-                            }
-                        }
-                    }
-                },
-                responses: {
-                    '200': {
-                        description:
-                            '瀵嗙爜淇敼鎴愬姛锛屽苟杩斿洖鏂扮殑浼氳瘽淇℃伅銆?',
-                        headers: {
-                            'x-api-remain': {
-                                $ref: '#/components/headers/ApiRemain'
-                            },
-                            'x-api-cost': {
-                                $ref: '#/components/headers/ApiCost'
-                            }
-                        },
-                        content: {
-                            'application/json': {
-                                schema: {
-                                    $ref: '#/components/schemas/AuthSessionResponse'
-                                }
-                            }
-                        }
-                    },
-                    '400': {
-                        description: '璇锋眰浣撴牸寮忎笉鍚堟硶銆?',
-                        headers: {
-                            'x-api-remain': {
-                                $ref: '#/components/headers/ApiRemain'
-                            },
-                            'x-api-cost': {
-                                $ref: '#/components/headers/ApiCost'
-                            }
-                        },
-                        content: {
-                            'application/json': {
-                                schema: {
-                                    $ref: '#/components/schemas/ApiFailureResponse'
-                                },
-                                example: {
-                                    ok: false,
-                                    data: 'newPasswordDigest 鏍煎紡涓嶆纭€?',
-                                    error: 'invalid_param'
-                                }
-                            }
-                        }
-                    },
-                    '401': {
-                        description: '褰撳墠瀵嗙爜閿欒銆?',
-                        headers: {
-                            'x-api-remain': {
-                                $ref: '#/components/headers/ApiRemain'
-                            },
-                            'x-api-cost': {
-                                $ref: '#/components/headers/ApiCost'
-                            }
-                        },
-                        content: {
-                            'application/json': {
-                                schema: {
-                                    $ref: '#/components/schemas/ApiFailureResponse'
-                                },
-                                example: {
-                                    ok: false,
-                                    data: '鏃у瘑鐮侀敊璇€?',
-                                    error: 'invalid_credentials'
-                                }
-                            }
-                        }
-                    },
-                    '403': {
-                        description: '褰撳墠浼氳瘽缂哄皯蹇呰鏉冮檺銆?',
-                        headers: {
-                            'x-api-remain': {
-                                $ref: '#/components/headers/ApiRemain'
-                            },
-                            'x-api-cost': {
-                                $ref: '#/components/headers/ApiCost'
-                            }
-                        },
-                        content: {
-                            'application/json': {
-                                schema: {
-                                    $ref: '#/components/schemas/ApiFailureResponse'
-                                }
-                            }
-                        }
-                    },
-                    '429': {
-                        description: '当前身份额度不足，请等待额度恢复后重试。',
-                        headers: {
-                            'x-api-remain': {
-                                $ref: '#/components/headers/ApiRemain'
-                            },
-                            'x-api-cost': {
-                                $ref: '#/components/headers/ApiCost'
-                            },
-                            'Retry-After': {
-                                $ref: '#/components/headers/RetryAfter'
-                            }
-                        },
-                        content: {
-                            'application/json': {
-                                schema: {
-                                    $ref: '#/components/schemas/ApiFailureResponse'
-                                }
-                            }
-                        }
-                    }
-                },
-                'x-slug': 'auth-password-change',
-                'x-group': '韬唤',
-                'x-sort-order': 15,
-                'x-auth-modes': ['cookie', 'apiKey'],
-                'x-required-scopes': ['api.auth.password.update'],
-                'x-examples': [
-                    {
-                        id: 'auth-password-change-cookie',
-                        label: 'cookie',
-                        summary: '浣跨敤褰撳墠浼氳瘽淇敼瀵嗙爜銆?',
-                        authMode: 'cookie',
-                        body: {
-                            currentPasswordDigest:
-                                '8d969eef6ecad3c29a3a629280e686cff8fabdcbf6dc2c5d20d6f7d9d4b5f9f1',
-                            newPasswordDigest:
-                                '5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8'
-                        }
                     }
                 ]
             }
@@ -1199,7 +1029,7 @@ export const developerDocsOpenApi = {
                 tags: ['Records'],
                 summary: '分页读取每日记录',
                 description:
-                    '按日期返回分页后的每日担当记录。只要具备对应公开权限，也可以匿名访问。',
+                    '按日期返回分页后的每日担当记录。',
                 parameters: [
                     {
                         $ref: '#/components/parameters/DailyDateQuery'
@@ -1293,7 +1123,7 @@ export const developerDocsOpenApi = {
                 tags: ['Timetable'],
                 summary: '按车次读取当前完整时刻表',
                 description:
-                    '返回当天可用的当前完整时刻表，包含全部经停站、当前站车次与检票口信息。固定成本为 1，并按 currentDayMaxAgeSeconds 进行缓存。只要具备对应公开权限，也可以匿名访问。',
+                    '返回当天可用的当前完整时刻表，包含全部经停站、当前站车次与检票口信息。',
                 parameters: [
                     {
                         $ref: '#/components/parameters/TrainCodeParam'
@@ -1391,7 +1221,7 @@ export const developerDocsOpenApi = {
                 tags: ['History'],
                 summary: '按车次查询历史',
                 description:
-                    '返回单个车次的分页历史记录。只要具备对应公开权限，也可以匿名访问。',
+                    '返回单个车次的分页历史记录。',
                 parameters: [
                     {
                         $ref: '#/components/parameters/TrainCodeParam'
@@ -1495,7 +1325,7 @@ export const developerDocsOpenApi = {
                 tags: ['History'],
                 summary: '按车组查询历史',
                 description:
-                    '返回单个车组的分页历史记录。只要具备对应公开权限，也可以匿名访问。',
+                    '返回单个车组的分页历史记录。',
                 parameters: [
                     {
                         $ref: '#/components/parameters/EmuCodeParam'
@@ -1600,7 +1430,7 @@ export const developerDocsOpenApi = {
                 tags: ['Exports'],
                 summary: '列出可用的日导出文件',
                 description:
-                    '按年和月列出已生成的日导出文件。只要具备对应公开权限，也可以匿名访问。',
+                    '按年和月列出已生成的日导出文件。',
                 parameters: [
                     {
                         $ref: '#/components/parameters/ExportYearQuery'

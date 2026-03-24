@@ -252,7 +252,7 @@
                                     :key="
                                         response.statusCode + ':' + header.name
                                     "
-                                    class="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 font-mono text-xs break-all text-slate-600">
+                                    class="break-all rounded-full border border-slate-200 bg-slate-50 px-3 py-1 font-mono text-xs text-slate-600">
                                     {{ header.name }}
                                 </span>
                             </div>

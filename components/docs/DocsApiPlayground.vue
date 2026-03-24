@@ -37,7 +37,9 @@
                 <div
                     v-if="pathParameters.length > 0"
                     class="space-y-3 rounded-[1rem] border border-slate-200 bg-white/80 p-4">
-                    <h4 class="text-sm font-medium text-slate-900">路径参数</h4>
+                    <h4 class="text-sm font-medium text-slate-900">
+                        路径参数
+                    </h4>
                     <div
                         v-for="parameter in pathParameters"
                         :key="'path:' + parameter.name"
@@ -59,7 +61,9 @@
                 <div
                     v-if="queryParameters.length > 0"
                     class="space-y-3 rounded-[1rem] border border-slate-200 bg-white/80 p-4">
-                    <h4 class="text-sm font-medium text-slate-900">查询参数</h4>
+                    <h4 class="text-sm font-medium text-slate-900">
+                        查询参数
+                    </h4>
                     <div
                         v-for="parameter in queryParameters"
                         :key="'query:' + parameter.name"
@@ -369,7 +373,7 @@ const exampleOptions = computed(() =>
 const authModeOptions = computed(() =>
     getPlayableAuthModes(props.endpoint.authModes).map((mode) => ({
         value: mode,
-        label: mode === 'cookie' ? '现有会话' : 'API Key'
+        label: mode === 'cookie' ? '当前会话' : 'API Key'
     }))
 );
 
