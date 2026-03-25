@@ -4,11 +4,13 @@ import { ensureEmuDatabaseSchema } from '~/server/libs/database/emu';
 import { ensureTaskDatabaseSchema } from '~/server/libs/database/task';
 import { estimateIdleTaskDurationMs } from '~/server/services/idleTaskEstimator';
 import { listDailyRecordsAll } from '~/server/services/emuRoutesStore';
+import { clearProbeStatus } from '~/server/services/probeStatusStore';
 import { rehydrateProbeRuntimeState } from '~/server/services/probeRuntimeState';
 import {
     removePendingTasksByExecutor,
     reconcileSingletonPendingTask,
-    type EnqueueTaskOptions
+    type EnqueueTaskOptions,
+    type ReconcileSingletonTaskResult
 } from '~/server/services/taskQueue';
 import { loadProbeAssets } from '~/server/services/probeAssetStore';
 import { warmYesterdayTrainEmuIndex } from '~/server/services/yesterdayTrainEmuIndexStore';
@@ -61,7 +63,7 @@ function reconcileStartupTask(
     executor: string,
     executionTime: number,
     options: EnqueueTaskOptions = {}
-) {
+): ReconcileSingletonTaskResult {
     const result = reconcileSingletonPendingTask(
         executor,
         {},
@@ -73,7 +75,30 @@ function reconcileStartupTask(
             `taskId=${result.taskId} removedTaskIds=${JSON.stringify(result.removedTaskIds)} ` +
             `reusedExecutionTime=${result.reusedExecutionTime ?? 'null'}`
     );
-    return result.taskId;
+    return result;
+}
+
+function catchUpOverdueProbeStatusClear(
+    result: ReconcileSingletonTaskResult
+): void {
+    if (result.action !== 'replaced_overdue') {
+        return;
+    }
+
+    try {
+        const clearedRows = clearProbeStatus();
+        logger.info(
+            `startup_probe_status_clear_catchup action=${result.action} removedTaskIds=${JSON.stringify(result.removedTaskIds)} futureTaskId=${result.taskId} clearedRows=${clearedRows}`
+        );
+    } catch (error) {
+        const message =
+            error instanceof Error
+                ? `${error.name}: ${error.message}`
+                : String(error);
+        logger.error(
+            `startup_probe_status_clear_catchup_failed action=${result.action} removedTaskIds=${JSON.stringify(result.removedTaskIds)} futureTaskId=${result.taskId} error=${message}`
+        );
+    }
 }
 
 function reconcileRefreshAssetTasks(): string[] {
@@ -94,8 +119,8 @@ function reconcileRefreshAssetTasks(): string[] {
             Date.now(),
             assetConfig.refresh.refreshAt
         );
-        const taskId = reconcileStartupTask(definition.executor, executionTime);
-        taskSummaries.push(`${definition.executor}:${taskId}`);
+        const task = reconcileStartupTask(definition.executor, executionTime);
+        taskSummaries.push(`${definition.executor}:${task.taskId}`);
     }
 
     return taskSummaries;
@@ -187,22 +212,22 @@ export default defineNitroPlugin(async () => {
         );
 
         if (!disabledStartupExecutors.has(BUILD_SCHEDULE_TASK_EXECUTOR)) {
-            const buildTaskId = reconcileStartupTask(
+            const buildTask = reconcileStartupTask(
                 BUILD_SCHEDULE_TASK_EXECUTOR,
                 executionTime
             );
             enqueuedStartupTasks.push(
-                `${BUILD_SCHEDULE_TASK_EXECUTOR}:${buildTaskId}`
+                `${BUILD_SCHEDULE_TASK_EXECUTOR}:${buildTask.taskId}`
             );
         }
 
         if (!disabledStartupExecutors.has(EXPORT_DAILY_RECORDS_TASK_EXECUTOR)) {
-            const exportTaskId = reconcileStartupTask(
+            const exportTask = reconcileStartupTask(
                 EXPORT_DAILY_RECORDS_TASK_EXECUTOR,
                 executionTime
             );
             enqueuedStartupTasks.push(
-                `${EXPORT_DAILY_RECORDS_TASK_EXECUTOR}:${exportTaskId}`
+                `${EXPORT_DAILY_RECORDS_TASK_EXECUTOR}:${exportTask.taskId}`
             );
         }
 
@@ -213,7 +238,7 @@ export default defineNitroPlugin(async () => {
                 GENERATE_ROUTE_REFRESH_TASKS_EXECUTOR,
                 0
             );
-            const generateTaskId = reconcileStartupTask(
+            const generateTask = reconcileStartupTask(
                 GENERATE_ROUTE_REFRESH_TASKS_EXECUTOR,
                 executionTime,
                 {
@@ -222,7 +247,7 @@ export default defineNitroPlugin(async () => {
                 }
             );
             enqueuedStartupTasks.push(
-                `${GENERATE_ROUTE_REFRESH_TASKS_EXECUTOR}:${generateTaskId}`
+                `${GENERATE_ROUTE_REFRESH_TASKS_EXECUTOR}:${generateTask.taskId}`
             );
         }
 
@@ -235,12 +260,13 @@ export default defineNitroPlugin(async () => {
                 Date.now(),
                 useConfig().spider.scheduleProbe.coupling.statusResetTimeHHmm
             );
-            const clearTaskId = reconcileStartupTask(
+            const clearTask = reconcileStartupTask(
                 CLEAR_DAILY_PROBE_STATUS_TASK_EXECUTOR,
                 clearExecutionTime
             );
+            catchUpOverdueProbeStatusClear(clearTask);
             enqueuedStartupTasks.push(
-                `${CLEAR_DAILY_PROBE_STATUS_TASK_EXECUTOR}:${clearTaskId}`
+                `${CLEAR_DAILY_PROBE_STATUS_TASK_EXECUTOR}:${clearTask.taskId}`
             );
         }
 
@@ -253,12 +279,12 @@ export default defineNitroPlugin(async () => {
                 Date.now(),
                 useConfig().task.apiKeyCleanup.dailyTimeHHmm
             );
-            const cleanupTaskId = reconcileStartupTask(
+            const cleanupTask = reconcileStartupTask(
                 CLEANUP_REVOKED_API_KEYS_TASK_EXECUTOR,
                 cleanupExecutionTime
             );
             enqueuedStartupTasks.push(
-                `${CLEANUP_REVOKED_API_KEYS_TASK_EXECUTOR}:${cleanupTaskId}`
+                `${CLEANUP_REVOKED_API_KEYS_TASK_EXECUTOR}:${cleanupTask.taskId}`
             );
         }
 
