@@ -6,6 +6,7 @@ import { estimateIdleTaskDurationMs } from '~/server/services/idleTaskEstimator'
 import { listDailyRecordsAll } from '~/server/services/emuRoutesStore';
 import { clearProbeStatus } from '~/server/services/probeStatusStore';
 import { rehydrateProbeRuntimeState } from '~/server/services/probeRuntimeState';
+import { startTaskScheduler } from '~/server/services/taskScheduler';
 import {
     removePendingTasksByExecutor,
     reconcileSingletonPendingTask,
@@ -293,6 +294,7 @@ export default defineNitroPlugin(async () => {
         logger.info(
             `enqueued_startup_tasks executionTime=${executionTime} enqueued=${JSON.stringify(enqueuedStartupTasks)}`
         );
+        startTaskScheduler();
     } catch (error) {
         const message =
             error instanceof Error
