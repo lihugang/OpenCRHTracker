@@ -232,6 +232,9 @@
             }
         }
     },
+    "logging": {
+        "retentionDays": 5
+    },
     "quota": {
         "anonymousMaxTokens": 25,
         "userMaxTokens": 1000,

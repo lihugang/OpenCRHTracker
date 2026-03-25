@@ -63,6 +63,10 @@ interface DailyExportTaskConfig {
     dailyTimeHHmm: string;
 }
 
+interface LoggingConfig {
+    retentionDays: number;
+}
+
 const ALLOWED_STARTUP_TASK_EXECUTORS = [
     'build_today_schedule',
     'generate_route_refresh_tasks',
@@ -205,6 +209,7 @@ export interface Config {
             };
         };
     };
+    logging: LoggingConfig;
     quota: {
         anonymousMaxTokens: number;
         userMaxTokens: number;
@@ -544,6 +549,7 @@ function validateConfig(raw: unknown): Config {
         taskScheduler.idle,
         'task.scheduler.idle'
     );
+    const logging = asObject(root.logging, 'logging');
 
     const quota = asObject(root.quota, 'quota');
 
@@ -1023,6 +1029,13 @@ function validateConfig(raw: unknown): Config {
                     )
                 }
             }
+        },
+        logging: {
+            retentionDays: asInteger(
+                logging.retentionDays,
+                'logging.retentionDays',
+                1
+            )
         },
         quota: {
             anonymousMaxTokens: asNumber(

@@ -1,4 +1,8 @@
 import log4js from 'log4js';
+import useConfig from '~/server/config';
+
+const logRetentionDays = useConfig().logging.retentionDays;
+const logBackups = Math.max(logRetentionDays - 1, 0);
 
 log4js.configure({
     appenders: {
@@ -14,7 +18,7 @@ log4js.configure({
             pattern: 'yyyy-MM-dd',
             compress: true,
             alwaysIncludePattern: true,
-            numBackups: 365
+            numBackups: logBackups
         }
     },
     categories: {

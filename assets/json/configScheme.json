@@ -812,6 +812,19 @@
                 "scheduler"
             ]
         },
+        "logging": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "retentionDays": {
+                    "type": "integer",
+                    "minimum": 1
+                }
+            },
+            "required": [
+                "retentionDays"
+            ]
+        },
         "quota": {
             "type": "object",
             "additionalProperties": false,
@@ -993,6 +1006,7 @@
         "user",
         "api",
         "task",
+        "logging",
         "quota",
         "cost"
     ]
