@@ -296,7 +296,7 @@ function parseOptionalUnixSeconds(
     dateYYYYMMDD: string,
     timeHHmm: string
 ): number | null {
-    if (!/^\d{8}$/.test(dateYYYYMMDD) || !/^\d{2}:\d{2}$/.test(timeHHmm)) {
+    if (!/^\d{8}$/.test(dateYYYYMMDD) || !/^\d{4}$/.test(timeHHmm)) {
         return null;
     }
 
