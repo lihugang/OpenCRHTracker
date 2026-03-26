@@ -32,7 +32,7 @@
         <div
             v-else-if="timetable"
             class="space-y-5">
-            <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div class="grid gap-3 sm:grid-cols-2">
                 <UiCard
                     :show-accent-bar="false"
                     variant="subtle">
@@ -55,27 +55,6 @@
                     </p>
                 </UiCard>
 
-                <UiCard
-                    :show-accent-bar="false"
-                    variant="subtle">
-                    <p class="text-xs uppercase tracking-[0.16em] text-slate-400">
-                        出发 / 终到时间
-                    </p>
-                    <p class="mt-2 font-mono text-sm text-crh-grey-dark">
-                        {{ formatTime(timetable.startAt) }} / {{ formatTime(timetable.endAt) }}
-                    </p>
-                </UiCard>
-
-                <UiCard
-                    :show-accent-bar="false"
-                    variant="subtle">
-                    <p class="text-xs uppercase tracking-[0.16em] text-slate-400">
-                        数据日期
-                    </p>
-                    <p class="mt-2 font-mono text-sm text-crh-grey-dark">
-                        {{ timetable.date }}
-                    </p>
-                </UiCard>
             </div>
 
             <div class="hidden overflow-hidden rounded-[1.25rem] border border-slate-200 md:block">
@@ -98,6 +77,9 @@
                             <td class="border-b border-slate-100 px-4 py-3 font-mono text-sm text-slate-500 last:border-b-0">
                                 {{ stop.stationNo }}
                             </td>
+                            <td class="border-b border-slate-100 px-4 py-3 font-mono text-sm text-slate-500 last:border-b-0">
+                                {{ stop.stationTrainCode || '--' }}
+                            </td>
                             <td class="border-b border-slate-100 px-4 py-3 text-sm font-medium text-crh-grey-dark last:border-b-0">
                                 {{ stop.stationName }}
                             </td>
@@ -106,9 +88,6 @@
                             </td>
                             <td class="border-b border-slate-100 px-4 py-3 font-mono text-sm text-slate-500 last:border-b-0">
                                 {{ formatNullableTime(stop.departAt) }}
-                            </td>
-                            <td class="border-b border-slate-100 px-4 py-3 font-mono text-sm text-slate-500 last:border-b-0">
-                                {{ stop.stationTrainCode || '--' }}
                             </td>
                             <td class="border-b border-slate-100 px-4 py-3 text-sm text-slate-500 last:border-b-0">
                                 {{ stop.wicket || '--' }}
@@ -158,7 +137,7 @@
                             </div>
                             <div>
                                 <p class="text-[11px] uppercase tracking-[0.16em] text-slate-400">
-                                    当前站车次
+                                    车次
                                 </p>
                                 <p class="mt-1 font-mono text-sm text-slate-500">
                                     {{ stop.stationTrainCode || '--' }}
@@ -209,7 +188,7 @@ const state = ref<'idle' | 'loading' | 'success' | 'empty' | 'error'>('idle');
 const timetable = ref<CurrentTrainTimetableData | null>(null);
 const errorMessage = ref('');
 
-const columns = ['站序', '站名', '到点', '开点', '当前站车次', '检票口'];
+const columns = ['站序', '车次', '站名', '到点', '开点', '检票口'];
 
 const modalTitle = computed(() => {
     if (timetable.value) {
