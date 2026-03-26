@@ -86,6 +86,17 @@
             "EMUTracked": "data/emu.db",
             "users": "data/users.db",
             "feedback": "data/feedback.db"
+        },
+        "runtime": {
+            "adminTraffic": {
+                "file": "data/runtime/admin-traffic.json",
+                "flushIntervalMinutes": 30
+            },
+            "requestMetrics12306": {
+                "file": "data/runtime/12306-request-metrics.json",
+                "retentionDays": 3,
+                "flushIntervalMinutes": 10
+            }
         }
     },
     "user": {

@@ -85,8 +85,56 @@ export interface AdminPassiveAlertsResponse {
     errorCount: number;
     topLoggers: AdminAlertLoggerCount[];
     typeCounts: AdminPassiveAlertTypeCount[];
+    requestMetricsRetentionDays: number;
+    requestMetricsRetained: boolean;
     requestBuckets: Admin12306RequestBucket[];
     items: AdminPassiveAlertItem[];
+}
+
+export type AdminTrafficWindow = '3h' | '24h' | '7d';
+
+export interface AdminTrafficMetricTotals {
+    webRequests: number;
+    apiCalls: number;
+    uniqueVisitors: number;
+    activeUsers: number;
+}
+
+export type AdminTrafficMetricKey = keyof AdminTrafficMetricTotals;
+
+export interface AdminTrafficMetricPeak {
+    startAt: number;
+    endAt: number;
+    value: number;
+}
+
+export interface AdminTrafficBucket extends AdminTrafficMetricTotals {
+    startAt: number;
+    endAt: number;
+}
+
+export interface AdminTrafficWindowSummary {
+    key: AdminTrafficWindow;
+    label: string;
+    bucketSeconds: number;
+    bucketCount: number;
+    coverageSeconds: number;
+    isPartial: boolean;
+    estimatedMetrics: AdminTrafficMetricKey[];
+    totals: AdminTrafficMetricTotals;
+    peaks: AdminTrafficMetricTotals & {
+        webRequestsBucket: AdminTrafficMetricPeak | null;
+        apiCallsBucket: AdminTrafficMetricPeak | null;
+        uniqueVisitorsBucket: AdminTrafficMetricPeak | null;
+        activeUsersBucket: AdminTrafficMetricPeak | null;
+    };
+    buckets: AdminTrafficBucket[];
+}
+
+export interface AdminTrafficResponse {
+    startedAt: number;
+    asOf: number;
+    windows: AdminTrafficWindowSummary[];
 }
 
 export type AdminTaskTemplateType =

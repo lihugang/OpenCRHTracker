@@ -92,6 +92,17 @@ interface AssetConfig {
     provider?: string;
 }
 
+interface RuntimeAdminTrafficConfig {
+    file: string;
+    flushIntervalMinutes: number;
+}
+
+interface Runtime12306RequestMetricsConfig {
+    file: string;
+    retentionDays: number;
+    flushIntervalMinutes: number;
+}
+
 export interface Config {
     spider: {
         userAgent: string;
@@ -125,6 +136,10 @@ export interface Config {
             schedule: AssetConfig;
         };
         databases: Record<'task' | 'EMUTracked' | 'users' | 'feedback', string>;
+        runtime: {
+            adminTraffic: RuntimeAdminTrafficConfig;
+            requestMetrics12306: Runtime12306RequestMetricsConfig;
+        };
     };
     user: {
         saltLength: number;
@@ -433,6 +448,15 @@ function validateConfig(raw: unknown): Config {
     const data = asObject(root.data, 'data');
     const assets = asObject(data.assets, 'data.assets');
     const databases = asObject(data.databases, 'data.databases');
+    const runtime = asObject(data.runtime, 'data.runtime');
+    const runtimeAdminTraffic = asObject(
+        runtime.adminTraffic,
+        'data.runtime.adminTraffic'
+    );
+    const runtimeRequestMetrics12306 = asObject(
+        runtime.requestMetrics12306,
+        'data.runtime.requestMetrics12306'
+    );
 
     const user = asObject(root.user, 'user');
     const userScrypt = asObject(user.scrypt, 'user.scrypt');
@@ -731,6 +755,35 @@ function validateConfig(raw: unknown): Config {
                     databases.feedback,
                     'data.databases.feedback'
                 )
+            },
+            runtime: {
+                adminTraffic: {
+                    file: asString(
+                        runtimeAdminTraffic.file,
+                        'data.runtime.adminTraffic.file'
+                    ),
+                    flushIntervalMinutes: asInteger(
+                        runtimeAdminTraffic.flushIntervalMinutes,
+                        'data.runtime.adminTraffic.flushIntervalMinutes',
+                        1
+                    )
+                },
+                requestMetrics12306: {
+                    file: asString(
+                        runtimeRequestMetrics12306.file,
+                        'data.runtime.requestMetrics12306.file'
+                    ),
+                    retentionDays: asInteger(
+                        runtimeRequestMetrics12306.retentionDays,
+                        'data.runtime.requestMetrics12306.retentionDays',
+                        1
+                    ),
+                    flushIntervalMinutes: asInteger(
+                        runtimeRequestMetrics12306.flushIntervalMinutes,
+                        'data.runtime.requestMetrics12306.flushIntervalMinutes',
+                        1
+                    )
+                }
             }
         },
         user: {

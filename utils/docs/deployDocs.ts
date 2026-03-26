@@ -128,7 +128,7 @@ export const deployDocsSections: DocsContentSection[] = [
                 type: 'code',
                 title: '完整示例：data/config.json',
                 language: 'json',
-                code: '{\n    "$schema": "../assets/json/configScheme.json",\n    "spider": {\n        "userAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 MicroMessenger/7.0.17(0x17001126) NetType/WIFI Language/zh_CN",\n        "params": {\n            "eKey": "OpenCRHTracker",\n            "jsonpCallback": "OpenCRHTracker",\n            "routeProbeCarCode": "CR400AF-C-2214"\n        },\n        "rateLimit": {\n            "query": {\n                "minIntervalMs": 1500\n            },\n            "search": {\n                "minIntervalMs": 8000\n            }\n        },\n        "scheduleProbe": {\n            "dailyTimeHHmm": "0000",\n            "retryAttempts": 3,\n            "maxBatchSize": 200,\n            "checkpointFlushEvery": 20,\n            "refresh": {\n                "batchSize": 20,\n                "ttlHours": 24,\n                "generateIntervalHours": 24\n            },\n            "probe": {\n                "defaultRetry": 5,\n                "overlapRetryDelaySeconds": 3600\n            },\n            "coupling": {\n                "statusResetTimeHHmm": "0000",\n                "detectDelaySeconds": 900,\n                "detectCooldownSeconds": 3600\n            },\n            "prefixRules": [\n                {\n                    "prefix": "G",\n                    "minNo": 1,\n                    "maxNo": 9999\n                },\n                {\n                    "prefix": "D",\n                    "minNo": 1,\n                    "maxNo": 9999\n                },\n                {\n                    "prefix": "C",\n                    "minNo": 1,\n                    "maxNo": 9999\n                },\n                {\n                    "prefix": "S",\n                    "minNo": 5500,\n                    "maxNo": 5600\n                }\n            ]\n        }\n    },\n    "data": {\n        "assets": {\n            "EMUList": {\n                "file": "data/emu_list.jsonl",\n                "provider": "https://storage.lihugang.top/open_crh_tracker/initialized_data/emu_list.jsonl",\n                "refresh": {\n                    "enabled": true,\n                    "refreshAt": "0000"\n                }\n            },\n            "QRCode": {\n                "file": "data/qrcode.jsonl",\n                "provider": "https://storage.lihugang.top/open_crh_tracker/initialized_data/qrcode.jsonl",\n                "refresh": {\n                    "enabled": true,\n                    "refreshAt": "0000"\n                }\n            },\n            "schedule": {\n                "file": "data/schedule.json",\n                "provider": "https://storage.lihugang.top/open_crh_tracker/initialized_data/schedule.json"\n            }\n        },\n        "databases": {\n            "task": "data/task.db",\n            "EMUTracked": "data/emu.db",\n            "users": "data/users.db",\n            "feedback": "data/feedback.db"\n        }\n    },\n    "user": {\n        "saltLength": 16,\n        "apiKeyPrefixes": {\n            "webapp": "ocrh_webapp_",\n            "api": "ocrh_api_"\n        },\n        "apiKeyBytes": 24,\n        "apiKeyTtlSeconds": 2592000,\n        "apiKeyMaxLifetimeSeconds": 157680000,\n        "apiKeyNameLength": {\n            "minLength": 1,\n            "maxLength": 64\n        },\n        "adminUserIds": [\n            "admin-user-id"\n        ],\n        "signKey": "replace-with-strong-random-secret",\n        "scrypt": {\n            "keyLength": 64,\n            "cost": 16384,\n            "blockSize": 8,\n            "parallelization": 1\n        }\n    },\n    "api": {\n        "versionPrefix": "/api/v1",\n        "apiKeyHeader": "authorization",\n        "authCookieName": "token",\n        "authRateLimit": {\n            "login": {\n                "maxRequests": 10,\n                "windowSeconds": 1800\n            },\n            "register": {\n                "maxRequests": 3,\n                "windowSeconds": 86400\n            }\n        },\n        "authCache": {\n            "userRecord": {\n                "maxEntries": 1024,\n                "defaultTtlSeconds": 1800\n            },\n            "apiKeyRecord": {\n                "maxEntries": 4096,\n                "defaultTtlSeconds": 21600\n            }\n        },\n        "payload": {\n            "maxStringLength": 16384\n        },\n        "feedback": {\n            "validation": {\n                "createBody": {\n                    "minLength": 2,\n                    "maxLength": 12000\n                },\n                "replyBody": {\n                    "minLength": 2,\n                    "maxLength": 2000\n                },\n                "title": {\n                    "minLength": 4,\n                    "maxLength": 80\n                }\n            }\n        },\n        "headers": {\n            "remain": "x-api-remain",\n            "cost": "x-api-cost",\n            "retryAfter": "Retry-After"\n        },\n        "cache": {\n            "currentDayMaxAgeSeconds": 300,\n            "historicalMaxAgeSeconds": 31536000,\n            "searchIndexMaxAgeSeconds": 1800,\n            "sitemapMaxAgeSeconds": 86400\n        },\n        "pagination": {\n            "defaultLimit": 20,\n            "maxLimit": 200\n        },\n        "timestampUnit": "seconds",\n        "debug": {\n            "enableEchoError": true\n        },\n        "permissions": {\n            "anonymousScopes": [\n                "api.config.read",\n                "api.search.read",\n                "api.records.daily.read",\n                "api.history.train.read",\n                "api.history.emu.read",\n                "api.exports.daily.read",\n                "api.feedback.read",\n                "api.feedback.create"\n            ],\n            "issuedKeyDefaultScopes": [\n                "api.config.read",\n                "api.search.read",\n                "api.records.daily.read",\n                "api.history.train.read",\n                "api.history.emu.read",\n                "api.exports.daily.read",\n                "api.feedback.read",\n                "api.feedback.create",\n                "api.feedback.reply",\n                "api.auth.me.read",\n                "api.auth.logout",\n                "api.auth.password.update",\n                "api.auth.api-keys.read",\n                "api.auth.api-keys.create",\n                "api.auth.api-keys.revoke"\n            ],\n            "creatableKeyMaxScopes": [\n                "api.auth.me.read",\n                "api.records.daily.read",\n                "api.history.train.read",\n                "api.history.emu.read",\n                "api.exports.daily.read"\n            ]\n        }\n    },\n    "task": {\n        "startup": {\n            "disabledExecutors": []\n        },\n        "apiKeyCleanup": {\n            "retentionDays": 7,\n            "dailyTimeHHmm": "0000"\n        },\n        "dailyExport": {\n            "dailyTimeHHmm": "0000"\n        },\n        "scheduler": {\n            "pollIntervalMs": 180000,\n            "maxTasksPerQuery": 65535,\n            "idle": {\n                "maxTasksPerTick": 256,\n                "emaAlpha": 0.3\n            }\n        }\n    },\n    "logging": {\n        "retentionDays": 5\n    },\n    "quota": {\n        "anonymousMaxTokens": 25,\n        "userMaxTokens": 1000,\n        "refillAmount": 5,\n        "refillIntervalSeconds": 300,\n        "resetToMaxOnRestart": true,\n        "consumeTokens": true\n    },\n    "cost": {\n        "fixed": {\n            "health": 0,\n            "authMe": 1,\n            "authLogout": 1,\n            "authChangePassword": 5,\n            "debugEchoError": 0,\n            "authIssueApiKey": 5,\n            "authListApiKeys": 1,\n            "authRevokeApiKey": 1,\n            "searchIndex": 1,\n            "exportDailyIndex": 2,\n            "exportDaily": 50\n        },\n        "perRecord": {\n            "historyEmu": {\n                "unitCost": 0.05,\n                "rounding": "ceil"\n            },\n            "historyTrain": {\n                "unitCost": 0.05,\n                "rounding": "ceil"\n            },\n            "recordsDaily": {\n                "unitCost": 0.05,\n                "rounding": "ceil"\n            }\n        }\n    }\n}'
+                code: '{\n    "$schema": "../assets/json/configScheme.json",\n    "spider": {\n        "userAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 MicroMessenger/7.0.17(0x17001126) NetType/WIFI Language/zh_CN",\n        "params": {\n            "eKey": "OpenCRHTracker",\n            "jsonpCallback": "OpenCRHTracker",\n            "routeProbeCarCode": "CR400AF-C-2214"\n        },\n        "rateLimit": {\n            "query": {\n                "minIntervalMs": 1500\n            },\n            "search": {\n                "minIntervalMs": 8000\n            }\n        },\n        "scheduleProbe": {\n            "dailyTimeHHmm": "0000",\n            "retryAttempts": 3,\n            "maxBatchSize": 200,\n            "checkpointFlushEvery": 20,\n            "refresh": {\n                "batchSize": 20,\n                "ttlHours": 24,\n                "generateIntervalHours": 24\n            },\n            "probe": {\n                "defaultRetry": 5,\n                "overlapRetryDelaySeconds": 3600\n            },\n            "coupling": {\n                "statusResetTimeHHmm": "0000",\n                "detectDelaySeconds": 900,\n                "detectCooldownSeconds": 3600\n            },\n            "prefixRules": [\n                {\n                    "prefix": "G",\n                    "minNo": 1,\n                    "maxNo": 9999\n                },\n                {\n                    "prefix": "D",\n                    "minNo": 1,\n                    "maxNo": 9999\n                },\n                {\n                    "prefix": "C",\n                    "minNo": 1,\n                    "maxNo": 9999\n                },\n                {\n                    "prefix": "S",\n                    "minNo": 5500,\n                    "maxNo": 5600\n                }\n            ]\n        }\n    },\n    "data": {\n        "assets": {\n            "EMUList": {\n                "file": "data/emu_list.jsonl",\n                "provider": "https://storage.lihugang.top/open_crh_tracker/initialized_data/emu_list.jsonl",\n                "refresh": {\n                    "enabled": true,\n                    "refreshAt": "0000"\n                }\n            },\n            "QRCode": {\n                "file": "data/qrcode.jsonl",\n                "provider": "https://storage.lihugang.top/open_crh_tracker/initialized_data/qrcode.jsonl",\n                "refresh": {\n                    "enabled": true,\n                    "refreshAt": "0000"\n                }\n            },\n            "schedule": {\n                "file": "data/schedule.json",\n                "provider": "https://storage.lihugang.top/open_crh_tracker/initialized_data/schedule.json"\n            }\n        },\n        "databases": {\n            "task": "data/task.db",\n            "EMUTracked": "data/emu.db",\n            "users": "data/users.db",\n            "feedback": "data/feedback.db"\n        },\n        "runtime": {\n            "adminTraffic": {\n                "file": "data/runtime/admin-traffic.json",\n                "flushIntervalMinutes": 30\n            },\n            "requestMetrics12306": {\n                "file": "data/runtime/12306-request-metrics.json",\n                "retentionDays": 3,\n                "flushIntervalMinutes": 10\n            }\n        }\n    },\n    "user": {\n        "saltLength": 16,\n        "apiKeyPrefixes": {\n            "webapp": "ocrh_webapp_",\n            "api": "ocrh_api_"\n        },\n        "apiKeyBytes": 24,\n        "apiKeyTtlSeconds": 2592000,\n        "apiKeyMaxLifetimeSeconds": 157680000,\n        "apiKeyNameLength": {\n            "minLength": 1,\n            "maxLength": 64\n        },\n        "adminUserIds": [\n            "admin-user-id"\n        ],\n        "signKey": "replace-with-strong-random-secret",\n        "scrypt": {\n            "keyLength": 64,\n            "cost": 16384,\n            "blockSize": 8,\n            "parallelization": 1\n        }\n    },\n    "api": {\n        "versionPrefix": "/api/v1",\n        "apiKeyHeader": "authorization",\n        "authCookieName": "token",\n        "authRateLimit": {\n            "login": {\n                "maxRequests": 10,\n                "windowSeconds": 1800\n            },\n            "register": {\n                "maxRequests": 3,\n                "windowSeconds": 86400\n            }\n        },\n        "authCache": {\n            "userRecord": {\n                "maxEntries": 1024,\n                "defaultTtlSeconds": 1800\n            },\n            "apiKeyRecord": {\n                "maxEntries": 4096,\n                "defaultTtlSeconds": 21600\n            }\n        },\n        "payload": {\n            "maxStringLength": 16384\n        },\n        "feedback": {\n            "validation": {\n                "createBody": {\n                    "minLength": 2,\n                    "maxLength": 12000\n                },\n                "replyBody": {\n                    "minLength": 2,\n                    "maxLength": 2000\n                },\n                "title": {\n                    "minLength": 4,\n                    "maxLength": 80\n                }\n            }\n        },\n        "headers": {\n            "remain": "x-api-remain",\n            "cost": "x-api-cost",\n            "retryAfter": "Retry-After"\n        },\n        "cache": {\n            "currentDayMaxAgeSeconds": 300,\n            "historicalMaxAgeSeconds": 31536000,\n            "searchIndexMaxAgeSeconds": 1800,\n            "sitemapMaxAgeSeconds": 86400\n        },\n        "pagination": {\n            "defaultLimit": 20,\n            "maxLimit": 200\n        },\n        "timestampUnit": "seconds",\n        "debug": {\n            "enableEchoError": true\n        },\n        "permissions": {\n            "anonymousScopes": [\n                "api.config.read",\n                "api.search.read",\n                "api.records.daily.read",\n                "api.history.train.read",\n                "api.history.emu.read",\n                "api.exports.daily.read",\n                "api.feedback.read",\n                "api.feedback.create"\n            ],\n            "issuedKeyDefaultScopes": [\n                "api.config.read",\n                "api.search.read",\n                "api.records.daily.read",\n                "api.history.train.read",\n                "api.history.emu.read",\n                "api.exports.daily.read",\n                "api.feedback.read",\n                "api.feedback.create",\n                "api.feedback.reply",\n                "api.auth.me.read",\n                "api.auth.logout",\n                "api.auth.password.update",\n                "api.auth.api-keys.read",\n                "api.auth.api-keys.create",\n                "api.auth.api-keys.revoke"\n            ],\n            "creatableKeyMaxScopes": [\n                "api.auth.me.read",\n                "api.records.daily.read",\n                "api.history.train.read",\n                "api.history.emu.read",\n                "api.exports.daily.read"\n            ]\n        }\n    },\n    "task": {\n        "startup": {\n            "disabledExecutors": []\n        },\n        "apiKeyCleanup": {\n            "retentionDays": 7,\n            "dailyTimeHHmm": "0000"\n        },\n        "dailyExport": {\n            "dailyTimeHHmm": "0000"\n        },\n        "scheduler": {\n            "pollIntervalMs": 180000,\n            "maxTasksPerQuery": 65535,\n            "idle": {\n                "maxTasksPerTick": 256,\n                "emaAlpha": 0.3\n            }\n        }\n    },\n    "logging": {\n        "retentionDays": 5\n    },\n    "quota": {\n        "anonymousMaxTokens": 25,\n        "userMaxTokens": 1000,\n        "refillAmount": 5,\n        "refillIntervalSeconds": 300,\n        "resetToMaxOnRestart": true,\n        "consumeTokens": true\n    },\n    "cost": {\n        "fixed": {\n            "health": 0,\n            "authMe": 1,\n            "authLogout": 1,\n            "authChangePassword": 5,\n            "debugEchoError": 0,\n            "authIssueApiKey": 5,\n            "authListApiKeys": 1,\n            "authRevokeApiKey": 1,\n            "searchIndex": 1,\n            "exportDailyIndex": 2,\n            "exportDaily": 50\n        },\n        "perRecord": {\n            "historyEmu": {\n                "unitCost": 0.05,\n                "rounding": "ceil"\n            },\n            "historyTrain": {\n                "unitCost": 0.05,\n                "rounding": "ceil"\n            },\n            "recordsDaily": {\n                "unitCost": 0.05,\n                "rounding": "ceil"\n            }\n        }\n    }\n}'
             },
             {
                 type: 'field-cards',
@@ -274,6 +274,59 @@ export const deployDocsSections: DocsContentSection[] = [
                         required: true,
                         description: '反馈与回复数据数据库路径。',
                         notes: ['所有数据库路径都建议指向持久化磁盘。']
+                    }
+                ]
+            },
+            {
+                type: 'field-cards',
+                title: 'data.runtime：运行时统计文件',
+                text: '这一组决定管理员流量统计与 12306 请求计数的落盘位置、保留天数和定时写盘间隔。',
+                cards: [
+                    {
+                        path: 'data.runtime.adminTraffic.file',
+                        valueType: 'string',
+                        required: true,
+                        description: '管理员流量统计文件路径。',
+                        notes: [
+                            '服务启动时会优先尝试从该文件恢复统计窗口。',
+                            '文件父目录必须可写，建议放在持久化磁盘。'
+                        ]
+                    },
+                    {
+                        path: 'data.runtime.adminTraffic.flushIntervalMinutes',
+                        valueType: 'integer',
+                        required: true,
+                        description:
+                            '管理员流量统计的定时落盘间隔，单位分钟，默认值为 30。',
+                        notes: ['仅在内存状态有变化时写盘。']
+                    },
+                    {
+                        path: 'data.runtime.requestMetrics12306.file',
+                        valueType: 'string',
+                        required: true,
+                        description: '12306 请求计数文件路径。',
+                        notes: [
+                            '管理员被动告警页的请求曲线直接读取该文件恢复的数据。',
+                            '12306 请求计数不再通过日志回放恢复。'
+                        ]
+                    },
+                    {
+                        path: 'data.runtime.requestMetrics12306.retentionDays',
+                        valueType: 'integer',
+                        required: true,
+                        description: '12306 请求计数保留天数，默认值为 3。',
+                        notes: [
+                            '系统只保留最近 N 天的半小时桶。',
+                            '超出保留窗口后，管理员页不再提供对应日期的请求曲线。'
+                        ]
+                    },
+                    {
+                        path: 'data.runtime.requestMetrics12306.flushIntervalMinutes',
+                        valueType: 'integer',
+                        required: true,
+                        description:
+                            '12306 请求计数的定时落盘间隔，单位分钟，默认值为 10。',
+                        notes: ['间隔越短，异常崩溃时潜在丢失的数据窗口越小。']
                     }
                 ]
             },
@@ -544,7 +597,7 @@ export const deployDocsSections: DocsContentSection[] = [
             {
                 type: 'field-cards',
                 title: 'logging：日志文件',
-                text: '这一组决定 logs/ 目录下按日滚动日志的保留时间。',
+                text: '这一组决定 logs/ 目录下按日滚动日志的保留时间；12306 请求计数已独立落盘，不再写入日志。',
                 cards: [
                     {
                         path: 'logging.retentionDays',
@@ -553,7 +606,8 @@ export const deployDocsSections: DocsContentSection[] = [
                         description: '应用日志的总保留天数，默认值为 5。',
                         notes: [
                             '保留天数包含当前当天正在写入的日志文件。',
-                            '日志文件位于 logs/ 目录，可按运维策略另行备份。'
+                            '日志文件位于 logs/ 目录，可按运维策略另行备份。',
+                            '12306 请求计数不会写入日志，日志中仅继续保留 warning、error 等异常信息。'
                         ]
                     }
                 ]
@@ -704,7 +758,7 @@ export const deployDocsSections: DocsContentSection[] = [
             },
             {
                 type: 'paragraph',
-                text: '应用会在 logs/ 目录下按天滚动写入日志，默认保留 5 天，可通过 logging.retentionDays 调整。'
+                text: '应用会在 logs/ 目录下按天滚动写入日志，同时按 data.runtime 配置把管理员流量统计和 12306 请求计数分别写入独立文件。12306 请求计数不再进入日志。'
             }
         ]
     },
@@ -716,6 +770,14 @@ export const deployDocsSections: DocsContentSection[] = [
             {
                 type: 'paragraph',
                 text: '更新代码前建议先停服务、备份 data 目录和当前生效的配置文件，再替换代码、重新构建并启动。'
+            },
+            {
+                type: 'paragraph',
+                text: '请确保 data.runtime.adminTraffic.file 与 data.runtime.requestMetrics12306.file 的父目录可写；管理员流量统计按 30 分钟默认周期落盘，12306 请求计数按 10 分钟默认周期落盘并按 retentionDays 自动裁剪。'
+            },
+            {
+                type: 'paragraph',
+                text: '当前运行时统计文件按单实例设计；如果部署多实例，请避免多个进程同时写同一份 runtime 文件。'
             }
         ]
     }

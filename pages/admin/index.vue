@@ -4,7 +4,7 @@
         :today-date-input-value="todayDateInputValue"
         :session="session"
         title="管理员概览"
-        description="查看当日被动告警摘要，并跳转到各个管理员功能页。">
+        description="查看当日被动告警摘要，并快速进入各个管理员功能页面。">
         <template #toolbar>
             <UiButton
                 type="button"
@@ -84,8 +84,7 @@
                                     最近告警
                                 </h3>
                                 <p class="text-sm leading-6 text-slate-500">
-                                    这里只预览最新 5
-                                    条，完整列表请进入被动告警页查看。
+                                    这里只预览最新 5 条，完整列表请进入被动告警页查看。
                                 </p>
                             </div>
 
@@ -182,8 +181,7 @@
                                 </p>
                                 <p
                                     class="mt-2 text-sm leading-6 text-slate-600">
-                                    查看完整 warning/error 列表、高频来源和
-                                    12306 请求曲线。
+                                    查看完整 warning/error 列表、高频来源和 12306 请求曲线。
                                 </p>
                             </button>
 
@@ -193,11 +191,25 @@
                                 @click="goToAnomalyScan">
                                 <p
                                     class="text-base font-semibold text-slate-900">
-                                    主动检测
+                                    主动扫描
                                 </p>
                                 <p
                                     class="mt-2 text-sm leading-6 text-slate-600">
                                     对所选日期执行异常扫描，并查看命中的交路明细。
+                                </p>
+                            </button>
+
+                            <button
+                                type="button"
+                                class="w-full rounded-[1rem] border border-slate-200 bg-white/90 px-4 py-4 text-left transition hover:border-slate-300 hover:bg-slate-50/80"
+                                @click="goToTraffic">
+                                <p
+                                    class="text-base font-semibold text-slate-900">
+                                    流量统计
+                                </p>
+                                <p
+                                    class="mt-2 text-sm leading-6 text-slate-600">
+                                    查看 3h、24h 和 7days 窗口内的网站请求、API 调用、独立访客和活跃用户走势。
                                 </p>
                             </button>
                         </div>
@@ -316,7 +328,7 @@ const recentAlerts = computed(
 
 useSiteSeo({
     title: '管理员概览 | Open CRH Tracker',
-    description: '查看管理员概览并进入详细功能页。',
+    description: '查看管理员概览并进入详细功能页面。',
     path: '/admin',
     noindex: true
 });
@@ -331,6 +343,10 @@ async function goToAnomalyScan() {
     await navigateTo(
         buildAdminRoute('/admin/anomaly-scan', selectedDateInput.value)
     );
+}
+
+async function goToTraffic() {
+    await navigateTo(buildAdminRoute('/admin/traffic', selectedDateInput.value));
 }
 
 function formatTimestamp(timestamp: number) {

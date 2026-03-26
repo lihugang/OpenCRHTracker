@@ -4,7 +4,7 @@
         :today-date-input-value="todayDateInputValue"
         :session="session"
         title="被动告警"
-        description="读取所选日期的 warning 与 error 日志，并查看聚合后的 12306 请求曲线。">
+        description="读取所选日期的 warning 与 error 日志，并查看聚合后的 12306 请求计数曲线。">
         <template #toolbar>
             <UiButton
                 type="button"
@@ -31,7 +31,7 @@
                         </h2>
                         <p class="text-sm leading-6 text-slate-600">
                             正在读取 {{ selectedDateYmd }} 的日志，并汇总
-                            warning、error 与 12306 请求事件。
+                            warning、error 与 12306 请求计数。
                         </p>
                     </div>
 
@@ -72,7 +72,7 @@
                             12306 请求数
                         </p>
                         <p class="mt-2 text-3xl font-semibold text-slate-900">
-                            {{ requestTotalCount }}
+                            {{ requestMetricsRetained ? requestTotalCount : '--' }}
                         </p>
                     </div>
                 </div>
@@ -105,12 +105,19 @@
                                 </p>
                             </div>
                             <p class="text-sm text-slate-500">
-                                峰值 {{ requestPeakCount }} / 30 分钟
+                                {{ requestPeakSummary }}
                             </p>
                         </div>
 
                         <div
-                            v-if="
+                            v-if="!requestMetricsRetained"
+                            class="rounded-[1rem] border border-slate-200 bg-slate-50/70 px-4 py-4 text-sm leading-6 text-slate-600">
+                            所选日期超出请求计数保留范围，目前仅保留最近
+                            {{ requestMetricsRetentionDays }} 天。
+                        </div>
+
+                        <div
+                            v-else-if="
                                 requestBuckets.length > 0 &&
                                 requestPeakCount > 0
                             "
@@ -140,7 +147,7 @@
                             v-else
                             eyebrow="无流量"
                             title="暂无 12306 请求曲线"
-                            description="所选日期还没有请求计数日志。" />
+                            description="所选日期还没有请求计数数据。" />
                     </div>
 
                     <div class="space-y-3">
@@ -379,6 +386,12 @@ const canLoadMore = computed(
 const requestBuckets = computed(
     () => passiveAlertsData.value?.requestBuckets ?? []
 );
+const requestMetricsRetentionDays = computed(
+    () => passiveAlertsData.value?.requestMetricsRetentionDays ?? 0
+);
+const requestMetricsRetained = computed(
+    () => passiveAlertsData.value?.requestMetricsRetained ?? true
+);
 const requestPeakCount = computed(() =>
     requestBuckets.value.reduce(
         (maxValue, bucket) => Math.max(maxValue, bucket.total),
@@ -387,6 +400,11 @@ const requestPeakCount = computed(() =>
 );
 const requestTotalCount = computed(() =>
     requestBuckets.value.reduce((total, bucket) => total + bucket.total, 0)
+);
+const requestPeakSummary = computed(() =>
+    requestMetricsRetained.value
+        ? `峰值 ${requestPeakCount.value} / 30 分钟`
+        : `仅保留近 ${requestMetricsRetentionDays.value} 天`
 );
 const requestAxisLabels = computed(() =>
     requestBuckets.value
@@ -399,7 +417,7 @@ const requestAxisLabels = computed(() =>
 
 useSiteSeo({
     title: '被动告警 | Open CRH Tracker',
-    description: '查看被动告警与 12306 请求曲线。',
+    description: '查看被动告警与 12306 请求计数曲线。',
     path: '/admin/passive-alerts',
     noindex: true
 });

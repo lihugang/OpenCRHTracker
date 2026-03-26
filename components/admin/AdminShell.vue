@@ -15,8 +15,7 @@
                         :show-accent-bar="false"
                         class="sticky top-24">
                         <div class="space-y-5">
-                            <div
-                                class="flex items-center justify-between gap-3">
+                            <div class="flex items-center justify-between gap-3">
                                 <UiButton
                                     type="button"
                                     variant="secondary"
@@ -125,7 +124,13 @@
                                             </div>
                                         </div>
 
-                                        <dl class="grid gap-4 sm:grid-cols-2">
+                                        <dl
+                                            class="grid gap-4"
+                                            :class="
+                                                props.showDateInput !== false
+                                                    ? 'sm:grid-cols-2'
+                                                    : 'sm:grid-cols-1'
+                                            ">
                                             <div class="space-y-1">
                                                 <dt
                                                     class="text-xs uppercase tracking-[0.18em] text-slate-400">
@@ -138,7 +143,9 @@
                                                     }}
                                                 </dd>
                                             </div>
-                                            <div class="space-y-1">
+                                            <div
+                                                v-if="props.showDateInput !== false"
+                                                class="space-y-1">
                                                 <dt
                                                     class="text-xs uppercase tracking-[0.18em] text-slate-400">
                                                     日期
@@ -151,8 +158,9 @@
                                         </dl>
 
                                         <UiField
+                                            v-if="props.showDateInput !== false"
                                             label="当前日期"
-                                            help="所有管理员页面共享该日期。">
+                                            help="所有管理员页面共享这个日期筛选。">
                                             <input
                                                 v-model="dateInputModel"
                                                 type="date"
@@ -226,6 +234,7 @@ const props = withDefaults(
         todayDateInputValue: string;
         session: AuthSession | null;
         eyebrow?: string;
+        showDateInput?: boolean;
     }>(),
     {
         eyebrow: '管理后台'
@@ -248,7 +257,11 @@ const navItems = [
         path: '/admin/passive-alerts'
     },
     {
-        label: '主动检测',
+        label: '流量统计',
+        path: '/admin/traffic'
+    },
+    {
+        label: '主动扫描',
         path: '/admin/anomaly-scan'
     },
     {

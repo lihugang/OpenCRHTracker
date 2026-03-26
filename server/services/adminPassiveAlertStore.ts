@@ -1,19 +1,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
-import getDayTimestampRange from '~/server/utils/date/getDayTimestampRange';
 import type {
-    Admin12306RequestBucket,
     AdminPassiveAlertItem,
     AdminPassiveAlertsResponse
 } from '~/types/admin';
+import { get12306RequestMetricsSnapshot } from '~/server/services/requestMetrics12306Store';
 
 const ALERT_LINE_PATTERN =
     /^\[(?<timestamp>[^\]]+)\] \[(?<level>[A-Z]+)\] (?<logger>[^ ]+) - (?<message>.*)$/;
-const REQUEST_BUCKET_SECONDS = 30 * 60;
-const REQUEST_BUCKET_COUNT = 48;
-const REQUEST_METRIC_LOGGER = '12306-network:request-metric';
-const REQUEST_METRIC_PREFIX = 'request ';
 
 interface PassiveAlertCursorPoint {
     timestamp: number;
@@ -71,44 +66,6 @@ function parseTimestampSeconds(rawValue: string): number | null {
     return Math.floor(timestampMs / 1000);
 }
 
-function createRequestBuckets(date: string): Admin12306RequestBucket[] {
-    const dayRange = getDayTimestampRange(date);
-
-    return Array.from({ length: REQUEST_BUCKET_COUNT }, (_, index) => {
-        const startAt = dayRange.startAt + index * REQUEST_BUCKET_SECONDS;
-
-        return {
-            startAt,
-            endAt: startAt + REQUEST_BUCKET_SECONDS - 1,
-            total: 0,
-            byOperation: {}
-        };
-    });
-}
-
-function parseMetricFields(message: string): Record<string, string> {
-    const fields: Record<string, string> = {};
-    const normalizedMessage = message.startsWith(REQUEST_METRIC_PREFIX)
-        ? message.slice(REQUEST_METRIC_PREFIX.length)
-        : message;
-
-    for (const part of normalizedMessage.split(/\s+/)) {
-        if (!part.includes('=')) {
-            continue;
-        }
-
-        const separatorIndex = part.indexOf('=');
-        const key = part.slice(0, separatorIndex);
-        const value = part.slice(separatorIndex + 1);
-
-        if (key && value) {
-            fields[key] = value;
-        }
-    }
-
-    return fields;
-}
-
 function buildAlertId(timestamp: number, lineIndex: number): string {
     return `${timestamp}:${lineIndex}`;
 }
@@ -140,14 +97,13 @@ export function readPassiveAlerts(
 ): AdminPassiveAlertsResponse {
     const { date, type, limit, cursor, rawCursor } = options;
     const { filePath, text } = readLogText(date);
-    const requestBuckets = createRequestBuckets(date);
+    const requestMetrics = get12306RequestMetricsSnapshot(date);
     const allAlerts: ParsedPassiveAlertItem[] = [];
     const loggerCounts = new Map<string, number>();
     let warnCount = 0;
     let errorCount = 0;
 
     if (text.length > 0) {
-        const dayRange = getDayTimestampRange(date);
         const lines = text.split(/\r?\n/);
 
         for (const [lineIndex, line] of lines.entries()) {
@@ -174,51 +130,25 @@ export function readPassiveAlerts(
             const logger = match.groups.logger ?? 'unknown';
             const message = match.groups.message ?? '';
 
-            if (level === 'WARN' || level === 'ERROR') {
-                if (level === 'WARN') {
-                    warnCount += 1;
-                } else {
-                    errorCount += 1;
-                }
-
-                allAlerts.push({
-                    id: buildAlertId(timestamp, lineIndex),
-                    timestamp,
-                    level: level as AdminPassiveAlertItem['level'],
-                    logger,
-                    message,
-                    lineIndex
-                });
-                loggerCounts.set(logger, (loggerCounts.get(logger) ?? 0) + 1);
-            }
-
-            if (
-                level !== 'INFO' ||
-                logger !== REQUEST_METRIC_LOGGER ||
-                !message.startsWith(REQUEST_METRIC_PREFIX)
-            ) {
+            if (level !== 'WARN' && level !== 'ERROR') {
                 continue;
             }
 
-            const bucketIndex = Math.floor(
-                (timestamp - dayRange.startAt) / REQUEST_BUCKET_SECONDS
-            );
-
-            if (
-                bucketIndex < 0 ||
-                bucketIndex >= requestBuckets.length ||
-                !requestBuckets[bucketIndex]
-            ) {
-                continue;
+            if (level === 'WARN') {
+                warnCount += 1;
+            } else {
+                errorCount += 1;
             }
 
-            const metricFields = parseMetricFields(message);
-            const operation = metricFields.operation ?? 'unknown';
-            const bucket = requestBuckets[bucketIndex]!;
-
-            bucket.total += 1;
-            bucket.byOperation[operation] =
-                (bucket.byOperation[operation] ?? 0) + 1;
+            allAlerts.push({
+                id: buildAlertId(timestamp, lineIndex),
+                timestamp,
+                level: level as AdminPassiveAlertItem['level'],
+                logger,
+                message,
+                lineIndex
+            });
+            loggerCounts.set(logger, (loggerCounts.get(logger) ?? 0) + 1);
         }
     }
 
@@ -271,7 +201,10 @@ export function readPassiveAlerts(
 
                 return left.type.localeCompare(right.type, 'zh-CN');
             }),
-        requestBuckets,
+        requestMetricsRetentionDays:
+            requestMetrics.requestMetricsRetentionDays,
+        requestMetricsRetained: requestMetrics.requestMetricsRetained,
+        requestBuckets: requestMetrics.requestBuckets,
         items: pageItems.map(({ lineIndex: _lineIndex, ...item }) => item)
     };
 }
