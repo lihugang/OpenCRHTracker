@@ -4,23 +4,28 @@ import normalizeCode from '~/server/utils/12306/normalizeCode';
 import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
 import { getShanghaiDayStartUnixSeconds } from '~/server/utils/date/shanghaiDateTime';
 
-interface YesterdayTrainEmuIndexCache {
+interface HistoricalRecentTrainEmuIndexCache {
     currentDate: string;
     trainToEmuCodes: Map<string, string[]>;
 }
 
-const logger = getLogger('yesterday-train-emu-index');
+const logger = getLogger('historical-recent-train-emu-index');
 
-let cached: YesterdayTrainEmuIndexCache | null = null;
+let cached: HistoricalRecentTrainEmuIndexCache | null = null;
 
-function rebuildCache(): YesterdayTrainEmuIndexCache {
+function rebuildCache(): HistoricalRecentTrainEmuIndexCache {
     const currentDate = getCurrentDateString();
     const currentDayStart = getShanghaiDayStartUnixSeconds(currentDate);
-    const previousDayStart = currentDayStart - 24 * 60 * 60;
-    const previousDayEnd = currentDayStart - 1;
+    const historicalRecentStart = currentDayStart - 2 * 24 * 60 * 60;
+    const historicalRecentEnd = currentDayStart - 1;
     const trainToEmuSet = new Map<string, Set<string>>();
 
-    for (const row of listDailyRecordsAll(previousDayStart, previousDayEnd)) {
+    for (
+        const row of listDailyRecordsAll(
+            historicalRecentStart,
+            historicalRecentEnd
+        )
+    ) {
         const trainCode = normalizeCode(row.train_code);
         const emuCode = normalizeCode(row.emu_code);
         if (trainCode.length === 0 || emuCode.length === 0) {
@@ -36,7 +41,7 @@ function rebuildCache(): YesterdayTrainEmuIndexCache {
         trainToEmuSet.set(trainCode, new Set([emuCode]));
     }
 
-    const nextCache: YesterdayTrainEmuIndexCache = {
+    const nextCache: HistoricalRecentTrainEmuIndexCache = {
         currentDate,
         trainToEmuCodes: new Map(
             Array.from(trainToEmuSet.entries(), ([trainCode, emuCodes]) => [
@@ -48,12 +53,12 @@ function rebuildCache(): YesterdayTrainEmuIndexCache {
 
     cached = nextCache;
     logger.info(
-        `rebuilt currentDate=${currentDate} previousDayStart=${previousDayStart} previousDayEnd=${previousDayEnd} trainCodes=${nextCache.trainToEmuCodes.size}`
+        `rebuilt currentDate=${currentDate} historicalRecentStart=${historicalRecentStart} historicalRecentEnd=${historicalRecentEnd} trainCodes=${nextCache.trainToEmuCodes.size}`
     );
     return nextCache;
 }
 
-function getActiveCache(): YesterdayTrainEmuIndexCache {
+function getActiveCache(): HistoricalRecentTrainEmuIndexCache {
     const currentDate = getCurrentDateString();
     if (cached && cached.currentDate === currentDate) {
         return cached;
@@ -62,11 +67,13 @@ function getActiveCache(): YesterdayTrainEmuIndexCache {
     return rebuildCache();
 }
 
-export function warmYesterdayTrainEmuIndex(): void {
+export function warmHistoricalRecentTrainEmuIndex(): void {
     rebuildCache();
 }
 
-export function getYesterdayEmuCodesByTrainCode(trainCode: string): string[] {
+export function getHistoricalRecentEmuCodesByTrainCode(
+    trainCode: string
+): string[] {
     const normalizedTrainCode = normalizeCode(trainCode);
     if (normalizedTrainCode.length === 0) {
         return [];

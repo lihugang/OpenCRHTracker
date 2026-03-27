@@ -51,7 +51,7 @@ export const crawlDocsSections: DocsContentSection[] = [
                 code: [
                     'taskScheduleBootstrap',
                     '  -> ensure database schema',
-                    '  -> loadProbeAssets / warmYesterdayTrainEmuIndex',
+                    '  -> loadProbeAssets / warmHistoricalRecentTrainEmuIndex',
                     '  -> register executors',
                     '  -> rehydrateProbeRuntimeState',
                     '  -> reconcile build_today_schedule',
@@ -173,7 +173,7 @@ export const crawlDocsSections: DocsContentSection[] = [
                     'probeRuntimeState：记录今天哪些车次组已经查过、哪些动车组已经分配过，用于去重和防止重复落盘。',
                     'probeStatusStore：记录单编组、重联、待确认、冲突等列车状态，用于后续校正与回溯。',
                     'emuRoutesStore：写入当天车次号与车组号的对应关系，形成记录。',
-                    'yesterdayTrainEmuIndexStore 与 probeAssetStore：分别提供昨日匹配线索和动车组资产，用于提高识别成功率与耦合检测能力。'
+                    'historicalRecentTrainEmuIndexStore 与 probeAssetStore：分别提供最近两日匹配线索和动车组资产，用于提高识别成功率与耦合检测能力。'
                 ]
             },
             {
@@ -181,7 +181,7 @@ export const crawlDocsSections: DocsContentSection[] = [
                 title: '异常与补偿',
                 items: [
                     '抓取信息失败但还有重试机会时，会立即重入 probe_train_departure，直到重试机会耗尽。',
-                    '如果命中昨日同担当，但畅行码复核结果显示当前返回的车次或日期不一致，会按 overlapRetryDelaySeconds 延迟重排当前车次组，等待 12306 数据刷新后再探测。',
+                    '如果命中最近两日同担当，但畅行码复核结果显示当前返回的车次或日期不一致，会按 overlapRetryDelaySeconds 延迟重排当前车次组，等待 12306 数据刷新后再探测。',
                     '如果发现多个车次组对同一编组的探测结果产生重叠，会按 overlapRetryDelaySeconds 延迟重排相关车次组。',
                     '识别出可能需要耦合编组补全时，会延迟添加 detect_coupled_emu_group 任务，负责重联检测，由单独执行器继续扩展。'
                 ]
@@ -194,8 +194,8 @@ export const crawlDocsSections: DocsContentSection[] = [
                     'probe_train_departure',
                     '  -> validate current schedule window',
                     '  -> probeEmuByTrainCodes(allCodes)',
-                    '  -> compare yesterday index / runtime state',
-                    '  -> verify seat code for yesterday-matched running trains',
+                    '  -> compare historicalRecent index / runtime state',
+                    '  -> verify seat code for historicalRecent-matched running trains',
                     '  -> persist probe status',
                     '  -> insertDailyEmuRoute',
                     '  -> requeue overlap or queue detect_coupled_emu_group when needed'

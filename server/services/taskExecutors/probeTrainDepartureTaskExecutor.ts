@@ -42,7 +42,7 @@ import {
     getTodayScheduleProbeGroupByTrainCode,
     type TodayScheduleProbeGroup
 } from '~/server/services/todayScheduleCache';
-import { getYesterdayEmuCodesByTrainCode } from '~/server/services/yesterdayTrainEmuIndexStore';
+import { getHistoricalRecentEmuCodesByTrainCode } from '~/server/services/historicalRecentTrainEmuIndexStore';
 import fetchEMUInfoByRoute from '~/server/utils/12306/network/fetchEMUInfoByRoute';
 import fetchRouteInfo from '~/server/utils/12306/network/fetchRouteInfo';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
@@ -708,7 +708,7 @@ async function validateConflictGroupRunningState(
     };
 }
 
-function collectYesterdayMatchingTrainCodes(
+function collectHistoricalRecentMatchingTrainCodes(
     trainCodes: string[],
     mainEmuCode: string
 ): string[] {
@@ -720,7 +720,7 @@ function collectYesterdayMatchingTrainCodes(
     const matchedTrainCodes: string[] = [];
     for (const trainCode of uniqueNormalizedCodes(trainCodes)) {
         if (
-            getYesterdayEmuCodesByTrainCode(trainCode).includes(
+            getHistoricalRecentEmuCodesByTrainCode(trainCode).includes(
                 normalizedMainEmuCode
             )
         ) {
@@ -1139,17 +1139,18 @@ async function executeProbeTrainDepartureTask(rawArgs: unknown): Promise<void> {
     const mainRecord = assets.emuByModelAndTrainSetNo.get(
         buildProbeAssetKey(parsedMainEmuCode!.model, currentTrainSetNo)
     );
-    const yesterdayMatchingTrainCodes = collectYesterdayMatchingTrainCodes(
-        allTrainCodes,
-        mainEmuCode
-    );
+    const historicalRecentMatchingTrainCodes =
+        collectHistoricalRecentMatchingTrainCodes(
+            allTrainCodes,
+            mainEmuCode
+        );
 
-    if (yesterdayMatchingTrainCodes.length > 0) {
+    if (historicalRecentMatchingTrainCodes.length > 0) {
         const todayTrainCodesValidation =
             await validateTodayRunningForTrainCodes(allTrainCodes);
         if (todayTrainCodesValidation.state === 'not_running') {
             logger.info(
-                `skip_yesterday_same_assignment_not_running trainCode=${args.trainCode} probedTrainCode=${probedTrainCode} mainEmuCode=${mainEmuCode} yesterdayMatchedTrainCodes=${yesterdayMatchingTrainCodes.join(',')} checkedTrainCodes=${allTrainCodes.join(',')} notRunningTrainCodes=${todayTrainCodesValidation.notRunningTrainCodes.join(',')}`
+                `skip_historical_recent_same_assignment_not_running trainCode=${args.trainCode} probedTrainCode=${probedTrainCode} mainEmuCode=${mainEmuCode} historicalRecentMatchedTrainCodes=${historicalRecentMatchingTrainCodes.join(',')} checkedTrainCodes=${allTrainCodes.join(',')} notRunningTrainCodes=${todayTrainCodesValidation.notRunningTrainCodes.join(',')}`
             );
             return;
         }
@@ -1163,11 +1164,11 @@ async function executeProbeTrainDepartureTask(rawArgs: unknown): Promise<void> {
             );
             if (seatCodeVerification.state === 'matched') {
                 logger.info(
-                    `seat_verify_pass trainCode=${args.trainCode} probedTrainCode=${probedTrainCode} mainEmuCode=${mainEmuCode} runningTrainCode=${todayTrainCodesValidation.runningTrainCode} reason=${seatCodeVerification.reason} seatTrainCode=${seatCodeVerification.seatTrainCode} seatInternalCode=${seatCodeVerification.seatInternalCode} seatStartAt=${seatCodeVerification.seatStartAt} yesterdayMatchedTrainCodes=${yesterdayMatchingTrainCodes.join(',')}`
+                    `seat_verify_pass trainCode=${args.trainCode} probedTrainCode=${probedTrainCode} mainEmuCode=${mainEmuCode} runningTrainCode=${todayTrainCodesValidation.runningTrainCode} reason=${seatCodeVerification.reason} seatTrainCode=${seatCodeVerification.seatTrainCode} seatInternalCode=${seatCodeVerification.seatInternalCode} seatStartAt=${seatCodeVerification.seatStartAt} historicalRecentMatchedTrainCodes=${historicalRecentMatchingTrainCodes.join(',')}`
                 );
             } else if (seatCodeVerification.state === 'unavailable') {
                 logger.info(
-                    `seat_verify_unavailable_continue trainCode=${args.trainCode} probedTrainCode=${probedTrainCode} mainEmuCode=${mainEmuCode} runningTrainCode=${todayTrainCodesValidation.runningTrainCode} reason=${seatCodeVerification.reason} yesterdayMatchedTrainCodes=${yesterdayMatchingTrainCodes.join(',')}`
+                    `seat_verify_unavailable_continue trainCode=${args.trainCode} probedTrainCode=${probedTrainCode} mainEmuCode=${mainEmuCode} runningTrainCode=${todayTrainCodesValidation.runningTrainCode} reason=${seatCodeVerification.reason} historicalRecentMatchedTrainCodes=${historicalRecentMatchingTrainCodes.join(',')}`
                 );
             } else if (args.retry > 0) {
                 const nextRetry = args.retry - 1;
@@ -1180,12 +1181,12 @@ async function executeProbeTrainDepartureTask(rawArgs: unknown): Promise<void> {
                     nextRetry
                 );
                 logger.warn(
-                    `seat_verify_mismatch_requeue trainCode=${args.trainCode} probedTrainCode=${probedTrainCode} mainEmuCode=${mainEmuCode} runningTrainCode=${todayTrainCodesValidation.runningTrainCode} retry=${args.retry} nextRetry=${nextRetry} nextTaskId=${nextTaskId} delaySeconds=${overlapRetryDelaySeconds} reason=${seatCodeVerification.reason} seatTrainCode=${seatCodeVerification.seatTrainCode} seatInternalCode=${seatCodeVerification.seatInternalCode} seatStartAt=${seatCodeVerification.seatStartAt} yesterdayMatchedTrainCodes=${yesterdayMatchingTrainCodes.join(',')}`
+                    `seat_verify_mismatch_requeue trainCode=${args.trainCode} probedTrainCode=${probedTrainCode} mainEmuCode=${mainEmuCode} runningTrainCode=${todayTrainCodesValidation.runningTrainCode} retry=${args.retry} nextRetry=${nextRetry} nextTaskId=${nextTaskId} delaySeconds=${overlapRetryDelaySeconds} reason=${seatCodeVerification.reason} seatTrainCode=${seatCodeVerification.seatTrainCode} seatInternalCode=${seatCodeVerification.seatInternalCode} seatStartAt=${seatCodeVerification.seatStartAt} historicalRecentMatchedTrainCodes=${historicalRecentMatchingTrainCodes.join(',')}`
                 );
                 return;
             } else {
                 logger.warn(
-                    `seat_verify_mismatch_exhausted trainCode=${args.trainCode} probedTrainCode=${probedTrainCode} mainEmuCode=${mainEmuCode} runningTrainCode=${todayTrainCodesValidation.runningTrainCode} retry=${args.retry} reason=${seatCodeVerification.reason} seatTrainCode=${seatCodeVerification.seatTrainCode} seatInternalCode=${seatCodeVerification.seatInternalCode} seatStartAt=${seatCodeVerification.seatStartAt} yesterdayMatchedTrainCodes=${yesterdayMatchingTrainCodes.join(',')}`
+                    `seat_verify_mismatch_exhausted trainCode=${args.trainCode} probedTrainCode=${probedTrainCode} mainEmuCode=${mainEmuCode} runningTrainCode=${todayTrainCodesValidation.runningTrainCode} retry=${args.retry} reason=${seatCodeVerification.reason} seatTrainCode=${seatCodeVerification.seatTrainCode} seatInternalCode=${seatCodeVerification.seatInternalCode} seatStartAt=${seatCodeVerification.seatStartAt} historicalRecentMatchedTrainCodes=${historicalRecentMatchingTrainCodes.join(',')}`
                 );
                 return;
             }
@@ -1193,7 +1194,7 @@ async function executeProbeTrainDepartureTask(rawArgs: unknown): Promise<void> {
 
         if (todayTrainCodesValidation.state === 'request_failed') {
             logger.info(
-                `continue_yesterday_same_assignment_request_failed trainCode=${args.trainCode} probedTrainCode=${probedTrainCode} mainEmuCode=${mainEmuCode} yesterdayMatchedTrainCodes=${yesterdayMatchingTrainCodes.join(',')} checkedTrainCodes=${allTrainCodes.join(',')} requestFailedTrainCodes=${todayTrainCodesValidation.requestFailedTrainCodes.join(',')} notRunningTrainCodes=${todayTrainCodesValidation.notRunningTrainCodes.join(',')}`
+                `continue_historical_recent_same_assignment_request_failed trainCode=${args.trainCode} probedTrainCode=${probedTrainCode} mainEmuCode=${mainEmuCode} historicalRecentMatchedTrainCodes=${historicalRecentMatchingTrainCodes.join(',')} checkedTrainCodes=${allTrainCodes.join(',')} requestFailedTrainCodes=${todayTrainCodesValidation.requestFailedTrainCodes.join(',')} notRunningTrainCodes=${todayTrainCodesValidation.notRunningTrainCodes.join(',')}`
             );
         }
     }

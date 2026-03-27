@@ -14,7 +14,7 @@ import {
     type ReconcileSingletonTaskResult
 } from '~/server/services/taskQueue';
 import { loadProbeAssets } from '~/server/services/probeAssetStore';
-import { warmYesterdayTrainEmuIndex } from '~/server/services/yesterdayTrainEmuIndexStore';
+import { warmHistoricalRecentTrainEmuIndex } from '~/server/services/historicalRecentTrainEmuIndexStore';
 import {
     BUILD_SCHEDULE_TASK_EXECUTOR,
     registerBuildScheduleTaskExecutor
@@ -168,14 +168,14 @@ export default defineNitroPlugin(async () => {
         ensureEmuDatabaseSchema();
         await loadProbeAssets();
         try {
-            warmYesterdayTrainEmuIndex();
+            warmHistoricalRecentTrainEmuIndex();
         } catch (error) {
             const message =
                 error instanceof Error
                     ? `${error.name}: ${error.message}`
                     : String(error);
             logger.warn(
-                `warm_yesterday_train_emu_index_failed error=${message}`
+                `warm_historical_recent_train_emu_index_failed error=${message}`
             );
         }
 
