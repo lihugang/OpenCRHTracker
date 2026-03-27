@@ -4,14 +4,11 @@ import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import Database from 'better-sqlite3';
 
 const execFileAsync = promisify(execFile);
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const timezone = 'Asia/Shanghai';
-const secondsPerDay = 24 * 60 * 60;
-const shanghaiUtcOffsetSeconds = 8 * 60 * 60;
 
 const sourceDir = path.join(
     rootDir,
@@ -35,13 +32,13 @@ const generatedCssPath = path.join(
 );
 const charsetPath = path.join(outputDir, 'charset.txt');
 const reportPath = path.join(outputDir, 'report.json');
+const configPath = path.join(rootDir, 'data', 'config.json');
 const conservativeCharsPath = path.join(
     rootDir,
     'scripts',
     'font-data',
     'source-han-conservative-chars.txt',
 );
-const emuDbPath = path.join(rootDir, 'data', 'emu.db');
 
 const sourceFonts = [
     {
@@ -141,55 +138,6 @@ function buildAsciiChars() {
     ).join('');
 }
 
-function getShanghaiDateParts(date = new Date()) {
-    const formatter = new Intl.DateTimeFormat('en-CA', {
-        timeZone: timezone,
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-    });
-    const parts = Object.fromEntries(
-        formatter
-            .formatToParts(date)
-            .filter((part) => part.type !== 'literal')
-            .map((part) => [part.type, part.value]),
-    );
-
-    return {
-        year: Number(parts.year),
-        month: Number(parts.month),
-        day: Number(parts.day),
-    };
-}
-
-function formatShanghaiDate(timestampMs) {
-    const formatter = new Intl.DateTimeFormat('en-CA', {
-        timeZone: timezone,
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-    });
-
-    return formatter.format(new Date(timestampMs));
-}
-
-function getRecentThreeDayWindow() {
-    const { year, month, day } = getShanghaiDateParts();
-    const todayStartUtcSeconds =
-        Math.floor(
-            Date.UTC(year, month - 1, day, 0, 0, 0) / 1000,
-        ) - shanghaiUtcOffsetSeconds;
-    const startAt = todayStartUtcSeconds - 2 * secondsPerDay;
-    const endAt = todayStartUtcSeconds + secondsPerDay - 1;
-
-    return {
-        startAt,
-        endAt,
-        startDate: formatShanghaiDate(startAt * 1000),
-        endDate: formatShanghaiDate(endAt * 1000),
-    };
-}
-
 function addCharsToSet(target, text) {
     for (const char of text) {
         if (char === '\r' || char === '\n' || char === '\t') {
@@ -200,12 +148,54 @@ function addCharsToSet(target, text) {
     }
 }
 
+function normalizeString(value) {
+    return typeof value === 'string' ? value.trim() : '';
+}
+
+function ensureObjectRecord(value, label) {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+        throw new Error(`${label} must be a JSON object`);
+    }
+
+    return value;
+}
+
+function resolveConfigFilePath(filePath) {
+    if (typeof filePath !== 'string' || filePath.trim().length === 0) {
+        throw new Error('config asset path must be a non-empty string');
+    }
+
+    return path.isAbsolute(filePath)
+        ? filePath
+        : path.resolve(rootDir, filePath);
+}
+
 async function readConservativeChars() {
     const raw = await fs.readFile(conservativeCharsPath, 'utf8');
     return raw
         .split(/\r?\n/u)
         .filter((line) => !line.trimStart().startsWith('#'))
         .join('');
+}
+
+async function readRuntimeAssetPaths() {
+    const raw = await fs.readFile(configPath, 'utf8');
+    const parsed = ensureObjectRecord(JSON.parse(raw), 'data/config.json');
+    const data = ensureObjectRecord(parsed.data, 'data/config.json data');
+    const assets = ensureObjectRecord(data.assets, 'data/config.json data.assets');
+    const schedule = ensureObjectRecord(
+        assets.schedule,
+        'data/config.json data.assets.schedule',
+    );
+    const emuList = ensureObjectRecord(
+        assets.EMUList,
+        'data/config.json data.assets.EMUList',
+    );
+
+    return {
+        schedulePath: resolveConfigFilePath(schedule.file),
+        emuListPath: resolveConfigFilePath(emuList.file),
+    };
 }
 
 async function walkTextFiles(entryPath, collectedFiles) {
@@ -273,49 +263,117 @@ async function collectStaticText() {
     };
 }
 
-function collectDatabaseStations(window) {
-    const database = new Database(emuDbPath, {
-        readonly: true,
-        fileMustExist: true,
-    });
+function parseJsonlRecords(input) {
+    const trimmed = input.trim();
 
-    try {
-        const rows = database
-            .prepare(
-                `SELECT start_station_name, end_station_name
-                 FROM daily_emu_routes
-                 WHERE start_at >= ? AND start_at <= ?`,
-            )
-            .all(window.startAt, window.endAt);
-
-        const stationNames = new Set();
-
-        for (const row of rows) {
-            if (typeof row.start_station_name === 'string' && row.start_station_name) {
-                stationNames.add(row.start_station_name);
-            }
-
-            if (typeof row.end_station_name === 'string' && row.end_station_name) {
-                stationNames.add(row.end_station_name);
-            }
-        }
-
-        const charSet = new Set();
-
-        for (const stationName of stationNames) {
-            addCharsToSet(charSet, stationName);
-        }
-
-        return {
-            rows,
-            stationNames: [...stationNames].sort((left, right) =>
-                left.localeCompare(right, 'zh-Hans-CN'),
-            ),
-            charSet,
-        };
-    } finally {
-        database.close();
+    if (!trimmed) {
+        return [];
     }
+
+    return trimmed
+        .split(/\r?\n/u)
+        .map((line, index) => {
+            const normalizedLine = line.trim();
+
+            if (!normalizedLine) {
+                return null;
+            }
+
+            let parsed;
+            try {
+                parsed = JSON.parse(normalizedLine);
+            } catch {
+                throw new Error(
+                    `Invalid JSONL at line ${index + 1}: not valid JSON.`,
+                );
+            }
+
+            return ensureObjectRecord(parsed, `emu_list.jsonl line ${index + 1}`);
+        })
+        .filter(Boolean);
+}
+
+async function collectScheduleStations(schedulePath) {
+    const raw = await fs.readFile(schedulePath, 'utf8');
+    const parsed = ensureObjectRecord(JSON.parse(raw), 'schedule.json');
+    const published =
+        parsed.published === null || parsed.published === undefined
+            ? null
+            : ensureObjectRecord(parsed.published, 'schedule.json published');
+    const items = Array.isArray(published?.items) ? published.items : [];
+    const stationNames = new Set();
+
+    for (const item of items) {
+        if (typeof item !== 'object' || item === null || Array.isArray(item)) {
+            continue;
+        }
+
+        const startStation = normalizeString(item.startStation);
+        const endStation = normalizeString(item.endStation);
+        if (startStation) {
+            stationNames.add(startStation);
+        }
+        if (endStation) {
+            stationNames.add(endStation);
+        }
+
+        const stops = Array.isArray(item.stops) ? item.stops : [];
+        for (const stop of stops) {
+            if (typeof stop !== 'object' || stop === null || Array.isArray(stop)) {
+                continue;
+            }
+
+            const stationName = normalizeString(stop.stationName);
+            if (stationName) {
+                stationNames.add(stationName);
+            }
+        }
+    }
+
+    const charSet = new Set();
+
+    for (const stationName of stationNames) {
+        addCharsToSet(charSet, stationName);
+    }
+
+    return {
+        scheduleItemCount: items.length,
+        stationNames: [...stationNames].sort((left, right) =>
+            left.localeCompare(right, 'zh-Hans-CN'),
+        ),
+        charSet,
+    };
+}
+
+async function collectEmuTags(emuListPath) {
+    const raw = await fs.readFile(emuListPath, 'utf8');
+    const rows = parseJsonlRecords(raw);
+    const tags = new Set();
+
+    for (const row of rows) {
+        if (!Array.isArray(row.tags)) {
+            continue;
+        }
+
+        for (const tag of row.tags) {
+            const normalizedTag = normalizeString(tag);
+            if (normalizedTag) {
+                tags.add(normalizedTag);
+            }
+        }
+    }
+
+    const charSet = new Set();
+
+    for (const tag of tags) {
+        addCharsToSet(charSet, tag);
+    }
+
+    return {
+        emuRecordCount: rows.length,
+        tags: [...tags].sort((left, right) => left.localeCompare(right, 'zh-Hans-CN')),
+        charSet,
+    };
 }
 
 function buildUnicodeRange(chars) {
@@ -533,15 +591,19 @@ async function writeGeneratedCss(unicodeRange, generatedFonts) {
 }
 
 async function buildReport({
+    schedulePath,
+    emuListPath,
     staticFiles,
     staticChars,
     conservativeChars,
-    databaseRows,
-    stationNames,
-    stationChars,
+    scheduleItemCount,
+    scheduleStationNames,
+    scheduleStationChars,
+    emuRecordCount,
+    emuTags,
+    emuTagChars,
     totalChars,
     unicodeRange,
-    window,
     generatedFonts,
     removedSubsetFiles,
 }) {
@@ -568,16 +630,21 @@ async function buildReport({
     return {
         generatedAt: new Date().toISOString(),
         timezone,
-        window,
         inputs: {
+            schedulePath: relativeFromRoot(schedulePath),
+            emuListPath: relativeFromRoot(emuListPath),
             staticFileCount: staticFiles.length,
             staticFiles,
             staticCharCount: staticChars.size,
             conservativeCharCount: conservativeChars.size,
-            databaseRowCount: databaseRows.length,
-            stationNameCount: stationNames.length,
-            stationNames,
-            stationCharCount: stationChars.size,
+            scheduleItemCount,
+            scheduleStationNameCount: scheduleStationNames.length,
+            scheduleStationNames,
+            scheduleStationCharCount: scheduleStationChars.size,
+            emuRecordCount,
+            emuTagCount: emuTags.length,
+            emuTags,
+            emuTagCharCount: emuTagChars.size,
         },
         outputs: {
             charsetPath: relativeFromRoot(charsetPath),
@@ -593,17 +660,21 @@ async function buildReport({
 }
 
 logStep('checking required input files');
-await fs.access(emuDbPath);
+await fs.access(configPath);
 await fs.access(conservativeCharsPath);
 await fs.mkdir(outputDir, { recursive: true });
 await ensureSourceFonts();
 logStep(`source fonts ready in ${relativeFromRoot(sourceDir)}`);
 
-logStep('collecting characters from repository and database');
+const assetPaths = await readRuntimeAssetPaths();
+await fs.access(assetPaths.schedulePath);
+await fs.access(assetPaths.emuListPath);
+
+logStep('collecting characters from repository and runtime assets');
 const staticResult = await collectStaticText();
 const conservativeCharsRaw = await readConservativeChars();
-const window = getRecentThreeDayWindow();
-const databaseResult = collectDatabaseStations(window);
+const scheduleResult = await collectScheduleStations(assetPaths.schedulePath);
+const emuTagResult = await collectEmuTags(assetPaths.emuListPath);
 
 const mergedChars = new Set();
 
@@ -617,7 +688,11 @@ for (const char of staticResult.charSet) {
     mergedChars.add(char);
 }
 
-for (const char of databaseResult.charSet) {
+for (const char of scheduleResult.charSet) {
+    mergedChars.add(char);
+}
+
+for (const char of emuTagResult.charSet) {
     mergedChars.add(char);
 }
 
@@ -629,8 +704,8 @@ const unicodeRange = buildUnicodeRange(totalChars);
 await fs.writeFile(charsetPath, totalChars.join(''), 'utf8');
 logStep(
     `collected ${totalChars.length} total chars from ${staticResult.files.length} static files, ` +
-        `${databaseResult.stationNames.length} station names, ` +
-        `window ${window.startDate}..${window.endDate}`,
+        `${scheduleResult.stationNames.length} schedule station names, ` +
+        `${emuTagResult.tags.length} emu tags`,
 );
 logStep(`wrote charset file: ${relativeFromRoot(charsetPath)}`);
 
@@ -659,15 +734,19 @@ const removedSubsetFiles = await cleanupOldSubsetOutputs(
 );
 
 const report = await buildReport({
+    schedulePath: assetPaths.schedulePath,
+    emuListPath: assetPaths.emuListPath,
     staticFiles: staticResult.files,
     staticChars: staticResult.charSet,
     conservativeChars: new Set(conservativeCharsRaw),
-    databaseRows: databaseResult.rows,
-    stationNames: databaseResult.stationNames,
-    stationChars: databaseResult.charSet,
+    scheduleItemCount: scheduleResult.scheduleItemCount,
+    scheduleStationNames: scheduleResult.stationNames,
+    scheduleStationChars: scheduleResult.charSet,
+    emuRecordCount: emuTagResult.emuRecordCount,
+    emuTags: emuTagResult.tags,
+    emuTagChars: emuTagResult.charSet,
     totalChars,
     unicodeRange,
-    window,
     generatedFonts,
     removedSubsetFiles,
 });
@@ -687,7 +766,8 @@ console.log(
             reportPath: relativeFromRoot(reportPath),
             generatedCssPath: relativeFromRoot(generatedCssPath),
             totalChars: totalChars.length,
-            stationNameCount: databaseResult.stationNames.length,
+            scheduleStationNameCount: scheduleResult.stationNames.length,
+            emuTagCount: emuTagResult.tags.length,
             subsetFiles: generatedFonts.map((font) => font.subsetName),
         },
         null,
