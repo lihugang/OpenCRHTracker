@@ -345,8 +345,9 @@ export function startTaskScheduler() {
     }, pollIntervalMs);
     started = true;
 
-    logger.info(`started pollIntervalMs=${pollIntervalMs} autoStart=true`);
-    void tick();
+    logger.info(
+        `started pollIntervalMs=${pollIntervalMs} autoStart=true immediateTick=false`
+    );
 }
 
 export function stopTaskScheduler() {
