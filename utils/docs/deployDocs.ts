@@ -579,7 +579,8 @@ export const deployDocsSections: DocsContentSection[] = [
                         path: 'task.referenceModel',
                         valueType: 'object',
                         required: true,
-                        description: 'Reference model index rebuild task settings.',
+                        description:
+                            'Reference model index rebuild task settings.',
                         notes: [
                             'windowDays sets the historical window; the current default is 14.',
                             'batchSize sets the paged scan size for daily_emu_routes; the current default is 1000.',

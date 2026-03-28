@@ -102,8 +102,8 @@
                     :show-accent-bar="false">
                     <div class="space-y-4">
                         <div
-                            class="flex flex-wrap items-start justify-between gap-4">
-                            <div class="space-y-2">
+                            class="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-start">
+                            <div class="min-w-0 space-y-2">
                                 <div class="flex flex-wrap items-center gap-2">
                                     <span
                                         class="inline-flex rounded-full border border-crh-blue/20 bg-blue-50 px-3 py-1 text-xs font-medium uppercase tracking-[0.14em] text-crh-blue">
@@ -126,8 +126,12 @@
                                 </p>
                             </div>
 
-                            <NuxtLink :to="'/docs/api/' + endpoint.slug">
-                                <UiButton variant="secondary">
+                            <NuxtLink
+                                :to="'/docs/api/' + endpoint.slug"
+                                class="shrink-0 md:self-start">
+                                <UiButton
+                                    variant="secondary"
+                                    class="whitespace-nowrap">
                                     查看接口
                                 </UiButton>
                             </NuxtLink>

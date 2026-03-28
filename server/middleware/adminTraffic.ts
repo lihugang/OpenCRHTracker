@@ -18,8 +18,7 @@ interface WebsiteTrafficIdentity {
 function isApiRequest(pathname: string) {
     const versionPrefix = useConfig().api.versionPrefix;
     return (
-        pathname === versionPrefix ||
-        pathname.startsWith(`${versionPrefix}/`)
+        pathname === versionPrefix || pathname.startsWith(`${versionPrefix}/`)
     );
 }
 
@@ -38,8 +37,7 @@ function isDocumentRequest(event: H3Event, pathname: string) {
 
     const accept = getHeader(event, 'accept');
     return (
-        typeof accept === 'string' &&
-        accept.toLowerCase().includes('text/html')
+        typeof accept === 'string' && accept.toLowerCase().includes('text/html')
     );
 }
 

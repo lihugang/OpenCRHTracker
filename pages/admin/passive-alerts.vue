@@ -72,7 +72,11 @@
                             12306 请求数
                         </p>
                         <p class="mt-2 text-3xl font-semibold text-slate-900">
-                            {{ requestMetricsRetained ? requestTotalCount : '--' }}
+                            {{
+                                requestMetricsRetained
+                                    ? requestTotalCount
+                                    : '--'
+                            }}
                         </p>
                     </div>
                 </div>

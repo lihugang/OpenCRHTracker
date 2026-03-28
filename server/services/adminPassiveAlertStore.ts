@@ -201,8 +201,7 @@ export function readPassiveAlerts(
 
                 return left.type.localeCompare(right.type, 'zh-CN');
             }),
-        requestMetricsRetentionDays:
-            requestMetrics.requestMetricsRetentionDays,
+        requestMetricsRetentionDays: requestMetrics.requestMetricsRetentionDays,
         requestMetricsRetained: requestMetrics.requestMetricsRetained,
         requestBuckets: requestMetrics.requestBuckets,
         items: pageItems.map(({ lineIndex: _lineIndex, ...item }) => item)

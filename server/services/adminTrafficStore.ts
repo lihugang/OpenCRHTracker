@@ -313,7 +313,10 @@ function restoreTrafficStoreFromDisk(): TrafficStoreContainer | null {
             return null;
         }
 
-        for (const [index, serializedBucket] of serializedWindow.buckets.entries()) {
+        for (const [
+            index,
+            serializedBucket
+        ] of serializedWindow.buckets.entries()) {
             const targetBucket = targetWindow.buckets[index]!;
 
             if (
@@ -333,10 +336,12 @@ function restoreTrafficStoreFromDisk(): TrafficStoreContainer | null {
 
             if (targetBucket.mode === 'estimate') {
                 if (
-                    typeof (serializedBucket as SerializedEstimatedTrafficBucket)
-                        .visitorSketch !== 'string' ||
-                    typeof (serializedBucket as SerializedEstimatedTrafficBucket)
-                        .activeUserSketch !== 'string'
+                    typeof (
+                        serializedBucket as SerializedEstimatedTrafficBucket
+                    ).visitorSketch !== 'string' ||
+                    typeof (
+                        serializedBucket as SerializedEstimatedTrafficBucket
+                    ).activeUserSketch !== 'string'
                 ) {
                     return null;
                 }
@@ -364,7 +369,10 @@ function restoreTrafficStoreFromDisk(): TrafficStoreContainer | null {
                     serializedBucket as SerializedExactTrafficBucket
                 ).activeUserIds;
 
-                if (!Array.isArray(visitorIds) || !Array.isArray(activeUserIds)) {
+                if (
+                    !Array.isArray(visitorIds) ||
+                    !Array.isArray(activeUserIds)
+                ) {
                     return null;
                 }
 
@@ -499,7 +507,8 @@ function buildWindowSnapshot(
     const buckets = Array.from(
         { length: windowState.bucketCount },
         (_, index): AdminTrafficBucket => {
-            const startAt = firstBucketStart + index * windowState.bucketSeconds;
+            const startAt =
+                firstBucketStart + index * windowState.bucketSeconds;
             const bucketIndex = toBucketIndex(
                 startAt,
                 windowState.bucketSeconds,
@@ -600,7 +609,8 @@ function buildWindowSnapshot(
             ? estimateCardinality(activeUserSketch!)
             : activeUserIds.size;
 
-    const fullCoverageSeconds = windowState.bucketSeconds * windowState.bucketCount;
+    const fullCoverageSeconds =
+        windowState.bucketSeconds * windowState.bucketCount;
     const coverageSeconds = Math.min(
         fullCoverageSeconds,
         Math.max(0, asOf - startedAt)

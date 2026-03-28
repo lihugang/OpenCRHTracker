@@ -206,10 +206,7 @@ export function clearAssignedEmuCodeByGroupKey(
 ): boolean {
     const normalizedGroupKey = groupKey.trim();
     const normalizedEmuCode = normalizeCode(emuCode);
-    if (
-        normalizedGroupKey.length === 0 ||
-        normalizedEmuCode.length === 0
-    ) {
+    if (normalizedGroupKey.length === 0 || normalizedEmuCode.length === 0) {
         return false;
     }
 

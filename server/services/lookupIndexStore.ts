@@ -146,7 +146,9 @@ function loadStationItems(scheduleFilePath: string) {
             subtitle: `时刻表 · ${count} 个车次`,
             tags: []
         }))
-        .sort((left, right) => left.code.localeCompare(right.code, 'zh-Hans-CN'));
+        .sort((left, right) =>
+            left.code.localeCompare(right.code, 'zh-Hans-CN')
+        );
 }
 
 function loadEmuItems(emuListFilePath: string) {

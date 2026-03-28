@@ -28,7 +28,8 @@
                                     class="text-xs font-semibold uppercase tracking-[0.22em] text-sky-700">
                                     Runtime Stats
                                 </p>
-                                <h2 class="text-2xl font-semibold text-slate-900">
+                                <h2
+                                    class="text-2xl font-semibold text-slate-900">
                                     相对时间窗口
                                 </h2>
                                 <p class="text-sm leading-6 text-slate-700">
@@ -45,7 +46,11 @@
                                     </dt>
                                     <dd
                                         class="mt-2 text-sm font-semibold text-slate-900">
-                                        {{ formatTimestamp(trafficData?.startedAt ?? 0) }}
+                                        {{
+                                            formatTimestamp(
+                                                trafficData?.startedAt ?? 0
+                                            )
+                                        }}
                                     </dd>
                                 </div>
                                 <div
@@ -56,7 +61,11 @@
                                     </dt>
                                     <dd
                                         class="mt-2 text-sm font-semibold text-slate-900">
-                                        {{ formatTimestamp(trafficData?.asOf ?? 0) }}
+                                        {{
+                                            formatTimestamp(
+                                                trafficData?.asOf ?? 0
+                                            )
+                                        }}
                                     </dd>
                                 </div>
                             </dl>
@@ -89,13 +98,21 @@
                                     </h3>
                                     <p class="text-sm leading-6 text-slate-500">
                                         当前已覆盖
-                                        {{ formatDuration(activeWindow.coverageSeconds) }}
+                                        {{
+                                            formatDuration(
+                                                activeWindow.coverageSeconds
+                                            )
+                                        }}
                                         <template v-if="activeWindow.isPartial">
-                                            ，尚未覆盖完整 {{ activeWindow.label }}
+                                            ，尚未覆盖完整
+                                            {{ activeWindow.label }}
                                         </template>
                                     </p>
                                     <p
-                                        v-if="activeWindow.estimatedMetrics.length > 0"
+                                        v-if="
+                                            activeWindow.estimatedMetrics
+                                                .length > 0
+                                        "
                                         class="text-xs leading-5 text-amber-700">
                                         7days 的独立访客和活跃用户为估算值。
                                     </p>
@@ -108,7 +125,8 @@
                                 </div>
                             </div>
 
-                            <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                            <div
+                                class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                                 <div
                                     class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-4 py-4">
                                     <p
@@ -117,7 +135,11 @@
                                     </p>
                                     <p
                                         class="mt-2 text-2xl font-semibold text-slate-900">
-                                        {{ formatDuration(activeWindow.coverageSeconds) }}
+                                        {{
+                                            formatDuration(
+                                                activeWindow.coverageSeconds
+                                            )
+                                        }}
                                     </p>
                                 </div>
                                 <div
@@ -128,7 +150,11 @@
                                     </p>
                                     <p
                                         class="mt-2 text-2xl font-semibold text-slate-900">
-                                        {{ formatBucketSeconds(activeWindow.bucketSeconds) }}
+                                        {{
+                                            formatBucketSeconds(
+                                                activeWindow.bucketSeconds
+                                            )
+                                        }}
                                     </p>
                                 </div>
                                 <div
@@ -150,7 +176,11 @@
                                     </p>
                                     <p
                                         class="mt-2 text-2xl font-semibold text-slate-900">
-                                        {{ activeWindow.isPartial ? '部分' : '完整' }}
+                                        {{
+                                            activeWindow.isPartial
+                                                ? '部分'
+                                                : '完整'
+                                        }}
                                     </p>
                                 </div>
                             </div>
@@ -167,10 +197,13 @@
                                             <div class="space-y-1">
                                                 <p
                                                     class="text-xs font-semibold uppercase tracking-[0.22em]"
-                                                    :class="metric.eyebrowClass">
+                                                    :class="
+                                                        metric.eyebrowClass
+                                                    ">
                                                     {{ metric.eyebrow }}
                                                 </p>
-                                                <div class="flex flex-wrap items-center gap-2">
+                                                <div
+                                                    class="flex flex-wrap items-center gap-2">
                                                     <h3
                                                         class="text-xl font-semibold text-slate-900">
                                                         {{ metric.title }}
@@ -183,10 +216,15 @@
                                                 </div>
                                             </div>
 
-                                            <div class="text-left md:text-right">
+                                            <div
+                                                class="text-left md:text-right">
                                                 <p
                                                     class="text-3xl font-semibold text-slate-900">
-                                                    {{ formatNumber(metric.total) }}
+                                                    {{
+                                                        formatNumber(
+                                                            metric.total
+                                                        )
+                                                    }}
                                                 </p>
                                                 <p
                                                     class="mt-1 text-xs leading-5 text-slate-500">
@@ -291,12 +329,11 @@ const windowOptions = [
 }>;
 
 async function fetchTraffic() {
-    const response = await requestFetch<TrackerApiResponse<AdminTrafficResponse>>(
-        '/api/v1/admin/traffic',
-        {
-            retry: 0
-        }
-    );
+    const response = await requestFetch<
+        TrackerApiResponse<AdminTrafficResponse>
+    >('/api/v1/admin/traffic', {
+        retry: 0
+    });
 
     if (!response.ok) {
         throw {
@@ -552,12 +589,11 @@ function formatDuration(totalSeconds: number) {
 
 <style scoped>
 .traffic-metric-card.traffic-metric-card {
-    background:
-        linear-gradient(
-            180deg,
-            rgba(248, 250, 252, 0.96),
-            rgba(255, 255, 255, 0.96)
-        );
+    background: linear-gradient(
+        180deg,
+        rgba(248, 250, 252, 0.96),
+        rgba(255, 255, 255, 0.96)
+    );
 }
 
 .traffic-chart {

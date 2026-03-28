@@ -31,10 +31,7 @@ function flushAllCallbacks() {
         try {
             callback();
         } catch (error) {
-            console.warn(
-                '[runtime-persistence] flush callback failed:',
-                error
-            );
+            console.warn('[runtime-persistence] flush callback failed:', error);
         }
     }
 }

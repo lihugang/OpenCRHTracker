@@ -283,10 +283,7 @@ function parseScheduleDocument(value: unknown): {
     const document = value as Record<string, unknown>;
     const version =
         typeof document.version === 'number' ? document.version : undefined;
-    if (
-        version !== 3 &&
-        version !== CURRENT_SCHEDULE_DOCUMENT_VERSION
-    ) {
+    if (version !== 3 && version !== CURRENT_SCHEDULE_DOCUMENT_VERSION) {
         return {
             document: null,
             migrated: false

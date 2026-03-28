@@ -210,7 +210,9 @@
                                     class="flex max-w-[58%] flex-wrap justify-end gap-1.5 text-right">
                                     <template v-if="hasReferenceModels(item)">
                                         <span
-                                            v-for="model in getReferenceModelLabels(item)"
+                                            v-for="model in getReferenceModelLabels(
+                                                item
+                                            )"
                                             :key="`mobile:${buildItemKey(item)}:${model}`"
                                             class="inline-flex items-center rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-[11px] font-medium leading-none text-sky-700">
                                             {{ model }}
@@ -235,15 +237,21 @@
                                         <p
                                             class="mt-1 truncate text-sm font-medium text-crh-grey-dark">
                                             <LookupStationLink
-                                                :station-name="item.startStation"
+                                                :station-name="
+                                                    item.startStation
+                                                "
                                                 :focus-train-codes="
-                                                    resolveStationFocusTrainCodes(item)
+                                                    resolveStationFocusTrainCodes(
+                                                        item
+                                                    )
                                                 "
                                                 :current-station-name="
                                                     props.stationName
                                                 "
                                                 :fallback-text="
-                                                    formatStation(item.startStation)
+                                                    formatStation(
+                                                        item.startStation
+                                                    )
                                                 " />
                                         </p>
                                     </div>
@@ -277,13 +285,17 @@
                                             <LookupStationLink
                                                 :station-name="item.endStation"
                                                 :focus-train-codes="
-                                                    resolveStationFocusTrainCodes(item)
+                                                    resolveStationFocusTrainCodes(
+                                                        item
+                                                    )
                                                 "
                                                 :current-station-name="
                                                     props.stationName
                                                 "
                                                 :fallback-text="
-                                                    formatStation(item.endStation)
+                                                    formatStation(
+                                                        item.endStation
+                                                    )
                                                 " />
                                         </p>
                                     </div>
@@ -302,7 +314,11 @@
                                         </p>
                                         <p
                                             class="mt-1 font-mono text-sm text-slate-500">
-                                            {{ formatNullableTime(item.arriveAt) }}
+                                            {{
+                                                formatNullableTime(
+                                                    item.arriveAt
+                                                )
+                                            }}
                                         </p>
                                     </button>
 
@@ -317,7 +333,11 @@
                                         </p>
                                         <p
                                             class="mt-1 font-mono text-sm text-slate-500">
-                                            {{ formatNullableTime(item.departAt) }}
+                                            {{
+                                                formatNullableTime(
+                                                    item.departAt
+                                                )
+                                            }}
                                         </p>
                                     </button>
                                 </div>

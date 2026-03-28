@@ -51,12 +51,7 @@ export default defineEventHandler(async (event) => {
             const limit = parseLimit(event);
             const rows = getTodayStationTimetableByStationName(stationName);
 
-            ensure(
-                rows.length > 0,
-                404,
-                'not_found',
-                '当前暂无该车站的时刻表'
-            );
+            ensure(rows.length > 0, 404, 'not_found', '当前暂无该车站的时刻表');
 
             const startIndex =
                 cursor === null ? 0 : findStartIndexFromCursor(rows, cursor);
@@ -66,9 +61,10 @@ export default defineEventHandler(async (event) => {
                 startIndex + pageRows.length < rows.length && lastRow
                     ? buildNextCursor(lastRow)
                     : '';
-            const referenceModelsByCodeSet = new Map<string, ReturnType<
-                typeof getReferenceModelsByTrainCodes
-            >>();
+            const referenceModelsByCodeSet = new Map<
+                string,
+                ReturnType<typeof getReferenceModelsByTrainCodes>
+            >();
 
             const response: StationTimetableResponse = {
                 stationName,
@@ -114,9 +110,9 @@ function getReferenceModelsForRow(
         ReturnType<typeof getReferenceModelsByTrainCodes>
     >
 ) {
-    const cacheKey = [...row.allCodes].sort((left, right) =>
-        left.localeCompare(right)
-    ).join('|');
+    const cacheKey = [...row.allCodes]
+        .sort((left, right) => left.localeCompare(right))
+        .join('|');
     const cachedReferenceModels = referenceModelsByCodeSet.get(cacheKey);
     if (cachedReferenceModels) {
         return cachedReferenceModels;
@@ -176,11 +172,7 @@ function parseStationTimetableCursor(
         !Number.isInteger(startAt) ||
         startAt < 0
     ) {
-        throw new ApiRequestError(
-            400,
-            'invalid_param',
-            `${label} 包含非法值`
-        );
+        throw new ApiRequestError(400, 'invalid_param', `${label} 包含非法值`);
     }
 
     return {

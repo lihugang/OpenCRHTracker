@@ -429,9 +429,8 @@ async function scanUnassignedCandidates(
 
         matchedGroups.set(trackedGroup.group.trainKey, trackedGroup);
         const matchedEmuScanRecords =
-            matchedEmuScanRecordsByTrainKey.get(
-                trackedGroup.group.trainKey
-            ) ?? new Map<string, string>();
+            matchedEmuScanRecordsByTrainKey.get(trackedGroup.group.trainKey) ??
+            new Map<string, string>();
         matchedEmuScanRecords.set(
             scannedEmuCode,
             seatCodeResult.route.trainRepeat
@@ -458,13 +457,10 @@ function collectMatchedEmuScanRecords(
         return [];
     }
 
-    return Array.from(
-        matchedEmuScans.entries(),
-        ([emuCode, trainRepeat]) => ({
-            emuCode,
-            trainRepeat
-        })
-    );
+    return Array.from(matchedEmuScans.entries(), ([emuCode, trainRepeat]) => ({
+        emuCode,
+        trainRepeat
+    }));
 }
 
 function cleanupPrunedTrackedGroupRows(

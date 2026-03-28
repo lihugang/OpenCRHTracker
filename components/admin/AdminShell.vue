@@ -15,7 +15,8 @@
                         :show-accent-bar="false"
                         class="sticky top-24">
                         <div class="space-y-5">
-                            <div class="flex items-center justify-between gap-3">
+                            <div
+                                class="flex items-center justify-between gap-3">
                                 <UiButton
                                     type="button"
                                     variant="secondary"
@@ -144,7 +145,10 @@
                                                 </dd>
                                             </div>
                                             <div
-                                                v-if="props.showDateInput !== false"
+                                                v-if="
+                                                    props.showDateInput !==
+                                                    false
+                                                "
                                                 class="space-y-1">
                                                 <dt
                                                     class="text-xs uppercase tracking-[0.18em] text-slate-400">

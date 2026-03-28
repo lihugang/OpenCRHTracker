@@ -84,7 +84,8 @@
                                     最近告警
                                 </h3>
                                 <p class="text-sm leading-6 text-slate-500">
-                                    这里只预览最新 5 条，完整列表请进入被动告警页查看。
+                                    这里只预览最新 5
+                                    条，完整列表请进入被动告警页查看。
                                 </p>
                             </div>
 
@@ -181,7 +182,8 @@
                                 </p>
                                 <p
                                     class="mt-2 text-sm leading-6 text-slate-600">
-                                    查看完整 warning/error 列表、高频来源和 12306 请求曲线。
+                                    查看完整 warning/error 列表、高频来源和
+                                    12306 请求曲线。
                                 </p>
                             </button>
 
@@ -209,7 +211,8 @@
                                 </p>
                                 <p
                                     class="mt-2 text-sm leading-6 text-slate-600">
-                                    查看 3h、24h 和 7days 窗口内的网站请求、API 调用、独立访客和活跃用户走势。
+                                    查看 3h、24h 和 7days 窗口内的网站请求、API
+                                    调用、独立访客和活跃用户走势。
                                 </p>
                             </button>
                         </div>
@@ -346,7 +349,9 @@ async function goToAnomalyScan() {
 }
 
 async function goToTraffic() {
-    await navigateTo(buildAdminRoute('/admin/traffic', selectedDateInput.value));
+    await navigateTo(
+        buildAdminRoute('/admin/traffic', selectedDateInput.value)
+    );
 }
 
 function formatTimestamp(timestamp: number) {

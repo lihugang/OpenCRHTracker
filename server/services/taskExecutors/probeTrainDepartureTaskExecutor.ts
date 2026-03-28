@@ -1142,10 +1142,7 @@ async function executeProbeTrainDepartureTask(rawArgs: unknown): Promise<void> {
         buildProbeAssetKey(parsedMainEmuCode!.model, currentTrainSetNo)
     );
     const historicalRecentMatchingTrainCodes =
-        collectHistoricalRecentMatchingTrainCodes(
-            allTrainCodes,
-            mainEmuCode
-        );
+        collectHistoricalRecentMatchingTrainCodes(allTrainCodes, mainEmuCode);
 
     if (historicalRecentMatchingTrainCodes.length > 0) {
         const todayTrainCodesValidation =

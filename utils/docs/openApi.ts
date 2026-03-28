@@ -1176,8 +1176,7 @@ export const developerDocsOpenApi = {
                 operationId: 'recordsDaily',
                 tags: ['Records'],
                 summary: '分页读取每日记录',
-                description:
-                    '按日期返回分页后的每日担当记录。',
+                description: '按日期返回分页后的每日担当记录。',
                 parameters: [
                     {
                         $ref: '#/components/parameters/DailyDateQuery'
@@ -1470,7 +1469,8 @@ export const developerDocsOpenApi = {
                     {
                         id: 'timetable-by-station-next-page',
                         label: '车站页下一页',
-                        summary: '复用上一页返回的 cursor，继续读取同一车站的后续时刻表数据。',
+                        summary:
+                            '复用上一页返回的 cursor，继续读取同一车站的后续时刻表数据。',
                         authMode: 'anonymous',
                         pathParams: {
                             stationName: '北京南'
@@ -1488,8 +1488,7 @@ export const developerDocsOpenApi = {
                 operationId: 'historyTrain',
                 tags: ['History'],
                 summary: '按车次查询历史',
-                description:
-                    '返回单个车次的分页历史记录。',
+                description: '返回单个车次的分页历史记录。',
                 parameters: [
                     {
                         $ref: '#/components/parameters/TrainCodeParam'
@@ -1592,8 +1591,7 @@ export const developerDocsOpenApi = {
                 operationId: 'historyEmu',
                 tags: ['History'],
                 summary: '按车组查询历史',
-                description:
-                    '返回单个车组的分页历史记录。',
+                description: '返回单个车组的分页历史记录。',
                 parameters: [
                     {
                         $ref: '#/components/parameters/EmuCodeParam'
@@ -1697,8 +1695,7 @@ export const developerDocsOpenApi = {
                 operationId: 'dailyExportIndex',
                 tags: ['Exports'],
                 summary: '列出可用的日导出文件',
-                description:
-                    '按年和月列出已生成的日导出文件。',
+                description: '按年和月列出已生成的日导出文件。',
                 parameters: [
                     {
                         $ref: '#/components/parameters/ExportYearQuery'

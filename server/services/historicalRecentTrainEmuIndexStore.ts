@@ -20,12 +20,10 @@ function rebuildCache(): HistoricalRecentTrainEmuIndexCache {
     const historicalRecentEnd = currentDayStart - 1;
     const trainToEmuSet = new Map<string, Set<string>>();
 
-    for (
-        const row of listDailyRecordsAll(
-            historicalRecentStart,
-            historicalRecentEnd
-        )
-    ) {
+    for (const row of listDailyRecordsAll(
+        historicalRecentStart,
+        historicalRecentEnd
+    )) {
         const trainCode = normalizeCode(row.train_code);
         const emuCode = normalizeCode(row.emu_code);
         if (trainCode.length === 0 || emuCode.length === 0) {

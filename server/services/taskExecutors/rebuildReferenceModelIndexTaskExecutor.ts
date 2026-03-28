@@ -71,9 +71,14 @@ export function registerRebuildReferenceModelIndexTaskExecutor() {
         return;
     }
 
-    registerTaskExecutor(REBUILD_REFERENCE_MODEL_INDEX_TASK_EXECUTOR, async () => {
-        await executeRebuildReferenceModelIndexTask();
-    });
+    registerTaskExecutor(
+        REBUILD_REFERENCE_MODEL_INDEX_TASK_EXECUTOR,
+        async () => {
+            await executeRebuildReferenceModelIndexTask();
+        }
+    );
     registered = true;
-    logger.info(`registered executor=${REBUILD_REFERENCE_MODEL_INDEX_TASK_EXECUTOR}`);
+    logger.info(
+        `registered executor=${REBUILD_REFERENCE_MODEL_INDEX_TASK_EXECUTOR}`
+    );
 }

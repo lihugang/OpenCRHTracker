@@ -184,7 +184,10 @@ async function executeRefreshRouteBatchTask(rawArgs: unknown) {
         const refreshedInternalCode =
             routeResult.data.route.internalCode.trim();
         const nextAllCodes = [...routeResult.data.route.allCodes];
-        const nextStops = toScheduleStops(state.date, routeResult.data.route.stops);
+        const nextStops = toScheduleStops(
+            state.date,
+            routeResult.data.route.stops
+        );
         let groupChanged = false;
         for (const index of groupItemIndexes) {
             const groupItem = state.items[index]!;

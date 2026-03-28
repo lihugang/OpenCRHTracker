@@ -1,4 +1,3 @@
-
 import { computed, ref, toValue, watch, type MaybeRefOrGetter } from 'vue';
 import type { TrackerApiResponse } from '~/types/homepage';
 import type {
@@ -33,12 +32,11 @@ async function fetchStationPage(
     target: LookupTarget,
     cursor: string
 ) {
-    const response = await requestFetch<TrackerApiResponse<StationTimetableResponse>>(
-        `/api/v1/timetable/station/${encodeURIComponent(target.code)}`,
-        {
-            query: buildStationQuery(cursor)
-        }
-    );
+    const response = await requestFetch<
+        TrackerApiResponse<StationTimetableResponse>
+    >(`/api/v1/timetable/station/${encodeURIComponent(target.code)}`, {
+        query: buildStationQuery(cursor)
+    });
 
     if (!response.ok) {
         throw {

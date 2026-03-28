@@ -69,7 +69,9 @@ function buildObservedRunKey(bucket: ReferenceModelRunBucket) {
         bucket.startAt,
         bucket.startStation,
         bucket.endStation,
-        [...bucket.models].sort((left, right) => left.localeCompare(right)).join('/')
+        [...bucket.models]
+            .sort((left, right) => left.localeCompare(right))
+            .join('/')
     ].join('#');
 }
 
@@ -176,7 +178,10 @@ function consumeDailyRecordRow(
 
     if (existingBucket) {
         existingBucket.models.add(model);
-        if (existingBucket.startStation.length === 0 && startStation.length > 0) {
+        if (
+            existingBucket.startStation.length === 0 &&
+            startStation.length > 0
+        ) {
             existingBucket.startStation = startStation;
         }
         if (existingBucket.endStation.length === 0 && endStation.length > 0) {

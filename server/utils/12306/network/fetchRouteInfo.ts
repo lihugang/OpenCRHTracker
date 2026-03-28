@@ -201,11 +201,15 @@ export default async function fetchRouteInfo(
                 );
 
                 return {
-                    stationNo: Number.isInteger(stationNo) ? stationNo : index + 1,
+                    stationNo: Number.isInteger(stationNo)
+                        ? stationNo
+                        : index + 1,
                     stationName: stop.stationName.trim(),
                     arriveAt,
                     departAt,
-                    stationTrainCode: stop.stationTrainCode.trim().toUpperCase(),
+                    stationTrainCode: stop.stationTrainCode
+                        .trim()
+                        .toUpperCase(),
                     wicket: normalizeOptionalField(stop.wicket),
                     isStart: index === 0,
                     isEnd: index === rawStops.length - 1

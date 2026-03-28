@@ -417,7 +417,9 @@
                                             <LookupStationLink
                                                 :station-name="item.endStation"
                                                 :focus-train-codes="
-                                                    resolveStationFocusTrainCodes(item)
+                                                    resolveStationFocusTrainCodes(
+                                                        item
+                                                    )
                                                 "
                                                 :fallback-text="
                                                     formatStationText(

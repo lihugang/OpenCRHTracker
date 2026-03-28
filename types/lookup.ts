@@ -64,8 +64,7 @@ export interface EmuHistoryResponse extends HistoryResponseBase<EmuHistoryRecord
     end?: number | null;
 }
 
-export interface StationTimetableResponse
-    extends HistoryResponseBase<StationTimetableRecord> {
+export interface StationTimetableResponse extends HistoryResponseBase<StationTimetableRecord> {
     stationName: string;
 }
 

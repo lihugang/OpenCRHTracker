@@ -36,10 +36,12 @@
                 <UiCard
                     :show-accent-bar="false"
                     variant="subtle">
-                    <p class="text-xs uppercase tracking-[0.16em] text-slate-400">
+                    <p
+                        class="text-xs uppercase tracking-[0.16em] text-slate-400">
                         车次
                     </p>
-                    <p class="mt-2 font-mono text-sm font-semibold text-crh-blue">
+                    <p
+                        class="mt-2 font-mono text-sm font-semibold text-crh-blue">
                         {{ timetable.allCodes.join(' / ') }}
                     </p>
                 </UiCard>
@@ -47,7 +49,8 @@
                 <UiCard
                     :show-accent-bar="false"
                     variant="subtle">
-                    <p class="text-xs uppercase tracking-[0.16em] text-slate-400">
+                    <p
+                        class="text-xs uppercase tracking-[0.16em] text-slate-400">
                         始发 / 终到
                     </p>
                     <p class="mt-2 text-sm font-medium text-crh-grey-dark">
@@ -62,11 +65,12 @@
                             fallback-text="--" />
                     </p>
                 </UiCard>
-
             </div>
 
-            <div class="hidden overflow-hidden rounded-[1.25rem] border border-slate-200 md:block">
-                <table class="min-w-full border-separate border-spacing-0 bg-white/90">
+            <div
+                class="hidden overflow-hidden rounded-[1.25rem] border border-slate-200 md:block">
+                <table
+                    class="min-w-full border-separate border-spacing-0 bg-white/90">
                     <thead>
                         <tr class="bg-slate-50/80 text-left">
                             <th
@@ -82,25 +86,33 @@
                             v-for="stop in timetable.stops"
                             :key="'desktop:' + stop.stationNo"
                             class="align-top">
-                            <td class="border-b border-slate-100 px-4 py-3 font-mono text-sm text-slate-500 last:border-b-0">
+                            <td
+                                class="border-b border-slate-100 px-4 py-3 font-mono text-sm text-slate-500 last:border-b-0">
                                 {{ stop.stationNo }}
                             </td>
-                            <td class="border-b border-slate-100 px-4 py-3 font-mono text-sm text-slate-500 last:border-b-0">
+                            <td
+                                class="border-b border-slate-100 px-4 py-3 font-mono text-sm text-slate-500 last:border-b-0">
                                 {{ stop.stationTrainCode || '--' }}
                             </td>
-                            <td class="border-b border-slate-100 px-4 py-3 text-sm font-medium text-crh-grey-dark last:border-b-0">
+                            <td
+                                class="border-b border-slate-100 px-4 py-3 text-sm font-medium text-crh-grey-dark last:border-b-0">
                                 <LookupStationLink
                                     :station-name="stop.stationName"
-                                    :focus-train-codes="resolveStopFocusTrainCodes(stop)"
+                                    :focus-train-codes="
+                                        resolveStopFocusTrainCodes(stop)
+                                    "
                                     fallback-text="--" />
                             </td>
-                            <td class="border-b border-slate-100 px-4 py-3 font-mono text-sm text-slate-500 last:border-b-0">
+                            <td
+                                class="border-b border-slate-100 px-4 py-3 font-mono text-sm text-slate-500 last:border-b-0">
                                 {{ formatNullableTime(stop.arriveAt) }}
                             </td>
-                            <td class="border-b border-slate-100 px-4 py-3 font-mono text-sm text-slate-500 last:border-b-0">
+                            <td
+                                class="border-b border-slate-100 px-4 py-3 font-mono text-sm text-slate-500 last:border-b-0">
                                 {{ formatNullableTime(stop.departAt) }}
                             </td>
-                            <td class="border-b border-slate-100 px-4 py-3 text-sm text-slate-500 last:border-b-0">
+                            <td
+                                class="border-b border-slate-100 px-4 py-3 text-sm text-slate-500 last:border-b-0">
                                 {{ stop.wicket || '--' }}
                             </td>
                         </tr>
@@ -117,13 +129,17 @@
                     <div class="space-y-3">
                         <div class="flex items-start justify-between gap-3">
                             <div class="min-w-0">
-                                <p class="text-xs uppercase tracking-[0.16em] text-slate-400">
+                                <p
+                                    class="text-xs uppercase tracking-[0.16em] text-slate-400">
                                     第 {{ stop.stationNo }} 站
                                 </p>
-                                <p class="mt-1 text-sm font-semibold text-crh-grey-dark">
+                                <p
+                                    class="mt-1 text-sm font-semibold text-crh-grey-dark">
                                     <LookupStationLink
                                         :station-name="stop.stationName"
-                                        :focus-train-codes="resolveStopFocusTrainCodes(stop)"
+                                        :focus-train-codes="
+                                            resolveStopFocusTrainCodes(stop)
+                                        "
                                         fallback-text="--" />
                                 </p>
                             </div>
@@ -134,31 +150,38 @@
 
                         <div class="grid grid-cols-2 gap-3">
                             <div>
-                                <p class="text-[11px] uppercase tracking-[0.16em] text-slate-400">
+                                <p
+                                    class="text-[11px] uppercase tracking-[0.16em] text-slate-400">
                                     到点
                                 </p>
-                                <p class="mt-1 font-mono text-sm text-slate-500">
+                                <p
+                                    class="mt-1 font-mono text-sm text-slate-500">
                                     {{ formatNullableTime(stop.arriveAt) }}
                                 </p>
                             </div>
                             <div>
-                                <p class="text-[11px] uppercase tracking-[0.16em] text-slate-400">
+                                <p
+                                    class="text-[11px] uppercase tracking-[0.16em] text-slate-400">
                                     开点
                                 </p>
-                                <p class="mt-1 font-mono text-sm text-slate-500">
+                                <p
+                                    class="mt-1 font-mono text-sm text-slate-500">
                                     {{ formatNullableTime(stop.departAt) }}
                                 </p>
                             </div>
                             <div>
-                                <p class="text-[11px] uppercase tracking-[0.16em] text-slate-400">
+                                <p
+                                    class="text-[11px] uppercase tracking-[0.16em] text-slate-400">
                                     车次
                                 </p>
-                                <p class="mt-1 font-mono text-sm text-slate-500">
+                                <p
+                                    class="mt-1 font-mono text-sm text-slate-500">
                                     {{ stop.stationTrainCode || '--' }}
                                 </p>
                             </div>
                             <div>
-                                <p class="text-[11px] uppercase tracking-[0.16em] text-slate-400">
+                                <p
+                                    class="text-[11px] uppercase tracking-[0.16em] text-slate-400">
                                     检票口
                                 </p>
                                 <p class="mt-1 text-sm text-slate-500">
@@ -287,8 +310,11 @@ watch(
         errorMessage.value = '';
 
         try {
-            const response = await $fetch<TrackerApiResponse<CurrentTrainTimetableData>>(
-                '/api/v1/timetable/train/' + encodeURIComponent(normalizedTrainCode)
+            const response = await $fetch<
+                TrackerApiResponse<CurrentTrainTimetableData>
+            >(
+                '/api/v1/timetable/train/' +
+                    encodeURIComponent(normalizedTrainCode)
             );
 
             if (!response.ok) {
@@ -299,8 +325,7 @@ watch(
 
             cachedTimetables.set(normalizedTrainCode, response.data);
             timetable.value = response.data;
-            state.value =
-                response.data.stops.length > 0 ? 'success' : 'empty';
+            state.value = response.data.stops.length > 0 ? 'success' : 'empty';
         } catch (error) {
             timetable.value = null;
             state.value = 'error';
@@ -353,7 +378,9 @@ function getUpdatedDateLabel(updatedAt: number | null) {
 }
 
 function formatCalendarDateLabel(timestamp: number) {
-    const parts = DATE_LABEL_FORMATTER.formatToParts(new Date(timestamp * 1000));
+    const parts = DATE_LABEL_FORMATTER.formatToParts(
+        new Date(timestamp * 1000)
+    );
     const year = parts.find((part) => part.type === 'year')?.value ?? '';
     const month = parts.find((part) => part.type === 'month')?.value ?? '';
     const day = parts.find((part) => part.type === 'day')?.value ?? '';

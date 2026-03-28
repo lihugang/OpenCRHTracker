@@ -26,10 +26,7 @@ export function addHyperLogLogHash(
     const rank =
         remainder === 0
             ? HLL_MAX_RANK
-            : Math.min(
-                  HLL_MAX_RANK,
-                  Math.clz32(remainder) - HLL_PRECISION + 1
-              );
+            : Math.min(HLL_MAX_RANK, Math.clz32(remainder) - HLL_PRECISION + 1);
 
     if (rank > (sketch[index] ?? 0)) {
         sketch[index] = rank;
@@ -64,11 +61,10 @@ export function estimateHyperLogLog(sketch: HyperLogLogSketch) {
     }
 
     const rawEstimate = HLL_ALPHA_MM / inverseSum;
-    if (
-        rawEstimate <= 2.5 * HLL_REGISTER_COUNT &&
-        zeroRegisters > 0
-    ) {
-        return HLL_REGISTER_COUNT * Math.log(HLL_REGISTER_COUNT / zeroRegisters);
+    if (rawEstimate <= 2.5 * HLL_REGISTER_COUNT && zeroRegisters > 0) {
+        return (
+            HLL_REGISTER_COUNT * Math.log(HLL_REGISTER_COUNT / zeroRegisters)
+        );
     }
 
     return rawEstimate;
