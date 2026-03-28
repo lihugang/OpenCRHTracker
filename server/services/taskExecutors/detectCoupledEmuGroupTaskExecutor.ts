@@ -7,6 +7,7 @@ import {
 import {
     buildRunningEmuGroupKey,
     buildTrainKey,
+    clearAssignedEmuCodeByGroupKey,
     ensureProbeStateForToday,
     isEmuAssignedToday,
     listAssignedEmuCodesByGroupKey,
@@ -18,13 +19,17 @@ import {
     type EmuListRecord
 } from '~/server/services/probeAssetStore';
 import {
+    deleteProbeStatusByTrainCodeAndEmuCodeAtStartAt,
     ensureProbeStatus,
     listProbeStatusByEmuCodeInRange,
     listProbeStatusByTrainCode,
     ProbeStatusValue,
     type ProbeStatusRow
 } from '~/server/services/probeStatusStore';
-import { insertDailyEmuRoute } from '~/server/services/emuRoutesStore';
+import {
+    deleteDailyRouteByTrainCodeAndEmuCodeAtStartAt,
+    insertDailyEmuRoute
+} from '~/server/services/emuRoutesStore';
 import { registerTaskExecutor } from '~/server/services/taskExecutorRegistry';
 import {
     getTodayScheduleCache,
@@ -55,6 +60,11 @@ interface TrackedTrainGroup {
     rows: ProbeStatusRow[];
     knownEmuCodes: Set<string>;
     finalStatus: ProbeStatusValue;
+}
+
+interface MatchedEmuScanRecord {
+    emuCode: string;
+    trainRepeat: string;
 }
 
 let registered = false;
@@ -363,14 +373,17 @@ async function scanUnassignedCandidates(
     cache: Map<string, TrackedTrainGroup | null>
 ): Promise<{
     matchedGroups: Map<string, TrackedTrainGroup>;
-    matchedEmuCodesByTrainKey: Map<string, Set<string>>;
+    matchedEmuScanRecordsByTrainKey: Map<string, Map<string, string>>;
     skippedAssignedCount: number;
     scannedCount: number;
     warningCount: number;
 }> {
     const assets = await loadProbeAssets();
     const matchedGroups = new Map<string, TrackedTrainGroup>();
-    const matchedEmuCodesByTrainKey = new Map<string, Set<string>>();
+    const matchedEmuScanRecordsByTrainKey = new Map<
+        string,
+        Map<string, string>
+    >();
     let skippedAssignedCount = 0;
     let scannedCount = 0;
     let warningCount = 0;
@@ -415,28 +428,91 @@ async function scanUnassignedCandidates(
         }
 
         matchedGroups.set(trackedGroup.group.trainKey, trackedGroup);
-        const matchedEmuCodes =
-            matchedEmuCodesByTrainKey.get(trackedGroup.group.trainKey) ??
-            new Set<string>();
-        matchedEmuCodes.add(scannedEmuCode);
-        matchedEmuCodesByTrainKey.set(
+        const matchedEmuScanRecords =
+            matchedEmuScanRecordsByTrainKey.get(
+                trackedGroup.group.trainKey
+            ) ?? new Map<string, string>();
+        matchedEmuScanRecords.set(
+            scannedEmuCode,
+            seatCodeResult.route.trainRepeat
+        );
+        matchedEmuScanRecordsByTrainKey.set(
             trackedGroup.group.trainKey,
-            matchedEmuCodes
+            matchedEmuScanRecords
         );
     }
 
     return {
         matchedGroups,
-        matchedEmuCodesByTrainKey,
+        matchedEmuScanRecordsByTrainKey,
         skippedAssignedCount,
         scannedCount,
         warningCount
     };
 }
 
+function collectMatchedEmuScanRecords(
+    matchedEmuScans: Map<string, string> | undefined
+): MatchedEmuScanRecord[] {
+    if (!matchedEmuScans) {
+        return [];
+    }
+
+    return Array.from(
+        matchedEmuScans.entries(),
+        ([emuCode, trainRepeat]) => ({
+            emuCode,
+            trainRepeat
+        })
+    );
+}
+
+function cleanupPrunedTrackedGroupRows(
+    trackedGroup: TrackedTrainGroup,
+    groupKey: string,
+    removedEmuCodes: string[]
+): {
+    deletedProbeStatusRows: number;
+    deletedDailyRouteRows: number;
+    clearedAssignedEmuCodes: number;
+} {
+    let deletedProbeStatusRows = 0;
+    let deletedDailyRouteRows = 0;
+    let clearedAssignedEmuCodes = 0;
+
+    for (const emuCode of removedEmuCodes) {
+        trackedGroup.knownEmuCodes.delete(emuCode);
+
+        if (clearAssignedEmuCodeByGroupKey(groupKey, emuCode)) {
+            clearedAssignedEmuCodes += 1;
+        }
+
+        for (const trainCode of trackedGroup.trainCodes) {
+            deletedProbeStatusRows +=
+                deleteProbeStatusByTrainCodeAndEmuCodeAtStartAt(
+                    trainCode,
+                    emuCode,
+                    trackedGroup.group.startAt
+                );
+            deletedDailyRouteRows +=
+                deleteDailyRouteByTrainCodeAndEmuCodeAtStartAt(
+                    trainCode,
+                    emuCode,
+                    trackedGroup.group.startAt
+                );
+        }
+    }
+
+    return {
+        deletedProbeStatusRows,
+        deletedDailyRouteRows,
+        clearedAssignedEmuCodes
+    };
+}
+
 async function persistResolvedTrackedGroup(
     trackedGroup: TrackedTrainGroup,
-    additionalEmuCodes: Iterable<string>,
+    matchedEmuScanRecords: MatchedEmuScanRecord[],
     scheduleRoutesByTrainCode: Map<string, TodayScheduleRoute>,
     nowSeconds: number
 ): Promise<void> {
@@ -446,12 +522,51 @@ async function persistResolvedTrackedGroup(
         group.trainInternalCode,
         group.startAt
     );
-    const emuCodes = uniqueNormalizedCodes([
+    const originalEmuCodes = uniqueNormalizedCodes([
         ...Array.from(trackedGroup.knownEmuCodes),
         ...listAssignedEmuCodesByGroupKey(groupKey),
-        ...Array.from(additionalEmuCodes)
+        ...matchedEmuScanRecords.map((record) => record.emuCode)
     ]);
-    if (trainCodes.length === 0 || emuCodes.length === 0) {
+    if (trainCodes.length === 0 || originalEmuCodes.length === 0) {
+        return;
+    }
+
+    let emuCodes = originalEmuCodes;
+    if (originalEmuCodes.length > 2) {
+        const trainRepeatZeroEmuCodes = new Set(
+            matchedEmuScanRecords
+                .filter((record) => record.trainRepeat === '0')
+                .map((record) => record.emuCode)
+        );
+        const removedEmuCodes = originalEmuCodes.filter((emuCode) =>
+            trainRepeatZeroEmuCodes.has(emuCode)
+        );
+
+        if (removedEmuCodes.length > 0) {
+            const cleanupState = cleanupPrunedTrackedGroupRows(
+                trackedGroup,
+                groupKey,
+                removedEmuCodes
+            );
+            emuCodes = originalEmuCodes.filter(
+                (emuCode) => !trainRepeatZeroEmuCodes.has(emuCode)
+            );
+            logger.warn(
+                `over_limit_prune_train_repeat_zero trainCodes=${trainCodes.join('/')} originalEmuCodes=${originalEmuCodes.join('/')} removedEmuCodes=${removedEmuCodes.join('/')} remainingEmuCodes=${emuCodes.join('/')} startAt=${group.startAt} groupKey=${groupKey} deletedProbeStatusRows=${cleanupState.deletedProbeStatusRows} deletedDailyRouteRows=${cleanupState.deletedDailyRouteRows} clearedAssignedEmuCodes=${cleanupState.clearedAssignedEmuCodes}`
+            );
+        }
+
+        if (emuCodes.length > 2) {
+            logger.warn(
+                `over_limit_after_prune_continue trainCodes=${trainCodes.join('/')} originalEmuCodes=${originalEmuCodes.join('/')} remainingEmuCodes=${emuCodes.join('/')} startAt=${group.startAt} groupKey=${groupKey}`
+            );
+        }
+    }
+
+    if (emuCodes.length === 0) {
+        logger.warn(
+            `all_emu_codes_pruned trainCodes=${trainCodes.join('/')} originalEmuCodes=${originalEmuCodes.join('/')} startAt=${group.startAt} groupKey=${groupKey}`
+        );
         return;
     }
 
@@ -564,7 +679,7 @@ async function executeDetectCoupledEmuGroupTask(
     );
     const {
         matchedGroups,
-        matchedEmuCodesByTrainKey,
+        matchedEmuScanRecordsByTrainKey,
         skippedAssignedCount,
         scannedCount,
         warningCount
@@ -579,7 +694,9 @@ async function executeDetectCoupledEmuGroupTask(
     for (const [trainKey, trackedGroup] of matchedGroups.entries()) {
         await persistResolvedTrackedGroup(
             trackedGroup,
-            matchedEmuCodesByTrainKey.get(trainKey) ?? [],
+            collectMatchedEmuScanRecords(
+                matchedEmuScanRecordsByTrainKey.get(trainKey)
+            ),
             scheduleRoutesByTrainCode,
             nowSeconds
         );

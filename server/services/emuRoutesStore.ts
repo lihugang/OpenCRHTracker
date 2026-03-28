@@ -20,6 +20,7 @@ export interface DailyEmuRouteRow {
 
 type EmuRouteSqlKey =
     | 'deleteDailyRouteById'
+    | 'deleteDailyRouteByTrainCodeAndEmuCodeAtStartAt'
     | 'deleteDailyRoutesByTrainCodeInRange'
     | 'insertDailyEmuRoute'
     | 'selectDailyRecordById'
@@ -170,6 +171,31 @@ export function deleteDailyRoutesByTrainCodeInRange(
         normalizedTrainCode,
         startAt,
         endAtExclusive
+    );
+    return result.changes;
+}
+
+export function deleteDailyRouteByTrainCodeAndEmuCodeAtStartAt(
+    trainCode: string,
+    emuCode: string,
+    startAt: number
+): number {
+    const normalizedTrainCode = normalizeCode(trainCode);
+    const normalizedEmuCode = normalizeCode(emuCode);
+    if (
+        normalizedTrainCode.length === 0 ||
+        normalizedEmuCode.length === 0 ||
+        !Number.isInteger(startAt) ||
+        startAt < 0
+    ) {
+        return 0;
+    }
+
+    const result = emuRouteStatements.run(
+        'deleteDailyRouteByTrainCodeAndEmuCodeAtStartAt',
+        normalizedTrainCode,
+        normalizedEmuCode,
+        startAt
     );
     return result.changes;
 }

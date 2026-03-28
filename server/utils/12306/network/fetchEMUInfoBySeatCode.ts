@@ -69,6 +69,7 @@ interface CachedSeatCodeResult {
             internalCode: string;
             startAt: number;
             endAt: number;
+            trainRepeat: string;
         };
         emu: {
             code: string;
@@ -178,7 +179,8 @@ export default async function fetchEMUInfoBySeatCode(code: string) {
                 endAt: getShanghaiUnixSecondsFromDateAndTime(
                     data.endDay,
                     data.endTime
-                ) // second timestamp
+                ), // second timestamp
+                trainRepeat: data.trainRepeat?.trim() ?? ''
             },
             emu: {
                 code: emuCode // like CR400AF-2230

@@ -200,6 +200,28 @@ export function listAssignedEmuCodesByGroupKey(groupKey: string): string[] {
     return emuCodes;
 }
 
+export function clearAssignedEmuCodeByGroupKey(
+    groupKey: string,
+    emuCode: string
+): boolean {
+    const normalizedGroupKey = groupKey.trim();
+    const normalizedEmuCode = normalizeCode(emuCode);
+    if (
+        normalizedGroupKey.length === 0 ||
+        normalizedEmuCode.length === 0
+    ) {
+        return false;
+    }
+
+    const record = assignedTodayEmuState.get(normalizedEmuCode);
+    if (!record || record.groupKey !== normalizedGroupKey) {
+        return false;
+    }
+
+    assignedTodayEmuState.delete(normalizedEmuCode);
+    return true;
+}
+
 export function clearRunningEmuStateByTrainKey(trainKey: string): string[] {
     const removedEmuCodes: string[] = [];
     for (const [emuCode, record] of assignedTodayEmuState.entries()) {
