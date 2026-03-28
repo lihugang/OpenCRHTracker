@@ -220,6 +220,12 @@
                                             </div>
                                         </div>
                                     </div>
+
+                                    <p
+                                        v-if="item.routes.length === 0"
+                                        class="rounded-[0.9rem] border border-dashed border-slate-300 bg-slate-50/70 px-3.5 py-3 text-sm leading-6 text-slate-500">
+                                        当前扫描项下的交路已在本页删除。如需按最新数据重新判断是否仍属异常，请手动再次点击“开始检测”。
+                                    </p>
                                 </div>
                             </div>
                         </article>
@@ -500,6 +506,35 @@ function handleDeleteRouteDialogVisibilityChange(nextValue: boolean) {
     closeDeleteRouteDialog();
 }
 
+function removeDeletedRouteFromCurrentScan(routeId: string) {
+    const currentScanData = anomalyScanData.value;
+    if (!currentScanData) {
+        return;
+    }
+
+    let didRemoveRoute = false;
+    const nextItems = currentScanData.items.map((item) => {
+        const nextRoutes = item.routes.filter((route) => route.id !== routeId);
+        if (nextRoutes.length !== item.routes.length) {
+            didRemoveRoute = true;
+        }
+
+        return {
+            ...item,
+            routes: nextRoutes
+        };
+    });
+
+    if (!didRemoveRoute) {
+        return;
+    }
+
+    anomalyScanData.value = {
+        ...currentScanData,
+        items: nextItems
+    };
+}
+
 async function confirmDeleteRoute() {
     if (!pendingDeleteRouteContext.value || isDeletingRoute.value) {
         return;
@@ -545,7 +580,7 @@ async function confirmDeleteRoute() {
 
         isDeleteRouteDialogOpen.value = false;
         pendingDeleteRouteContext.value = null;
-        await runAnomalyScan();
+        removeDeletedRouteFromCurrentScan(targetRoute.id);
     } catch (error) {
         deleteRouteErrorMessage.value = getApiErrorMessage(
             error,
