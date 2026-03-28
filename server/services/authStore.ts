@@ -48,7 +48,7 @@ interface ApiKeyScopeRecord {
     scope: string;
 }
 
-export interface ApiKeyRecord {
+interface StoredApiKeyRecord {
     key: string;
     revoke_id: string;
     user_id: string;
@@ -58,6 +58,18 @@ export interface ApiKeyRecord {
     revoked_at: number | null;
     expires_at: number;
     daily_token_limit: number;
+}
+
+export interface ApiKeyRecord {
+    key: StoredApiKeyRecord['key'];
+    revoke_id: StoredApiKeyRecord['revoke_id'];
+    user_id: StoredApiKeyRecord['user_id'];
+    issuer: StoredApiKeyRecord['issuer'];
+    name: StoredApiKeyRecord['name'];
+    active_from: StoredApiKeyRecord['active_from'];
+    revoked_at: StoredApiKeyRecord['revoked_at'];
+    expires_at: StoredApiKeyRecord['expires_at'];
+    daily_token_limit: StoredApiKeyRecord['daily_token_limit'];
     scopes: string[];
 }
 
@@ -106,7 +118,7 @@ const userRecordCache = new LRUCache<
 
 const apiKeyRecordCache = new LRUCache<
     string,
-    ApiKeyRecord | typeof MISSING_API_KEY_RECORD
+    StoredApiKeyRecord | typeof MISSING_API_KEY_RECORD
 >({
     max: useConfig().api.authCache.apiKeyRecord.maxEntries,
     ttl: useConfig().api.authCache.apiKeyRecord.defaultTtlSeconds * 1000,
@@ -263,39 +275,18 @@ function cacheIssuedApiKey(apiKey: IssuedAuthSession) {
         active_from: apiKey.activeFrom,
         revoked_at: null,
         expires_at: apiKey.expiresAt,
-        daily_token_limit: apiKey.dailyTokenLimit,
-        scopes: apiKey.scopes
+        daily_token_limit: apiKey.dailyTokenLimit
     });
 }
 
-function hydrateApiKeyScopesByKey(keyId: string) {
-    return authStatements
-        .all<ApiKeyScopeRecord>('selectApiKeyScopesByKey', keyId)
-        .map((record) => record.scope);
-}
-
-function sameScopeSet(left: string[], right: string[]) {
-    const normalizedLeft = [...normalizeScopeList(left)].sort();
-    const normalizedRight = [...normalizeScopeList(right)].sort();
-
-    if (normalizedLeft.length !== normalizedRight.length) {
-        return false;
-    }
-
-    return normalizedLeft.every(
-        (scope, index) => scope === normalizedRight[index]
-    );
-}
-
-function matchesPayload(record: ApiKeyRecord, payload: ApiKeyPayload) {
+function matchesPayload(record: StoredApiKeyRecord, payload: ApiKeyPayload) {
     return (
         record.key === payload.keyId &&
         record.user_id === payload.userId &&
         record.issuer === payload.issuer &&
         record.active_from === payload.activeFrom &&
         record.expires_at === payload.expiresAt &&
-        record.daily_token_limit === payload.dailyTokenLimit &&
-        sameScopeSet(record.scopes, payload.scopes)
+        record.daily_token_limit === payload.dailyTokenLimit
     );
 }
 
@@ -313,7 +304,8 @@ function resolveDefaultSessionScopes(userId: string, issuer: ApiKeyIssuer) {
 
 function buildAuthSessionFromRecord(
     apiKey: string,
-    record: ApiKeyRecord
+    record: StoredApiKeyRecord,
+    scopes: string[]
 ): IssuedAuthSession {
     return {
         userId: record.user_id,
@@ -323,7 +315,7 @@ function buildAuthSessionFromRecord(
         name: record.name,
         apiKey,
         maskedApiKey: maskApiKey(apiKey),
-        scopes: record.scopes,
+        scopes,
         activeFrom: record.active_from,
         expiresAt: record.expires_at,
         dailyTokenLimit: record.daily_token_limit
@@ -348,7 +340,7 @@ function getStoredApiKeyRecord(keyId: string, now: number) {
         return cached === MISSING_API_KEY_RECORD ? undefined : cached;
     }
 
-    const record = authStatements.get<Omit<ApiKeyRecord, 'scopes'>>(
+    const record = authStatements.get<StoredApiKeyRecord>(
         'selectValidApiKey',
         keyId,
         now,
@@ -361,12 +353,8 @@ function getStoredApiKeyRecord(keyId: string, now: number) {
         return undefined;
     }
 
-    const hydratedRecord: ApiKeyRecord = {
-        ...record,
-        scopes: hydrateApiKeyScopesByKey(keyId)
-    };
-    apiKeyRecordCache.set(keyId, hydratedRecord);
-    return hydratedRecord;
+    apiKeyRecordCache.set(keyId, record);
+    return record;
 }
 
 export function getUserByUsername(username: string) {
@@ -658,7 +646,7 @@ export function getValidApiKey(apiKey: string) {
         return undefined;
     }
 
-    return buildAuthSessionFromRecord(apiKey, storedRecord);
+    return buildAuthSessionFromRecord(apiKey, storedRecord, payload.scopes);
 }
 
 export function maskApiKey(key: string) {
