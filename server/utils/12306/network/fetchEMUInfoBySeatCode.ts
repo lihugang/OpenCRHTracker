@@ -1,6 +1,7 @@
 import waitFor12306RequestSlot from '../requestLimiter';
 import useConfig from '~/server/config';
 import getLogger from '~/server/libs/log4js';
+import getCurrentDateString from '../../date/getCurrentDateString';
 import { getShanghaiUnixSecondsFromDateAndTime } from '../../date/shanghaiDateTime';
 import log12306RequestFailure from './log12306RequestFailure';
 import log12306RequestMetric from './log12306RequestMetric';
@@ -61,6 +62,7 @@ const logger = getLogger('12306-network:fetch-emu-info-by-seat-code');
 
 interface CachedSeatCodeResult {
     expiresAt: number;
+    startDay: string;
     value: {
         route: {
             code: string;
@@ -79,10 +81,11 @@ const cachedSeatCodeResults = new Map<string, CachedSeatCodeResult>();
 export default async function fetchEMUInfoBySeatCode(code: string) {
     const normalizedCode = code.trim();
     const nowSeconds = getNowSeconds();
+    const currentDate = getCurrentDateString();
 
     const cached = cachedSeatCodeResults.get(normalizedCode);
     if (cached) {
-        if (cached.expiresAt > nowSeconds) {
+        if (cached.expiresAt > nowSeconds && cached.startDay === currentDate) {
             return cached.value;
         }
 
@@ -126,6 +129,7 @@ export default async function fetchEMUInfoBySeatCode(code: string) {
         const json: EMUInfoResponse = await response.json();
         const data = json.data;
         const emuCode = data?.carCode?.trim();
+        const startDay = data?.startDay?.trim() ?? '';
         if (!emuCode || !data?.trainNo) {
             log12306RequestFailure({
                 logger,
@@ -143,13 +147,32 @@ export default async function fetchEMUInfoBySeatCode(code: string) {
             });
             return null;
         }
+        if (startDay !== currentDate) {
+            log12306RequestFailure({
+                logger,
+                operation: 'invalid_response',
+                url,
+                context: {
+                    seatCode: normalizedCode,
+                    startDay,
+                    currentDate
+                },
+                responseStatus: response.status,
+                responseOk: response.ok,
+                businessStatus: json.status,
+                errorCode: json.errorCode,
+                errorMsg: json.errorMsg,
+                detail: 'seat route startDay is not current day'
+            });
+            return null;
+        }
 
         const result = {
             route: {
                 code: data.trainCode, // G xxxx
                 internalCode: data.trainNo,
                 startAt: getShanghaiUnixSecondsFromDateAndTime(
-                    data.startDay,
+                    startDay,
                     data.startTime
                 ), // second timestamp
                 endAt: getShanghaiUnixSecondsFromDateAndTime(
@@ -165,6 +188,7 @@ export default async function fetchEMUInfoBySeatCode(code: string) {
         if (result.route.endAt > nowSeconds) {
             cachedSeatCodeResults.set(normalizedCode, {
                 expiresAt: result.route.endAt,
+                startDay,
                 value: result
             });
         }
