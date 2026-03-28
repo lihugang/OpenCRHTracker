@@ -421,7 +421,7 @@ async function scanUnassignedCandidates(
         );
         if (!trackedGroup) {
             warningCount += 1;
-            logger.warn(
+            logger.debug(
                 `scan_unmatched_current_group bureau=${bureau} model=${model} emuCode=${scannedEmuCode} trainCode=${scannedTrainCode} trainInternalCode=${normalizeCode(seatCodeResult.route.internalCode)} startAt=${seatCodeResult.route.startAt} endAt=${seatCodeResult.route.endAt}`
             );
             continue;

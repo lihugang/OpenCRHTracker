@@ -217,6 +217,7 @@ export default async function fetchRouteInfo(
         if (!startStation || !endStation || !json.data?.trainNo) {
             log12306RequestFailure({
                 logger,
+                level: 'debug',
                 operation: 'invalid_response',
                 url,
                 context: {

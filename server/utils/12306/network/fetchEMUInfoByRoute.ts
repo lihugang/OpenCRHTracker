@@ -84,6 +84,7 @@ export default async function fetchEMUInfoByRoute(route: string) {
         if (!emuCode) {
             log12306RequestFailure({
                 logger,
+                level: 'debug',
                 operation: 'invalid_response',
                 url,
                 context: {

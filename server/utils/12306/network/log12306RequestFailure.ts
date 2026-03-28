@@ -4,6 +4,7 @@ interface Log12306RequestFailureOptions {
     logger: Logger;
     operation: string;
     url: string;
+    level?: 'warn' | 'debug';
     context?: Record<string, unknown>;
     responseStatus?: number;
     responseOk?: boolean;
@@ -52,5 +53,6 @@ export default function log12306RequestFailure(
     appendField(parts, 'detail', options.detail);
     appendField(parts, 'error', options.error);
 
-    options.logger.warn(parts.join(' '));
+    const level = options.level ?? 'warn';
+    options.logger[level](parts.join(' '));
 }

@@ -134,6 +134,7 @@ export default async function fetchEMUInfoBySeatCode(code: string) {
         if (!emuCode || !data?.trainNo) {
             log12306RequestFailure({
                 logger,
+                level: 'debug',
                 operation: 'invalid_response',
                 url,
                 context: {

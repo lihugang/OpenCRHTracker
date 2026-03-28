@@ -285,7 +285,7 @@ export default async function runScheduleProbe(
                         groupItem.code
                     );
                 }
-                logger.warn(
+                logger.debug(
                     `enrich failed runId=${runId} trainCode=${item.code} attempts=${routeResult.attempts} groupSize=${groupItems.length}`
                 );
             }
