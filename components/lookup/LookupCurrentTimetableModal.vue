@@ -164,12 +164,20 @@ import { computed, ref, watch } from 'vue';
 import type { TrackerApiResponse } from '~/types/homepage';
 import type { CurrentTrainTimetableData } from '~/types/lookup';
 import getApiErrorMessage from '~/utils/api/getApiErrorMessage';
+import formatShanghaiDateString from '~/utils/time/formatShanghaiDateString';
 
 const TIME_FORMATTER = new Intl.DateTimeFormat('zh-CN', {
     timeZone: 'Asia/Shanghai',
     hour: '2-digit',
     minute: '2-digit',
     hour12: false
+});
+
+const DATE_LABEL_FORMATTER = new Intl.DateTimeFormat('zh-CN', {
+    timeZone: 'Asia/Shanghai',
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric'
 });
 
 const cachedTimetables = new Map<string, CurrentTrainTimetableData>();
@@ -207,8 +215,15 @@ const modalDescription = computed(() => {
         timetable.value?.allCodes[0] ??
         props.displayCodes?.[0] ??
         props.trainCode;
+    const updatedDateLabel = getUpdatedDateLabel(
+        timetable.value?.updatedAt ?? null
+    );
 
-    return `当前展示的是今日 ${displayCode} 次列车时刻表数据，仅供参考`;
+    if (updatedDateLabel.length === 0) {
+        return `当前展示的是 ${displayCode} 次列车时刻表数据，仅供参考`;
+    }
+
+    return `当前展示的是${updatedDateLabel} ${displayCode} 次列车时刻表数据，仅供参考`;
 });
 
 watch(
@@ -268,5 +283,43 @@ function formatNullableTime(timestamp: number | null) {
 
 function formatTime(timestamp: number) {
     return TIME_FORMATTER.format(new Date(timestamp * 1000));
+}
+
+function getUpdatedDateLabel(updatedAt: number | null) {
+    if (updatedAt === null || !Number.isFinite(updatedAt) || updatedAt <= 0) {
+        return '';
+    }
+
+    const todayTimestamp = Math.floor(Date.now() / 1000);
+    const updatedDateKey = formatShanghaiDateString(updatedAt);
+    if (updatedDateKey.length === 0) {
+        return '';
+    }
+
+    if (updatedDateKey === formatShanghaiDateString(todayTimestamp)) {
+        return '今日';
+    }
+
+    if (
+        updatedDateKey ===
+        formatShanghaiDateString(todayTimestamp - 24 * 60 * 60)
+    ) {
+        return '昨日';
+    }
+
+    return formatCalendarDateLabel(updatedAt);
+}
+
+function formatCalendarDateLabel(timestamp: number) {
+    const parts = DATE_LABEL_FORMATTER.formatToParts(new Date(timestamp * 1000));
+    const year = parts.find((part) => part.type === 'year')?.value ?? '';
+    const month = parts.find((part) => part.type === 'month')?.value ?? '';
+    const day = parts.find((part) => part.type === 'day')?.value ?? '';
+
+    if (year.length === 0 || month.length === 0 || day.length === 0) {
+        return '';
+    }
+
+    return `${year} 年 ${month} 月 ${day} 日`;
 }
 </script>

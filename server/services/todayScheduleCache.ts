@@ -13,6 +13,7 @@ export interface TodayScheduleRoute {
     allCodes: string[];
     startAt: number;
     endAt: number;
+    updatedAt: number | null;
     startStation: string;
     endStation: string;
 }
@@ -104,6 +105,7 @@ function rebuildCache(): TodayScheduleCache {
                 allCodes,
                 startAt,
                 endAt,
+                updatedAt: item.lastRouteRefreshAt,
                 startStation: item.startStation.trim(),
                 endStation: item.endStation.trim(),
                 stops: item.stops.map((stop) => ({
@@ -138,6 +140,7 @@ function rebuildCache(): TodayScheduleCache {
                         allCodes: timetable.allCodes,
                         startAt,
                         endAt,
+                        updatedAt: timetable.updatedAt,
                         startStation: timetable.startStation,
                         endStation: timetable.endStation
                     });
@@ -163,6 +166,13 @@ function rebuildCache(): TodayScheduleCache {
                     startAt
                 );
                 existingGroup.endAt = Math.max(existingGroup.endAt, endAt);
+                existingGroup.updatedAt = Math.max(
+                    existingGroup.updatedAt ?? 0,
+                    timetable.updatedAt ?? 0
+                );
+                if (existingGroup.updatedAt === 0) {
+                    existingGroup.updatedAt = null;
+                }
                 if (
                     existingGroup.startStation.length === 0 &&
                     item.startStation.trim().length > 0
@@ -185,6 +195,7 @@ function rebuildCache(): TodayScheduleCache {
                 allCodes: [...timetable.allCodes],
                 startAt,
                 endAt,
+                updatedAt: timetable.updatedAt,
                 startStation: timetable.startStation,
                 endStation: timetable.endStation
             });

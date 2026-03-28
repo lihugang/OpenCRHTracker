@@ -6,7 +6,6 @@ import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';
 import setCacheControl from '~/server/utils/api/response/setCacheControl';
 import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
-import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
 import type { CurrentTrainTimetableData } from '~/types/lookup';
 
 export default defineEventHandler(async (event) => {
@@ -40,7 +39,7 @@ export default defineEventHandler(async (event) => {
             );
 
             const response: CurrentTrainTimetableData = {
-                date: getCurrentDateString(),
+                updatedAt: timetable.updatedAt,
                 requestTrainCode: trainCode,
                 trainCode: timetable.trainCode,
                 internalCode: timetable.trainInternalCode,

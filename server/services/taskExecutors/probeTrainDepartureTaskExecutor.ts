@@ -271,7 +271,8 @@ function buildFallbackGroupFromArgs(
         startStation: args.startStation,
         endStation: args.endStation,
         startAt: args.startAt,
-        endAt: args.endAt
+        endAt: args.endAt,
+        updatedAt: null
     };
 }
 
@@ -286,7 +287,8 @@ function buildFallbackGroupFromRouteRow(
         startStation: row.start_station_name,
         endStation: row.end_station_name,
         startAt: row.start_at,
-        endAt: row.end_at
+        endAt: row.end_at,
+        updatedAt: null
     };
 }
 

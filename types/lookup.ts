@@ -74,7 +74,7 @@ export interface CurrentTrainTimetableStop {
 }
 
 export interface CurrentTrainTimetableData {
-    date: string;
+    updatedAt: number | null;
     requestTrainCode: string;
     trainCode: string;
     internalCode: string;

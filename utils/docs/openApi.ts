@@ -771,7 +771,7 @@ export const developerDocsOpenApi = {
                     data: {
                         type: 'object',
                         required: [
-                            'date',
+                            'updatedAt',
                             'requestTrainCode',
                             'trainCode',
                             'internalCode',
@@ -783,9 +783,10 @@ export const developerDocsOpenApi = {
                             'stops'
                         ],
                         properties: {
-                            date: {
-                                type: 'string',
-                                example: '20260324'
+                            updatedAt: {
+                                type: 'integer',
+                                nullable: true,
+                                example: 1774059000
                             },
                             requestTrainCode: {
                                 type: 'string',
