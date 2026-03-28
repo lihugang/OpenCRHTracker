@@ -27,7 +27,18 @@
                 enter-active-class="transition duration-[320ms] ease-out"
                 enter-from-class="translate-x-6 opacity-0">
                 <div class="landing-preview">
+                    <LookupStationTimetableList
+                        v-if="transitionTarget.type === 'station'"
+                        :station-name="transitionTarget.code"
+                        state="loading"
+                        :items="[]"
+                        summary="正在加载车站时刻表，并准备跳转到对应详情页…"
+                        :is-loading-more="false"
+                        :can-load-more="false"
+                        error-message="" />
+
                     <LookupHistoryList
+                        v-else
                         :type="transitionTarget.type"
                         :code="transitionTarget.code"
                         state="loading"
@@ -59,7 +70,7 @@
                             v-model="draftCode"
                             eyebrow="OpenCRHTracker"
                             title="动车组运用情况查询"
-                            description="输入车次号或车组号可查询列车担当情况"
+                            description="输入车次号、车组号可查询列车担当情况"
                             placeholder="D2212 或 CR400AF-C-2214"
                             :detected-type="detectedTarget?.type ?? null"
                             :loading="isNavigating"
@@ -101,9 +112,17 @@ let mediaQueryList: MediaQueryList | null = null;
 let mediaQueryHandler: ((event: MediaQueryListEvent) => void) | null = null;
 
 const detectedTarget = computed(() => resolveLookupTarget(draftCode.value));
-const previewSearchTitle = computed(() =>
-    transitionTarget.value?.type === 'train' ? '车次详情查询' : '车组详情查询'
-);
+const previewSearchTitle = computed(() => {
+    if (transitionTarget.value?.type === 'train') {
+        return '车次详情查询';
+    }
+
+    if (transitionTarget.value?.type === 'emu') {
+        return '车组详情查询';
+    }
+
+    return '车站时刻表查询';
+});
 const previewSearchDescription = computed(() => '');
 
 useSiteSeo({
@@ -136,7 +155,7 @@ onBeforeUnmount(() => {
 async function submitLookup() {
     const resolvedTarget = resolveLookupTarget(draftCode.value);
     if (!resolvedTarget) {
-        inputError.value = '请输入车次号或车组号。';
+        inputError.value = '请输入车次号、车组号或车站名。';
         return;
     }
 

@@ -61,6 +61,16 @@ export const developerDocsOpenApi = {
                 },
                 example: 'D2212'
             },
+            StationNameParam: {
+                name: 'stationName',
+                in: 'path',
+                required: true,
+                description: '要查询的车站名，例如 北京南。',
+                schema: {
+                    type: 'string'
+                },
+                example: '北京南'
+            },
             EmuCodeParam: {
                 name: 'emuCode',
                 in: 'path',
@@ -760,6 +770,20 @@ export const developerDocsOpenApi = {
                     }
                 }
             },
+            ReferenceModelItem: {
+                type: 'object',
+                required: ['model', 'weightedShare'],
+                properties: {
+                    model: {
+                        type: 'string',
+                        example: 'CR400AF-Z'
+                    },
+                    weightedShare: {
+                        type: 'number',
+                        example: 0.625
+                    }
+                }
+            },
             CurrentTrainTimetableResponse: {
                 type: 'object',
                 required: ['ok', 'data', 'error'],
@@ -776,6 +800,7 @@ export const developerDocsOpenApi = {
                             'trainCode',
                             'internalCode',
                             'allCodes',
+                            'referenceModels',
                             'startStation',
                             'endStation',
                             'startAt',
@@ -807,6 +832,18 @@ export const developerDocsOpenApi = {
                                 },
                                 example: ['G8388', 'G8385']
                             },
+                            referenceModels: {
+                                type: 'array',
+                                items: {
+                                    $ref: '#/components/schemas/ReferenceModelItem'
+                                },
+                                example: [
+                                    {
+                                        model: 'CR400AF-Z',
+                                        weightedShare: 0.625
+                                    }
+                                ]
+                            },
                             startStation: {
                                 type: 'string',
                                 example: '北京南'
@@ -827,6 +864,116 @@ export const developerDocsOpenApi = {
                                 type: 'array',
                                 items: {
                                     $ref: '#/components/schemas/CurrentTrainTimetableStop'
+                                }
+                            }
+                        }
+                    },
+                    error: {
+                        type: 'string',
+                        example: ''
+                    }
+                }
+            },
+            StationTimetableItem: {
+                type: 'object',
+                required: [
+                    'trainCode',
+                    'allCodes',
+                    'arriveAt',
+                    'departAt',
+                    'startStation',
+                    'endStation',
+                    'updatedAt',
+                    'referenceModels'
+                ],
+                properties: {
+                    trainCode: {
+                        type: 'string',
+                        example: 'G12'
+                    },
+                    allCodes: {
+                        type: 'array',
+                        items: {
+                            type: 'string'
+                        },
+                        example: ['G12', 'G13']
+                    },
+                    arriveAt: {
+                        type: 'integer',
+                        nullable: true,
+                        example: 1774063560
+                    },
+                    departAt: {
+                        type: 'integer',
+                        nullable: true,
+                        example: 1774063920
+                    },
+                    startStation: {
+                        type: 'string',
+                        example: '上海虹桥'
+                    },
+                    endStation: {
+                        type: 'string',
+                        example: '北京南'
+                    },
+                    updatedAt: {
+                        type: 'integer',
+                        nullable: true,
+                        example: 1774059000
+                    },
+                    referenceModels: {
+                        type: 'array',
+                        items: {
+                            $ref: '#/components/schemas/ReferenceModelItem'
+                        },
+                        example: [
+                            {
+                                model: 'CR400AF-Z',
+                                weightedShare: 0.625
+                            }
+                        ]
+                    }
+                }
+            },
+            StationTimetableResponse: {
+                type: 'object',
+                required: ['ok', 'data', 'error'],
+                properties: {
+                    ok: {
+                        type: 'boolean',
+                        example: true
+                    },
+                    data: {
+                        type: 'object',
+                        required: [
+                            'stationName',
+                            'cursor',
+                            'limit',
+                            'nextCursor',
+                            'items'
+                        ],
+                        properties: {
+                            stationName: {
+                                type: 'string',
+                                example: '北京南'
+                            },
+                            cursor: {
+                                type: 'string',
+                                example: ''
+                            },
+                            limit: {
+                                type: 'integer',
+                                example: 40
+                            },
+                            nextCursor: {
+                                type: 'string',
+                                nullable: true,
+                                example: '600:1774063920:G12:3:1774050000'
+                            },
+                            items: {
+                                type: 'array',
+                                items: {
+                                    $ref: '#/components/schemas/StationTimetableItem'
                                 }
                             }
                         }
@@ -1124,7 +1271,7 @@ export const developerDocsOpenApi = {
                 tags: ['Timetable'],
                 summary: '按车次读取当前完整时刻表',
                 description:
-                    '返回当天可用的当前完整时刻表，包含全部经停站、当前站车次与检票口信息。',
+                    '返回当天可用的当前完整时刻表，包含全部经停站、当前站车次与检票口信息，以及基于最近历史担当推算出的参考车型；成功响应的缓存时长由 api.cache.timetableMaxAgeSeconds 控制。',
                 parameters: [
                     {
                         $ref: '#/components/parameters/TrainCodeParam'
@@ -1211,6 +1358,126 @@ export const developerDocsOpenApi = {
                         authMode: 'anonymous',
                         pathParams: {
                             trainCode: 'G8388'
+                        }
+                    }
+                ]
+            }
+        },
+        '/timetable/station/{stationName}': {
+            get: {
+                operationId: 'stationTimetable',
+                tags: ['Timetable'],
+                summary: '按车站读取当日站内时刻表',
+                description:
+                    '返回指定车站在当天已发布时刻表中的计划车次列表，按站内事件时间排序并支持游标分页；每条记录都附带基于最近历史担当推算出的参考车型；成功响应的缓存时长由 api.cache.timetableMaxAgeSeconds 控制。',
+                parameters: [
+                    {
+                        $ref: '#/components/parameters/StationNameParam'
+                    },
+                    {
+                        $ref: '#/components/parameters/LimitQuery'
+                    },
+                    {
+                        $ref: '#/components/parameters/CursorQuery'
+                    }
+                ],
+                security: [{}, { bearerAuth: [] }, { cookieAuth: [] }],
+                responses: {
+                    '200': {
+                        description: '指定车站的当日站内时刻表分页结果。',
+                        headers: {
+                            'x-api-remain': {
+                                $ref: '#/components/headers/ApiRemain'
+                            },
+                            'x-api-cost': {
+                                $ref: '#/components/headers/ApiCost'
+                            }
+                        },
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    $ref: '#/components/schemas/StationTimetableResponse'
+                                }
+                            }
+                        }
+                    },
+                    '400': {
+                        description: 'Invalid path or query parameters.',
+                        headers: {
+                            'x-api-remain': {
+                                $ref: '#/components/headers/ApiRemain'
+                            },
+                            'x-api-cost': {
+                                $ref: '#/components/headers/ApiCost'
+                            }
+                        },
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    $ref: '#/components/schemas/ApiFailureResponse'
+                                },
+                                example: {
+                                    ok: false,
+                                    data: 'stationName 不能为空。',
+                                    error: 'invalid_param'
+                                }
+                            }
+                        }
+                    },
+                    '404': {
+                        description: '指定车站暂无当日时刻表数据。',
+                        headers: {
+                            'x-api-remain': {
+                                $ref: '#/components/headers/ApiRemain'
+                            },
+                            'x-api-cost': {
+                                $ref: '#/components/headers/ApiCost'
+                            }
+                        },
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    $ref: '#/components/schemas/ApiFailureResponse'
+                                },
+                                example: {
+                                    ok: false,
+                                    data: '当前暂无该车站的时刻表。',
+                                    error: 'not_found'
+                                }
+                            }
+                        }
+                    }
+                },
+                'x-slug': 'timetable-station',
+                'x-group': '时刻表',
+                'x-sort-order': 26,
+                'x-auth-modes': ['anonymous', 'cookie', 'apiKey'],
+                'x-required-scopes': ['api.timetable.station.read'],
+                'x-examples': [
+                    {
+                        id: 'timetable-by-station',
+                        label: '车站页首屏',
+                        summary:
+                            '读取指定车站当日已发布时刻表中的首屏结果，可用于站点页和站点搜索跳转。',
+                        authMode: 'anonymous',
+                        pathParams: {
+                            stationName: '北京南'
+                        },
+                        query: {
+                            limit: '40'
+                        }
+                    },
+                    {
+                        id: 'timetable-by-station-next-page',
+                        label: '车站页下一页',
+                        summary: '复用上一页返回的 cursor，继续读取同一车站的后续时刻表数据。',
+                        authMode: 'anonymous',
+                        pathParams: {
+                            stationName: '北京南'
+                        },
+                        query: {
+                            limit: '40',
+                            cursor: '1774063920:G12:3:1774050000'
                         }
                     }
                 ]

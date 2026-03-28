@@ -13,6 +13,12 @@ export interface LookupSuggestIndex {
 let cachedItems: LookupSuggestItem[] | null = null;
 let cachedIndex: LookupSuggestIndex | null = null;
 
+const TYPE_ORDER: Record<LookupSuggestItem['type'], number> = {
+    train: 0,
+    emu: 1,
+    station: 2
+};
+
 function normalizeKeyword(value: string) {
     return value.trim().toUpperCase();
 }
@@ -61,7 +67,7 @@ function compareSuggestionOrder(query: string) {
         }
 
         if (left.type !== right.type) {
-            return left.type === 'train' ? -1 : 1;
+            return TYPE_ORDER[left.type] - TYPE_ORDER[right.type];
         }
 
         if (left.code.length !== right.code.length) {
@@ -108,9 +114,11 @@ function buildLookupSuggestIndex(
             return;
         }
 
-        emuCodeTrie.insert(normalizedCode, itemIndex);
-        for (const tag of item.tags) {
-            emuTagTrie.insertMany(buildTagVariants(tag), itemIndex);
+        if (item.type === 'emu') {
+            emuCodeTrie.insert(normalizedCode, itemIndex);
+            for (const tag of item.tags) {
+                emuTagTrie.insertMany(buildTagVariants(tag), itemIndex);
+            }
         }
     });
 

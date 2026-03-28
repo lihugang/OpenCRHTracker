@@ -51,7 +51,15 @@
                         始发 / 终到
                     </p>
                     <p class="mt-2 text-sm font-medium text-crh-grey-dark">
-                        {{ timetable.startStation }} -> {{ timetable.endStation }}
+                        <LookupStationLink
+                            :station-name="timetable.startStation"
+                            :focus-train-codes="timetableFocusTrainCodes"
+                            fallback-text="--" />
+                        <span class="mx-1">-></span>
+                        <LookupStationLink
+                            :station-name="timetable.endStation"
+                            :focus-train-codes="timetableFocusTrainCodes"
+                            fallback-text="--" />
                     </p>
                 </UiCard>
 
@@ -81,7 +89,10 @@
                                 {{ stop.stationTrainCode || '--' }}
                             </td>
                             <td class="border-b border-slate-100 px-4 py-3 text-sm font-medium text-crh-grey-dark last:border-b-0">
-                                {{ stop.stationName }}
+                                <LookupStationLink
+                                    :station-name="stop.stationName"
+                                    :focus-train-codes="resolveStopFocusTrainCodes(stop)"
+                                    fallback-text="--" />
                             </td>
                             <td class="border-b border-slate-100 px-4 py-3 font-mono text-sm text-slate-500 last:border-b-0">
                                 {{ formatNullableTime(stop.arriveAt) }}
@@ -110,7 +121,10 @@
                                     第 {{ stop.stationNo }} 站
                                 </p>
                                 <p class="mt-1 text-sm font-semibold text-crh-grey-dark">
-                                    {{ stop.stationName }}
+                                    <LookupStationLink
+                                        :station-name="stop.stationName"
+                                        :focus-train-codes="resolveStopFocusTrainCodes(stop)"
+                                        fallback-text="--" />
                                 </p>
                             </div>
                             <span class="font-mono text-xs text-slate-400">
@@ -162,7 +176,10 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import type { TrackerApiResponse } from '~/types/homepage';
-import type { CurrentTrainTimetableData } from '~/types/lookup';
+import type {
+    CurrentTrainTimetableData,
+    CurrentTrainTimetableStop
+} from '~/types/lookup';
 import getApiErrorMessage from '~/utils/api/getApiErrorMessage';
 import formatShanghaiDateString from '~/utils/time/formatShanghaiDateString';
 
@@ -225,6 +242,31 @@ const modalDescription = computed(() => {
 
     return `当前展示的是${updatedDateLabel} ${displayCode} 次列车时刻表数据，仅供参考`;
 });
+
+const timetableFocusTrainCodes = computed(() => {
+    return normalizeTrainCodes([
+        ...(timetable.value?.allCodes ?? []),
+        ...(props.displayCodes ?? []),
+        props.trainCode
+    ]);
+});
+
+function normalizeTrainCodes(codes: string[]) {
+    return Array.from(
+        new Set(
+            codes
+                .map((code) => code.trim().toUpperCase())
+                .filter((code) => code.length > 0)
+        )
+    );
+}
+
+function resolveStopFocusTrainCodes(stop: CurrentTrainTimetableStop) {
+    return normalizeTrainCodes([
+        stop.stationTrainCode,
+        ...timetableFocusTrainCodes.value
+    ]);
+}
 
 watch(
     () => [props.modelValue, props.trainCode] as const,

@@ -1,5 +1,6 @@
 import { defineEventHandler, getRouterParam } from 'h3';
 import useConfig from '~/server/config';
+import { getReferenceModelsByTrainCodes } from '~/server/services/referenceModelIndexStore';
 import { getTodayScheduleTimetableByTrainCode } from '~/server/services/todayScheduleCache';
 import getFixedCost from '~/server/utils/api/cost/getFixedCost';
 import executeApi from '~/server/utils/api/executor/executeApi';
@@ -9,7 +10,7 @@ import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
 import type { CurrentTrainTimetableData } from '~/types/lookup';
 
 export default defineEventHandler(async (event) => {
-    const cacheMaxAge = useConfig().api.cache.currentDayMaxAgeSeconds;
+    const cacheMaxAge = useConfig().api.cache.timetableMaxAgeSeconds;
 
     return executeApi(
         event,
@@ -44,6 +45,9 @@ export default defineEventHandler(async (event) => {
                 trainCode: timetable.trainCode,
                 internalCode: timetable.trainInternalCode,
                 allCodes: [...timetable.allCodes],
+                referenceModels: getReferenceModelsByTrainCodes(
+                    timetable.allCodes
+                ),
                 startStation: timetable.startStation,
                 endStation: timetable.endStation,
                 startAt: timetable.startAt,

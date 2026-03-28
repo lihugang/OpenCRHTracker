@@ -173,7 +173,8 @@
             "currentDayMaxAgeSeconds": 300,
             "historicalMaxAgeSeconds": 31536000,
             "searchIndexMaxAgeSeconds": 1800,
-            "sitemapMaxAgeSeconds": 86400
+            "sitemapMaxAgeSeconds": 86400,
+            "timetableMaxAgeSeconds": 21600
         },
         "pagination": {
             "defaultLimit": 20,
@@ -193,7 +194,8 @@
                 "api.timetable.train.read",
                 "api.exports.daily.read",
                 "api.feedback.read",
-                "api.feedback.create"
+                "api.feedback.create",
+                "api.timetable.station.read"
             ],
             "issuedKeyDefaultScopes": [
                 "api.config.read",
@@ -211,7 +213,8 @@
                 "api.auth.password.update",
                 "api.auth.api-keys.read",
                 "api.auth.api-keys.create",
-                "api.auth.api-keys.revoke"
+                "api.auth.api-keys.revoke",
+                "api.timetable.station.read"
             ],
             "creatableKeyMaxScopes": [
                 "api.auth.me.read",
@@ -219,7 +222,8 @@
                 "api.history.train.read",
                 "api.history.emu.read",
                 "api.timetable.train.read",
-                "api.exports.daily.read"
+                "api.exports.daily.read",
+                "api.timetable.station.read"
             ]
         }
     },
@@ -233,6 +237,12 @@
         },
         "dailyExport": {
             "dailyTimeHHmm": "0000"
+        },
+        "referenceModel": {
+            "windowDays": 14,
+            "batchSize": 1000,
+            "threshold": 0.3,
+            "dailyTimeHHmm": "0300"
         },
         "scheduler": {
             "pollIntervalMs": 180000,
@@ -279,6 +289,10 @@
                 "rounding": "ceil"
             },
             "recordsDaily": {
+                "unitCost": 0.05,
+                "rounding": "ceil"
+            },
+            "timetableStation": {
                 "unitCost": 0.05,
                 "rounding": "ceil"
             }

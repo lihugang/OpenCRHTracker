@@ -4,7 +4,10 @@ import useConfig from '~/server/config';
 import { buildTrainKey } from '~/server/services/probeRuntimeState';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
 import { loadPublishedScheduleState } from '~/server/utils/12306/scheduleProbe/stateStore';
-import { toUnixSecondsFromShanghaiDayOffset } from '~/server/utils/date/shanghaiDateTime';
+import {
+    toShanghaiDayOffsetFromUnixSeconds,
+    toUnixSecondsFromShanghaiDayOffset
+} from '~/server/utils/date/shanghaiDateTime';
 import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
 
 export interface TodayScheduleRoute {
@@ -38,6 +41,17 @@ export interface TodayScheduleProbeGroup extends TodayScheduleRoute {
     allCodes: string[];
 }
 
+export interface TodayScheduleStationIndexRow extends TodayScheduleRoute {
+    trainKey: string;
+    stationName: string;
+    stationNo: number;
+    arriveAt: number | null;
+    departAt: number | null;
+    clockSortAt: number;
+    sortAt: number;
+    stableKey: string;
+}
+
 interface TodayScheduleCache {
     date: string;
     scheduleFilePath: string;
@@ -46,6 +60,7 @@ interface TodayScheduleCache {
     timetablesByTrainCode: Map<string, TodayScheduleTimetable>;
     groupsByTrainKey: Map<string, TodayScheduleProbeGroup>;
     groupKeysByTrainCode: Map<string, string>;
+    stationRowsByStationName: Map<string, TodayScheduleStationIndexRow[]>;
 }
 
 let cached: TodayScheduleCache | null = null;
@@ -72,6 +87,14 @@ function rebuildCache(): TodayScheduleCache {
     const timetablesByTrainCode = new Map<string, TodayScheduleTimetable>();
     const groupsByTrainKey = new Map<string, TodayScheduleProbeGroup>();
     const groupKeysByTrainCode = new Map<string, string>();
+    const stationRowsByStationName = new Map<
+        string,
+        TodayScheduleStationIndexRow[]
+    >();
+    const stationRowIndexesByStationName = new Map<
+        string,
+        Map<string, TodayScheduleStationIndexRow>
+    >();
 
     if (state?.date === currentDate) {
         for (const item of state.items) {
@@ -132,6 +155,29 @@ function rebuildCache(): TodayScheduleCache {
                 }))
             };
 
+            const activeGroup = upsertProbeGroup(
+                groupsByTrainKey,
+                trainKey,
+                timetable
+            );
+
+            for (const stop of timetable.stops) {
+                const stationName = stop.stationName.trim();
+                if (stationName.length === 0) {
+                    continue;
+                }
+
+                upsertStationRow(
+                    stationRowsByStationName,
+                    stationRowIndexesByStationName,
+                    state.date,
+                    stationName,
+                    activeGroup,
+                    timetable,
+                    stop
+                );
+            }
+
             for (const aliasCode of timetable.allCodes) {
                 if (!routesByTrainCode.has(aliasCode)) {
                     routesByTrainCode.set(aliasCode, {
@@ -154,52 +200,18 @@ function rebuildCache(): TodayScheduleCache {
             for (const aliasCode of timetable.allCodes) {
                 groupKeysByTrainCode.set(aliasCode, trainKey);
             }
-            const existingGroup = groupsByTrainKey.get(trainKey);
-            if (existingGroup) {
-                for (const aliasCode of timetable.allCodes) {
-                    if (!existingGroup.allCodes.includes(aliasCode)) {
-                        existingGroup.allCodes.push(aliasCode);
-                    }
-                }
-                existingGroup.startAt = Math.min(
-                    existingGroup.startAt,
-                    startAt
-                );
-                existingGroup.endAt = Math.max(existingGroup.endAt, endAt);
-                existingGroup.updatedAt = Math.max(
-                    existingGroup.updatedAt ?? 0,
-                    timetable.updatedAt ?? 0
-                );
-                if (existingGroup.updatedAt === 0) {
-                    existingGroup.updatedAt = null;
-                }
-                if (
-                    existingGroup.startStation.length === 0 &&
-                    item.startStation.trim().length > 0
-                ) {
-                    existingGroup.startStation = item.startStation.trim();
-                }
-                if (
-                    existingGroup.endStation.length === 0 &&
-                    item.endStation.trim().length > 0
-                ) {
-                    existingGroup.endStation = item.endStation.trim();
-                }
-                continue;
-            }
-
-            groupsByTrainKey.set(trainKey, {
-                trainKey,
-                trainCode,
-                trainInternalCode,
-                allCodes: [...timetable.allCodes],
-                startAt,
-                endAt,
-                updatedAt: timetable.updatedAt,
-                startStation: timetable.startStation,
-                endStation: timetable.endStation
-            });
         }
+    }
+
+    for (const rows of stationRowsByStationName.values()) {
+        for (const row of rows) {
+            const activeGroup = groupsByTrainKey.get(row.trainKey);
+            if (activeGroup) {
+                applyGroupToStationRow(row, activeGroup);
+            }
+        }
+
+        rows.sort(compareStationRows);
     }
 
     cached = {
@@ -209,7 +221,8 @@ function rebuildCache(): TodayScheduleCache {
         routesByTrainCode,
         timetablesByTrainCode,
         groupsByTrainKey,
-        groupKeysByTrainCode
+        groupKeysByTrainCode,
+        stationRowsByStationName
     };
     return cached;
 }
@@ -250,6 +263,20 @@ export function getTodayScheduleTimetableByTrainCode(
     }
 
     return activeCache.timetablesByTrainCode.get(normalizedTrainCode) ?? null;
+}
+
+export function getTodayStationTimetableByStationName(
+    stationName: string
+): TodayScheduleStationIndexRow[] {
+    const activeCache = getActiveCache();
+    const normalizedStationName = stationName.trim();
+    if (normalizedStationName.length === 0) {
+        return [];
+    }
+
+    return (
+        activeCache.stationRowsByStationName.get(normalizedStationName) ?? []
+    );
 }
 
 export function getTodayScheduleProbeGroupByTrainCode(
@@ -299,4 +326,268 @@ function normalizeAliasCodes(allCodes: string[], trainCode: string): string[] {
     }
 
     return [...codes];
+}
+
+function upsertProbeGroup(
+    groupsByTrainKey: Map<string, TodayScheduleProbeGroup>,
+    trainKey: string,
+    timetable: TodayScheduleTimetable
+): TodayScheduleProbeGroup {
+    const existingGroup = groupsByTrainKey.get(trainKey);
+    if (!existingGroup) {
+        const nextGroup: TodayScheduleProbeGroup = {
+            trainKey,
+            trainCode: timetable.trainCode,
+            trainInternalCode: timetable.trainInternalCode,
+            allCodes: [...timetable.allCodes],
+            startAt: timetable.startAt,
+            endAt: timetable.endAt,
+            updatedAt: timetable.updatedAt,
+            startStation: timetable.startStation,
+            endStation: timetable.endStation
+        };
+        groupsByTrainKey.set(trainKey, nextGroup);
+        return nextGroup;
+    }
+
+    existingGroup.allCodes = mergeCodeLists(
+        existingGroup.allCodes,
+        timetable.allCodes
+    );
+    existingGroup.startAt = Math.min(existingGroup.startAt, timetable.startAt);
+    existingGroup.endAt = Math.max(existingGroup.endAt, timetable.endAt);
+    existingGroup.updatedAt = mergeNullableMax(
+        existingGroup.updatedAt,
+        timetable.updatedAt
+    );
+    existingGroup.trainInternalCode = pickPreferredText(
+        existingGroup.trainInternalCode,
+        timetable.trainInternalCode
+    );
+    existingGroup.startStation = pickPreferredText(
+        existingGroup.startStation,
+        timetable.startStation
+    );
+    existingGroup.endStation = pickPreferredText(
+        existingGroup.endStation,
+        timetable.endStation
+    );
+
+    return existingGroup;
+}
+
+function upsertStationRow(
+    stationRowsByStationName: Map<string, TodayScheduleStationIndexRow[]>,
+    stationRowIndexesByStationName: Map<
+        string,
+        Map<string, TodayScheduleStationIndexRow>
+    >,
+    date: string,
+    stationName: string,
+    group: TodayScheduleProbeGroup,
+    timetable: TodayScheduleTimetable,
+    stop: TodayScheduleStop
+) {
+    const sortAt = stop.arriveAt ?? stop.departAt ?? timetable.startAt;
+    const clockSortAt = buildStationClockSortAt(date, sortAt);
+    const aggregationKey = buildStationRowAggregationKey(
+        group.trainKey,
+        stop.stationNo,
+        sortAt,
+        timetable.startAt
+    );
+    const rowIndex =
+        stationRowIndexesByStationName.get(stationName) ??
+        new Map<string, TodayScheduleStationIndexRow>();
+    const existingRow = rowIndex.get(aggregationKey);
+
+    if (existingRow) {
+        mergeStationRow(existingRow, date, group, timetable, stop);
+        if (!stationRowIndexesByStationName.has(stationName)) {
+            stationRowIndexesByStationName.set(stationName, rowIndex);
+        }
+        return;
+    }
+
+    const nextRow: TodayScheduleStationIndexRow = {
+        trainKey: group.trainKey,
+        trainCode: resolveStationDisplayTrainCode(
+            stop.stationTrainCode,
+            group.trainCode
+        ),
+        trainInternalCode: group.trainInternalCode,
+        allCodes: [...group.allCodes],
+        startAt: group.startAt,
+        endAt: group.endAt,
+        updatedAt: group.updatedAt,
+        startStation: group.startStation,
+        endStation: group.endStation,
+        stationName,
+        stationNo: stop.stationNo,
+        arriveAt: stop.arriveAt,
+        departAt: stop.departAt,
+        clockSortAt,
+        sortAt,
+        stableKey: aggregationKey
+    };
+
+    rowIndex.set(aggregationKey, nextRow);
+    stationRowIndexesByStationName.set(stationName, rowIndex);
+
+    const rows = stationRowsByStationName.get(stationName) ?? [];
+    rows.push(nextRow);
+    stationRowsByStationName.set(stationName, rows);
+}
+
+function buildStationRowAggregationKey(
+    trainKey: string,
+    stationNo: number,
+    sortAt: number,
+    startAt: number
+) {
+    return [trainKey, stationNo, sortAt, startAt].join(':');
+}
+
+function mergeStationRow(
+    row: TodayScheduleStationIndexRow,
+    date: string,
+    group: TodayScheduleProbeGroup,
+    timetable: TodayScheduleTimetable,
+    stop: TodayScheduleStop
+) {
+    applyGroupToStationRow(row, group);
+
+    const normalizedStopTrainCode = normalizeCode(stop.stationTrainCode);
+    if (
+        normalizedStopTrainCode.length > 0 &&
+        row.trainCode === group.trainCode
+    ) {
+        row.trainCode = normalizedStopTrainCode;
+    }
+
+    row.stationNo = Math.min(row.stationNo, stop.stationNo);
+    row.arriveAt = mergeNullableMin(row.arriveAt, stop.arriveAt);
+    row.departAt = mergeNullableMax(row.departAt, stop.departAt);
+    row.sortAt = row.arriveAt ?? row.departAt ?? timetable.startAt;
+    row.clockSortAt = buildStationClockSortAt(date, row.sortAt);
+}
+
+function applyGroupToStationRow(
+    row: TodayScheduleStationIndexRow,
+    group: TodayScheduleProbeGroup
+) {
+    row.trainInternalCode = pickPreferredText(
+        row.trainInternalCode,
+        group.trainInternalCode
+    );
+    row.allCodes = mergeCodeLists(row.allCodes, group.allCodes);
+    row.startAt = Math.min(row.startAt, group.startAt);
+    row.endAt = Math.max(row.endAt, group.endAt);
+    row.updatedAt = mergeNullableMax(row.updatedAt, group.updatedAt);
+    row.startStation = pickPreferredText(row.startStation, group.startStation);
+    row.endStation = pickPreferredText(row.endStation, group.endStation);
+
+    if (row.trainCode.length === 0) {
+        row.trainCode = group.trainCode;
+    }
+}
+
+function resolveStationDisplayTrainCode(
+    stationTrainCode: string,
+    fallbackTrainCode: string
+) {
+    const normalizedStationTrainCode = normalizeCode(stationTrainCode);
+    if (normalizedStationTrainCode.length > 0) {
+        return normalizedStationTrainCode;
+    }
+
+    return normalizeCode(fallbackTrainCode);
+}
+
+function pickPreferredText(currentValue: string, nextValue: string) {
+    return currentValue.length > 0 ? currentValue : nextValue.trim();
+}
+
+function mergeCodeLists(leftCodes: string[], rightCodes: string[]) {
+    const mergedCodes = new Set<string>();
+
+    for (const code of leftCodes) {
+        const normalizedCode = normalizeCode(code);
+        if (normalizedCode.length > 0) {
+            mergedCodes.add(normalizedCode);
+        }
+    }
+
+    for (const code of rightCodes) {
+        const normalizedCode = normalizeCode(code);
+        if (normalizedCode.length > 0) {
+            mergedCodes.add(normalizedCode);
+        }
+    }
+
+    return [...mergedCodes];
+}
+
+function mergeNullableMax(
+    leftValue: number | null,
+    rightValue: number | null
+): number | null {
+    if (leftValue === null) {
+        return rightValue;
+    }
+    if (rightValue === null) {
+        return leftValue;
+    }
+
+    return Math.max(leftValue, rightValue);
+}
+
+function mergeNullableMin(
+    leftValue: number | null,
+    rightValue: number | null
+): number | null {
+    if (leftValue === null) {
+        return rightValue;
+    }
+    if (rightValue === null) {
+        return leftValue;
+    }
+
+    return Math.min(leftValue, rightValue);
+}
+
+function buildStationClockSortAt(date: string, sortAt: number) {
+    const dayOffset = toShanghaiDayOffsetFromUnixSeconds(date, sortAt);
+    return ((dayOffset % 86400) + 86400) % 86400;
+}
+
+function compareStationRows(
+    left: TodayScheduleStationIndexRow,
+    right: TodayScheduleStationIndexRow
+): number {
+    if (left.clockSortAt !== right.clockSortAt) {
+        return left.clockSortAt - right.clockSortAt;
+    }
+
+    if (left.sortAt !== right.sortAt) {
+        return left.sortAt - right.sortAt;
+    }
+
+    const trainCodeDiff = left.trainCode.localeCompare(
+        right.trainCode,
+        'zh-Hans-CN'
+    );
+    if (trainCodeDiff !== 0) {
+        return trainCodeDiff;
+    }
+
+    if (left.stationNo !== right.stationNo) {
+        return left.stationNo - right.stationNo;
+    }
+
+    if (left.startAt !== right.startAt) {
+        return left.startAt - right.startAt;
+    }
+
+    return left.stableKey.localeCompare(right.stableKey, 'zh-Hans-CN');
 }

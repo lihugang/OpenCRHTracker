@@ -666,13 +666,18 @@
                         "sitemapMaxAgeSeconds": {
                             "type": "integer",
                             "minimum": 0
+                        },
+                        "timetableMaxAgeSeconds": {
+                            "type": "integer",
+                            "minimum": 0
                         }
                     },
                     "required": [
                         "currentDayMaxAgeSeconds",
                         "historicalMaxAgeSeconds",
                         "searchIndexMaxAgeSeconds",
-                        "sitemapMaxAgeSeconds"
+                        "sitemapMaxAgeSeconds",
+                        "timetableMaxAgeSeconds"
                     ]
                 },
                 "pagination": {
@@ -779,7 +784,8 @@
                                     "dispatch_daily_probe_tasks",
                                     "clear_daily_probe_status",
                                     "cleanup_revoked_api_keys",
-                                    "export_daily_records"
+                                    "export_daily_records",
+                                    "rebuild_reference_model_index"
                                 ]
                             }
                         }
@@ -816,6 +822,35 @@
                         }
                     },
                     "required": [
+                        "dailyTimeHHmm"
+                    ]
+                },
+                "referenceModel": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "windowDays": {
+                            "type": "integer",
+                            "minimum": 1
+                        },
+                        "batchSize": {
+                            "type": "integer",
+                            "minimum": 1
+                        },
+                        "threshold": {
+                            "type": "number",
+                            "exclusiveMinimum": 0,
+                            "maximum": 1
+                        },
+                        "dailyTimeHHmm": {
+                            "type": "string",
+                            "pattern": "^\\d{4}$"
+                        }
+                    },
+                    "required": [
+                        "windowDays",
+                        "batchSize",
+                        "threshold",
                         "dailyTimeHHmm"
                     ]
                 },
@@ -861,6 +896,7 @@
             "required": [
                 "apiKeyCleanup",
                 "dailyExport",
+                "referenceModel",
                 "scheduler"
             ]
         },
@@ -997,12 +1033,16 @@
                         },
                         "recordsDaily": {
                             "$ref": "#/definitions/perRecordRule"
+                        },
+                        "timetableStation": {
+                            "$ref": "#/definitions/perRecordRule"
                         }
                     },
                     "required": [
                         "historyEmu",
                         "historyTrain",
-                        "recordsDaily"
+                        "recordsDaily",
+                        "timetableStation"
                     ]
                 }
             },

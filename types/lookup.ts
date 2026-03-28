@@ -1,4 +1,4 @@
-export type LookupTargetType = 'train' | 'emu';
+export type LookupTargetType = 'train' | 'emu' | 'station';
 
 export interface LookupTarget {
     type: LookupTargetType;
@@ -34,6 +34,17 @@ export interface EmuHistoryRecord {
     endStation: string;
 }
 
+export interface StationTimetableRecord {
+    trainCode: string;
+    allCodes: string[];
+    arriveAt: number | null;
+    departAt: number | null;
+    startStation: string;
+    endStation: string;
+    updatedAt: number | null;
+    referenceModels: ReferenceModelItem[];
+}
+
 export interface HistoryResponseBase<TItem> {
     cursor: string;
     limit: number;
@@ -51,6 +62,11 @@ export interface EmuHistoryResponse extends HistoryResponseBase<EmuHistoryRecord
     emuCode: string;
     start?: number | null;
     end?: number | null;
+}
+
+export interface StationTimetableResponse
+    extends HistoryResponseBase<StationTimetableRecord> {
+    stationName: string;
 }
 
 export interface LookupHistoryListItem {
@@ -79,11 +95,17 @@ export interface CurrentTrainTimetableData {
     trainCode: string;
     internalCode: string;
     allCodes: string[];
+    referenceModels: ReferenceModelItem[];
     startStation: string;
     endStation: string;
     startAt: number;
     endAt: number;
     stops: CurrentTrainTimetableStop[];
+}
+
+export interface ReferenceModelItem {
+    model: string;
+    weightedShare: number;
 }
 
 export type RecentAssignmentsState =

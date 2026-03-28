@@ -41,7 +41,7 @@ export const crawlDocsSections: DocsContentSection[] = [
                     'build_today_schedule：负责生成今日时刻表，并在成功后补发 dispatch_daily_probe_tasks。',
                     'generate_route_refresh_tasks 与 refresh_route_batch：负责对时刻表中过期或缺失的线路信息做增量补刷。',
                     'dispatch_daily_probe_tasks 与 probe_train_departure：负责把今日的时刻表拆成发车探测任务，并在发车窗口内识别担当。',
-                    'clear_daily_probe_status、detect_coupled_emu_group、export_daily_records 等任务会围绕状态清理、耦合检测和导出继续运转。'
+                    'clear_daily_probe_status、detect_coupled_emu_group、export_daily_records、rebuild_reference_model_index 等任务会围绕状态清理、耦合检测、导出和参考车型索引刷新继续运转。'
                 ]
             },
             {
@@ -57,7 +57,8 @@ export const crawlDocsSections: DocsContentSection[] = [
                     '  -> reconcile build_today_schedule',
                     '  -> reconcile generate_route_refresh_tasks',
                     '  -> reconcile clear_daily_probe_status',
-                    '  -> reconcile export_daily_records'
+                    '  -> reconcile export_daily_records',
+                    '  -> reconcile rebuild_reference_model_index'
                 ].join('\n')
             }
         ]
@@ -350,7 +351,7 @@ export const crawlDocsSections: DocsContentSection[] = [
                         valueType: 'array<string>',
                         required: false,
                         description:
-                            '可以在启动时跳过 build_today_schedule、generate_route_refresh_tasks 等关键任务。',
+                            '可以在启动时跳过 build_today_schedule、generate_route_refresh_tasks、rebuild_reference_model_index 等关键任务。',
                         notes: [
                             '排查“为什么启动后不抓取”时，先检查这里是否禁用了对应 executor。'
                         ]
@@ -371,7 +372,7 @@ export const crawlDocsSections: DocsContentSection[] = [
                 items: [
                     '看启动日志是否出现 registered executor=build_today_schedule、generate_route_refresh_tasks、probe_train_departure 等关键注册日志。',
                     '确认 data.assets.schedule.file 指向的时刻表更新时间是否为当天，而不是旧文件或状态处于构建中。',
-                    '确认 task.startup.disabledExecutors 没有禁用 build_today_schedule 或 generate_route_refresh_tasks。',
+                    '确认 task.startup.disabledExecutors 没有禁用 build_today_schedule、generate_route_refresh_tasks 或 rebuild_reference_model_index。',
                     '如果当天探测没有生成，优先检查 build_today_schedule 是否成功，以及是否添加了 dispatch_daily_probe_tasks。'
                 ]
             },

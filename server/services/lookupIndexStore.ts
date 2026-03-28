@@ -3,6 +3,7 @@ import path from 'path';
 import useConfig from '~/server/config';
 import { loadPublishedScheduleState } from '~/server/utils/12306/scheduleProbe/stateStore';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
+import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
 import parseJsonlToJson from '~/server/utils/json/parseJsonlToJson';
 import type { LookupSuggestItem } from '~/types/lookup';
 
@@ -24,6 +25,11 @@ interface LookupIndexCache {
 
 const DEFAULT_TRAIN_SUBTITLE = '暂无区间信息';
 const DEFAULT_EMU_SUBTITLE = '暂无配属信息';
+const TYPE_ORDER: Record<LookupSuggestItem['type'], number> = {
+    train: 0,
+    emu: 1,
+    station: 2
+};
 
 let cached: LookupIndexCache | null = null;
 
@@ -44,7 +50,7 @@ function buildTrainSubtitle(startStation: string, endStation: string) {
     const end = endStation.trim();
 
     if (start && end) {
-        return `${start} → ${end}`;
+        return `${start} -> ${end}`;
     }
 
     if (start || end) {
@@ -108,6 +114,41 @@ function loadTrainItems(scheduleFilePath: string) {
     return Array.from(deduplicated.values());
 }
 
+function loadStationItems(scheduleFilePath: string) {
+    const state = loadPublishedScheduleState(scheduleFilePath);
+    const currentDate = getCurrentDateString();
+    if (!state || state.date !== currentDate) {
+        return [];
+    }
+
+    const stationCounts = new Map<string, number>();
+    for (const item of state.items) {
+        for (const stop of item.stops) {
+            const stationName =
+                typeof stop.stationName === 'string'
+                    ? stop.stationName.trim()
+                    : '';
+            if (stationName.length === 0) {
+                continue;
+            }
+
+            stationCounts.set(
+                stationName,
+                (stationCounts.get(stationName) ?? 0) + 1
+            );
+        }
+    }
+
+    return Array.from(stationCounts.entries())
+        .map<LookupSuggestItem>(([stationName, count]) => ({
+            type: 'station',
+            code: stationName,
+            subtitle: `时刻表 · ${count} 个车次`,
+            tags: []
+        }))
+        .sort((left, right) => left.code.localeCompare(right.code, 'zh-Hans-CN'));
+}
+
 function loadEmuItems(emuListFilePath: string) {
     const text = fs.readFileSync(resolveAssetPath(emuListFilePath), 'utf8');
     const rows = parseJsonlToJson<RawEmuListRecord>(text);
@@ -148,7 +189,7 @@ function loadEmuItems(emuListFilePath: string) {
 
 function compareIndexItems(left: LookupSuggestItem, right: LookupSuggestItem) {
     if (left.type !== right.type) {
-        return left.type === 'train' ? -1 : 1;
+        return TYPE_ORDER[left.type] - TYPE_ORDER[right.type];
     }
 
     if (left.code.length !== right.code.length) {
@@ -170,7 +211,8 @@ function rebuildCache() {
         emuListMtimeMs: getFileMtimeMs(emuListFilePath),
         items: [
             ...loadTrainItems(scheduleFilePath),
-            ...loadEmuItems(emuListFilePath)
+            ...loadEmuItems(emuListFilePath),
+            ...loadStationItems(scheduleFilePath)
         ].sort(compareIndexItems)
     };
 

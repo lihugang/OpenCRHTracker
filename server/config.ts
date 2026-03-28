@@ -63,6 +63,13 @@ interface DailyExportTaskConfig {
     dailyTimeHHmm: string;
 }
 
+interface ReferenceModelTaskConfig {
+    windowDays: number;
+    batchSize: number;
+    threshold: number;
+    dailyTimeHHmm: string;
+}
+
 interface LoggingConfig {
     retentionDays: number;
 }
@@ -73,7 +80,8 @@ const ALLOWED_STARTUP_TASK_EXECUTORS = [
     'dispatch_daily_probe_tasks',
     'clear_daily_probe_status',
     'cleanup_revoked_api_keys',
-    'export_daily_records'
+    'export_daily_records',
+    'rebuild_reference_model_index'
 ] as const;
 
 type StartupTaskExecutor = (typeof ALLOWED_STARTUP_TASK_EXECUTORS)[number];
@@ -198,6 +206,7 @@ export interface Config {
             historicalMaxAgeSeconds: number;
             searchIndexMaxAgeSeconds: number;
             sitemapMaxAgeSeconds: number;
+            timetableMaxAgeSeconds: number;
         };
         pagination: {
             defaultLimit: number;
@@ -215,6 +224,7 @@ export interface Config {
         };
         apiKeyCleanup: ApiKeyCleanupConfig;
         dailyExport: DailyExportTaskConfig;
+        referenceModel: ReferenceModelTaskConfig;
         scheduler: {
             pollIntervalMs: number;
             maxTasksPerQuery: number;
@@ -252,6 +262,7 @@ export interface Config {
             historyEmu: CostPerRecordRule;
             historyTrain: CostPerRecordRule;
             recordsDaily: CostPerRecordRule;
+            timetableStation: CostPerRecordRule;
         };
     };
 }
@@ -568,6 +579,10 @@ function validateConfig(raw: unknown): Config {
         'task.apiKeyCleanup'
     );
     const taskDailyExport = asObject(task.dailyExport, 'task.dailyExport');
+    const taskReferenceModel = asObject(
+        task.referenceModel,
+        'task.referenceModel'
+    );
     const taskScheduler = asObject(task.scheduler, 'task.scheduler');
     const taskSchedulerIdle = asObject(
         taskScheduler.idle,
@@ -591,6 +606,10 @@ function validateConfig(raw: unknown): Config {
     const recordsDaily = asObject(
         costPerRecord.recordsDaily,
         'cost.perRecord.recordsDaily'
+    );
+    const timetableStation = asObject(
+        costPerRecord.timetableStation,
+        'cost.perRecord.timetableStation'
     );
 
     const configResult: Config = {
@@ -982,6 +1001,11 @@ function validateConfig(raw: unknown): Config {
                     apiCache.sitemapMaxAgeSeconds,
                     'api.cache.sitemapMaxAgeSeconds',
                     0
+                ),
+                timetableMaxAgeSeconds: asInteger(
+                    apiCache.timetableMaxAgeSeconds,
+                    'api.cache.timetableMaxAgeSeconds',
+                    0
                 )
             },
             pagination: {
@@ -1056,6 +1080,27 @@ function validateConfig(raw: unknown): Config {
                 dailyTimeHHmm: asString(
                     taskDailyExport.dailyTimeHHmm,
                     'task.dailyExport.dailyTimeHHmm'
+                )
+            },
+            referenceModel: {
+                windowDays: asInteger(
+                    taskReferenceModel.windowDays,
+                    'task.referenceModel.windowDays',
+                    1
+                ),
+                batchSize: asInteger(
+                    taskReferenceModel.batchSize,
+                    'task.referenceModel.batchSize',
+                    1
+                ),
+                threshold: asNumber(
+                    taskReferenceModel.threshold,
+                    'task.referenceModel.threshold',
+                    0
+                ),
+                dailyTimeHHmm: asString(
+                    taskReferenceModel.dailyTimeHHmm,
+                    'task.referenceModel.dailyTimeHHmm'
                 )
             },
             scheduler: {
@@ -1201,6 +1246,17 @@ function validateConfig(raw: unknown): Config {
                         recordsDaily.rounding,
                         'cost.perRecord.recordsDaily.rounding'
                     )
+                },
+                timetableStation: {
+                    unitCost: asNumber(
+                        timetableStation.unitCost,
+                        'cost.perRecord.timetableStation.unitCost',
+                        0
+                    ),
+                    rounding: asRounding(
+                        timetableStation.rounding,
+                        'cost.perRecord.timetableStation.rounding'
+                    )
                 }
             }
         }
@@ -1269,6 +1325,20 @@ function validateConfig(raw: unknown): Config {
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         assert(false, `task.dailyExport.dailyTimeHHmm is invalid: ${message}`);
+    }
+    assert(
+        configResult.task.referenceModel.threshold > 0 &&
+            configResult.task.referenceModel.threshold <= 1,
+        'task.referenceModel.threshold must be > 0 and <= 1'
+    );
+    try {
+        parseDailyTimeHHmm(configResult.task.referenceModel.dailyTimeHHmm);
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        assert(
+            false,
+            `task.referenceModel.dailyTimeHHmm is invalid: ${message}`
+        );
     }
     for (const key of ['EMUList', 'QRCode'] as const) {
         const asset = configResult.data.assets[key];

@@ -231,7 +231,14 @@
                                             isMissingText(item.startStation)
                                         )
                                     ]">
-                                    {{ formatStationText(item.startStation) }}
+                                    <LookupStationLink
+                                        :station-name="item.startStation"
+                                        :focus-train-codes="
+                                            resolveStationFocusTrainCodes(item)
+                                        "
+                                        :fallback-text="
+                                            formatStationText(item.startStation)
+                                        " />
                                 </td>
                                 <td
                                     :class="[
@@ -256,7 +263,14 @@
                                             isMissingText(item.endStation)
                                         )
                                     ]">
-                                    {{ formatStationText(item.endStation) }}
+                                    <LookupStationLink
+                                        :station-name="item.endStation"
+                                        :focus-train-codes="
+                                            resolveStationFocusTrainCodes(item)
+                                        "
+                                        :fallback-text="
+                                            formatStationText(item.endStation)
+                                        " />
                                 </td>
                                 <td
                                     :class="[
@@ -355,11 +369,15 @@
                                                     )
                                                 )
                                             ]">
-                                            {{
-                                                formatStationText(
+                                            <LookupStationLink
+                                                :station-name="
                                                     item.startStation
-                                                )
-                                            }}
+                                                "
+                                                :fallback-text="
+                                                    formatStationText(
+                                                        item.startStation
+                                                    )
+                                                " />
                                         </p>
                                     </div>
 
@@ -396,11 +414,16 @@
                                                     )
                                                 )
                                             ]">
-                                            {{
-                                                formatStationText(
-                                                    item.endStation
-                                                )
-                                            }}
+                                            <LookupStationLink
+                                                :station-name="item.endStation"
+                                                :focus-train-codes="
+                                                    resolveStationFocusTrainCodes(item)
+                                                "
+                                                :fallback-text="
+                                                    formatStationText(
+                                                        item.endStation
+                                                    )
+                                                " />
                                         </p>
                                     </div>
                                 </div>
@@ -691,6 +714,21 @@ function normalizeDisplayCodes(codes: string[]): string[] {
     return leftCode.localeCompare(rightCode) <= 0
         ? normalizedCodes
         : [rightCode, leftCode];
+}
+
+function resolveStationFocusTrainCodes(item: DisplayHistoryListItem) {
+    if (props.type === 'train') {
+        const trainCode = props.code.trim().toUpperCase();
+        return trainCode.length > 0 ? [trainCode] : [];
+    }
+
+    return Array.from(
+        new Set(
+            item.codes
+                .map((code) => code.trim().toUpperCase())
+                .filter((code) => code.length > 0)
+        )
+    );
 }
 
 function resolveTimetableTrainCode(item: DisplayHistoryListItem) {
