@@ -164,7 +164,7 @@ async function executeRefreshRouteBatchTask(rawArgs: unknown) {
 
         if (!routeResult.ok || routeResult.data.status !== 'running') {
             failed += 1;
-            logger.warn(
+            logger.debug(
                 `refresh_failed code=${item.code} attempts=${routeResult.attempts} groupSize=${groupItemIndexes.length}`
             );
             continue;

@@ -1121,7 +1121,7 @@ async function executeProbeTrainDepartureTask(rawArgs: unknown): Promise<void> {
                 { ...args, retry: nextRetry },
                 nowSeconds
             );
-            logger.warn(
+            logger.debug(
                 `route_probe_failed_requeue trainCode=${args.trainCode} retry=${args.retry} nextRetry=${nextRetry} nextTaskId=${nextTaskId} attemptedTrainCodes=${allTrainCodes.join(',')}`
             );
             return;
@@ -1179,7 +1179,7 @@ async function executeProbeTrainDepartureTask(rawArgs: unknown): Promise<void> {
                     nowSeconds,
                     nextRetry
                 );
-                logger.warn(
+                logger.debug(
                     `seat_verify_mismatch_requeue trainCode=${args.trainCode} probedTrainCode=${probedTrainCode} mainEmuCode=${mainEmuCode} runningTrainCode=${todayTrainCodesValidation.runningTrainCode} retry=${args.retry} nextRetry=${nextRetry} nextTaskId=${nextTaskId} delaySeconds=${overlapRetryDelaySeconds} reason=${seatCodeVerification.reason} seatTrainCode=${seatCodeVerification.seatTrainCode} seatInternalCode=${seatCodeVerification.seatInternalCode} seatStartAt=${seatCodeVerification.seatStartAt} historicalRecentMatchedTrainCodes=${historicalRecentMatchingTrainCodes.join(',')}`
                 );
                 return;

@@ -152,6 +152,7 @@ export default async function fetchEMUInfoBySeatCode(code: string) {
         if (startDay !== currentDate) {
             log12306RequestFailure({
                 logger,
+                level: 'debug',
                 operation: 'invalid_response',
                 url,
                 context: {
