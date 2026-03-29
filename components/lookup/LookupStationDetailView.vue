@@ -20,6 +20,37 @@
                 @submit="submitSearch" />
         </template>
 
+        <template #sidebar-favorite>
+            <LookupFavoritePanel
+                v-if="favoriteItem"
+                :code="favoriteItem.code"
+                :active="isFavorited(favoriteItem)"
+                :loading="isFavoritePending(favoriteItem)"
+                :error-message="favoriteErrorMessage"
+                @click="toggleFavoriteItem" />
+        </template>
+
+        <div
+            v-if="favoriteItem"
+            class="px-1 min-[960px]:landscape:hidden">
+            <div class="space-y-2">
+                <UiFavoriteButton
+                    :active="isFavorited(favoriteItem)"
+                    :loading="isFavoritePending(favoriteItem)"
+                    @click="toggleFavoriteItem" />
+                <p
+                    v-if="favoriteErrorMessage"
+                    class="flex items-center gap-1.5 pl-1 text-xs leading-5 text-[#E53E3E]">
+                    <span
+                        aria-hidden="true"
+                        class="font-semibold">
+                        [!]
+                    </span>
+                    <span>{{ favoriteErrorMessage }}</span>
+                </p>
+            </div>
+        </div>
+
         <LookupStationTimetableList
             :station-name="stationName"
             :state="state"
@@ -43,6 +74,7 @@ import {
     watch
 } from 'vue';
 import type { StationTimetableRecord } from '~/types/lookup';
+import { useFavoriteLookups } from '~/composables/useFavoriteLookups';
 import {
     buildLookupPath,
     normalizeLookupCode,
@@ -93,6 +125,12 @@ const target = computed(() => {
 
 const detectedTarget = computed(() => resolveLookupTarget(draftCode.value));
 const {
+    errorMessage: favoriteErrorMessage,
+    isFavorited,
+    isFavoritePending,
+    toggleFavorite
+} = useFavoriteLookups();
+const {
     state,
     items,
     errorMessage,
@@ -101,6 +139,18 @@ const {
     canLoadMore,
     loadMore
 } = useStationTimetableList(target);
+
+const favoriteItem = computed(() => {
+    if (!target.value) {
+        return null;
+    }
+
+    return {
+        type: target.value.type,
+        code: target.value.code,
+        tags: []
+    };
+});
 
 const searchTitle = computed(() => '车站时刻表查询');
 const searchDescription = computed(() => '');
@@ -285,6 +335,14 @@ useSiteSeo({
     path: () => '/station/' + encodeURIComponent(stationName.value),
     noindex: true
 });
+
+async function toggleFavoriteItem() {
+    if (!favoriteItem.value) {
+        return;
+    }
+
+    await toggleFavorite(favoriteItem.value);
+}
 
 async function submitSearch() {
     const resolvedTarget = resolveLookupTarget(draftCode.value);

@@ -389,6 +389,6 @@ function formatCalendarDateLabel(timestamp: number) {
         return '';
     }
 
-    return `${year} 年 ${month} 月 ${day} 日`;
+    return ` ${year} 年 ${month} 月 ${day} 日`;
 }
 </script>

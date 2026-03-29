@@ -156,6 +156,9 @@ export interface Config {
             api: string;
         };
         adminUserIds: string[];
+        favorites: {
+            maxEntries: number;
+        };
         apiKeyBytes: number;
         apiKeyTtlSeconds: number;
         apiKeyMaxLifetimeSeconds: number;
@@ -188,6 +191,10 @@ export interface Config {
                 defaultTtlSeconds: number;
             };
             apiKeyRecord: {
+                maxEntries: number;
+                defaultTtlSeconds: number;
+            };
+            userProfile: {
                 maxEntries: number;
                 defaultTtlSeconds: number;
             };
@@ -539,6 +546,10 @@ function validateConfig(raw: unknown): Config {
         apiAuthCache.apiKeyRecord,
         'api.authCache.apiKeyRecord'
     );
+    const apiAuthCacheUserProfile = asObject(
+        apiAuthCache.userProfile,
+        'api.authCache.userProfile'
+    );
     const apiPayload = asObject(api.payload, 'api.payload');
     const apiFeedback = asObject(api.feedback, 'api.feedback');
     const apiFeedbackValidation = asObject(
@@ -824,6 +835,13 @@ function validateConfig(raw: unknown): Config {
                           )
             },
             adminUserIds,
+            favorites: {
+                maxEntries: asInteger(
+                    asObject(user.favorites, 'user.favorites').maxEntries,
+                    'user.favorites.maxEntries',
+                    1
+                )
+            },
             apiKeyBytes: asNumber(user.apiKeyBytes, 'user.apiKeyBytes', 16),
             apiKeyTtlSeconds: asNumber(
                 user.apiKeyTtlSeconds,
@@ -922,6 +940,18 @@ function validateConfig(raw: unknown): Config {
                     defaultTtlSeconds: asInteger(
                         apiAuthCacheApiKeyRecord.defaultTtlSeconds,
                         'api.authCache.apiKeyRecord.defaultTtlSeconds',
+                        1
+                    )
+                },
+                userProfile: {
+                    maxEntries: asInteger(
+                        apiAuthCacheUserProfile.maxEntries,
+                        'api.authCache.userProfile.maxEntries',
+                        1
+                    ),
+                    defaultTtlSeconds: asInteger(
+                        apiAuthCacheUserProfile.defaultTtlSeconds,
+                        'api.authCache.userProfile.defaultTtlSeconds',
                         1
                     )
                 }

@@ -30,6 +30,12 @@
                         <slot name="search" />
                     </div>
 
+                    <div
+                        v-if="$slots['sidebar-favorite']"
+                        class="mt-4 hidden min-[960px]:landscape:block">
+                        <slot name="sidebar-favorite" />
+                    </div>
+
                     <UiCard
                         v-if="showQuickLinks"
                         :show-accent-bar="false"

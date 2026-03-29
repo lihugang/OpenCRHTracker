@@ -197,6 +197,20 @@
                         </div>
 
                         <div
+                            v-else-if="currentPanelId === 'favorites'"
+                            key="favorites"
+                            class="max-w-3xl">
+                            <DashboardFavoriteListPanel
+                                :items="favoriteItems"
+                                :is-loading="isFavoritesLoading"
+                                :error-message="favoritesErrorMessage"
+                                :max-entries="favoriteMaxEntries"
+                                :format-timestamp="formatTimestamp"
+                                :is-favorite-pending="isFavoritePending"
+                                @toggle-favorite="toggleFavorite" />
+                        </div>
+
+                        <div
                             v-else
                             key="developer"
                             class="grid gap-6 xl:grid-cols-[minmax(18rem,24rem)_minmax(0,1fr)]">
@@ -639,7 +653,7 @@ const dashboardPageCopy = {
     panelSheetEyebrow: 'SWITCH',
     panelSheetTitle: '切换选项卡',
     pageTitle: '设置 | Open CRH Tracker',
-    pageDescription: '管理账户安全、会话和 API 密钥。'
+    pageDescription: '管理账户安全、收藏、会话和 API 密钥。'
 } as const;
 
 const dashboardPanels = [
@@ -649,6 +663,13 @@ const dashboardPanels = [
         headerTitle: '常规',
         title: '账户与基础操作',
         description: '查看账户和登录状态。'
+    },
+    {
+        id: 'favorites',
+        label: '收藏',
+        headerTitle: '收藏',
+        title: '收藏项目',
+        description: '查看和管理你的收藏。'
     },
     {
         id: 'developer',
@@ -682,6 +703,9 @@ const scopeLabelMap: Record<string, string> = {
     'api.auth.api-keys.read': '读取密钥',
     'api.auth.api-keys.create': '签发密钥',
     'api.auth.api-keys.revoke': '吊销密钥',
+    'api.auth.favorites': '收藏',
+    'api.auth.favorites.read': '读取收藏',
+    'api.auth.favorites.write': '修改收藏',
     'api.auth.logout': '退出登录',
     'api.search': '搜索',
     'api.search.read': '读取搜索',
@@ -712,6 +736,14 @@ const route = useRoute();
 const router = useRouter();
 const { session, clearSession, setSession } = useAuthState();
 const requestFetch = import.meta.server ? useRequestFetch() : $fetch;
+const {
+    items: favoriteItems,
+    maxEntries: favoriteMaxEntries,
+    state: favoritesState,
+    errorMessage: favoritesErrorMessage,
+    isFavoritePending,
+    toggleFavorite
+} = useFavoriteLookups();
 
 const logoutErrorMessage = ref('');
 const isLoggingOut = ref(false);
@@ -753,7 +785,15 @@ function readPanelQuery(value: unknown) {
 }
 
 function normalizePanelId(value: string): DashboardPanelId {
-    return value === 'developer' ? 'developer' : 'general';
+    if (value === 'developer') {
+        return 'developer';
+    }
+
+    if (value === 'favorites') {
+        return 'favorites';
+    }
+
+    return 'general';
 }
 
 const currentPanelId = computed<DashboardPanelId>(() =>
@@ -906,6 +946,7 @@ const canSubmitIssueForm = computed(
         !isIssuing.value && !issueNameError.value && issueForm.scopes.length > 0
 );
 const isApiKeysLoading = computed(() => apiKeysStatus.value === 'pending');
+const isFavoritesLoading = computed(() => favoritesState.value === 'loading');
 const apiKeysErrorMessage = computed(() =>
     apiKeysError.value
         ? getApiErrorMessage(apiKeysError.value, '加载 API 密钥列表失败。')

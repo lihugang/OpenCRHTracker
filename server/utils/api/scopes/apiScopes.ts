@@ -13,6 +13,10 @@ export const API_SCOPES = {
             read: 'api.auth.api-keys.read',
             create: 'api.auth.api-keys.create',
             revoke: 'api.auth.api-keys.revoke'
+        },
+        favorites: {
+            read: 'api.auth.favorites.read',
+            write: 'api.auth.favorites.write'
         }
     },
     search: {

@@ -1,47 +1,17 @@
 import { computed } from 'vue';
 import type { RecentLookupSearchItem } from '~/types/lookup';
-import { normalizeLookupCode } from '~/utils/lookup/lookupTarget';
+import {
+    isLookupTargetType,
+    normalizeLookupSuggestItem
+} from '~/utils/lookup/lookupFavorite';
 
 const STORAGE_KEY = 'opencrhtracker:recent-lookups';
 const MAX_RECENT_LOOKUPS = 5;
 
-function isRecentLookupType(
-    value: unknown
-): value is RecentLookupSearchItem['type'] {
-    return value === 'train' || value === 'emu' || value === 'station';
-}
-
-function normalizeRecentLookupCode(item: RecentLookupSearchItem) {
-    return item.type === 'station'
-        ? item.code.trim()
-        : normalizeLookupCode(item.code);
-}
-
 function normalizeRecentLookupItem(
     item: RecentLookupSearchItem
 ): RecentLookupSearchItem | null {
-    const code = normalizeRecentLookupCode(item);
-    const subtitle = item.subtitle.trim();
-    const tags = Array.isArray(item.tags)
-        ? item.tags
-              .filter((tag): tag is string => typeof tag === 'string')
-              .map((tag) => tag.trim())
-              .filter(
-                  (tag, index, array) =>
-                      tag.length > 0 && array.indexOf(tag) === index
-              )
-        : [];
-
-    if (code.length === 0) {
-        return null;
-    }
-
-    return {
-        type: item.type,
-        code,
-        subtitle,
-        tags
-    };
+    return normalizeLookupSuggestItem(item);
 }
 
 function parseRecentLookupItems(value: string) {
@@ -60,7 +30,7 @@ function parseRecentLookupItems(value: string) {
                     !('code' in item) ||
                     !('subtitle' in item) ||
                     !('tags' in item) ||
-                    !isRecentLookupType(item.type) ||
+                    !isLookupTargetType(item.type) ||
                     typeof item.code !== 'string' ||
                     typeof item.subtitle !== 'string' ||
                     !Array.isArray(item.tags)
@@ -117,10 +87,7 @@ function isSameRecentLookupItem(
     left: RecentLookupSearchItem,
     right: RecentLookupSearchItem
 ) {
-    return (
-        left.type === right.type &&
-        normalizeRecentLookupCode(left) === normalizeRecentLookupCode(right)
-    );
+    return left.type === right.type && left.code === right.code;
 }
 
 export function useRecentLookupSearches() {

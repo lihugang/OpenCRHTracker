@@ -463,12 +463,26 @@
                 },
                 "apiKeyNameLength": {
                     "$ref": "#/definitions/lengthRange"
+                },
+                "favorites": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "maxEntries": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    "required": [
+                        "maxEntries"
+                    ]
                 }
             },
             "required": [
                 "apiKeyNameLength",
                 "saltLength",
                 "apiKeyPrefixes",
+                "favorites",
                 "apiKeyBytes",
                 "apiKeyTtlSeconds",
                 "scrypt"
@@ -575,11 +589,30 @@
                                 "maxEntries",
                                 "defaultTtlSeconds"
                             ]
+                        },
+                        "userProfile": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "maxEntries": {
+                                    "type": "integer",
+                                    "minimum": 1
+                                },
+                                "defaultTtlSeconds": {
+                                    "type": "integer",
+                                    "minimum": 1
+                                }
+                            },
+                            "required": [
+                                "maxEntries",
+                                "defaultTtlSeconds"
+                            ]
                         }
                     },
                     "required": [
                         "userRecord",
-                        "apiKeyRecord"
+                        "apiKeyRecord",
+                        "userProfile"
                     ]
                 },
                 "payload": {

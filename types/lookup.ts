@@ -14,6 +14,16 @@ export interface LookupSuggestItem {
 
 export type RecentLookupSearchItem = LookupSuggestItem;
 
+export interface FavoriteLookupInput {
+    type: LookupTargetType;
+    code: string;
+    tags: string[];
+}
+
+export interface FavoriteLookupItem extends FavoriteLookupInput {
+    starredAt: number;
+}
+
 export type LookupSuggestionMode = 'recent' | 'suggestions';
 
 export interface LookupIndexResponse {

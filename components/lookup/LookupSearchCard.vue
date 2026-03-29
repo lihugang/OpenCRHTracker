@@ -133,66 +133,80 @@
                                     v-else
                                     ref="suggestionListRef"
                                     class="harmony-scrollbar max-h-72 overflow-y-auto py-2">
-                                    <div
-                                        v-if="menuTitle"
-                                        class="px-4 pb-2 pt-1 text-[11px] font-medium uppercase tracking-[0.24em] text-slate-400">
-                                        {{ menuTitle }}
-                                    </div>
+                                    <template
+                                        v-for="section in menuSections"
+                                        :key="section.id">
+                                        <div
+                                            v-if="section.title"
+                                            class="px-4 pb-2 pt-1 text-[11px] font-medium uppercase tracking-[0.24em] text-slate-400">
+                                            {{ section.title }}
+                                        </div>
 
-                                    <button
-                                        v-for="(item, index) in suggestionItems"
-                                        :key="`${item.type}:${item.code}`"
-                                        type="button"
-                                        :data-suggestion-index="index"
-                                        :class="[
-                                            'flex w-full items-center px-4 py-3 text-left transition',
-                                            activeIndex === index
-                                                ? 'bg-blue-50 text-crh-blue'
-                                                : 'text-crh-grey-dark hover:bg-slate-50'
-                                        ]"
-                                        @mousedown.prevent
-                                        @mouseenter="activeIndex = index"
-                                        @click="selectSuggestion(item)">
-                                        <span
+                                        <button
+                                            v-for="entry in section.entries"
+                                            :key="`${section.id}:${entry.key}`"
+                                            type="button"
+                                            :data-suggestion-index="entry.index"
                                             :class="[
-                                                'flex min-w-0 items-start gap-3',
-                                                compact
-                                                    ? 'flex-wrap gap-x-3 gap-y-1'
-                                                    : ''
-                                            ]">
+                                                'flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition',
+                                                activeIndex === entry.index
+                                                    ? 'bg-blue-50 text-crh-blue'
+                                                    : 'text-crh-grey-dark hover:bg-slate-50'
+                                            ]"
+                                            @mousedown.prevent
+                                            @mouseenter="activeIndex = entry.index"
+                                            @click="selectSuggestion(entry.item)">
                                             <span
-                                                class="shrink-0 text-sm font-semibold">
-                                                {{ item.code }}
-                                            </span>
-                                            <span
-                                                class="flex min-w-0 flex-1 flex-col gap-1.5">
+                                                :class="[
+                                                    'flex min-w-0 items-start gap-3',
+                                                    compact
+                                                        ? 'flex-wrap gap-x-3 gap-y-1'
+                                                        : ''
+                                                ]">
                                                 <span
-                                                    :class="[
-                                                        'min-w-0 text-xs text-slate-500',
-                                                        compact
-                                                            ? ''
-                                                            : 'truncate'
-                                                    ]">
-                                                    {{ item.subtitle }}
+                                                    class="shrink-0 text-sm font-semibold">
+                                                    {{ entry.item.code }}
                                                 </span>
                                                 <span
-                                                    v-if="
-                                                        getSuggestionTags(item)
-                                                            .length > 0
-                                                    "
-                                                    class="flex flex-wrap gap-1.5">
+                                                    class="flex min-w-0 flex-1 flex-col gap-1.5">
                                                     <span
-                                                        v-for="tag in getSuggestionTags(
-                                                            item
-                                                        )"
-                                                        :key="tag"
-                                                        class="inline-flex items-center rounded-full bg-blue-600/8 px-2 py-0.5 text-[11px] font-medium leading-none text-blue-600">
-                                                        {{ tag }}
+                                                        v-if="getSuggestionSubtitle(entry.item)"
+                                                        :class="[
+                                                            'min-w-0 text-xs text-slate-500',
+                                                            compact
+                                                                ? ''
+                                                                : 'truncate'
+                                                        ]">
+                                                        {{ getSuggestionSubtitle(entry.item) }}
+                                                    </span>
+                                                    <span
+                                                        v-if="
+                                                            getSuggestionTags(entry.item)
+                                                                .length > 0
+                                                        "
+                                                        class="flex flex-wrap gap-1.5">
+                                                        <span
+                                                            v-for="tag in getSuggestionTags(
+                                                                entry.item
+                                                            )"
+                                                            :key="tag"
+                                                            class="inline-flex items-center rounded-full bg-blue-600/8 px-2 py-0.5 text-[11px] font-medium leading-none text-blue-600">
+                                                            {{ tag }}
+                                                        </span>
                                                     </span>
                                                 </span>
                                             </span>
-                                        </span>
-                                    </button>
+
+                                            <svg
+                                                v-if="entry.isFavorite"
+                                                aria-hidden="true"
+                                                viewBox="0 0 20 20"
+                                                class="h-4 w-4 shrink-0 fill-current text-amber-500">
+                                                <path
+                                                    d="M10 2.4L12.28 7.03L17.39 7.78L13.7 11.38L14.57 16.46L10 14.06L5.43 16.46L6.3 11.38L2.61 7.78L7.72 7.03L10 2.4Z" />
+                                            </svg>
+                                        </button>
+                                    </template>
                                 </div>
                             </div>
                         </div>
@@ -226,16 +240,20 @@ import {
     watch
 } from 'vue';
 import type {
+    FavoriteLookupItem,
     LookupSuggestItem,
     LookupTargetType,
     RecentLookupSearchItem
 } from '~/types/lookup';
+import { useFavoriteLookups } from '~/composables/useFavoriteLookups';
 import { useRecentLookupSearches } from '~/composables/useRecentLookupSearches';
 import safeFocus from '~/utils/safeFocus';
 import {
-    normalizeLookupCode,
-    resolveLookupTarget
-} from '~/utils/lookup/lookupTarget';
+    buildLookupFavoriteFallbackSubtitle,
+    buildLookupItemKeyFromItem,
+    buildLookupItemKeyFromTarget
+} from '~/utils/lookup/lookupFavorite';
+import { resolveLookupTarget } from '~/utils/lookup/lookupTarget';
 
 const props = withDefaults(
     defineProps<{
@@ -285,6 +303,77 @@ const {
     mode: suggestionMode
 } = useLookupSuggestions(() => props.modelValue);
 const { addRecentSearch } = useRecentLookupSearches();
+const {
+    items: favoriteItems,
+    favoriteKeySet
+} = useFavoriteLookups();
+
+const recentMenuItems = computed(() => {
+    if (suggestionMode.value !== 'recent') {
+        return [];
+    }
+
+    return suggestionItems.value.filter(
+        (item) => !favoriteKeySet.value.has(buildLookupItemKeyFromItem(item))
+    );
+});
+
+type LookupMenuItem = LookupSuggestItem | FavoriteLookupItem;
+
+const menuSections = computed(() => {
+    const sections: Array<{
+        id: 'favorites' | 'recent' | 'suggestions';
+        title: string;
+        entries: Array<{
+            item: LookupMenuItem;
+            index: number;
+            key: string;
+            isFavorite: boolean;
+        }>;
+    }> = [];
+    let currentIndex = 0;
+
+    function pushSection(
+        id: 'favorites' | 'recent' | 'suggestions',
+        title: string,
+        items: LookupMenuItem[]
+    ) {
+        if (items.length === 0) {
+            return;
+        }
+
+        sections.push({
+            id,
+            title,
+            entries: items.map((item) => {
+                const entry = {
+                    item,
+                    index: currentIndex,
+                    key: buildLookupItemKeyFromItem(item),
+                    isFavorite: favoriteKeySet.value.has(
+                        buildLookupItemKeyFromItem(item)
+                    )
+                };
+
+                currentIndex += 1;
+                return entry;
+            })
+        });
+    }
+
+    if (suggestionMode.value === 'recent') {
+        pushSection('favorites', '收藏', favoriteItems.value);
+        pushSection('recent', '最近搜索', recentMenuItems.value);
+        return sections;
+    }
+
+    pushSection('suggestions', '', suggestionItems.value);
+    return sections;
+});
+
+const menuEntries = computed(() =>
+    menuSections.value.flatMap((section) => section.entries)
+);
 
 const shouldShowMenu = computed(() => {
     if (!isMenuOpen.value) {
@@ -295,18 +384,16 @@ const shouldShowMenu = computed(() => {
         suggestionsState.value === 'loading' ||
         suggestionsState.value === 'error' ||
         suggestionsState.value === 'empty' ||
-        suggestionItems.value.length > 0
+        menuEntries.value.length > 0
     );
 });
 
-const menuTitle = computed(() =>
-    suggestionMode.value === 'recent' ? '\u6700\u8fd1\u641c\u7d22' : ''
-);
 const emptyStateMessage = computed(() =>
     suggestionMode.value === 'recent'
-        ? '\u6682\u65e0\u6700\u8fd1\u641c\u7d22'
-        : '\u672a\u627e\u5230\u5339\u914d\u9879'
+        ? '暂无收藏或最近搜索'
+        : '未找到匹配项'
 );
+
 
 function closeMenu() {
     isMenuOpen.value = false;
@@ -324,7 +411,7 @@ function handleInput(event: Event) {
 }
 
 function moveActive(direction: 1 | -1) {
-    if (suggestionItems.value.length === 0) {
+    if (menuEntries.value.length === 0) {
         return;
     }
 
@@ -332,18 +419,31 @@ function moveActive(direction: 1 | -1) {
 
     if (activeIndex.value < 0) {
         activeIndex.value =
-            direction > 0 ? 0 : suggestionItems.value.length - 1;
+            direction > 0 ? 0 : menuEntries.value.length - 1;
         return;
     }
 
     activeIndex.value =
-        (activeIndex.value + direction + suggestionItems.value.length) %
-        suggestionItems.value.length;
+        (activeIndex.value + direction + menuEntries.value.length) %
+        menuEntries.value.length;
 }
 
-async function selectSuggestion(item: LookupSuggestItem) {
+function toRecentLookupSearchItem(item: LookupMenuItem): RecentLookupSearchItem {
+    if ('subtitle' in item) {
+        return item;
+    }
+
+    return {
+        type: item.type,
+        code: item.code,
+        subtitle: buildLookupFavoriteFallbackSubtitle(item.type),
+        tags: item.tags
+    };
+}
+
+async function selectSuggestion(item: LookupMenuItem) {
     emit('update:modelValue', item.code);
-    addRecentSearch(item);
+    addRecentSearch(toRecentLookupSearchItem(item));
     closeMenu();
     await nextTick();
     emit('submit');
@@ -353,15 +453,24 @@ function getSingleSuggestion() {
     if (
         suggestionMode.value !== 'suggestions' ||
         suggestionsState.value !== 'success' ||
-        suggestionItems.value.length !== 1
+        menuEntries.value.length !== 1
     ) {
         return null;
     }
 
-    return suggestionItems.value[0] ?? null;
+    const item = menuEntries.value[0]?.item ?? null;
+    return item && 'subtitle' in item ? item : null;
 }
 
-function getSuggestionTags(item: LookupSuggestItem) {
+function getSuggestionSubtitle(item: LookupMenuItem) {
+    if (!('subtitle' in item) || typeof item.subtitle !== 'string') {
+        return '';
+    }
+
+    return item.subtitle.trim();
+}
+
+function getSuggestionTags(item: LookupMenuItem) {
     return Array.isArray(item.tags)
         ? item.tags
               .filter((tag): tag is string => typeof tag === 'string')
@@ -374,23 +483,7 @@ function isSameSuggestionItem(
     left: LookupSuggestItem,
     right: { type: LookupTargetType; code: string }
 ) {
-    if (left.type !== right.type) {
-        return false;
-    }
-
-    if (left.type === 'station') {
-        return left.code.trim() === right.code.trim();
-    }
-
-    return normalizeLookupCode(left.code) === normalizeLookupCode(right.code);
-}
-
-function buildFallbackSubtitle(type: LookupTargetType) {
-    if (type === 'station') {
-        return '\u8f66\u7ad9\u65f6\u523b\u8868';
-    }
-
-    return '\u5386\u53f2\u62c5\u5f53\u8bb0\u5f55';
+    return buildLookupItemKeyFromItem(left) === buildLookupItemKeyFromTarget(right);
 }
 
 function resolveRecentSearchItem() {
@@ -410,7 +503,7 @@ function resolveRecentSearchItem() {
     return {
         type: resolvedTarget.type,
         code: resolvedTarget.code,
-        subtitle: buildFallbackSubtitle(resolvedTarget.type),
+        subtitle: buildLookupFavoriteFallbackSubtitle(resolvedTarget.type),
         tags: []
     } satisfies RecentLookupSearchItem;
 }
@@ -439,7 +532,7 @@ async function submitCurrentValue() {
 async function submitFromEnter() {
     const activeItem =
         shouldShowMenu.value && activeIndex.value >= 0
-            ? (suggestionItems.value[activeIndex.value] ?? null)
+            ? (menuEntries.value[activeIndex.value]?.item ?? null)
             : null;
 
     if (activeItem) {

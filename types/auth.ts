@@ -1,3 +1,5 @@
+import type { FavoriteLookupItem } from '~/types/lookup';
+
 export type AuthApiKeyIssuer = 'webapp' | 'api';
 
 export interface AuthApiKeyNameLength {
@@ -82,4 +84,10 @@ export interface AuthIssueApiKeyResponse {
     expiresAt: number;
     dailyTokenLimit: number;
     scopes: string[];
+}
+
+export interface AuthFavoritesResponse {
+    userId: string;
+    maxEntries: number;
+    items: FavoriteLookupItem[];
 }

@@ -119,6 +119,9 @@
         "apiKeyNameLength": {
             "minLength": 1,
             "maxLength": 64
+        },
+        "favorites": {
+            "maxEntries": 10
         }
     },
     "api": {
@@ -142,6 +145,10 @@
             },
             "apiKeyRecord": {
                 "maxEntries": 4096,
+                "defaultTtlSeconds": 21600
+            },
+            "userProfile": {
+                "maxEntries": 256,
                 "defaultTtlSeconds": 21600
             }
         },
@@ -214,6 +221,8 @@
                 "api.auth.api-keys.read",
                 "api.auth.api-keys.create",
                 "api.auth.api-keys.revoke",
+                "api.auth.favorites.read",
+                "api.auth.favorites.write",
                 "api.timetable.station.read"
             ],
             "creatableKeyMaxScopes": [
