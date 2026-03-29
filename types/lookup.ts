@@ -12,6 +12,10 @@ export interface LookupSuggestItem {
     tags: string[];
 }
 
+export type RecentLookupSearchItem = LookupSuggestItem;
+
+export type LookupSuggestionMode = 'recent' | 'suggestions';
+
 export interface LookupIndexResponse {
     items: LookupSuggestItem[];
 }

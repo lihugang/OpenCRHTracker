@@ -126,13 +126,19 @@
                                 <div
                                     v-else-if="suggestionsState === 'empty'"
                                     class="px-4 py-3 text-sm text-slate-500">
-                                    未找到匹配项
+                                    {{ emptyStateMessage }}
                                 </div>
 
                                 <div
                                     v-else
                                     ref="suggestionListRef"
                                     class="harmony-scrollbar max-h-72 overflow-y-auto py-2">
+                                    <div
+                                        v-if="menuTitle"
+                                        class="px-4 pb-2 pt-1 text-[11px] font-medium uppercase tracking-[0.24em] text-slate-400">
+                                        {{ menuTitle }}
+                                    </div>
+
                                     <button
                                         v-for="(item, index) in suggestionItems"
                                         :key="`${item.type}:${item.code}`"
@@ -219,8 +225,17 @@ import {
     ref,
     watch
 } from 'vue';
-import type { LookupSuggestItem, LookupTargetType } from '~/types/lookup';
+import type {
+    LookupSuggestItem,
+    LookupTargetType,
+    RecentLookupSearchItem
+} from '~/types/lookup';
+import { useRecentLookupSearches } from '~/composables/useRecentLookupSearches';
 import safeFocus from '~/utils/safeFocus';
+import {
+    normalizeLookupCode,
+    resolveLookupTarget
+} from '~/utils/lookup/lookupTarget';
 
 const props = withDefaults(
     defineProps<{
@@ -267,12 +282,12 @@ const {
     state: suggestionsState,
     items: suggestionItems,
     errorMessage: suggestionsErrorMessage,
-    normalizedQuery,
-    minQueryLength
+    mode: suggestionMode
 } = useLookupSuggestions(() => props.modelValue);
+const { addRecentSearch } = useRecentLookupSearches();
 
 const shouldShowMenu = computed(() => {
-    if (!isMenuOpen.value || normalizedQuery.value.length < minQueryLength) {
+    if (!isMenuOpen.value) {
         return false;
     }
 
@@ -284,15 +299,22 @@ const shouldShowMenu = computed(() => {
     );
 });
 
+const menuTitle = computed(() =>
+    suggestionMode.value === 'recent' ? '\u6700\u8fd1\u641c\u7d22' : ''
+);
+const emptyStateMessage = computed(() =>
+    suggestionMode.value === 'recent'
+        ? '\u6682\u65e0\u6700\u8fd1\u641c\u7d22'
+        : '\u672a\u627e\u5230\u5339\u914d\u9879'
+);
+
 function closeMenu() {
     isMenuOpen.value = false;
     activeIndex.value = -1;
 }
 
 function handleFocus() {
-    if (normalizedQuery.value.length >= minQueryLength) {
-        isMenuOpen.value = true;
-    }
+    isMenuOpen.value = true;
 }
 
 function handleInput(event: Event) {
@@ -321,6 +343,7 @@ function moveActive(direction: 1 | -1) {
 
 async function selectSuggestion(item: LookupSuggestItem) {
     emit('update:modelValue', item.code);
+    addRecentSearch(item);
     closeMenu();
     await nextTick();
     emit('submit');
@@ -328,6 +351,7 @@ async function selectSuggestion(item: LookupSuggestItem) {
 
 function getSingleSuggestion() {
     if (
+        suggestionMode.value !== 'suggestions' ||
         suggestionsState.value !== 'success' ||
         suggestionItems.value.length !== 1
     ) {
@@ -346,6 +370,60 @@ function getSuggestionTags(item: LookupSuggestItem) {
         : [];
 }
 
+function isSameSuggestionItem(
+    left: LookupSuggestItem,
+    right: { type: LookupTargetType; code: string }
+) {
+    if (left.type !== right.type) {
+        return false;
+    }
+
+    if (left.type === 'station') {
+        return left.code.trim() === right.code.trim();
+    }
+
+    return normalizeLookupCode(left.code) === normalizeLookupCode(right.code);
+}
+
+function buildFallbackSubtitle(type: LookupTargetType) {
+    if (type === 'station') {
+        return '\u8f66\u7ad9\u65f6\u523b\u8868';
+    }
+
+    return '\u5386\u53f2\u62c5\u5f53\u8bb0\u5f55';
+}
+
+function resolveRecentSearchItem() {
+    const resolvedTarget = resolveLookupTarget(props.modelValue);
+    if (!resolvedTarget) {
+        return null;
+    }
+
+    const matchedSuggestion = suggestionItems.value.find((item) =>
+        isSameSuggestionItem(item, resolvedTarget)
+    );
+
+    if (matchedSuggestion) {
+        return matchedSuggestion;
+    }
+
+    return {
+        type: resolvedTarget.type,
+        code: resolvedTarget.code,
+        subtitle: buildFallbackSubtitle(resolvedTarget.type),
+        tags: []
+    } satisfies RecentLookupSearchItem;
+}
+
+function recordCurrentSearch() {
+    const recentSearchItem = resolveRecentSearchItem();
+    if (!recentSearchItem) {
+        return;
+    }
+
+    addRecentSearch(recentSearchItem);
+}
+
 async function submitCurrentValue() {
     const singleSuggestion = getSingleSuggestion();
     if (singleSuggestion) {
@@ -353,6 +431,7 @@ async function submitCurrentValue() {
         return;
     }
 
+    recordCurrentSearch();
     closeMenu();
     emit('submit');
 }

@@ -1,11 +1,16 @@
 import { computed, ref, toValue, watch, type MaybeRefOrGetter } from 'vue';
 import type { TrackerApiResponse } from '~/types/homepage';
-import type { LookupIndexResponse, LookupSuggestItem } from '~/types/lookup';
+import type {
+    LookupIndexResponse,
+    LookupSuggestItem,
+    LookupSuggestionMode
+} from '~/types/lookup';
 import getApiErrorMessage from '~/utils/api/getApiErrorMessage';
 import getLookupSuggestIndex, {
     type LookupSuggestIndex
 } from '~/utils/lookup/lookupSuggestIndex';
 import { normalizeLookupCode } from '~/utils/lookup/lookupTarget';
+import { useRecentLookupSearches } from '~/composables/useRecentLookupSearches';
 
 const MIN_QUERY_LENGTH = 2;
 const SUGGEST_LIMIT = 25;
@@ -50,6 +55,8 @@ export function useLookupSuggestions(
     );
     const items = ref<LookupSuggestItem[]>([]);
     const errorMessage = ref('');
+    const mode = ref<LookupSuggestionMode>('suggestions');
+    const { recentSearches } = useRecentLookupSearches();
 
     const normalizedQuery = computed(() =>
         normalizeLookupCode(toValue(querySource))
@@ -67,10 +74,14 @@ export function useLookupSuggestions(
 
     async function refreshSuggestions(query: string) {
         if (query.length < MIN_QUERY_LENGTH) {
-            reset();
+            mode.value = 'recent';
+            items.value = recentSearches.value.slice(0, limit);
+            state.value = items.value.length > 0 ? 'success' : 'empty';
+            errorMessage.value = '';
             return;
         }
 
+        mode.value = 'suggestions';
         state.value = 'loading';
         errorMessage.value = '';
 
@@ -92,8 +103,8 @@ export function useLookupSuggestions(
     }
 
     watch(
-        normalizedQuery,
-        async (query) => {
+        [normalizedQuery, recentSearches],
+        async ([query]) => {
             if (import.meta.server) {
                 reset();
                 return;
@@ -110,6 +121,7 @@ export function useLookupSuggestions(
         state,
         items,
         errorMessage,
+        mode,
         normalizedQuery,
         minQueryLength: MIN_QUERY_LENGTH
     };
