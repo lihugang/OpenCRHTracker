@@ -269,6 +269,10 @@ const navItems = [
         path: '/admin/anomaly-scan'
     },
     {
+        label: 'WebApp Token',
+        path: '/admin/webapp-tokens'
+    },
+    {
         label: '任务创建',
         path: '/admin/tasks'
     }

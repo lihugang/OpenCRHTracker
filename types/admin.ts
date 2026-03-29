@@ -173,3 +173,10 @@ export interface AdminCreateTaskResponse {
     date?: string;
     normalizedTrainCodes?: string[];
 }
+
+export interface AdminRevokeAllWebappTokensResponse {
+    issuer: 'webapp';
+    revokedCount: number;
+    revokedAt: number;
+    revokedCurrentSession: boolean;
+}
