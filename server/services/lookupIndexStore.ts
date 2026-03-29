@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import useConfig from '~/server/config';
-import { loadPublishedScheduleState } from '~/server/utils/12306/scheduleProbe/stateStore';
+import { loadActiveScheduleState } from '~/server/utils/12306/scheduleProbe/stateStore';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
 import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
 import parseJsonlToJson from '~/server/utils/json/parseJsonlToJson';
@@ -94,7 +94,7 @@ function buildEmuSubtitle(record: { bureau: string; depot: string }) {
 }
 
 function loadTrainItems(scheduleFilePath: string) {
-    const state = loadPublishedScheduleState(scheduleFilePath);
+    const state = loadActiveScheduleState(scheduleFilePath);
     const deduplicated = new Map<string, LookupSuggestItem>();
 
     for (const item of state?.items ?? []) {
@@ -115,7 +115,7 @@ function loadTrainItems(scheduleFilePath: string) {
 }
 
 function loadStationItems(scheduleFilePath: string) {
-    const state = loadPublishedScheduleState(scheduleFilePath);
+    const state = loadActiveScheduleState(scheduleFilePath);
     const currentDate = getCurrentDateString();
     if (!state || state.date !== currentDate) {
         return [];

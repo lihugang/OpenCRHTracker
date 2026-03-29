@@ -3,7 +3,7 @@ import path from 'path';
 import useConfig from '~/server/config';
 import { buildTrainKey } from '~/server/services/probeRuntimeState';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
-import { loadPublishedScheduleState } from '~/server/utils/12306/scheduleProbe/stateStore';
+import { loadActiveScheduleState } from '~/server/utils/12306/scheduleProbe/stateStore';
 import {
     toShanghaiDayOffsetFromUnixSeconds,
     toUnixSecondsFromShanghaiDayOffset
@@ -82,7 +82,7 @@ function rebuildCache(): TodayScheduleCache {
     const currentDate = getCurrentDateString();
     const scheduleFilePath = config.data.assets.schedule.file;
     const scheduleMtimeMs = getFileMtimeMs(scheduleFilePath);
-    const state = loadPublishedScheduleState(scheduleFilePath);
+    const state = loadActiveScheduleState(scheduleFilePath);
     const routesByTrainCode = new Map<string, TodayScheduleRoute>();
     const timetablesByTrainCode = new Map<string, TodayScheduleTimetable>();
     const groupsByTrainKey = new Map<string, TodayScheduleProbeGroup>();
@@ -96,7 +96,7 @@ function rebuildCache(): TodayScheduleCache {
         Map<string, TodayScheduleStationIndexRow>
     >();
 
-    if (state?.date === currentDate) {
+    if (state) {
         for (const item of state.items) {
             if (item.startAt === null || item.endAt === null) {
                 continue;

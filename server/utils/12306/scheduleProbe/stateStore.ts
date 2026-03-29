@@ -506,6 +506,32 @@ export function loadPublishedScheduleState(
     return document?.published ? cloneScheduleState(document.published) : null;
 }
 
+export function loadActiveScheduleState(
+    scheduleFilePath: string
+): ScheduleState | null {
+    const document = loadScheduleDocument(scheduleFilePath);
+    if (!document) {
+        return null;
+    }
+
+    const today = getCurrentDateString();
+    const published = document.published;
+    if (published && published.date === today) {
+        return cloneScheduleState(published);
+    }
+
+    const building = document.building;
+    if (building && building.date === today) {
+        return cloneScheduleState(building);
+    }
+
+    if (published) {
+        return cloneScheduleState(published);
+    }
+
+    return building ? cloneScheduleState(building) : null;
+}
+
 export function savePublishedScheduleState(
     scheduleFilePath: string,
     state: ScheduleState | null
