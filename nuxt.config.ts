@@ -3,6 +3,10 @@ import tailwindcss from '@tailwindcss/vite';
 export default defineNuxtConfig({
     compatibilityDate: '2025-05-15',
     devtools: { enabled: false },
+    sourcemap: {
+        client: false,
+        server: false
+    },
     app: {
         head: {
             htmlAttrs: {
@@ -45,6 +49,7 @@ export default defineNuxtConfig({
         }
     },
     nitro: {
+        sourceMap: false,
         esbuild: {
             options: {
                 target: 'esnext'
@@ -97,6 +102,9 @@ export default defineNuxtConfig({
 
     pwa: {
         registerType: 'autoUpdate',
+        injectManifest: {
+            sourcemap: false
+        },
         manifest: {
             name: 'Open China Railway HighSpeed Train Tracker',
             short_name: 'Open CRH Tracker',
