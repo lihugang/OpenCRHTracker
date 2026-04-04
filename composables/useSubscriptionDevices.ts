@@ -1,4 +1,4 @@
-import { computed, onMounted, watch } from 'vue';
+import { computed, watch } from 'vue';
 import type {
     AuthSession,
     AuthSubscriptionItem,
@@ -349,6 +349,10 @@ export function useSubscriptionDevices() {
     const errorMessage = useState('subscription-devices-error', () => '');
     const loadedUserId = useState('subscription-devices-user-id', () => '');
     const maxDevices = useState('subscription-devices-max-devices', () => 20);
+    const initialized = useState(
+        'subscription-devices-initialized',
+        () => false
+    );
     const syncTimeoutSeconds = useState(
         'subscription-devices-sync-timeout-seconds',
         () => DEFAULT_SUBSCRIPTION_SYNC_TIMEOUT_SECONDS
@@ -829,26 +833,53 @@ export function useSubscriptionDevices() {
         return pendingIds.value.includes(`${kind}:${id}`);
     }
 
-    if (import.meta.client) {
-        onMounted(() => {
-            void refresh(true);
-        });
+    function ensureInitialized() {
+        if (!import.meta.client || initialized.value) {
+            return;
+        }
+
+        initialized.value = true;
 
         watch(
-            () => session.value?.userId ?? '',
-            (nextUserId, previousUserId) => {
-                if (!nextUserId) {
+            () =>
+                [
+                    session.value?.userId ?? '',
+                    canReadSubscriptions.value
+                ] as const,
+            ([nextUserId, nextCanReadSubscriptions], previousValue) => {
+                const [previousUserId, previousCanReadSubscriptions] =
+                    previousValue ?? ['', false];
+
+                if (!nextUserId || !nextCanReadSubscriptions) {
                     reset();
                     void syncCurrentDeviceState();
                     return;
                 }
 
-                if (nextUserId !== previousUserId) {
-                    void refresh(true);
+                if (
+                    nextUserId !== previousUserId ||
+                    nextCanReadSubscriptions !== previousCanReadSubscriptions ||
+                    loadedUserId.value !== nextUserId ||
+                    state.value === 'idle'
+                ) {
+                    void refresh(
+                        nextUserId !== previousUserId ||
+                            nextCanReadSubscriptions !==
+                                previousCanReadSubscriptions ||
+                            loadedUserId.value !== nextUserId
+                    );
+                    return;
                 }
+
+                void syncCurrentDeviceState();
+            },
+            {
+                immediate: true
             }
         );
     }
+
+    ensureInitialized();
 
     return {
         items: computed(() => items.value),

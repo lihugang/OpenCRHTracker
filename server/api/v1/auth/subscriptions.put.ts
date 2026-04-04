@@ -1,4 +1,5 @@
 import { defineEventHandler, getHeader, readBody } from 'h3';
+import getLogger from '~/server/libs/log4js';
 import useConfig from '~/server/config';
 import {
     listUserSubscriptions,
@@ -13,7 +14,8 @@ import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
 import {
     createSubscriptionListResponse,
     getSubscriptionNameMaxLength,
-    normalizeSubscriptionName
+    normalizeSubscriptionName,
+    previewSubscriptionEndpoint
 } from '~/server/utils/auth/subscriptions';
 import { buildDeviceRegistrationSucceededNotification } from '~/server/utils/notifications/templates/deviceRegistrationSucceeded';
 
@@ -31,6 +33,16 @@ interface PutSubscriptionValue {
 interface PutSubscriptionKeysValue {
     p256dh?: unknown;
     auth?: unknown;
+}
+
+const logger = getLogger('auth-subscriptions-api');
+
+function getErrorMessage(error: unknown) {
+    if (error instanceof Error) {
+        return error.message;
+    }
+
+    return String(error);
 }
 
 export default defineEventHandler(async (event) => {
@@ -154,11 +166,24 @@ export default defineEventHandler(async (event) => {
             );
 
             if (result.action === 'created') {
-                await sendPushNotificationToSubscription(
-                    identity.id,
-                    result.item,
-                    buildDeviceRegistrationSucceededNotification()
-                );
+                try {
+                    const notificationResult =
+                        await sendPushNotificationToSubscription(
+                            identity.id,
+                            result.item,
+                            buildDeviceRegistrationSucceededNotification()
+                        );
+
+                    if (!notificationResult.delivered) {
+                        logger.warn(
+                            `subscription_registration_notification_failed userId=${identity.id} endpoint=${previewSubscriptionEndpoint(result.item.endpoint)} message=${notificationResult.message}`
+                        );
+                    }
+                } catch (error) {
+                    logger.error(
+                        `subscription_registration_notification_failed_unexpected userId=${identity.id} endpoint=${previewSubscriptionEndpoint(result.item.endpoint)} message=${getErrorMessage(error)}`
+                    );
+                }
             }
 
             return createSubscriptionListResponse(

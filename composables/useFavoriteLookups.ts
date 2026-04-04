@@ -40,6 +40,7 @@ export function useFavoriteLookups() {
     const errorMessage = useState('favorite-lookups-error', () => '');
     const loadedUserId = useState('favorite-lookups-user-id', () => '');
     const maxEntries = useState('favorite-lookups-max-entries', () => 10);
+    const initialized = useState('favorite-lookups-initialized', () => false);
     const pendingKeys = useState<string[]>(
         'favorite-lookups-pending-keys',
         () => []
@@ -283,17 +284,36 @@ export function useFavoriteLookups() {
         return pendingKeys.value.includes(buildLookupItemKeyFromItem(target));
     }
 
-    if (import.meta.client) {
+    function ensureInitialized() {
+        if (!import.meta.client || initialized.value) {
+            return;
+        }
+
+        initialized.value = true;
+
         watch(
-            () => session.value?.userId ?? '',
-            (nextUserId, previousUserId) => {
-                if (!nextUserId) {
+            () =>
+                [session.value?.userId ?? '', canReadFavorites.value] as const,
+            ([nextUserId, nextCanReadFavorites], previousValue) => {
+                const [previousUserId, previousCanReadFavorites] =
+                    previousValue ?? ['', false];
+
+                if (!nextUserId || !nextCanReadFavorites) {
                     reset();
                     return;
                 }
 
-                if (nextUserId !== previousUserId) {
-                    void refresh(true);
+                if (
+                    nextUserId !== previousUserId ||
+                    nextCanReadFavorites !== previousCanReadFavorites ||
+                    loadedUserId.value !== nextUserId ||
+                    state.value === 'idle'
+                ) {
+                    void refresh(
+                        nextUserId !== previousUserId ||
+                            nextCanReadFavorites !== previousCanReadFavorites ||
+                            loadedUserId.value !== nextUserId
+                    );
                 }
             },
             {
@@ -301,6 +321,8 @@ export function useFavoriteLookups() {
             }
         );
     }
+
+    ensureInitialized();
 
     return {
         items: computed(() => items.value),

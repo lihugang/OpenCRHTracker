@@ -59,6 +59,10 @@ export function useEventSubscriptions() {
     const errorMessage = useState('event-subscriptions-error', () => '');
     const loadedUserId = useState('event-subscriptions-user-id', () => '');
     const maxEntries = useState('event-subscriptions-max-entries', () => 50);
+    const initialized = useState(
+        'event-subscriptions-initialized',
+        () => false
+    );
     const pendingKeys = useState<string[]>(
         'event-subscriptions-pending-keys',
         () => []
@@ -360,17 +364,40 @@ export function useEventSubscriptions() {
         );
     }
 
-    if (import.meta.client) {
+    function ensureInitialized() {
+        if (!import.meta.client || initialized.value) {
+            return;
+        }
+
+        initialized.value = true;
+
         watch(
-            () => session.value?.userId ?? '',
-            (nextUserId, previousUserId) => {
-                if (!nextUserId) {
+            () =>
+                [
+                    session.value?.userId ?? '',
+                    canReadSubscriptions.value
+                ] as const,
+            ([nextUserId, nextCanReadSubscriptions], previousValue) => {
+                const [previousUserId, previousCanReadSubscriptions] =
+                    previousValue ?? ['', false];
+
+                if (!nextUserId || !nextCanReadSubscriptions) {
                     reset();
                     return;
                 }
 
-                if (nextUserId !== previousUserId) {
-                    void refresh(true);
+                if (
+                    nextUserId !== previousUserId ||
+                    nextCanReadSubscriptions !== previousCanReadSubscriptions ||
+                    loadedUserId.value !== nextUserId ||
+                    state.value === 'idle'
+                ) {
+                    void refresh(
+                        nextUserId !== previousUserId ||
+                            nextCanReadSubscriptions !==
+                                previousCanReadSubscriptions ||
+                            loadedUserId.value !== nextUserId
+                    );
                 }
             },
             {
@@ -378,6 +405,8 @@ export function useEventSubscriptions() {
             }
         );
     }
+
+    ensureInitialized();
 
     return {
         items: computed(() => items.value),

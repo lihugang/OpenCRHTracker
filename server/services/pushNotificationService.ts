@@ -5,6 +5,7 @@ import {
     removeUserSubscriptionsByEndpoints,
     type UserProfileSubscriptionItem
 } from '~/server/services/userProfileStore';
+import { previewSubscriptionEndpoint } from '~/server/utils/auth/subscriptions';
 import type { NotificationPayload } from '~/types/notifications';
 
 interface WebPushLike {
@@ -32,9 +33,14 @@ interface PushSendResult {
     message: string;
 }
 
+interface WebPushClientResolution {
+    client: WebPushLike | null;
+    failureMessage: string;
+}
+
 const logger = getLogger('push-notification');
 const WEB_PUSH_MODULE_SPECIFIER = 'web-push';
-let webPushPromise: Promise<WebPushLike | null> | null = null;
+let webPushPromise: Promise<WebPushClientResolution> | null = null;
 
 function getPushErrorMessage(error: unknown) {
     if (error instanceof Error) {
@@ -89,31 +95,71 @@ async function getWebPushClient() {
             config.user.push.vapidPrivateKey.trim().length === 0
         ) {
             logger.warn('push_disabled_missing_vapid_keys');
-            return null;
+            return {
+                client: null,
+                failureMessage: 'missing_vapid_keys'
+            } satisfies WebPushClientResolution;
         }
 
-        const importedModule = (await import(
-            WEB_PUSH_MODULE_SPECIFIER
-        )) as Partial<WebPushLike> & { default?: WebPushLike };
-        const webPush = importedModule.default ?? importedModule;
+        try {
+            const importedModule = (await import(
+                WEB_PUSH_MODULE_SPECIFIER
+            )) as Partial<WebPushLike> & { default?: WebPushLike };
+            const webPush = importedModule.default ?? importedModule;
 
-        if (
-            typeof webPush.setVapidDetails !== 'function' ||
-            typeof webPush.sendNotification !== 'function'
-        ) {
-            throw new Error('Invalid web-push module export');
+            if (
+                typeof webPush.setVapidDetails !== 'function' ||
+                typeof webPush.sendNotification !== 'function'
+            ) {
+                throw new Error('Invalid web-push module export');
+            }
+
+            webPush.setVapidDetails(
+                'mailto:push@opencrhtracker.local',
+                config.user.push.vapidPublicKey,
+                config.user.push.vapidPrivateKey
+            );
+
+            return {
+                client: webPush as WebPushLike,
+                failureMessage: ''
+            } satisfies WebPushClientResolution;
+        } catch (error) {
+            const message = getPushErrorMessage(error);
+            logger.error(`push_client_init_failed message=${message}`);
+            return {
+                client: null,
+                failureMessage: `web_push_init_failed:${message}`
+            } satisfies WebPushClientResolution;
         }
-
-        webPush.setVapidDetails(
-            'mailto:push@opencrhtracker.local',
-            config.user.push.vapidPublicKey,
-            config.user.push.vapidPrivateKey
-        );
-
-        return webPush as WebPushLike;
     })();
 
     return webPushPromise;
+}
+
+function removeInvalidSubscriptions(
+    userId: string,
+    endpoints: readonly string[],
+    context: 'single' | 'batch'
+) {
+    try {
+        removeUserSubscriptionsByEndpoints(userId, endpoints);
+
+        if (context === 'single' && endpoints[0]) {
+            logger.info(
+                `push_subscription_removed_invalid userId=${userId} endpoint=${previewSubscriptionEndpoint(endpoints[0])}`
+            );
+            return;
+        }
+
+        logger.info(
+            `push_subscription_removed_invalid_batch userId=${userId} endpoints=${JSON.stringify(endpoints.map((endpoint) => previewSubscriptionEndpoint(endpoint)))}`
+        );
+    } catch (error) {
+        logger.error(
+            `push_subscription_cleanup_failed userId=${userId} context=${context} message=${getPushErrorMessage(error)}`
+        );
+    }
 }
 
 function toStoredPushSubscription(item: UserProfileSubscriptionItem): {
@@ -138,17 +184,17 @@ async function sendPushNotificationToStoredSubscription(
     item: UserProfileSubscriptionItem,
     payload: NotificationPayload
 ): Promise<PushSendResult> {
-    const webPush = await getWebPushClient();
-    if (!webPush) {
+    const clientResolution = await getWebPushClient();
+    if (!clientResolution.client) {
         return {
             delivered: false,
             hardInvalid: false,
-            message: 'missing_vapid_keys'
+            message: clientResolution.failureMessage
         };
     }
 
     try {
-        await webPush.sendNotification(
+        await clientResolution.client.sendNotification(
             toStoredPushSubscription(item),
             JSON.stringify(payload)
         );
@@ -179,16 +225,13 @@ export async function sendPushNotificationToSubscription(
     if (!result.hardInvalid) {
         if (!result.delivered && result.message.length > 0) {
             logger.warn(
-                `push_send_failed_single userId=${userId} endpoint=${item.endpoint} message=${result.message}`
+                `push_send_failed_single userId=${userId} endpoint=${previewSubscriptionEndpoint(item.endpoint)} message=${result.message}`
             );
         }
         return result;
     }
 
-    removeUserSubscriptionsByEndpoints(userId, [item.endpoint]);
-    logger.info(
-        `push_subscription_removed_invalid userId=${userId} endpoint=${item.endpoint}`
-    );
+    removeInvalidSubscriptions(userId, [item.endpoint], 'single');
     return result;
 }
 
@@ -218,16 +261,13 @@ export async function sendPushNotificationToUser(
         .map((item) => item.endpoint);
 
     if (removedEndpoints.length > 0) {
-        removeUserSubscriptionsByEndpoints(userId, removedEndpoints);
-        logger.info(
-            `push_subscription_removed_invalid_batch userId=${userId} endpoints=${JSON.stringify(removedEndpoints)}`
-        );
+        removeInvalidSubscriptions(userId, removedEndpoints, 'batch');
     }
 
     for (const item of results) {
         if (!item.result.delivered && !item.result.hardInvalid) {
             logger.warn(
-                `push_send_failed userId=${userId} endpoint=${item.endpoint} message=${item.result.message}`
+                `push_send_failed userId=${userId} endpoint=${previewSubscriptionEndpoint(item.endpoint)} message=${item.result.message}`
             );
         }
     }
