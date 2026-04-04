@@ -28,7 +28,8 @@ export default defineEventHandler(async (event) => {
         async ({ identity }) => {
             const config = useConfig();
             const subscriptionId = getRouterParam(event, 'id');
-            const body = (await readBody<PatchSubscriptionBody | null>(event)) ?? {};
+            const body =
+                (await readBody<PatchSubscriptionBody | null>(event)) ?? {};
 
             ensure(
                 typeof subscriptionId === 'string' && subscriptionId.length > 0,

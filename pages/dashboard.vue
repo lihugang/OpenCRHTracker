@@ -217,9 +217,7 @@
                             <DashboardEventSubscriptionPanel
                                 :items="eventSubscriptionItems"
                                 :is-loading="isEventSubscriptionsLoading"
-                                :error-message="
-                                    eventSubscriptionsErrorMessage
-                                "
+                                :error-message="eventSubscriptionsErrorMessage"
                                 :max-entries="eventSubscriptionMaxEntries"
                                 :device-count="subscriptionItems.length"
                                 :format-timestamp="formatTimestamp"
@@ -235,12 +233,12 @@
                                 :max-devices="subscriptionMaxDevices"
                                 :vapid-public-key="vapidPublicKey"
                                 :supports-push="supportsPush"
-                                :notification-permission="notificationPermission"
+                                :notification-permission="
+                                    notificationPermission
+                                "
                                 :current-item="currentSubscriptionItem"
                                 :current-device-status="currentDeviceStatus"
-                                :can-write-subscriptions="
-                                    canWriteSubscriptions
-                                "
+                                :can-write-subscriptions="canWriteSubscriptions"
                                 :is-refreshing-current-device="
                                     isRefreshingCurrentDevice
                                 "

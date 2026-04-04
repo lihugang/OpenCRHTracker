@@ -2,7 +2,8 @@
     <UiCard :show-accent-bar="false">
         <div class="space-y-5">
             <div class="space-y-2">
-                <p class="text-xs font-medium uppercase tracking-[0.26em] text-crh-blue/80">
+                <p
+                    class="text-xs font-medium uppercase tracking-[0.26em] text-crh-blue/80">
                     Targets
                 </p>
                 <div class="flex flex-wrap items-center justify-between gap-3">
@@ -16,7 +17,6 @@
                 </div>
             </div>
             <div class="motion-divider opacity-70" />
-
 
             <UiEmptyState
                 v-if="isLoading"

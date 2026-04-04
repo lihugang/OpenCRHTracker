@@ -23,7 +23,8 @@ export default defineEventHandler(async (event) => {
             requiredScopes: [API_SCOPES.auth.favorites.write]
         },
         async ({ identity }) => {
-            const body = (await readBody<DeleteFavoriteBody | null>(event)) ?? {};
+            const body =
+                (await readBody<DeleteFavoriteBody | null>(event)) ?? {};
 
             ensure(
                 typeof body === 'object' &&

@@ -154,8 +154,12 @@
                                                     : 'text-crh-grey-dark hover:bg-slate-50'
                                             ]"
                                             @mousedown.prevent
-                                            @mouseenter="activeIndex = entry.index"
-                                            @click="selectSuggestion(entry.item)">
+                                            @mouseenter="
+                                                activeIndex = entry.index
+                                            "
+                                            @click="
+                                                selectSuggestion(entry.item)
+                                            ">
                                             <span
                                                 :class="[
                                                     'flex min-w-0 items-start gap-3',
@@ -170,19 +174,28 @@
                                                 <span
                                                     class="flex min-w-0 flex-1 flex-col gap-1.5">
                                                     <span
-                                                        v-if="getSuggestionSubtitle(entry.item)"
+                                                        v-if="
+                                                            getSuggestionSubtitle(
+                                                                entry.item
+                                                            )
+                                                        "
                                                         :class="[
                                                             'min-w-0 text-xs text-slate-500',
                                                             compact
                                                                 ? ''
                                                                 : 'truncate'
                                                         ]">
-                                                        {{ getSuggestionSubtitle(entry.item) }}
+                                                        {{
+                                                            getSuggestionSubtitle(
+                                                                entry.item
+                                                            )
+                                                        }}
                                                     </span>
                                                     <span
                                                         v-if="
-                                                            getSuggestionTags(entry.item)
-                                                                .length > 0
+                                                            getSuggestionTags(
+                                                                entry.item
+                                                            ).length > 0
                                                         "
                                                         class="flex flex-wrap gap-1.5">
                                                         <span
@@ -303,10 +316,7 @@ const {
     mode: suggestionMode
 } = useLookupSuggestions(() => props.modelValue);
 const { addRecentSearch } = useRecentLookupSearches();
-const {
-    items: favoriteItems,
-    favoriteKeySet
-} = useFavoriteLookups();
+const { items: favoriteItems, favoriteKeySet } = useFavoriteLookups();
 
 const recentMenuItems = computed(() => {
     if (suggestionMode.value !== 'recent') {
@@ -389,11 +399,8 @@ const shouldShowMenu = computed(() => {
 });
 
 const emptyStateMessage = computed(() =>
-    suggestionMode.value === 'recent'
-        ? '暂无收藏或最近搜索'
-        : '未找到匹配项'
+    suggestionMode.value === 'recent' ? '暂无收藏或最近搜索' : '未找到匹配项'
 );
-
 
 function closeMenu() {
     isMenuOpen.value = false;
@@ -418,8 +425,7 @@ function moveActive(direction: 1 | -1) {
     isMenuOpen.value = true;
 
     if (activeIndex.value < 0) {
-        activeIndex.value =
-            direction > 0 ? 0 : menuEntries.value.length - 1;
+        activeIndex.value = direction > 0 ? 0 : menuEntries.value.length - 1;
         return;
     }
 
@@ -428,7 +434,9 @@ function moveActive(direction: 1 | -1) {
         menuEntries.value.length;
 }
 
-function toRecentLookupSearchItem(item: LookupMenuItem): RecentLookupSearchItem {
+function toRecentLookupSearchItem(
+    item: LookupMenuItem
+): RecentLookupSearchItem {
     if ('subtitle' in item) {
         return item;
     }
@@ -483,7 +491,9 @@ function isSameSuggestionItem(
     left: LookupSuggestItem,
     right: { type: LookupTargetType; code: string }
 ) {
-    return buildLookupItemKeyFromItem(left) === buildLookupItemKeyFromTarget(right);
+    return (
+        buildLookupItemKeyFromItem(left) === buildLookupItemKeyFromTarget(right)
+    );
 }
 
 function resolveRecentSearchItem() {

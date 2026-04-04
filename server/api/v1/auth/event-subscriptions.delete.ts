@@ -24,7 +24,8 @@ export default defineEventHandler(async (event) => {
         },
         async ({ identity }) => {
             const body =
-                (await readBody<DeleteEventSubscriptionBody | null>(event)) ?? {};
+                (await readBody<DeleteEventSubscriptionBody | null>(event)) ??
+                {};
 
             ensure(
                 typeof body === 'object' &&

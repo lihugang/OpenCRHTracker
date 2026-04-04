@@ -68,7 +68,8 @@
                         v-if="currentItem"
                         class="grid gap-3 pt-1 text-sm text-slate-600 sm:grid-cols-2">
                         <div class="space-y-1">
-                            <dt class="text-xs uppercase tracking-[0.16em] text-slate-400">
+                            <dt
+                                class="text-xs uppercase tracking-[0.16em] text-slate-400">
                                 设备名称
                             </dt>
                             <dd class="font-semibold text-slate-900">
@@ -76,7 +77,8 @@
                             </dd>
                         </div>
                         <div class="space-y-1">
-                            <dt class="text-xs uppercase tracking-[0.16em] text-slate-400">
+                            <dt
+                                class="text-xs uppercase tracking-[0.16em] text-slate-400">
                                 最近同步
                             </dt>
                             <dd class="font-semibold text-slate-900">
@@ -144,7 +146,8 @@
                             </div>
 
                             <div class="space-y-1">
-                                <h3 class="text-lg font-semibold text-slate-900">
+                                <h3
+                                    class="text-lg font-semibold text-slate-900">
                                     {{ item.name }}
                                 </h3>
                                 <p class="text-sm text-slate-500">
@@ -152,9 +155,11 @@
                                 </p>
                             </div>
 
-                            <dl class="grid gap-3 text-sm text-slate-600 sm:grid-cols-3">
+                            <dl
+                                class="grid gap-3 text-sm text-slate-600 sm:grid-cols-3">
                                 <div class="space-y-1">
-                                    <dt class="text-xs uppercase tracking-[0.16em] text-slate-400">
+                                    <dt
+                                        class="text-xs uppercase tracking-[0.16em] text-slate-400">
                                         创建时间
                                     </dt>
                                     <dd class="font-semibold text-slate-900">
@@ -162,7 +167,8 @@
                                     </dd>
                                 </div>
                                 <div class="space-y-1">
-                                    <dt class="text-xs uppercase tracking-[0.16em] text-slate-400">
+                                    <dt
+                                        class="text-xs uppercase tracking-[0.16em] text-slate-400">
                                         最近更新
                                     </dt>
                                     <dd class="font-semibold text-slate-900">
@@ -170,14 +176,17 @@
                                     </dd>
                                 </div>
                                 <div class="space-y-1">
-                                    <dt class="text-xs uppercase tracking-[0.16em] text-slate-400">
+                                    <dt
+                                        class="text-xs uppercase tracking-[0.16em] text-slate-400">
                                         过期时间
                                     </dt>
                                     <dd class="font-semibold text-slate-900">
                                         {{
                                             item.expirationTime === null
                                                 ? '由浏览器决定'
-                                                : formatTimestamp(item.expirationTime)
+                                                : formatTimestamp(
+                                                      item.expirationTime
+                                                  )
                                         }}
                                     </dd>
                                 </div>
@@ -218,7 +227,8 @@
             class="space-y-4">
             <div
                 class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-4 py-4">
-                <p class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
+                <p
+                    class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
                     当前设备
                 </p>
                 <p class="mt-2 text-sm font-semibold text-slate-900">
@@ -226,9 +236,7 @@
                 </p>
             </div>
 
-            <UiField
-                label="设备名称"
->
+            <UiField label="设备名称">
                 <input
                     ref="renameInputRef"
                     v-model.trim="renameValue"
@@ -241,8 +249,7 @@
         </div>
 
         <template #footer>
-            <div
-                class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            <div class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
                 <UiButton
                     type="button"
                     variant="secondary"
@@ -260,7 +267,6 @@
             </div>
         </template>
     </UiModal>
-
 </template>
 
 <script setup lang="ts">
@@ -421,7 +427,9 @@ const capabilityHint = computed(() => {
     return '';
 });
 
-const displayErrorMessage = computed(() => props.errorMessage || capabilityHint.value);
+const displayErrorMessage = computed(
+    () => props.errorMessage || capabilityHint.value
+);
 
 function openRenameModal(item: AuthSubscriptionItem) {
     renameTarget.value = item;
@@ -476,5 +484,4 @@ function handleRenameInputKeydown(event: KeyboardEvent) {
     event.preventDefault();
     void submitRename();
 }
-
 </script>

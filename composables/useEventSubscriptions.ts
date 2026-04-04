@@ -88,7 +88,9 @@ export function useEventSubscriptions() {
             : pendingKeys.value.filter((pendingKey) => pendingKey !== key);
     }
 
-    function replaceItems(nextItems: AuthEventSubscriptionListResponse['items']) {
+    function replaceItems(
+        nextItems: AuthEventSubscriptionListResponse['items']
+    ) {
         items.value = [...nextItems].sort(
             (left, right) => right.updatedAt - left.updatedAt
         );
@@ -201,8 +203,7 @@ export function useEventSubscriptions() {
 
         errorMessage.value = '';
 
-        const currentDeviceReady =
-            await ensureCurrentDeviceSubscriptionReady();
+        const currentDeviceReady = await ensureCurrentDeviceSubscriptionReady();
         if (!currentDeviceReady) {
             state.value = 'error';
             errorMessage.value =
@@ -255,10 +256,7 @@ export function useEventSubscriptions() {
         } catch (error) {
             items.value = previousItems;
             state.value = 'error';
-            errorMessage.value = getApiErrorMessage(
-                error,
-                '订阅对象失败。'
-            );
+            errorMessage.value = getApiErrorMessage(error, '订阅对象失败。');
             return false;
         } finally {
             setPending(targetKey, false);
@@ -329,7 +327,11 @@ export function useEventSubscriptions() {
             return false;
         }
 
-        if (subscriptionKeySet.value.has(buildNotificationTargetKey(normalizedTarget))) {
+        if (
+            subscriptionKeySet.value.has(
+                buildNotificationTargetKey(normalizedTarget)
+            )
+        ) {
             return removeEventSubscription(normalizedTarget);
         }
 

@@ -89,11 +89,7 @@ export function upsertUserEventSubscription(
 ) {
     const normalizedTarget = normalizeNotificationTarget(target);
     if (!normalizedTarget) {
-        throw new ApiRequestError(
-            400,
-            'invalid_param',
-            '订阅目标无效'
-        );
+        throw new ApiRequestError(400, 'invalid_param', '订阅目标无效');
     }
 
     const maxEntries = useConfig().user.pushSubscriptions.maxEventSubscriptions;
@@ -135,11 +131,7 @@ export function removeUserEventSubscription(
 ) {
     const normalizedTarget = normalizeNotificationTarget(target);
     if (!normalizedTarget) {
-        throw new ApiRequestError(
-            400,
-            'invalid_param',
-            '订阅目标无效'
-        );
+        throw new ApiRequestError(400, 'invalid_param', '订阅目标无效');
     }
 
     const transaction = useUsersDatabase().transaction(() => {

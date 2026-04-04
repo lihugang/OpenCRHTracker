@@ -45,9 +45,7 @@ function parseRecentLookupItems(value: string) {
                     tags: item.tags
                 } as RecentLookupSearchItem);
             })
-            .filter(
-                (item): item is RecentLookupSearchItem => item !== null
-            )
+            .filter((item): item is RecentLookupSearchItem => item !== null)
             .slice(0, MAX_RECENT_LOOKUPS);
     } catch {
         return [];

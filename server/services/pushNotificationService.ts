@@ -8,7 +8,11 @@ import {
 import type { NotificationPayload } from '~/types/notifications';
 
 interface WebPushLike {
-    setVapidDetails(subject: string, publicKey: string, privateKey: string): void;
+    setVapidDetails(
+        subject: string,
+        publicKey: string,
+        privateKey: string
+    ): void;
     sendNotification(
         subscription: {
             endpoint: string;
@@ -112,9 +116,7 @@ async function getWebPushClient() {
     return webPushPromise;
 }
 
-function toStoredPushSubscription(
-    item: UserProfileSubscriptionItem
-): {
+function toStoredPushSubscription(item: UserProfileSubscriptionItem): {
     endpoint: string;
     expirationTime: number | null;
     keys: {
@@ -170,7 +172,10 @@ export async function sendPushNotificationToSubscription(
     item: UserProfileSubscriptionItem,
     payload: NotificationPayload
 ) {
-    const result = await sendPushNotificationToStoredSubscription(item, payload);
+    const result = await sendPushNotificationToStoredSubscription(
+        item,
+        payload
+    );
     if (!result.hardInvalid) {
         if (!result.delivered && result.message.length > 0) {
             logger.warn(
@@ -202,7 +207,10 @@ export async function sendPushNotificationToUser(
     const results = await Promise.all(
         items.map(async (item) => ({
             endpoint: item.endpoint,
-            result: await sendPushNotificationToStoredSubscription(item, payload)
+            result: await sendPushNotificationToStoredSubscription(
+                item,
+                payload
+            )
         }))
     );
     const removedEndpoints = results

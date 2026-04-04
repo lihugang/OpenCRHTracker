@@ -497,7 +497,8 @@ export const developerDocsOpenApi = {
                             },
                             syncTimeoutSeconds: {
                                 type: 'integer',
-                                description: '客户端启用或同步当前设备订阅时使用的超时秒数。',
+                                description:
+                                    '客户端启用或同步当前设备订阅时使用的超时秒数。',
                                 example: 30
                             },
                             items: {
@@ -1276,7 +1277,7 @@ export const developerDocsOpenApi = {
                 tags: ['Auth'],
                 summary: 'List push subscription devices',
                 description:
-                    'Returns the current user\'s stored PushSubscription endpoints and the configured device cap.',
+                    "Returns the current user's stored PushSubscription endpoints and the configured device cap.",
                 security: [
                     {
                         bearerAuth: []
@@ -1328,7 +1329,8 @@ export const developerDocsOpenApi = {
                         }
                     },
                     '403': {
-                        description: 'Missing required subscription read scope.',
+                        description:
+                            'Missing required subscription read scope.',
                         headers: {
                             'x-api-remain': {
                                 $ref: '#/components/headers/ApiRemain'
@@ -1360,7 +1362,8 @@ export const developerDocsOpenApi = {
                     {
                         id: 'auth-subscriptions-list-cookie',
                         label: 'cookie',
-                        summary: 'List stored PushSubscription endpoints from the current browser session.',
+                        summary:
+                            'List stored PushSubscription endpoints from the current browser session.',
                         authMode: 'cookie'
                     }
                 ]
@@ -1370,7 +1373,7 @@ export const developerDocsOpenApi = {
                 tags: ['Auth'],
                 summary: 'Create or refresh a push subscription device',
                 description:
-                    'Stores the current browser\'s PushSubscription endpoint and returns the refreshed device list.',
+                    "Stores the current browser's PushSubscription endpoint and returns the refreshed device list.",
                 requestBody: {
                     required: true,
                     content: {
@@ -1403,7 +1406,8 @@ export const developerDocsOpenApi = {
                                                 properties: {
                                                     p256dh: {
                                                         type: 'string',
-                                                        example: 'p256dh-example'
+                                                        example:
+                                                            'p256dh-example'
                                                     },
                                                     auth: {
                                                         type: 'string',
@@ -1504,7 +1508,8 @@ export const developerDocsOpenApi = {
                         }
                     },
                     '403': {
-                        description: 'Missing required subscription write scope.',
+                        description:
+                            'Missing required subscription write scope.',
                         headers: {
                             'x-api-remain': {
                                 $ref: '#/components/headers/ApiRemain'
@@ -1559,7 +1564,8 @@ export const developerDocsOpenApi = {
                     {
                         id: 'auth-subscriptions-upsert',
                         label: 'save current device',
-                        summary: 'Create or refresh the current browser\'s PushSubscription record.',
+                        summary:
+                            "Create or refresh the current browser's PushSubscription record.",
                         authMode: 'cookie',
                         body: {
                             name: 'Windows / Chrome / PWA',
@@ -1690,7 +1696,8 @@ export const developerDocsOpenApi = {
                         }
                     },
                     '403': {
-                        description: 'Missing required subscription write scope.',
+                        description:
+                            'Missing required subscription write scope.',
                         headers: {
                             'x-api-remain': {
                                 $ref: '#/components/headers/ApiRemain'
@@ -1745,7 +1752,8 @@ export const developerDocsOpenApi = {
                     {
                         id: 'auth-subscriptions-rename',
                         label: 'rename device',
-                        summary: 'Change the display name of one stored device record.',
+                        summary:
+                            'Change the display name of one stored device record.',
                         authMode: 'cookie',
                         pathParams: {
                             id: 'e8f0d2a8-1c2e-4a36-8c2b-demo'
@@ -1848,7 +1856,8 @@ export const developerDocsOpenApi = {
                         }
                     },
                     '403': {
-                        description: 'Missing required subscription write scope.',
+                        description:
+                            'Missing required subscription write scope.',
                         headers: {
                             'x-api-remain': {
                                 $ref: '#/components/headers/ApiRemain'
@@ -1903,7 +1912,8 @@ export const developerDocsOpenApi = {
                     {
                         id: 'auth-subscriptions-delete',
                         label: 'delete device',
-                        summary: 'Delete one stored PushSubscription device record.',
+                        summary:
+                            'Delete one stored PushSubscription device record.',
                         authMode: 'cookie',
                         pathParams: {
                             id: 'e8f0d2a8-1c2e-4a36-8c2b-demo'

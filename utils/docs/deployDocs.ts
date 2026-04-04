@@ -474,13 +474,15 @@ export const deployDocsSections: DocsContentSection[] = [
                         path: 'api.authCache',
                         valueType: 'object',
                         required: true,
-                        description: '用户记录、用户资料和 API Key 记录缓存的容量与 TTL。'
+                        description:
+                            '用户记录、用户资料和 API Key 记录缓存的容量与 TTL。'
                     },
                     {
                         path: 'api.authCache.userProfile',
                         valueType: 'object',
                         required: true,
-                        description: 'user profile 数据 JSON 的服务端缓存容量与 TTL。',
+                        description:
+                            'user profile 数据 JSON 的服务端缓存容量与 TTL。',
                         notes: [
                             '收藏接口读写成功后会直接回写这一层缓存，而不是简单删除缓存。',
                             '本次推荐值为 maxEntries=256，defaultTtlSeconds=21600。'

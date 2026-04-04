@@ -163,7 +163,9 @@
                                     :active="
                                         isSubscribed(feedbackSubscriptionTarget)
                                     "
-                                    :loading="isFeedbackSubscriptionActionPending"
+                                    :loading="
+                                        isFeedbackSubscriptionActionPending
+                                    "
                                     @click="toggleFeedbackSubscription" />
 
                                 <UiButton

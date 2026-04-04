@@ -51,9 +51,7 @@ function createSubscriptionTimeoutRunner(
                 new Promise<never>((_, reject) => {
                     timeoutId = setTimeout(() => {
                         reject(
-                            new Error(
-                                SUBSCRIPTION_SYNC_TIMEOUT_ERROR_MESSAGE
-                            )
+                            new Error(SUBSCRIPTION_SYNC_TIMEOUT_ERROR_MESSAGE)
                         );
                     }, remainingMs);
                 })
@@ -364,16 +362,20 @@ export function useSubscriptionDevices() {
         'subscription-devices-refreshing-current',
         () => false
     );
-    const currentEndpoint = useState('subscription-devices-current-endpoint', () => '');
+    const currentEndpoint = useState(
+        'subscription-devices-current-endpoint',
+        () => ''
+    );
     const pushSupportState = useState<PushSupportState>(
         'subscription-devices-push-support-state',
         () => resolvePushSupportState()
     );
-    const notificationPermission = useState<NotificationPermission | 'unsupported'>(
-        'subscription-devices-permission',
-        () => (import.meta.client && 'Notification' in window
+    const notificationPermission = useState<
+        NotificationPermission | 'unsupported'
+    >('subscription-devices-permission', () =>
+        import.meta.client && 'Notification' in window
             ? Notification.permission
-            : 'unsupported')
+            : 'unsupported'
     );
 
     const canReadSubscriptions = computed(() =>
@@ -383,8 +385,11 @@ export function useSubscriptionDevices() {
         hasSubscriptionScope(session.value, 'api.auth.subscriptions.write')
     );
     const supportsPush = computed(() => pushSupportState.value === 'supported');
-    const currentItem = computed(() =>
-        items.value.find((item) => item.endpoint === currentEndpoint.value) ?? null
+    const currentItem = computed(
+        () =>
+            items.value.find(
+                (item) => item.endpoint === currentEndpoint.value
+            ) ?? null
     );
     const currentDeviceStatus = computed<CurrentDeviceStatus>(() => {
         if (pushSupportState.value === 'unknown') {
@@ -670,7 +675,6 @@ export function useSubscriptionDevices() {
             isRefreshingCurrentDevice.value = false;
         }
     }
-
 
     async function ensureCurrentDeviceSubscriptionReady() {
         if (!import.meta.client) {

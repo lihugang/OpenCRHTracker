@@ -1,11 +1,6 @@
-export const NOTIFICATION_TARGET_TYPES = [
-    'train',
-    'emu',
-    'feedback'
-] as const;
+export const NOTIFICATION_TARGET_TYPES = ['train', 'emu', 'feedback'] as const;
 
-export type NotificationTargetType =
-    (typeof NOTIFICATION_TARGET_TYPES)[number];
+export type NotificationTargetType = (typeof NOTIFICATION_TARGET_TYPES)[number];
 
 export interface NotificationTarget {
     targetType: NotificationTargetType;

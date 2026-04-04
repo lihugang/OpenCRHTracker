@@ -2,13 +2,12 @@
     <UiCard :show-accent-bar="false">
         <div class="space-y-5">
             <div class="space-y-2">
-                <p class="text-xs font-medium uppercase tracking-[0.26em] text-crh-blue/80">
+                <p
+                    class="text-xs font-medium uppercase tracking-[0.26em] text-crh-blue/80">
                     Favorites
                 </p>
                 <div class="flex flex-wrap items-center justify-between gap-3">
-                    <h3 class="text-xl font-semibold text-slate-900">
-                        收藏
-                    </h3>
+                    <h3 class="text-xl font-semibold text-slate-900">收藏</h3>
                     <span
                         class="inline-flex items-center rounded-full bg-slate-900 px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.1em] text-white">
                         {{ items.length }} / {{ maxEntries }}

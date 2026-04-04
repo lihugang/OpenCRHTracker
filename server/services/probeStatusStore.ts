@@ -123,7 +123,9 @@ export function getProbeStatusByTrainCodeValue(
     trainCode: string,
     startAt: number
 ) {
-    return getHighestProbeStatus(listProbeStatusByTrainCode(trainCode, startAt));
+    return getHighestProbeStatus(
+        listProbeStatusByTrainCode(trainCode, startAt)
+    );
 }
 
 export function listProbeStatusByTrainCodeInRange(

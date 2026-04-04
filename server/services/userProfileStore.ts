@@ -214,9 +214,7 @@ function normalizeUserProfileData(value: unknown): UserProfileData {
                       return null;
                   }
 
-                  return toFavoriteLookupItem(
-                      item as UserProfileFavoriteValue
-                  );
+                  return toFavoriteLookupItem(item as UserProfileFavoriteValue);
               })
               .filter((item): item is FavoriteLookupItem => item !== null)
               .sort((left, right) => right.starredAt - left.starredAt)

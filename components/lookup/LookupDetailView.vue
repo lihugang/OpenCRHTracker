@@ -26,7 +26,8 @@
                 :show-accent-bar="false"
                 class="hidden min-[960px]:landscape:block">
                 <div class="space-y-3">
-                    <p class="text-xs font-medium uppercase tracking-[0.2em] text-slate-400">
+                    <p
+                        class="text-xs font-medium uppercase tracking-[0.2em] text-slate-400">
                         ACTIONS
                     </p>
 
@@ -148,9 +149,10 @@ import {
 const MOBILE_QUERY = '(max-width: 767px)';
 const MOBILE_COLLAPSE_OFFSET = 28;
 const MOBILE_STICKY_MIN_SCROLLABLE_SPACE = 160;
+type LookupDetailTargetType = Extract<LookupTargetType, 'train' | 'emu'>;
 
 const props = defineProps<{
-    targetType: LookupTargetType;
+    targetType: LookupDetailTargetType;
 }>();
 
 const route = useRoute();

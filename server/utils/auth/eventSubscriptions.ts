@@ -105,8 +105,6 @@ export function createEventSubscriptionListResponse(
         maxEntries: useConfig().user.pushSubscriptions.maxEventSubscriptions,
         items: items
             .map((item) => toPublicEventSubscriptionItem(userId, item))
-            .filter(
-                (item): item is AuthEventSubscriptionItem => item !== null
-            )
+            .filter((item): item is AuthEventSubscriptionItem => item !== null)
     };
 }

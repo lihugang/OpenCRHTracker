@@ -116,7 +116,10 @@ async function sendNotificationToTargetSubscribers(
 export async function notifyLookupStatusChanges(
     candidates: LookupStatusNotificationCandidate[]
 ) {
-    const uniqueCandidates = new Map<string, LookupStatusNotificationCandidate>();
+    const uniqueCandidates = new Map<
+        string,
+        LookupStatusNotificationCandidate
+    >();
 
     for (const candidate of candidates) {
         if (
@@ -187,7 +190,12 @@ export async function notifyFeedbackReply(
             targetType: 'feedback',
             targetId: String(topicId)
         },
-        buildFeedbackReplyNotification(topicId, topicTitle, authorName, messageId),
+        buildFeedbackReplyNotification(
+            topicId,
+            topicTitle,
+            authorName,
+            messageId
+        ),
         {
             excludeUserIds: authorUserId ? [authorUserId] : [],
             canReceiveUserId: (userId) =>

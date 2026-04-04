@@ -15,10 +15,7 @@ import {
 
 type FavoriteState = 'idle' | 'loading' | 'success' | 'error';
 
-function hasFavoriteScope(
-    session: AuthSession | null,
-    requiredScope: string
-) {
+function hasFavoriteScope(session: AuthSession | null, requiredScope: string) {
     return (session?.scopes ?? []).some((scope) => {
         const normalizedScope = scope.trim().toLowerCase();
         const normalizedRequired = requiredScope.trim().toLowerCase();
@@ -49,7 +46,8 @@ export function useFavoriteLookups() {
     );
 
     const favoriteKeySet = computed(
-        () => new Set(items.value.map((item) => buildLookupItemKeyFromItem(item)))
+        () =>
+            new Set(items.value.map((item) => buildLookupItemKeyFromItem(item)))
     );
     const canReadFavorites = computed(() =>
         hasFavoriteScope(session.value, 'api.auth.favorites.read')
@@ -114,7 +112,11 @@ export function useFavoriteLookups() {
             return items.value;
         }
 
-        if (!isAuthenticated.value || !session.value || !canReadFavorites.value) {
+        if (
+            !isAuthenticated.value ||
+            !session.value ||
+            !canReadFavorites.value
+        ) {
             reset();
             return items.value;
         }
@@ -196,7 +198,6 @@ export function useFavoriteLookups() {
             maxEntries.value = response.data.maxEntries;
             state.value = 'success';
             errorMessage.value = '';
-
 
             return true;
         } catch (error) {

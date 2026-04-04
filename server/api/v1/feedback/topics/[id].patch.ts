@@ -163,16 +163,11 @@ export default defineEventHandler(async (event) => {
             );
 
             if (topic.row.status !== status) {
-                await notifyFeedbackStatusUpdated(
-                    topicId,
-                    title,
-                    status,
-                    {
-                        creatorUserId: topic.row.creator_user_id,
-                        visibility: topic.row.visibility,
-                        deletedAt: topic.row.deleted_at
-                    }
-                );
+                await notifyFeedbackStatusUpdated(topicId, title, status, {
+                    creatorUserId: topic.row.creator_user_id,
+                    visibility: topic.row.visibility,
+                    deletedAt: topic.row.deleted_at
+                });
             }
 
             return {

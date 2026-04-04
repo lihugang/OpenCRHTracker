@@ -44,7 +44,8 @@ export default defineEventHandler(async (event) => {
         },
         async ({ identity }) => {
             const config = useConfig();
-            const body = (await readBody<PutSubscriptionBody | null>(event)) ?? {};
+            const body =
+                (await readBody<PutSubscriptionBody | null>(event)) ?? {};
 
             ensure(
                 typeof body === 'object' &&
