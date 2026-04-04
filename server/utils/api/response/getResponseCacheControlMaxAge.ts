@@ -4,7 +4,7 @@ import { getShanghaiDayStartUnixSeconds } from '~/server/utils/date/shanghaiDate
 
 export function getDailyResponseCacheControlMaxAge(date: string): number {
     const cache = useConfig().api.cache;
-    return date === getCurrentDateString()
+    return date >= getCurrentDateString()
         ? cache.currentDayMaxAgeSeconds
         : cache.historicalMaxAgeSeconds;
 }
@@ -24,17 +24,19 @@ export function getMonthlyResponseCacheControlMaxAge(
 }
 
 export function getHistoryResponseCacheControlMaxAge(
-    latestStartAt: number | undefined,
-    itemsLength: number,
-    limit: number
+    cursorStartAt: number | null | undefined
 ): number {
     const cache = useConfig().api.cache;
-    if (latestStartAt === undefined || itemsLength !== limit) {
+    if (
+        !Number.isInteger(cursorStartAt) ||
+        cursorStartAt === null ||
+        cursorStartAt === undefined
+    ) {
         return cache.currentDayMaxAgeSeconds;
     }
 
     const todayStartAt = getShanghaiDayStartUnixSeconds(getCurrentDateString());
-    return latestStartAt < todayStartAt
+    return cursorStartAt < todayStartAt
         ? cache.historicalMaxAgeSeconds
         : cache.currentDayMaxAgeSeconds;
 }

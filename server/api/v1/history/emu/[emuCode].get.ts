@@ -25,9 +25,7 @@ export default defineEventHandler(async (event) => {
                 setCacheControl(
                     successEvent,
                     getHistoryResponseCacheControlMaxAge(
-                        data.items[0]?.startAt,
-                        data.items.length,
-                        data.limit
+                        parseCursor(data.cursor, 'cursor')?.startAt
                     )
                 )
         },
