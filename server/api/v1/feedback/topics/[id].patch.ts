@@ -12,6 +12,7 @@ import {
     isValidFeedbackStatus,
     updateFeedbackTopicFields
 } from '~/server/services/feedbackStore';
+import { notifyFeedbackStatusUpdated } from '~/server/services/eventNotificationService';
 import {
     ensureFeedbackString,
     parseFeedbackTopicId
@@ -160,6 +161,19 @@ export default defineEventHandler(async (event) => {
                 },
                 now
             );
+
+            if (topic.row.status !== status) {
+                await notifyFeedbackStatusUpdated(
+                    topicId,
+                    title,
+                    status,
+                    {
+                        creatorUserId: topic.row.creator_user_id,
+                        visibility: topic.row.visibility,
+                        deletedAt: topic.row.deleted_at
+                    }
+                );
+            }
 
             return {
                 id: topicId,

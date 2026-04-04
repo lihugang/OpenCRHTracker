@@ -8,6 +8,7 @@ import {
     getFeedbackTopicById,
     hideFeedbackTopic
 } from '~/server/services/feedbackStore';
+import { notifyFeedbackHidden } from '~/server/services/eventNotificationService';
 import { parseFeedbackTopicId } from '~/server/utils/feedback/request';
 import type { DeleteFeedbackTopicResponse } from '~/types/feedback';
 

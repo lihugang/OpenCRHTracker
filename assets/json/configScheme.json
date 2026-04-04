@@ -476,6 +476,45 @@
                     "required": [
                         "maxEntries"
                     ]
+                },
+                "pushSubscriptions": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "maxDevices": {
+                            "type": "integer",
+                            "minimum": 1
+                        },
+                        "maxEventSubscriptions": {
+                            "type": "integer",
+                            "minimum": 1
+                        },
+                        "syncTimeoutSeconds": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "default": 30
+                        }
+                    },
+                    "required": [
+                        "maxDevices",
+                        "maxEventSubscriptions"
+                    ]
+                },
+                "push": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "vapidPublicKey": {
+                            "type": "string"
+                        },
+                        "vapidPrivateKey": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "vapidPublicKey",
+                        "vapidPrivateKey"
+                    ]
                 }
             },
             "required": [
@@ -483,6 +522,8 @@
                 "saltLength",
                 "apiKeyPrefixes",
                 "favorites",
+                "pushSubscriptions",
+                "push",
                 "apiKeyBytes",
                 "apiKeyTtlSeconds",
                 "scrypt"
@@ -1018,6 +1059,22 @@
                             "type": "integer",
                             "minimum": 0
                         },
+                        "authListSubscriptions": {
+                            "type": "integer",
+                            "minimum": 0
+                        },
+                        "authUpsertSubscription": {
+                            "type": "integer",
+                            "minimum": 0
+                        },
+                        "authUpdateSubscription": {
+                            "type": "integer",
+                            "minimum": 0
+                        },
+                        "authDeleteSubscription": {
+                            "type": "integer",
+                            "minimum": 0
+                        },
                         "searchIndex": {
                             "type": "integer",
                             "minimum": 0
@@ -1048,6 +1105,10 @@
                         "authIssueApiKey",
                         "authListApiKeys",
                         "authRevokeApiKey",
+                        "authListSubscriptions",
+                        "authUpsertSubscription",
+                        "authUpdateSubscription",
+                        "authDeleteSubscription",
                         "searchIndex",
                         "timetableTrain",
                         "exportDailyIndex",

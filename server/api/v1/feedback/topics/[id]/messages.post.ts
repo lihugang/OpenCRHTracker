@@ -9,6 +9,7 @@ import {
     createFeedbackMessage,
     getFeedbackTopicById
 } from '~/server/services/feedbackStore';
+import { notifyFeedbackReply } from '~/server/services/eventNotificationService';
 import {
     canManageFeedback,
     canReplyFeedbackTopic,
@@ -86,6 +87,19 @@ export default defineEventHandler(async (event) => {
                 body: content,
                 now
             });
+            await notifyFeedbackReply(
+                topicId,
+                topic.row.title,
+                canManageFeedback(identity)
+                    ? identity.id
+                    : topic.row.creator_user_id !== null &&
+                        identity.id === topic.row.creator_user_id
+                      ? '反馈提出者'
+                      : identity.id,
+                identity.id,
+                messageId,
+                accessTarget
+            );
 
             return {
                 topicId,

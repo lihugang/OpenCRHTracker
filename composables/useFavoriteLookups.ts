@@ -81,25 +81,22 @@ export function useFavoriteLookups() {
         path: string,
         options?: {
             method?: 'GET' | 'PUT' | 'DELETE';
-            body?: Record<string, unknown>;
+            body?: object;
         }
     ) {
-        const { data, error } = await useCsrfFetch<
+        const response = await useNuxtApp().$csrfFetch<
             TrackerApiResponse<AuthFavoritesResponse>
         >(path, {
             ...options,
-            key: `favorites:${options?.method ?? 'GET'}:${path}:${Date.now()}`,
-            watch: false,
-            server: false
+            retry: 0
         });
 
-        if (error.value) {
-            throw error.value;
-        }
-
-        const response = data.value;
-        if (!response) {
-            throw new Error('Missing favorites response');
+        if (
+            !response ||
+            typeof response !== 'object' ||
+            typeof response.ok !== 'boolean'
+        ) {
+            throw new Error('收藏接口未返回有效数据。');
         }
 
         if (!response.ok) {
@@ -199,6 +196,8 @@ export function useFavoriteLookups() {
             maxEntries.value = response.data.maxEntries;
             state.value = 'success';
             errorMessage.value = '';
+
+
             return true;
         } catch (error) {
             items.value = previousItems;

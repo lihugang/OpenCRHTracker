@@ -52,6 +52,14 @@ function normalizeEmuCode(emuCode: string): string {
     return normalizeCode(emuCode);
 }
 
+function getHighestProbeStatus(rows: ProbeStatusRow[]): ProbeStatusValue | 0 {
+    return rows.reduce<ProbeStatusValue | 0>(
+        (currentMax, row) =>
+            row.status > currentMax ? row.status : currentMax,
+        0
+    );
+}
+
 export function listProbeStatusByEmuCode(
     emuCode: string,
     startAt: number
@@ -66,6 +74,10 @@ export function listProbeStatusByEmuCode(
         normalizedEmuCode,
         startAt
     );
+}
+
+export function getProbeStatusByEmuCodeValue(emuCode: string, startAt: number) {
+    return getHighestProbeStatus(listProbeStatusByEmuCode(emuCode, startAt));
 }
 
 export function listProbeStatusByEmuCodeInRange(
@@ -105,6 +117,13 @@ export function listProbeStatusByTrainCode(
         normalizedTrainCode,
         startAt
     );
+}
+
+export function getProbeStatusByTrainCodeValue(
+    trainCode: string,
+    startAt: number
+) {
+    return getHighestProbeStatus(listProbeStatusByTrainCode(trainCode, startAt));
 }
 
 export function listProbeStatusByTrainCodeInRange(

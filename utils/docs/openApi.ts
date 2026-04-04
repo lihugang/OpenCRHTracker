@@ -415,6 +415,105 @@ export const developerDocsOpenApi = {
                     }
                 }
             },
+            AuthSubscriptionItem: {
+                type: 'object',
+                required: [
+                    'id',
+                    'name',
+                    'endpoint',
+                    'endpointPreview',
+                    'expirationTime',
+                    'createdAt',
+                    'updatedAt',
+                    'userAgent'
+                ],
+                properties: {
+                    id: {
+                        type: 'string',
+                        example: 'e8f0d2a8-1c2e-4a36-8c2b-demo'
+                    },
+                    name: {
+                        type: 'string',
+                        example: 'Windows / Chrome / PWA'
+                    },
+                    endpoint: {
+                        type: 'string',
+                        example:
+                            'https://updates.push.services.mozilla.com/wpush/v2/example-endpoint'
+                    },
+                    endpointPreview: {
+                        type: 'string',
+                        example: 'https://updates.push.s...example-endpoint'
+                    },
+                    expirationTime: {
+                        type: 'integer',
+                        nullable: true,
+                        example: null
+                    },
+                    createdAt: {
+                        type: 'integer',
+                        example: 1741968000
+                    },
+                    updatedAt: {
+                        type: 'integer',
+                        example: 1744560000
+                    },
+                    userAgent: {
+                        type: 'string',
+                        example:
+                            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/135.0.0.0 Safari/537.36'
+                    }
+                }
+            },
+            AuthSubscriptionListResponse: {
+                type: 'object',
+                required: ['ok', 'data', 'error'],
+                properties: {
+                    ok: {
+                        type: 'boolean',
+                        example: true
+                    },
+                    data: {
+                        type: 'object',
+                        required: [
+                            'userId',
+                            'maxDevices',
+                            'vapidPublicKey',
+                            'syncTimeoutSeconds',
+                            'items'
+                        ],
+                        properties: {
+                            userId: {
+                                type: 'string',
+                                example: 'example-user'
+                            },
+                            maxDevices: {
+                                type: 'integer',
+                                example: 5
+                            },
+                            vapidPublicKey: {
+                                type: 'string',
+                                example: 'BAExamplePublicKey'
+                            },
+                            syncTimeoutSeconds: {
+                                type: 'integer',
+                                description: '客户端启用或同步当前设备订阅时使用的超时秒数。',
+                                example: 30
+                            },
+                            items: {
+                                type: 'array',
+                                items: {
+                                    $ref: '#/components/schemas/AuthSubscriptionItem'
+                                }
+                            }
+                        }
+                    },
+                    error: {
+                        type: 'string',
+                        example: ''
+                    }
+                }
+            },
             DailyRecordItem: {
                 type: 'object',
                 required: [
@@ -1167,6 +1266,648 @@ export const developerDocsOpenApi = {
                         label: 'cookie',
                         summary: '使用当前登录会话读取会话信息。',
                         authMode: 'cookie'
+                    }
+                ]
+            }
+        },
+        '/auth/subscriptions': {
+            get: {
+                operationId: 'authListSubscriptions',
+                tags: ['Auth'],
+                summary: 'List push subscription devices',
+                description:
+                    'Returns the current user\'s stored PushSubscription endpoints and the configured device cap.',
+                security: [
+                    {
+                        bearerAuth: []
+                    },
+                    {
+                        cookieAuth: []
+                    }
+                ],
+                responses: {
+                    '200': {
+                        description: 'Push subscription device list.',
+                        headers: {
+                            'x-api-remain': {
+                                $ref: '#/components/headers/ApiRemain'
+                            },
+                            'x-api-cost': {
+                                $ref: '#/components/headers/ApiCost'
+                            }
+                        },
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    $ref: '#/components/schemas/AuthSubscriptionListResponse'
+                                }
+                            }
+                        }
+                    },
+                    '401': {
+                        description: 'Missing or invalid authentication.',
+                        headers: {
+                            'x-api-remain': {
+                                $ref: '#/components/headers/ApiRemain'
+                            },
+                            'x-api-cost': {
+                                $ref: '#/components/headers/ApiCost'
+                            }
+                        },
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    $ref: '#/components/schemas/ApiFailureResponse'
+                                },
+                                example: {
+                                    ok: false,
+                                    data: 'API Key invalid or expired.',
+                                    error: 'invalid_api_key'
+                                }
+                            }
+                        }
+                    },
+                    '403': {
+                        description: 'Missing required subscription read scope.',
+                        headers: {
+                            'x-api-remain': {
+                                $ref: '#/components/headers/ApiRemain'
+                            },
+                            'x-api-cost': {
+                                $ref: '#/components/headers/ApiCost'
+                            }
+                        },
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    $ref: '#/components/schemas/ApiFailureResponse'
+                                },
+                                example: {
+                                    ok: false,
+                                    data: 'Missing required scope api.auth.subscriptions.read.',
+                                    error: 'forbidden'
+                                }
+                            }
+                        }
+                    }
+                },
+                'x-slug': 'auth-subscriptions-list',
+                'x-group': 'Auth',
+                'x-sort-order': 12,
+                'x-auth-modes': ['cookie', 'apiKey'],
+                'x-required-scopes': ['api.auth.subscriptions.read'],
+                'x-examples': [
+                    {
+                        id: 'auth-subscriptions-list-cookie',
+                        label: 'cookie',
+                        summary: 'List stored PushSubscription endpoints from the current browser session.',
+                        authMode: 'cookie'
+                    }
+                ]
+            },
+            put: {
+                operationId: 'authUpsertSubscription',
+                tags: ['Auth'],
+                summary: 'Create or refresh a push subscription device',
+                description:
+                    'Stores the current browser\'s PushSubscription endpoint and returns the refreshed device list.',
+                requestBody: {
+                    required: true,
+                    content: {
+                        'application/json': {
+                            schema: {
+                                type: 'object',
+                                required: ['subscription'],
+                                properties: {
+                                    name: {
+                                        type: 'string',
+                                        example: 'Windows / Chrome / PWA'
+                                    },
+                                    subscription: {
+                                        type: 'object',
+                                        required: ['endpoint', 'keys'],
+                                        properties: {
+                                            endpoint: {
+                                                type: 'string',
+                                                example:
+                                                    'https://updates.push.services.mozilla.com/wpush/v2/example-endpoint'
+                                            },
+                                            expirationTime: {
+                                                type: 'integer',
+                                                nullable: true,
+                                                example: null
+                                            },
+                                            keys: {
+                                                type: 'object',
+                                                required: ['p256dh', 'auth'],
+                                                properties: {
+                                                    p256dh: {
+                                                        type: 'string',
+                                                        example: 'p256dh-example'
+                                                    },
+                                                    auth: {
+                                                        type: 'string',
+                                                        example: 'auth-example'
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            example: {
+                                name: 'Windows / Chrome / PWA',
+                                subscription: {
+                                    endpoint:
+                                        'https://updates.push.services.mozilla.com/wpush/v2/example-endpoint',
+                                    expirationTime: null,
+                                    keys: {
+                                        p256dh: 'p256dh-example',
+                                        auth: 'auth-example'
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                security: [
+                    {
+                        bearerAuth: []
+                    },
+                    {
+                        cookieAuth: []
+                    }
+                ],
+                responses: {
+                    '200': {
+                        description: 'Device stored successfully.',
+                        headers: {
+                            'x-api-remain': {
+                                $ref: '#/components/headers/ApiRemain'
+                            },
+                            'x-api-cost': {
+                                $ref: '#/components/headers/ApiCost'
+                            }
+                        },
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    $ref: '#/components/schemas/AuthSubscriptionListResponse'
+                                }
+                            }
+                        }
+                    },
+                    '400': {
+                        description: 'Invalid request body.',
+                        headers: {
+                            'x-api-remain': {
+                                $ref: '#/components/headers/ApiRemain'
+                            },
+                            'x-api-cost': {
+                                $ref: '#/components/headers/ApiCost'
+                            }
+                        },
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    $ref: '#/components/schemas/ApiFailureResponse'
+                                },
+                                example: {
+                                    ok: false,
+                                    data: 'subscription.endpoint must not be empty.',
+                                    error: 'invalid_param'
+                                }
+                            }
+                        }
+                    },
+                    '401': {
+                        description: 'Missing or invalid authentication.',
+                        headers: {
+                            'x-api-remain': {
+                                $ref: '#/components/headers/ApiRemain'
+                            },
+                            'x-api-cost': {
+                                $ref: '#/components/headers/ApiCost'
+                            }
+                        },
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    $ref: '#/components/schemas/ApiFailureResponse'
+                                },
+                                example: {
+                                    ok: false,
+                                    data: 'API Key invalid or expired.',
+                                    error: 'invalid_api_key'
+                                }
+                            }
+                        }
+                    },
+                    '403': {
+                        description: 'Missing required subscription write scope.',
+                        headers: {
+                            'x-api-remain': {
+                                $ref: '#/components/headers/ApiRemain'
+                            },
+                            'x-api-cost': {
+                                $ref: '#/components/headers/ApiCost'
+                            }
+                        },
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    $ref: '#/components/schemas/ApiFailureResponse'
+                                },
+                                example: {
+                                    ok: false,
+                                    data: 'Missing required scope api.auth.subscriptions.write.',
+                                    error: 'forbidden'
+                                }
+                            }
+                        }
+                    },
+                    '409': {
+                        description: 'The device cap has been reached.',
+                        headers: {
+                            'x-api-remain': {
+                                $ref: '#/components/headers/ApiRemain'
+                            },
+                            'x-api-cost': {
+                                $ref: '#/components/headers/ApiCost'
+                            }
+                        },
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    $ref: '#/components/schemas/ApiFailureResponse'
+                                },
+                                example: {
+                                    ok: false,
+                                    data: 'Subscription device limit exceeded.',
+                                    error: 'subscriptions_limit_exceeded'
+                                }
+                            }
+                        }
+                    }
+                },
+                'x-slug': 'auth-subscriptions-upsert',
+                'x-group': 'Auth',
+                'x-sort-order': 13,
+                'x-auth-modes': ['cookie', 'apiKey'],
+                'x-required-scopes': ['api.auth.subscriptions.write'],
+                'x-examples': [
+                    {
+                        id: 'auth-subscriptions-upsert',
+                        label: 'save current device',
+                        summary: 'Create or refresh the current browser\'s PushSubscription record.',
+                        authMode: 'cookie',
+                        body: {
+                            name: 'Windows / Chrome / PWA',
+                            subscription: {
+                                endpoint:
+                                    'https://updates.push.services.mozilla.com/wpush/v2/example-endpoint',
+                                expirationTime: null,
+                                keys: {
+                                    p256dh: 'p256dh-example',
+                                    auth: 'auth-example'
+                                }
+                            }
+                        }
+                    }
+                ]
+            }
+        },
+        '/auth/subscriptions/{id}': {
+            patch: {
+                operationId: 'authRenameSubscription',
+                tags: ['Auth'],
+                summary: 'Rename a stored push subscription device',
+                description:
+                    'Updates the display name of one stored PushSubscription device record.',
+                parameters: [
+                    {
+                        name: 'id',
+                        in: 'path',
+                        required: true,
+                        description: 'Subscription device identifier.',
+                        schema: {
+                            type: 'string'
+                        },
+                        example: 'e8f0d2a8-1c2e-4a36-8c2b-demo'
+                    }
+                ],
+                requestBody: {
+                    required: true,
+                    content: {
+                        'application/json': {
+                            schema: {
+                                type: 'object',
+                                required: ['name'],
+                                properties: {
+                                    name: {
+                                        type: 'string',
+                                        example: 'Office Chrome'
+                                    }
+                                }
+                            },
+                            example: {
+                                name: 'Office Chrome'
+                            }
+                        }
+                    }
+                },
+                security: [
+                    {
+                        bearerAuth: []
+                    },
+                    {
+                        cookieAuth: []
+                    }
+                ],
+                responses: {
+                    '200': {
+                        description: 'Device renamed successfully.',
+                        headers: {
+                            'x-api-remain': {
+                                $ref: '#/components/headers/ApiRemain'
+                            },
+                            'x-api-cost': {
+                                $ref: '#/components/headers/ApiCost'
+                            }
+                        },
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    $ref: '#/components/schemas/AuthSubscriptionListResponse'
+                                }
+                            }
+                        }
+                    },
+                    '400': {
+                        description: 'Invalid path parameter or request body.',
+                        headers: {
+                            'x-api-remain': {
+                                $ref: '#/components/headers/ApiRemain'
+                            },
+                            'x-api-cost': {
+                                $ref: '#/components/headers/ApiCost'
+                            }
+                        },
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    $ref: '#/components/schemas/ApiFailureResponse'
+                                },
+                                example: {
+                                    ok: false,
+                                    data: 'name must be a string.',
+                                    error: 'invalid_param'
+                                }
+                            }
+                        }
+                    },
+                    '401': {
+                        description: 'Missing or invalid authentication.',
+                        headers: {
+                            'x-api-remain': {
+                                $ref: '#/components/headers/ApiRemain'
+                            },
+                            'x-api-cost': {
+                                $ref: '#/components/headers/ApiCost'
+                            }
+                        },
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    $ref: '#/components/schemas/ApiFailureResponse'
+                                },
+                                example: {
+                                    ok: false,
+                                    data: 'API Key invalid or expired.',
+                                    error: 'invalid_api_key'
+                                }
+                            }
+                        }
+                    },
+                    '403': {
+                        description: 'Missing required subscription write scope.',
+                        headers: {
+                            'x-api-remain': {
+                                $ref: '#/components/headers/ApiRemain'
+                            },
+                            'x-api-cost': {
+                                $ref: '#/components/headers/ApiCost'
+                            }
+                        },
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    $ref: '#/components/schemas/ApiFailureResponse'
+                                },
+                                example: {
+                                    ok: false,
+                                    data: 'Missing required scope api.auth.subscriptions.write.',
+                                    error: 'forbidden'
+                                }
+                            }
+                        }
+                    },
+                    '404': {
+                        description: 'The target device record does not exist.',
+                        headers: {
+                            'x-api-remain': {
+                                $ref: '#/components/headers/ApiRemain'
+                            },
+                            'x-api-cost': {
+                                $ref: '#/components/headers/ApiCost'
+                            }
+                        },
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    $ref: '#/components/schemas/ApiFailureResponse'
+                                },
+                                example: {
+                                    ok: false,
+                                    data: 'Subscription device not found.',
+                                    error: 'not_found'
+                                }
+                            }
+                        }
+                    }
+                },
+                'x-slug': 'auth-subscriptions-rename',
+                'x-group': 'Auth',
+                'x-sort-order': 14,
+                'x-auth-modes': ['cookie', 'apiKey'],
+                'x-required-scopes': ['api.auth.subscriptions.write'],
+                'x-examples': [
+                    {
+                        id: 'auth-subscriptions-rename',
+                        label: 'rename device',
+                        summary: 'Change the display name of one stored device record.',
+                        authMode: 'cookie',
+                        pathParams: {
+                            id: 'e8f0d2a8-1c2e-4a36-8c2b-demo'
+                        },
+                        body: {
+                            name: 'Office Chrome'
+                        }
+                    }
+                ]
+            },
+            delete: {
+                operationId: 'authDeleteSubscription',
+                tags: ['Auth'],
+                summary: 'Delete a stored push subscription device',
+                description:
+                    'Removes one stored PushSubscription device record and returns the refreshed device list.',
+                parameters: [
+                    {
+                        name: 'id',
+                        in: 'path',
+                        required: true,
+                        description: 'Subscription device identifier.',
+                        schema: {
+                            type: 'string'
+                        },
+                        example: 'e8f0d2a8-1c2e-4a36-8c2b-demo'
+                    }
+                ],
+                security: [
+                    {
+                        bearerAuth: []
+                    },
+                    {
+                        cookieAuth: []
+                    }
+                ],
+                responses: {
+                    '200': {
+                        description: 'Device deleted successfully.',
+                        headers: {
+                            'x-api-remain': {
+                                $ref: '#/components/headers/ApiRemain'
+                            },
+                            'x-api-cost': {
+                                $ref: '#/components/headers/ApiCost'
+                            }
+                        },
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    $ref: '#/components/schemas/AuthSubscriptionListResponse'
+                                }
+                            }
+                        }
+                    },
+                    '400': {
+                        description: 'Invalid path parameter.',
+                        headers: {
+                            'x-api-remain': {
+                                $ref: '#/components/headers/ApiRemain'
+                            },
+                            'x-api-cost': {
+                                $ref: '#/components/headers/ApiCost'
+                            }
+                        },
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    $ref: '#/components/schemas/ApiFailureResponse'
+                                },
+                                example: {
+                                    ok: false,
+                                    data: 'id must not be empty.',
+                                    error: 'invalid_param'
+                                }
+                            }
+                        }
+                    },
+                    '401': {
+                        description: 'Missing or invalid authentication.',
+                        headers: {
+                            'x-api-remain': {
+                                $ref: '#/components/headers/ApiRemain'
+                            },
+                            'x-api-cost': {
+                                $ref: '#/components/headers/ApiCost'
+                            }
+                        },
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    $ref: '#/components/schemas/ApiFailureResponse'
+                                },
+                                example: {
+                                    ok: false,
+                                    data: 'API Key invalid or expired.',
+                                    error: 'invalid_api_key'
+                                }
+                            }
+                        }
+                    },
+                    '403': {
+                        description: 'Missing required subscription write scope.',
+                        headers: {
+                            'x-api-remain': {
+                                $ref: '#/components/headers/ApiRemain'
+                            },
+                            'x-api-cost': {
+                                $ref: '#/components/headers/ApiCost'
+                            }
+                        },
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    $ref: '#/components/schemas/ApiFailureResponse'
+                                },
+                                example: {
+                                    ok: false,
+                                    data: 'Missing required scope api.auth.subscriptions.write.',
+                                    error: 'forbidden'
+                                }
+                            }
+                        }
+                    },
+                    '404': {
+                        description: 'The target device record does not exist.',
+                        headers: {
+                            'x-api-remain': {
+                                $ref: '#/components/headers/ApiRemain'
+                            },
+                            'x-api-cost': {
+                                $ref: '#/components/headers/ApiCost'
+                            }
+                        },
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    $ref: '#/components/schemas/ApiFailureResponse'
+                                },
+                                example: {
+                                    ok: false,
+                                    data: 'Subscription device not found.',
+                                    error: 'not_found'
+                                }
+                            }
+                        }
+                    }
+                },
+                'x-slug': 'auth-subscriptions-delete',
+                'x-group': 'Auth',
+                'x-sort-order': 15,
+                'x-auth-modes': ['cookie', 'apiKey'],
+                'x-required-scopes': ['api.auth.subscriptions.write'],
+                'x-examples': [
+                    {
+                        id: 'auth-subscriptions-delete',
+                        label: 'delete device',
+                        summary: 'Delete one stored PushSubscription device record.',
+                        authMode: 'cookie',
+                        pathParams: {
+                            id: 'e8f0d2a8-1c2e-4a36-8c2b-demo'
+                        }
                     }
                 ]
             }

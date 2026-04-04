@@ -1,6 +1,8 @@
 <template>
-    <AppAuthEntry />
-    <slot />
+    <div>
+        <AppAuthEntry />
+        <slot />
+    </div>
 </template>
 
 <script setup lang="ts">

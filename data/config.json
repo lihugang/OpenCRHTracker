@@ -122,6 +122,15 @@
         },
         "favorites": {
             "maxEntries": 10
+        },
+        "pushSubscriptions": {
+            "maxDevices": 5,
+            "maxEventSubscriptions": 50,
+            "syncTimeoutSeconds": 30
+        },
+        "push": {
+            "vapidPublicKey": "",
+            "vapidPrivateKey": ""
         }
     },
     "api": {
@@ -223,6 +232,8 @@
                 "api.auth.api-keys.revoke",
                 "api.auth.favorites.read",
                 "api.auth.favorites.write",
+                "api.auth.subscriptions.read",
+                "api.auth.subscriptions.write",
                 "api.timetable.station.read"
             ],
             "creatableKeyMaxScopes": [
@@ -282,6 +293,10 @@
             "authIssueApiKey": 5,
             "authListApiKeys": 1,
             "authRevokeApiKey": 1,
+            "authListSubscriptions": 1,
+            "authUpsertSubscription": 1,
+            "authUpdateSubscription": 1,
+            "authDeleteSubscription": 1,
             "searchIndex": 1,
             "timetableTrain": 1,
             "exportDailyIndex": 2,

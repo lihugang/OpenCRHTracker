@@ -20,6 +20,8 @@ import {
     deleteProbeStatusByTrainCodeInRange,
     ensureProbeStatus,
     getLatestResolvedProbeStatusByEmuCodeBefore,
+    getProbeStatusByEmuCodeValue,
+    getProbeStatusByTrainCodeValue,
     listProbeStatusByEmuCode,
     listProbeStatusByEmuCodeInRange,
     listProbeStatusByTrainCode,
@@ -35,6 +37,7 @@ import {
     listDailyRoutesByTrainCodeInRange,
     type DailyEmuRouteRow
 } from '~/server/services/emuRoutesStore';
+import { notifyLookupStatusChanges } from '~/server/services/eventNotificationService';
 import { registerTaskExecutor } from '~/server/services/taskExecutorRegistry';
 import { enqueueTask } from '~/server/services/taskQueue';
 import { DETECT_COUPLED_EMU_GROUP_TASK_EXECUTOR } from '~/server/services/taskExecutors/detectCoupledEmuGroupTaskExecutor';
@@ -957,14 +960,44 @@ async function tryResolveOverlappingRoutes(
     return true;
 }
 
-function applyResolvedResult(
+function collectLookupStatusNotificationCandidates(
+    allTrainCodes: string[],
+    allEmuCodes: string[],
+    startAt: number,
+    status: ProbeStatusValue
+) {
+    return [
+        ...uniqueNormalizedCodes(allTrainCodes).map((targetId) => ({
+            targetType: 'train' as const,
+            targetId,
+            startAt,
+            previousStatus: getProbeStatusByTrainCodeValue(targetId, startAt),
+            nextStatus: status
+        })),
+        ...uniqueNormalizedCodes(allEmuCodes).map((targetId) => ({
+            targetType: 'emu' as const,
+            targetId,
+            startAt,
+            previousStatus: getProbeStatusByEmuCodeValue(targetId, startAt),
+            nextStatus: status
+        }))
+    ];
+}
+
+async function applyResolvedResult(
     args: ProbeTrainDepartureTaskArgs,
     trainKey: string,
     allTrainCodes: string[],
     allEmuCodes: string[],
     status: ProbeStatusValue,
     nowSeconds: number
-): void {
+): Promise<void> {
+    const notificationCandidates = collectLookupStatusNotificationCandidates(
+        allTrainCodes,
+        allEmuCodes,
+        args.startAt,
+        status
+    );
     const groupKey = buildRunningEmuGroupKey(
         args.trainCode,
         args.trainInternalCode,
@@ -992,15 +1025,16 @@ function applyResolvedResult(
         nowSeconds
     );
     markQueriedTrainKey(trainKey);
+    await notifyLookupStatusChanges(notificationCandidates);
 }
 
-function tryReuseHistoricalProbeStatus(
+async function tryReuseHistoricalProbeStatus(
     args: ProbeTrainDepartureTaskArgs,
     trainKey: string,
     mainEmuCode: string,
     allTrainCodes: string[],
     nowSeconds: number
-): boolean {
+): Promise<boolean> {
     const latestResolvedRow = getLatestResolvedProbeStatusByEmuCodeBefore(
         mainEmuCode,
         args.startAt
@@ -1036,7 +1070,7 @@ function tryReuseHistoricalProbeStatus(
         return false;
     }
 
-    applyResolvedResult(
+    await applyResolvedResult(
         args,
         trainKey,
         allTrainCodes,
@@ -1208,7 +1242,7 @@ async function executeProbeTrainDepartureTask(rawArgs: unknown): Promise<void> {
         logger.warn(
             `main_emu_asset_not_found trainCode=${args.trainCode} mainEmuCode=${mainEmuCode}`
         );
-        applyResolvedResult(
+        await applyResolvedResult(
             args,
             trainKey,
             allTrainCodes,
@@ -1220,7 +1254,7 @@ async function executeProbeTrainDepartureTask(rawArgs: unknown): Promise<void> {
     }
 
     if (!mainRecord.multiple) {
-        applyResolvedResult(
+        await applyResolvedResult(
             args,
             trainKey,
             allTrainCodes,
@@ -1254,7 +1288,7 @@ async function executeProbeTrainDepartureTask(rawArgs: unknown): Promise<void> {
                 knownGroup.finalStatus
             );
         }
-        applyResolvedResult(
+        await applyResolvedResult(
             args,
             trainKey,
             allTrainCodes,
@@ -1271,7 +1305,7 @@ async function executeProbeTrainDepartureTask(rawArgs: unknown): Promise<void> {
     }
 
     if (
-        tryReuseHistoricalProbeStatus(
+        await tryReuseHistoricalProbeStatus(
             args,
             trainKey,
             mainEmuCode,

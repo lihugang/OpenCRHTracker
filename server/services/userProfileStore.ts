@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { LRUCache } from 'lru-cache';
 import { useUsersDatabase } from '~/server/libs/database/users';
 import { createPreparedSqlStore } from '~/server/libs/database/prepared';
@@ -31,14 +32,62 @@ interface UserProfileFavoriteValue extends Record<string, unknown> {
     starredAt?: unknown;
 }
 
+interface UserProfileSubscriptionKeysValue extends Record<string, unknown> {
+    p256dh?: unknown;
+    auth?: unknown;
+}
+
+interface UserProfileSubscriptionValue extends Record<string, unknown> {
+    id?: unknown;
+    name?: unknown;
+    endpoint?: unknown;
+    expirationTime?: unknown;
+    keys?: unknown;
+    createdAt?: unknown;
+    updatedAt?: unknown;
+    userAgent?: unknown;
+}
+
 interface UserProfileDataRaw extends Record<string, unknown> {
     version?: unknown;
     favorites?: unknown;
+    subscriptions?: unknown;
+}
+
+export interface UserProfileSubscriptionItem {
+    id: string;
+    name: string;
+    endpoint: string;
+    expirationTime: number | null;
+    keys: {
+        p256dh: string;
+        auth: string;
+    };
+    createdAt: number;
+    updatedAt: number;
+    userAgent: string;
+}
+
+export interface UpsertUserSubscriptionInput {
+    name: string;
+    endpoint: string;
+    expirationTime: number | null;
+    keys: {
+        p256dh: string;
+        auth: string;
+    };
+}
+
+export interface UpsertUserSubscriptionResult {
+    action: 'created' | 'updated';
+    item: UserProfileSubscriptionItem;
+    items: UserProfileSubscriptionItem[];
 }
 
 export interface UserProfileData {
     version: 1;
     favorites: FavoriteLookupItem[];
+    subscriptions: UserProfileSubscriptionItem[];
 }
 
 type UserProfileSqlKey = 'selectUserProfileByUserId' | 'upsertUserProfile';
@@ -62,17 +111,15 @@ const userProfileCache = new LRUCache<string, UserProfileData>({
 function createDefaultUserProfileData(): UserProfileData {
     return {
         version: 1,
-        favorites: []
+        favorites: [],
+        subscriptions: []
     };
 }
 
 function toFavoriteLookupItem(
     value: UserProfileFavoriteValue
 ): FavoriteLookupItem | null {
-    if (
-        !isLookupTargetType(value.type) ||
-        typeof value.code !== 'string'
-    ) {
+    if (!isLookupTargetType(value.type) || typeof value.code !== 'string') {
         return null;
     }
 
@@ -82,6 +129,72 @@ function toFavoriteLookupItem(
         tags: value.tags,
         starredAt: value.starredAt
     } as FavoriteLookupItem);
+}
+
+function toUserProfileSubscriptionItem(
+    value: UserProfileSubscriptionValue
+): UserProfileSubscriptionItem | null {
+    if (
+        typeof value.id !== 'string' ||
+        value.id.trim().length === 0 ||
+        typeof value.name !== 'string' ||
+        value.name.trim().length === 0 ||
+        typeof value.endpoint !== 'string' ||
+        value.endpoint.trim().length === 0 ||
+        typeof value.createdAt !== 'number' ||
+        !Number.isInteger(value.createdAt) ||
+        value.createdAt <= 0 ||
+        typeof value.updatedAt !== 'number' ||
+        !Number.isInteger(value.updatedAt) ||
+        value.updatedAt <= 0 ||
+        typeof value.userAgent !== 'string'
+    ) {
+        return null;
+    }
+
+    const keys =
+        typeof value.keys === 'object' &&
+        value.keys !== null &&
+        !Array.isArray(value.keys)
+            ? (value.keys as UserProfileSubscriptionKeysValue)
+            : null;
+
+    if (
+        !keys ||
+        typeof keys.p256dh !== 'string' ||
+        keys.p256dh.trim().length === 0 ||
+        typeof keys.auth !== 'string' ||
+        keys.auth.trim().length === 0
+    ) {
+        return null;
+    }
+
+    if (
+        value.expirationTime !== null &&
+        value.expirationTime !== undefined &&
+        (typeof value.expirationTime !== 'number' ||
+            !Number.isInteger(value.expirationTime) ||
+            value.expirationTime <= 0)
+    ) {
+        return null;
+    }
+
+    return {
+        id: value.id.trim(),
+        name: value.name.trim(),
+        endpoint: value.endpoint.trim(),
+        expirationTime:
+            typeof value.expirationTime === 'number'
+                ? value.expirationTime
+                : null,
+        keys: {
+            p256dh: keys.p256dh.trim(),
+            auth: keys.auth.trim()
+        },
+        createdAt: value.createdAt,
+        updatedAt: value.updatedAt,
+        userAgent: value.userAgent.trim()
+    };
 }
 
 function normalizeUserProfileData(value: unknown): UserProfileData {
@@ -108,10 +221,31 @@ function normalizeUserProfileData(value: unknown): UserProfileData {
               .filter((item): item is FavoriteLookupItem => item !== null)
               .sort((left, right) => right.starredAt - left.starredAt)
         : [];
+    const subscriptions = Array.isArray(raw.subscriptions)
+        ? raw.subscriptions
+              .map((item) => {
+                  if (
+                      typeof item !== 'object' ||
+                      item === null ||
+                      Array.isArray(item)
+                  ) {
+                      return null;
+                  }
+
+                  return toUserProfileSubscriptionItem(
+                      item as UserProfileSubscriptionValue
+                  );
+              })
+              .filter(
+                  (item): item is UserProfileSubscriptionItem => item !== null
+              )
+              .sort((left, right) => right.updatedAt - left.updatedAt)
+        : [];
 
     return {
         version: 1,
-        favorites
+        favorites,
+        subscriptions
     };
 }
 
@@ -167,6 +301,10 @@ export function listUserFavoriteLookups(userId: string) {
     return getCurrentUserProfileData(userId).favorites;
 }
 
+export function listUserSubscriptions(userId: string) {
+    return getCurrentUserProfileData(userId).subscriptions;
+}
+
 export function upsertUserFavoriteLookup(
     userId: string,
     item: FavoriteLookupInput
@@ -212,7 +350,8 @@ export function upsertUserFavoriteLookup(
 
         const nextProfile: UserProfileData = {
             version: 1,
-            favorites: nextFavorites
+            favorites: nextFavorites,
+            subscriptions: profile.subscriptions
         };
 
         writeUserProfileData(userId, nextProfile, now);
@@ -262,11 +401,198 @@ export function removeUserFavoriteLookup(
 
         const nextProfile: UserProfileData = {
             version: 1,
-            favorites: nextFavorites
+            favorites: nextFavorites,
+            subscriptions: profile.subscriptions
         };
 
         writeUserProfileData(userId, nextProfile, now);
         return nextProfile.favorites;
+    });
+
+    return transaction();
+}
+
+export function upsertUserSubscription(
+    userId: string,
+    input: UpsertUserSubscriptionInput,
+    userAgent: string
+): UpsertUserSubscriptionResult {
+    const maxDevices = useConfig().user.pushSubscriptions.maxDevices;
+    const now = getNowSeconds();
+
+    const transaction = useUsersDatabase().transaction(() => {
+        const row = getStoredUserProfileRow(userId);
+        const profile = row
+            ? parseUserProfileData(row.data_json)
+            : createDefaultUserProfileData();
+        const existing = profile.subscriptions.find(
+            (item) => item.endpoint === input.endpoint
+        );
+
+        if (!existing && profile.subscriptions.length >= maxDevices) {
+            throw new ApiRequestError(
+                409,
+                'subscriptions_limit_exceeded',
+                '\u8ba2\u9605\u8bbe\u5907\u6570\u91cf\u5df2\u8fbe\u4e0a\u9650\uff0c\u8bf7\u5148\u5220\u9664\u90e8\u5206\u8bbe\u5907'
+            );
+        }
+
+        const nextItem: UserProfileSubscriptionItem = {
+            id: existing?.id ?? crypto.randomUUID(),
+            name: input.name.trim(),
+            endpoint: input.endpoint.trim(),
+            expirationTime: input.expirationTime,
+            keys: {
+                p256dh: input.keys.p256dh.trim(),
+                auth: input.keys.auth.trim()
+            },
+            createdAt: existing?.createdAt ?? now,
+            updatedAt: now,
+            userAgent: userAgent.trim()
+        };
+        const nextSubscriptions = [
+            nextItem,
+            ...profile.subscriptions.filter(
+                (item) => item.endpoint !== input.endpoint.trim()
+            )
+        ].sort((left, right) => right.updatedAt - left.updatedAt);
+        const nextProfile: UserProfileData = {
+            version: 1,
+            favorites: profile.favorites,
+            subscriptions: nextSubscriptions
+        };
+
+        writeUserProfileData(userId, nextProfile, now);
+        return {
+            action: existing ? 'updated' : 'created',
+            item: nextItem,
+            items: nextProfile.subscriptions
+        } satisfies UpsertUserSubscriptionResult;
+    });
+
+    return transaction();
+}
+
+export function renameUserSubscription(
+    userId: string,
+    subscriptionId: string,
+    name: string
+) {
+    const now = getNowSeconds();
+
+    const transaction = useUsersDatabase().transaction(() => {
+        const row = getStoredUserProfileRow(userId);
+        const profile = row
+            ? parseUserProfileData(row.data_json)
+            : createDefaultUserProfileData();
+        const matched = profile.subscriptions.find(
+            (item) => item.id === subscriptionId
+        );
+
+        if (!matched) {
+            throw new ApiRequestError(
+                404,
+                'not_found',
+                '\u672a\u627e\u5230\u5bf9\u5e94\u7684\u8ba2\u9605\u8bbe\u5907'
+            );
+        }
+
+        const nextSubscriptions = profile.subscriptions
+            .map((item) =>
+                item.id === subscriptionId
+                    ? {
+                          ...item,
+                          name: name.trim(),
+                          updatedAt: now
+                      }
+                    : item
+            )
+            .sort((left, right) => right.updatedAt - left.updatedAt);
+        const nextProfile: UserProfileData = {
+            version: 1,
+            favorites: profile.favorites,
+            subscriptions: nextSubscriptions
+        };
+
+        writeUserProfileData(userId, nextProfile, now);
+        return nextProfile.subscriptions;
+    });
+
+    return transaction();
+}
+
+export function removeUserSubscription(userId: string, subscriptionId: string) {
+    const now = getNowSeconds();
+
+    const transaction = useUsersDatabase().transaction(() => {
+        const row = getStoredUserProfileRow(userId);
+        const profile = row
+            ? parseUserProfileData(row.data_json)
+            : createDefaultUserProfileData();
+        const nextSubscriptions = profile.subscriptions.filter(
+            (item) => item.id !== subscriptionId
+        );
+
+        if (nextSubscriptions.length === profile.subscriptions.length) {
+            throw new ApiRequestError(
+                404,
+                'not_found',
+                '\u672a\u627e\u5230\u5bf9\u5e94\u7684\u8ba2\u9605\u8bbe\u5907'
+            );
+        }
+
+        const nextProfile: UserProfileData = {
+            version: 1,
+            favorites: profile.favorites,
+            subscriptions: nextSubscriptions
+        };
+
+        writeUserProfileData(userId, nextProfile, now);
+        return nextProfile.subscriptions;
+    });
+
+    return transaction();
+}
+
+export function removeUserSubscriptionsByEndpoints(
+    userId: string,
+    endpoints: readonly string[]
+) {
+    const normalizedEndpoints = Array.from(
+        new Set(
+            endpoints
+                .map((endpoint) => endpoint.trim())
+                .filter((endpoint) => endpoint.length > 0)
+        )
+    );
+    if (normalizedEndpoints.length === 0) {
+        return listUserSubscriptions(userId);
+    }
+
+    const now = getNowSeconds();
+
+    const transaction = useUsersDatabase().transaction(() => {
+        const row = getStoredUserProfileRow(userId);
+        const profile = row
+            ? parseUserProfileData(row.data_json)
+            : createDefaultUserProfileData();
+        const endpointSet = new Set(normalizedEndpoints);
+        const nextSubscriptions = profile.subscriptions.filter(
+            (item) => !endpointSet.has(item.endpoint)
+        );
+
+        if (nextSubscriptions.length === profile.subscriptions.length) {
+            return profile.subscriptions;
+        }
+
+        const nextProfile: UserProfileData = {
+            version: 1,
+            favorites: profile.favorites,
+            subscriptions: nextSubscriptions
+        };
+
+        writeUserProfileData(userId, nextProfile, now);
+        return nextProfile.subscriptions;
     });
 
     return transaction();

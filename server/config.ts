@@ -74,6 +74,8 @@ interface LoggingConfig {
     retentionDays: number;
 }
 
+const DEFAULT_PUSH_SUBSCRIPTION_SYNC_TIMEOUT_SECONDS = 30;
+
 const ALLOWED_STARTUP_TASK_EXECUTORS = [
     'build_today_schedule',
     'generate_route_refresh_tasks',
@@ -158,6 +160,15 @@ export interface Config {
         adminUserIds: string[];
         favorites: {
             maxEntries: number;
+        };
+        pushSubscriptions: {
+            maxDevices: number;
+            maxEventSubscriptions: number;
+            syncTimeoutSeconds: number;
+        };
+        push: {
+            vapidPublicKey: string;
+            vapidPrivateKey: string;
         };
         apiKeyBytes: number;
         apiKeyTtlSeconds: number;
@@ -260,6 +271,10 @@ export interface Config {
             authIssueApiKey: number;
             authListApiKeys: number;
             authRevokeApiKey: number;
+            authListSubscriptions: number;
+            authUpsertSubscription: number;
+            authUpdateSubscription: number;
+            authDeleteSubscription: number;
             searchIndex: number;
             timetableTrain: number;
             exportDailyIndex: number;
@@ -478,6 +493,10 @@ function validateConfig(raw: unknown): Config {
 
     const user = asObject(root.user, 'user');
     const userScrypt = asObject(user.scrypt, 'user.scrypt');
+    const userPushSubscriptions = asObject(
+        user.pushSubscriptions,
+        'user.pushSubscriptions'
+    );
     const userApiKeyPrefixes = asOptionalObject(
         user.apiKeyPrefixes,
         'user.apiKeyPrefixes'
@@ -500,12 +519,32 @@ function validateConfig(raw: unknown): Config {
     const envAdminUserIdsRaw = process.env.OCRH_ADMIN_USERS?.trim();
     const envAdminUserIds = parseEnvList(envAdminUserIdsRaw);
     const envSignKey = process.env.OCRH_SIGN_KEY?.trim();
+    const userPush =
+        user.push === undefined ? undefined : asObject(user.push, 'user.push');
+    const envVapidPublicKey = process.env.OCRH_VAPID_PUBLIC_KEY?.trim();
+    const envVapidPrivateKey = process.env.OCRH_VAPID_PRIVATE_KEY?.trim();
     const configSignKey =
         user.signKey === undefined
             ? ''
             : asString(user.signKey, 'user.signKey');
+    const configVapidPublicKey =
+        userPush?.vapidPublicKey === undefined
+            ? ''
+            : asString(userPush.vapidPublicKey, 'user.push.vapidPublicKey');
+    const configVapidPrivateKey =
+        userPush?.vapidPrivateKey === undefined
+            ? ''
+            : asString(userPush.vapidPrivateKey, 'user.push.vapidPrivateKey');
     const signKey =
         envSignKey && envSignKey.length > 0 ? envSignKey : configSignKey;
+    const vapidPublicKey =
+        envVapidPublicKey && envVapidPublicKey.length > 0
+            ? envVapidPublicKey
+            : configVapidPublicKey;
+    const vapidPrivateKey =
+        envVapidPrivateKey && envVapidPrivateKey.length > 0
+            ? envVapidPrivateKey
+            : configVapidPrivateKey;
     const adminUserIds =
         envAdminUserIdsRaw && envAdminUserIdsRaw.length > 0
             ? envAdminUserIds
@@ -524,6 +563,24 @@ function validateConfig(raw: unknown): Config {
     if (!import.meta.dev && (!envSignKey || envSignKey.length === 0)) {
         console.warn(
             '[config] WARNING: OCRH signing key was loaded from config instead of process.env.OCRH_SIGN_KEY'
+        );
+    }
+    if (
+        !import.meta.dev &&
+        (!envVapidPublicKey || envVapidPublicKey.length === 0) &&
+        configVapidPublicKey.length > 0
+    ) {
+        console.warn(
+            '[config] WARNING: OCRH VAPID public key was loaded from config instead of process.env.OCRH_VAPID_PUBLIC_KEY'
+        );
+    }
+    if (
+        !import.meta.dev &&
+        (!envVapidPrivateKey || envVapidPrivateKey.length === 0) &&
+        configVapidPrivateKey.length > 0
+    ) {
+        console.warn(
+            '[config] WARNING: OCRH VAPID private key was loaded from config instead of process.env.OCRH_VAPID_PRIVATE_KEY'
         );
     }
 
@@ -841,6 +898,30 @@ function validateConfig(raw: unknown): Config {
                     'user.favorites.maxEntries',
                     1
                 )
+            },
+            pushSubscriptions: {
+                maxDevices: asInteger(
+                    userPushSubscriptions.maxDevices,
+                    'user.pushSubscriptions.maxDevices',
+                    1
+                ),
+                maxEventSubscriptions: asInteger(
+                    userPushSubscriptions.maxEventSubscriptions,
+                    'user.pushSubscriptions.maxEventSubscriptions',
+                    1
+                ),
+                syncTimeoutSeconds:
+                    userPushSubscriptions.syncTimeoutSeconds === undefined
+                        ? DEFAULT_PUSH_SUBSCRIPTION_SYNC_TIMEOUT_SECONDS
+                        : asInteger(
+                              userPushSubscriptions.syncTimeoutSeconds,
+                              'user.pushSubscriptions.syncTimeoutSeconds',
+                              1
+                          )
+            },
+            push: {
+                vapidPublicKey,
+                vapidPrivateKey
             },
             apiKeyBytes: asNumber(user.apiKeyBytes, 'user.apiKeyBytes', 16),
             apiKeyTtlSeconds: asNumber(
@@ -1220,6 +1301,26 @@ function validateConfig(raw: unknown): Config {
                 authRevokeApiKey: asNumber(
                     costFixed.authRevokeApiKey,
                     'cost.fixed.authRevokeApiKey',
+                    0
+                ),
+                authListSubscriptions: asNumber(
+                    costFixed.authListSubscriptions,
+                    'cost.fixed.authListSubscriptions',
+                    0
+                ),
+                authUpsertSubscription: asNumber(
+                    costFixed.authUpsertSubscription,
+                    'cost.fixed.authUpsertSubscription',
+                    0
+                ),
+                authUpdateSubscription: asNumber(
+                    costFixed.authUpdateSubscription,
+                    'cost.fixed.authUpdateSubscription',
+                    0
+                ),
+                authDeleteSubscription: asNumber(
+                    costFixed.authDeleteSubscription,
+                    'cost.fixed.authDeleteSubscription',
                     0
                 ),
                 searchIndex: asNumber(

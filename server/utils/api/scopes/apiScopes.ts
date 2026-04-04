@@ -17,6 +17,10 @@ export const API_SCOPES = {
         favorites: {
             read: 'api.auth.favorites.read',
             write: 'api.auth.favorites.write'
+        },
+        subscriptions: {
+            read: 'api.auth.subscriptions.read',
+            write: 'api.auth.subscriptions.write'
         }
     },
     search: {

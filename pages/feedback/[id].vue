@@ -158,6 +158,14 @@
                                     </div>
                                 </div>
 
+                                <UiSubscriptionButton
+                                    class="w-full justify-center"
+                                    :active="
+                                        isSubscribed(feedbackSubscriptionTarget)
+                                    "
+                                    :loading="isFeedbackSubscriptionActionPending"
+                                    @click="toggleFeedbackSubscription" />
+
                                 <UiButton
                                     variant="secondary"
                                     size="sm"
@@ -178,6 +186,12 @@
                                     @click="hideTopic">
                                     设为不公开
                                 </UiButton>
+
+                                <p
+                                    v-if="eventSubscriptionErrorMessage"
+                                    class="text-sm leading-6 text-status-delayed">
+                                    {{ eventSubscriptionErrorMessage }}
+                                </p>
                             </div>
                         </UiCard>
 
@@ -247,6 +261,12 @@
                     </aside>
 
                     <div class="order-1 space-y-6 lg:order-2">
+                        <p
+                            v-if="eventSubscriptionErrorMessage"
+                            class="text-sm leading-6 text-status-delayed lg:hidden">
+                            {{ eventSubscriptionErrorMessage }}
+                        </p>
+
                         <UiCard variant="accent">
                             <div class="space-y-5">
                                 <div class="space-y-3">
@@ -495,6 +515,12 @@
                             @click="replyFilterMode = 'key'">
                             关键回复
                         </button>
+                        <UiSubscriptionButton
+                            class="shrink-0"
+                            size="sm"
+                            :active="isSubscribed(feedbackSubscriptionTarget)"
+                            :loading="isFeedbackSubscriptionActionPending"
+                            @click="toggleFeedbackSubscription" />
                         <button
                             type="button"
                             class="shrink-0 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:text-slate-900"
@@ -541,6 +567,7 @@ import {
     ref,
     watch
 } from 'vue';
+import type { NotificationTarget } from '~/types/notifications';
 import type {
     DeleteFeedbackTopicResponse,
     FeedbackCategoryKey,
@@ -571,6 +598,13 @@ import type { TrackerApiResponse } from '~/types/homepage';
 
 const route = useRoute();
 const requestFetch = import.meta.server ? useRequestFetch() : $fetch;
+const {
+    errorMessage: eventSubscriptionErrorMessage,
+    isSubscribed,
+    isPending: isEventSubscriptionPending,
+    toggleEventSubscription
+} = useEventSubscriptions();
+const { isRefreshingCurrentDevice } = useSubscriptionDevices();
 
 const MOBILE_QUERY = '(max-width: 767px)';
 
@@ -622,6 +656,15 @@ const manageForm = reactive<{
     categoryKey: 'website.bug',
     status: 'pending'
 });
+const feedbackSubscriptionTarget = computed<NotificationTarget>(() => ({
+    targetType: 'feedback',
+    targetId: String(route.params.id)
+}));
+const isFeedbackSubscriptionActionPending = computed(
+    () =>
+        isRefreshingCurrentDevice.value ||
+        isEventSubscriptionPending(feedbackSubscriptionTarget.value)
+);
 
 const visibleMessages = computed(() => {
     if (!topic.value) {
@@ -667,6 +710,10 @@ async function scrollToBottom() {
 
 async function scrollToManageSection() {
     await scrollToElement(manageSectionRef.value);
+}
+
+async function toggleFeedbackSubscription() {
+    await toggleEventSubscription(feedbackSubscriptionTarget.value);
 }
 
 watch(

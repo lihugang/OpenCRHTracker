@@ -1,4 +1,5 @@
 import type { FavoriteLookupItem } from '~/types/lookup';
+import type { NotificationTargetType } from '~/types/notifications';
 
 export type AuthApiKeyIssuer = 'webapp' | 'api';
 
@@ -31,6 +32,17 @@ export interface AuthApiKeyUsageSummary {
     last8Hours: number;
     last1Day: number;
     bucketSeconds: number;
+}
+
+export interface AuthSubscriptionItem {
+    id: string;
+    name: string;
+    endpoint: string;
+    endpointPreview: string;
+    expirationTime: number | null;
+    createdAt: number;
+    updatedAt: number;
+    userAgent: string;
 }
 
 export interface AuthMeResponse {
@@ -90,4 +102,27 @@ export interface AuthFavoritesResponse {
     userId: string;
     maxEntries: number;
     items: FavoriteLookupItem[];
+}
+
+export interface AuthSubscriptionListResponse {
+    userId: string;
+    maxDevices: number;
+    vapidPublicKey: string;
+    syncTimeoutSeconds: number;
+    items: AuthSubscriptionItem[];
+}
+
+export interface AuthEventSubscriptionItem {
+    targetType: NotificationTargetType;
+    targetId: string;
+    label: string;
+    path: string;
+    createdAt: number;
+    updatedAt: number;
+}
+
+export interface AuthEventSubscriptionListResponse {
+    userId: string;
+    maxEntries: number;
+    items: AuthEventSubscriptionItem[];
 }

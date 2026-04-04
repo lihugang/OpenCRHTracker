@@ -21,6 +21,8 @@ import {
 import {
     deleteProbeStatusByTrainCodeAndEmuCodeAtStartAt,
     ensureProbeStatus,
+    getProbeStatusByEmuCodeValue,
+    getProbeStatusByTrainCodeValue,
     listProbeStatusByEmuCodeInRange,
     listProbeStatusByTrainCode,
     ProbeStatusValue,
@@ -30,6 +32,7 @@ import {
     deleteDailyRouteByTrainCodeAndEmuCodeAtStartAt,
     insertDailyEmuRoute
 } from '~/server/services/emuRoutesStore';
+import { notifyLookupStatusChanges } from '~/server/services/eventNotificationService';
 import { registerTaskExecutor } from '~/server/services/taskExecutorRegistry';
 import {
     getTodayScheduleCache,
@@ -580,6 +583,28 @@ async function persistResolvedTrackedGroup(
         scheduleRoute?.startStation ?? group.startStation ?? '';
     const endStation = scheduleRoute?.endStation ?? group.endStation ?? '';
     const endAt = scheduleRoute?.endAt ?? group.endAt;
+    const notificationCandidates = [
+        ...uniqueNormalizedCodes(trainCodes).map((targetId) => ({
+            targetType: 'train' as const,
+            targetId,
+            startAt: group.startAt,
+            previousStatus: getProbeStatusByTrainCodeValue(
+                targetId,
+                group.startAt
+            ),
+            nextStatus: finalStatus
+        })),
+        ...uniqueNormalizedCodes(emuCodes).map((targetId) => ({
+            targetType: 'emu' as const,
+            targetId,
+            startAt: group.startAt,
+            previousStatus: getProbeStatusByEmuCodeValue(
+                targetId,
+                group.startAt
+            ),
+            nextStatus: finalStatus
+        }))
+    ];
 
     for (const trainCode of trainCodes) {
         for (const emuCode of emuCodes) {
@@ -625,6 +650,7 @@ async function persistResolvedTrackedGroup(
         group.startAt,
         nowSeconds
     );
+    await notifyLookupStatusChanges(notificationCandidates);
 }
 
 async function executeDetectCoupledEmuGroupTask(

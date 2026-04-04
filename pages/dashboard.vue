@@ -211,6 +211,50 @@
                         </div>
 
                         <div
+                            v-else-if="currentPanelId === 'subscriptions'"
+                            key="subscriptions"
+                            class="max-w-4xl space-y-6">
+                            <DashboardEventSubscriptionPanel
+                                :items="eventSubscriptionItems"
+                                :is-loading="isEventSubscriptionsLoading"
+                                :error-message="
+                                    eventSubscriptionsErrorMessage
+                                "
+                                :max-entries="eventSubscriptionMaxEntries"
+                                :device-count="subscriptionItems.length"
+                                :format-timestamp="formatTimestamp"
+                                :is-pending="isEventSubscriptionPending"
+                                @delete-subscription="
+                                    removeEventSubscription
+                                " />
+
+                            <DashboardSubscriptionPanel
+                                :items="subscriptionItems"
+                                :state="subscriptionsState"
+                                :error-message="subscriptionsErrorMessage"
+                                :max-devices="subscriptionMaxDevices"
+                                :vapid-public-key="vapidPublicKey"
+                                :supports-push="supportsPush"
+                                :notification-permission="notificationPermission"
+                                :current-item="currentSubscriptionItem"
+                                :current-device-status="currentDeviceStatus"
+                                :can-write-subscriptions="
+                                    canWriteSubscriptions
+                                "
+                                :is-refreshing-current-device="
+                                    isRefreshingCurrentDevice
+                                "
+                                :format-timestamp="formatTimestamp"
+                                :refresh="refreshSubscriptions"
+                                :sync-current-device="
+                                    syncCurrentDeviceSubscription
+                                "
+                                :rename-subscription="renameSubscription"
+                                :delete-subscription="deleteSubscription"
+                                :is-pending="isSubscriptionPending" />
+                        </div>
+
+                        <div
                             v-else
                             key="developer"
                             class="grid gap-6 xl:grid-cols-[minmax(18rem,24rem)_minmax(0,1fr)]">
@@ -653,7 +697,7 @@ const dashboardPageCopy = {
     panelSheetEyebrow: 'SWITCH',
     panelSheetTitle: '切换选项卡',
     pageTitle: '设置 | Open CRH Tracker',
-    pageDescription: '管理账户安全、收藏、会话和 API 密钥。'
+    pageDescription: '管理账户安全、收藏、订阅设备、会话和 API 密钥。'
 } as const;
 
 const dashboardPanels = [
@@ -670,6 +714,13 @@ const dashboardPanels = [
         headerTitle: '收藏',
         title: '收藏项目',
         description: '查看和管理你的收藏。'
+    },
+    {
+        id: 'subscriptions',
+        label: '订阅',
+        headerTitle: '订阅',
+        title: '订阅设备',
+        description: '查看和管理各设备的订阅。'
     },
     {
         id: 'developer',
@@ -706,6 +757,9 @@ const scopeLabelMap: Record<string, string> = {
     'api.auth.favorites': '收藏',
     'api.auth.favorites.read': '读取收藏',
     'api.auth.favorites.write': '修改收藏',
+    'api.auth.subscriptions': '订阅',
+    'api.auth.subscriptions.read': '读取订阅',
+    'api.auth.subscriptions.write': '修改订阅',
     'api.auth.logout': '退出登录',
     'api.search': '搜索',
     'api.search.read': '读取搜索',
@@ -744,6 +798,32 @@ const {
     isFavoritePending,
     toggleFavorite
 } = useFavoriteLookups();
+const {
+    items: eventSubscriptionItems,
+    maxEntries: eventSubscriptionMaxEntries,
+    state: eventSubscriptionsState,
+    errorMessage: eventSubscriptionsErrorMessage,
+    isPending: isEventSubscriptionPending,
+    removeEventSubscription
+} = useEventSubscriptions();
+const {
+    items: subscriptionItems,
+    state: subscriptionsState,
+    errorMessage: subscriptionsErrorMessage,
+    maxDevices: subscriptionMaxDevices,
+    vapidPublicKey,
+    supportsPush,
+    notificationPermission,
+    currentItem: currentSubscriptionItem,
+    currentDeviceStatus,
+    isRefreshingCurrentDevice,
+    canWriteSubscriptions,
+    syncCurrentDeviceSubscription,
+    renameSubscription,
+    deleteSubscription,
+    isPending: isSubscriptionPending,
+    refresh: refreshSubscriptions
+} = useSubscriptionDevices();
 
 const logoutErrorMessage = ref('');
 const isLoggingOut = ref(false);
@@ -787,6 +867,10 @@ function readPanelQuery(value: unknown) {
 function normalizePanelId(value: string): DashboardPanelId {
     if (value === 'developer') {
         return 'developer';
+    }
+
+    if (value === 'subscriptions') {
+        return 'subscriptions';
     }
 
     if (value === 'favorites') {
@@ -947,6 +1031,9 @@ const canSubmitIssueForm = computed(
 );
 const isApiKeysLoading = computed(() => apiKeysStatus.value === 'pending');
 const isFavoritesLoading = computed(() => favoritesState.value === 'loading');
+const isEventSubscriptionsLoading = computed(
+    () => eventSubscriptionsState.value === 'loading'
+);
 const apiKeysErrorMessage = computed(() =>
     apiKeysError.value
         ? getApiErrorMessage(apiKeysError.value, '加载 API 密钥列表失败。')

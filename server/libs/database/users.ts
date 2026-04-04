@@ -6,7 +6,31 @@ import importSqlBatch from '~/server/utils/sql/importSqlBatch';
 
 function ensureUsersSchema(db: Database.Database) {
     const schemaSql = importSqlBatch('users/schema');
-    for (const statement of Object.values(schemaSql)) {
+    const orderedKeys = [
+        'createUsersTable',
+        'createUserProfilesTable',
+        'createApiKeysTable',
+        'createApiKeyScopesTable',
+        'createUserEventSubscriptionsTable',
+        'createUserEventSubscriptionsIndexes'
+    ];
+    const executedKeys = new Set<string>();
+
+    for (const key of orderedKeys) {
+        const statement = schemaSql[key];
+        if (!statement) {
+            continue;
+        }
+
+        db.exec(statement);
+        executedKeys.add(key);
+    }
+
+    for (const [key, statement] of Object.entries(schemaSql)) {
+        if (executedKeys.has(key)) {
+            continue;
+        }
+
         db.exec(statement);
     }
 }
