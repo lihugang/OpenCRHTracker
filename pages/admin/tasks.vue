@@ -171,6 +171,7 @@
 
 <script setup lang="ts">
 import type {
+    AdminCreateTaskRequest,
     AdminCreateTaskResponse,
     AdminRefreshRouteInfoNowTaskRequest,
     AdminRegenerateDailyExportTaskRequest
@@ -186,7 +187,6 @@ definePageMeta({
 
 type TaskRequestStatus = 'idle' | 'pending';
 
-const requestFetch = import.meta.server ? useRequestFetch() : $fetch;
 const { session } = useAuthState();
 const { selectedDateInput, todayDateInputValue } = await useAdminDateQuery();
 
@@ -222,14 +222,26 @@ const normalizedTrainCodesPreview = computed(() =>
     )
 );
 
-async function postAdminTask<TBody extends object>(body: TBody) {
-    const response = await requestFetch<
+async function postAdminTask(body: AdminCreateTaskRequest) {
+    const { data, error } = await useCsrfFetch<
         TrackerApiResponse<AdminCreateTaskResponse>
     >('/api/v1/admin/tasks', {
         method: 'POST',
         retry: 0,
-        body
+        body,
+        key: `admin:tasks:create:${body.type}:${Date.now()}`,
+        watch: false,
+        server: false
     });
+
+    if (error.value) {
+        throw error.value;
+    }
+
+    const response = data.value;
+    if (!response) {
+        throw new Error('Missing admin task creation response');
+    }
 
     if (!response.ok) {
         throw {
