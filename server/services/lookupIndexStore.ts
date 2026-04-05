@@ -12,6 +12,7 @@ interface RawEmuListRecord extends Record<string, unknown> {
     trainSetNo?: unknown;
     bureau?: unknown;
     depot?: unknown;
+    enableSeatCode?: unknown;
     tags?: unknown;
 }
 
@@ -76,6 +77,10 @@ function normalizeTags(value: unknown): string[] {
             (item, index, array) =>
                 item.length > 0 && array.indexOf(item) === index
         );
+}
+
+function isSeatCodeEnabled(value: unknown): boolean {
+    return value !== false;
 }
 
 function buildEmuSubtitle(record: { bureau: string; depot: string }) {
@@ -161,6 +166,10 @@ function loadEmuItems(emuListFilePath: string) {
             typeof row.model !== 'string' ||
             typeof row.trainSetNo !== 'string'
         ) {
+            continue;
+        }
+
+        if (!isSeatCodeEnabled(row.enableSeatCode)) {
             continue;
         }
 

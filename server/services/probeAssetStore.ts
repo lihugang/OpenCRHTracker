@@ -8,6 +8,7 @@ interface RawEmuListRecord extends Record<string, unknown> {
     trainSetNo?: unknown;
     bureau?: unknown;
     depot?: unknown;
+    enableSeatCode?: unknown;
     multiple?: unknown;
     tags?: unknown;
 }
@@ -65,6 +66,14 @@ function normalizeRequiredString(
     return normalizedValue;
 }
 
+function normalizeOptionalString(value: unknown): string {
+    return typeof value === 'string' ? value.trim() : '';
+}
+
+function isSeatCodeEnabled(value: unknown): boolean {
+    return value !== false;
+}
+
 function normalizeTags(value: unknown): string[] {
     if (!Array.isArray(value)) {
         return [];
@@ -92,7 +101,11 @@ export function parseEmuListAssetText(text: string): EmuListRecord[] {
             normalizeRequiredString(row.trainSetNo, 'trainSetNo', rowNumber)
         );
         const bureau = normalizeRequiredString(row.bureau, 'bureau', rowNumber);
-        const depot = normalizeRequiredString(row.depot, 'depot', rowNumber);
+        const depot = normalizeOptionalString(row.depot);
+
+        if (!isSeatCodeEnabled(row.enableSeatCode)) {
+            continue;
+        }
 
         emuList.push({
             model,
@@ -143,6 +156,9 @@ function buildProbeAssets(
         }
 
         const key = buildModelAndTrainSetNoKey(row.model, row.trainSetNo);
+        if (!emuByModelAndTrainSetNo.has(key)) {
+            continue;
+        }
         const code = row.code.trim();
         if (key.length === 0 || code.length === 0) {
             continue;
