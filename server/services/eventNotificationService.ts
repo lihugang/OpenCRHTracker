@@ -1,6 +1,10 @@
 import getLogger from '~/server/libs/log4js';
 import useConfig from '~/server/config';
-import { ProbeStatusValue } from '~/server/services/probeStatusStore';
+import {
+    listProbeStatusByEmuCode,
+    listProbeStatusByTrainCode,
+    ProbeStatusValue
+} from '~/server/services/probeStatusStore';
 import {
     listUserIdsSubscribedToTarget,
     upsertUserEventSubscription
@@ -35,6 +39,28 @@ interface FeedbackAccessTarget {
 }
 
 const logger = getLogger('event-notification');
+
+function buildLookupStatusNotificationPayload(
+    candidate: LookupStatusNotificationCandidate
+): NotificationPayload {
+    if (candidate.targetType === 'train') {
+        return buildTrainStatusUpdatedNotification(
+            candidate.targetId,
+            candidate.startAt,
+            listProbeStatusByTrainCode(candidate.targetId, candidate.startAt).map(
+                (row) => row.emu_code
+            )
+        );
+    }
+
+    return buildEmuStatusUpdatedNotification(
+        candidate.targetId,
+        candidate.startAt,
+        listProbeStatusByEmuCode(candidate.targetId, candidate.startAt).map(
+            (row) => row.train_code
+        )
+    );
+}
 
 function shouldNotifyLookupStatusChange(
     previousStatus: number,
@@ -139,18 +165,7 @@ export async function notifyLookupStatusChanges(
 
     await Promise.all(
         Array.from(uniqueCandidates.values()).map(async (candidate) => {
-            const payload =
-                candidate.targetType === 'train'
-                    ? buildTrainStatusUpdatedNotification(
-                          candidate.targetId,
-                          candidate.startAt,
-                          candidate.nextStatus
-                      )
-                    : buildEmuStatusUpdatedNotification(
-                          candidate.targetId,
-                          candidate.startAt,
-                          candidate.nextStatus
-                      );
+            const payload = buildLookupStatusNotificationPayload(candidate);
 
             await sendNotificationToTargetSubscribers(
                 {

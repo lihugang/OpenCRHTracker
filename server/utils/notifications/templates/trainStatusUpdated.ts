@@ -1,26 +1,23 @@
-import { ProbeStatusValue } from '~/server/services/probeStatusStore';
 import type { NotificationPayload } from '~/types/notifications';
-import formatTrackerTimestamp from '~/utils/time/formatTrackerTimestamp';
-
-function getProbeStatusLabel(status: ProbeStatusValue) {
-    return status === ProbeStatusValue.CoupledFormationResolved
-        ? '重联'
-        : '单编组';
-}
+import uniqueNormalizedCodes from '~/server/utils/12306/uniqueNormalizedCodes';
 
 export function buildTrainStatusUpdatedNotification(
     trainCode: string,
     startAt: number,
-    status: ProbeStatusValue
+    emuCodes: string[]
 ): NotificationPayload {
-    const formattedStartAt = formatTrackerTimestamp(startAt);
-    const statusLabel = getProbeStatusLabel(status);
+    const [primaryEmuCode = '', coupledEmuCode = ''] =
+        uniqueNormalizedCodes(emuCodes);
+
+    const body = primaryEmuCode
+        ? coupledEmuCode
+            ? `今日 ${trainCode} 次列车由 ${primaryEmuCode}（车组号），重联 ${coupledEmuCode} 担当`
+            : `今日 ${trainCode} 次列车由 ${primaryEmuCode}（车组号）担当`
+        : `今日 ${trainCode} 次列车担当信息已更新`;
 
     return {
-        title: `车次 ${trainCode} 已更新`,
-        body: formattedStartAt
-            ? `${formattedStartAt} 的记录已更新为${statusLabel}状态。`
-            : `记录已更新为${statusLabel}状态。`,
+        title: `${trainCode} 次列车 | Open CRH Tracker`,
+        body,
         url: `/train/${encodeURIComponent(trainCode)}`,
         tag: `ocrh:train:${encodeURIComponent(trainCode)}:${startAt}`
     };

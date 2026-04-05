@@ -7,7 +7,7 @@ export function buildFeedbackReplyNotification(
     messageId: number
 ): NotificationPayload {
     return {
-        title: '反馈有新回复',
+        title: '新回复 | Open CRH Tracker',
         body: `${authorName} 回复了「${topicTitle}」。`,
         url: `/feedback/${topicId}`,
         tag: `ocrh:feedback:${topicId}:reply:${messageId}`

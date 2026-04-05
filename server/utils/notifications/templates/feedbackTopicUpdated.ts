@@ -8,7 +8,7 @@ export function buildFeedbackStatusUpdatedNotification(
     status: FeedbackStatus
 ): NotificationPayload {
     return {
-        title: '反馈状态已更新',
+        title: '反馈状态已更新 | Open CRH Tracker',
         body: `「${topicTitle}」已更新为 ${getFeedbackStatusLabel(status)}。`,
         url: `/feedback/${topicId}`,
         tag: `ocrh:feedback:${topicId}:status:${status}`
@@ -20,7 +20,7 @@ export function buildFeedbackHiddenNotification(
     topicTitle: string
 ): NotificationPayload {
     return {
-        title: '反馈可见性已更新',
+        title: '反馈可见性已更新 | Open CRH Tracker',
         body: `「${topicTitle}」已被管理员设为不公开。`,
         url: `/feedback/${topicId}`,
         tag: `ocrh:feedback:${topicId}:visibility:hidden`

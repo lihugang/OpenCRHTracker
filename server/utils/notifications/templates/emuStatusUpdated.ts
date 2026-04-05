@@ -1,26 +1,19 @@
-import { ProbeStatusValue } from '~/server/services/probeStatusStore';
+import uniqueNormalizedCodes from '~/server/utils/12306/uniqueNormalizedCodes';
 import type { NotificationPayload } from '~/types/notifications';
-import formatTrackerTimestamp from '~/utils/time/formatTrackerTimestamp';
-
-function getProbeStatusLabel(status: ProbeStatusValue) {
-    return status === ProbeStatusValue.CoupledFormationResolved
-        ? '重联'
-        : '单编组';
-}
 
 export function buildEmuStatusUpdatedNotification(
     emuCode: string,
     startAt: number,
-    status: ProbeStatusValue
+    trainCodes: string[]
 ): NotificationPayload {
-    const formattedStartAt = formatTrackerTimestamp(startAt);
-    const statusLabel = getProbeStatusLabel(status);
+    const trainCodeText = uniqueNormalizedCodes(trainCodes).join(' / ');
+    const body = trainCodeText
+        ? `今日 ${emuCode}（车组号）担当 ${trainCodeText} 次列车`
+        : `今日 ${emuCode}（车组号）运用信息已更新`;
 
     return {
-        title: `车组 ${emuCode} 已更新`,
-        body: formattedStartAt
-            ? `${formattedStartAt} 的记录已更新为${statusLabel}状态。`
-            : `记录已更新为${statusLabel}状态。`,
+        title: `${emuCode}（车组号）运用情况 | Open CRH Tracker`,
+        body,
         url: `/emu/${encodeURIComponent(emuCode)}`,
         tag: `ocrh:emu:${encodeURIComponent(emuCode)}:${startAt}`
     };
