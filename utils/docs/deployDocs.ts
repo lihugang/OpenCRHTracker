@@ -440,12 +440,12 @@ export const deployDocsSections: DocsContentSection[] = [
                         valueType: 'integer',
                         required: true,
                         description:
-                            'Device limit for stored PushSubscription endpoints, reserved event-subscription rule limit, and current-device sync timeout in seconds.',
+                            '已存储 PushSubscription 端点的设备数量上限、预留的事件订阅规则数量上限，以及当前设备同步超时时间（秒）。',
                         notes: [
-                            'maxDevices counts stored PushSubscription endpoints per user.',
-                            'One physical device may consume multiple entries when it uses different browsers, profiles, or PWA installs.',
-                            'maxEventSubscriptions is reserved for future event-subscription rules and is not enforced by the current code.',
-                            'syncTimeoutSeconds controls how long the dashboard waits for permission prompts, Service Worker readiness, and browser subscription calls before showing a timeout error; the default is 30 seconds.'
+                            'maxDevices 按每个用户已存储的 PushSubscription 端点数量计数。',
+                            '同一台物理设备在使用不同浏览器、不同用户配置或不同 PWA 安装时，可能会占用多条记录。',
+                            'maxEventSubscriptions 为后续事件订阅规则预留，当前代码尚未实际强制这一上限。',
+                            'syncTimeoutSeconds 控制控制台等待权限弹窗、Service Worker 就绪和浏览器订阅调用的最长时间；默认值为 30 秒。'
                         ]
                     },
                     {
@@ -657,12 +657,12 @@ export const deployDocsSections: DocsContentSection[] = [
                         valueType: 'object',
                         required: true,
                         description:
-                            'Reference model index rebuild task settings.',
+                            '参考车型索引重建任务的配置项。',
                         notes: [
-                            'windowDays sets the historical window; the current default is 14.',
-                            'batchSize sets the paged scan size for daily_emu_routes; the current default is 1000.',
-                            'threshold is the weightedShare cutoff and must be > 0 and <= 1.',
-                            'dailyTimeHHmm controls the daily rebuild time for rebuild_reference_model_index.'
+                            'windowDays 用于设置历史窗口天数，当前默认值为 14。',
+                            'batchSize 用于设置扫描 daily_emu_routes 时的分页批大小，当前默认值为 1000。',
+                            'threshold 是 weightedShare 的阈值，必须大于 0 且小于等于 1。',
+                            'dailyTimeHHmm 控制 rebuild_reference_model_index 的每日重建时间。'
                         ]
                     },
                     {
