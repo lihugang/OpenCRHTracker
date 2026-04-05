@@ -137,6 +137,72 @@ export interface AdminTrafficResponse {
     windows: AdminTrafficWindowSummary[];
 }
 
+export interface AdminUserListItem {
+    userId: string;
+    createdAt: number;
+    lastLoginAt: number | null;
+    apiRemainCost: number;
+}
+
+export interface AdminUsersResponse {
+    totalUsers: number;
+    asOf: number;
+    items: AdminUserListItem[];
+}
+
+export type AdminServerMetricsWindow = '4h' | '24h';
+
+export interface AdminServerMetricsPeak {
+    startAt: number;
+    endAt: number;
+    value: number;
+}
+
+export interface AdminServerMetricsBucket {
+    startAt: number;
+    endAt: number;
+    systemSampleCount: number;
+    cpuPercent: number | null;
+    memoryUsedRatio: number | null;
+    memoryUsedBytes: number | null;
+    memoryTotalBytes: number | null;
+    load1m: number | null;
+    ssrRequestCount: number;
+    ssrAvgDurationMs: number | null;
+    ssrP95DurationMs: number | null;
+    apiRequestCount: number;
+    apiAvgDurationMs: number | null;
+    apiP95DurationMs: number | null;
+}
+
+export interface AdminServerMetricsWindowSummary {
+    key: AdminServerMetricsWindow;
+    label: string;
+    bucketSeconds: number;
+    bucketCount: number;
+    coverageSeconds: number;
+    isPartial: boolean;
+    latest: AdminServerMetricsBucket | null;
+    peaks: {
+        cpuPercentBucket: AdminServerMetricsPeak | null;
+        memoryUsedRatioBucket: AdminServerMetricsPeak | null;
+        load1mBucket: AdminServerMetricsPeak | null;
+        ssrAvgDurationMsBucket: AdminServerMetricsPeak | null;
+        ssrP95DurationMsBucket: AdminServerMetricsPeak | null;
+        apiAvgDurationMsBucket: AdminServerMetricsPeak | null;
+        apiP95DurationMsBucket: AdminServerMetricsPeak | null;
+    };
+    buckets: AdminServerMetricsBucket[];
+}
+
+export interface AdminServerMetricsResponse {
+    startedAt: number;
+    asOf: number;
+    lastSampleAt: number | null;
+    loadAverageSupported: boolean;
+    windows: AdminServerMetricsWindowSummary[];
+}
+
 export type AdminTaskTemplateType =
     | 'regenerate_daily_export'
     | 'refresh_route_info_now';

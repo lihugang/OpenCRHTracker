@@ -92,6 +92,11 @@
                 "file": "data/runtime/admin-traffic.json",
                 "flushIntervalMinutes": 30
             },
+            "adminServerMetrics": {
+                "file": "data/runtime/admin-server-metrics.json",
+                "flushIntervalMinutes": 10,
+                "sampleIntervalSeconds": 60
+            },
             "requestMetrics12306": {
                 "file": "data/runtime/12306-request-metrics.json",
                 "retentionDays": 3,

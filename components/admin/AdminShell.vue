@@ -257,12 +257,20 @@ const navItems = [
         path: '/admin'
     },
     {
+        label: '用户',
+        path: '/admin/users'
+    },
+    {
         label: '被动告警',
         path: '/admin/passive-alerts'
     },
     {
         label: '流量统计',
         path: '/admin/traffic'
+    },
+    {
+        label: '服务器监控',
+        path: '/admin/server-metrics'
     },
     {
         label: '主动扫描',

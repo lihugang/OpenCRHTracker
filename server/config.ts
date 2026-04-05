@@ -107,6 +107,12 @@ interface RuntimeAdminTrafficConfig {
     flushIntervalMinutes: number;
 }
 
+interface RuntimeAdminServerMetricsConfig {
+    file: string;
+    flushIntervalMinutes: number;
+    sampleIntervalSeconds: number;
+}
+
 interface Runtime12306RequestMetricsConfig {
     file: string;
     retentionDays: number;
@@ -148,6 +154,7 @@ export interface Config {
         databases: Record<'task' | 'EMUTracked' | 'users' | 'feedback', string>;
         runtime: {
             adminTraffic: RuntimeAdminTrafficConfig;
+            adminServerMetrics: RuntimeAdminServerMetricsConfig;
             requestMetrics12306: Runtime12306RequestMetricsConfig;
         };
     };
@@ -502,6 +509,10 @@ function validateConfig(raw: unknown): Config {
     const runtimeAdminTraffic = asObject(
         runtime.adminTraffic,
         'data.runtime.adminTraffic'
+    );
+    const runtimeAdminServerMetrics = asObject(
+        runtime.adminServerMetrics,
+        'data.runtime.adminServerMetrics'
     );
     const runtimeRequestMetrics12306 = asObject(
         runtime.requestMetrics12306,
@@ -900,6 +911,22 @@ function validateConfig(raw: unknown): Config {
                     flushIntervalMinutes: asInteger(
                         runtimeAdminTraffic.flushIntervalMinutes,
                         'data.runtime.adminTraffic.flushIntervalMinutes',
+                        1
+                    )
+                },
+                adminServerMetrics: {
+                    file: asString(
+                        runtimeAdminServerMetrics.file,
+                        'data.runtime.adminServerMetrics.file'
+                    ),
+                    flushIntervalMinutes: asInteger(
+                        runtimeAdminServerMetrics.flushIntervalMinutes,
+                        'data.runtime.adminServerMetrics.flushIntervalMinutes',
+                        1
+                    ),
+                    sampleIntervalSeconds: asInteger(
+                        runtimeAdminServerMetrics.sampleIntervalSeconds,
+                        'data.runtime.adminServerMetrics.sampleIntervalSeconds',
                         1
                     )
                 },

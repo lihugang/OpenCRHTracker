@@ -215,6 +215,21 @@
                                     调用、独立访客和活跃用户走势。
                                 </p>
                             </button>
+
+                            <button
+                                type="button"
+                                class="w-full rounded-[1rem] border border-slate-200 bg-white/90 px-4 py-4 text-left transition hover:border-slate-300 hover:bg-slate-50/80"
+                                @click="goToServerMetrics">
+                                <p
+                                    class="text-base font-semibold text-slate-900">
+                                    服务器监控
+                                </p>
+                                <p
+                                    class="mt-2 text-sm leading-6 text-slate-600">
+                                    查看近 4 小时和 24 小时的 CPU、内存、系统负载与
+                                    SSR / API 处理时长走势。
+                                </p>
+                            </button>
                         </div>
                     </div>
                 </UiCard>
@@ -352,6 +367,10 @@ async function goToTraffic() {
     await navigateTo(
         buildAdminRoute('/admin/traffic', selectedDateInput.value)
     );
+}
+
+async function goToServerMetrics() {
+    await navigateTo('/admin/server-metrics');
 }
 
 function formatTimestamp(timestamp: number) {

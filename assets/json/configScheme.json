@@ -348,6 +348,29 @@
                                 "flushIntervalMinutes"
                             ]
                         },
+                        "adminServerMetrics": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "file": {
+                                    "type": "string",
+                                    "minLength": 1
+                                },
+                                "flushIntervalMinutes": {
+                                    "type": "integer",
+                                    "minimum": 1
+                                },
+                                "sampleIntervalSeconds": {
+                                    "type": "integer",
+                                    "minimum": 1
+                                }
+                            },
+                            "required": [
+                                "file",
+                                "flushIntervalMinutes",
+                                "sampleIntervalSeconds"
+                            ]
+                        },
                         "requestMetrics12306": {
                             "type": "object",
                             "additionalProperties": false,
@@ -374,6 +397,7 @@
                     },
                     "required": [
                         "adminTraffic",
+                        "adminServerMetrics",
                         "requestMetrics12306"
                     ]
                 }
