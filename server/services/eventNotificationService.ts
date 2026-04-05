@@ -47,9 +47,10 @@ function buildLookupStatusNotificationPayload(
         return buildTrainStatusUpdatedNotification(
             candidate.targetId,
             candidate.startAt,
-            listProbeStatusByTrainCode(candidate.targetId, candidate.startAt).map(
-                (row) => row.emu_code
-            )
+            listProbeStatusByTrainCode(
+                candidate.targetId,
+                candidate.startAt
+            ).map((row) => row.emu_code)
         );
     }
 

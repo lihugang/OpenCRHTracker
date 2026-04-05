@@ -62,7 +62,25 @@ export default defineNuxtConfig({
                 ignored: ['**/db/**']
             }
         },
-        plugins: [tailwindcss() as any]
+        plugins: [tailwindcss() as any],
+        build: {
+            rollupOptions: {
+                output: {
+                    manualChunks(id) {
+                        if (id.includes('/components/')) {
+                            const parts = id
+                                .split('/components/')[1]
+                                .split('/');
+                            if (parts.length > 1) {
+                                const folderName = parts[0];
+                                return `components-${folderName}`;
+                            }
+                            return 'components-common';
+                        }
+                    }
+                }
+            }
+        }
     },
     css: ['~/assets/css/tailwind.css'],
     modules: ['nuxt-security', '@vite-pwa/nuxt'],

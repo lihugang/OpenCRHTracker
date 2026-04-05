@@ -13,7 +13,10 @@ export function buildEmuStatusUpdatedNotification(
     const normalizedTrainCodes = uniqueNormalizedCodes(trainCodes);
     const trainCodeText = normalizedTrainCodes.join(' / ');
     const routeSummaryText = formatNotificationRouteSummary(
-        resolveNotificationRouteSummaryByTrainCodes(normalizedTrainCodes, startAt)
+        resolveNotificationRouteSummaryByTrainCodes(
+            normalizedTrainCodes,
+            startAt
+        )
     );
     const body = trainCodeText
         ? routeSummaryText
