@@ -31,10 +31,14 @@
 
                             <div class="flex flex-wrap gap-2">
                                 <span
-                                    v-for="mode in endpoint.authModes"
-                                    :key="endpoint.slug + ':mode:' + mode"
+                                    v-for="
+                                        label in getDocsVisibleAuthModeLabels(
+                                            endpoint.authModes
+                                        )
+                                    "
+                                    :key="endpoint.slug + ':mode:' + label"
                                     class="inline-flex rounded-full border border-white/70 bg-white/80 px-3 py-1 text-xs font-medium text-slate-700">
-                                    {{ mode }}
+                                    {{ label }}
                                 </span>
                                 <span
                                     v-for="scope in endpoint.requiredScopes"
@@ -56,6 +60,36 @@
         </UiCard>
 
         <div class="space-y-6">
+            <UiCard
+                v-if="costDisplay"
+                :show-accent-bar="false">
+                <div class="space-y-5">
+                    <div class="space-y-2">
+                        <p
+                            class="text-xs font-medium uppercase tracking-[0.2em] text-crh-blue/80">
+                            COST
+                        </p>
+                        <h2 class="text-2xl font-semibold text-slate-900">
+                            扣费规则
+                        </h2>
+                        <p class="text-sm leading-6 text-slate-600">
+                            {{ costDisplay.description }}
+                        </p>
+                    </div>
+
+                    <div
+                        class="rounded-[1rem] border border-slate-200 bg-slate-50/90 p-4">
+                        <p class="text-sm leading-6 text-slate-700">
+                            {{ costDisplay.ruleText }}
+                        </p>
+                    </div>
+
+                    <p class="text-sm leading-6 text-slate-600">
+                        {{ costDisplay.note }}
+                    </p>
+                </div>
+            </UiCard>
+
             <UiCard :show-accent-bar="false">
                 <div class="space-y-5">
                     <div class="space-y-2">
@@ -323,12 +357,14 @@
 
 <script setup lang="ts">
 import { createError } from 'h3';
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import useDocsApiRuntimeConfig from '~/composables/useDocsApiRuntimeConfig';
 import {
     describeSchema,
     formatSchemaType,
+    getDocsApiCostDisplay,
     getDocsApiEndpointBySlug,
+    getDocsVisibleAuthModeLabels,
     getDocsParameterGroups,
     stringifyExample
 } from '~/utils/docs/apiDocs';
@@ -349,6 +385,9 @@ if (!endpoint) {
 const isPlaygroundOpen = ref(false);
 const parameterGroups = getDocsParameterGroups(endpoint);
 const { data: apiConfig } = await useDocsApiRuntimeConfig();
+const costDisplay = computed(() =>
+    getDocsApiCostDisplay(endpoint, apiConfig.value)
+);
 
 function resolveParameterSchema(parameter: OpenApiParameter) {
     return parameter.schema && '$ref' in parameter.schema

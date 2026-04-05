@@ -43,6 +43,38 @@ export default defineEventHandler(async (event) => {
                     pagination: {
                         defaultLimit: config.api.pagination.defaultLimit,
                         maxLimit: config.api.pagination.maxLimit
+                    },
+                    cost: {
+                        minimumRequestCost: 1,
+                        fixed: {
+                            authMe: config.cost.fixed.authMe,
+                            timetableTrain: config.cost.fixed.timetableTrain,
+                            exportDailyIndex: config.cost.fixed.exportDailyIndex,
+                            exportDaily: config.cost.fixed.exportDaily
+                        },
+                        perRecord: {
+                            recordsDaily: {
+                                unitCost: config.cost.perRecord.recordsDaily.unitCost,
+                                rounding:
+                                    config.cost.perRecord.recordsDaily.rounding
+                            },
+                            timetableStation: {
+                                unitCost:
+                                    config.cost.perRecord.timetableStation.unitCost,
+                                rounding:
+                                    config.cost.perRecord.timetableStation.rounding
+                            },
+                            historyTrain: {
+                                unitCost: config.cost.perRecord.historyTrain.unitCost,
+                                rounding:
+                                    config.cost.perRecord.historyTrain.rounding
+                            },
+                            historyEmu: {
+                                unitCost: config.cost.perRecord.historyEmu.unitCost,
+                                rounding:
+                                    config.cost.perRecord.historyEmu.rounding
+                            }
+                        }
                     }
                 }
             };

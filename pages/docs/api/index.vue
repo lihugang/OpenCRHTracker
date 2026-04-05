@@ -140,10 +140,14 @@
 
                         <div class="flex flex-wrap gap-2">
                             <span
-                                v-for="mode in endpoint.authModes"
-                                :key="endpoint.slug + ':mode:' + mode"
+                                v-for="
+                                    label in getDocsVisibleAuthModeLabels(
+                                        endpoint.authModes
+                                    )
+                                "
+                                :key="endpoint.slug + ':mode:' + label"
                                 class="inline-flex rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600">
-                                {{ mode }}
+                                {{ label }}
                             </span>
                             <span
                                 v-for="scope in endpoint.requiredScopes"
@@ -152,6 +156,12 @@
                                 {{ scope }}
                             </span>
                         </div>
+
+                        <p
+                            v-if="getEndpointCostSummary(endpoint)"
+                            class="text-sm leading-6 text-slate-600">
+                            {{ getEndpointCostSummary(endpoint) }}
+                        </p>
                     </div>
                 </UiCard>
             </div>
@@ -161,7 +171,12 @@
 
 <script setup lang="ts">
 import useDocsApiRuntimeConfig from '~/composables/useDocsApiRuntimeConfig';
-import { listDocsApiGroups } from '~/utils/docs/apiDocs';
+import {
+    getDocsApiCostDisplay,
+    getDocsVisibleAuthModeLabels,
+    listDocsApiGroups
+} from '~/utils/docs/apiDocs';
+import type { DocsApiEndpoint } from '~/types/docs';
 
 const groups = listDocsApiGroups();
 const { data: apiConfig } = await useDocsApiRuntimeConfig();
@@ -172,6 +187,10 @@ const responseEnvelopeExample = [
     '    "error": ""',
     '}'
 ].join('\n');
+
+function getEndpointCostSummary(endpoint: DocsApiEndpoint) {
+    return getDocsApiCostDisplay(endpoint, apiConfig.value)?.summary ?? '';
+}
 
 definePageMeta({
     pageTransition: {

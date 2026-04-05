@@ -180,6 +180,34 @@ export interface DocsApiGroup {
     endpoints: DocsApiEndpoint[];
 }
 
+export interface DocsApiPerRecordCostRule {
+    unitCost: number;
+    rounding: 'ceil';
+}
+
+export interface DocsApiCostRuntimeConfig {
+    minimumRequestCost: number;
+    fixed: {
+        authMe: number;
+        timetableTrain: number;
+        exportDailyIndex: number;
+        exportDaily: number;
+    };
+    perRecord: {
+        recordsDaily: DocsApiPerRecordCostRule;
+        timetableStation: DocsApiPerRecordCostRule;
+        historyTrain: DocsApiPerRecordCostRule;
+        historyEmu: DocsApiPerRecordCostRule;
+    };
+}
+
+export interface DocsApiCostDisplay {
+    summary: string;
+    ruleText: string;
+    description: string;
+    note: string;
+}
+
 export interface DocsApiRuntimeConfig {
     versionPrefix: string;
     apiKeyHeader: string;
@@ -194,4 +222,5 @@ export interface DocsApiRuntimeConfig {
         defaultLimit: number;
         maxLimit: number;
     };
+    cost: DocsApiCostRuntimeConfig;
 }

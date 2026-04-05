@@ -1,7 +1,9 @@
 import developerDocsOpenApi from '~/utils/docs/openApi';
 import type {
+    DocsApiCostDisplay,
     DocsApiEndpoint,
     DocsApiGroup,
+    DocsAuthMode,
     DocsApiRuntimeConfig,
     DocsResolvedResponse,
     OpenApiHeader,
@@ -28,6 +30,33 @@ export const DEFAULT_DOCS_API_RUNTIME_CONFIG: DocsApiRuntimeConfig = {
     pagination: {
         defaultLimit: 20,
         maxLimit: 200
+    },
+    cost: {
+        minimumRequestCost: 1,
+        fixed: {
+            authMe: 1,
+            timetableTrain: 1,
+            exportDailyIndex: 2,
+            exportDaily: 50
+        },
+        perRecord: {
+            recordsDaily: {
+                unitCost: 0.05,
+                rounding: 'ceil'
+            },
+            timetableStation: {
+                unitCost: 0.05,
+                rounding: 'ceil'
+            },
+            historyTrain: {
+                unitCost: 0.05,
+                rounding: 'ceil'
+            },
+            historyEmu: {
+                unitCost: 0.05,
+                rounding: 'ceil'
+            }
+        }
     }
 };
 
@@ -229,12 +258,100 @@ const tagDescriptionMap = new Map(
     ])
 );
 
+const FIXED_COST_ENDPOINT_KEYS = {
+    'auth-me': 'authMe',
+    'timetable-train': 'timetableTrain',
+    'exports-daily-index': 'exportDailyIndex',
+    'exports-daily-date': 'exportDaily'
+} as const satisfies Record<
+    string,
+    keyof DocsApiRuntimeConfig['cost']['fixed']
+>;
+
+const PER_RECORD_COST_ENDPOINT_KEYS = {
+    'records-daily': 'recordsDaily',
+    'timetable-station': 'timetableStation',
+    'history-train': 'historyTrain',
+    'history-emu': 'historyEmu'
+} as const satisfies Record<
+    string,
+    keyof DocsApiRuntimeConfig['cost']['perRecord']
+>;
+
 export function listDocsApiEndpoints() {
     return endpointList;
 }
 
 export function getDocsApiEndpointBySlug(slug: string) {
     return endpointMap.get(slug) ?? null;
+}
+
+export function getDocsVisibleAuthModeLabels(modes: DocsAuthMode[]) {
+    return modes.flatMap((mode) =>
+        mode === 'anonymous' ? ['可匿名访问'] : []
+    );
+}
+
+function formatCostValue(value: number) {
+    return Number.isInteger(value) ? String(value) : value.toFixed(2);
+}
+
+function formatCostRounding(rounding: DocsApiRuntimeConfig['cost']['perRecord'][keyof DocsApiRuntimeConfig['cost']['perRecord']]['rounding']) {
+    if (rounding === 'ceil') {
+        return '向上取整';
+    }
+
+    return rounding;
+}
+
+export function getDocsApiCostDisplay(
+    endpoint: DocsApiEndpoint,
+    runtimeConfig: DocsApiRuntimeConfig
+): DocsApiCostDisplay | null {
+    const fixedCostKey =
+        FIXED_COST_ENDPOINT_KEYS[
+            endpoint.slug as keyof typeof FIXED_COST_ENDPOINT_KEYS
+        ];
+    if (fixedCostKey) {
+        const fixedCost = runtimeConfig.cost.fixed[fixedCostKey];
+        const ruleText = `固定 ${formatCostValue(fixedCost)} 点额度/次`;
+
+        return {
+            summary: `扣费规则：${ruleText}`,
+            ruleText,
+            description: '每次请求按固定额度扣费，不随返回条数变化。',
+            note: `实际扣费以响应头 ${runtimeConfig.headers.cost} 为准。`
+        };
+    }
+
+    const perRecordCostKey =
+        PER_RECORD_COST_ENDPOINT_KEYS[
+            endpoint.slug as keyof typeof PER_RECORD_COST_ENDPOINT_KEYS
+        ];
+    if (perRecordCostKey) {
+        const rule = runtimeConfig.cost.perRecord[perRecordCostKey];
+        const minimumRequestCost = runtimeConfig.cost.minimumRequestCost;
+        const ruleText =
+            '按本页返回条数计费，' +
+            formatCostValue(rule.unitCost) +
+            ' 额度/条，' +
+            formatCostRounding(rule.rounding) +
+            '，最低扣费额度为 ' +
+            formatCostValue(minimumRequestCost);
+
+        return {
+            summary: '扣费规则：' + ruleText,
+            ruleText,
+            description:
+                'items 表示本次响应实际返回的记录条数，按记录数计算后再应用最低扣费。',
+            note:
+                '实际扣费以响应头 ' +
+                runtimeConfig.headers.cost +
+                ' 为准；请求失败时也可能触发最低扣费。'
+        };
+    }
+
+    return null;
 }
 
 export function listDocsApiGroups(): DocsApiGroup[] {
