@@ -6,6 +6,7 @@ import type {
     FavoriteLookupItem,
     LookupSuggestItem
 } from '~/types/lookup';
+import type { NotificationTarget } from '~/types/notifications';
 import getApiErrorMessage from '~/utils/api/getApiErrorMessage';
 import {
     buildLookupItemKeyFromItem,
@@ -27,8 +28,22 @@ function hasFavoriteScope(session: AuthSession | null, requiredScope: string) {
     });
 }
 
+function buildRelatedEventSubscriptionTarget(
+    target: Pick<LookupSuggestItem, 'type' | 'code'>
+): NotificationTarget | null {
+    if (target.type !== 'train' && target.type !== 'emu') {
+        return null;
+    }
+
+    return {
+        targetType: target.type,
+        targetId: target.code
+    };
+}
+
 export function useFavoriteLookups() {
     const { session, isAuthenticated } = useAuthState();
+    const { removeLocalEventSubscription } = useEventSubscriptions();
     const items = useState<FavoriteLookupItem[]>(
         'favorite-lookups-items',
         () => []
@@ -218,6 +233,8 @@ export function useFavoriteLookups() {
         target: Pick<LookupSuggestItem, 'type' | 'code'>
     ) {
         const favoriteKey = buildLookupItemKeyFromItem(target);
+        const relatedEventSubscriptionTarget =
+            buildRelatedEventSubscriptionTarget(target);
         const previousItems = [...items.value];
 
         if (!isAuthenticated.value || !session.value) {
@@ -242,6 +259,9 @@ export function useFavoriteLookups() {
             replaceItems(response.data.items);
             loadedUserId.value = response.data.userId;
             maxEntries.value = response.data.maxEntries;
+            if (relatedEventSubscriptionTarget) {
+                removeLocalEventSubscription(relatedEventSubscriptionTarget);
+            }
             state.value = 'success';
             errorMessage.value = '';
             return true;

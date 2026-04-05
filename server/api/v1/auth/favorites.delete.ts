@@ -1,6 +1,8 @@
 import { defineEventHandler, readBody } from 'h3';
 import useConfig from '~/server/config';
+import { removeUserEventSubscription } from '~/server/services/userEventSubscriptionStore';
 import { removeUserFavoriteLookup } from '~/server/services/userProfileStore';
+import ApiRequestError from '~/server/utils/api/errors/ApiRequestError';
 import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';
 import ensurePayloadStringLength from '~/server/utils/api/payload/ensurePayloadStringLength';
@@ -57,6 +59,25 @@ export default defineEventHandler(async (event) => {
                 type: body.type as LookupTargetType,
                 code: body.code
             });
+
+            if (body.type === 'train' || body.type === 'emu') {
+                try {
+                    removeUserEventSubscription(identity.id, {
+                        targetType: body.type,
+                        targetId: body.code
+                    });
+                } catch (error) {
+                    if (
+                        !(
+                            error instanceof ApiRequestError &&
+                            error.errorCode === 'not_found'
+                        )
+                    ) {
+                        throw error;
+                    }
+                }
+            }
+
             const response: AuthFavoritesResponse = {
                 userId: identity.id,
                 maxEntries: config.user.favorites.maxEntries,

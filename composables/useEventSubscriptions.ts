@@ -100,6 +100,23 @@ export function useEventSubscriptions() {
         );
     }
 
+    function removeLocalEventSubscription(target: NotificationTarget) {
+        const normalizedTarget = normalizeNotificationTarget(target);
+        if (!normalizedTarget) {
+            return;
+        }
+
+        const targetKey = buildNotificationTargetKey(normalizedTarget);
+        items.value = items.value.filter(
+            (item) =>
+                buildNotificationTargetKey({
+                    targetType: item.targetType,
+                    targetId: item.targetId
+                }) !== targetKey
+        );
+        setPending(targetKey, false);
+    }
+
     function reset() {
         items.value = [];
         state.value = 'idle';
@@ -419,6 +436,7 @@ export function useEventSubscriptions() {
         isPending,
         refresh,
         addEventSubscription,
+        removeLocalEventSubscription,
         removeEventSubscription,
         toggleEventSubscription,
         requireEventSubscriptionAuth
