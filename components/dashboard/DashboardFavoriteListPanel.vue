@@ -24,7 +24,7 @@
                 description="请稍候，正在同步你的收藏列表。" />
 
             <UiEmptyState
-                v-else-if="errorMessage"
+                v-else-if="errorMessage && items.length === 0"
                 eyebrow="ERROR"
                 title="收藏列表加载失败"
                 :description="errorMessage"
@@ -39,6 +39,17 @@
             <div
                 v-else
                 class="space-y-3">
+                <div
+                    v-if="errorMessage"
+                    class="flex items-center gap-1.5 text-sm leading-6 text-[#E53E3E]">
+                    <span
+                        aria-hidden="true"
+                        class="font-semibold">
+                        [!]
+                    </span>
+                    <span>{{ errorMessage }}</span>
+                </div>
+
                 <div
                     v-for="item in items"
                     :key="`${item.type}:${item.code}`"

@@ -25,7 +25,7 @@
                 description="请稍候，正在同步你的订阅对象列表。" />
 
             <UiEmptyState
-                v-else-if="errorMessage"
+                v-else-if="errorMessage && items.length === 0"
                 eyebrow="ERROR"
                 title="订阅对象加载失败"
                 :description="errorMessage"
@@ -40,6 +40,17 @@
             <div
                 v-else
                 class="space-y-3">
+                <div
+                    v-if="errorMessage"
+                    class="flex items-center gap-1.5 text-sm leading-6 text-[#E53E3E]">
+                    <span
+                        aria-hidden="true"
+                        class="font-semibold">
+                        [!]
+                    </span>
+                    <span>{{ errorMessage }}</span>
+                </div>
+
                 <div
                     v-for="item in items"
                     :key="`${item.targetType}:${item.targetId}`"

@@ -68,9 +68,12 @@ export default defineNuxtConfig({
                 output: {
                     manualChunks(id) {
                         if (id.includes('/components/')) {
-                            const parts = id
-                                .split('/components/')[1]
-                                .split('/');
+                            const componentPath =
+                                id.split('/components/')[1];
+                            if (!componentPath) {
+                                return 'components-common';
+                            }
+                            const parts = componentPath.split('/');
                             if (parts.length > 1) {
                                 const folderName = parts[0];
                                 return `components-${folderName}`;
