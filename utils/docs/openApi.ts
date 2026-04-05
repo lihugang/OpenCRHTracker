@@ -90,7 +90,7 @@ export const developerDocsOpenApi = {
                     type: 'string',
                     pattern: '^\\d{8}$'
                 },
-                example: formatShanghaiDateString(Date.now())
+                example: '20260401'
             },
             CursorQuery: {
                 name: 'cursor',
@@ -1927,7 +1927,7 @@ export const developerDocsOpenApi = {
                 operationId: 'recordsDaily',
                 tags: ['Records'],
                 summary: '分页读取每日记录',
-                description: '按日期返回分页后的每日担当记录。',
+                description: '读取该日的车次车组担当记录。',
                 parameters: [
                     {
                         $ref: '#/components/parameters/DailyDateQuery'
@@ -1996,7 +1996,7 @@ export const developerDocsOpenApi = {
                             '不额外携带身份信息，直接读取某一天的第一页数据。',
                         authMode: 'anonymous',
                         query: {
-                            date: '20260321',
+                            date: '20260401',
                             limit: '20'
                         }
                     },
@@ -2007,9 +2007,9 @@ export const developerDocsOpenApi = {
                             '复用服务端返回的 cursor，继续读取下一页每日记录。',
                         authMode: 'anonymous',
                         query: {
-                            date: '20260321',
+                            date: '20260401',
                             limit: '20',
-                            cursor: '1741996800:15231'
+                            cursor: '1775054700:133827'
                         }
                     }
                 ]
@@ -2021,7 +2021,7 @@ export const developerDocsOpenApi = {
                 tags: ['Timetable'],
                 summary: '按车次读取当前完整时刻表',
                 description:
-                    '返回当天可用的当前完整时刻表，包含全部经停站、当前站车次与检票口信息，以及基于最近历史担当推算出的参考车型；成功响应的缓存时长由 api.cache.timetableMaxAgeSeconds 控制。',
+                    '返回该车次的时刻表，包括经停站、当前站车次、检票口信息和参考车型。',
                 parameters: [
                     {
                         $ref: '#/components/parameters/TrainCodeParam'
@@ -2119,7 +2119,7 @@ export const developerDocsOpenApi = {
                 tags: ['Timetable'],
                 summary: '按车站读取当日站内时刻表',
                 description:
-                    '返回指定车站在当天已发布时刻表中的计划车次列表，按站内事件时间排序并支持游标分页；每条记录都附带基于最近历史担当推算出的参考车型；成功响应的缓存时长由 api.cache.timetableMaxAgeSeconds 控制。',
+                    '返回指定车站的计划车次列表，按列车到站时间升序排序。',
                 parameters: [
                     {
                         $ref: '#/components/parameters/StationNameParam'
@@ -2239,7 +2239,7 @@ export const developerDocsOpenApi = {
                 operationId: 'historyTrain',
                 tags: ['History'],
                 summary: '按车次查询历史',
-                description: '返回单个车次的分页历史记录。',
+                description: '返回单个车次的历史车底记录。',
                 parameters: [
                     {
                         $ref: '#/components/parameters/TrainCodeParam'
@@ -2331,7 +2331,7 @@ export const developerDocsOpenApi = {
                         },
                         query: {
                             limit: '20',
-                            cursor: '1773731220:59054'
+                            cursor: '1775272680:180756'
                         }
                     }
                 ]
@@ -2342,7 +2342,7 @@ export const developerDocsOpenApi = {
                 operationId: 'historyEmu',
                 tags: ['History'],
                 summary: '按车组查询历史',
-                description: '返回单个车组的分页历史记录。',
+                description: '返回单个车组的历史担当记录。',
                 parameters: [
                     {
                         $ref: '#/components/parameters/EmuCodeParam'
@@ -2376,6 +2376,29 @@ export const developerDocsOpenApi = {
                             'application/json': {
                                 schema: {
                                     $ref: '#/components/schemas/EmuHistoryResponse'
+                                },
+                                example: {
+                                    ok: true,
+                                    data: {
+                                        emuCode: 'CR400AF-C-2214',
+                                        start: 0,
+                                        end: 9999999999,
+                                        cursor: '',
+                                        limit: 1,
+                                        nextCursor: '1775388780:207709',
+                                        items: [
+                                            {
+                                                startAt: 1775388780,
+                                                endAt: 1775393040,
+                                                id: '207709',
+                                                trainCode: 'C2739',
+                                                startStation: '北京西',
+                                                endStation: '雄安',
+                                                line: []
+                                            }
+                                        ]
+                                    },
+                                    error: ''
                                 }
                             }
                         }
@@ -2435,7 +2458,7 @@ export const developerDocsOpenApi = {
                         },
                         query: {
                             limit: '20',
-                            cursor: '1773731220:59054'
+                            cursor: '1775211900:166909'
                         }
                     }
                 ]
@@ -2507,7 +2530,7 @@ export const developerDocsOpenApi = {
                 tags: ['Exports'],
                 summary: '读取单日导出文件',
                 description:
-                    '读取某天已生成的导出文件；开启 binary 模式时返回原始文本，否则返回 JSON 包裹结构。',
+                    '读取某日已生成的车次车底对应关系导出文件；开启 binary 模式时返回原始文本，否则返回 JSON 包裹结构。',
                 parameters: [
                     {
                         $ref: '#/components/parameters/DateParam'
@@ -2612,7 +2635,7 @@ export const developerDocsOpenApi = {
                         summary: '以标准 JSON 包裹结构读取导出内容。',
                         authMode: 'anonymous',
                         pathParams: {
-                            date: '20260320'
+                            date: '20260401'
                         },
                         query: {
                             format: 'csv',
@@ -2626,7 +2649,7 @@ export const developerDocsOpenApi = {
                             '直接返回原始导出文本和下载响应头，便于文件处理。',
                         authMode: 'anonymous',
                         pathParams: {
-                            date: '20260320'
+                            date: '20260401'
                         },
                         query: {
                             format: 'jsonl',

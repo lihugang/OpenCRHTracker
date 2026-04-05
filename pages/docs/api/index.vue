@@ -33,7 +33,8 @@
                     </p>
                     <p class="text-sm leading-6 text-slate-600">
                         除鉴权和每日数据导出外其他接口都允许匿名访问和使用 API
-                        Key 访问。
+                        Key 访问。请打开用户页，切换选项卡至“开发”页，轻击“签发”按钮以获取您的
+                        API Key。
                     </p>
                     <p class="font-mono text-xs text-slate-500">
                         API Key 请求头：{{ apiConfig.apiKeyHeader }}

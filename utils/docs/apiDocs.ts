@@ -31,6 +31,17 @@ export const DEFAULT_DOCS_API_RUNTIME_CONFIG: DocsApiRuntimeConfig = {
     }
 };
 
+const PUBLIC_DOCS_API_SLUGS = new Set<string>([
+    'auth-me',
+    'records-daily',
+    'timetable-train',
+    'timetable-station',
+    'history-train',
+    'history-emu',
+    'exports-daily-index',
+    'exports-daily-date'
+]);
+
 function isReference(value: unknown): value is OpenApiReference {
     return (
         typeof value === 'object' &&
@@ -198,6 +209,7 @@ const endpointList = Object.entries(developerDocsOpenApi.paths)
             }
         );
     })
+    .filter((endpoint) => PUBLIC_DOCS_API_SLUGS.has(endpoint.slug))
     .sort((left, right) => {
         if (left.group !== right.group) {
             return left.group.localeCompare(right.group);
