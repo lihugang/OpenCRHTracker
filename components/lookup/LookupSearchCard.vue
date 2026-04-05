@@ -59,7 +59,7 @@
                                 ? 'sr-only'
                                 : 'text-sm font-medium text-crh-grey-dark'
                         ">
-                        车次号 / 车组号
+                        {{ inputLabel }}
                     </label>
 
                     <div
@@ -104,124 +104,6 @@
                                 </span>
                                 <span>{{ errorMessage }}</span>
                             </p>
-
-                            <div
-                                v-if="shouldShowMenu"
-                                class="absolute inset-x-0 top-full z-30 mt-2 overflow-hidden rounded-2xl border border-slate-200/90 bg-white/96 shadow-[0_18px_40px_-18px_rgba(15,23,42,0.35)] backdrop-blur">
-                                <div
-                                    v-if="suggestionsState === 'loading'"
-                                    class="px-4 py-3 text-sm text-slate-500">
-                                    正在加载补全...
-                                </div>
-
-                                <div
-                                    v-else-if="suggestionsState === 'error'"
-                                    class="px-4 py-3 text-sm text-status-delayed">
-                                    {{
-                                        suggestionsErrorMessage ||
-                                        '补全加载失败'
-                                    }}
-                                </div>
-
-                                <div
-                                    v-else-if="suggestionsState === 'empty'"
-                                    class="px-4 py-3 text-sm text-slate-500">
-                                    {{ emptyStateMessage }}
-                                </div>
-
-                                <div
-                                    v-else
-                                    ref="suggestionListRef"
-                                    class="harmony-scrollbar max-h-72 overflow-y-auto py-2">
-                                    <template
-                                        v-for="section in menuSections"
-                                        :key="section.id">
-                                        <div
-                                            v-if="section.title"
-                                            class="px-4 pb-2 pt-1 text-[11px] font-medium uppercase tracking-[0.24em] text-slate-400">
-                                            {{ section.title }}
-                                        </div>
-
-                                        <button
-                                            v-for="entry in section.entries"
-                                            :key="`${section.id}:${entry.key}`"
-                                            type="button"
-                                            :data-suggestion-index="entry.index"
-                                            :class="[
-                                                'flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition',
-                                                activeIndex === entry.index
-                                                    ? 'bg-blue-50 text-crh-blue'
-                                                    : 'text-crh-grey-dark hover:bg-slate-50'
-                                            ]"
-                                            @mousedown.prevent
-                                            @mouseenter="
-                                                activeIndex = entry.index
-                                            "
-                                            @click="
-                                                selectSuggestion(entry.item)
-                                            ">
-                                            <span
-                                                :class="[
-                                                    'flex min-w-0 items-start gap-3',
-                                                    compact
-                                                        ? 'flex-wrap gap-x-3 gap-y-1'
-                                                        : ''
-                                                ]">
-                                                <span
-                                                    class="shrink-0 text-sm font-semibold">
-                                                    {{ entry.item.code }}
-                                                </span>
-                                                <span
-                                                    class="flex min-w-0 flex-1 flex-col gap-1.5">
-                                                    <span
-                                                        v-if="
-                                                            getSuggestionSubtitle(
-                                                                entry.item
-                                                            )
-                                                        "
-                                                        :class="[
-                                                            'min-w-0 text-xs text-slate-500',
-                                                            compact
-                                                                ? ''
-                                                                : 'truncate'
-                                                        ]">
-                                                        {{
-                                                            getSuggestionSubtitle(
-                                                                entry.item
-                                                            )
-                                                        }}
-                                                    </span>
-                                                    <span
-                                                        v-if="
-                                                            getSuggestionTags(
-                                                                entry.item
-                                                            ).length > 0
-                                                        "
-                                                        class="flex flex-wrap gap-1.5">
-                                                        <span
-                                                            v-for="tag in getSuggestionTags(
-                                                                entry.item
-                                                            )"
-                                                            :key="tag"
-                                                            class="inline-flex items-center rounded-full bg-blue-600/8 px-2 py-0.5 text-[11px] font-medium leading-none text-blue-600">
-                                                            {{ tag }}
-                                                        </span>
-                                                    </span>
-                                                </span>
-                                            </span>
-
-                                            <svg
-                                                v-if="entry.isFavorite"
-                                                aria-hidden="true"
-                                                viewBox="0 0 20 20"
-                                                class="h-4 w-4 shrink-0 fill-current text-amber-500">
-                                                <path
-                                                    d="M10 2.4L12.28 7.03L17.39 7.78L13.7 11.38L14.57 16.46L10 14.06L5.43 16.46L6.3 11.38L2.61 7.78L7.72 7.03L10 2.4Z" />
-                                            </svg>
-                                        </button>
-                                    </template>
-                                </div>
-                            </div>
                         </div>
 
                         <UiButton
@@ -241,6 +123,102 @@
             </form>
         </div>
     </UiCard>
+
+    <Teleport to="body">
+        <div
+            v-if="isClient && shouldShowMenu && menuStyle"
+            ref="menuPanelRef"
+            :style="menuStyle"
+            class="z-[60] overflow-hidden rounded-2xl border border-slate-200/90 bg-white/98 shadow-[0_18px_40px_-18px_rgba(15,23,42,0.35)] min-[768px]:backdrop-blur">
+            <div
+                v-if="suggestionsState === 'loading'"
+                class="px-4 py-3 text-sm text-slate-500">
+                {{ loadingMessage }}
+            </div>
+
+            <div
+                v-else-if="suggestionsState === 'error'"
+                class="px-4 py-3 text-sm text-status-delayed">
+                {{ suggestionsErrorMessage || suggestionLoadErrorFallback }}
+            </div>
+
+            <div
+                v-else-if="suggestionsState === 'empty'"
+                class="px-4 py-3 text-sm text-slate-500">
+                {{ emptyStateMessage }}
+            </div>
+
+            <div
+                v-else
+                ref="suggestionListRef"
+                class="harmony-scrollbar overflow-y-auto py-2"
+                :style="suggestionListStyle">
+                <template
+                    v-for="section in menuSections"
+                    :key="section.id">
+                    <div
+                        v-if="section.title"
+                        class="px-4 pb-2 pt-1 text-[11px] font-medium uppercase tracking-[0.24em] text-slate-400">
+                        {{ section.title }}
+                    </div>
+
+                    <button
+                        v-for="entry in section.entries"
+                        :key="`${section.id}:${entry.key}`"
+                        type="button"
+                        :data-suggestion-index="entry.index"
+                        :class="[
+                            'flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition',
+                            activeIndex === entry.index
+                                ? 'bg-blue-50 text-crh-blue'
+                                : 'text-crh-grey-dark hover:bg-slate-50'
+                        ]"
+                        @mousedown.prevent
+                        @mouseenter="activeIndex = entry.index"
+                        @click="selectSuggestion(entry.item)">
+                        <span
+                            :class="[
+                                'flex min-w-0 items-start gap-3',
+                                compact ? 'flex-wrap gap-x-3 gap-y-1' : ''
+                            ]">
+                            <span class="shrink-0 text-sm font-semibold">
+                                {{ entry.item.code }}
+                            </span>
+                            <span class="flex min-w-0 flex-1 flex-col gap-1.5">
+                                <span
+                                    v-if="getSuggestionSubtitle(entry.item)"
+                                    :class="[
+                                        'min-w-0 text-xs text-slate-500',
+                                        compact ? '' : 'truncate'
+                                    ]">
+                                    {{ getSuggestionSubtitle(entry.item) }}
+                                </span>
+                                <span
+                                    v-if="getSuggestionTags(entry.item).length > 0"
+                                    class="flex flex-wrap gap-1.5">
+                                    <span
+                                        v-for="tag in getSuggestionTags(entry.item)"
+                                        :key="tag"
+                                        class="inline-flex items-center rounded-full bg-blue-600/8 px-2 py-0.5 text-[11px] font-medium leading-none text-blue-600">
+                                        {{ tag }}
+                                    </span>
+                                </span>
+                            </span>
+                        </span>
+
+                        <svg
+                            v-if="entry.isFavorite"
+                            aria-hidden="true"
+                            viewBox="0 0 20 20"
+                            class="h-4 w-4 shrink-0 fill-current text-amber-500">
+                            <path
+                                d="M10 2.4L12.28 7.03L17.39 7.78L13.7 11.38L14.57 16.46L10 14.06L5.43 16.46L6.3 11.38L2.61 7.78L7.72 7.03L10 2.4Z" />
+                        </svg>
+                    </button>
+                </template>
+            </div>
+        </div>
+    </Teleport>
 </template>
 
 <script setup lang="ts">
@@ -252,6 +230,7 @@ import {
     ref,
     watch
 } from 'vue';
+import type { CSSProperties } from 'vue';
 import type {
     FavoriteLookupItem,
     LookupSuggestItem,
@@ -267,6 +246,14 @@ import {
     buildLookupItemKeyFromTarget
 } from '~/utils/lookup/lookupFavorite';
 import { resolveLookupTarget } from '~/utils/lookup/lookupTarget';
+
+const inputLabel = '\u8f66\u6b21\u53f7 / \u8f66\u7ec4\u53f7';
+const loadingMessage = '\u6b63\u5728\u52a0\u8f7d\u8865\u5168...';
+const suggestionLoadErrorFallback = '\u8865\u5168\u52a0\u8f7d\u5931\u8d25';
+const favoriteSectionTitle = '\u6536\u85cf';
+const recentSectionTitle = '\u6700\u8fd1\u641c\u7d22';
+const emptyRecentStateMessage = '\u6682\u65e0\u6536\u85cf\u6216\u6700\u8fd1\u641c\u7d22';
+const emptySuggestionStateMessage = '\u672a\u627e\u5230\u5339\u914d\u9879';
 
 const props = withDefaults(
     defineProps<{
@@ -292,8 +279,8 @@ const props = withDefaults(
         collapsed: false,
         errorMessage: '',
         detectedType: null,
-        submitLabel: '查询',
-        placeholder: 'D2212 或 CR400AF-C-2214',
+        submitLabel: '\u67e5\u8be2',
+        placeholder: 'D2212 \u6216 CR400AF-C-2214',
         layoutMode: 'responsive'
     }
 );
@@ -306,8 +293,14 @@ const emit = defineEmits<{
 const inputRef = ref<HTMLInputElement | null>(null);
 const rootRef = ref<HTMLElement | null>(null);
 const suggestionListRef = ref<HTMLElement | null>(null);
+const menuPanelRef = ref<HTMLElement | null>(null);
 const activeIndex = ref(-1);
 const isMenuOpen = ref(false);
+const isClient = ref(false);
+const menuStyle = ref<CSSProperties | null>(null);
+const suggestionListStyle = ref<CSSProperties>({
+    maxHeight: '18rem'
+});
 
 const {
     state: suggestionsState,
@@ -372,8 +365,8 @@ const menuSections = computed(() => {
     }
 
     if (suggestionMode.value === 'recent') {
-        pushSection('favorites', '收藏', favoriteItems.value);
-        pushSection('recent', '最近搜索', recentMenuItems.value);
+        pushSection('favorites', favoriteSectionTitle, favoriteItems.value);
+        pushSection('recent', recentSectionTitle, recentMenuItems.value);
         return sections;
     }
 
@@ -399,12 +392,15 @@ const shouldShowMenu = computed(() => {
 });
 
 const emptyStateMessage = computed(() =>
-    suggestionMode.value === 'recent' ? '暂无收藏或最近搜索' : '未找到匹配项'
+    suggestionMode.value === 'recent'
+        ? emptyRecentStateMessage
+        : emptySuggestionStateMessage
 );
 
 function closeMenu() {
     isMenuOpen.value = false;
     activeIndex.value = -1;
+    menuStyle.value = null;
 }
 
 function handleFocus() {
@@ -562,11 +558,68 @@ function handleDocumentPointerDown(event: PointerEvent) {
         return;
     }
 
+    if (
+        event.target instanceof Node &&
+        menuPanelRef.value?.contains(event.target)
+    ) {
+        return;
+    }
+
     closeMenu();
 }
 
+function syncMenuPosition() {
+    if (!import.meta.client || !shouldShowMenu.value || !rootRef.value) {
+        return;
+    }
+
+    const rootRect = rootRef.value.getBoundingClientRect();
+    if (rootRect.width <= 0 || rootRect.height <= 0) {
+        return;
+    }
+
+    const viewportPadding = 12;
+    const menuGap = 8;
+    const viewportWidth =
+        window.visualViewport?.width ?? document.documentElement.clientWidth;
+    const viewportHeight =
+        window.visualViewport?.height ?? window.innerHeight;
+    const maxMenuWidth = Math.max(viewportWidth - viewportPadding * 2, 0);
+    const menuWidth = Math.min(rootRect.width, maxMenuWidth);
+    const maxLeft = viewportPadding + Math.max(maxMenuWidth - menuWidth, 0);
+    const left = Math.min(
+        Math.max(rootRect.left, viewportPadding),
+        maxLeft
+    );
+    const top = Math.max(rootRect.bottom + menuGap, viewportPadding);
+    const availableHeight = Math.max(
+        viewportHeight - top - viewportPadding,
+        120
+    );
+
+    menuStyle.value = {
+        position: 'fixed',
+        top: `${Math.round(top)}px`,
+        left: `${Math.round(left)}px`,
+        width: `${Math.round(menuWidth)}px`
+    };
+    suggestionListStyle.value = {
+        maxHeight: `${Math.round(Math.min(availableHeight, 288))}px`
+    };
+}
+
 onMounted(() => {
+    isClient.value = true;
     document.addEventListener('pointerdown', handleDocumentPointerDown);
+    window.addEventListener('scroll', syncMenuPosition, {
+        passive: true,
+        capture: true
+    });
+    window.addEventListener('resize', syncMenuPosition, {
+        passive: true
+    });
+    window.visualViewport?.addEventListener('resize', syncMenuPosition);
+    window.visualViewport?.addEventListener('scroll', syncMenuPosition);
 
     if (props.autoFocus) {
         safeFocus(inputRef.value, {
@@ -578,6 +631,10 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
     document.removeEventListener('pointerdown', handleDocumentPointerDown);
+    window.removeEventListener('scroll', syncMenuPosition, true);
+    window.removeEventListener('resize', syncMenuPosition);
+    window.visualViewport?.removeEventListener('resize', syncMenuPosition);
+    window.visualViewport?.removeEventListener('scroll', syncMenuPosition);
 });
 
 watch(activeIndex, async (value) => {
@@ -594,4 +651,37 @@ watch(activeIndex, async (value) => {
         block: 'nearest'
     });
 });
+
+watch(
+    shouldShowMenu,
+    async (value) => {
+        if (!value) {
+            menuStyle.value = null;
+            return;
+        }
+
+        await nextTick();
+        syncMenuPosition();
+    },
+    {
+        immediate: true
+    }
+);
+
+watch(
+    () => [
+        props.collapsed,
+        props.modelValue,
+        suggestionsState.value,
+        menuEntries.value.length
+    ],
+    async () => {
+        if (!shouldShowMenu.value) {
+            return;
+        }
+
+        await nextTick();
+        syncMenuPosition();
+    }
+);
 </script>
