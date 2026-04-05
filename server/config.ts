@@ -169,6 +169,7 @@ export interface Config {
         push: {
             vapidPublicKey: string;
             vapidPrivateKey: string;
+            vapidEmail: string;
         };
         apiKeyBytes: number;
         apiKeyTtlSeconds: number;
@@ -321,6 +322,11 @@ function asString(value: unknown, name: string): string {
     return value;
 }
 
+function asPlainString(value: unknown, name: string): string {
+    assert(typeof value === 'string', `${name} must be a string`);
+    return value;
+}
+
 function asNumber(value: unknown, name: string, min: number): number {
     assert(
         typeof value === 'number' && Number.isFinite(value),
@@ -392,6 +398,17 @@ function parseEnvList(rawValue: string | undefined) {
     }
 
     return normalizeUniqueStringList(rawValue.split(','));
+}
+
+function assertValidEmailAddress(value: string, name: string) {
+    assert(
+        !value.toLowerCase().startsWith('mailto:'),
+        `${name} must be a plain email address without the mailto: prefix`
+    );
+    assert(
+        /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value),
+        `${name} must be a valid email address`
+    );
 }
 
 function parseRefreshableAssetConfig(
@@ -523,6 +540,7 @@ function validateConfig(raw: unknown): Config {
         user.push === undefined ? undefined : asObject(user.push, 'user.push');
     const envVapidPublicKey = process.env.OCRH_VAPID_PUBLIC_KEY?.trim();
     const envVapidPrivateKey = process.env.OCRH_VAPID_PRIVATE_KEY?.trim();
+    const envVapidEmail = process.env.OCRH_VAPID_EMAIL?.trim();
     const configSignKey =
         user.signKey === undefined
             ? ''
@@ -530,11 +548,21 @@ function validateConfig(raw: unknown): Config {
     const configVapidPublicKey =
         userPush?.vapidPublicKey === undefined
             ? ''
-            : asString(userPush.vapidPublicKey, 'user.push.vapidPublicKey');
+            : asPlainString(
+                  userPush.vapidPublicKey,
+                  'user.push.vapidPublicKey'
+              ).trim();
     const configVapidPrivateKey =
         userPush?.vapidPrivateKey === undefined
             ? ''
-            : asString(userPush.vapidPrivateKey, 'user.push.vapidPrivateKey');
+            : asPlainString(
+                  userPush.vapidPrivateKey,
+                  'user.push.vapidPrivateKey'
+              ).trim();
+    const configVapidEmail =
+        userPush?.vapidEmail === undefined
+            ? ''
+            : asPlainString(userPush.vapidEmail, 'user.push.vapidEmail').trim();
     const signKey =
         envSignKey && envSignKey.length > 0 ? envSignKey : configSignKey;
     const vapidPublicKey =
@@ -545,10 +573,21 @@ function validateConfig(raw: unknown): Config {
         envVapidPrivateKey && envVapidPrivateKey.length > 0
             ? envVapidPrivateKey
             : configVapidPrivateKey;
+    const vapidEmail =
+        envVapidEmail && envVapidEmail.length > 0
+            ? envVapidEmail
+            : configVapidEmail;
     const adminUserIds =
         envAdminUserIdsRaw && envAdminUserIdsRaw.length > 0
             ? envAdminUserIds
             : configAdminUserIds;
+
+    if (configVapidEmail.length > 0) {
+        assertValidEmailAddress(configVapidEmail, 'user.push.vapidEmail');
+    }
+    if (envVapidEmail && envVapidEmail.length > 0) {
+        assertValidEmailAddress(envVapidEmail, 'process.env.OCRH_VAPID_EMAIL');
+    }
 
     assert(signKey.length > 0, 'user.signKey must be configured');
     if (
@@ -581,6 +620,15 @@ function validateConfig(raw: unknown): Config {
     ) {
         console.warn(
             '[config] WARNING: OCRH VAPID private key was loaded from config instead of process.env.OCRH_VAPID_PRIVATE_KEY'
+        );
+    }
+    if (
+        !import.meta.dev &&
+        (!envVapidEmail || envVapidEmail.length === 0) &&
+        configVapidEmail.length > 0
+    ) {
+        console.warn(
+            '[config] WARNING: OCRH VAPID email was loaded from config instead of process.env.OCRH_VAPID_EMAIL'
         );
     }
 
@@ -921,7 +969,8 @@ function validateConfig(raw: unknown): Config {
             },
             push: {
                 vapidPublicKey,
-                vapidPrivateKey
+                vapidPrivateKey,
+                vapidEmail
             },
             apiKeyBytes: asNumber(user.apiKeyBytes, 'user.apiKeyBytes', 16),
             apiKeyTtlSeconds: asNumber(

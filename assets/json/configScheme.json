@@ -509,11 +509,15 @@
                         },
                         "vapidPrivateKey": {
                             "type": "string"
+                        },
+                        "vapidEmail": {
+                            "type": "string"
                         }
                     },
                     "required": [
                         "vapidPublicKey",
-                        "vapidPrivateKey"
+                        "vapidPrivateKey",
+                        "vapidEmail"
                     ]
                 }
             },

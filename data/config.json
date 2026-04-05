@@ -130,7 +130,8 @@
         },
         "push": {
             "vapidPublicKey": "",
-            "vapidPrivateKey": ""
+            "vapidPrivateKey": "",
+            "vapidEmail": ""
         }
     },
     "api": {

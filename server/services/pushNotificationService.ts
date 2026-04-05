@@ -40,6 +40,14 @@ interface WebPushClientResolution {
 
 const logger = getLogger('push-notification');
 const WEB_PUSH_MODULE_SPECIFIER = 'web-push';
+const PUSH_ERROR_BODY_PREVIEW_MAX_LENGTH = 240;
+const PUSH_ERROR_LOG_HEADER_NAMES = [
+    'www-authenticate',
+    'apns-id',
+    'retry-after',
+    'content-type',
+    'date'
+] as const;
 let webPushPromise: Promise<WebPushClientResolution> | null = null;
 
 function getPushErrorMessage(error: unknown) {
@@ -61,6 +69,134 @@ function getPushErrorStatusCode(error: unknown) {
     }
 
     return null;
+}
+
+function getPushErrorBody(error: unknown) {
+    if (
+        typeof error === 'object' &&
+        error !== null &&
+        'body' in error &&
+        typeof error.body === 'string'
+    ) {
+        return error.body;
+    }
+
+    return '';
+}
+
+function getPushErrorHeaders(error: unknown) {
+    if (
+        typeof error === 'object' &&
+        error !== null &&
+        'headers' in error &&
+        typeof error.headers === 'object' &&
+        error.headers !== null &&
+        !Array.isArray(error.headers)
+    ) {
+        return error.headers as Record<string, unknown>;
+    }
+
+    return null;
+}
+
+function previewPushErrorBody(body: string) {
+    const normalized = body.trim().replace(/\s+/g, ' ');
+
+    if (normalized.length <= PUSH_ERROR_BODY_PREVIEW_MAX_LENGTH) {
+        return normalized;
+    }
+
+    return `${normalized.slice(0, PUSH_ERROR_BODY_PREVIEW_MAX_LENGTH)}...`;
+}
+
+function normalizePushErrorHeaderValue(value: unknown) {
+    if (typeof value === 'string') {
+        return value;
+    }
+
+    if (Array.isArray(value)) {
+        return value
+            .filter((item): item is string => typeof item === 'string')
+            .join(', ');
+    }
+
+    return '';
+}
+
+function getPushErrorHeaderValue(
+    headers: Record<string, unknown>,
+    headerName: string
+) {
+    const matchedKey = Object.keys(headers).find(
+        (key) => key.toLowerCase() === headerName.toLowerCase()
+    );
+    if (!matchedKey) {
+        return '';
+    }
+
+    return normalizePushErrorHeaderValue(headers[matchedKey]).trim();
+}
+
+function getPushErrorHeaderSummary(error: unknown) {
+    const headers = getPushErrorHeaders(error);
+    if (!headers) {
+        return '';
+    }
+
+    const summary: Record<string, string> = {};
+
+    for (const headerName of PUSH_ERROR_LOG_HEADER_NAMES) {
+        const value = getPushErrorHeaderValue(headers, headerName);
+        if (value.length > 0) {
+            summary[headerName] = value;
+        }
+    }
+
+    if (Object.keys(summary).length === 0) {
+        return '';
+    }
+
+    return JSON.stringify(summary);
+}
+
+function formatPushErrorForLog(error: unknown) {
+    const message = getPushErrorMessage(error);
+    const statusCode = getPushErrorStatusCode(error);
+    const bodyPreview = previewPushErrorBody(getPushErrorBody(error));
+    const headerSummary = getPushErrorHeaderSummary(error);
+    const details = [message];
+
+    if (statusCode !== null) {
+        details.push(`statusCode=${statusCode}`);
+    }
+
+    if (bodyPreview.length > 0) {
+        details.push(`body=${JSON.stringify(bodyPreview)}`);
+    }
+
+    if (headerSummary.length > 0) {
+        details.push(`headers=${headerSummary}`);
+    }
+
+    return details.join(' ');
+}
+
+function getMissingVapidConfigParts(config: ReturnType<typeof useConfig>) {
+    const missingParts: string[] = [];
+
+    if (config.user.push.vapidPublicKey.trim().length === 0) {
+        missingParts.push('public_key');
+    }
+
+    if (config.user.push.vapidPrivateKey.trim().length === 0) {
+        missingParts.push('private_key');
+    }
+
+    if (config.user.push.vapidEmail.trim().length === 0) {
+        missingParts.push('email');
+    }
+
+    return missingParts;
 }
 
 function isHardInvalidPushError(error: unknown) {
@@ -90,16 +226,18 @@ async function getWebPushClient() {
 
     webPushPromise = (async () => {
         const config = useConfig();
-        if (
-            config.user.push.vapidPublicKey.trim().length === 0 ||
-            config.user.push.vapidPrivateKey.trim().length === 0
-        ) {
-            logger.warn('push_disabled_missing_vapid_keys');
+        const missingVapidConfigParts = getMissingVapidConfigParts(config);
+        if (missingVapidConfigParts.length > 0) {
+            logger.warn(
+                `push_disabled_missing_vapid_config missing=${missingVapidConfigParts.join(',')}`
+            );
             return {
                 client: null,
-                failureMessage: 'missing_vapid_keys'
+                failureMessage: `missing_vapid_config:${missingVapidConfigParts.join(',')}`
             } satisfies WebPushClientResolution;
         }
+
+        const vapidSubject = `mailto:${config.user.push.vapidEmail}`;
 
         try {
             const importedModule = (await import(
@@ -115,7 +253,7 @@ async function getWebPushClient() {
             }
 
             webPush.setVapidDetails(
-                'mailto:push@opencrhtracker.local',
+                vapidSubject,
                 config.user.push.vapidPublicKey,
                 config.user.push.vapidPrivateKey
             );
@@ -125,8 +263,10 @@ async function getWebPushClient() {
                 failureMessage: ''
             } satisfies WebPushClientResolution;
         } catch (error) {
-            const message = getPushErrorMessage(error);
-            logger.error(`push_client_init_failed message=${message}`);
+            const message = formatPushErrorForLog(error);
+            logger.error(
+                `push_client_init_failed subject=${JSON.stringify(vapidSubject)} message=${message}`
+            );
             return {
                 client: null,
                 failureMessage: `web_push_init_failed:${message}`
@@ -208,7 +348,7 @@ async function sendPushNotificationToStoredSubscription(
         return {
             delivered: false,
             hardInvalid: isHardInvalidPushError(error),
-            message: getPushErrorMessage(error)
+            message: formatPushErrorForLog(error)
         };
     }
 }
