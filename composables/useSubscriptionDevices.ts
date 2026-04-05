@@ -304,9 +304,9 @@ function resolveCurrentDeviceCapabilityMessage(options: {
         case 'checking':
             return '正在检测当前浏览器的 Web Push 支持状态，请稍候。';
         case 'ios-open-in-safari':
-            return 'iPhone / iPad 订阅仅支持 Safari。请在 Safari 中打开当前页面后再启用订阅。';
+            return '根据苹果公司要求，通知订阅功能只能在 Safari 浏览器上启用，请您用系统默认浏览器打开此网页。';
         case 'ios-install-pwa':
-            return 'iPhone / iPad 需要先用 Safari 将本站添加到主屏幕，再从 PWA 中打开后启用订阅。';
+            return '根据苹果公司要求，只有被添加到主屏幕的网站才能调用浏览器通知功能。请您用 Safari 浏览器打开此网页，轻击屏幕下方的‘分享’按钮，选择‘添加到主屏幕’并确认，然后通过手机主屏幕上的快捷方式访问本网站并点击‘订阅’按钮。';
         case 'unsupported':
             return '当前浏览器环境不支持 Web Push，无法为这台设备创建订阅。';
         case 'missing-key':
