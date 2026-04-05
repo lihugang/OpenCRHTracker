@@ -12,12 +12,14 @@ import type {
     AdminServerMetricsBucket,
     AdminServerMetricsPeak,
     AdminServerMetricsResponse,
+    AdminServerMetricsTopRoute,
     AdminServerMetricsWindow,
     AdminServerMetricsWindowSummary
 } from '~/types/admin';
 
 const logger = getLogger('admin-server-metrics-store');
-const ADMIN_SERVER_METRICS_FILE_VERSION = 1;
+const ADMIN_SERVER_METRICS_FILE_VERSION = 2;
+const TOP_ROUTE_LIMIT = 5;
 const DURATION_HISTOGRAM_BOUNDS_MS = [
     25,
     50,
@@ -35,12 +37,23 @@ const DURATION_HISTOGRAM_BOUNDS_MS = [
     60000,
     Number.POSITIVE_INFINITY
 ] as const;
+const UUID_SEGMENT_PATTERN =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const LONG_HEX_SEGMENT_PATTERN = /^[0-9a-f]{16,}$/i;
+const LONG_TOKEN_SEGMENT_PATTERN = /^[A-Za-z0-9_-]{24,}$/;
 
 type RequestMetricKind = 'ssr' | 'api';
+type RouteMetricsCollection = Record<string, MutableRouteMetrics>;
 
 interface CpuSnapshot {
     idle: number;
     total: number;
+}
+
+interface MutableRouteMetrics {
+    requestCount: number;
+    durationTotalMs: number;
+    durationHistogram: number[];
 }
 
 interface MutableServerMetricsBucket {
@@ -56,9 +69,11 @@ interface MutableServerMetricsBucket {
     ssrRequestCount: number;
     ssrDurationTotalMs: number;
     ssrDurationHistogram: number[];
+    ssrRoutes: Record<string, MutableRouteMetrics>;
     apiRequestCount: number;
     apiDurationTotalMs: number;
     apiDurationHistogram: number[];
+    apiRoutes: Record<string, MutableRouteMetrics>;
 }
 
 interface ServerMetricsWindowState {
@@ -82,6 +97,12 @@ interface ServerMetricsStoreContainer {
     sampleTimer?: ReturnType<typeof setInterval>;
 }
 
+interface SerializedRouteMetrics {
+    requestCount: number;
+    durationTotalMs: number;
+    durationHistogram: number[];
+}
+
 interface SerializedServerMetricsBucket {
     startAt: number;
     systemSampleCount: number;
@@ -95,9 +116,11 @@ interface SerializedServerMetricsBucket {
     ssrRequestCount: number;
     ssrDurationTotalMs: number;
     ssrDurationHistogram: number[];
+    ssrRoutes: Record<string, SerializedRouteMetrics>;
     apiRequestCount: number;
     apiDurationTotalMs: number;
     apiDurationHistogram: number[];
+    apiRoutes: Record<string, SerializedRouteMetrics>;
 }
 
 interface SerializedServerMetricsWindowState {
@@ -123,6 +146,7 @@ interface GlobalWithServerMetricsStore {
 
 interface RecordRequestDurationSample {
     kind: RequestMetricKind;
+    pathname: string;
     durationMs: number;
     timestamp?: number;
 }
@@ -155,6 +179,14 @@ function createDurationHistogram() {
     return Array.from({ length: DURATION_HISTOGRAM_BOUNDS_MS.length }, () => 0);
 }
 
+function createRouteMetrics(): MutableRouteMetrics {
+    return {
+        requestCount: 0,
+        durationTotalMs: 0,
+        durationHistogram: createDurationHistogram()
+    };
+}
+
 function createEmptyBucket(startAt = 0): MutableServerMetricsBucket {
     return {
         startAt,
@@ -169,9 +201,11 @@ function createEmptyBucket(startAt = 0): MutableServerMetricsBucket {
         ssrRequestCount: 0,
         ssrDurationTotalMs: 0,
         ssrDurationHistogram: createDurationHistogram(),
+        ssrRoutes: {},
         apiRequestCount: 0,
         apiDurationTotalMs: 0,
-        apiDurationHistogram: createDurationHistogram()
+        apiDurationHistogram: createDurationHistogram(),
+        apiRoutes: {}
     };
 }
 
@@ -211,6 +245,47 @@ function toBucketIndex(
     return Math.floor(bucketStart / bucketSeconds) % bucketCount;
 }
 
+function normalizeRouteSegment(segment: string) {
+    if (
+        /^\d+$/.test(segment) ||
+        UUID_SEGMENT_PATTERN.test(segment) ||
+        LONG_HEX_SEGMENT_PATTERN.test(segment) ||
+        LONG_TOKEN_SEGMENT_PATTERN.test(segment)
+    ) {
+        return ':param';
+    }
+
+    return segment;
+}
+
+function normalizeRoutePath(pathname: string) {
+    const rawPathname =
+        typeof pathname === 'string' && pathname.trim().length > 0
+            ? pathname.trim()
+            : '/';
+    const collapsedPathname = rawPathname.replace(/\/{2,}/g, '/');
+    const normalizedPathname = collapsedPathname.startsWith('/')
+        ? collapsedPathname
+        : `/${collapsedPathname}`;
+    const trimmedPathname =
+        normalizedPathname.length > 1
+            ? normalizedPathname.replace(/\/+$/g, '')
+            : normalizedPathname;
+
+    if (trimmedPathname === '/' || trimmedPathname.length <= 0) {
+        return '/';
+    }
+
+    const normalizedSegments = trimmedPathname
+        .split('/')
+        .filter(Boolean)
+        .map(normalizeRouteSegment);
+
+    return normalizedSegments.length > 0
+        ? `/${normalizedSegments.join('/')}`
+        : '/';
+}
+
 function resetBucket(bucket: MutableServerMetricsBucket, bucketStart: number) {
     bucket.startAt = bucketStart;
     bucket.systemSampleCount = 0;
@@ -224,9 +299,11 @@ function resetBucket(bucket: MutableServerMetricsBucket, bucketStart: number) {
     bucket.ssrRequestCount = 0;
     bucket.ssrDurationTotalMs = 0;
     bucket.ssrDurationHistogram.fill(0);
+    bucket.ssrRoutes = {};
     bucket.apiRequestCount = 0;
     bucket.apiDurationTotalMs = 0;
     bucket.apiDurationHistogram.fill(0);
+    bucket.apiRoutes = {};
 }
 
 function hydrateBucket(
@@ -284,13 +361,17 @@ function observeDurationHistogram(histogram: number[], durationMs: number) {
     }
 }
 
-function approximateP95DurationMs(histogram: number[]): number | null {
+function approximatePercentileDurationMs(
+    histogram: number[],
+    percentile: number
+): number | null {
     const totalCount = histogram.reduce((total, count) => total + count, 0);
     if (totalCount <= 0) {
         return null;
     }
 
-    const targetCount = Math.ceil(totalCount * 0.95);
+    const normalizedPercentile = Math.min(1, Math.max(0, percentile));
+    const targetCount = Math.max(1, Math.ceil(totalCount * normalizedPercentile));
     let currentCount = 0;
 
     for (const [index, count] of histogram.entries()) {
@@ -315,6 +396,95 @@ function toAveragedValue(total: number, count: number): number | null {
     }
 
     return total / count;
+}
+
+function toRouteSnapshot(
+    path: string,
+    routeMetrics: MutableRouteMetrics
+): AdminServerMetricsTopRoute {
+    return {
+        path,
+        requestCount: routeMetrics.requestCount,
+        avgDurationMs: toAveragedValue(
+            routeMetrics.durationTotalMs,
+            routeMetrics.requestCount
+        ),
+        p50DurationMs: approximatePercentileDurationMs(
+            routeMetrics.durationHistogram,
+            0.5
+        ),
+        p75DurationMs: approximatePercentileDurationMs(
+            routeMetrics.durationHistogram,
+            0.75
+        ),
+        p95DurationMs: approximatePercentileDurationMs(
+            routeMetrics.durationHistogram,
+            0.95
+        )
+    };
+}
+
+function buildTopRoutes(routeMetricsMap: RouteMetricsCollection) {
+    return Object.entries(routeMetricsMap)
+        .map(([path, routeMetrics]) => toRouteSnapshot(path, routeMetrics))
+        .sort((left, right) => {
+            const avgDelta =
+                (right.avgDurationMs ?? Number.NEGATIVE_INFINITY) -
+                (left.avgDurationMs ?? Number.NEGATIVE_INFINITY);
+            if (avgDelta !== 0) {
+                return avgDelta;
+            }
+
+            if (right.requestCount !== left.requestCount) {
+                return right.requestCount - left.requestCount;
+            }
+
+            return left.path.localeCompare(right.path);
+        })
+        .slice(0, TOP_ROUTE_LIMIT);
+}
+
+function cloneRouteMetricsMap(routeMetricsMap: RouteMetricsCollection) {
+    return Object.fromEntries(
+        Object.entries(routeMetricsMap).map(([path, routeMetrics]) => [
+            path,
+            {
+                requestCount: routeMetrics.requestCount,
+                durationTotalMs: routeMetrics.durationTotalMs,
+                durationHistogram: [...routeMetrics.durationHistogram]
+            } satisfies SerializedRouteMetrics
+        ])
+    );
+}
+
+function recordRouteMetrics(
+    routeMetricsMap: RouteMetricsCollection,
+    pathname: string,
+    durationMs: number
+) {
+    const existingMetrics = routeMetricsMap[pathname] ?? createRouteMetrics();
+    existingMetrics.requestCount += 1;
+    existingMetrics.durationTotalMs += durationMs;
+    observeDurationHistogram(existingMetrics.durationHistogram, durationMs);
+    routeMetricsMap[pathname] = existingMetrics;
+}
+
+function mergeRouteMetrics(
+    target: RouteMetricsCollection,
+    source: RouteMetricsCollection
+) {
+    for (const [path, sourceMetrics] of Object.entries(source)) {
+        const targetMetrics = target[path] ?? createRouteMetrics();
+        targetMetrics.requestCount += sourceMetrics.requestCount;
+        targetMetrics.durationTotalMs += sourceMetrics.durationTotalMs;
+
+        for (const [index, count] of sourceMetrics.durationHistogram.entries()) {
+            targetMetrics.durationHistogram[index] =
+                (targetMetrics.durationHistogram[index] ?? 0) + count;
+        }
+
+        target[path] = targetMetrics;
+    }
 }
 
 function toBucketSnapshot(
@@ -344,13 +514,35 @@ function toBucketSnapshot(
             bucket.ssrDurationTotalMs,
             bucket.ssrRequestCount
         ),
-        ssrP95DurationMs: approximateP95DurationMs(bucket.ssrDurationHistogram),
+        ssrP50DurationMs: approximatePercentileDurationMs(
+            bucket.ssrDurationHistogram,
+            0.5
+        ),
+        ssrP75DurationMs: approximatePercentileDurationMs(
+            bucket.ssrDurationHistogram,
+            0.75
+        ),
+        ssrP95DurationMs: approximatePercentileDurationMs(
+            bucket.ssrDurationHistogram,
+            0.95
+        ),
         apiRequestCount: bucket.apiRequestCount,
         apiAvgDurationMs: toAveragedValue(
             bucket.apiDurationTotalMs,
             bucket.apiRequestCount
         ),
-        apiP95DurationMs: approximateP95DurationMs(bucket.apiDurationHistogram)
+        apiP50DurationMs: approximatePercentileDurationMs(
+            bucket.apiDurationHistogram,
+            0.5
+        ),
+        apiP75DurationMs: approximatePercentileDurationMs(
+            bucket.apiDurationHistogram,
+            0.75
+        ),
+        apiP95DurationMs: approximatePercentileDurationMs(
+            bucket.apiDurationHistogram,
+            0.95
+        )
     };
 }
 
@@ -369,9 +561,13 @@ function createEmptyBucketSnapshot(
         load1m: null,
         ssrRequestCount: 0,
         ssrAvgDurationMs: null,
+        ssrP50DurationMs: null,
+        ssrP75DurationMs: null,
         ssrP95DurationMs: null,
         apiRequestCount: 0,
         apiAvgDurationMs: null,
+        apiP50DurationMs: null,
+        apiP75DurationMs: null,
         apiP95DurationMs: null
     };
 }
@@ -417,6 +613,26 @@ function isValidHistogram(rawValue: unknown) {
     );
 }
 
+function isValidRouteMetricsMap(rawValue: unknown) {
+    if (typeof rawValue !== 'object' || rawValue === null || Array.isArray(rawValue)) {
+        return false;
+    }
+
+    return Object.entries(rawValue).every(([path, routeMetrics]) => {
+        return (
+            typeof path === 'string' &&
+            path.startsWith('/') &&
+            typeof routeMetrics === 'object' &&
+            routeMetrics !== null &&
+            !Array.isArray(routeMetrics) &&
+            Number.isInteger(routeMetrics.requestCount) &&
+            routeMetrics.requestCount >= 0 &&
+            isFiniteNonNegativeNumber(routeMetrics.durationTotalMs) &&
+            isValidHistogram(routeMetrics.durationHistogram)
+        );
+    });
+}
+
 function isFiniteNonNegativeNumber(value: unknown) {
     return typeof value === 'number' && Number.isFinite(value) && value >= 0;
 }
@@ -448,9 +664,11 @@ function serializeStore(
                 ssrRequestCount: bucket.ssrRequestCount,
                 ssrDurationTotalMs: bucket.ssrDurationTotalMs,
                 ssrDurationHistogram: [...bucket.ssrDurationHistogram],
+                ssrRoutes: cloneRouteMetricsMap(bucket.ssrRoutes),
                 apiRequestCount: bucket.apiRequestCount,
                 apiDurationTotalMs: bucket.apiDurationTotalMs,
-                apiDurationHistogram: [...bucket.apiDurationHistogram]
+                apiDurationHistogram: [...bucket.apiDurationHistogram],
+                apiRoutes: cloneRouteMetricsMap(bucket.apiRoutes)
             }))
         }))
     };
@@ -537,10 +755,12 @@ function restoreStoreFromDisk(): ServerMetricsStoreContainer | null {
                 serializedBucket.ssrRequestCount < 0 ||
                 !isFiniteNonNegativeNumber(serializedBucket.ssrDurationTotalMs) ||
                 !isValidHistogram(serializedBucket.ssrDurationHistogram) ||
+                !isValidRouteMetricsMap(serializedBucket.ssrRoutes) ||
                 !Number.isInteger(serializedBucket.apiRequestCount) ||
                 serializedBucket.apiRequestCount < 0 ||
                 !isFiniteNonNegativeNumber(serializedBucket.apiDurationTotalMs) ||
-                !isValidHistogram(serializedBucket.apiDurationHistogram)
+                !isValidHistogram(serializedBucket.apiDurationHistogram) ||
+                !isValidRouteMetricsMap(serializedBucket.apiRoutes)
             ) {
                 return null;
             }
@@ -565,12 +785,18 @@ function restoreStoreFromDisk(): ServerMetricsStoreContainer | null {
             targetBucket.ssrDurationHistogram = [
                 ...serializedBucket.ssrDurationHistogram
             ];
+            targetBucket.ssrRoutes = cloneRouteMetricsMap(
+                serializedBucket.ssrRoutes
+            );
             targetBucket.apiRequestCount = serializedBucket.apiRequestCount;
             targetBucket.apiDurationTotalMs =
                 serializedBucket.apiDurationTotalMs;
             targetBucket.apiDurationHistogram = [
                 ...serializedBucket.apiDurationHistogram
             ];
+            targetBucket.apiRoutes = cloneRouteMetricsMap(
+                serializedBucket.apiRoutes
+            );
         }
     }
 
@@ -696,13 +922,21 @@ function buildWindowSnapshot(
     const firstBucketStart =
         lastBucketStart -
         (windowState.bucketCount - 1) * windowState.bucketSeconds;
+    const aggregatedRoutes: Record<RequestMetricKind, RouteMetricsCollection> = {
+        ssr: {},
+        api: {}
+    };
 
     let cpuPercentBucket: AdminServerMetricsPeak | null = null;
     let memoryUsedRatioBucket: AdminServerMetricsPeak | null = null;
     let load1mBucket: AdminServerMetricsPeak | null = null;
     let ssrAvgDurationMsBucket: AdminServerMetricsPeak | null = null;
+    let ssrP50DurationMsBucket: AdminServerMetricsPeak | null = null;
+    let ssrP75DurationMsBucket: AdminServerMetricsPeak | null = null;
     let ssrP95DurationMsBucket: AdminServerMetricsPeak | null = null;
     let apiAvgDurationMsBucket: AdminServerMetricsPeak | null = null;
+    let apiP50DurationMsBucket: AdminServerMetricsPeak | null = null;
+    let apiP75DurationMsBucket: AdminServerMetricsPeak | null = null;
     let apiP95DurationMsBucket: AdminServerMetricsPeak | null = null;
 
     const buckets = Array.from(
@@ -716,13 +950,15 @@ function buildWindowSnapshot(
                 windowState.bucketCount
             );
             const storedBucket = windowState.buckets[bucketIndex]!;
-            const bucket =
-                storedBucket.startAt === startAt
-                    ? toBucketSnapshot(storedBucket, windowState.bucketSeconds)
-                    : createEmptyBucketSnapshot(
-                          startAt,
-                          windowState.bucketSeconds
-                      );
+            const bucketIsCurrent = storedBucket.startAt === startAt;
+            const bucket = bucketIsCurrent
+                ? toBucketSnapshot(storedBucket, windowState.bucketSeconds)
+                : createEmptyBucketSnapshot(startAt, windowState.bucketSeconds);
+
+            if (bucketIsCurrent) {
+                mergeRouteMetrics(aggregatedRoutes.ssr, storedBucket.ssrRoutes);
+                mergeRouteMetrics(aggregatedRoutes.api, storedBucket.apiRoutes);
+            }
 
             cpuPercentBucket = pickPeak(
                 cpuPercentBucket,
@@ -740,6 +976,16 @@ function buildWindowSnapshot(
                 bucket,
                 bucket.ssrAvgDurationMs
             );
+            ssrP50DurationMsBucket = pickPeak(
+                ssrP50DurationMsBucket,
+                bucket,
+                bucket.ssrP50DurationMs
+            );
+            ssrP75DurationMsBucket = pickPeak(
+                ssrP75DurationMsBucket,
+                bucket,
+                bucket.ssrP75DurationMs
+            );
             ssrP95DurationMsBucket = pickPeak(
                 ssrP95DurationMsBucket,
                 bucket,
@@ -749,6 +995,16 @@ function buildWindowSnapshot(
                 apiAvgDurationMsBucket,
                 bucket,
                 bucket.apiAvgDurationMs
+            );
+            apiP50DurationMsBucket = pickPeak(
+                apiP50DurationMsBucket,
+                bucket,
+                bucket.apiP50DurationMs
+            );
+            apiP75DurationMsBucket = pickPeak(
+                apiP75DurationMsBucket,
+                bucket,
+                bucket.apiP75DurationMs
             );
             apiP95DurationMsBucket = pickPeak(
                 apiP95DurationMsBucket,
@@ -780,9 +1036,17 @@ function buildWindowSnapshot(
             memoryUsedRatioBucket,
             load1mBucket,
             ssrAvgDurationMsBucket,
+            ssrP50DurationMsBucket,
+            ssrP75DurationMsBucket,
             ssrP95DurationMsBucket,
             apiAvgDurationMsBucket,
+            apiP50DurationMsBucket,
+            apiP75DurationMsBucket,
             apiP95DurationMsBucket
+        },
+        topRoutes: {
+            ssr: buildTopRoutes(aggregatedRoutes.ssr),
+            api: buildTopRoutes(aggregatedRoutes.api)
         },
         buckets
     };
@@ -798,6 +1062,7 @@ export function recordAdminServerMetricsRequestDuration(
     const store = getStore();
     const timestamp = sample.timestamp ?? getNowSeconds();
     const durationMs = Math.max(0, sample.durationMs);
+    const normalizedPathname = normalizeRoutePath(sample.pathname);
 
     for (const windowState of store.windows) {
         const bucket = hydrateBucket(windowState, timestamp);
@@ -805,10 +1070,12 @@ export function recordAdminServerMetricsRequestDuration(
             bucket.ssrRequestCount += 1;
             bucket.ssrDurationTotalMs += durationMs;
             observeDurationHistogram(bucket.ssrDurationHistogram, durationMs);
+            recordRouteMetrics(bucket.ssrRoutes, normalizedPathname, durationMs);
         } else {
             bucket.apiRequestCount += 1;
             bucket.apiDurationTotalMs += durationMs;
             observeDurationHistogram(bucket.apiDurationHistogram, durationMs);
+            recordRouteMetrics(bucket.apiRoutes, normalizedPathname, durationMs);
         }
     }
 

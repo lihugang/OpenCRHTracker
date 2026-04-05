@@ -306,7 +306,7 @@ export const deployDocsSections: DocsContentSection[] = [
                         required: true,
                         description: '服务器监控统计文件路径。',
                         notes: [
-                            '管理员服务器监控页的 CPU、内存、系统负载与 SSR/API 时长窗口会从这里恢复。',
+                            '管理员服务器监控页的 CPU、内存、系统负载、SSR/API 时长窗口与 Top 5 慢路径聚合会从这里恢复。',
                             '文件父目录必须可写，建议放在持久化磁盘。'
                         ]
                     },
@@ -326,7 +326,7 @@ export const deployDocsSections: DocsContentSection[] = [
                             '服务器监控后台采样间隔，单位秒，默认值为 60。',
                         notes: [
                             'CPU、内存和系统负载会按这个周期采样。',
-                            'SSR/API 时长仍按请求完成时实时入桶。'
+                            'SSR/API 时长与路径级延迟聚合仍按请求完成时实时入桶。'
                         ]
                     },
                     {
@@ -888,7 +888,7 @@ export const deployDocsSections: DocsContentSection[] = [
             },
             {
                 type: 'paragraph',
-                text: '请确保 data.runtime.adminTraffic.file、data.runtime.adminServerMetrics.file 与 data.runtime.requestMetrics12306.file 的父目录可写；管理员流量统计按 30 分钟默认周期落盘，服务器监控按 10 分钟默认周期落盘并每 60 秒采样一次，12306 请求计数按 10 分钟默认周期落盘并按 retentionDays 自动裁剪。'
+                text: '请确保 data.runtime.adminTraffic.file、data.runtime.adminServerMetrics.file 与 data.runtime.requestMetrics12306.file 的父目录可写；管理员流量统计按 30 分钟默认周期落盘，服务器监控按 10 分钟默认周期落盘并每 60 秒采样一次，同时持久化 SSR/API 时长与路径级延迟聚合，12306 请求计数按 10 分钟默认周期落盘并按 retentionDays 自动裁剪。'
             },
             {
                 type: 'paragraph',

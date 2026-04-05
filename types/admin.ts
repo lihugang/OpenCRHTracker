@@ -169,10 +169,23 @@ export interface AdminServerMetricsBucket {
     load1m: number | null;
     ssrRequestCount: number;
     ssrAvgDurationMs: number | null;
+    ssrP50DurationMs: number | null;
+    ssrP75DurationMs: number | null;
     ssrP95DurationMs: number | null;
     apiRequestCount: number;
     apiAvgDurationMs: number | null;
+    apiP50DurationMs: number | null;
+    apiP75DurationMs: number | null;
     apiP95DurationMs: number | null;
+}
+
+export interface AdminServerMetricsTopRoute {
+    path: string;
+    requestCount: number;
+    avgDurationMs: number | null;
+    p50DurationMs: number | null;
+    p75DurationMs: number | null;
+    p95DurationMs: number | null;
 }
 
 export interface AdminServerMetricsWindowSummary {
@@ -188,9 +201,17 @@ export interface AdminServerMetricsWindowSummary {
         memoryUsedRatioBucket: AdminServerMetricsPeak | null;
         load1mBucket: AdminServerMetricsPeak | null;
         ssrAvgDurationMsBucket: AdminServerMetricsPeak | null;
+        ssrP50DurationMsBucket: AdminServerMetricsPeak | null;
+        ssrP75DurationMsBucket: AdminServerMetricsPeak | null;
         ssrP95DurationMsBucket: AdminServerMetricsPeak | null;
         apiAvgDurationMsBucket: AdminServerMetricsPeak | null;
+        apiP50DurationMsBucket: AdminServerMetricsPeak | null;
+        apiP75DurationMsBucket: AdminServerMetricsPeak | null;
         apiP95DurationMsBucket: AdminServerMetricsPeak | null;
+    };
+    topRoutes: {
+        ssr: AdminServerMetricsTopRoute[];
+        api: AdminServerMetricsTopRoute[];
     };
     buckets: AdminServerMetricsBucket[];
 }

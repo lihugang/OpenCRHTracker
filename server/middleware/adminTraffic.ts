@@ -85,6 +85,7 @@ export default defineEventHandler((event) => {
             finalized = true;
             recordAdminServerMetricsRequestDuration({
                 kind: requestDurationKind!,
+                pathname,
                 durationMs: Math.max(0, Date.now() - startedAtMs)
             });
         };
