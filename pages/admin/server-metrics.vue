@@ -37,6 +37,10 @@
                                     SSR / API 延迟图显示 Avg、P50、P75、P95 四条曲线，
                                     Top 5 路径会跟随当前窗口切换。
                                 </p>
+                                <p class="max-w-3xl text-xs leading-5 text-sky-700">
+                                    慢路径会优先按动态路由模板聚合，例如 /train/:code 和
+                                    /api/v1/feedback/topics/:id。
+                                </p>
                             </div>
 
                             <dl class="grid gap-3 sm:grid-cols-3">

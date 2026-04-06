@@ -2,6 +2,7 @@ import os from 'os';
 import getLogger from '~/server/libs/log4js';
 import useConfig from '~/server/config';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
+import { adminServerMetricsRouteTemplates } from '~/server/utils/meta/routeTemplates';
 import {
     readJsonFileIfExists,
     registerRuntimeFlushCallback,
@@ -18,7 +19,7 @@ import type {
 } from '~/types/admin';
 
 const logger = getLogger('admin-server-metrics-store');
-const ADMIN_SERVER_METRICS_FILE_VERSION = 2;
+const ADMIN_SERVER_METRICS_FILE_VERSION = 3;
 const TOP_ROUTE_LIMIT = 5;
 const DURATION_HISTOGRAM_BOUNDS_MS = [
     25,
@@ -258,7 +259,7 @@ function normalizeRouteSegment(segment: string) {
     return segment;
 }
 
-function normalizeRoutePath(pathname: string) {
+function normalizePathname(pathname: string) {
     const rawPathname =
         typeof pathname === 'string' && pathname.trim().length > 0
             ? pathname.trim()
@@ -276,7 +277,57 @@ function normalizeRoutePath(pathname: string) {
         return '/';
     }
 
-    const normalizedSegments = trimmedPathname
+    return trimmedPathname;
+}
+
+function toPathSegments(pathname: string) {
+    const normalizedPathname = normalizePathname(pathname);
+    return normalizedPathname === '/'
+        ? []
+        : normalizedPathname.split('/').filter(Boolean);
+}
+
+function findDynamicRouteTemplate(kind: RequestMetricKind, pathname: string) {
+    const pathnameSegments = toPathSegments(pathname);
+    const routeTemplates = adminServerMetricsRouteTemplates[kind];
+
+    for (const routeTemplate of routeTemplates) {
+        if (routeTemplate.segments.length !== pathnameSegments.length) {
+            continue;
+        }
+
+        let matched = true;
+        for (const [index, templateSegment] of routeTemplate.segments.entries()) {
+            const pathnameSegment = pathnameSegments[index];
+            if (!pathnameSegment) {
+                matched = false;
+                break;
+            }
+
+            if (
+                !templateSegment.startsWith(':') &&
+                templateSegment !== pathnameSegment
+            ) {
+                matched = false;
+                break;
+            }
+        }
+
+        if (matched) {
+            return routeTemplate.template;
+        }
+    }
+
+    return null;
+}
+
+function normalizeRoutePath(pathname: string) {
+    const normalizedPathname = normalizePathname(pathname);
+    if (normalizedPathname === '/') {
+        return '/';
+    }
+
+    const normalizedSegments = normalizedPathname
         .split('/')
         .filter(Boolean)
         .map(normalizeRouteSegment);
@@ -1062,7 +1113,9 @@ export function recordAdminServerMetricsRequestDuration(
     const store = getStore();
     const timestamp = sample.timestamp ?? getNowSeconds();
     const durationMs = Math.max(0, sample.durationMs);
-    const normalizedPathname = normalizeRoutePath(sample.pathname);
+    const normalizedPathname =
+        findDynamicRouteTemplate(sample.kind, sample.pathname) ??
+        normalizeRoutePath(sample.pathname);
 
     for (const windowState of store.windows) {
         const bucket = hydrateBucket(windowState, timestamp);

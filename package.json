@@ -3,8 +3,9 @@
     "private": true,
     "type": "module",
     "scripts": {
-        "prebuild": "node scripts/write-commit-id.mjs",
-        "predev": "node scripts/write-commit-id.mjs",
+        "prebuild": "node scripts/write-generated-meta.mjs",
+        "predev": "node scripts/write-generated-meta.mjs",
+        "pregenerate": "node scripts/write-generated-meta.mjs",
         "build": "nuxt build",
         "dev": "nuxt dev",
         "typecheck": "nuxi typecheck",
