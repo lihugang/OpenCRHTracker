@@ -409,6 +409,15 @@ function mergePublishedRouteInfo(
     return nextPublished;
 }
 
+function hasUsableTimetableData(state: ScheduleState): boolean {
+    return state.items.some(
+        (item) =>
+            item.startAt !== null &&
+            item.endAt !== null &&
+            item.stops.length > 0
+    );
+}
+
 export function createInitialScheduleState(
     date: string,
     config: ScheduleProbeRuntimeConfig
@@ -521,12 +530,16 @@ export function loadActiveScheduleState(
     }
 
     const building = document.building;
-    if (building && building.date === today) {
+    if (building && building.date === today && hasUsableTimetableData(building)) {
         return cloneScheduleState(building);
     }
 
     if (published) {
         return cloneScheduleState(published);
+    }
+
+    if (building && building.date === today) {
+        return cloneScheduleState(building);
     }
 
     return building ? cloneScheduleState(building) : null;
