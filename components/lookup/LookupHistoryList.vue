@@ -294,61 +294,56 @@
                 </div>
 
                 <div class="space-y-2.5 md:hidden">
-                    <UiCard
-                        v-for="item in groupedItems"
-                        :key="item.id"
-                        :class="[
-                            'history-result-card',
-                            item.isTintedDateBand
-                                ? 'history-result-card--tinted'
-                                : '',
-                            isRunningItem(item) ? 'running-result-card' : ''
-                        ]"
-                        :show-accent-bar="false"
-                        variant="subtle">
-                        <div class="space-y-3">
+                    <template
+                        v-for="(item, index) in groupedItems"
+                        :key="item.id">
+                        <div
+                            v-if="shouldShowMobileDateHeader(index, item)"
+                            :class="[
+                                'px-1 pb-1 text-xs font-medium text-slate-500',
+                                index === 0 ? 'pt-0' : 'pt-3'
+                            ]">
+                            <NuxtLink
+                                v-if="shouldShowExportDateLink(item.startAt)"
+                                :to="buildExportDateLink(item.startAt)"
+                                class="history-date-link">
+                                {{ formatDateLabel(item.startAt) }}
+                            </NuxtLink>
+                            <span v-else>
+                                {{ formatDateLabel(item.startAt) }}
+                            </span>
+                        </div>
+
+                        <UiCard
+                            :class="[
+                                'history-result-card',
+                                isRunningItem(item)
+                                    ? 'running-result-card'
+                                    : ''
+                            ]"
+                            :show-accent-bar="false"
+                            variant="subtle">
+                            <div class="space-y-3">
                             <div class="flex items-start gap-3">
-                                <div class="min-w-0">
-                                    <div
-                                        class="text-xs font-medium text-slate-500">
+                                <div
+                                    class="min-w-0 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-sm font-semibold text-crh-blue">
+                                    <template
+                                        v-for="(code, codeIndex) in item.codes"
+                                        :key="`${item.id}:mobile:${code}`">
                                         <NuxtLink
-                                            v-if="
-                                                shouldShowExportDateLink(
-                                                    item.startAt
-                                                )
-                                            "
-                                            :to="
-                                                buildExportDateLink(
-                                                    item.startAt
-                                                )
-                                            "
-                                            class="history-date-link">
-                                            {{ formatDateLabel(item.startAt) }}
+                                            :to="buildCodeLink(code)"
+                                            class="cursor-pointer transition hover:underline">
+                                            {{ formatCodeText(code) }}
                                         </NuxtLink>
-                                        <span v-else>
-                                            {{ formatDateLabel(item.startAt) }}
+                                        <span
+                                            v-if="
+                                                codeIndex <
+                                                item.codes.length - 1
+                                            "
+                                            class="text-slate-400">
+                                            {{ mergeSeparator }}
                                         </span>
-                                    </div>
-                                    <div
-                                        class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-sm font-semibold text-crh-blue">
-                                        <template
-                                            v-for="(code, index) in item.codes"
-                                            :key="`${item.id}:mobile:${code}`">
-                                            <NuxtLink
-                                                :to="buildCodeLink(code)"
-                                                class="cursor-pointer transition hover:underline">
-                                                {{ formatCodeText(code) }}
-                                            </NuxtLink>
-                                            <span
-                                                v-if="
-                                                    index <
-                                                    item.codes.length - 1
-                                                "
-                                                class="text-slate-400">
-                                                {{ mergeSeparator }}
-                                            </span>
-                                        </template>
-                                    </div>
+                                    </template>
                                 </div>
                             </div>
 
@@ -372,6 +367,11 @@
                                             <LookupStationLink
                                                 :station-name="
                                                     item.startStation
+                                                "
+                                                :focus-train-codes="
+                                                    resolveStationFocusTrainCodes(
+                                                        item
+                                                    )
                                                 "
                                                 :fallback-text="
                                                     formatStationText(
@@ -500,6 +500,7 @@
                             </div>
                         </div>
                     </UiCard>
+                    </template>
                 </div>
 
                 <div
@@ -864,6 +865,17 @@ function formatStationText(value: string) {
     return normalized.length > 0 ? normalized : '暂无站点信息';
 }
 
+function shouldShowMobileDateHeader(
+    index: number,
+    item: DisplayHistoryListItem
+) {
+    if (index === 0) {
+        return true;
+    }
+
+    return groupedItems.value[index - 1]?.dateKey !== item.dateKey;
+}
+
 function isRunningItem(item: GroupedHistoryListItem) {
     return isTimestampRangeActive(
         item.startAt,
@@ -950,11 +962,6 @@ function buildCodeLink(code: string) {
         border-color 220ms ease;
 }
 
-.history-result-card--tinted:not(.running-result-card) {
-    border-color: rgba(147, 197, 253, 0.95);
-    background: linear-gradient(180deg, #f6faff 0%, #dbeafe 100%);
-}
-
 @media (max-width: 767px) {
     .history-panel-card.history-panel-card {
         padding-left: 1.5rem;
@@ -974,9 +981,5 @@ function buildCodeLink(code: string) {
         box-shadow: inset 0 0 0 999px rgba(191, 219, 254, 0.74);
     }
 
-    .history-result-card--tinted:not(.running-result-card):hover {
-        border-color: rgba(147, 197, 253, 0.95);
-        background: linear-gradient(180deg, #eff6ff 0%, #bfdbfe 100%);
-    }
 }
 </style>
