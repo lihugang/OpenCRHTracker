@@ -104,6 +104,127 @@
                                 </span>
                                 <span>{{ errorMessage }}</span>
                             </p>
+
+                            <div
+                                v-if="shouldRenderInlineMenu"
+                                ref="inlineMenuRef"
+                                :class="[
+                                    'absolute inset-x-0 top-full z-30 mt-2 overflow-hidden rounded-2xl border border-slate-200/90 bg-white/96 shadow-[0_18px_40px_-18px_rgba(15,23,42,0.35)] backdrop-blur',
+                                    isMeasuringOcclusion
+                                        ? 'invisible pointer-events-none'
+                                        : ''
+                                ]">
+                                <div
+                                    v-if="suggestionsState === 'loading'"
+                                    class="px-4 py-3 text-sm text-slate-500">
+                                    {{ loadingMessage }}
+                                </div>
+
+                                <div
+                                    v-else-if="suggestionsState === 'error'"
+                                    class="px-4 py-3 text-sm text-status-delayed">
+                                    {{ suggestionsErrorMessage || suggestionLoadErrorFallback }}
+                                </div>
+
+                                <div
+                                    v-else-if="suggestionsState === 'empty'"
+                                    class="px-4 py-3 text-sm text-slate-500">
+                                    {{ emptyStateMessage }}
+                                </div>
+
+                                <div
+                                    v-else
+                                    ref="suggestionListRef"
+                                    class="harmony-scrollbar max-h-72 overflow-y-auto py-2">
+                                    <template
+                                        v-for="section in menuSections"
+                                        :key="section.id">
+                                        <div
+                                            v-if="section.title"
+                                            class="px-4 pb-2 pt-1 text-[11px] font-medium uppercase tracking-[0.24em] text-slate-400">
+                                            {{ section.title }}
+                                        </div>
+
+                                        <button
+                                            v-for="entry in section.entries"
+                                            :key="`${section.id}:${entry.key}`"
+                                            type="button"
+                                            :data-suggestion-index="entry.index"
+                                            :class="[
+                                                'flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition',
+                                                activeIndex === entry.index
+                                                    ? 'bg-blue-50 text-crh-blue'
+                                                    : 'text-crh-grey-dark hover:bg-slate-50'
+                                            ]"
+                                            @mousedown.prevent
+                                            @mouseenter="
+                                                activeIndex = entry.index
+                                            "
+                                            @click="
+                                                selectSuggestion(entry.item)
+                                            ">
+                                            <span
+                                                :class="[
+                                                    'flex min-w-0 items-start gap-3',
+                                                    compact
+                                                        ? 'flex-wrap gap-x-3 gap-y-1'
+                                                        : ''
+                                                ]">
+                                                <span
+                                                    class="shrink-0 text-sm font-semibold">
+                                                    {{ entry.item.code }}
+                                                </span>
+                                                <span
+                                                    class="flex min-w-0 flex-1 flex-col gap-1.5">
+                                                    <span
+                                                        v-if="
+                                                            getSuggestionSubtitle(
+                                                                entry.item
+                                                            )
+                                                        "
+                                                        :class="[
+                                                            'min-w-0 text-xs text-slate-500',
+                                                            compact
+                                                                ? ''
+                                                                : 'truncate'
+                                                        ]">
+                                                        {{
+                                                            getSuggestionSubtitle(
+                                                                entry.item
+                                                            )
+                                                        }}
+                                                    </span>
+                                                    <span
+                                                        v-if="
+                                                            getSuggestionTags(
+                                                                entry.item
+                                                            ).length > 0
+                                                        "
+                                                        class="flex flex-wrap gap-1.5">
+                                                        <span
+                                                            v-for="tag in getSuggestionTags(
+                                                                entry.item
+                                                            )"
+                                                            :key="tag"
+                                                            class="inline-flex items-center rounded-full bg-blue-600/8 px-2 py-0.5 text-[11px] font-medium leading-none text-blue-600">
+                                                            {{ tag }}
+                                                        </span>
+                                                    </span>
+                                                </span>
+                                            </span>
+
+                                            <svg
+                                                v-if="entry.isFavorite"
+                                                aria-hidden="true"
+                                                viewBox="0 0 20 20"
+                                                class="h-4 w-4 shrink-0 fill-current text-amber-500">
+                                                <path
+                                                    d="M10 2.4L12.28 7.03L17.39 7.78L13.7 11.38L14.57 16.46L10 14.06L5.43 16.46L6.3 11.38L2.61 7.78L7.72 7.03L10 2.4Z" />
+                                            </svg>
+                                        </button>
+                                    </template>
+                                </div>
+                            </div>
                         </div>
 
                         <UiButton
@@ -126,7 +247,7 @@
 
     <Teleport to="body">
         <div
-            v-if="isClient && shouldShowMenu && menuStyle"
+            v-if="shouldRenderTeleportMenu && menuStyle"
             ref="menuPanelRef"
             :style="menuStyle"
             class="z-[60] overflow-hidden rounded-2xl border border-slate-200/90 bg-white/98 shadow-[0_18px_40px_-18px_rgba(15,23,42,0.35)] min-[768px]:backdrop-blur">
@@ -247,13 +368,28 @@ import {
 } from '~/utils/lookup/lookupFavorite';
 import { resolveLookupTarget } from '~/utils/lookup/lookupTarget';
 
+const DETAIL_STICKY_OVERLAY_FALLBACK_STORAGE_KEY =
+    'opencrhtracker:lookup-search-overlay-fallback:detail-sticky:v1';
+const MENU_SAMPLE_X_RATIOS = [0.2, 0.5, 0.8] as const;
+const MENU_SAMPLE_Y_OFFSETS = [12, 36, 72] as const;
+const MENU_SAMPLE_INSET_PX = 8;
+const MENU_INLINE_MAX_HEIGHT_PX = 288;
+const MENU_FALLBACK_MIN_HEIGHT_PX = 120;
+const MENU_FALLBACK_GAP_PX = 8;
+const MENU_FALLBACK_VIEWPORT_PADDING_PX = 12;
+const MENU_TOP_ROW_OCCLUDED_THRESHOLD = 2;
+const MENU_TOTAL_OCCLUDED_THRESHOLD = 3;
 const inputLabel = '\u8f66\u6b21\u53f7 / \u8f66\u7ec4\u53f7';
 const loadingMessage = '\u6b63\u5728\u52a0\u8f7d\u8865\u5168...';
 const suggestionLoadErrorFallback = '\u8865\u5168\u52a0\u8f7d\u5931\u8d25';
 const favoriteSectionTitle = '\u6536\u85cf';
 const recentSectionTitle = '\u6700\u8fd1\u641c\u7d22';
-const emptyRecentStateMessage = '\u6682\u65e0\u6536\u85cf\u6216\u6700\u8fd1\u641c\u7d22';
+const emptyRecentStateMessage =
+    '\u6682\u65e0\u6536\u85cf\u6216\u6700\u8fd1\u641c\u7d22';
 const emptySuggestionStateMessage = '\u672a\u627e\u5230\u5339\u914d\u9879';
+
+type OverlayFallbackProfile = 'none' | 'detail-sticky';
+type MenuRenderMode = 'inline' | 'teleport';
 
 const props = withDefaults(
     defineProps<{
@@ -270,6 +406,7 @@ const props = withDefaults(
         placeholder?: string;
         autoFocus?: boolean;
         layoutMode?: 'responsive' | 'stacked';
+        overlayFallbackProfile?: OverlayFallbackProfile;
     }>(),
     {
         eyebrow: 'OpenCRHTracker',
@@ -281,7 +418,8 @@ const props = withDefaults(
         detectedType: null,
         submitLabel: '\u67e5\u8be2',
         placeholder: 'D2212 \u6216 CR400AF-C-2214',
-        layoutMode: 'responsive'
+        layoutMode: 'responsive',
+        overlayFallbackProfile: 'none'
     }
 );
 
@@ -292,15 +430,20 @@ const emit = defineEmits<{
 
 const inputRef = ref<HTMLInputElement | null>(null);
 const rootRef = ref<HTMLElement | null>(null);
+const inlineMenuRef = ref<HTMLElement | null>(null);
 const suggestionListRef = ref<HTMLElement | null>(null);
 const menuPanelRef = ref<HTMLElement | null>(null);
 const activeIndex = ref(-1);
 const isMenuOpen = ref(false);
 const isClient = ref(false);
+const isMeasuringOcclusion = ref(false);
+const renderMode = ref<MenuRenderMode>('inline');
+const hasDetailStickyFallbackCache = ref(false);
 const menuStyle = ref<CSSProperties | null>(null);
 const suggestionListStyle = ref<CSSProperties>({
-    maxHeight: '18rem'
+    maxHeight: `${MENU_INLINE_MAX_HEIGHT_PX}px`
 });
+let hasTeleportListeners = false;
 
 const {
     state: suggestionsState,
@@ -391,34 +534,96 @@ const shouldShowMenu = computed(() => {
     );
 });
 
+const shouldRenderInlineMenu = computed(
+    () =>
+        shouldShowMenu.value &&
+        (renderMode.value === 'inline' || isMeasuringOcclusion.value)
+);
+
+const shouldRenderTeleportMenu = computed(
+    () =>
+        isClient.value &&
+        shouldShowMenu.value &&
+        renderMode.value === 'teleport'
+);
+
+const isTeleportMenuActive = computed(
+    () => shouldShowMenu.value && renderMode.value === 'teleport'
+);
+
+const shouldUseDetailStickyFallbackProfile = computed(
+    () => props.overlayFallbackProfile === 'detail-sticky'
+);
+
 const emptyStateMessage = computed(() =>
     suggestionMode.value === 'recent'
         ? emptyRecentStateMessage
         : emptySuggestionStateMessage
 );
 
+function readDetailStickyFallbackCache() {
+    if (!import.meta.client) {
+        return false;
+    }
+
+    try {
+        return (
+            window.localStorage.getItem(
+                DETAIL_STICKY_OVERLAY_FALLBACK_STORAGE_KEY
+            ) === '1'
+        );
+    } catch {
+        return false;
+    }
+}
+
+function persistDetailStickyFallbackCache() {
+    if (!import.meta.client) {
+        return;
+    }
+
+    try {
+        window.localStorage.setItem(
+            DETAIL_STICKY_OVERLAY_FALLBACK_STORAGE_KEY,
+            '1'
+        );
+    } catch {
+        // Keep the runtime fallback even if storage is unavailable.
+    }
+}
+
 function closeMenu() {
     isMenuOpen.value = false;
     activeIndex.value = -1;
+    isMeasuringOcclusion.value = false;
+    renderMode.value = 'inline';
     menuStyle.value = null;
+    suggestionListStyle.value = {
+        maxHeight: `${MENU_INLINE_MAX_HEIGHT_PX}px`
+    };
 }
 
 function handleFocus() {
-    isMenuOpen.value = true;
+    void openMenu();
 }
 
 function handleInput(event: Event) {
     emit('update:modelValue', (event.target as HTMLInputElement).value);
-    isMenuOpen.value = true;
     activeIndex.value = -1;
+
+    if (!isMenuOpen.value) {
+        void openMenu();
+    }
 }
 
-function moveActive(direction: 1 | -1) {
+async function moveActive(direction: 1 | -1) {
+    if (!isMenuOpen.value) {
+        await openMenu();
+    }
+
     if (menuEntries.value.length === 0) {
         return;
     }
-
-    isMenuOpen.value = true;
 
     if (activeIndex.value < 0) {
         activeIndex.value = direction > 0 ? 0 : menuEntries.value.length - 1;
@@ -559,6 +764,7 @@ function handleDocumentPointerDown(event: PointerEvent) {
     }
 
     if (
+        renderMode.value === 'teleport' &&
         event.target instanceof Node &&
         menuPanelRef.value?.contains(event.target)
     ) {
@@ -568,8 +774,108 @@ function handleDocumentPointerDown(event: PointerEvent) {
     closeMenu();
 }
 
+function clamp(value: number, min: number, max: number) {
+    return Math.min(Math.max(value, min), max);
+}
+
+function buildInlineMenuSamplePoints(rect: DOMRect) {
+    const viewportWidth =
+        window.visualViewport?.width ?? document.documentElement.clientWidth;
+    const viewportHeight =
+        window.visualViewport?.height ?? window.innerHeight;
+    const minX = rect.left + MENU_SAMPLE_INSET_PX;
+    const maxX = rect.right - MENU_SAMPLE_INSET_PX;
+    const minY = rect.top + MENU_SAMPLE_INSET_PX;
+    const maxY = rect.bottom - MENU_SAMPLE_INSET_PX;
+    const fallbackX = clamp(
+        rect.left + rect.width / 2,
+        MENU_SAMPLE_INSET_PX,
+        Math.max(viewportWidth - MENU_SAMPLE_INSET_PX, MENU_SAMPLE_INSET_PX)
+    );
+    const fallbackY = clamp(
+        rect.top + rect.height / 2,
+        MENU_SAMPLE_INSET_PX,
+        Math.max(viewportHeight - MENU_SAMPLE_INSET_PX, MENU_SAMPLE_INSET_PX)
+    );
+
+    return MENU_SAMPLE_Y_OFFSETS.flatMap((offset, rowIndex) =>
+        MENU_SAMPLE_X_RATIOS.map((ratio) => {
+            const rawX = rect.left + rect.width * ratio;
+            const rawY = rect.top + offset;
+            const x =
+                minX <= maxX
+                    ? clamp(rawX, minX, maxX)
+                    : fallbackX;
+            const y =
+                minY <= maxY
+                    ? clamp(rawY, minY, maxY)
+                    : fallbackY;
+
+            return {
+                x: clamp(
+                    x,
+                    MENU_SAMPLE_INSET_PX,
+                    Math.max(
+                        viewportWidth - MENU_SAMPLE_INSET_PX,
+                        MENU_SAMPLE_INSET_PX
+                    )
+                ),
+                y: clamp(
+                    y,
+                    MENU_SAMPLE_INSET_PX,
+                    Math.max(
+                        viewportHeight - MENU_SAMPLE_INSET_PX,
+                        MENU_SAMPLE_INSET_PX
+                    )
+                ),
+                rowIndex
+            };
+        })
+    );
+}
+
+function detectInlineMenuOcclusion() {
+    if (!import.meta.client || !inlineMenuRef.value) {
+        return false;
+    }
+
+    const menuRect = inlineMenuRef.value.getBoundingClientRect();
+    if (menuRect.width <= 0 || menuRect.height <= 0) {
+        return false;
+    }
+
+    const samplePoints = buildInlineMenuSamplePoints(menuRect);
+    let topRowOccludedPoints = 0;
+    let totalOccludedPoints = 0;
+
+    for (const point of samplePoints) {
+        const topElement = document.elementFromPoint(point.x, point.y);
+
+        if (!topElement || inlineMenuRef.value.contains(topElement)) {
+            continue;
+        }
+
+        totalOccludedPoints += 1;
+
+        if (point.rowIndex === 0) {
+            topRowOccludedPoints += 1;
+        }
+    }
+
+    return (
+        topRowOccludedPoints >= MENU_TOP_ROW_OCCLUDED_THRESHOLD ||
+        totalOccludedPoints >= MENU_TOTAL_OCCLUDED_THRESHOLD
+    );
+}
+
+function waitForAnimationFrame() {
+    return new Promise<void>((resolve) => {
+        window.requestAnimationFrame(() => resolve());
+    });
+}
+
 function syncMenuPosition() {
-    if (!import.meta.client || !shouldShowMenu.value || !rootRef.value) {
+    if (!import.meta.client || !shouldRenderTeleportMenu.value || !rootRef.value) {
         return;
     }
 
@@ -578,23 +884,29 @@ function syncMenuPosition() {
         return;
     }
 
-    const viewportPadding = 12;
-    const menuGap = 8;
     const viewportWidth =
         window.visualViewport?.width ?? document.documentElement.clientWidth;
     const viewportHeight =
         window.visualViewport?.height ?? window.innerHeight;
-    const maxMenuWidth = Math.max(viewportWidth - viewportPadding * 2, 0);
+    const maxMenuWidth = Math.max(
+        viewportWidth - MENU_FALLBACK_VIEWPORT_PADDING_PX * 2,
+        0
+    );
     const menuWidth = Math.min(rootRect.width, maxMenuWidth);
-    const maxLeft = viewportPadding + Math.max(maxMenuWidth - menuWidth, 0);
+    const maxLeft =
+        MENU_FALLBACK_VIEWPORT_PADDING_PX +
+        Math.max(maxMenuWidth - menuWidth, 0);
     const left = Math.min(
-        Math.max(rootRect.left, viewportPadding),
+        Math.max(rootRect.left, MENU_FALLBACK_VIEWPORT_PADDING_PX),
         maxLeft
     );
-    const top = Math.max(rootRect.bottom + menuGap, viewportPadding);
+    const top = Math.max(
+        rootRect.bottom + MENU_FALLBACK_GAP_PX,
+        MENU_FALLBACK_VIEWPORT_PADDING_PX
+    );
     const availableHeight = Math.max(
-        viewportHeight - top - viewportPadding,
-        120
+        viewportHeight - top - MENU_FALLBACK_VIEWPORT_PADDING_PX,
+        MENU_FALLBACK_MIN_HEIGHT_PX
     );
 
     menuStyle.value = {
@@ -604,13 +916,17 @@ function syncMenuPosition() {
         width: `${Math.round(menuWidth)}px`
     };
     suggestionListStyle.value = {
-        maxHeight: `${Math.round(Math.min(availableHeight, 288))}px`
+        maxHeight: `${Math.round(
+            Math.min(availableHeight, MENU_INLINE_MAX_HEIGHT_PX)
+        )}px`
     };
 }
 
-onMounted(() => {
-    isClient.value = true;
-    document.addEventListener('pointerdown', handleDocumentPointerDown);
+function attachTeleportListeners() {
+    if (!import.meta.client || hasTeleportListeners) {
+        return;
+    }
+
     window.addEventListener('scroll', syncMenuPosition, {
         passive: true,
         capture: true
@@ -620,6 +936,71 @@ onMounted(() => {
     });
     window.visualViewport?.addEventListener('resize', syncMenuPosition);
     window.visualViewport?.addEventListener('scroll', syncMenuPosition);
+    hasTeleportListeners = true;
+}
+
+function detachTeleportListeners() {
+    if (!import.meta.client || !hasTeleportListeners) {
+        return;
+    }
+
+    window.removeEventListener('scroll', syncMenuPosition, true);
+    window.removeEventListener('resize', syncMenuPosition);
+    window.visualViewport?.removeEventListener('resize', syncMenuPosition);
+    window.visualViewport?.removeEventListener('scroll', syncMenuPosition);
+    hasTeleportListeners = false;
+}
+
+async function openMenu() {
+    if (isMenuOpen.value) {
+        return;
+    }
+
+    isMenuOpen.value = true;
+    renderMode.value = 'inline';
+    isMeasuringOcclusion.value = false;
+    menuStyle.value = null;
+    suggestionListStyle.value = {
+        maxHeight: `${MENU_INLINE_MAX_HEIGHT_PX}px`
+    };
+
+    if (!shouldUseDetailStickyFallbackProfile.value) {
+        return;
+    }
+
+    if (hasDetailStickyFallbackCache.value) {
+        renderMode.value = 'teleport';
+        await nextTick();
+        syncMenuPosition();
+        return;
+    }
+
+    isMeasuringOcclusion.value = true;
+    await nextTick();
+    await waitForAnimationFrame();
+
+    if (!isMenuOpen.value) {
+        return;
+    }
+
+    const isOccluded = detectInlineMenuOcclusion();
+    isMeasuringOcclusion.value = false;
+
+    if (!isOccluded) {
+        return;
+    }
+
+    hasDetailStickyFallbackCache.value = true;
+    persistDetailStickyFallbackCache();
+    renderMode.value = 'teleport';
+    await nextTick();
+    syncMenuPosition();
+}
+
+onMounted(() => {
+    isClient.value = true;
+    hasDetailStickyFallbackCache.value = readDetailStickyFallbackCache();
+    document.addEventListener('pointerdown', handleDocumentPointerDown);
 
     if (props.autoFocus) {
         safeFocus(inputRef.value, {
@@ -631,10 +1012,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
     document.removeEventListener('pointerdown', handleDocumentPointerDown);
-    window.removeEventListener('scroll', syncMenuPosition, true);
-    window.removeEventListener('resize', syncMenuPosition);
-    window.visualViewport?.removeEventListener('resize', syncMenuPosition);
-    window.visualViewport?.removeEventListener('scroll', syncMenuPosition);
+    detachTeleportListeners();
 });
 
 watch(activeIndex, async (value) => {
@@ -653,13 +1031,14 @@ watch(activeIndex, async (value) => {
 });
 
 watch(
-    shouldShowMenu,
+    isTeleportMenuActive,
     async (value) => {
         if (!value) {
-            menuStyle.value = null;
+            detachTeleportListeners();
             return;
         }
 
+        attachTeleportListeners();
         await nextTick();
         syncMenuPosition();
     },
@@ -676,7 +1055,7 @@ watch(
         menuEntries.value.length
     ],
     async () => {
-        if (!shouldShowMenu.value) {
+        if (!isTeleportMenuActive.value) {
             return;
         }
 
