@@ -4,8 +4,8 @@
             :class="[
                 'flex cursor-pointer items-start gap-3 rounded-[1rem] border px-4 py-3 transition',
                 isChecked
-                    ? 'border-crh-blue/35 bg-blue-50/70'
-                    : 'border-slate-200 bg-white/85 hover:border-slate-300 hover:bg-slate-50/70'
+                    ? 'dashboard-nav-sheet-active'
+                    : 'border-white/70 bg-white/74 backdrop-blur-sm hover:border-slate-300/70 hover:bg-white/88'
             ]">
             <input
                 :checked="isChecked"

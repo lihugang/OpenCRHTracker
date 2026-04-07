@@ -15,7 +15,7 @@
                 <div class="motion-divider" />
 
                 <div
-                    class="rounded-[1rem] border border-white/70 bg-white/85 px-4 py-4 shadow-[0_18px_40px_rgba(15,23,42,0.06)]">
+                    class="dashboard-glass-card-strong rounded-[1rem] border px-4 py-4">
                     <div class="flex items-start justify-between gap-3">
                         <div class="min-w-0 space-y-3">
                             <div class="space-y-1">
@@ -101,7 +101,7 @@
                 <div class="motion-divider opacity-70" />
 
                 <div
-                    class="rounded-[1rem] border border-slate-200 bg-[linear-gradient(180deg,rgba(239,246,255,0.78)_0%,rgba(255,255,255,0.95)_100%)] px-4 py-4">
+                    class="dashboard-soft-surface rounded-[1rem] border px-4 py-4">
                     <div
                         class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                         <div class="space-y-1.5">

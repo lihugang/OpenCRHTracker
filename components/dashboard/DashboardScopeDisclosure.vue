@@ -2,7 +2,7 @@
     <div class="space-y-2">
         <button
             type="button"
-            class="group flex w-full cursor-pointer items-center justify-between gap-4 rounded-[1rem] border border-slate-200 bg-slate-50/80 px-4 py-3 text-left shadow-sm transition-[border-color,background-color,box-shadow,color] duration-200 ease-out hover:border-slate-300 hover:bg-white/90 hover:shadow-[0_12px_28px_-22px_rgba(15,23,42,0.35)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-crh-blue/25 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+            class="dashboard-soft-surface group flex w-full cursor-pointer items-center justify-between gap-4 rounded-[1rem] border px-4 py-3 text-left transition-[border-color,background-color,box-shadow,color] duration-200 ease-out hover:border-slate-300/70 hover:bg-white/72 hover:shadow-[0_12px_28px_-22px_rgba(15,23,42,0.18)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-crh-blue/25 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
             :aria-expanded="isExpanded ? 'true' : 'false'"
             @click="toggle">
             <span
@@ -37,7 +37,7 @@
             leave-to-class="translate-y-1 opacity-0 motion-reduce:translate-y-0">
             <div
                 v-if="isExpanded"
-                class="flex flex-wrap gap-2 rounded-[1rem] border border-slate-200 bg-white/85 px-5 py-4">
+                class="dashboard-glass-card flex flex-wrap gap-2 rounded-[1rem] border px-5 py-4">
                 <span
                     v-for="scope in scopes"
                     :key="scope"

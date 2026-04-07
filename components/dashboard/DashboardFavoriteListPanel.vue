@@ -53,7 +53,7 @@
                 <div
                     v-for="item in items"
                     :key="`${item.type}:${item.code}`"
-                    class="rounded-[1rem] border border-slate-200 bg-white/85 px-4 py-4 shadow-[0_18px_40px_rgba(15,23,42,0.05)]">
+                    class="dashboard-glass-card rounded-[1rem] border px-4 py-4">
                     <div class="flex items-start justify-between gap-4">
                         <NuxtLink
                             :to="buildLookupPath(item)"

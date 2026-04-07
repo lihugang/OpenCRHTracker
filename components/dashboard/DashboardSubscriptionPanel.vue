@@ -42,7 +42,7 @@
             <div class="motion-divider" />
 
             <section
-                class="rounded-[1.2rem] border border-slate-200 bg-slate-50/80 p-5">
+                class="dashboard-soft-surface rounded-[1.2rem] border p-5">
                 <div class="space-y-3">
                     <div class="flex flex-wrap items-center gap-2">
                         <span
@@ -132,7 +132,7 @@
                 <article
                     v-for="item in items"
                     :key="item.id"
-                    class="rounded-[1.15rem] border border-slate-200 bg-white/85 px-5 py-4 shadow-[0_16px_32px_-26px_rgba(15,23,42,0.28)]">
+                    class="dashboard-glass-card rounded-[1.15rem] border px-5 py-4">
                     <div
                         class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                         <div class="min-w-0 flex-1 space-y-4">
@@ -226,7 +226,7 @@
             v-if="renameTarget"
             class="space-y-4">
             <div
-                class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-4 py-4">
+                class="dashboard-soft-surface rounded-[1rem] border px-4 py-4">
                 <p
                     class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
                     当前设备

@@ -12,7 +12,7 @@
                 <aside class="hidden lg:block">
                     <UiCard
                         :show-accent-bar="false"
-                        class="sticky top-24">
+                        class="dashboard-glass-card sticky top-24">
                         <div class="space-y-5">
                             <div
                                 class="flex items-center justify-between gap-3">
@@ -63,7 +63,7 @@
                                             class="h-5 w-1 rounded-full transition"
                                             :class="
                                                 panel.id === currentPanelId
-                                                    ? 'bg-crh-blue'
+                                                    ? 'bg-crh-blue shadow-[0_0_10px_rgba(0,82,155,0.35)]'
                                                     : 'bg-slate-300/80 group-hover:bg-slate-400/90'
                                             " />
                                         <span
@@ -80,7 +80,7 @@
                 <div class="space-y-6">
                     <UiCard
                         :show-accent-bar="false"
-                        class="lg:hidden">
+                        class="dashboard-glass-card lg:hidden">
                         <div class="space-y-4">
                             <div
                                 class="flex items-center justify-between gap-3">
@@ -135,7 +135,7 @@
                                     class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white/90 text-crh-blue transition"
                                     :class="
                                         isPanelSheetOpen
-                                            ? 'border-crh-blue/25 bg-blue-50/80'
+                                            ? 'border-crh-blue/25 bg-blue-50/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] backdrop-blur-sm'
                                             : ''
                                     ">
                                     <svg
@@ -347,7 +347,7 @@
                 v-if="revokeTarget"
                 class="space-y-4">
                 <div
-                    class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-4 py-4">
+                    class="dashboard-soft-surface rounded-[1rem] border px-4 py-4">
                     <div
                         class="flex flex-wrap items-center justify-between gap-3">
                         <span :class="getIssuerBadgeClass(revokeTarget.issuer)">
@@ -428,7 +428,7 @@
                 </div>
 
                 <div
-                    class="grid gap-4 rounded-[1rem] border border-slate-200 bg-slate-50/80 px-4 py-4 sm:grid-cols-2">
+                    class="dashboard-soft-surface grid gap-4 rounded-[1rem] border px-4 py-4 sm:grid-cols-2">
                     <div class="space-y-1 sm:col-span-2">
                         <p
                             class="text-xs uppercase tracking-[0.18em] text-slate-400">
@@ -565,7 +565,7 @@
                 </div>
 
                 <div
-                    class="rounded-[1rem] border border-dashed border-slate-200 bg-slate-50/80 px-4 py-4 text-sm leading-6 text-slate-600">
+                    class="dashboard-soft-surface rounded-[1rem] border border-dashed px-4 py-4 text-sm leading-6 text-slate-600">
                     最长存活时间：
                     <span class="font-semibold text-slate-900">
                         {{ formatDuration(maxLifetimeSeconds) }}
@@ -588,7 +588,7 @@
                     </div>
 
                     <div
-                        class="rounded-[1.1rem] border border-slate-200 bg-slate-50/70 px-4 py-4">
+                        class="dashboard-soft-surface rounded-[1.1rem] border px-4 py-4">
                         <DashboardScopeTree
                             v-model="issueForm.scopes"
                             :scopes="creatableScopes"
@@ -1168,14 +1168,14 @@ function hasClientScope(grantedScopes: string[], requiredScope: string) {
 
 function getPanelButtonClass(panelId: DashboardPanelId) {
     return panelId === currentPanelId.value
-        ? 'group w-full rounded-[0.95rem] border border-crh-blue/15 bg-blue-50/70 px-3.5 py-3 text-crh-blue transition'
-        : 'group w-full rounded-[0.95rem] border border-transparent bg-transparent px-3.5 py-3 text-slate-600 transition hover:border-slate-200/80 hover:bg-white/70 hover:text-slate-900';
+        ? 'dashboard-nav-active group w-full rounded-[0.95rem] border px-3.5 py-3 transition'
+        : 'group w-full rounded-[0.95rem] border border-transparent bg-transparent px-3.5 py-3 text-slate-600 transition hover:border-white/70 hover:bg-white/60 hover:text-slate-900 hover:backdrop-blur-sm hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]';
 }
 
 function getPanelSheetOptionClass(panelId: DashboardPanelId) {
     return panelId === currentPanelId.value
-        ? 'flex w-full items-center justify-between gap-4 rounded-[1rem] border border-crh-blue/20 bg-blue-50/80 px-4 py-4 text-crh-blue transition'
-        : 'flex w-full items-center justify-between gap-4 rounded-[1rem] border border-slate-200 bg-white/90 px-4 py-4 text-slate-700 transition hover:border-slate-300 hover:bg-slate-50/80';
+        ? 'dashboard-nav-sheet-active flex w-full items-center justify-between gap-4 rounded-[1rem] border px-4 py-4 transition'
+        : 'flex w-full items-center justify-between gap-4 rounded-[1rem] border border-white/70 bg-white/78 px-4 py-4 text-slate-700 transition hover:border-slate-300/70 hover:bg-white/88 hover:backdrop-blur-sm';
 }
 
 function getIssuerLabel(issuer: AuthApiKeyIssuer) {

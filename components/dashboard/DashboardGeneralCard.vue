@@ -13,7 +13,7 @@
                 <div class="motion-divider" />
 
                 <div
-                    class="rounded-[1rem] border border-white/70 bg-white/85 px-4 py-4 shadow-[0_18px_40px_rgba(15,23,42,0.06)]">
+                    class="dashboard-glass-card-strong rounded-[1rem] border px-4 py-4">
                     <dl class="grid gap-3 text-sm text-slate-600">
                         <div class="space-y-1.5">
                             <dt
@@ -146,7 +146,7 @@
 
         <UiCard
             :show-accent-bar="false"
-            class="border-rose-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(255,247,247,0.96)_100%)]">
+            class="dashboard-danger-surface">
             <div class="space-y-5">
                 <div class="space-y-2">
                     <p

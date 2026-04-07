@@ -32,12 +32,12 @@
                 <div
                     v-for="index in 5"
                     :key="`api-key-skeleton:${index}`"
-                    class="animate-pulse rounded-[1.15rem] border border-slate-200 bg-white/80 px-5 py-4">
-                    <div class="h-4 w-24 rounded bg-slate-200" />
-                    <div class="mt-3 h-4 w-56 rounded bg-slate-100" />
+                    class="dashboard-skeleton-surface animate-pulse rounded-[1.15rem] border px-5 py-4">
+                    <div class="dashboard-skeleton-block h-4 w-24 rounded" />
+                    <div class="dashboard-skeleton-block-muted mt-3 h-4 w-56 rounded" />
                     <div class="mt-4 grid gap-2 sm:grid-cols-2">
-                        <div class="h-3 w-28 rounded bg-slate-100" />
-                        <div class="h-3 w-24 rounded bg-slate-100" />
+                        <div class="dashboard-skeleton-block-muted h-3 w-28 rounded" />
+                        <div class="dashboard-skeleton-block-muted h-3 w-24 rounded" />
                     </div>
                 </div>
             </div>
@@ -87,7 +87,7 @@
                         <div
                             v-for="item in group.items"
                             :key="item.revokeId"
-                            class="rounded-[1.15rem] border border-slate-200 bg-white/85 px-5 py-4 shadow-[0_16px_32px_-26px_rgba(15,23,42,0.28)]">
+                            class="dashboard-glass-card rounded-[1.15rem] border px-5 py-4">
                             <div
                                 class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                                 <div class="min-w-0 space-y-4">
@@ -185,7 +185,7 @@
 
                                         <dl class="grid gap-3 sm:grid-cols-3">
                                             <div
-                                                class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-4 py-3">
+                                                class="dashboard-soft-surface rounded-[1rem] border px-4 py-3">
                                                 <dt
                                                     class="text-xs uppercase tracking-[0.18em] text-slate-400">
                                                     1 小时
@@ -200,7 +200,7 @@
                                                 </dd>
                                             </div>
                                             <div
-                                                class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-4 py-3">
+                                                class="dashboard-soft-surface rounded-[1rem] border px-4 py-3">
                                                 <dt
                                                     class="text-xs uppercase tracking-[0.18em] text-slate-400">
                                                     8 小时
@@ -216,7 +216,7 @@
                                                 </dd>
                                             </div>
                                             <div
-                                                class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-4 py-3">
+                                                class="dashboard-soft-surface rounded-[1rem] border px-4 py-3">
                                                 <dt
                                                     class="text-xs uppercase tracking-[0.18em] text-slate-400">
                                                     1 天
