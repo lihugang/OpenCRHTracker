@@ -11,6 +11,7 @@ interface RawEmuListRecord extends Record<string, unknown> {
     enableSeatCode?: unknown;
     multiple?: unknown;
     tags?: unknown;
+    alias?: unknown;
 }
 
 interface RawQrCodeRecord extends Record<string, unknown> {
@@ -26,6 +27,7 @@ export interface EmuListRecord {
     depot: string;
     multiple: boolean;
     tags: string[];
+    alias: string[];
 }
 
 export interface ProbeAssets {
@@ -33,6 +35,7 @@ export interface ProbeAssets {
     emuByModelAndTrainSetNo: Map<string, EmuListRecord>;
     emuListByBureauAndModel: Map<string, EmuListRecord[]>;
     qrcodeByModelAndTrainSetNo: Map<string, string>;
+    canonicalEmuCodeByAnyCode: Map<string, string>;
 }
 
 let cached: ProbeAssets | null = null;
@@ -43,6 +46,10 @@ function buildModelAndTrainSetNoKey(model: string, trainSetNo: string): string {
 
 function buildBureauAndModelKey(bureau: string, model: string): string {
     return `${bureau.trim()}#${normalizeCode(model)}`;
+}
+
+function buildCanonicalEmuCode(model: string, trainSetNo: string): string {
+    return normalizeCode(`${model}-${trainSetNo}`);
 }
 
 function normalizeRequiredString(
@@ -88,6 +95,78 @@ function normalizeTags(value: unknown): string[] {
         );
 }
 
+function normalizeAliases(value: unknown): string[] {
+    if (!Array.isArray(value)) {
+        return [];
+    }
+
+    return value
+        .filter((item): item is string => typeof item === 'string')
+        .map((item) => normalizeCode(item))
+        .filter(
+            (item, index, array) =>
+                item.length > 0 && array.indexOf(item) === index
+        );
+}
+
+function registerCanonicalEmuCode(
+    canonicalEmuCodeByAnyCode: Map<string, string>,
+    code: string,
+    canonicalCode: string,
+    rowNumber: number,
+    fieldName: string
+): void {
+    const existingCanonicalCode = canonicalEmuCodeByAnyCode.get(code);
+    if (
+        typeof existingCanonicalCode === 'string' &&
+        existingCanonicalCode !== canonicalCode
+    ) {
+        throw new Error(
+            `EMUList row ${rowNumber} field ${fieldName} conflicts for ${code}: already mapped to ${existingCanonicalCode}`
+        );
+    }
+
+    canonicalEmuCodeByAnyCode.set(code, canonicalCode);
+}
+
+function buildCanonicalEmuCodeByAnyCode(
+    emuList: EmuListRecord[]
+): Map<string, string> {
+    const canonicalEmuCodeByAnyCode = new Map<string, string>();
+
+    for (const [index, record] of emuList.entries()) {
+        const rowNumber = index + 1;
+        const canonicalCode = buildCanonicalEmuCode(
+            record.model,
+            record.trainSetNo
+        );
+
+        registerCanonicalEmuCode(
+            canonicalEmuCodeByAnyCode,
+            canonicalCode,
+            canonicalCode,
+            rowNumber,
+            'model/trainSetNo'
+        );
+
+        for (const alias of record.alias) {
+            if (alias === canonicalCode) {
+                continue;
+            }
+
+            registerCanonicalEmuCode(
+                canonicalEmuCodeByAnyCode,
+                alias,
+                canonicalCode,
+                rowNumber,
+                'alias'
+            );
+        }
+    }
+
+    return canonicalEmuCodeByAnyCode;
+}
+
 export function parseEmuListAssetText(text: string): EmuListRecord[] {
     const rawEmuRecords = parseJsonlToJson<RawEmuListRecord>(text);
     const emuList: EmuListRecord[] = [];
@@ -113,10 +192,12 @@ export function parseEmuListAssetText(text: string): EmuListRecord[] {
             bureau,
             depot,
             multiple: row.multiple === true,
-            tags: normalizeTags(row.tags)
+            tags: normalizeTags(row.tags),
+            alias: normalizeAliases(row.alias)
         });
     }
 
+    buildCanonicalEmuCodeByAnyCode(emuList);
     return emuList;
 }
 
@@ -126,6 +207,7 @@ function buildProbeAssets(
 ): ProbeAssets {
     const emuByModelAndTrainSetNo = new Map<string, EmuListRecord>();
     const emuListByBureauAndModel = new Map<string, EmuListRecord[]>();
+    const canonicalEmuCodeByAnyCode = buildCanonicalEmuCodeByAnyCode(emuList);
 
     for (const record of emuList) {
         emuByModelAndTrainSetNo.set(
@@ -170,7 +252,8 @@ function buildProbeAssets(
         emuList,
         emuByModelAndTrainSetNo,
         emuListByBureauAndModel,
-        qrcodeByModelAndTrainSetNo
+        qrcodeByModelAndTrainSetNo,
+        canonicalEmuCodeByAnyCode
     };
 }
 
@@ -201,6 +284,21 @@ export async function loadProbeAssets(): Promise<ProbeAssets> {
 
 export function buildProbeAssetKey(model: string, trainSetNo: string): string {
     return buildModelAndTrainSetNoKey(model, trainSetNo);
+}
+
+export async function resolveCanonicalEmuCode(
+    rawEmuCode: string
+): Promise<string> {
+    const normalizedEmuCode = normalizeCode(rawEmuCode);
+    if (normalizedEmuCode.length === 0) {
+        return '';
+    }
+
+    const assets = await loadProbeAssets();
+    return (
+        assets.canonicalEmuCodeByAnyCode.get(normalizedEmuCode) ??
+        normalizedEmuCode
+    );
 }
 
 export function invalidateProbeAssetsCache(): void {

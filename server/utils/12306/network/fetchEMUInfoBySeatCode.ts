@@ -1,6 +1,7 @@
 import waitFor12306RequestSlot from '../requestLimiter';
 import useConfig from '~/server/config';
 import getLogger from '~/server/libs/log4js';
+import { resolveCanonicalEmuCode } from '~/server/services/probeAssetStore';
 import getCurrentDateString from '../../date/getCurrentDateString';
 import { getShanghaiUnixSecondsFromDateAndTime } from '../../date/shanghaiDateTime';
 import log12306RequestFailure from './log12306RequestFailure';
@@ -170,6 +171,8 @@ export default async function fetchEMUInfoBySeatCode(code: string) {
             return null;
         }
 
+        const canonicalEmuCode = await resolveCanonicalEmuCode(emuCode);
+
         const result = {
             route: {
                 code: data.trainCode, // G xxxx
@@ -185,7 +188,7 @@ export default async function fetchEMUInfoBySeatCode(code: string) {
                 trainRepeat: data.trainRepeat?.trim() ?? ''
             },
             emu: {
-                code: emuCode // like CR400AF-2230
+                code: canonicalEmuCode // like CR400AF-2230
             }
         };
 

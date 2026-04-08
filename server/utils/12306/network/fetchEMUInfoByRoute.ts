@@ -1,5 +1,6 @@
 import useConfig from '~/server/config';
 import getLogger from '~/server/libs/log4js';
+import { resolveCanonicalEmuCode } from '~/server/services/probeAssetStore';
 import getCurrentDateString from '../../date/getCurrentDateString';
 import log12306RequestFailure from './log12306RequestFailure';
 import log12306RequestMetric from './log12306RequestMetric';
@@ -99,12 +100,14 @@ export default async function fetchEMUInfoByRoute(route: string) {
             return null;
         }
 
+        const canonicalEmuCode = await resolveCanonicalEmuCode(emuCode);
+
         return {
             route: {
                 code: route // G xxxx
             },
             emu: {
-                code: emuCode // like CR400AF-2230
+                code: canonicalEmuCode // like CR400AF-2230
             }
         };
     } catch (error) {
