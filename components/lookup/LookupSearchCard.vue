@@ -108,6 +108,7 @@
                             <div
                                 v-if="shouldRenderInlineMenu"
                                 ref="inlineMenuRef"
+                                :style="inlineMenuStyle"
                                 :class="[
                                     'absolute inset-x-0 top-full z-30 mt-2 overflow-hidden rounded-2xl border border-slate-200/90 bg-white/96 shadow-[0_18px_40px_-18px_rgba(15,23,42,0.35)] backdrop-blur',
                                     isMeasuringOcclusion
@@ -151,7 +152,7 @@
                                             type="button"
                                             :data-suggestion-index="entry.index"
                                             :class="[
-                                                'flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition',
+                                                'grid w-full grid-cols-[var(--lookup-code-column-width,max-content)_minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1 px-4 py-3 text-left transition',
                                                 activeIndex === entry.index
                                                     ? 'bg-blue-50 text-crh-blue'
                                                     : 'text-crh-grey-dark hover:bg-slate-50'
@@ -164,51 +165,39 @@
                                                 selectSuggestion(entry.item)
                                             ">
                                             <span
-                                                :class="[
-                                                    'flex min-w-0 items-start gap-3',
-                                                    compact
-                                                        ? 'flex-wrap gap-x-3 gap-y-1'
-                                                        : ''
-                                                ]">
+                                                data-suggestion-code
+                                                class="block min-w-0 whitespace-nowrap text-sm font-semibold">
+                                                {{ entry.item.code }}
+                                            </span>
+                                            <span
+                                                class="flex min-w-0 flex-col gap-1.5">
                                                 <span
-                                                    class="shrink-0 text-sm font-semibold">
-                                                    {{ entry.item.code }}
+                                                    v-if="
+                                                        getSuggestionSubtitle(
+                                                            entry.item
+                                                        )
+                                                    "
+                                                    class="min-w-0 truncate text-xs text-slate-500">
+                                                    {{
+                                                        getSuggestionSubtitle(
+                                                            entry.item
+                                                        )
+                                                    }}
                                                 </span>
                                                 <span
-                                                    class="flex min-w-0 flex-1 flex-col gap-1.5">
+                                                    v-if="
+                                                        getSuggestionTags(
+                                                            entry.item
+                                                        ).length > 0
+                                                    "
+                                                    class="flex flex-wrap gap-1.5">
                                                     <span
-                                                        v-if="
-                                                            getSuggestionSubtitle(
-                                                                entry.item
-                                                            )
-                                                        "
-                                                        :class="[
-                                                            'min-w-0 text-xs text-slate-500',
-                                                            compact
-                                                                ? ''
-                                                                : 'truncate'
-                                                        ]">
-                                                        {{
-                                                            getSuggestionSubtitle(
-                                                                entry.item
-                                                            )
-                                                        }}
-                                                    </span>
-                                                    <span
-                                                        v-if="
-                                                            getSuggestionTags(
-                                                                entry.item
-                                                            ).length > 0
-                                                        "
-                                                        class="flex flex-wrap gap-1.5">
-                                                        <span
-                                                            v-for="tag in getSuggestionTags(
-                                                                entry.item
-                                                            )"
-                                                            :key="tag"
-                                                            class="inline-flex items-center rounded-full bg-blue-600/8 px-2 py-0.5 text-[11px] font-medium leading-none text-blue-600">
-                                                            {{ tag }}
-                                                        </span>
+                                                        v-for="tag in getSuggestionTags(
+                                                            entry.item
+                                                        )"
+                                                        :key="tag"
+                                                        class="inline-flex items-center rounded-full bg-blue-600/8 px-2 py-0.5 text-[11px] font-medium leading-none text-blue-600">
+                                                        {{ tag }}
                                                     </span>
                                                 </span>
                                             </span>
@@ -217,7 +206,7 @@
                                                 v-if="entry.isFavorite"
                                                 aria-hidden="true"
                                                 viewBox="0 0 20 20"
-                                                class="h-4 w-4 shrink-0 fill-current text-amber-500">
+                                                class="h-4 w-4 shrink-0 self-center fill-current text-amber-500">
                                                 <path
                                                     d="M10 2.4L12.28 7.03L17.39 7.78L13.7 11.38L14.57 16.46L10 14.06L5.43 16.46L6.3 11.38L2.61 7.78L7.72 7.03L10 2.4Z" />
                                             </svg>
@@ -249,7 +238,7 @@
         <div
             v-if="shouldRenderTeleportMenu && menuStyle"
             ref="menuPanelRef"
-            :style="menuStyle"
+            :style="teleportMenuStyle"
             class="z-[60] overflow-hidden rounded-2xl border border-slate-200/90 bg-white/98 shadow-[0_18px_40px_-18px_rgba(15,23,42,0.35)] min-[768px]:backdrop-blur">
             <div
                 v-if="suggestionsState === 'loading'"
@@ -289,7 +278,7 @@
                         type="button"
                         :data-suggestion-index="entry.index"
                         :class="[
-                            'flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition',
+                            'grid w-full grid-cols-[var(--lookup-code-column-width,max-content)_minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1 px-4 py-3 text-left transition',
                             activeIndex === entry.index
                                 ? 'bg-blue-50 text-crh-blue'
                                 : 'text-crh-grey-dark hover:bg-slate-50'
@@ -298,31 +287,24 @@
                         @mouseenter="activeIndex = entry.index"
                         @click="selectSuggestion(entry.item)">
                         <span
-                            :class="[
-                                'flex min-w-0 items-start gap-3',
-                                compact ? 'flex-wrap gap-x-3 gap-y-1' : ''
-                            ]">
-                            <span class="shrink-0 text-sm font-semibold">
-                                {{ entry.item.code }}
+                            data-suggestion-code
+                            class="block min-w-0 whitespace-nowrap text-sm font-semibold">
+                            {{ entry.item.code }}
+                        </span>
+                        <span class="flex min-w-0 flex-col gap-1.5">
+                            <span
+                                v-if="getSuggestionSubtitle(entry.item)"
+                                class="min-w-0 truncate text-xs text-slate-500">
+                                {{ getSuggestionSubtitle(entry.item) }}
                             </span>
-                            <span class="flex min-w-0 flex-1 flex-col gap-1.5">
+                            <span
+                                v-if="getSuggestionTags(entry.item).length > 0"
+                                class="flex flex-wrap gap-1.5">
                                 <span
-                                    v-if="getSuggestionSubtitle(entry.item)"
-                                    :class="[
-                                        'min-w-0 text-xs text-slate-500',
-                                        compact ? '' : 'truncate'
-                                    ]">
-                                    {{ getSuggestionSubtitle(entry.item) }}
-                                </span>
-                                <span
-                                    v-if="getSuggestionTags(entry.item).length > 0"
-                                    class="flex flex-wrap gap-1.5">
-                                    <span
-                                        v-for="tag in getSuggestionTags(entry.item)"
-                                        :key="tag"
-                                        class="inline-flex items-center rounded-full bg-blue-600/8 px-2 py-0.5 text-[11px] font-medium leading-none text-blue-600">
-                                        {{ tag }}
-                                    </span>
+                                    v-for="tag in getSuggestionTags(entry.item)"
+                                    :key="tag"
+                                    class="inline-flex items-center rounded-full bg-blue-600/8 px-2 py-0.5 text-[11px] font-medium leading-none text-blue-600">
+                                    {{ tag }}
                                 </span>
                             </span>
                         </span>
@@ -331,7 +313,7 @@
                             v-if="entry.isFavorite"
                             aria-hidden="true"
                             viewBox="0 0 20 20"
-                            class="h-4 w-4 shrink-0 fill-current text-amber-500">
+                            class="h-4 w-4 shrink-0 self-center fill-current text-amber-500">
                             <path
                                 d="M10 2.4L12.28 7.03L17.39 7.78L13.7 11.38L14.57 16.46L10 14.06L5.43 16.46L6.3 11.38L2.61 7.78L7.72 7.03L10 2.4Z" />
                         </svg>
@@ -390,6 +372,9 @@ const emptySuggestionStateMessage = '\u672a\u627e\u5230\u5339\u914d\u9879';
 
 type OverlayFallbackProfile = 'none' | 'detail-sticky';
 type MenuRenderMode = 'inline' | 'teleport';
+type LookupMenuStyle = CSSProperties & {
+    '--lookup-code-column-width'?: string;
+};
 
 const props = withDefaults(
     defineProps<{
@@ -443,7 +428,9 @@ const menuStyle = ref<CSSProperties | null>(null);
 const suggestionListStyle = ref<CSSProperties>({
     maxHeight: `${MENU_INLINE_MAX_HEIGHT_PX}px`
 });
+const codeColumnWidthPx = ref<number | null>(null);
 let hasTeleportListeners = false;
+let codeColumnWidthMeasurementFrame = 0;
 
 const {
     state: suggestionsState,
@@ -520,6 +507,11 @@ const menuSections = computed(() => {
 const menuEntries = computed(() =>
     menuSections.value.flatMap((section) => section.entries)
 );
+const menuEntrySignature = computed(() =>
+    menuEntries.value
+        .map((entry) => `${entry.key}:${entry.isFavorite ? '1' : '0'}`)
+        .join('|')
+);
 
 const shouldShowMenu = computed(() => {
     if (!isMenuOpen.value) {
@@ -553,6 +545,12 @@ const isTeleportMenuActive = computed(
 
 const shouldUseDetailStickyFallbackProfile = computed(
     () => props.overlayFallbackProfile === 'detail-sticky'
+);
+const inlineMenuStyle = computed<LookupMenuStyle>(() =>
+    buildLookupMenuStyle()
+);
+const teleportMenuStyle = computed<LookupMenuStyle>(() =>
+    buildLookupMenuStyle(menuStyle.value)
 );
 
 const emptyStateMessage = computed(() =>
@@ -601,6 +599,7 @@ function closeMenu() {
     suggestionListStyle.value = {
         maxHeight: `${MENU_INLINE_MAX_HEIGHT_PX}px`
     };
+    resetCodeColumnWidth();
 }
 
 function handleFocus() {
@@ -778,6 +777,101 @@ function clamp(value: number, min: number, max: number) {
     return Math.min(Math.max(value, min), max);
 }
 
+function buildLookupMenuStyle(baseStyle?: CSSProperties | null): LookupMenuStyle {
+    return {
+        ...(baseStyle ?? {}),
+        ...(codeColumnWidthPx.value === null
+            ? {}
+            : {
+                  '--lookup-code-column-width': `${codeColumnWidthPx.value}px`
+              })
+    };
+}
+
+function resetCodeColumnWidth() {
+    codeColumnWidthPx.value = null;
+
+    if (import.meta.client && codeColumnWidthMeasurementFrame !== 0) {
+        window.cancelAnimationFrame(codeColumnWidthMeasurementFrame);
+        codeColumnWidthMeasurementFrame = 0;
+    }
+}
+
+function getActiveMenuElement() {
+    if (renderMode.value === 'teleport') {
+        return menuPanelRef.value;
+    }
+
+    return inlineMenuRef.value;
+}
+
+function measureCodeColumnWidth() {
+    if (!import.meta.client || !shouldShowMenu.value || menuEntries.value.length === 0) {
+        codeColumnWidthPx.value = null;
+        return;
+    }
+
+    const menuElement = getActiveMenuElement();
+    if (!menuElement) {
+        codeColumnWidthPx.value = null;
+        return;
+    }
+
+    const codeElements = Array.from(
+        menuElement.querySelectorAll<HTMLElement>('[data-suggestion-code]')
+    );
+    if (codeElements.length === 0) {
+        codeColumnWidthPx.value = null;
+        return;
+    }
+
+    const measuredMaxWidth = codeElements.reduce((maxWidth, element) => {
+        return Math.max(
+            maxWidth,
+            element.scrollWidth,
+            element.getBoundingClientRect().width
+        );
+    }, 0);
+    if (measuredMaxWidth <= 0) {
+        codeColumnWidthPx.value = null;
+        return;
+    }
+
+    codeColumnWidthPx.value = Math.ceil(measuredMaxWidth);
+}
+
+function scheduleCodeColumnWidthMeasurement() {
+    if (!import.meta.client) {
+        return;
+    }
+
+    if (!shouldShowMenu.value || menuEntries.value.length === 0) {
+        resetCodeColumnWidth();
+        return;
+    }
+
+    if (codeColumnWidthMeasurementFrame !== 0) {
+        window.cancelAnimationFrame(codeColumnWidthMeasurementFrame);
+    }
+
+    codeColumnWidthMeasurementFrame = window.requestAnimationFrame(() => {
+        codeColumnWidthMeasurementFrame = 0;
+        measureCodeColumnWidth();
+    });
+}
+
+function handleWindowResize() {
+    if (!isMenuOpen.value) {
+        return;
+    }
+
+    if (isTeleportMenuActive.value) {
+        syncMenuPosition();
+    }
+
+    scheduleCodeColumnWidthMeasurement();
+}
+
 function buildInlineMenuSamplePoints(rect: DOMRect) {
     const viewportWidth =
         window.visualViewport?.width ?? document.documentElement.clientWidth;
@@ -931,10 +1025,6 @@ function attachTeleportListeners() {
         passive: true,
         capture: true
     });
-    window.addEventListener('resize', syncMenuPosition, {
-        passive: true
-    });
-    window.visualViewport?.addEventListener('resize', syncMenuPosition);
     window.visualViewport?.addEventListener('scroll', syncMenuPosition);
     hasTeleportListeners = true;
 }
@@ -945,8 +1035,6 @@ function detachTeleportListeners() {
     }
 
     window.removeEventListener('scroll', syncMenuPosition, true);
-    window.removeEventListener('resize', syncMenuPosition);
-    window.visualViewport?.removeEventListener('resize', syncMenuPosition);
     window.visualViewport?.removeEventListener('scroll', syncMenuPosition);
     hasTeleportListeners = false;
 }
@@ -1001,6 +1089,10 @@ onMounted(() => {
     isClient.value = true;
     hasDetailStickyFallbackCache.value = readDetailStickyFallbackCache();
     document.addEventListener('pointerdown', handleDocumentPointerDown);
+    window.addEventListener('resize', handleWindowResize, {
+        passive: true
+    });
+    window.visualViewport?.addEventListener('resize', handleWindowResize);
 
     if (props.autoFocus) {
         safeFocus(inputRef.value, {
@@ -1012,7 +1104,10 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
     document.removeEventListener('pointerdown', handleDocumentPointerDown);
+    window.removeEventListener('resize', handleWindowResize);
+    window.visualViewport?.removeEventListener('resize', handleWindowResize);
     detachTeleportListeners();
+    resetCodeColumnWidth();
 });
 
 watch(activeIndex, async (value) => {
@@ -1035,12 +1130,15 @@ watch(
     async (value) => {
         if (!value) {
             detachTeleportListeners();
+            await nextTick();
+            scheduleCodeColumnWidthMeasurement();
             return;
         }
 
         attachTeleportListeners();
         await nextTick();
         syncMenuPosition();
+        scheduleCodeColumnWidthMeasurement();
     },
     {
         immediate: true
@@ -1052,15 +1150,36 @@ watch(
         props.collapsed,
         props.modelValue,
         suggestionsState.value,
-        menuEntries.value.length
+        menuEntrySignature.value,
+        menuEntries.value.length,
+        renderMode.value
     ],
     async () => {
-        if (!isTeleportMenuActive.value) {
+        if (!shouldShowMenu.value) {
+            resetCodeColumnWidth();
             return;
         }
 
         await nextTick();
-        syncMenuPosition();
+
+        if (isTeleportMenuActive.value) {
+            syncMenuPosition();
+        }
+
+        scheduleCodeColumnWidthMeasurement();
+    }
+);
+
+watch(
+    shouldShowMenu,
+    async (value) => {
+        if (!value) {
+            resetCodeColumnWidth();
+            return;
+        }
+
+        await nextTick();
+        scheduleCodeColumnWidthMeasurement();
     }
 );
 </script>
