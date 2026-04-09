@@ -430,7 +430,6 @@ const suggestionListStyle = ref<CSSProperties>({
 });
 const codeColumnWidthPx = ref<number | null>(null);
 let hasTeleportListeners = false;
-let codeColumnWidthMeasurementFrame = 0;
 
 const {
     state: suggestionsState,
@@ -790,11 +789,6 @@ function buildLookupMenuStyle(baseStyle?: CSSProperties | null): LookupMenuStyle
 
 function resetCodeColumnWidth() {
     codeColumnWidthPx.value = null;
-
-    if (import.meta.client && codeColumnWidthMeasurementFrame !== 0) {
-        window.cancelAnimationFrame(codeColumnWidthMeasurementFrame);
-        codeColumnWidthMeasurementFrame = 0;
-    }
 }
 
 function getActiveMenuElement() {
@@ -805,6 +799,15 @@ function getActiveMenuElement() {
     return inlineMenuRef.value;
 }
 
+function restoreCodeColumnWidthStyle(menuElement: HTMLElement, widthValue: string) {
+    if (widthValue.length > 0) {
+        menuElement.style.setProperty('--lookup-code-column-width', widthValue);
+        return;
+    }
+
+    menuElement.style.removeProperty('--lookup-code-column-width');
+}
+
 function measureCodeColumnWidth() {
     if (!import.meta.client || !shouldShowMenu.value || menuEntries.value.length === 0) {
         codeColumnWidthPx.value = null;
@@ -813,15 +816,19 @@ function measureCodeColumnWidth() {
 
     const menuElement = getActiveMenuElement();
     if (!menuElement) {
-        codeColumnWidthPx.value = null;
         return;
     }
+
+    const previousInlineCodeColumnWidth = menuElement.style.getPropertyValue(
+        '--lookup-code-column-width'
+    );
+    menuElement.style.removeProperty('--lookup-code-column-width');
 
     const codeElements = Array.from(
         menuElement.querySelectorAll<HTMLElement>('[data-suggestion-code]')
     );
     if (codeElements.length === 0) {
-        codeColumnWidthPx.value = null;
+        restoreCodeColumnWidthStyle(menuElement, previousInlineCodeColumnWidth);
         return;
     }
 
@@ -833,14 +840,27 @@ function measureCodeColumnWidth() {
         );
     }, 0);
     if (measuredMaxWidth <= 0) {
-        codeColumnWidthPx.value = null;
+        restoreCodeColumnWidthStyle(menuElement, previousInlineCodeColumnWidth);
         return;
     }
 
-    codeColumnWidthPx.value = Math.ceil(measuredMaxWidth);
+    const nextWidth = Math.ceil(measuredMaxWidth);
+    if (
+        codeColumnWidthPx.value !== null &&
+        Math.abs(codeColumnWidthPx.value - nextWidth) <= 1
+    ) {
+        restoreCodeColumnWidthStyle(menuElement, previousInlineCodeColumnWidth);
+        return;
+    }
+
+    menuElement.style.setProperty(
+        '--lookup-code-column-width',
+        `${nextWidth}px`
+    );
+    codeColumnWidthPx.value = nextWidth;
 }
 
-function scheduleCodeColumnWidthMeasurement() {
+async function refreshCodeColumnWidth(syncTeleportPosition = false) {
     if (!import.meta.client) {
         return;
     }
@@ -850,26 +870,22 @@ function scheduleCodeColumnWidthMeasurement() {
         return;
     }
 
-    if (codeColumnWidthMeasurementFrame !== 0) {
-        window.cancelAnimationFrame(codeColumnWidthMeasurementFrame);
+    await nextTick();
+
+    if (syncTeleportPosition && isTeleportMenuActive.value) {
+        syncMenuPosition();
+        await nextTick();
     }
 
-    codeColumnWidthMeasurementFrame = window.requestAnimationFrame(() => {
-        codeColumnWidthMeasurementFrame = 0;
-        measureCodeColumnWidth();
-    });
+    measureCodeColumnWidth();
 }
 
-function handleWindowResize() {
+async function handleWindowResize() {
     if (!isMenuOpen.value) {
         return;
     }
 
-    if (isTeleportMenuActive.value) {
-        syncMenuPosition();
-    }
-
-    scheduleCodeColumnWidthMeasurement();
+    await refreshCodeColumnWidth(true);
 }
 
 function buildInlineMenuSamplePoints(rect: DOMRect) {
@@ -1130,18 +1146,16 @@ watch(
     async (value) => {
         if (!value) {
             detachTeleportListeners();
-            await nextTick();
-            scheduleCodeColumnWidthMeasurement();
+            await refreshCodeColumnWidth();
             return;
         }
 
         attachTeleportListeners();
-        await nextTick();
-        syncMenuPosition();
-        scheduleCodeColumnWidthMeasurement();
+        await refreshCodeColumnWidth(true);
     },
     {
-        immediate: true
+        immediate: true,
+        flush: 'post'
     }
 );
 
@@ -1160,13 +1174,10 @@ watch(
             return;
         }
 
-        await nextTick();
-
-        if (isTeleportMenuActive.value) {
-            syncMenuPosition();
-        }
-
-        scheduleCodeColumnWidthMeasurement();
+        await refreshCodeColumnWidth(isTeleportMenuActive.value);
+    },
+    {
+        flush: 'post'
     }
 );
 
@@ -1178,8 +1189,10 @@ watch(
             return;
         }
 
-        await nextTick();
-        scheduleCodeColumnWidthMeasurement();
+        await refreshCodeColumnWidth(isTeleportMenuActive.value);
+    },
+    {
+        flush: 'post'
     }
 );
 </script>
