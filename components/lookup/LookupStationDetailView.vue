@@ -345,8 +345,8 @@ async function toggleFavoriteItem() {
     await toggleFavorite(favoriteItem.value);
 }
 
-async function submitSearch() {
-    const resolvedTarget = resolveLookupTarget(draftCode.value);
+async function submitSearch(selectedCode?: string) {
+    const resolvedTarget = resolveLookupTarget(selectedCode ?? draftCode.value);
     if (!resolvedTarget) {
         inputError.value = '请输入车次号、车组号或车站名。';
         return;

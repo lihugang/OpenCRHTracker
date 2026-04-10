@@ -153,8 +153,8 @@ onBeforeUnmount(() => {
     }
 });
 
-async function submitLookup() {
-    const resolvedTarget = resolveLookupTarget(draftCode.value);
+async function submitLookup(selectedCode?: string) {
+    const resolvedTarget = resolveLookupTarget(selectedCode ?? draftCode.value);
     if (!resolvedTarget) {
         inputError.value = '请输入车次号、车组号或车站名。';
         return;

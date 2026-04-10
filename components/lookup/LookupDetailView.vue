@@ -369,8 +369,8 @@ async function toggleEventSubscriptionItem() {
     await toggleEventSubscription(eventSubscriptionTarget.value);
 }
 
-async function submitSearch() {
-    const resolvedTarget = resolveLookupTarget(draftCode.value);
+async function submitSearch(selectedCode?: string) {
+    const resolvedTarget = resolveLookupTarget(selectedCode ?? draftCode.value);
     if (!resolvedTarget) {
         inputError.value = '请输入车次号或车组号。';
         return;

@@ -409,7 +409,7 @@ const props = withDefaults(
 );
 
 const emit = defineEmits<{
-    submit: [];
+    submit: [value?: string];
     'update:modelValue': [value: string];
 }>();
 
@@ -648,12 +648,11 @@ function toRecentLookupSearchItem(
     };
 }
 
-async function selectSuggestion(item: LookupMenuItem) {
+function selectSuggestion(item: LookupMenuItem) {
     emit('update:modelValue', item.code);
     addRecentSearch(toRecentLookupSearchItem(item));
     closeMenu();
-    await nextTick();
-    emit('submit');
+    emit('submit', item.code);
 }
 
 function getSingleSuggestion() {
@@ -729,7 +728,7 @@ function recordCurrentSearch() {
 async function submitCurrentValue() {
     const singleSuggestion = getSingleSuggestion();
     if (singleSuggestion) {
-        await selectSuggestion(singleSuggestion);
+        selectSuggestion(singleSuggestion);
         return;
     }
 
@@ -745,7 +744,7 @@ async function submitFromEnter() {
             : null;
 
     if (activeItem) {
-        await selectSuggestion(activeItem);
+        selectSuggestion(activeItem);
         return;
     }
 
