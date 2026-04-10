@@ -268,7 +268,7 @@
             "windowDays": 14,
             "batchSize": 1000,
             "threshold": 0.3,
-            "dailyTimeHHmm": "0300"
+            "dailyTimesHHmm": ["0300", "0900", "1500", "2100"]
         },
         "scheduler": {
             "pollIntervalMs": 180000,

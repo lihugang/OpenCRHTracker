@@ -161,3 +161,29 @@ export function getNextExecutionTimeInShanghaiSeconds(
 
     return getNextDayExecutionTimeInShanghaiSeconds(nowMs, dailyTimeHHmm);
 }
+
+export function getNextExecutionTimeByDailyTimesInShanghaiSeconds(
+    nowMs: number,
+    dailyTimesHHmm: string[]
+): number {
+    if (dailyTimesHHmm.length === 0) {
+        throw new Error('dailyTimesHHmm must not be empty');
+    }
+
+    let nextExecutionTime: number | null = null;
+
+    for (const dailyTimeHHmm of dailyTimesHHmm) {
+        const executionTime = getNextExecutionTimeInShanghaiSeconds(
+            nowMs,
+            dailyTimeHHmm
+        );
+        if (
+            nextExecutionTime === null ||
+            executionTime < nextExecutionTime
+        ) {
+            nextExecutionTime = executionTime;
+        }
+    }
+
+    return nextExecutionTime!;
+}

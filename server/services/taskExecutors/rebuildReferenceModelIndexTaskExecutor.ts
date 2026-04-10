@@ -5,7 +5,7 @@ import { registerTaskExecutor } from '~/server/services/taskExecutorRegistry';
 import { enqueueTask } from '~/server/services/taskQueue';
 import {
     formatShanghaiDateTime,
-    getNextDayExecutionTimeInShanghaiSeconds
+    getNextExecutionTimeByDailyTimesInShanghaiSeconds
 } from '~/server/utils/date/shanghaiDateTime';
 
 export const REBUILD_REFERENCE_MODEL_INDEX_TASK_EXECUTOR =
@@ -16,10 +16,10 @@ const logger = getLogger('task-executor:rebuild-reference-model-index');
 let registered = false;
 
 function enqueueNextDailyReferenceModelTask() {
-    const dailyTimeHHmm = useConfig().task.referenceModel.dailyTimeHHmm;
-    const nextExecutionTime = getNextDayExecutionTimeInShanghaiSeconds(
+    const dailyTimesHHmm = useConfig().task.referenceModel.dailyTimesHHmm;
+    const nextExecutionTime = getNextExecutionTimeByDailyTimesInShanghaiSeconds(
         Date.now(),
-        dailyTimeHHmm
+        dailyTimesHHmm
     );
     const taskId = enqueueTask(
         REBUILD_REFERENCE_MODEL_INDEX_TASK_EXECUTOR,

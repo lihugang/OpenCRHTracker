@@ -67,7 +67,7 @@ interface ReferenceModelTaskConfig {
     windowDays: number;
     batchSize: number;
     threshold: number;
-    dailyTimeHHmm: string;
+    dailyTimesHHmm: string[];
 }
 
 interface LoggingConfig {
@@ -465,6 +465,39 @@ function parseScopeList(value: unknown, name: string) {
     );
 
     return normalizeScopeList(rawScopes);
+}
+
+function parseDailyTimesHHmm(value: unknown, name: string) {
+    const rawDailyTimesHHmm = asArray(value, name);
+    assert(rawDailyTimesHHmm.length > 0, `${name} must not be empty`);
+
+    const dedupedDailyTimesHHmm = new Set<string>();
+    const dailyTimesHHmm = rawDailyTimesHHmm.map((item, index) => {
+        const dailyTimeHHmm = asPlainString(
+            item,
+            `${name}[${index}]`
+        ).trim();
+        assert(
+            dailyTimeHHmm.length > 0,
+            `${name}[${index}] must be a non-empty string`
+        );
+        try {
+            parseDailyTimeHHmm(dailyTimeHHmm);
+        } catch (error) {
+            const message =
+                error instanceof Error ? error.message : String(error);
+            assert(false, `${name}[${index}] is invalid: ${message}`);
+        }
+        assert(
+            !dedupedDailyTimesHHmm.has(dailyTimeHHmm),
+            `${name}[${index}] has duplicated time: ${dailyTimeHHmm}`
+        );
+        dedupedDailyTimesHHmm.add(dailyTimeHHmm);
+        return dailyTimeHHmm;
+    });
+
+    dailyTimesHHmm.sort((left, right) => left.localeCompare(right));
+    return dailyTimesHHmm;
 }
 
 function validateConfig(raw: unknown): Config {
@@ -1285,9 +1318,9 @@ function validateConfig(raw: unknown): Config {
                     'task.referenceModel.threshold',
                     0
                 ),
-                dailyTimeHHmm: asString(
-                    taskReferenceModel.dailyTimeHHmm,
-                    'task.referenceModel.dailyTimeHHmm'
+                dailyTimesHHmm: parseDailyTimesHHmm(
+                    taskReferenceModel.dailyTimesHHmm,
+                    'task.referenceModel.dailyTimesHHmm'
                 )
             },
             scheduler: {
@@ -1538,15 +1571,6 @@ function validateConfig(raw: unknown): Config {
             configResult.task.referenceModel.threshold <= 1,
         'task.referenceModel.threshold must be > 0 and <= 1'
     );
-    try {
-        parseDailyTimeHHmm(configResult.task.referenceModel.dailyTimeHHmm);
-    } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        assert(
-            false,
-            `task.referenceModel.dailyTimeHHmm is invalid: ${message}`
-        );
-    }
     for (const key of ['EMUList', 'QRCode'] as const) {
         const asset = configResult.data.assets[key];
         try {
