@@ -107,6 +107,7 @@ const isNavigating = ref(false);
 const isLandscapeWide = ref(false);
 const splitPreviewVisible = ref(false);
 const transitionTarget = ref<LookupTarget | null>(null);
+const route = useRoute();
 
 let mediaQueryList: MediaQueryList | null = null;
 let mediaQueryHandler: ((event: MediaQueryListEvent) => void) | null = null;
@@ -161,16 +162,25 @@ async function submitLookup() {
 
     inputError.value = '';
     isNavigating.value = true;
+    const sourcePath = route.fullPath;
 
-    if (isLandscapeWide.value) {
-        transitionTarget.value = resolvedTarget;
-        splitPreviewVisible.value = true;
-        await new Promise((resolve) => {
-            window.setTimeout(resolve, ANIMATION_DURATION_MS);
-        });
+    try {
+        if (isLandscapeWide.value) {
+            transitionTarget.value = resolvedTarget;
+            splitPreviewVisible.value = true;
+            await new Promise((resolve) => {
+                window.setTimeout(resolve, ANIMATION_DURATION_MS);
+            });
+        }
+
+        await navigateTo(buildLookupPath(resolvedTarget));
+    } finally {
+        if (route.fullPath === sourcePath) {
+            isNavigating.value = false;
+            splitPreviewVisible.value = false;
+            transitionTarget.value = null;
+        }
     }
-
-    await navigateTo(buildLookupPath(resolvedTarget));
 }
 </script>
 

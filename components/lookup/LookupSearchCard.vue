@@ -1127,14 +1127,28 @@ onBeforeUnmount(() => {
 });
 
 watch(activeIndex, async (value) => {
-    if (value < 0 || !suggestionListRef.value) {
+    if (value < 0 || !shouldShowMenu.value) {
         return;
     }
 
+    const targetIndex = value;
     await nextTick();
 
-    const activeItem = suggestionListRef.value.querySelector<HTMLElement>(
-        `[data-suggestion-index="${value}"]`
+    if (
+        targetIndex !== activeIndex.value ||
+        !shouldShowMenu.value ||
+        !isMenuOpen.value
+    ) {
+        return;
+    }
+
+    const suggestionListElement = suggestionListRef.value;
+    if (!suggestionListElement) {
+        return;
+    }
+
+    const activeItem = suggestionListElement.querySelector<HTMLElement>(
+        `[data-suggestion-index="${targetIndex}"]`
     );
     activeItem?.scrollIntoView({
         block: 'nearest'
