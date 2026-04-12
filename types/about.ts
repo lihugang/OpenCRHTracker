@@ -10,6 +10,11 @@ export interface AboutFontLicenseDefinition {
     licenseText: string;
 }
 
+export interface AboutFriendLinkDefinition {
+    name: string;
+    url: string;
+}
+
 export interface AboutExposedConfigData {
     about: {
         schedulerPollIntervalMs: number;

@@ -60,6 +60,51 @@
 
                         <div
                             class="rounded-[1.25rem] border border-slate-200 bg-white/80 px-5 py-5">
+                            <div class="space-y-4">
+                                <div class="space-y-3">
+                                    <p
+                                        class="text-xs font-medium uppercase tracking-[0.2em] text-crh-blue/80">
+                                        LINKS
+                                    </p>
+                                    <p class="text-sm leading-6 text-slate-600">
+                                        友情链接
+                                    </p>
+                                </div>
+
+                                <div class="grid gap-3 sm:grid-cols-2">
+                                    <a
+                                        v-for="entry in friendLinkEntries"
+                                        :key="entry.url"
+                                        :href="entry.url"
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        class="group rounded-2xl border border-slate-200/90 bg-slate-50/80 px-4 py-4 transition hover:border-crh-blue/30 hover:bg-white hover:shadow-[0_14px_36px_-24px_rgba(15,23,42,0.25)]">
+                                        <div
+                                            class="flex items-start justify-between gap-3">
+                                            <div class="min-w-0 space-y-1.5">
+                                                <p
+                                                    class="text-sm font-semibold text-slate-900 transition group-hover:text-crh-blue">
+                                                    {{ entry.name }}
+                                                </p>
+                                                <p
+                                                    class="break-all text-xs leading-5 text-slate-500">
+                                                    {{ entry.host }}
+                                                </p>
+                                            </div>
+
+                                            <span
+                                                aria-hidden="true"
+                                                class="text-sm text-slate-400 transition group-hover:text-crh-blue">
+                                                ↗
+                                            </span>
+                                        </div>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div
+                            class="rounded-[1.25rem] border border-slate-200 bg-white/80 px-5 py-5">
                             <div class="space-y-3">
                                 <p
                                     class="text-xs font-medium uppercase tracking-[0.2em] text-crh-blue/80">
@@ -114,9 +159,11 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import AboutFontLicenseModal from '~/components/about/AboutFontLicenseModal.vue';
 import type {
     AboutExposedConfigData,
-    AboutFontLicenseName
+    AboutFontLicenseName,
+    AboutFriendLinkDefinition
 } from '~/types/about';
 import type { TrackerApiResponse } from '~/types/homepage';
+import { aboutFriendLinks } from '~/utils/about/friendLinks';
 import {
     aboutFontLicenseNames,
     aboutFontLicenses
@@ -166,9 +213,24 @@ const fontLicenseEntries = computed(() => {
     return aboutFontLicenseNames.map((name) => aboutFontLicenses[name]);
 });
 
+const friendLinkEntries = computed(() => {
+    return aboutFriendLinks.map((entry) => ({
+        ...entry,
+        host: formatFriendLinkHost(entry)
+    }));
+});
+
 const isFontLicenseOpen = computed(() => {
     return activeFontLicenseName.value !== null;
 });
+
+function formatFriendLinkHost(entry: AboutFriendLinkDefinition) {
+    try {
+        return new URL(entry.url).hostname.replace(/^www\./, '');
+    } catch {
+        return entry.url;
+    }
+}
 
 function openFontLicense(fontName: AboutFontLicenseName) {
     activeFontLicenseName.value = fontName;
