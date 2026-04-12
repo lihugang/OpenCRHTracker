@@ -132,6 +132,14 @@
                                 class="inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-900 hover:text-slate-900">
                                 返回首页
                             </NuxtLink>
+                            <a
+                                v-if="shouldShowSponsorLink"
+                                :href="authorSponsorUrl"
+                                target="_blank"
+                                rel="noreferrer"
+                                class="inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-900 hover:text-slate-900">
+                                在爱发电上赞助作者
+                            </a>
                             <NuxtLink
                                 to="/feedback"
                                 class="inline-flex items-center justify-center rounded-2xl bg-crh-blue px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-900">
@@ -170,6 +178,8 @@ import {
 } from '~/utils/about/fontLicenses';
 
 const MOBILE_QUERY = '(max-width: 767px)';
+const { isOfficialInstance, isDevelopment } = useOfficialInstance();
+const authorSponsorUrl = 'https://ifdian.net/a/lihugang';
 
 const requestFetch = useRequestFetch();
 const activeFontLicenseName = ref<AboutFontLicenseName | null>(null);
@@ -218,6 +228,10 @@ const friendLinkEntries = computed(() => {
         ...entry,
         host: formatFriendLinkHost(entry)
     }));
+});
+
+const shouldShowSponsorLink = computed(() => {
+    return isOfficialInstance || isDevelopment;
 });
 
 const isFontLicenseOpen = computed(() => {
