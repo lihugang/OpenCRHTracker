@@ -617,6 +617,27 @@
                         class="text-sm text-status-delayed">
                         {{ createErrorMessage }}
                     </p>
+                    <div
+                        v-if="isUnofficialInstanceFeedbackBlocked"
+                        class="rounded-[1rem] border border-rose-200 bg-rose-50/80 px-4 py-4 text-sm leading-6 text-rose-900">
+                        当前站点不是 Open CRH Tracker 官方站点，反馈功能已被禁用。请前往
+                        <a
+                            :href="officialFeedbackUrl"
+                            class="font-semibold underline decoration-current underline-offset-4 transition hover:text-rose-700"
+                            rel="noreferrer"
+                            target="_blank">
+                            官方反馈页
+                        </a>
+                        或
+                        <a
+                            :href="githubProjectUrl"
+                            class="font-semibold underline decoration-current underline-offset-4 transition hover:text-rose-700"
+                            rel="noreferrer"
+                            target="_blank">
+                            GitHub 仓库
+                        </a>
+                        反馈问题。
+                    </div>
                 </div>
             </div>
 
@@ -633,7 +654,7 @@
                     <UiButton
                         type="button"
                         :loading="isSubmitting"
-                        :disabled="!canSubmitComposer"
+                        :disabled="isSubmitButtonDisabled"
                         @click="submitTopic">
                         提交反馈
                     </UiButton>
@@ -742,8 +763,11 @@ interface TravelCodeQrWorkerResponseMessage {
 const requestFetch = import.meta.server ? useRequestFetch() : $fetch;
 const route = useRoute();
 const { isAuthenticated } = useAuthState();
+const { officialOrigin, shouldShowUnofficialWarning } = useOfficialInstance();
 
 const MOBILE_QUERY = '(max-width: 767px)';
+const githubProjectUrl = 'https://github.com/lihugang/OpenCRHTracker';
+const officialFeedbackUrl = `${officialOrigin}/feedback`;
 
 const desktopPrimaryOptions = feedbackPrimaryTypeSelectOptions.filter(
     (option): option is { value: FeedbackPrimaryType; label: string } =>
@@ -903,6 +927,18 @@ const canSubmitComposer = computed(() => {
     }
 
     return true;
+});
+
+const isUnofficialInstanceFeedbackBlocked = computed(
+    () => shouldShowUnofficialWarning
+);
+
+const isSubmitButtonDisabled = computed(() => {
+    return (
+        isSubmitting.value ||
+        !canSubmitComposer.value ||
+        isUnofficialInstanceFeedbackBlocked.value
+    );
 });
 
 const isPublicVisibility = computed({
@@ -1497,7 +1533,8 @@ async function submitTopic() {
     if (
         isSubmitting.value ||
         !composerForm.primaryType ||
-        !canSubmitComposer.value
+        !canSubmitComposer.value ||
+        isUnofficialInstanceFeedbackBlocked.value
     ) {
         return;
     }
