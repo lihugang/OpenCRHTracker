@@ -197,7 +197,7 @@ export default defineNuxtConfig({
             theme_color: '#fff8e1'
         },
         workbox: {
-            globPatterns: ['**/*.{js,css,png,svg,ico,html}'],
+            globPatterns: ['**/*.{js,css,png,webp,avif,svg,ico,html}'],
             navigateFallback: '/',
             runtimeCaching: [
                 {

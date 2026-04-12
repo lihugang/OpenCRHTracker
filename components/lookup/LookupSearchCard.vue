@@ -3,11 +3,19 @@
         :variant="compact ? 'subtle' : 'accent'"
         allow-overflow>
         <div class="absolute inset-0 overflow-hidden rounded-[inherit]">
-            <img
-                src="/images/background.png"
-                alt=""
-                aria-hidden="true"
-                class="h-full w-full object-cover object-[68%_center]" />
+            <picture class="block h-full w-full">
+                <source
+                    srcset="/images/background.avif"
+                    type="image/avif" />
+                <source
+                    srcset="/images/background.webp"
+                    type="image/webp" />
+                <img
+                    src="/images/background.png"
+                    alt=""
+                    aria-hidden="true"
+                    class="h-full w-full object-cover object-[68%_center]" />
+            </picture>
             <div
                 class="absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,0.95)_0%,rgba(248,250,252,0.86)_42%,rgba(248,250,252,0.72)_72%,rgba(248,250,252,0.84)_100%)]" />
         </div>
