@@ -818,7 +818,7 @@ const viewTabOptions = computed(() => {
     if (canManageFeedback.value) {
         options.push({
             value: 'all',
-            label: '鍏ㄩ儴鍙嶉'
+            label: '全部反馈'
         });
     }
 
