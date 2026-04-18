@@ -6,12 +6,19 @@ const OFFICIAL_HOSTNAME = new TextDecoder()
     .decode(OFFICIAL_HOSTNAME_BYTES)
     .toLowerCase();
 
+function isOfficialHostname(currentHostname: string) {
+    return (
+        currentHostname === OFFICIAL_HOSTNAME ||
+        currentHostname.endsWith(`.${OFFICIAL_HOSTNAME}`)
+    );
+}
+
 export default function useOfficialInstance() {
     const requestUrl = useRequestURL();
     const currentHostname = (requestUrl.hostname || '').toLowerCase();
     const isDevelopment = import.meta.dev;
     const isOfficialInstance =
-        isDevelopment || currentHostname === OFFICIAL_HOSTNAME;
+        isDevelopment || isOfficialHostname(currentHostname);
 
     return {
         currentHostname,
