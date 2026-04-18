@@ -3,7 +3,6 @@ import ApiRequestError from '~/server/utils/api/errors/ApiRequestError';
 import useConfig from '~/server/config';
 import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';
-import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
 import {
     appendFeedbackSystemMessage,
@@ -13,6 +12,7 @@ import {
     updateFeedbackTopicFields
 } from '~/server/services/feedbackStore';
 import { notifyFeedbackStatusUpdated } from '~/server/services/eventNotificationService';
+import { canManageFeedback } from '~/server/utils/feedback/permissions';
 import {
     ensureFeedbackString,
     parseFeedbackTopicId
@@ -37,10 +37,15 @@ export default defineEventHandler(async (event) => {
     const config = useConfig();
     return executeApi(
         event,
-        {
-            requiredScopes: [API_SCOPES.feedback.manage]
-        },
-        async () => {
+        {},
+        async ({ identity }) => {
+            ensure(
+                canManageFeedback(identity),
+                403,
+                'forbidden_scope',
+                '当前身份无法管理反馈'
+            );
+
             const topicId = parseFeedbackTopicId(event.context.params?.id);
             const topic = getFeedbackTopicById(topicId);
 

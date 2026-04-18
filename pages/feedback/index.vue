@@ -722,6 +722,9 @@ import {
     createEmptyFeedbackComposerFields,
     type FeedbackComposerFields
 } from '~/utils/feedback/topic';
+import hasClientScope, {
+    CLIENT_AUTH_SCOPES
+} from '~/utils/auth/hasClientScope';
 import formatTrackerTimestamp from '~/utils/time/formatTrackerTimestamp';
 
 const FeedbackSmartQuestionsModal = defineAsyncComponent(
@@ -762,7 +765,7 @@ interface TravelCodeQrWorkerResponseMessage {
 
 const requestFetch = import.meta.server ? useRequestFetch() : $fetch;
 const route = useRoute();
-const { isAuthenticated } = useAuthState();
+const { session, isAuthenticated } = useAuthState();
 const { officialOrigin, shouldShowUnofficialWarning } = useOfficialInstance();
 
 const MOBILE_QUERY = '(max-width: 767px)';
@@ -773,6 +776,29 @@ const desktopPrimaryOptions = feedbackPrimaryTypeSelectOptions.filter(
     (option): option is { value: FeedbackPrimaryType; label: string } =>
         option.value !== ''
 );
+
+const canManageFeedback = computed(() => {
+    const scopes = session.value?.scopes ?? [];
+    return (
+        hasClientScope(scopes, CLIENT_AUTH_SCOPES.admin) ||
+        hasClientScope(scopes, CLIENT_AUTH_SCOPES.feedbackManage)
+    );
+});
+
+function resolveRequestedView(): FeedbackTopicListResponse['view'] {
+    const requestedView =
+        typeof route.query.view === 'string' ? route.query.view : 'public';
+
+    if (requestedView === 'all') {
+        return canManageFeedback.value ? 'all' : 'public';
+    }
+
+    if (requestedView === 'mine') {
+        return isAuthenticated.value ? 'mine' : 'public';
+    }
+
+    return 'public';
+}
 
 const viewTabOptions = computed(() => {
     const options = [
@@ -789,11 +815,18 @@ const viewTabOptions = computed(() => {
         });
     }
 
+    if (canManageFeedback.value) {
+        options.push({
+            value: 'all',
+            label: '鍏ㄩ儴鍙嶉'
+        });
+    }
+
     return options;
 });
 
-const currentView = ref<'public' | 'mine'>(
-    isAuthenticated.value && route.query.view === 'mine' ? 'mine' : 'public'
+const currentView = ref<FeedbackTopicListResponse['view']>(
+    resolveRequestedView()
 );
 const filterPrimaryType = ref<FeedbackPrimaryType | ''>('');
 const filterSecondaryType = ref<FeedbackSecondaryType | ''>('');
@@ -1444,11 +1477,23 @@ async function loadTopics(reset = true) {
     }
 }
 
-watch(isAuthenticated, (nextValue) => {
-    if (!nextValue && currentView.value === 'mine') {
-        currentView.value = 'public';
+watch(
+    [isAuthenticated, canManageFeedback, () => route.query.view],
+    () => {
+        const requestedView =
+            typeof route.query.view === 'string' ? route.query.view : '';
+        const nextView = resolveRequestedView();
+
+        if (
+            (currentView.value === 'mine' && !isAuthenticated.value) ||
+            (currentView.value === 'all' && !canManageFeedback.value) ||
+            ((requestedView === 'mine' || requestedView === 'all') &&
+                currentView.value !== nextView)
+        ) {
+            currentView.value = nextView;
+        }
     }
-});
+);
 
 watch(filterPrimaryType, (nextValue) => {
     if (!nextValue) {

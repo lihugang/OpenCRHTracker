@@ -2,7 +2,6 @@ import { defineEventHandler, readBody } from 'h3';
 import ApiRequestError from '~/server/utils/api/errors/ApiRequestError';
 import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';
-import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
 import useConfig from '~/server/config';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
 import {
@@ -12,6 +11,7 @@ import {
 import { notifyFeedbackReply } from '~/server/services/eventNotificationService';
 import {
     canManageFeedback,
+    canReplyFeedbackApi,
     canReplyFeedbackTopic,
     canViewFeedbackTopic
 } from '~/server/utils/feedback/permissions';
@@ -29,10 +29,15 @@ export default defineEventHandler(async (event) => {
     const config = useConfig();
     return executeApi(
         event,
-        {
-            requiredScopes: [API_SCOPES.feedback.reply]
-        },
+        {},
         async ({ identity }) => {
+            ensure(
+                canReplyFeedbackApi(identity),
+                403,
+                'forbidden_scope',
+                '当前身份无法发送回复'
+            );
+
             const topicId = parseFeedbackTopicId(event.context.params?.id);
             const topic = getFeedbackTopicById(topicId);
 

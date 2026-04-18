@@ -1,7 +1,7 @@
 import { defineEventHandler } from 'h3';
 import ApiRequestError from '~/server/utils/api/errors/ApiRequestError';
 import executeApi from '~/server/utils/api/executor/executeApi';
-import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
+import ensure from '~/server/utils/api/executor/ensure';
 import {
     buildFeedbackTopicDetail,
     getFeedbackTopicById,
@@ -9,6 +9,7 @@ import {
 } from '~/server/services/feedbackStore';
 import {
     canManageFeedback,
+    canReadFeedback,
     canReplyFeedbackTopic,
     canViewFeedbackTopic,
     isFeedbackOwner
@@ -20,10 +21,16 @@ export default defineEventHandler(async (event) => {
     return executeApi(
         event,
         {
-            cors: true,
-            requiredScopes: [API_SCOPES.feedback.read]
+            cors: true
         },
         async ({ identity }) => {
+            ensure(
+                canReadFeedback(identity),
+                403,
+                'forbidden_scope',
+                '当前身份无法查看反馈'
+            );
+
             const topicId = parseFeedbackTopicId(event.context.params?.id);
             const topic = getFeedbackTopicById(topicId);
 

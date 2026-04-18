@@ -10,7 +10,24 @@ export interface FeedbackTopicAccessTarget {
 }
 
 export function canManageFeedback(identity: ApiIdentity) {
-    return hasScope(identity.scopes, API_SCOPES.feedback.manage);
+    return (
+        hasScope(identity.scopes, API_SCOPES.admin) ||
+        hasScope(identity.scopes, API_SCOPES.feedback.manage)
+    );
+}
+
+export function canReadFeedback(identity: ApiIdentity) {
+    return (
+        canManageFeedback(identity) ||
+        hasScope(identity.scopes, API_SCOPES.feedback.read)
+    );
+}
+
+export function canReplyFeedbackApi(identity: ApiIdentity) {
+    return (
+        canManageFeedback(identity) ||
+        hasScope(identity.scopes, API_SCOPES.feedback.reply)
+    );
 }
 
 export function isFeedbackOwner(

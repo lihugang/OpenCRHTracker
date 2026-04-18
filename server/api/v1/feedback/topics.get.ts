@@ -12,8 +12,10 @@ import {
 import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';
 import parseLimit from '~/server/utils/api/query/parseLimit';
-import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
-import { canManageFeedback } from '~/server/utils/feedback/permissions';
+import {
+    canManageFeedback,
+    canReadFeedback
+} from '~/server/utils/feedback/permissions';
 import type {
     FeedbackPrimaryType,
     FeedbackSecondaryType,
@@ -25,8 +27,7 @@ export default defineEventHandler(async (event) => {
     return executeApi(
         event,
         {
-            cors: true,
-            requiredScopes: [API_SCOPES.feedback.read]
+            cors: true
         },
         async ({ identity }) => {
             const query = getQuery(event);
@@ -95,6 +96,32 @@ export default defineEventHandler(async (event) => {
                 status: rawStatus as FeedbackStatus | ''
             };
 
+            if (rawView === 'all') {
+                ensure(
+                    canManageFeedback(identity),
+                    403,
+                    'forbidden_scope',
+                    '当前身份无法查看全部反馈'
+                );
+
+                const result = listAllFeedbackTopics(filters, cursor, limit);
+
+                return {
+                    view: 'all',
+                    ...filters,
+                    limit,
+                    nextCursor: result.nextCursor,
+                    items: result.items
+                } satisfies FeedbackTopicListResponse;
+            }
+
+            ensure(
+                canReadFeedback(identity),
+                403,
+                'forbidden_scope',
+                '当前身份无法查看反馈'
+            );
+
             if (rawView === 'mine') {
                 ensure(
                     identity.type === 'user',
@@ -112,25 +139,6 @@ export default defineEventHandler(async (event) => {
 
                 return {
                     view: 'mine',
-                    ...filters,
-                    limit,
-                    nextCursor: result.nextCursor,
-                    items: result.items
-                } satisfies FeedbackTopicListResponse;
-            }
-
-            if (rawView === 'all') {
-                ensure(
-                    canManageFeedback(identity),
-                    403,
-                    'forbidden_scope',
-                    '当前身份无法查看全部反馈'
-                );
-
-                const result = listAllFeedbackTopics(filters, cursor, limit);
-
-                return {
-                    view: 'all',
                     ...filters,
                     limit,
                     nextCursor: result.nextCursor,

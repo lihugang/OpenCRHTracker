@@ -1,24 +1,29 @@
 import { defineEventHandler } from 'h3';
 import ApiRequestError from '~/server/utils/api/errors/ApiRequestError';
 import executeApi from '~/server/utils/api/executor/executeApi';
-import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
+import ensure from '~/server/utils/api/executor/ensure';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
 import {
     appendFeedbackSystemMessage,
     getFeedbackTopicById,
     hideFeedbackTopic
 } from '~/server/services/feedbackStore';
-import { notifyFeedbackHidden } from '~/server/services/eventNotificationService';
+import { canManageFeedback } from '~/server/utils/feedback/permissions';
 import { parseFeedbackTopicId } from '~/server/utils/feedback/request';
 import type { DeleteFeedbackTopicResponse } from '~/types/feedback';
 
 export default defineEventHandler(async (event) => {
     return executeApi(
         event,
-        {
-            requiredScopes: [API_SCOPES.feedback.manage]
-        },
-        async () => {
+        {},
+        async ({ identity }) => {
+            ensure(
+                canManageFeedback(identity),
+                403,
+                'forbidden_scope',
+                '当前身份无法管理反馈'
+            );
+
             const topicId = parseFeedbackTopicId(event.context.params?.id);
             const topic = getFeedbackTopicById(topicId);
 

@@ -1,5 +1,6 @@
 export const CLIENT_AUTH_SCOPES = {
-    admin: 'api.admin'
+    admin: 'api.admin',
+    feedbackManage: 'api.feedback.manage'
 } as const;
 
 function normalizeScopeValue(scope: string) {
