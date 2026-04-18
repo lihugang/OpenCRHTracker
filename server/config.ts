@@ -75,6 +75,11 @@ interface LoggingConfig {
 }
 
 const DEFAULT_PUSH_SUBSCRIPTION_SYNC_TIMEOUT_SECONDS = 30;
+const DEFAULT_CLIENT_IP_HEADERS = [
+    'cf-connecting-ip',
+    'x-forwarded-for',
+    'x-real-ip'
+] as const;
 
 const ALLOWED_STARTUP_TASK_EXECUTORS = [
     'build_today_schedule',
@@ -194,6 +199,7 @@ export interface Config {
         versionPrefix: string;
         apiKeyHeader: string;
         authCookieName: string;
+        clientIpHeaders: string[];
         authRateLimit: {
             login: {
                 maxRequests: number;
@@ -397,6 +403,19 @@ function parseNonEmptyStringList(value: unknown, name: string) {
             asString(item, `${name}[${index}]`)
         )
     );
+}
+
+function parseClientIpHeaderList(value: unknown, name: string) {
+    const headers = normalizeUniqueStringList(
+        asArray(value, name).map((item, index) =>
+            asPlainString(item, `${name}[${index}]`).trim().toLowerCase()
+        )
+    );
+    assert(
+        headers.length > 0,
+        `${name} must contain at least one non-empty string`
+    );
+    return headers;
 }
 
 function parseEnvList(rawValue: string | undefined) {
@@ -677,6 +696,13 @@ function validateConfig(raw: unknown): Config {
     }
 
     const api = asObject(root.api, 'api');
+    const apiClientIpHeaders =
+        api.clientIpHeaders === undefined
+            ? [...DEFAULT_CLIENT_IP_HEADERS]
+            : parseClientIpHeaderList(
+                  api.clientIpHeaders,
+                  'api.clientIpHeaders'
+              );
     const apiAuthRateLimit = asObject(api.authRateLimit, 'api.authRateLimit');
     const apiAuthRateLimitLogin = asObject(
         apiAuthRateLimit.login,
@@ -1082,6 +1108,7 @@ function validateConfig(raw: unknown): Config {
             versionPrefix: asString(api.versionPrefix, 'api.versionPrefix'),
             apiKeyHeader: asString(api.apiKeyHeader, 'api.apiKeyHeader'),
             authCookieName: asString(api.authCookieName, 'api.authCookieName'),
+            clientIpHeaders: apiClientIpHeaders,
             authRateLimit: {
                 login: {
                     maxRequests: asInteger(

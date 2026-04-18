@@ -573,6 +573,13 @@
                     "type": "string",
                     "minLength": 1
                 },
+                "clientIpHeaders": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "minLength": 1
+                    }
+                },
                 "authRateLimit": {
                     "type": "object",
                     "additionalProperties": false,

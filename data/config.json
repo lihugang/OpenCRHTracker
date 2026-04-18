@@ -143,6 +143,11 @@
         "versionPrefix": "/api/v1",
         "apiKeyHeader": "authorization",
         "authCookieName": "token",
+        "clientIpHeaders": [
+            "cf-connecting-ip",
+            "x-forwarded-for",
+            "x-real-ip"
+        ],
         "authRateLimit": {
             "login": {
                 "maxRequests": 10,
