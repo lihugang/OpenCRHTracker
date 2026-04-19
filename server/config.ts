@@ -70,6 +70,13 @@ interface ReferenceModelTaskConfig {
     dailyTimesHHmm: string[];
 }
 
+interface CirculationTaskConfig {
+    windowDays: number;
+    batchSize: number;
+    threshold: number;
+    dailyTimesHHmm: string[];
+}
+
 interface LoggingConfig {
     retentionDays: number;
 }
@@ -88,7 +95,8 @@ const ALLOWED_STARTUP_TASK_EXECUTORS = [
     'clear_daily_probe_status',
     'cleanup_revoked_api_keys',
     'export_daily_records',
-    'rebuild_reference_model_index'
+    'rebuild_reference_model_index',
+    'rebuild_train_circulation_index'
 ] as const;
 
 type StartupTaskExecutor = (typeof ALLOWED_STARTUP_TASK_EXECUTORS)[number];
@@ -257,6 +265,7 @@ export interface Config {
         apiKeyCleanup: ApiKeyCleanupConfig;
         dailyExport: DailyExportTaskConfig;
         referenceModel: ReferenceModelTaskConfig;
+        circulation: CirculationTaskConfig;
         scheduler: {
             pollIntervalMs: number;
             maxTasksPerQuery: number;
@@ -769,6 +778,7 @@ function validateConfig(raw: unknown): Config {
         task.referenceModel,
         'task.referenceModel'
     );
+    const taskCirculation = asObject(task.circulation, 'task.circulation');
     const taskScheduler = asObject(task.scheduler, 'task.scheduler');
     const taskSchedulerIdle = asObject(
         taskScheduler.idle,
@@ -1350,6 +1360,27 @@ function validateConfig(raw: unknown): Config {
                     'task.referenceModel.dailyTimesHHmm'
                 )
             },
+            circulation: {
+                windowDays: asInteger(
+                    taskCirculation.windowDays,
+                    'task.circulation.windowDays',
+                    1
+                ),
+                batchSize: asInteger(
+                    taskCirculation.batchSize,
+                    'task.circulation.batchSize',
+                    1
+                ),
+                threshold: asNumber(
+                    taskCirculation.threshold,
+                    'task.circulation.threshold',
+                    0
+                ),
+                dailyTimesHHmm: parseDailyTimesHHmm(
+                    taskCirculation.dailyTimesHHmm,
+                    'task.circulation.dailyTimesHHmm'
+                )
+            },
             scheduler: {
                 pollIntervalMs: asInteger(
                     taskScheduler.pollIntervalMs,
@@ -1597,6 +1628,11 @@ function validateConfig(raw: unknown): Config {
         configResult.task.referenceModel.threshold > 0 &&
             configResult.task.referenceModel.threshold <= 1,
         'task.referenceModel.threshold must be > 0 and <= 1'
+    );
+    assert(
+        configResult.task.circulation.threshold > 0 &&
+            configResult.task.circulation.threshold <= 1,
+        'task.circulation.threshold must be > 0 and <= 1'
     );
     for (const key of ['EMUList', 'QRCode'] as const) {
         const asset = configResult.data.assets[key];

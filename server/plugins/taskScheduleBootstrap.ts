@@ -42,6 +42,10 @@ import {
     REBUILD_REFERENCE_MODEL_INDEX_TASK_EXECUTOR,
     registerRebuildReferenceModelIndexTaskExecutor
 } from '~/server/services/taskExecutors/rebuildReferenceModelIndexTaskExecutor';
+import {
+    REBUILD_TRAIN_CIRCULATION_INDEX_TASK_EXECUTOR,
+    registerRebuildTrainCirculationIndexTaskExecutor
+} from '~/server/services/taskExecutors/rebuildTrainCirculationIndexTaskExecutor';
 import { registerDetectCoupledEmuGroupTaskExecutor } from '~/server/services/taskExecutors/detectCoupledEmuGroupTaskExecutor';
 import {
     REFRESH_ASSET_TASK_DEFINITIONS,
@@ -62,7 +66,8 @@ const STARTUP_EXECUTORS = [
     CLEAR_DAILY_PROBE_STATUS_TASK_EXECUTOR,
     CLEANUP_REVOKED_API_KEYS_TASK_EXECUTOR,
     EXPORT_DAILY_RECORDS_TASK_EXECUTOR,
-    REBUILD_REFERENCE_MODEL_INDEX_TASK_EXECUTOR
+    REBUILD_REFERENCE_MODEL_INDEX_TASK_EXECUTOR,
+    REBUILD_TRAIN_CIRCULATION_INDEX_TASK_EXECUTOR
 ] as const;
 
 function reconcileStartupTask(
@@ -193,6 +198,7 @@ export default defineNitroPlugin(async () => {
         registerCleanupRevokedApiKeysTaskExecutor();
         registerExportDailyRecordsTaskExecutor();
         registerRebuildReferenceModelIndexTaskExecutor();
+        registerRebuildTrainCirculationIndexTaskExecutor();
         registerDetectCoupledEmuGroupTaskExecutor();
         registerRefreshAssetFileTaskExecutors();
 
@@ -249,6 +255,20 @@ export default defineNitroPlugin(async () => {
             );
             enqueuedStartupTasks.push(
                 `${REBUILD_REFERENCE_MODEL_INDEX_TASK_EXECUTOR}:${referenceModelTask.taskId}`
+            );
+        }
+
+        if (
+            !disabledStartupExecutors.has(
+                REBUILD_TRAIN_CIRCULATION_INDEX_TASK_EXECUTOR
+            )
+        ) {
+            const circulationTask = reconcileStartupTask(
+                REBUILD_TRAIN_CIRCULATION_INDEX_TASK_EXECUTOR,
+                executionTime
+            );
+            enqueuedStartupTasks.push(
+                `${REBUILD_TRAIN_CIRCULATION_INDEX_TASK_EXECUTOR}:${circulationTask.taskId}`
             );
         }
 

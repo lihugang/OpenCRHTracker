@@ -41,7 +41,7 @@ export const crawlDocsSections: DocsContentSection[] = [
                     'build_today_schedule：负责生成今日时刻表，并在成功后补发 dispatch_daily_probe_tasks。',
                     'generate_route_refresh_tasks 与 refresh_route_batch：负责对时刻表中过期或缺失的线路信息做增量补刷。',
                     'dispatch_daily_probe_tasks 与 probe_train_departure：负责把今日的时刻表拆成发车探测任务，并在发车窗口内识别担当。',
-                    'clear_daily_probe_status、detect_coupled_emu_group、export_daily_records、rebuild_reference_model_index 等任务会围绕状态清理、耦合检测、导出和参考车型索引刷新继续运转。'
+                    'clear_daily_probe_status、detect_coupled_emu_group、export_daily_records、rebuild_reference_model_index、rebuild_train_circulation_index 等任务会围绕状态清理、耦合检测、导出、参考车型索引刷新和交路索引重建继续运转。'
                 ]
             },
             {
@@ -58,7 +58,49 @@ export const crawlDocsSections: DocsContentSection[] = [
                     '  -> reconcile generate_route_refresh_tasks',
                     '  -> reconcile clear_daily_probe_status',
                     '  -> reconcile export_daily_records',
-                    '  -> reconcile rebuild_reference_model_index'
+                    '  -> reconcile rebuild_reference_model_index',
+                    '  -> reconcile rebuild_train_circulation_index'
+                ].join('\n')
+            }
+        ]
+    },
+    {
+        id: 'circulation-index',
+        title: '推断交路索引',
+        summary:
+            '系统会按近 14 天运用记录流式扫描 daily_emu_routes，为当前时刻表中的车次推断交路，并把结果并入车次时刻表接口响应。',
+        blocks: [
+            {
+                type: 'paragraph',
+                text: 'rebuild_train_circulation_index 的入口在 server/services/taskExecutors/rebuildTrainCirculationIndexTaskExecutor.ts。它会分页读取 daily_emu_routes，按车组聚合同一天内相邻车次，清洗跨整天断开的边，归一化入边和出边权重，再按阈值提取交路；无法稳定并入已有交路的临客会自然保留为单车次交路。'
+            },
+            {
+                type: 'list',
+                title: '当前实现要点',
+                items: [
+                    '只扫描 task.circulation.windowDays 指定窗口内的数据，避免全表加载，适合每天约 20k 条记录的生产规模。',
+                    '当相邻观测跨越超过 1 个自然日时会删除这条边；相邻自然日的正常连接会被保留。',
+                    'threshold 只作用于归一化后的边权重；1/1 的单次强连接允许保留。',
+                    '如果遍历中形成环，会优先选择出边优势最大的节点作为交路终点；剩余未归路车次会补成单节点交路。'
+                ]
+            },
+            {
+                type: 'list',
+                title: '接口行为',
+                items: [
+                    '当前不新增独立公开接口，而是把 inferredCirculation 直接并入 /api/v1/timetable/train/{trainCode} 的响应。',
+                    '当前只为今日时刻表中存在的车次返回推断交路结果；如果索引里不存在该车次，就不会附带交路数据。'
+                ]
+            },
+            {
+                type: 'code',
+                title: '相关配置',
+                language: 'text',
+                code: [
+                    'task.circulation.windowDays',
+                    'task.circulation.batchSize',
+                    'task.circulation.threshold',
+                    'task.circulation.dailyTimesHHmm'
                 ].join('\n')
             }
         ]
@@ -351,7 +393,7 @@ export const crawlDocsSections: DocsContentSection[] = [
                         valueType: 'array<string>',
                         required: false,
                         description:
-                            '可以在启动时跳过 build_today_schedule、generate_route_refresh_tasks、rebuild_reference_model_index 等关键任务。',
+                            '可以在启动时跳过 build_today_schedule、generate_route_refresh_tasks、rebuild_reference_model_index、rebuild_train_circulation_index 等关键任务。',
                         notes: [
                             '排查“为什么启动后不抓取”时，先检查这里是否禁用了对应 executor。'
                         ]
@@ -370,9 +412,9 @@ export const crawlDocsSections: DocsContentSection[] = [
                 type: 'list',
                 title: '建议先检查的点',
                 items: [
-                    '看启动日志是否出现 registered executor=build_today_schedule、generate_route_refresh_tasks、probe_train_departure 等关键注册日志。',
+                    '看启动日志是否出现 registered executor=build_today_schedule、generate_route_refresh_tasks、probe_train_departure、rebuild_train_circulation_index 等关键注册日志。',
                     '确认 data.assets.schedule.file 指向的时刻表更新时间是否为当天，而不是旧文件或状态处于构建中。',
-                    '确认 task.startup.disabledExecutors 没有禁用 build_today_schedule、generate_route_refresh_tasks 或 rebuild_reference_model_index。',
+                    '确认 task.startup.disabledExecutors 没有禁用 build_today_schedule、generate_route_refresh_tasks、rebuild_reference_model_index 或 rebuild_train_circulation_index。',
                     '如果当天探测没有生成，优先检查 build_today_schedule 是否成功，以及是否添加了 dispatch_daily_probe_tasks。'
                 ]
             },

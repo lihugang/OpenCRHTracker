@@ -196,7 +196,12 @@ const taskFlowCode = [
     '                  -> upgrade to CoupledFormationResolved or finalize single',
     '                  -> persistBackfilledCoupledRoutes when coupled',
     '  -> generate_route_refresh_tasks',
-    '      -> refresh_route_batch x N'
+    '      -> refresh_route_batch x N',
+    '  -> rebuild_train_circulation_index',
+    '      -> stream daily_emu_routes window',
+    '      -> normalize edge weights / break loops',
+    '      -> persist inferred circulations',
+    '      -> embed inferredCirculation into timetable responses'
 ].join('\n');
 
 definePageMeta({

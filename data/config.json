@@ -275,6 +275,12 @@
             "threshold": 0.3,
             "dailyTimesHHmm": ["0300", "0900", "1500", "2100"]
         },
+        "circulation": {
+            "windowDays": 14,
+            "batchSize": 2000,
+            "threshold": 0.8,
+            "dailyTimesHHmm": ["0200"]
+        },
         "scheduler": {
             "pollIntervalMs": 180000,
             "maxTasksPerQuery": 65535,

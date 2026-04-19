@@ -884,6 +884,102 @@ export const developerDocsOpenApi = {
                     }
                 }
             },
+            InferredCirculationNode: {
+                type: 'object',
+                required: [
+                    'internalCode',
+                    'allCodes',
+                    'incomingWeight',
+                    'incomingSupportCount',
+                    'outgoingWeight',
+                    'outgoingSupportCount'
+                ],
+                properties: {
+                    internalCode: {
+                        type: 'string',
+                        nullable: true,
+                        example: '2400000G8388B'
+                    },
+                    allCodes: {
+                        type: 'array',
+                        items: {
+                            type: 'string'
+                        },
+                        example: ['G8388', 'G8385']
+                    },
+                    incomingWeight: {
+                        type: 'number',
+                        nullable: true,
+                        example: null
+                    },
+                    incomingSupportCount: {
+                        type: 'integer',
+                        nullable: true,
+                        example: null
+                    },
+                    outgoingWeight: {
+                        type: 'number',
+                        nullable: true,
+                        example: 1
+                    },
+                    outgoingSupportCount: {
+                        type: 'integer',
+                        nullable: true,
+                        example: 3
+                    }
+                }
+            },
+            InferredCirculation: {
+                type: 'object',
+                required: [
+                    'routeId',
+                    'windowStart',
+                    'windowEnd',
+                    'threshold',
+                    'lowestLinkWeight',
+                    'lowestLinkSupportCount',
+                    'containsLoopBreak',
+                    'nodes'
+                ],
+                properties: {
+                    routeId: {
+                        type: 'string',
+                        example: 'circulation_a1b2c3d4'
+                    },
+                    windowStart: {
+                        type: 'integer',
+                        example: 1775347200
+                    },
+                    windowEnd: {
+                        type: 'integer',
+                        example: 1776556799
+                    },
+                    threshold: {
+                        type: 'number',
+                        example: 0.8
+                    },
+                    lowestLinkWeight: {
+                        type: 'number',
+                        nullable: true,
+                        example: 1
+                    },
+                    lowestLinkSupportCount: {
+                        type: 'integer',
+                        nullable: true,
+                        example: 3
+                    },
+                    containsLoopBreak: {
+                        type: 'boolean',
+                        example: false
+                    },
+                    nodes: {
+                        type: 'array',
+                        items: {
+                            $ref: '#/components/schemas/InferredCirculationNode'
+                        }
+                    }
+                }
+            },
             CurrentTrainTimetableResponse: {
                 type: 'object',
                 required: ['ok', 'data', 'error'],
@@ -908,6 +1004,7 @@ export const developerDocsOpenApi = {
                             'endStation',
                             'startAt',
                             'endAt',
+                            'inferredCirculation',
                             'stops'
                         ],
                         properties: {
@@ -974,6 +1071,73 @@ export const developerDocsOpenApi = {
                             endAt: {
                                 type: 'integer',
                                 example: 1774076820
+                            },
+                            inferredCirculation: {
+                                oneOf: [
+                                    {
+                                        $ref: '#/components/schemas/InferredCirculation'
+                                    }
+                                ],
+                                nullable: true,
+                                example: {
+                                    routeId: 'circulation_ed7147d7',
+                                    windowStart: 1775404800,
+                                    windowEnd: 1776614399,
+                                    threshold: 0.8,
+                                    lowestLinkWeight: 1,
+                                    lowestLinkSupportCount: 13,
+                                    containsLoopBreak: false,
+                                    nodes: [
+                                        {
+                                            internalCode: '38000G208500',
+                                            allCodes: ['G2085'],
+                                            incomingWeight: null,
+                                            incomingSupportCount: null,
+                                            outgoingWeight: 1,
+                                            outgoingSupportCount: 14
+                                        },
+                                        {
+                                            internalCode: '390000G5120C',
+                                            allCodes: ['G512'],
+                                            incomingWeight: 1,
+                                            incomingSupportCount: 14,
+                                            outgoingWeight: 1,
+                                            outgoingSupportCount: 13
+                                        },
+                                        {
+                                            internalCode: '240000G34910',
+                                            allCodes: ['G349'],
+                                            incomingWeight: 1,
+                                            incomingSupportCount: 13,
+                                            outgoingWeight: 1,
+                                            outgoingSupportCount: 13
+                                        },
+                                        {
+                                            internalCode: '4E000G228800',
+                                            allCodes: ['G2288', 'G2289'],
+                                            incomingWeight: 1,
+                                            incomingSupportCount: 13,
+                                            outgoingWeight: 1,
+                                            outgoingSupportCount: 14
+                                        },
+                                        {
+                                            internalCode: '40000G182401',
+                                            allCodes: ['G1821', 'G1824'],
+                                            incomingWeight: 1,
+                                            incomingSupportCount: 14,
+                                            outgoingWeight: 1,
+                                            outgoingSupportCount: 13
+                                        },
+                                        {
+                                            internalCode: '5L00000G8400',
+                                            allCodes: ['G84', 'G85'],
+                                            incomingWeight: 1,
+                                            incomingSupportCount: 13,
+                                            outgoingWeight: null,
+                                            outgoingSupportCount: null
+                                        }
+                                    ]
+                                }
                             },
                             stops: {
                                 type: 'array',
@@ -2058,6 +2222,161 @@ export const developerDocsOpenApi = {
                             'application/json': {
                                 schema: {
                                     $ref: '#/components/schemas/CurrentTrainTimetableResponse'
+                                },
+                                example: {
+                                    ok: true,
+                                    data: {
+                                        updatedAt: 1774893900,
+                                        requestTrainCode: 'G512',
+                                        trainCode: 'G512',
+                                        internalCode: '390000G5120C',
+                                        allCodes: ['G512'],
+                                        bureauCode: 'N',
+                                        trainDepartment: '郑州动车段',
+                                        passengerDepartment: '郑州客运段',
+                                        referenceModels: [
+                                            {
+                                                model: 'CR400BF-A',
+                                                weightedShare: 1
+                                            }
+                                        ],
+                                        startStation: '汉口',
+                                        endStation: '北京西',
+                                        startAt: 1776575340,
+                                        endAt: 1776594060,
+                                        inferredCirculation: {
+                                            routeId: 'circulation_ed7147d7',
+                                            windowStart: 1775404800,
+                                            windowEnd: 1776614399,
+                                            threshold: 0.8,
+                                            lowestLinkWeight: 1,
+                                            lowestLinkSupportCount: 13,
+                                            containsLoopBreak: false,
+                                            nodes: [
+                                                {
+                                                    internalCode: '38000G208500',
+                                                    allCodes: ['G2085'],
+                                                    incomingWeight: null,
+                                                    incomingSupportCount: null,
+                                                    outgoingWeight: 1,
+                                                    outgoingSupportCount: 14
+                                                },
+                                                {
+                                                    internalCode: '390000G5120C',
+                                                    allCodes: ['G512'],
+                                                    incomingWeight: 1,
+                                                    incomingSupportCount: 14,
+                                                    outgoingWeight: 1,
+                                                    outgoingSupportCount: 13
+                                                },
+                                                {
+                                                    internalCode: '240000G34910',
+                                                    allCodes: ['G349'],
+                                                    incomingWeight: 1,
+                                                    incomingSupportCount: 13,
+                                                    outgoingWeight: 1,
+                                                    outgoingSupportCount: 13
+                                                },
+                                                {
+                                                    internalCode: '4E000G228800',
+                                                    allCodes: ['G2288', 'G2289'],
+                                                    incomingWeight: 1,
+                                                    incomingSupportCount: 13,
+                                                    outgoingWeight: 1,
+                                                    outgoingSupportCount: 14
+                                                },
+                                                {
+                                                    internalCode: '40000G182401',
+                                                    allCodes: ['G1821', 'G1824'],
+                                                    incomingWeight: 1,
+                                                    incomingSupportCount: 14,
+                                                    outgoingWeight: 1,
+                                                    outgoingSupportCount: 13
+                                                },
+                                                {
+                                                    internalCode: '5L00000G8400',
+                                                    allCodes: ['G84', 'G85'],
+                                                    incomingWeight: 1,
+                                                    incomingSupportCount: 13,
+                                                    outgoingWeight: null,
+                                                    outgoingSupportCount: null
+                                                }
+                                            ]
+                                        },
+                                        stops: [
+                                            {
+                                                stationNo: 1,
+                                                stationName: '汉口',
+                                                arriveAt: 1776575340,
+                                                departAt: 1776575340,
+                                                stationTrainCode: 'G512',
+                                                wicket: '二楼11B检票口',
+                                                isStart: true,
+                                                isEnd: false
+                                            },
+                                            {
+                                                stationNo: 2,
+                                                stationName: '许昌东',
+                                                arriveAt: 1776581040,
+                                                departAt: 1776581760,
+                                                stationTrainCode: 'G512',
+                                                wicket: '一层检票口',
+                                                isStart: false,
+                                                isEnd: false
+                                            },
+                                            {
+                                                stationNo: 3,
+                                                stationName: '郑州东',
+                                                arriveAt: 1776583140,
+                                                departAt: 1776583320,
+                                                stationTrainCode: 'G512',
+                                                wicket: '6A_7A,6B_7B',
+                                                isStart: false,
+                                                isEnd: false
+                                            },
+                                            {
+                                                stationNo: 4,
+                                                stationName: '高邑西',
+                                                arriveAt: 1776588120,
+                                                departAt: 1776588240,
+                                                stationTrainCode: 'G512',
+                                                wicket: '检票口1',
+                                                isStart: false,
+                                                isEnd: false
+                                            },
+                                            {
+                                                stationNo: 5,
+                                                stationName: '石家庄',
+                                                arriveAt: 1776589140,
+                                                departAt: 1776589320,
+                                                stationTrainCode: 'G512',
+                                                wicket: '14B15B',
+                                                isStart: false,
+                                                isEnd: false
+                                            },
+                                            {
+                                                stationNo: 6,
+                                                stationName: '保定东',
+                                                arriveAt: 1776591420,
+                                                departAt: 1776591540,
+                                                stationTrainCode: 'G512',
+                                                wicket: '进站检票口,进站检票口2',
+                                                isStart: false,
+                                                isEnd: false
+                                            },
+                                            {
+                                                stationNo: 7,
+                                                stationName: '北京西',
+                                                arriveAt: 1776594060,
+                                                departAt: 1776594060,
+                                                stationTrainCode: 'G512',
+                                                wicket: '',
+                                                isStart: false,
+                                                isEnd: true
+                                            }
+                                        ]
+                                    },
+                                    error: ''
                                 }
                             }
                         }

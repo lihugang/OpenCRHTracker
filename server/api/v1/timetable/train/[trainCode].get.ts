@@ -1,6 +1,7 @@
 import { defineEventHandler, getRouterParam } from 'h3';
 import useConfig from '~/server/config';
 import { getReferenceModelsByTrainCodes } from '~/server/services/referenceModelIndexStore';
+import { getInferredCirculationByTrainCodes } from '~/server/services/trainCirculationIndexStore';
 import { getTodayScheduleTimetableByTrainCode } from '~/server/services/todayScheduleCache';
 import getFixedCost from '~/server/utils/api/cost/getFixedCost';
 import executeApi from '~/server/utils/api/executor/executeApi';
@@ -55,6 +56,9 @@ export default defineEventHandler(async (event) => {
                 endStation: timetable.endStation,
                 startAt: timetable.startAt,
                 endAt: timetable.endAt,
+                inferredCirculation: getInferredCirculationByTrainCodes(
+                    timetable.allCodes
+                ),
                 stops: timetable.stops.map((stop) => ({
                     ...stop
                 }))

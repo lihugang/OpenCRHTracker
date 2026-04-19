@@ -102,6 +102,26 @@ export interface CurrentTrainTimetableStop {
     isEnd: boolean;
 }
 
+export interface InferredCirculationNode {
+    internalCode: string | null;
+    allCodes: string[];
+    incomingWeight: number | null;
+    incomingSupportCount: number | null;
+    outgoingWeight: number | null;
+    outgoingSupportCount: number | null;
+}
+
+export interface InferredCirculation {
+    routeId: string;
+    windowStart: number;
+    windowEnd: number;
+    threshold: number;
+    lowestLinkWeight: number | null;
+    lowestLinkSupportCount: number | null;
+    containsLoopBreak: boolean;
+    nodes: InferredCirculationNode[];
+}
+
 export interface CurrentTrainTimetableData {
     updatedAt: number | null;
     requestTrainCode: string;
@@ -116,6 +136,7 @@ export interface CurrentTrainTimetableData {
     endStation: string;
     startAt: number;
     endAt: number;
+    inferredCirculation: InferredCirculation | null;
     stops: CurrentTrainTimetableStop[];
 }
 
