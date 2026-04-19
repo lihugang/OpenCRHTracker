@@ -105,6 +105,10 @@ export interface CurrentTrainTimetableStop {
 export interface InferredCirculationNode {
     internalCode: string | null;
     allCodes: string[];
+    startStation: string;
+    endStation: string;
+    startAt: number | null;
+    endAt: number | null;
     incomingWeight: number | null;
     incomingSupportCount: number | null;
     outgoingWeight: number | null;

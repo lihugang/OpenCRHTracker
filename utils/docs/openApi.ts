@@ -889,6 +889,10 @@ export const developerDocsOpenApi = {
                 required: [
                     'internalCode',
                     'allCodes',
+                    'startStation',
+                    'endStation',
+                    'startAt',
+                    'endAt',
                     'incomingWeight',
                     'incomingSupportCount',
                     'outgoingWeight',
@@ -906,6 +910,24 @@ export const developerDocsOpenApi = {
                             type: 'string'
                         },
                         example: ['G8388', 'G8385']
+                    },
+                    startStation: {
+                        type: 'string',
+                        example: '北京南'
+                    },
+                    endStation: {
+                        type: 'string',
+                        example: '上海虹桥'
+                    },
+                    startAt: {
+                        type: 'integer',
+                        nullable: true,
+                        example: 1774060020
+                    },
+                    endAt: {
+                        type: 'integer',
+                        nullable: true,
+                        example: 1774076820
                     },
                     incomingWeight: {
                         type: 'number',
@@ -1096,6 +1118,10 @@ export const developerDocsOpenApi = {
                                         {
                                             internalCode: '38000G208500',
                                             allCodes: ['G2085'],
+                                            startStation: '青岛北',
+                                            endStation: '杭州西',
+                                            startAt: 1776419400,
+                                            endAt: 1776437280,
                                             incomingWeight: null,
                                             incomingSupportCount: null,
                                             outgoingWeight: 1,
@@ -1104,6 +1130,10 @@ export const developerDocsOpenApi = {
                                         {
                                             internalCode: '390000G5120C',
                                             allCodes: ['G512'],
+                                            startStation: '杭州西',
+                                            endStation: '武汉',
+                                            startAt: 1776440400,
+                                            endAt: 1776451440,
                                             incomingWeight: 1,
                                             incomingSupportCount: 14,
                                             outgoingWeight: 1,
@@ -1112,6 +1142,10 @@ export const developerDocsOpenApi = {
                                         {
                                             internalCode: '240000G34910',
                                             allCodes: ['G349'],
+                                            startStation: '武汉',
+                                            endStation: '北京南',
+                                            startAt: 1776454200,
+                                            endAt: 1776473280,
                                             incomingWeight: 1,
                                             incomingSupportCount: 13,
                                             outgoingWeight: 1,
@@ -1120,6 +1154,10 @@ export const developerDocsOpenApi = {
                                         {
                                             internalCode: '4E000G228800',
                                             allCodes: ['G2288', 'G2289'],
+                                            startStation: '北京南',
+                                            endStation: '青岛北',
+                                            startAt: 1776476400,
+                                            endAt: 1776494280,
                                             incomingWeight: 1,
                                             incomingSupportCount: 13,
                                             outgoingWeight: 1,
@@ -1128,6 +1166,10 @@ export const developerDocsOpenApi = {
                                         {
                                             internalCode: '40000G182401',
                                             allCodes: ['G1821', 'G1824'],
+                                            startStation: '青岛北',
+                                            endStation: '上海虹桥',
+                                            startAt: 1776498000,
+                                            endAt: 1776517200,
                                             incomingWeight: 1,
                                             incomingSupportCount: 14,
                                             outgoingWeight: 1,
@@ -1136,6 +1178,10 @@ export const developerDocsOpenApi = {
                                         {
                                             internalCode: '5L00000G8400',
                                             allCodes: ['G84', 'G85'],
+                                            startStation: '上海虹桥',
+                                            endStation: '北京南',
+                                            startAt: 1776521400,
+                                            endAt: 1776540000,
                                             incomingWeight: 1,
                                             incomingSupportCount: 13,
                                             outgoingWeight: null,
@@ -2262,6 +2308,10 @@ export const developerDocsOpenApi = {
                                                 {
                                                     internalCode: '38000G208500',
                                                     allCodes: ['G2085'],
+                                                    startStation: '青岛北',
+                                                    endStation: '杭州西',
+                                                    startAt: 1776419400,
+                                                    endAt: 1776437280,
                                                     incomingWeight: null,
                                                     incomingSupportCount: null,
                                                     outgoingWeight: 1,
@@ -2270,6 +2320,10 @@ export const developerDocsOpenApi = {
                                                 {
                                                     internalCode: '390000G5120C',
                                                     allCodes: ['G512'],
+                                                    startStation: '汉口',
+                                                    endStation: '北京西',
+                                                    startAt: 1776575340,
+                                                    endAt: 1776594060,
                                                     incomingWeight: 1,
                                                     incomingSupportCount: 14,
                                                     outgoingWeight: 1,
@@ -2278,6 +2332,10 @@ export const developerDocsOpenApi = {
                                                 {
                                                     internalCode: '240000G34910',
                                                     allCodes: ['G349'],
+                                                    startStation: '北京西',
+                                                    endStation: '郑州东',
+                                                    startAt: 1776597000,
+                                                    endAt: 1776610500,
                                                     incomingWeight: 1,
                                                     incomingSupportCount: 13,
                                                     outgoingWeight: 1,
@@ -2286,6 +2344,10 @@ export const developerDocsOpenApi = {
                                                 {
                                                     internalCode: '4E000G228800',
                                                     allCodes: ['G2288', 'G2289'],
+                                                    startStation: '郑州东',
+                                                    endStation: '青岛北',
+                                                    startAt: 1776613200,
+                                                    endAt: 1776630600,
                                                     incomingWeight: 1,
                                                     incomingSupportCount: 13,
                                                     outgoingWeight: 1,
@@ -2294,6 +2356,10 @@ export const developerDocsOpenApi = {
                                                 {
                                                     internalCode: '40000G182401',
                                                     allCodes: ['G1821', 'G1824'],
+                                                    startStation: '青岛北',
+                                                    endStation: '上海虹桥',
+                                                    startAt: 1776498000,
+                                                    endAt: 1776517200,
                                                     incomingWeight: 1,
                                                     incomingSupportCount: 14,
                                                     outgoingWeight: 1,
@@ -2302,6 +2368,10 @@ export const developerDocsOpenApi = {
                                                 {
                                                     internalCode: '5L00000G8400',
                                                     allCodes: ['G84', 'G85'],
+                                                    startStation: '上海虹桥',
+                                                    endStation: '北京南',
+                                                    startAt: 1776521400,
+                                                    endAt: 1776540000,
                                                     incomingWeight: 1,
                                                     incomingSupportCount: 13,
                                                     outgoingWeight: null,

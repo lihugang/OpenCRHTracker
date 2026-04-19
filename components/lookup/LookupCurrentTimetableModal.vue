@@ -206,6 +206,314 @@
                     </div>
                 </UiCard>
             </div>
+
+            <UiCard
+                :show-accent-bar="false"
+                variant="subtle">
+                <div class="space-y-4">
+                    <p
+                        class="text-xs uppercase tracking-[0.16em] text-slate-400">
+                        交路表
+                    </p>
+
+                    <div
+                        v-if="circulationNodes.length > 0"
+                        class="hidden space-y-3 md:block">
+                        <div
+                            v-for="(node, index) in circulationNodes"
+                            :key="`desktop:${node.key}`"
+                            class="flex gap-3">
+                            <div class="flex w-7 shrink-0 flex-col items-center">
+                                <span
+                                    :class="[
+                                        'inline-flex h-7 w-7 items-center justify-center rounded-full border text-xs font-semibold transition',
+                                        node.isCurrent
+                                            ? 'border-crh-blue bg-crh-blue text-white shadow-[0_6px_16px_-10px_rgba(0,82,155,0.85)]'
+                                            : 'border-slate-200 bg-white text-slate-500'
+                                    ]">
+                                    {{ index + 1 }}
+                                </span>
+                                <span
+                                    v-if="index + 1 < circulationNodes.length"
+                                    :class="[
+                                        'mt-2 min-h-6 w-px flex-1',
+                                        node.isCurrent
+                                            ? 'bg-crh-blue/30'
+                                            : 'bg-slate-200'
+                                    ]"
+                                    aria-hidden="true" />
+                            </div>
+
+                            <div
+                                :class="[
+                                    'min-w-0 flex-1 rounded-[1rem] border px-4 py-3 transition',
+                                    node.isCurrent
+                                        ? 'border-crh-blue/20 bg-blue-50/80 shadow-[0_14px_30px_-24px_rgba(0,82,155,0.55)]'
+                                        : 'border-slate-200 bg-white/90'
+                                ]">
+                                <div
+                                    class="flex flex-wrap items-start justify-between gap-3">
+                                    <div
+                                        class="min-w-0 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-sm font-semibold">
+                                        <template
+                                            v-for="(code, codeIndex) in node.allCodes"
+                                            :key="`${node.key}:desktop:${code}`">
+                                            <span
+                                                v-if="isCurrentCirculationCode(code)"
+                                                :class="
+                                                    node.isCurrent
+                                                        ? 'text-crh-blue'
+                                                        : 'text-crh-grey-dark'
+                                                ">
+                                                {{ code }}
+                                            </span>
+                                            <NuxtLink
+                                                v-else
+                                                :to="buildCirculationCodeLink(code)"
+                                                :class="[
+                                                    'transition hover:underline',
+                                                    node.isCurrent
+                                                        ? 'text-crh-blue'
+                                                        : 'text-crh-grey-dark hover:text-crh-blue'
+                                                ]">
+                                                {{ code }}
+                                            </NuxtLink>
+                                            <span
+                                                v-if="codeIndex < node.allCodes.length - 1"
+                                                class="text-slate-400">
+                                                /
+                                            </span>
+                                        </template>
+                                    </div>
+
+                                    <span
+                                        v-if="node.isCurrent"
+                                        class="inline-flex items-center rounded-full border border-crh-blue/20 bg-white/80 px-2.5 py-1 text-xs font-medium text-crh-blue">
+                                        当前车次
+                                    </span>
+                                </div>
+
+                                <div class="mt-3 grid gap-3 sm:grid-cols-2">
+                                    <div
+                                        class="rounded-[0.9rem] border border-slate-200/80 bg-white/70 px-3 py-3">
+                                        <p
+                                            class="text-[11px] uppercase tracking-[0.16em] text-slate-400">
+                                            始发 / 终到
+                                        </p>
+                                        <p class="mt-1 text-sm font-medium text-crh-grey-dark">
+                                            <LookupStationLink
+                                                :station-name="node.startStation"
+                                                :focus-train-codes="
+                                                    resolveCirculationNodeFocusTrainCodes(
+                                                        node
+                                                    )
+                                                "
+                                                fallback-text="--" />
+                                            <span class="mx-1">-></span>
+                                            <LookupStationLink
+                                                :station-name="node.endStation"
+                                                :focus-train-codes="
+                                                    resolveCirculationNodeFocusTrainCodes(
+                                                        node
+                                                    )
+                                                "
+                                                fallback-text="--" />
+                                        </p>
+                                    </div>
+
+                                    <div
+                                        class="rounded-[0.9rem] border border-slate-200/80 bg-white/70 px-3 py-3">
+                                        <p
+                                            class="text-[11px] uppercase tracking-[0.16em] text-slate-400">
+                                            始发时间 / 终到时间
+                                        </p>
+                                        <p
+                                            class="mt-1 font-mono text-sm text-slate-500">
+                                            {{ formatNullableTime(node.startAt) }}
+                                            <span class="mx-1">-></span>
+                                            {{ formatNullableTime(node.endAt) }}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div
+                        v-if="circulationNodes.length > 0"
+                        class="space-y-2.5 md:hidden">
+                        <div
+                            v-for="(node, index) in circulationNodes"
+                            :key="`mobile:${node.key}`"
+                            class="flex gap-3">
+                            <div class="flex w-7 shrink-0 flex-col items-center">
+                                <span
+                                    :class="[
+                                        'inline-flex h-7 w-7 items-center justify-center rounded-full border text-xs font-semibold transition',
+                                        node.isCurrent
+                                            ? 'border-crh-blue bg-crh-blue text-white shadow-[0_6px_16px_-10px_rgba(0,82,155,0.85)]'
+                                            : 'border-slate-200 bg-white text-slate-500'
+                                    ]">
+                                    {{ index + 1 }}
+                                </span>
+                                <span
+                                    v-if="index + 1 < circulationNodes.length"
+                                    :class="[
+                                        'mt-2 min-h-6 w-px flex-1',
+                                        node.isCurrent
+                                            ? 'bg-crh-blue/30'
+                                            : 'bg-slate-200'
+                                    ]"
+                                    aria-hidden="true" />
+                            </div>
+
+                            <UiCard
+                                :show-accent-bar="false"
+                                variant="subtle"
+                                :class="[
+                                    'min-w-0 flex-1',
+                                    node.isCurrent
+                                        ? 'border-crh-blue/20 bg-blue-50/60 shadow-[0_14px_30px_-24px_rgba(0,82,155,0.55)]'
+                                        : ''
+                                ]">
+                                <div class="space-y-3">
+                                    <div
+                                        class="flex items-start justify-between gap-3">
+                                        <div
+                                            class="min-w-0 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-sm font-semibold text-crh-blue">
+                                            <template
+                                                v-for="(code, codeIndex) in node.allCodes"
+                                                :key="`${node.key}:${code}`">
+                                                <span v-if="isCurrentCirculationCode(code)">
+                                                    {{ code }}
+                                                </span>
+                                                <NuxtLink
+                                                    v-else
+                                                    :to="buildCirculationCodeLink(code)"
+                                                    class="transition hover:underline">
+                                                    {{ code }}
+                                                </NuxtLink>
+                                                <span
+                                                    v-if="codeIndex < node.allCodes.length - 1"
+                                                    class="text-slate-400">
+                                                    /
+                                                </span>
+                                            </template>
+                                        </div>
+
+                                        <span
+                                            v-if="node.isCurrent"
+                                            class="inline-flex items-center rounded-full border border-crh-blue/20 bg-white px-2.5 py-1 text-xs font-medium text-crh-blue">
+                                            当前车次
+                                        </span>
+                                    </div>
+
+                                    <div
+                                        :class="[
+                                            'rounded-[1rem] border bg-white/90 px-4 py-3',
+                                            node.isCurrent
+                                                ? 'border-crh-blue/20'
+                                                : 'border-slate-200'
+                                        ]">
+                                        <div class="flex items-center gap-3">
+                                            <div class="min-w-0 flex-1">
+                                                <p
+                                                    class="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">
+                                                    始发站
+                                                </p>
+                                                <p
+                                                    class="mt-1 truncate text-sm font-medium text-crh-grey-dark">
+                                                    <LookupStationLink
+                                                        :station-name="node.startStation"
+                                                        :focus-train-codes="
+                                                            resolveCirculationNodeFocusTrainCodes(
+                                                                node
+                                                            )
+                                                        "
+                                                        fallback-text="--" />
+                                                </p>
+                                            </div>
+
+                                            <div
+                                                class="shrink-0 flex min-w-[4.75rem] items-center gap-[0.35rem] text-slate-400"
+                                                aria-hidden="true">
+                                                <span
+                                                    class="h-px flex-1 bg-[linear-gradient(90deg,rgb(203_213_225),rgb(148_163_184))]" />
+                                                <span class="text-[0.8rem] leading-none">
+                                                    ->
+                                                </span>
+                                                <span
+                                                    class="h-px flex-1 bg-[linear-gradient(90deg,rgb(203_213_225),rgb(148_163_184))]" />
+                                            </div>
+
+                                            <div class="min-w-0 flex-1 text-right">
+                                                <p
+                                                    class="text-[11px] uppercase tracking-[0.18em] text-slate-400">
+                                                    终到站
+                                                </p>
+                                                <p
+                                                    class="mt-1 truncate text-sm font-medium text-crh-grey-dark">
+                                                    <LookupStationLink
+                                                        :station-name="node.endStation"
+                                                        :focus-train-codes="
+                                                            resolveCirculationNodeFocusTrainCodes(
+                                                                node
+                                                            )
+                                                        "
+                                                        fallback-text="--" />
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <div
+                                            class="mt-3 flex items-center gap-3 border-t border-slate-100 pt-3">
+                                            <div class="min-w-0 flex-1">
+                                                <p
+                                                    class="text-[11px] uppercase tracking-[0.18em] text-slate-400">
+                                                    始发时间
+                                                </p>
+                                                <p
+                                                    class="mt-1 font-mono text-sm text-slate-500">
+                                                    {{ formatNullableTime(node.startAt) }}
+                                                </p>
+                                            </div>
+
+                                            <div
+                                                class="flex basis-6 items-center justify-center text-slate-400"
+                                                aria-hidden="true">
+                                                <span
+                                                    class="h-px flex-1 bg-[linear-gradient(90deg,rgb(226_232_240),rgb(148_163_184))]" />
+                                                <span class="px-1 text-[0.8rem] leading-none">
+                                                    ->
+                                                </span>
+                                                <span
+                                                    class="h-px flex-1 bg-[linear-gradient(90deg,rgb(226_232_240),rgb(148_163_184))]" />
+                                            </div>
+
+                                            <div class="min-w-0 flex-1 text-right">
+                                                <p
+                                                    class="text-[11px] uppercase tracking-[0.18em] text-slate-400">
+                                                    终到时间
+                                                </p>
+                                                <p
+                                                    class="mt-1 font-mono text-sm text-slate-500">
+                                                    {{ formatNullableTime(node.endAt) }}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </UiCard>
+                        </div>
+                    </div>
+
+                    <div
+                        v-else
+                        class="rounded-[1rem] border border-dashed border-slate-200 bg-white/70 px-4 py-4 text-sm leading-6 text-slate-500">
+                        暂无推断交路，后续可在交路索引更新后再查看。
+                    </div>
+                </div>
+            </UiCard>
         </div>
     </UiModal>
 </template>
@@ -218,6 +526,7 @@ import type {
     CurrentTrainTimetableStop
 } from '~/types/lookup';
 import getApiErrorMessage from '~/utils/api/getApiErrorMessage';
+import { buildLookupPath } from '~/utils/lookup/lookupTarget';
 import formatShanghaiDateString from '~/utils/time/formatShanghaiDateString';
 
 const TIME_FORMATTER = new Intl.DateTimeFormat('zh-CN', {
@@ -235,6 +544,16 @@ const DATE_LABEL_FORMATTER = new Intl.DateTimeFormat('zh-CN', {
 });
 
 const cachedTimetables = new Map<string, CurrentTrainTimetableData>();
+
+interface DisplayCirculationNode {
+    key: string;
+    allCodes: string[];
+    startStation: string;
+    endStation: string;
+    startAt: number | null;
+    endAt: number | null;
+    isCurrent: boolean;
+}
 
 const props = defineProps<{
     modelValue: boolean;
@@ -288,6 +607,68 @@ const timetableFocusTrainCodes = computed(() => {
     ]);
 });
 
+const inferredCirculation = computed(() => timetable.value?.inferredCirculation ?? null);
+
+const currentCirculationTrainCodeSet = computed(() => {
+    return new Set(
+        normalizeTrainCodes([
+            ...(timetable.value?.allCodes ?? []),
+            timetable.value?.requestTrainCode ?? '',
+            ...(props.displayCodes ?? []),
+            props.trainCode
+        ])
+    );
+});
+
+const currentCirculationNodeIndex = computed(() => {
+    const circulation = inferredCirculation.value;
+    if (!circulation) {
+        return -1;
+    }
+
+    const normalizedInternalCode = normalizeComparableCode(
+        timetable.value?.internalCode
+    );
+    if (normalizedInternalCode.length > 0) {
+        const nodeIndex = circulation.nodes.findIndex(
+            (node) =>
+                normalizeComparableCode(node.internalCode) ===
+                normalizedInternalCode
+        );
+        if (nodeIndex >= 0) {
+            return nodeIndex;
+        }
+    }
+
+    return circulation.nodes.findIndex((node) =>
+        node.allCodes.some((code) =>
+            currentCirculationTrainCodeSet.value.has(
+                normalizeComparableCode(code)
+            )
+        )
+    );
+});
+
+const circulationNodes = computed<DisplayCirculationNode[]>(() => {
+    const circulation = inferredCirculation.value;
+    if (!circulation) {
+        return [];
+    }
+
+    return circulation.nodes.map((node, index) => ({
+        key:
+            normalizeComparableCode(node.internalCode) ||
+            node.allCodes.join('/') ||
+            `node:${index}`,
+        allCodes: [...node.allCodes],
+        startStation: node.startStation,
+        endStation: node.endStation,
+        startAt: node.startAt,
+        endAt: node.endAt,
+        isCurrent: index === currentCirculationNodeIndex.value
+    }));
+});
+
 const responsibilitySummary = computed(() => {
     const bureauName = timetable.value?.bureauName.trim() ?? '';
     if (bureauName.length === 0) {
@@ -297,8 +678,9 @@ const responsibilitySummary = computed(() => {
     const trainDepartment = timetable.value?.trainDepartment.trim() ?? '';
     const passengerDepartment =
         timetable.value?.passengerDepartment.trim() ?? '';
-    const leadingText =
-        bureauName + '，' +  (trainDepartment.length > 0 ? trainDepartment : '');
+    const leadingText = [bureauName, trainDepartment]
+        .filter((part) => part.length > 0)
+        .join('，');
 
     if (passengerDepartment.length === 0) {
         return leadingText;
@@ -307,11 +689,15 @@ const responsibilitySummary = computed(() => {
     return `${leadingText}，${passengerDepartment}`;
 });
 
+function normalizeComparableCode(code: string | null | undefined) {
+    return typeof code === 'string' ? code.trim().toUpperCase() : '';
+}
+
 function normalizeTrainCodes(codes: string[]) {
     return Array.from(
         new Set(
             codes
-                .map((code) => code.trim().toUpperCase())
+                .map((code) => normalizeComparableCode(code))
                 .filter((code) => code.length > 0)
         )
     );
@@ -322,6 +708,24 @@ function resolveStopFocusTrainCodes(stop: CurrentTrainTimetableStop) {
         stop.stationTrainCode,
         ...timetableFocusTrainCodes.value
     ]);
+}
+
+function resolveCirculationNodeFocusTrainCodes(node: DisplayCirculationNode) {
+    return normalizeTrainCodes([
+        ...node.allCodes,
+        ...timetableFocusTrainCodes.value
+    ]);
+}
+
+function isCurrentCirculationCode(code: string) {
+    return currentCirculationTrainCodeSet.value.has(normalizeComparableCode(code));
+}
+
+function buildCirculationCodeLink(code: string) {
+    return buildLookupPath({
+        type: 'train',
+        code: normalizeComparableCode(code)
+    });
 }
 
 watch(

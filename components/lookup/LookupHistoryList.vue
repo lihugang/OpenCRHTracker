@@ -353,7 +353,7 @@
                                     <div class="min-w-0 flex-1">
                                         <p
                                             class="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">
-                                            出发站
+                                            始发站
                                         </p>
                                         <p
                                             :class="[
@@ -439,7 +439,7 @@
                                         @click="openTimetable(item)">
                                         <p
                                             class="text-[11px] uppercase tracking-[0.18em] text-slate-400">
-                                            出发时间
+                                            始发时间
                                         </p>
                                         <p
                                             :class="[
@@ -627,8 +627,8 @@ const mergeSeparator = computed(() => {
 const columns = computed(() => [
     '日期',
     codeColumnLabel.value,
-    '出发站点',
-    '出发时间',
+    '始发站点',
+    '始发时间',
     '终到站点',
     '终到时间'
 ]);

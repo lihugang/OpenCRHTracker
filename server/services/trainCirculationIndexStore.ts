@@ -4,7 +4,10 @@ import {
     listDailyRecordsPaged,
     type DailyEmuRouteRow
 } from '~/server/services/emuRoutesStore';
-import { getTodayScheduleProbeGroups } from '~/server/services/todayScheduleCache';
+import {
+    getTodayScheduleProbeGroups,
+    getTodayScheduleTimetableByTrainCode
+} from '~/server/services/todayScheduleCache';
 import {
     getRelativeDateString
 } from '~/server/utils/date/getCurrentDateString';
@@ -452,6 +455,37 @@ function buildLookupByTrainCode(circulations: InternalInferredCirculation[]) {
     return lookupByTrainCode;
 }
 
+function resolvePublicNodeTimetable(
+    node: InternalInferredCirculationNode
+) {
+    const candidateTrainCodes = uniqueNormalizedCodes([
+        node.trainCode,
+        ...node.allCodes
+    ]);
+
+    for (const trainCode of candidateTrainCodes) {
+        const timetable = getTodayScheduleTimetableByTrainCode(trainCode);
+        if (timetable) {
+            return timetable;
+        }
+    }
+
+    const normalizedInternalCode = normalizeCode(node.internalCode ?? '');
+    if (normalizedInternalCode.length === 0) {
+        return null;
+    }
+
+    for (const group of getTodayScheduleProbeGroups().values()) {
+        if (normalizeCode(group.trainInternalCode) !== normalizedInternalCode) {
+            continue;
+        }
+
+        return getTodayScheduleTimetableByTrainCode(group.trainCode);
+    }
+
+    return null;
+}
+
 function buildCirculationsFromGraph(
     nodeMetasByNodeId: CirculationNodeMeta[],
     outgoingEdgesByNodeId: Map<number, EdgeStat[]>,
@@ -570,14 +604,22 @@ function buildCirculationsFromGraph(
 function toPublicInferredCirculation(
     circulation: InternalInferredCirculation
 ): InferredCirculation {
-    const nodes: InferredCirculationNode[] = circulation.nodes.map((node) => ({
-        internalCode: node.internalCode,
-        allCodes: [...node.allCodes],
-        incomingWeight: node.incomingWeight,
-        incomingSupportCount: node.incomingSupportCount,
-        outgoingWeight: node.outgoingWeight,
-        outgoingSupportCount: node.outgoingSupportCount
-    }));
+    const nodes: InferredCirculationNode[] = circulation.nodes.map((node) => {
+        const timetable = resolvePublicNodeTimetable(node);
+
+        return {
+            internalCode: node.internalCode,
+            allCodes: [...node.allCodes],
+            startStation: timetable?.startStation ?? '',
+            endStation: timetable?.endStation ?? '',
+            startAt: timetable?.startAt ?? null,
+            endAt: timetable?.endAt ?? null,
+            incomingWeight: node.incomingWeight,
+            incomingSupportCount: node.incomingSupportCount,
+            outgoingWeight: node.outgoingWeight,
+            outgoingSupportCount: node.outgoingSupportCount
+        };
+    });
 
     return {
         routeId: circulation.routeId,
