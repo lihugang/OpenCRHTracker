@@ -900,6 +900,9 @@ export const developerDocsOpenApi = {
                             'trainCode',
                             'internalCode',
                             'allCodes',
+                            'bureauCode',
+                            'trainDepartment',
+                            'passengerDepartment',
                             'referenceModels',
                             'startStation',
                             'endStation',
@@ -931,6 +934,18 @@ export const developerDocsOpenApi = {
                                     type: 'string'
                                 },
                                 example: ['G8388', 'G8385']
+                            },
+                            bureauCode: {
+                                type: 'string',
+                                example: 'P'
+                            },
+                            trainDepartment: {
+                                type: 'string',
+                                example: '北京动车段'
+                            },
+                            passengerDepartment: {
+                                type: 'string',
+                                example: 'P'
                             },
                             referenceModels: {
                                 type: 'array',

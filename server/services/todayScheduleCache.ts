@@ -14,6 +14,9 @@ export interface TodayScheduleRoute {
     trainCode: string;
     trainInternalCode: string;
     allCodes: string[];
+    bureauCode: string;
+    trainDepartment: string;
+    passengerDepartment: string;
     startAt: number;
     endAt: number;
     updatedAt: number | null;
@@ -126,6 +129,9 @@ function rebuildCache(): TodayScheduleCache {
                 trainCode,
                 trainInternalCode,
                 allCodes,
+                bureauCode: item.bureauCode.trim(),
+                trainDepartment: item.trainDepartment.trim(),
+                passengerDepartment: item.passengerDepartment.trim(),
                 startAt,
                 endAt,
                 updatedAt: item.lastRouteRefreshAt,
@@ -184,6 +190,9 @@ function rebuildCache(): TodayScheduleCache {
                         trainCode,
                         trainInternalCode,
                         allCodes: timetable.allCodes,
+                        bureauCode: timetable.bureauCode,
+                        trainDepartment: timetable.trainDepartment,
+                        passengerDepartment: timetable.passengerDepartment,
                         startAt,
                         endAt,
                         updatedAt: timetable.updatedAt,
@@ -340,6 +349,9 @@ function upsertProbeGroup(
             trainCode: timetable.trainCode,
             trainInternalCode: timetable.trainInternalCode,
             allCodes: [...timetable.allCodes],
+            bureauCode: timetable.bureauCode,
+            trainDepartment: timetable.trainDepartment,
+            passengerDepartment: timetable.passengerDepartment,
             startAt: timetable.startAt,
             endAt: timetable.endAt,
             updatedAt: timetable.updatedAt,
@@ -359,6 +371,18 @@ function upsertProbeGroup(
     existingGroup.updatedAt = mergeNullableMax(
         existingGroup.updatedAt,
         timetable.updatedAt
+    );
+    existingGroup.bureauCode = pickPreferredText(
+        existingGroup.bureauCode,
+        timetable.bureauCode
+    );
+    existingGroup.trainDepartment = pickPreferredText(
+        existingGroup.trainDepartment,
+        timetable.trainDepartment
+    );
+    existingGroup.passengerDepartment = pickPreferredText(
+        existingGroup.passengerDepartment,
+        timetable.passengerDepartment
     );
     existingGroup.trainInternalCode = pickPreferredText(
         existingGroup.trainInternalCode,
@@ -417,6 +441,9 @@ function upsertStationRow(
         ),
         trainInternalCode: group.trainInternalCode,
         allCodes: [...group.allCodes],
+        bureauCode: group.bureauCode,
+        trainDepartment: group.trainDepartment,
+        passengerDepartment: group.passengerDepartment,
         startAt: group.startAt,
         endAt: group.endAt,
         updatedAt: group.updatedAt,
@@ -481,6 +508,15 @@ function applyGroupToStationRow(
         group.trainInternalCode
     );
     row.allCodes = mergeCodeLists(row.allCodes, group.allCodes);
+    row.bureauCode = pickPreferredText(row.bureauCode, group.bureauCode);
+    row.trainDepartment = pickPreferredText(
+        row.trainDepartment,
+        group.trainDepartment
+    );
+    row.passengerDepartment = pickPreferredText(
+        row.passengerDepartment,
+        group.passengerDepartment
+    );
     row.startAt = Math.min(row.startAt, group.startAt);
     row.endAt = Math.max(row.endAt, group.endAt);
     row.updatedAt = mergeNullableMax(row.updatedAt, group.updatedAt);

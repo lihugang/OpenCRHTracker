@@ -26,6 +26,9 @@ export interface ScheduleItem {
     code: string;
     internalCode: string;
     allCodes: string[];
+    bureauCode: string;
+    trainDepartment: string;
+    passengerDepartment: string;
     startStation: string;
     endStation: string;
     startAt: number | null;

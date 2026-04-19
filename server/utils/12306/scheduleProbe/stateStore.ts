@@ -214,6 +214,15 @@ function asScheduleState(value: unknown): ScheduleState | null {
         if (typeof row.internalCode !== 'string') {
             row.internalCode = '';
         }
+        if (typeof row.bureauCode !== 'string') {
+            row.bureauCode = '';
+        }
+        if (typeof row.trainDepartment !== 'string') {
+            row.trainDepartment = '';
+        }
+        if (typeof row.passengerDepartment !== 'string') {
+            row.passengerDepartment = '';
+        }
         if (typeof row.startStation !== 'string') {
             row.startStation = '';
         }
@@ -269,6 +278,34 @@ function asScheduleState(value: unknown): ScheduleState | null {
     return state as ScheduleState;
 }
 
+function scheduleStateNeedsRouteMetadataMigration(value: unknown): boolean {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+        return false;
+    }
+
+    const items = (value as { items?: unknown }).items;
+    if (!Array.isArray(items)) {
+        return false;
+    }
+
+    return items.some((item) => {
+        if (typeof item !== 'object' || item === null || Array.isArray(item)) {
+            return false;
+        }
+
+        const row = item as {
+            bureauCode?: unknown;
+            trainDepartment?: unknown;
+            passengerDepartment?: unknown;
+        };
+        return (
+            typeof row.bureauCode !== 'string' ||
+            typeof row.trainDepartment !== 'string' ||
+            typeof row.passengerDepartment !== 'string'
+        );
+    });
+}
+
 function parseScheduleDocument(value: unknown): {
     document: ScheduleDocument | null;
     migrated: boolean;
@@ -289,7 +326,18 @@ function parseScheduleDocument(value: unknown): {
             migrated: false
         };
     }
-    const migrated = version !== CURRENT_SCHEDULE_DOCUMENT_VERSION;
+    const publishedNeedsMigration =
+        document.published !== null &&
+        typeof document.published !== 'undefined' &&
+        scheduleStateNeedsRouteMetadataMigration(document.published);
+    const buildingNeedsMigration =
+        document.building !== null &&
+        typeof document.building !== 'undefined' &&
+        scheduleStateNeedsRouteMetadataMigration(document.building);
+    const migrated =
+        version !== CURRENT_SCHEDULE_DOCUMENT_VERSION ||
+        publishedNeedsMigration ||
+        buildingNeedsMigration;
 
     let published: ScheduleState | null = null;
     if (
@@ -391,6 +439,9 @@ function mergePublishedRouteInfo(
 
         item.startStation = currentItem.startStation;
         item.endStation = currentItem.endStation;
+        item.bureauCode = currentItem.bureauCode;
+        item.trainDepartment = currentItem.trainDepartment;
+        item.passengerDepartment = currentItem.passengerDepartment;
         item.startAt = currentItem.startAt;
         item.endAt = currentItem.endAt;
         item.lastRouteRefreshAt = currentItem.lastRouteRefreshAt;

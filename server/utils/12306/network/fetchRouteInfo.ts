@@ -88,6 +88,9 @@ export interface RouteInfoData {
     code: string;
     allCodes: string[];
     internalCode: string;
+    bureauCode: string;
+    trainDepartment: string;
+    passengerDepartment: string;
     startStation: string;
     endStation: string;
     startAt: number;
@@ -188,6 +191,7 @@ export default async function fetchRouteInfo(
         }
 
         const rawStops = json.data?.trainDetail?.stopTime ?? [];
+        const routeMetadata = resolveRouteMetadata(rawStops);
         const stops = rawStops
             .map((stop, index) => {
                 const stationNo = Number.parseInt(stop.stationNo, 10);
@@ -274,6 +278,9 @@ export default async function fetchRouteInfo(
                     ...json.data.trainDetail.stationTrainCodeAll.split('/')
                 ]),
                 internalCode: json.data.trainNo,
+                bureauCode: routeMetadata.bureauCode,
+                trainDepartment: routeMetadata.trainDepartment,
+                passengerDepartment: routeMetadata.passengerDepartment,
                 startStation: startStation.stationName,
                 endStation: endStation.stationName,
                 startAt,
@@ -323,4 +330,42 @@ function normalizeOptionalField(value: string | undefined): string {
     }
 
     return normalized;
+}
+
+function resolveRouteMetadata(
+    rawStops: RouteInfoResponse['data']['trainDetail']['stopTime']
+): Pick<RouteInfoData, 'bureauCode' | 'trainDepartment' | 'passengerDepartment'> {
+    const metadata: Pick<
+        RouteInfoData,
+        'bureauCode' | 'trainDepartment' | 'passengerDepartment'
+    > = {
+        bureauCode: '',
+        trainDepartment: '',
+        passengerDepartment: ''
+    };
+
+    for (const stop of rawStops) {
+        if (metadata.bureauCode.length === 0) {
+            metadata.bureauCode = normalizeOptionalField(stop.bureau_code);
+        }
+        if (metadata.trainDepartment.length === 0) {
+            metadata.trainDepartment = normalizeOptionalField(
+                stop.jiaolu_dept_train
+            );
+        }
+        if (metadata.passengerDepartment.length === 0) {
+            metadata.passengerDepartment = normalizeOptionalField(
+                stop.jiaolu_corporation_code
+            );
+        }
+        if (
+            metadata.bureauCode.length > 0 &&
+            metadata.trainDepartment.length > 0 &&
+            metadata.passengerDepartment.length > 0
+        ) {
+            break;
+        }
+    }
+
+    return metadata;
 }

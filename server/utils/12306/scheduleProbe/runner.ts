@@ -54,6 +54,9 @@ function restorePreservedRouteInfo(
         return false;
     }
 
+    item.bureauCode = preservedItem.bureauCode;
+    item.trainDepartment = preservedItem.trainDepartment;
+    item.passengerDepartment = preservedItem.passengerDepartment;
     item.startStation = preservedItem.startStation;
     item.endStation = preservedItem.endStation;
     item.startAt = preservedItem.startAt;
@@ -265,6 +268,11 @@ export default async function runScheduleProbe(
                     routeResult.data.route.stops
                 );
                 for (const groupItem of groupItems) {
+                    groupItem.bureauCode = routeResult.data.route.bureauCode;
+                    groupItem.trainDepartment =
+                        routeResult.data.route.trainDepartment;
+                    groupItem.passengerDepartment =
+                        routeResult.data.route.passengerDepartment;
                     groupItem.startStation =
                         routeResult.data.route.startStation.trim();
                     groupItem.endStation =

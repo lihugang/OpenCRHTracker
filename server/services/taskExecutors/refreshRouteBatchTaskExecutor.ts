@@ -32,6 +32,9 @@ interface RefreshRouteBatchTaskArgs {
 interface RefreshRouteGroupUpdate {
     codes: string[];
     allCodes: string[];
+    bureauCode: string;
+    trainDepartment: string;
+    passengerDepartment: string;
     startStation: string;
     endStation: string;
     startAt: number;
@@ -88,6 +91,9 @@ function applyGroupUpdate(
 
         const item = state.items[itemIndex]!;
         item.allCodes = [...update.allCodes];
+        item.bureauCode = update.bureauCode;
+        item.trainDepartment = update.trainDepartment;
+        item.passengerDepartment = update.passengerDepartment;
         item.startStation = update.startStation;
         item.endStation = update.endStation;
         item.startAt = update.startAt;
@@ -184,6 +190,11 @@ async function executeRefreshRouteBatchTask(rawArgs: unknown) {
         const refreshedInternalCode =
             routeResult.data.route.internalCode.trim();
         const nextAllCodes = [...routeResult.data.route.allCodes];
+        const nextBureauCode = routeResult.data.route.bureauCode.trim();
+        const nextTrainDepartment =
+            routeResult.data.route.trainDepartment.trim();
+        const nextPassengerDepartment =
+            routeResult.data.route.passengerDepartment.trim();
         const nextStops = toScheduleStops(
             state.date,
             routeResult.data.route.stops
@@ -193,6 +204,9 @@ async function executeRefreshRouteBatchTask(rawArgs: unknown) {
             const groupItem = state.items[index]!;
             if (
                 groupItem.allCodes.join('/') !== nextAllCodes.join('/') ||
+                groupItem.bureauCode !== nextBureauCode ||
+                groupItem.trainDepartment !== nextTrainDepartment ||
+                groupItem.passengerDepartment !== nextPassengerDepartment ||
                 groupItem.startStation !== nextStartStation ||
                 groupItem.endStation !== nextEndStation ||
                 groupItem.startAt !== nextStartAt ||
@@ -202,6 +216,9 @@ async function executeRefreshRouteBatchTask(rawArgs: unknown) {
                 groupChanged = true;
             }
             groupItem.allCodes = [...nextAllCodes];
+            groupItem.bureauCode = nextBureauCode;
+            groupItem.trainDepartment = nextTrainDepartment;
+            groupItem.passengerDepartment = nextPassengerDepartment;
             groupItem.startStation = nextStartStation;
             groupItem.endStation = nextEndStation;
             groupItem.startAt = nextStartAt;
@@ -225,6 +242,9 @@ async function executeRefreshRouteBatchTask(rawArgs: unknown) {
                 normalizeCode(state.items[index]!.code)
             ),
             allCodes: nextAllCodes,
+            bureauCode: nextBureauCode,
+            trainDepartment: nextTrainDepartment,
+            passengerDepartment: nextPassengerDepartment,
             startStation: nextStartStation,
             endStation: nextEndStation,
             startAt: nextStartAt,

@@ -45,6 +45,9 @@ export default defineEventHandler(async (event) => {
                 trainCode: timetable.trainCode,
                 internalCode: timetable.trainInternalCode,
                 allCodes: [...timetable.allCodes],
+                bureauCode: timetable.bureauCode,
+                trainDepartment: timetable.trainDepartment,
+                passengerDepartment: timetable.passengerDepartment,
                 referenceModels: getReferenceModelsByTrainCodes(
                     timetable.allCodes
                 ),

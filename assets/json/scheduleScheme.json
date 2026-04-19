@@ -146,6 +146,15 @@
                     },
                     "minItems": 1
                 },
+                "bureauCode": {
+                    "type": "string"
+                },
+                "trainDepartment": {
+                    "type": "string"
+                },
+                "passengerDepartment": {
+                    "type": "string"
+                },
                 "startStation": {
                     "type": "string"
                 },
@@ -185,6 +194,9 @@
                 "code",
                 "internalCode",
                 "allCodes",
+                "bureauCode",
+                "trainDepartment",
+                "passengerDepartment",
                 "startStation",
                 "endStation",
                 "startAt",
