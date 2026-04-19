@@ -10,7 +10,13 @@ export type FeedbackPrimaryType = (typeof FEEDBACK_PRIMARY_TYPES)[number];
 
 export const FEEDBACK_SECONDARY_TYPES_BY_PRIMARY = {
     website: ['bug', 'feature', 'security', 'other'],
-    data: ['train_missing', 'train_wrong', 'coupling_missing', 'other'],
+    data: [
+        'train_missing',
+        'train_wrong',
+        'route_wrong',
+        'coupling_missing',
+        'other'
+    ],
     api: ['bug', 'feature', 'more_quota'],
     docs: ['bug', 'feature', 'other'],
     other: ['']
@@ -91,6 +97,13 @@ export const FEEDBACK_CATEGORY_OPTIONS = [
         secondaryType: 'train_wrong',
         label: '数据 / 车次数据错误',
         shortLabel: '车次数据错误'
+    },
+    {
+        key: 'data.route_wrong',
+        primaryType: 'data',
+        secondaryType: 'route_wrong',
+        label: '数据 / 交路数据错误',
+        shortLabel: '交路数据错误'
     },
     {
         key: 'data.coupling_missing',

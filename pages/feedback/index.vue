@@ -495,6 +495,49 @@
                         </div>
                     </div>
 
+                    <div
+                        v-if="isRouteDataWrongCategory"
+                        class="grid gap-4 md:grid-cols-2">
+                        <UiField
+                            label="错误交路"
+                            required
+                            help="填写当前页面显示有误的交路内容。">
+                            <input
+                                v-model.trim="composerForm.details.wrongRoute"
+                                type="text"
+                                maxlength="240"
+                                class="harmony-input w-full px-4 py-3 text-base"
+                                @keydown.enter.prevent="
+                                    focusNextComposerField($event)
+                                "
+                                @keydown.backspace="
+                                    focusPreviousComposerFieldOnBackspace(
+                                        $event
+                                    )
+                                "
+                                placeholder="请输入错误交路" />
+                        </UiField>
+
+                        <UiField
+                            label="正确交路"
+                            help="选填；若你确认正确结果，可一并填入。">
+                            <input
+                                v-model.trim="composerForm.details.correctRoute"
+                                type="text"
+                                maxlength="240"
+                                class="harmony-input w-full px-4 py-3 text-base"
+                                @keydown.enter.prevent="
+                                    focusNextComposerField($event)
+                                "
+                                @keydown.backspace="
+                                    focusPreviousComposerFieldOnBackspace(
+                                        $event
+                                    )
+                                "
+                                placeholder="请输入正确交路" />
+                        </UiField>
+                    </div>
+
                     <UiField
                         label="补充说明"
                         help="选填，描述你看到的问题、预期结果或建议内容。">
@@ -923,6 +966,13 @@ const isCouplingCategory = computed(() => {
     );
 });
 
+const isRouteDataWrongCategory = computed(() => {
+    return (
+        composerForm.primaryType === 'data' &&
+        composerForm.secondaryType === 'route_wrong'
+    );
+});
+
 const showTravelCodeQuestion = computed(() => {
     return (
         isCouplingCategory.value &&
@@ -953,6 +1003,10 @@ const canSubmitComposer = computed(() => {
 
     if (isSecurityCategory.value && !isAuthenticated.value) {
         return false;
+    }
+
+    if (isRouteDataWrongCategory.value) {
+        return composerForm.details.wrongRoute.trim().length > 0;
     }
 
     if (isTrainDataCategory.value || isCouplingCategory.value) {

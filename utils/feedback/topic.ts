@@ -8,6 +8,8 @@ export interface FeedbackComposerFields {
     trainCode: string;
     emuCodesRaw: string;
     missingEmuCode: string;
+    wrongRoute: string;
+    correctRoute: string;
     travelCode: string;
     hasTravelCodeImage: boolean;
     customText: string;
@@ -18,6 +20,8 @@ export function createEmptyFeedbackComposerFields(): FeedbackComposerFields {
         trainCode: '',
         emuCodesRaw: '',
         missingEmuCode: '',
+        wrongRoute: '',
+        correctRoute: '',
         travelCode: '',
         hasTravelCodeImage: false,
         customText: ''
@@ -47,6 +51,8 @@ export function buildFeedbackAutoTitle(
                 return '数据异常：车次数据缺失';
             case 'train_wrong':
                 return '数据异常：车次数据错误';
+            case 'route_wrong':
+                return '数据异常：交路数据错误';
             case 'coupling_missing':
                 return '数据异常：未检出重联车';
             default:
@@ -100,6 +106,20 @@ export function buildFeedbackTopicBody(
     }
     if (fields.missingEmuCode) {
         lines.push(`未追踪到的车组号：${fields.missingEmuCode}`);
+    }
+    if (
+        primaryType === 'data' &&
+        secondaryType === 'route_wrong' &&
+        fields.wrongRoute
+    ) {
+        lines.push(`错误交路：${fields.wrongRoute}`);
+    }
+    if (
+        primaryType === 'data' &&
+        secondaryType === 'route_wrong' &&
+        fields.correctRoute
+    ) {
+        lines.push(`正确交路：${fields.correctRoute}`);
     }
     if (fields.travelCode) {
         lines.push(`畅行码识别结果：${fields.travelCode}`);
