@@ -129,6 +129,7 @@ export interface CurrentTrainTimetableData {
     internalCode: string;
     allCodes: string[];
     bureauCode: string;
+    bureauName: string;
     trainDepartment: string;
     passengerDepartment: string;
     referenceModels: ReferenceModelItem[];

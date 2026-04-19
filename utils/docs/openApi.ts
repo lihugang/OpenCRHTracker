@@ -997,6 +997,7 @@ export const developerDocsOpenApi = {
                             'internalCode',
                             'allCodes',
                             'bureauCode',
+                            'bureauName',
                             'trainDepartment',
                             'passengerDepartment',
                             'referenceModels',
@@ -1036,13 +1037,17 @@ export const developerDocsOpenApi = {
                                 type: 'string',
                                 example: 'P'
                             },
+                            bureauName: {
+                                type: 'string',
+                                example: '北京局集团'
+                            },
                             trainDepartment: {
                                 type: 'string',
                                 example: '北京动车段'
                             },
                             passengerDepartment: {
                                 type: 'string',
-                                example: 'P'
+                                example: '北京客运段'
                             },
                             referenceModels: {
                                 type: 'array',
@@ -2232,8 +2237,9 @@ export const developerDocsOpenApi = {
                                         internalCode: '390000G5120C',
                                         allCodes: ['G512'],
                                         bureauCode: 'N',
-                                        trainDepartment: '郑州动车段',
-                                        passengerDepartment: '郑州客运段',
+                                        bureauName: '武汉局集团',
+                                        trainDepartment: '武汉动车段',
+                                        passengerDepartment: '武汉客运段',
                                         referenceModels: [
                                             {
                                                 model: 'CR400BF-A',

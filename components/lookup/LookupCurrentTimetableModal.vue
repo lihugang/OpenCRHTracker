@@ -65,6 +65,20 @@
                             fallback-text="--" />
                     </p>
                 </UiCard>
+
+                <UiCard
+                    v-if="responsibilitySummary"
+                    :show-accent-bar="false"
+                    variant="subtle"
+                    class="sm:col-span-2">
+                    <p
+                        class="text-xs uppercase tracking-[0.16em] text-slate-400">
+                        担当
+                    </p>
+                    <p class="mt-2 text-sm font-medium text-crh-grey-dark">
+                        {{ responsibilitySummary }}
+                    </p>
+                </UiCard>
             </div>
 
             <div
@@ -272,6 +286,25 @@ const timetableFocusTrainCodes = computed(() => {
         ...(props.displayCodes ?? []),
         props.trainCode
     ]);
+});
+
+const responsibilitySummary = computed(() => {
+    const bureauName = timetable.value?.bureauName.trim() ?? '';
+    if (bureauName.length === 0) {
+        return '';
+    }
+
+    const trainDepartment = timetable.value?.trainDepartment.trim() ?? '';
+    const passengerDepartment =
+        timetable.value?.passengerDepartment.trim() ?? '';
+    const leadingText =
+        bureauName + '，' +  (trainDepartment.length > 0 ? trainDepartment : '');
+
+    if (passengerDepartment.length === 0) {
+        return leadingText;
+    }
+
+    return `${leadingText}，${passengerDepartment}`;
 });
 
 function normalizeTrainCodes(codes: string[]) {

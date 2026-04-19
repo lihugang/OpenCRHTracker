@@ -9,6 +9,7 @@ import ensure from '~/server/utils/api/executor/ensure';
 import setCacheControl from '~/server/utils/api/response/setCacheControl';
 import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
 import type { CurrentTrainTimetableData } from '~/types/lookup';
+import resolveBureauNameByCode from '~/utils/railway/resolveBureauNameByCode';
 
 export default defineEventHandler(async (event) => {
     const cacheMaxAge = useConfig().api.cache.timetableMaxAgeSeconds;
@@ -47,6 +48,7 @@ export default defineEventHandler(async (event) => {
                 internalCode: timetable.trainInternalCode,
                 allCodes: [...timetable.allCodes],
                 bureauCode: timetable.bureauCode,
+                bureauName: resolveBureauNameByCode(timetable.bureauCode),
                 trainDepartment: timetable.trainDepartment,
                 passengerDepartment: timetable.passengerDepartment,
                 referenceModels: getReferenceModelsByTrainCodes(
