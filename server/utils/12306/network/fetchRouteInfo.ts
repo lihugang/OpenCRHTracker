@@ -346,7 +346,9 @@ function resolveRouteMetadata(
 
     for (const stop of rawStops) {
         if (metadata.bureauCode.length === 0) {
-            metadata.bureauCode = normalizeOptionalField(stop.bureau_code);
+            metadata.bureauCode = normalizeOptionalField(
+                stop.corporation_code
+            ).slice(0, 1);
         }
         if (metadata.trainDepartment.length === 0) {
             metadata.trainDepartment = normalizeOptionalField(
