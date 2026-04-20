@@ -3,7 +3,6 @@
         :model-value="props.modelValue"
         eyebrow="TIMETABLE"
         :title="modalTitle"
-        :description="modalDescription"
         size="lg"
         height="tall"
         @update:model-value="emit('update:modelValue', $event)">
@@ -31,8 +30,24 @@
 
         <div
             v-else-if="timetable"
-            class="space-y-5">
-            <div class="grid gap-3 sm:grid-cols-2">
+            class="flex flex-col gap-5">
+            <div class="order-2 space-y-5">
+                <div class="motion-divider" />
+
+                <div
+                    v-if="timetableNotice"
+                    class="rounded-[1rem] border border-slate-200 bg-white/80 px-4 py-3">
+                    <p
+                        class="text-xs tracking-[0.16em] text-slate-400">
+                        时刻表
+                    </p>
+                    <p class="mt-2 text-sm leading-6 text-crh-grey-dark">
+                        {{ timetableNotice }}
+                    </p>
+                </div>
+            </div>
+
+            <div class="order-3 grid gap-3 sm:grid-cols-2">
                 <UiCard
                     :show-accent-bar="false"
                     variant="subtle">
@@ -82,7 +97,7 @@
             </div>
 
             <div
-                class="hidden overflow-hidden rounded-[1.25rem] border border-slate-200 md:block">
+                class="order-4 hidden overflow-hidden rounded-[1.25rem] border border-slate-200 md:block">
                 <table
                     class="min-w-full border-separate border-spacing-0 bg-white/90">
                     <thead>
@@ -134,7 +149,7 @@
                 </table>
             </div>
 
-            <div class="space-y-2.5 md:hidden">
+            <div class="order-5 space-y-2.5 md:hidden">
                 <UiCard
                     v-for="stop in timetable.stops"
                     :key="'mobile:' + stop.stationNo"
@@ -208,6 +223,7 @@
             </div>
 
             <UiCard
+                class="order-1"
                 :show-accent-bar="false"
                 variant="subtle">
                 <div class="space-y-4">
@@ -415,8 +431,8 @@
                                                 ? 'border-crh-blue/20'
                                                 : 'border-slate-200'
                                         ]">
-                                        <div class="flex items-center gap-3">
-                                            <div class="min-w-0 flex-1">
+                                        <div class="grid grid-cols-2 gap-3">
+                                            <div class="min-w-0">
                                                 <p
                                                     class="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">
                                                     始发站
@@ -434,19 +450,7 @@
                                                 </p>
                                             </div>
 
-                                            <div
-                                                class="shrink-0 flex min-w-[4.75rem] items-center gap-[0.35rem] text-slate-400"
-                                                aria-hidden="true">
-                                                <span
-                                                    class="h-px flex-1 bg-[linear-gradient(90deg,rgb(203_213_225),rgb(148_163_184))]" />
-                                                <span class="text-[0.8rem] leading-none">
-                                                    ->
-                                                </span>
-                                                <span
-                                                    class="h-px flex-1 bg-[linear-gradient(90deg,rgb(203_213_225),rgb(148_163_184))]" />
-                                            </div>
-
-                                            <div class="min-w-0 flex-1 text-right">
+                                            <div class="min-w-0 text-right">
                                                 <p
                                                     class="text-[11px] uppercase tracking-[0.18em] text-slate-400">
                                                     终到站
@@ -466,8 +470,8 @@
                                         </div>
 
                                         <div
-                                            class="mt-3 flex items-center gap-3 border-t border-slate-100 pt-3">
-                                            <div class="min-w-0 flex-1">
+                                            class="mt-3 grid grid-cols-2 gap-3 border-t border-slate-100 pt-3">
+                                            <div class="min-w-0">
                                                 <p
                                                     class="text-[11px] uppercase tracking-[0.18em] text-slate-400">
                                                     始发时间
@@ -478,19 +482,7 @@
                                                 </p>
                                             </div>
 
-                                            <div
-                                                class="flex basis-6 items-center justify-center text-slate-400"
-                                                aria-hidden="true">
-                                                <span
-                                                    class="h-px flex-1 bg-[linear-gradient(90deg,rgb(226_232_240),rgb(148_163_184))]" />
-                                                <span class="px-1 text-[0.8rem] leading-none">
-                                                    ->
-                                                </span>
-                                                <span
-                                                    class="h-px flex-1 bg-[linear-gradient(90deg,rgb(226_232_240),rgb(148_163_184))]" />
-                                            </div>
-
-                                            <div class="min-w-0 flex-1 text-right">
+                                            <div class="min-w-0 text-right">
                                                 <p
                                                     class="text-[11px] uppercase tracking-[0.18em] text-slate-400">
                                                     终到时间
@@ -583,7 +575,7 @@ const modalTitle = computed(() => {
     return props.trainCode || '当前时刻表';
 });
 
-const modalDescription = computed(() => {
+const timetableNotice = computed(() => {
     const displayCode =
         timetable.value?.allCodes[0] ??
         props.displayCodes?.[0] ??
