@@ -56,6 +56,21 @@
                                 @click="toggleEventSubscriptionItem" />
                         </div>
 
+                        <UiButton
+                            variant="secondary"
+                            size="sm"
+                            block
+                            :disabled="!canOpenFuturePrediction"
+                            @click="openFuturePredictionModal">
+                            未来担当预测
+                        </UiButton>
+
+                        <p
+                            v-if="futurePredictionActionHint"
+                            class="text-xs leading-5 text-slate-500">
+                            {{ futurePredictionActionHint }}
+                        </p>
+
                         <p
                             v-if="favoriteErrorMessage"
                             class="flex items-center gap-1.5 text-xs leading-5 text-[#E53E3E]">
@@ -85,14 +100,31 @@
             v-if="favoriteItem && eventSubscriptionTarget"
             class="px-1 min-[960px]:landscape:hidden">
             <div class="space-y-2">
-                <UiFavoriteButton
-                    :active="isFavorited(favoriteItem)"
-                    :loading="isFavoritePending(favoriteItem)"
-                    @click="toggleFavoriteItem" />
-                <UiSubscriptionButton
-                    :active="isSubscribed(eventSubscriptionTarget)"
-                    :loading="isSubscriptionActionPending"
-                    @click="toggleEventSubscriptionItem" />
+                <div class="flex items-center justify-between gap-3">
+                    <div class="flex items-center gap-2">
+                        <UiFavoriteButton
+                            :active="isFavorited(favoriteItem)"
+                            :loading="isFavoritePending(favoriteItem)"
+                            @click="toggleFavoriteItem" />
+                        <UiSubscriptionButton
+                            :active="isSubscribed(eventSubscriptionTarget)"
+                            :loading="isSubscriptionActionPending"
+                            @click="toggleEventSubscriptionItem" />
+                    </div>
+                    <UiButton
+                        variant="secondary"
+                        size="sm"
+                        class="shrink-0"
+                        :disabled="!canOpenFuturePrediction"
+                        @click="openFuturePredictionModal">
+                        未来担当预测
+                    </UiButton>
+                </div>
+                <p
+                    v-if="futurePredictionActionHint"
+                    class="pl-1 text-xs leading-5 text-slate-500">
+                    {{ futurePredictionActionHint }}
+                </p>
                 <p
                     v-if="favoriteErrorMessage"
                     class="flex items-center gap-1.5 pl-1 text-xs leading-5 text-[#E53E3E]">
@@ -126,6 +158,14 @@
             :is-loading-more="isLoadingMore"
             :can-load-more="canLoadMore"
             @request-more="loadMore" />
+
+        <LookupFutureAssignmentPredictionModal
+            :model-value="isFuturePredictionModalOpen"
+            :source-type="futurePredictionSourceType"
+            :source-code="futurePredictionSourceCode"
+            :anchor-train-code="futurePredictionAnchorTrainCode"
+            :display-codes="futurePredictionDisplayCodes"
+            @update:model-value="isFuturePredictionModalOpen = $event" />
     </LookupDetailShell>
 </template>
 
@@ -138,7 +178,7 @@ import {
     ref,
     watch
 } from 'vue';
-import type { LookupTargetType } from '~/types/lookup';
+import type { LookupHistoryListItem, LookupTargetType } from '~/types/lookup';
 import type { NotificationTarget } from '~/types/notifications';
 import { useFavoriteLookups } from '~/composables/useFavoriteLookups';
 import {
@@ -162,6 +202,7 @@ const inputError = ref('');
 const isMobileViewport = ref(false);
 const isMobileHeaderCollapsed = ref(false);
 const shouldUseMobileStickyHeader = ref(false);
+const isFuturePredictionModalOpen = ref(false);
 
 let mobileQueryList: MediaQueryList | null = null;
 let mobileQueryHandler: ((event: MediaQueryListEvent) => void) | null = null;
@@ -217,6 +258,7 @@ const favoriteItem = computed(() => {
         tags: []
     };
 });
+
 const eventSubscriptionTarget = computed<NotificationTarget | null>(() => {
     if (!target.value) {
         return null;
@@ -227,6 +269,7 @@ const eventSubscriptionTarget = computed<NotificationTarget | null>(() => {
         targetId: target.value.code
     };
 });
+
 const isSubscriptionActionPending = computed(() => {
     if (!favoriteItem.value || !eventSubscriptionTarget.value) {
         return false;
@@ -237,6 +280,39 @@ const isSubscriptionActionPending = computed(() => {
         isEventSubscriptionPending(eventSubscriptionTarget.value) ||
         isRefreshingCurrentDevice.value
     );
+});
+
+const latestHistoryItem = computed<LookupHistoryListItem | null>(() => {
+    return items.value[0] ?? null;
+});
+
+const futurePredictionSourceType = computed(() => props.targetType);
+
+const futurePredictionSourceCode = computed(() => normalizedCode.value);
+
+const futurePredictionAnchorTrainCode = computed(() => {
+    if (props.targetType === 'train') {
+        return normalizedCode.value;
+    }
+
+    return latestHistoryItem.value?.code.trim().toUpperCase() ?? '';
+});
+
+const futurePredictionDisplayCodes = computed(() => {
+    const code = futurePredictionAnchorTrainCode.value;
+    return code.length > 0 ? [code] : [];
+});
+
+const canOpenFuturePrediction = computed(() => {
+    if (props.targetType === 'train') {
+        return normalizedCode.value.length > 0;
+    }
+
+    return futurePredictionAnchorTrainCode.value.length > 0;
+});
+
+const futurePredictionActionHint = computed(() => {
+    return '';
 });
 
 const searchTitle = computed(() => {
@@ -286,6 +362,7 @@ watch(
     (value) => {
         draftCode.value = value;
         inputError.value = '';
+        isFuturePredictionModalOpen.value = false;
     },
     {
         immediate: true
@@ -341,6 +418,14 @@ useSiteSeo({
             : '/emu/' + normalizedCode.value,
     noindex: true
 });
+
+function openFuturePredictionModal() {
+    if (!canOpenFuturePrediction.value) {
+        return;
+    }
+
+    isFuturePredictionModalOpen.value = true;
+}
 
 async function toggleFavoriteItem() {
     if (!favoriteItem.value) {

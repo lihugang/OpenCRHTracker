@@ -1,4 +1,8 @@
 export type LookupTargetType = 'train' | 'emu' | 'station';
+export type FutureAssignmentPredictionSourceType = Extract<
+    LookupTargetType,
+    'train' | 'emu'
+>;
 
 export interface LookupTarget {
     type: LookupTargetType;
@@ -143,6 +147,66 @@ export interface CurrentTrainTimetableData {
     endAt: number;
     inferredCirculation: InferredCirculation | null;
     stops: CurrentTrainTimetableStop[];
+}
+
+export type FutureAssignmentPredictionMatchSource =
+    | 'train-history'
+    | 'emu-history'
+    | 'yesterday-rollover'
+    | 'template';
+
+export type FutureAssignmentPredictionStatus =
+    | 'idle'
+    | 'no_circulation'
+    | 'unresolved'
+    | 'no_future'
+    | 'ready';
+
+export type FutureAssignmentAnchorResolvedBy =
+    | 'today-history'
+    | 'yesterday-rollover'
+    | 'historical-route-anchor';
+
+export interface FutureAssignmentPredictionNode {
+    key: string;
+    allCodes: string[];
+    startStation: string;
+    endStation: string;
+    predictedStartAt: number | null;
+    predictedEndAt: number | null;
+    routeDayOffset: number;
+    routeNodeIndex: number;
+    dayOffsetFromToday: number;
+    matchedBy: FutureAssignmentPredictionMatchSource;
+}
+
+export interface FutureAssignmentPredictedEmuItem {
+    key: string;
+    emuCodes: string[];
+    predictedStartAt: number | null;
+    predictedEndAt: number | null;
+    dayOffsetFromToday: number;
+    routeDayOffset: number;
+    startStation: string;
+    endStation: string;
+    matchedBy: FutureAssignmentPredictionMatchSource;
+}
+
+export interface FutureAssignmentProgress {
+    currentRouteDayOffset: number;
+    currentNodeIndex: number;
+    resolvedBy: FutureAssignmentAnchorResolvedBy;
+    matchedBy: FutureAssignmentPredictionMatchSource;
+    actualDayOffsetFromToday: number;
+}
+
+export interface FutureAssignmentDisplayAnchor {
+    mode: 'current-progress' | 'train-alignment';
+    routeDayOffset: number;
+    routeNodeIndex: number;
+    resolvedBy: FutureAssignmentAnchorResolvedBy;
+    matchedBy: FutureAssignmentPredictionMatchSource;
+    actualDayOffsetFromToday: number;
 }
 
 export interface ReferenceModelItem {
