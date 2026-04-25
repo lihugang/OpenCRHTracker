@@ -8,5 +8,9 @@ export const aboutFriendLinks: AboutFriendLinkDefinition[] = [
     {
         name: '列车运行可视化',
         url: 'https://trainvisual.top'
+    },
+    {
+        name: '中国铁路地图数据下载',
+        url: 'https://crmapdata.lihugang.top'
     }
 ];
