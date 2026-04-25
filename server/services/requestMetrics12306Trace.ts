@@ -82,6 +82,10 @@ interface TraceSummaryOptions {
 
 const traceContextStorage = new AsyncLocalStorage<TraceContextState>();
 
+export function hasCurrent12306TraceContext() {
+    return traceContextStorage.getStore() !== undefined;
+}
+
 function asErrorMessage(error: unknown) {
     return error instanceof Error
         ? `${error.name}: ${error.message}`

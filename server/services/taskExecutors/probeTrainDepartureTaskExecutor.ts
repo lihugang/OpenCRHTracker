@@ -1156,7 +1156,8 @@ async function tryReuseHistoricalProbeStatus(
             mainEmuCode,
             historicalStartAt: latestResolvedRow.start_at,
             status: knownGroup.finalStatus,
-            emuCodes: allEmuCodes.length
+            emuCodes: allEmuCodes.length,
+            emuCodeList: allEmuCodes.join('/')
         }
     });
     logger.info(
@@ -1533,6 +1534,7 @@ async function executeProbeTrainDepartureTaskInternal(
                 mainEmuCode,
                 status: knownGroup.finalStatus,
                 emuCodes: knownGroup.emuCodes.length,
+                emuCodeList: knownGroup.emuCodes.join('/'),
                 attemptedTrainCodes: allTrainCodes.length
             }
         });
@@ -1608,6 +1610,7 @@ async function executeProbeTrainDepartureTask(rawArgs: unknown): Promise<void> {
             title: '探测列车发车编组',
             functionName: 'executeProbeTrainDepartureTask',
             subject: {
+                traceTitle: '执行任务',
                 primaryTrainCode: parsedArgs.trainCode,
                 allTrainCodes: [
                     parsedArgs.trainCode,

@@ -14,6 +14,7 @@ export const adminServerMetricsRouteTemplates = {
     ],
     api: [
         { template: '/api/v1/feedback/topics/:id/messages', segments: ['api', 'v1', 'feedback', 'topics', ':id', 'messages'] },
+        { template: '/api/v1/admin/12306-traces/:traceId', segments: ['api', 'v1', 'admin', '12306-traces', ':traceId'] },
         { template: '/api/v1/auth/api-keys/:revokeId', segments: ['api', 'v1', 'auth', 'api-keys', ':revokeId'] },
         { template: '/api/v1/auth/subscriptions/:id', segments: ['api', 'v1', 'auth', 'subscriptions', ':id'] },
         { template: '/api/v1/exports/daily/:date', segments: ['api', 'v1', 'exports', 'daily', ':date'] },

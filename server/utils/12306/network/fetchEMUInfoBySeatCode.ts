@@ -3,6 +3,7 @@ import useConfig from '~/server/config';
 import getLogger from '~/server/libs/log4js';
 import { resolveCanonicalEmuCode } from '~/server/services/probeAssetStore';
 import {
+    hasCurrent12306TraceContext,
     record12306TraceRequest,
     with12306TraceFunction
 } from '~/server/services/requestMetrics12306Trace';
@@ -87,6 +88,7 @@ export default async function fetchEMUInfoBySeatCode(code: string) {
     const normalizedCode = code.trim();
     const nowSeconds = getNowSeconds();
     const currentDate = getCurrentDateString();
+    const hasParentTraceContext = hasCurrent12306TraceContext();
 
     const cached = cachedSeatCodeResults.get(normalizedCode);
     if (cached) {
@@ -116,11 +118,15 @@ export default async function fetchEMUInfoBySeatCode(code: string) {
         {
             title: '按座位码获取编组信息',
             functionName: 'fetchEMUInfoBySeatCode',
-            subject: {
-                traceKey: `seat-code:${normalizedCode}`,
-                traceTitle: '座位码编组查询',
-                traceSubtitle: normalizedCode
-            },
+            subject: hasParentTraceContext
+                ? {
+                      traceSubtitle: normalizedCode
+                  }
+                : {
+                      traceKey: `seat-code:${normalizedCode}`,
+                      traceTitle: '座位码编组查询',
+                      traceSubtitle: normalizedCode
+                  },
             context: {
                 seatCode: normalizedCode
             },

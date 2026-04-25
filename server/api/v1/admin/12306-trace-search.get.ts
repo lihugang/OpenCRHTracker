@@ -1,8 +1,5 @@
 import { defineEventHandler, getQuery } from 'h3';
-import {
-    list12306TraceListItems
-} from '~/server/services/requestMetrics12306Store';
-import parseLimit from '~/server/utils/api/query/parseLimit';
+import { search12306TrainTraceDays } from '~/server/services/requestMetrics12306Store';
 import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';
 import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
@@ -21,9 +18,6 @@ export default defineEventHandler(async (event) => {
                 typeof query.trainCode === 'string'
                     ? query.trainCode.trim()
                     : '';
-            const cursor =
-                typeof query.cursor === 'string' ? query.cursor.trim() : '';
-            const limit = parseLimit(event);
 
             ensure(
                 /^\d{8}$/.test(date),
@@ -31,12 +25,16 @@ export default defineEventHandler(async (event) => {
                 'invalid_param',
                 'date 不符合 YYYYMMDD'
             );
+            ensure(
+                trainCode.length > 0,
+                400,
+                'invalid_param',
+                'trainCode 不能为空'
+            );
 
-            return list12306TraceListItems({
+            return search12306TrainTraceDays({
                 date,
-                trainCode,
-                cursor,
-                limit
+                trainCode
             });
         }
     );

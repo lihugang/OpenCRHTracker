@@ -1,5 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import type {
+    Admin12306CouplingTaskEntryTone,
+    Admin12306CouplingTaskResponse,
+    Admin12306CouplingTaskResultEntry,
+    Admin12306CouplingTaskSummaryItem,
+    Admin12306CouplingTaskTrainGroup,
     Admin12306RequestBucket,
     Admin12306TraceDetailItem,
     Admin12306TraceDetailResponse,
@@ -7,7 +12,12 @@ import type {
     Admin12306TraceEventLevel,
     Admin12306TraceListItem,
     Admin12306TraceListResponse,
-    Admin12306TraceStatus
+    Admin12306TraceStatus,
+    Admin12306TrainTraceDayItem,
+    Admin12306TrainTraceResultStatus,
+    Admin12306TrainTraceSearchResponse,
+    Admin12306TrainTraceSourceKind,
+    Admin12306TrainTraceSourceRow
 } from '~/types/admin';
 import useConfig from '~/server/config';
 import getDayTimestampRange from '~/server/utils/date/getDayTimestampRange';
@@ -178,6 +188,16 @@ interface List12306TracesOptions {
 interface Get12306TraceDetailOptions {
     date: string;
     traceId: string;
+}
+
+interface Search12306TrainTraceDaysOptions {
+    date: string;
+    trainCode: string;
+}
+
+interface Get12306CouplingTaskOptions {
+    date: string;
+    taskId: number;
 }
 
 interface TraceCursorPoint {
@@ -733,6 +753,1303 @@ function parseTraceCursor(rawValue: string | undefined): TraceCursorPoint | null
     };
 }
 
+function shiftShanghaiDateString(date: string, offsetDays: number) {
+    const { startAt } = getDayTimestampRange(date);
+    return formatShanghaiDateString(
+        (startAt + offsetDays * 24 * 60 * 60) * 1000
+    );
+}
+
+function parseNormalizedCodes(value: unknown) {
+    if (typeof value !== 'string') {
+        return [] as string[];
+    }
+
+    return Array.from(
+        new Set(
+            value
+                .split(/[\/,]/)
+                .map((item) => normalizeCode(item))
+                .filter((item) => item.length > 0)
+        )
+    );
+}
+
+function formatHistoricalDateContext(value: unknown) {
+    if (typeof value !== 'string' || value.trim().length === 0) {
+        return '';
+    }
+
+    const timestamp = Number.parseInt(value, 10);
+    if (!Number.isInteger(timestamp) || timestamp <= 0) {
+        return '';
+    }
+
+    return formatShanghaiDateString(timestamp * 1000);
+}
+
+function toStatusLabel(
+    status: Admin12306TrainTraceResultStatus
+): string {
+    switch (status) {
+        case 'single':
+            return '单编组';
+        case 'coupled':
+            return '重联';
+        case 'pending':
+            return '未明确';
+        default:
+            return '未明确';
+    }
+}
+
+function parseProbeStatusResult(value: unknown): {
+    status: Admin12306TrainTraceResultStatus;
+    label: string;
+} {
+    const normalizedValue =
+        typeof value === 'string' ? value.trim() : String(value ?? '').trim();
+
+    switch (normalizedValue) {
+        case '1':
+            return {
+                status: 'pending',
+                label: '未明确'
+            };
+        case '2':
+            return {
+                status: 'single',
+                label: '单编组'
+            };
+        case '3':
+            return {
+                status: 'coupled',
+                label: '重联'
+            };
+        default:
+            return {
+                status: 'unknown',
+                label: '未明确'
+            };
+    }
+}
+
+function buildCouplingResultLabel(
+    emuCodes: string[],
+    primaryEmuCode: string
+) {
+    if (emuCodes.length === 0) {
+        return '重联';
+    }
+
+    const extraCodes = primaryEmuCode
+        ? emuCodes.filter((emuCode) => emuCode !== primaryEmuCode)
+        : emuCodes.slice(1);
+    if (extraCodes.length === 0) {
+        return `重联 ${emuCodes.join(' / ')}`;
+    }
+
+    return `重联 ${extraCodes.join(' / ')}`;
+}
+
+function buildCouplingDetailText(emuCodes: string[]) {
+    if (emuCodes.length < 2) {
+        return '';
+    }
+
+    return `${emuCodes[0]} 重联 ${emuCodes.slice(1).join(' / ')}`;
+}
+
+function formatHistoryValidationReason(value: unknown) {
+    const reason =
+        typeof value === 'string' ? value.trim() : String(value ?? '').trim();
+
+    switch (reason) {
+        case 'matched_internal_code':
+            return '按内部车次匹配';
+        case 'matched_train_code':
+            return '按车次匹配';
+        case 'seat_code_missing':
+            return '缺少座位码';
+        case 'seat_code_request_failed':
+            return '座位码请求失败';
+        case 'main_emu_code_invalid':
+            return '主编组号无效';
+        case 'seat_route_not_current_day':
+            return '座位码结果不是当日';
+        case 'seat_internal_code_mismatch':
+            return '座位码内部车次不一致';
+        case 'seat_train_code_mismatch':
+            return '座位码车次不一致';
+        default:
+            return reason;
+    }
+}
+
+function parseContextInteger(value: unknown) {
+    if (typeof value === 'number') {
+        return Number.isInteger(value) && value >= 0 ? value : null;
+    }
+
+    if (typeof value !== 'string') {
+        return null;
+    }
+
+    const parsedValue = Number.parseInt(value.trim(), 10);
+    return Number.isInteger(parsedValue) && parsedValue >= 0
+        ? parsedValue
+        : null;
+}
+
+function parseTrainTraceCouplingTaskId(
+    event: Admin12306TraceEvent
+): number | null {
+    return parseContextInteger(event.context.detectionTaskId);
+}
+
+function buildTrainTraceCouplingAction(
+    event: Admin12306TraceEvent
+): Pick<
+    Admin12306TrainTraceSourceRow,
+    'clickable' | 'actionType' | 'couplingTaskId' | 'couplingTaskDate'
+> {
+    const couplingTaskId = parseTrainTraceCouplingTaskId(event);
+    if (couplingTaskId === null) {
+        return {
+            clickable: false,
+            actionType: null,
+            couplingTaskId: null,
+            couplingTaskDate: null
+        };
+    }
+
+    return {
+        clickable: true,
+        actionType: 'open_coupling_task',
+        couplingTaskId,
+        couplingTaskDate: formatShanghaiDateString(event.timestamp * 1000)
+    };
+}
+
+function buildTrainTraceNoopAction(): Pick<
+    Admin12306TrainTraceSourceRow,
+    'clickable' | 'actionType' | 'couplingTaskId' | 'couplingTaskDate'
+> {
+    return {
+        clickable: false,
+        actionType: null,
+        couplingTaskId: null,
+        couplingTaskDate: null
+    };
+}
+
+function getCouplingTaskToneByLevel(
+    level: Admin12306TraceEventLevel
+): Admin12306CouplingTaskEntryTone {
+    switch (level) {
+        case 'ERROR':
+            return 'danger';
+        case 'WARN':
+            return 'warning';
+        default:
+            return 'neutral';
+    }
+}
+
+function parseEventTrainCodes(event: Admin12306TraceEvent) {
+    const trainCodes = parseNormalizedCodes(event.context.trainCodes);
+    if (trainCodes.length > 0) {
+        return trainCodes;
+    }
+
+    const trainCode = normalizeCode(event.context.trainCode ?? '');
+    return trainCode ? [trainCode] : [];
+}
+
+function buildCouplingTaskEntryKey(trainCodes: string[]) {
+    if (trainCodes.length === 0) {
+        return 'unassigned';
+    }
+
+    return trainCodes.join('/');
+}
+
+function getTraceOperation(event: Admin12306TraceEvent) {
+    return 'operation' in event ? event.operation : '';
+}
+
+function appendDetailPart(parts: string[], value: string) {
+    const normalized = value.trim();
+    if (normalized.length > 0) {
+        parts.push(normalized);
+    }
+}
+
+function traceMatchesTrainCode(
+    trace: MutableTraceSummary,
+    queryTrainCode: string
+) {
+    if (trace.primaryTrainCode === queryTrainCode) {
+        return true;
+    }
+
+    return trace.allTrainCodes.includes(queryTrainCode);
+}
+
+function eventMatchesTrainCode(
+    trace: MutableTraceSummary,
+    event: Admin12306TraceEvent,
+    queryTrainCode: string
+) {
+    if (event.kind === 'request' && event.operation === 'fetch_emu_info_by_route') {
+        const eventTrainCode = normalizeCode(event.context.trainCode ?? '');
+        return (
+            eventTrainCode.length > 0 &&
+            (eventTrainCode === queryTrainCode ||
+                (traceMatchesTrainCode(trace, queryTrainCode) &&
+                    trace.allTrainCodes.includes(eventTrainCode)))
+        );
+    }
+
+    if (event.kind === 'decision') {
+        if (
+            event.operation === 'pending_group_resolved_single' ||
+            event.operation === 'coupled_group_detected' ||
+            event.operation === 'single_group_upgraded_to_coupled'
+        ) {
+            const trainCodes = parseNormalizedCodes(event.context.trainCodes);
+            return trainCodes.includes(queryTrainCode);
+        }
+
+        if (
+            event.operation === 'reuse_historical_status' ||
+            event.operation === 'resolved_from_status' ||
+            event.operation === 'pending_coupling_detection' ||
+            event.operation === 'resolved_single_non_multiple' ||
+            event.operation === 'main_emu_asset_not_found'
+        ) {
+            const eventTrainCode = normalizeCode(event.context.trainCode ?? '');
+            if (eventTrainCode.length === 0) {
+                return traceMatchesTrainCode(trace, queryTrainCode);
+            }
+
+            return (
+                eventTrainCode === queryTrainCode ||
+                (traceMatchesTrainCode(trace, queryTrainCode) &&
+                    trace.allTrainCodes.includes(eventTrainCode))
+            );
+        }
+    }
+
+    const trainCode = normalizeCode(event.context.trainCode ?? '');
+    if (trainCode === queryTrainCode) {
+        return true;
+    }
+
+    const trainCodes = parseNormalizedCodes(event.context.trainCodes);
+    if (trainCodes.includes(queryTrainCode)) {
+        return true;
+    }
+
+    return traceMatchesTrainCode(trace, queryTrainCode);
+}
+
+function buildTrainTraceSourceRow(
+    trace: MutableTraceSummary,
+    event: Admin12306TraceEvent,
+    queryTrainCode: string
+): (Admin12306TrainTraceSourceRow & {
+    resultStatus: Admin12306TrainTraceResultStatus;
+    relatedEmuCodes: string[];
+}) | null {
+    if (!eventMatchesTrainCode(trace, event, queryTrainCode)) {
+        return null;
+    }
+
+    if (event.kind === 'request' && event.operation === 'fetch_emu_info_by_route') {
+        const queriedTrainCode = normalizeCode(event.context.trainCode ?? '');
+        const emuCode = normalizeCode(event.context.emuCode ?? '');
+        const detailParts: string[] = [];
+
+        if (queriedTrainCode.length > 0 && queriedTrainCode !== queryTrainCode) {
+            appendDetailPart(detailParts, `实际命中 ${queriedTrainCode}`);
+        }
+        if (emuCode.length === 0) {
+            appendDetailPart(
+                detailParts,
+                event.errorMessage || event.title || '12306 未返回编组信息'
+            );
+        }
+
+        return {
+            id: event.id,
+            timestamp: event.timestamp,
+            source: '按车次获取动车组信息',
+            result: emuCode || '未检出',
+            detail: detailParts.join(' · '),
+            kind: 'route_query',
+            level: event.level,
+            ...buildTrainTraceNoopAction(),
+            resultStatus: 'unknown',
+            relatedEmuCodes: emuCode ? [emuCode] : []
+        };
+    }
+
+    if (event.kind === 'decision' || event.kind === 'conflict') {
+        if (event.operation === 'skip_historical_recent_same_assignment_not_running') {
+            const historicalTrainCodes = parseNormalizedCodes(
+                event.context.historicalRecentMatchedTrainCodes
+            );
+            const notRunningTrainCodes = parseNormalizedCodes(
+                event.context.notRunningTrainCodes
+            );
+            const detailParts: string[] = [];
+
+            appendDetailPart(
+                detailParts,
+                historicalTrainCodes.length > 0
+                    ? `历史命中 ${historicalTrainCodes.join(' / ')}`
+                    : ''
+            );
+            appendDetailPart(
+                detailParts,
+                notRunningTrainCodes.length > 0
+                    ? `今日未开行 ${notRunningTrainCodes.join(' / ')}`
+                    : ''
+            );
+
+            return {
+                id: event.id,
+                timestamp: event.timestamp,
+                source: '历史担当校验',
+                result: '今日不开行',
+                detail: detailParts.join(' · '),
+                kind: 'history_validation',
+                level: event.level,
+                ...buildTrainTraceNoopAction(),
+                resultStatus: 'unknown',
+                relatedEmuCodes: []
+            };
+        }
+
+        if (event.operation === 'seat_verify_pass') {
+            const detailParts: string[] = [];
+            const reason = formatHistoryValidationReason(event.context.reason);
+
+            appendDetailPart(
+                detailParts,
+                reason ? `复核方式 ${reason}` : ''
+            );
+            appendDetailPart(
+                detailParts,
+                normalizeCode(event.context.runningTrainCode ?? '')
+                    ? `今日运行 ${normalizeCode(event.context.runningTrainCode ?? '')}`
+                    : ''
+            );
+            appendDetailPart(
+                detailParts,
+                normalizeCode(event.context.seatTrainCode ?? '')
+                    ? `座位码车次 ${normalizeCode(event.context.seatTrainCode ?? '')}`
+                    : ''
+            );
+            appendDetailPart(
+                detailParts,
+                normalizeCode(event.context.seatInternalCode ?? '')
+                    ? `座位码内部车次 ${normalizeCode(event.context.seatInternalCode ?? '')}`
+                    : ''
+            );
+
+            return {
+                id: event.id,
+                timestamp: event.timestamp,
+                source: '历史担当校验',
+                result: '复核通过',
+                detail: detailParts.join(' · '),
+                kind: 'history_validation',
+                level: event.level,
+                ...buildTrainTraceNoopAction(),
+                resultStatus: 'unknown',
+                relatedEmuCodes: []
+            };
+        }
+
+        if (event.operation === 'seat_verify_unavailable_continue') {
+            const historicalTrainCodes = parseNormalizedCodes(
+                event.context.historicalRecentMatchedTrainCodes
+            );
+            const detailParts: string[] = [];
+            const reason = formatHistoryValidationReason(event.context.reason);
+
+            appendDetailPart(detailParts, reason);
+            appendDetailPart(
+                detailParts,
+                normalizeCode(event.context.runningTrainCode ?? '')
+                    ? `今日运行 ${normalizeCode(event.context.runningTrainCode ?? '')}`
+                    : ''
+            );
+            appendDetailPart(
+                detailParts,
+                historicalTrainCodes.length > 0
+                    ? `历史命中 ${historicalTrainCodes.join(' / ')}`
+                    : ''
+            );
+
+            return {
+                id: event.id,
+                timestamp: event.timestamp,
+                source: '历史担当校验',
+                result: '座位码不可用',
+                detail: detailParts.join(' · '),
+                kind: 'history_validation',
+                level: event.level,
+                ...buildTrainTraceNoopAction(),
+                resultStatus: 'unknown',
+                relatedEmuCodes: []
+            };
+        }
+
+        if (
+            event.operation === 'seat_verify_mismatch_requeue' ||
+            event.operation === 'seat_verify_mismatch_exhausted'
+        ) {
+            const historicalTrainCodes = parseNormalizedCodes(
+                event.context.historicalRecentMatchedTrainCodes
+            );
+            const detailParts: string[] = [];
+            const reason = formatHistoryValidationReason(event.context.reason);
+
+            appendDetailPart(detailParts, reason);
+            appendDetailPart(
+                detailParts,
+                normalizeCode(event.context.runningTrainCode ?? '')
+                    ? `今日运行 ${normalizeCode(event.context.runningTrainCode ?? '')}`
+                    : ''
+            );
+            appendDetailPart(
+                detailParts,
+                normalizeCode(event.context.seatTrainCode ?? '')
+                    ? `座位码车次 ${normalizeCode(event.context.seatTrainCode ?? '')}`
+                    : ''
+            );
+            appendDetailPart(
+                detailParts,
+                normalizeCode(event.context.seatInternalCode ?? '')
+                    ? `座位码内部车次 ${normalizeCode(event.context.seatInternalCode ?? '')}`
+                    : ''
+            );
+            appendDetailPart(
+                detailParts,
+                historicalTrainCodes.length > 0
+                    ? `历史命中 ${historicalTrainCodes.join(' / ')}`
+                    : ''
+            );
+
+            if (event.operation === 'seat_verify_mismatch_requeue') {
+                appendDetailPart(
+                    detailParts,
+                    event.context.nextTaskId
+                        ? `已延迟重试 #${String(event.context.nextTaskId).trim()}`
+                        : ''
+                );
+            }
+
+            return {
+                id: event.id,
+                timestamp: event.timestamp,
+                source: '历史担当校验',
+                result:
+                    event.operation === 'seat_verify_mismatch_requeue'
+                        ? '复核冲突，延迟重试'
+                        : '复核冲突，重试耗尽',
+                detail: detailParts.join(' · '),
+                kind: 'history_validation',
+                level: event.level,
+                ...buildTrainTraceNoopAction(),
+                resultStatus: 'unknown',
+                relatedEmuCodes: []
+            };
+        }
+
+        if (
+            event.operation ===
+            'continue_historical_recent_same_assignment_request_failed'
+        ) {
+            const historicalTrainCodes = parseNormalizedCodes(
+                event.context.historicalRecentMatchedTrainCodes
+            );
+            const requestFailedTrainCodes = parseNormalizedCodes(
+                event.context.requestFailedTrainCodes
+            );
+            const notRunningTrainCodes = parseNormalizedCodes(
+                event.context.notRunningTrainCodes
+            );
+            const detailParts: string[] = [];
+
+            appendDetailPart(
+                detailParts,
+                historicalTrainCodes.length > 0
+                    ? `历史命中 ${historicalTrainCodes.join(' / ')}`
+                    : ''
+            );
+            appendDetailPart(
+                detailParts,
+                requestFailedTrainCodes.length > 0
+                    ? `请求失败 ${requestFailedTrainCodes.join(' / ')}`
+                    : ''
+            );
+            appendDetailPart(
+                detailParts,
+                notRunningTrainCodes.length > 0
+                    ? `未开行 ${notRunningTrainCodes.join(' / ')}`
+                    : ''
+            );
+
+            return {
+                id: event.id,
+                timestamp: event.timestamp,
+                source: '历史担当校验',
+                result: '运行校验请求失败',
+                detail: detailParts.join(' · '),
+                kind: 'history_validation',
+                level: event.level,
+                ...buildTrainTraceNoopAction(),
+                resultStatus: 'unknown',
+                relatedEmuCodes: []
+            };
+        }
+
+        if (event.operation === 'reuse_historical_status_incomplete') {
+            const detailParts: string[] = [];
+            const historicalDate = formatHistoricalDateContext(
+                event.context.historicalStartAt
+            );
+            const mainEmuCode = normalizeCode(event.context.mainEmuCode ?? '');
+
+            appendDetailPart(
+                detailParts,
+                historicalDate ? `历史日期 ${historicalDate}` : ''
+            );
+            appendDetailPart(
+                detailParts,
+                mainEmuCode ? `主编组 ${mainEmuCode}` : ''
+            );
+
+            return {
+                id: event.id,
+                timestamp: event.timestamp,
+                source: '历史担当校验',
+                result: '历史状态不完整',
+                detail: detailParts.join(' · '),
+                kind: 'history_validation',
+                level: event.level,
+                ...buildTrainTraceNoopAction(),
+                resultStatus: 'unknown',
+                relatedEmuCodes: mainEmuCode ? [mainEmuCode] : []
+            };
+        }
+    }
+
+    if (event.kind !== 'decision') {
+        return null;
+    }
+
+    if (
+        event.operation === 'reuse_historical_status' ||
+        event.operation === 'resolved_from_status'
+    ) {
+        const parsedStatus = parseProbeStatusResult(event.context.status);
+        const detailParts: string[] = [];
+        const mainEmuCode = normalizeCode(event.context.mainEmuCode ?? '');
+        const emuCodeList = parseNormalizedCodes(event.context.emuCodeList);
+        const historicalDate = formatHistoricalDateContext(
+            event.context.historicalStartAt
+        );
+
+        if (parsedStatus.status === 'coupled') {
+            appendDetailPart(detailParts, buildCouplingDetailText(emuCodeList));
+        }
+        appendDetailPart(
+            detailParts,
+            historicalDate ? `复用 ${historicalDate}` : ''
+        );
+        appendDetailPart(
+            detailParts,
+            parsedStatus.status !== 'coupled' && mainEmuCode
+                ? `主编组 ${mainEmuCode}`
+                : ''
+        );
+
+        return {
+            id: event.id,
+            timestamp: event.timestamp,
+            source: '复用重联状态',
+            result: parsedStatus.label,
+            detail: detailParts.join(' · '),
+            kind: 'reuse_status',
+            level: event.level,
+            ...buildTrainTraceNoopAction(),
+            resultStatus: parsedStatus.status,
+            relatedEmuCodes:
+                emuCodeList.length > 0
+                    ? emuCodeList
+                    : (mainEmuCode ? [mainEmuCode] : [])
+        };
+    }
+
+    if (event.operation === 'pending_coupling_detection') {
+        const mainEmuCode = normalizeCode(event.context.mainEmuCode ?? '');
+
+        return {
+            id: event.id,
+            timestamp: event.timestamp,
+            source: '复用重联状态',
+            result: '未明确',
+            detail: mainEmuCode ? `主编组 ${mainEmuCode}` : '',
+            kind: 'reuse_status',
+            level: event.level,
+            ...buildTrainTraceNoopAction(),
+            resultStatus: 'pending',
+            relatedEmuCodes: mainEmuCode ? [mainEmuCode] : []
+        };
+    }
+
+    if (
+        event.operation === 'resolved_single_non_multiple' ||
+        event.operation === 'main_emu_asset_not_found'
+    ) {
+        const mainEmuCode = normalizeCode(event.context.mainEmuCode ?? '');
+
+        return {
+            id: event.id,
+            timestamp: event.timestamp,
+            source: '车辆资产判断',
+            result: '单编组',
+            detail: mainEmuCode ? `主编组 ${mainEmuCode}` : '',
+            kind: 'asset_resolve',
+            level: event.level,
+            ...buildTrainTraceNoopAction(),
+            resultStatus: 'single',
+            relatedEmuCodes: mainEmuCode ? [mainEmuCode] : []
+        };
+    }
+
+    if (event.operation === 'pending_group_resolved_single') {
+        const emuCodes = parseNormalizedCodes(event.context.emuCodes);
+
+        return {
+            id: event.id,
+            timestamp: event.timestamp,
+            source: '重联扫描任务',
+            result: '未检出',
+            detail: emuCodes.length > 0 ? `主编组 ${emuCodes[0]}` : '',
+            kind: 'coupling_scan',
+            level: event.level,
+            ...buildTrainTraceCouplingAction(event),
+            resultStatus: 'single',
+            relatedEmuCodes: emuCodes
+        };
+    }
+
+    if (
+        event.operation === 'coupled_group_detected' ||
+        event.operation === 'single_group_upgraded_to_coupled'
+    ) {
+        const emuCodes = parseNormalizedCodes(event.context.emuCodes);
+        const primaryEmuCode = emuCodes[0] ?? '';
+
+        return {
+            id: event.id,
+            timestamp: event.timestamp,
+            source: '重联扫描任务',
+            result: buildCouplingResultLabel(emuCodes, primaryEmuCode),
+            detail:
+                event.operation === 'single_group_upgraded_to_coupled'
+                    ? '单编组结果已升级'
+                    : '',
+            kind: 'coupling_scan',
+            level: event.level,
+            ...buildTrainTraceCouplingAction(event),
+            resultStatus: 'coupled',
+            relatedEmuCodes: emuCodes
+        };
+    }
+
+    return null;
+}
+
+function compareTrainTraceSourceRows(
+    left: Admin12306TrainTraceSourceRow,
+    right: Admin12306TrainTraceSourceRow
+) {
+    return left.timestamp - right.timestamp || left.id.localeCompare(right.id);
+}
+
+function shouldKeepDistinctTrainTraceRow(
+    current: Admin12306TrainTraceSourceRow,
+    previous: Admin12306TrainTraceSourceRow | null
+) {
+    if (!previous) {
+        return true;
+    }
+
+    return !(
+        previous.timestamp === current.timestamp &&
+        previous.source === current.source &&
+        previous.result === current.result &&
+        previous.detail === current.detail &&
+        previous.kind === current.kind &&
+        previous.clickable === current.clickable &&
+        previous.actionType === current.actionType &&
+        previous.couplingTaskId === current.couplingTaskId &&
+        previous.couplingTaskDate === current.couplingTaskDate
+    );
+}
+
+function buildTrainTraceDayItem(
+    date: string,
+    traces: MutableTraceSummary[],
+    queryTrainCode: string
+): Admin12306TrainTraceDayItem | null {
+    const sourceRows = traces
+        .flatMap((trace) =>
+            trace.events.map((event) => buildTrainTraceSourceRow(trace, event, queryTrainCode))
+        )
+        .filter(
+            (
+                row
+            ): row is Admin12306TrainTraceSourceRow & {
+                resultStatus: Admin12306TrainTraceResultStatus;
+                relatedEmuCodes: string[];
+            } => row !== null
+        )
+        .sort(compareTrainTraceSourceRows);
+
+    const distinctRows: Admin12306TrainTraceSourceRow[] = [];
+    const matchedTrainCodes = new Set<string>();
+    const relatedEmuCodes = new Set<string>();
+    let resolvedStatus: Admin12306TrainTraceResultStatus = 'unknown';
+
+    for (const trace of traces) {
+        if (trace.primaryTrainCode.length > 0) {
+            matchedTrainCodes.add(trace.primaryTrainCode);
+        }
+        for (const trainCode of trace.allTrainCodes) {
+            matchedTrainCodes.add(trainCode);
+        }
+    }
+
+    for (const row of sourceRows) {
+        if (shouldKeepDistinctTrainTraceRow(row, distinctRows.at(-1) ?? null)) {
+            distinctRows.push({
+                id: row.id,
+                timestamp: row.timestamp,
+                source: row.source,
+                result: row.result,
+                detail: row.detail,
+                kind: row.kind,
+                level: row.level,
+                clickable: row.clickable,
+                actionType: row.actionType,
+                couplingTaskId: row.couplingTaskId,
+                couplingTaskDate: row.couplingTaskDate
+            });
+        }
+
+        if (row.resultStatus !== 'unknown') {
+            resolvedStatus = row.resultStatus;
+        }
+
+        for (const emuCode of row.relatedEmuCodes) {
+            relatedEmuCodes.add(emuCode);
+        }
+    }
+
+    if (distinctRows.length === 0) {
+        return null;
+    }
+
+    return {
+        date,
+        queryTrainCode,
+        matchedTrainCodes: Array.from(matchedTrainCodes),
+        relatedEmuCodes: Array.from(relatedEmuCodes),
+        traceCount: traces.length,
+        resultStatus: resolvedStatus,
+        resultLabel: toStatusLabel(resolvedStatus),
+        rows: distinctRows
+    };
+}
+
+function parseContextText(value: unknown) {
+    return typeof value === 'string' ? value.trim() : String(value ?? '').trim();
+}
+
+function parseTraceRawArgs(trace: MutableTraceSummary | null) {
+    const fallback = {
+        bureau: '',
+        model: ''
+    };
+
+    if (!trace) {
+        return fallback;
+    }
+
+    const rawArgs =
+        trace.events.find(
+            (event) =>
+                typeof event.context.rawArgs === 'string' &&
+                event.context.rawArgs.trim().length > 0
+        )?.context.rawArgs ?? '';
+
+    if (typeof rawArgs !== 'string' || rawArgs.trim().length === 0) {
+        return fallback;
+    }
+
+    try {
+        const parsed = JSON.parse(rawArgs) as {
+            bureau?: unknown;
+            model?: unknown;
+        };
+
+        return {
+            bureau:
+                typeof parsed.bureau === 'string' ? parsed.bureau.trim() : '',
+            model:
+                typeof parsed.model === 'string'
+                    ? normalizeCode(parsed.model)
+                    : ''
+        };
+    } catch {
+        return fallback;
+    }
+}
+
+function buildCouplingTaskSummaryItem(
+    event: Admin12306TraceEvent
+): Admin12306CouplingTaskSummaryItem | null {
+    const operation = getTraceOperation(event);
+    const detailParts: string[] = [];
+    const bureau = parseContextText(event.context.bureau);
+    const model = normalizeCode(event.context.model ?? '');
+
+    appendDetailPart(detailParts, bureau ? `担当局 ${bureau}` : '');
+    appendDetailPart(detailParts, model ? `车型 ${model}` : '');
+
+    if (operation === 'coupling_scan_skip_recent_detection') {
+        const cooldownSeconds = parseContextInteger(
+            event.context.cooldownSeconds
+        );
+
+        appendDetailPart(
+            detailParts,
+            cooldownSeconds !== null ? `冷却 ${cooldownSeconds} 秒` : ''
+        );
+
+        return {
+            id: event.id,
+            timestamp: event.timestamp,
+            title: '最近已执行重联扫描',
+            detail: detailParts.join(' · '),
+            level: event.level
+        };
+    }
+
+    if (operation === 'coupling_scan_candidate_group_not_found') {
+        return {
+            id: event.id,
+            timestamp: event.timestamp,
+            title: '未找到候选动车组',
+            detail: detailParts.join(' · '),
+            level: event.level
+        };
+    }
+
+    if (operation === 'coupling_scan_task_summary') {
+        const candidates = parseContextInteger(event.context.candidates);
+        const pendingGroups = parseContextInteger(event.context.pendingGroups);
+        const matchedGroups = parseContextInteger(event.context.matchedGroups);
+        const finalizedSingleGroups = parseContextInteger(
+            event.context.finalizedSingleGroups
+        );
+        const skippedAssigned = parseContextInteger(
+            event.context.skippedAssigned
+        );
+        const scannedCount = parseContextInteger(event.context.scannedCount);
+        const warningCount = parseContextInteger(event.context.warningCount);
+
+        appendDetailPart(
+            detailParts,
+            candidates !== null ? `候选 ${candidates}` : ''
+        );
+        appendDetailPart(
+            detailParts,
+            pendingGroups !== null ? `待检 ${pendingGroups}` : ''
+        );
+        appendDetailPart(
+            detailParts,
+            matchedGroups !== null ? `重联 ${matchedGroups}` : ''
+        );
+        appendDetailPart(
+            detailParts,
+            finalizedSingleGroups !== null
+                ? `单编组 ${finalizedSingleGroups}`
+                : ''
+        );
+        appendDetailPart(
+            detailParts,
+            skippedAssigned !== null ? `跳过 ${skippedAssigned}` : ''
+        );
+        appendDetailPart(
+            detailParts,
+            scannedCount !== null ? `已扫 ${scannedCount}` : ''
+        );
+        appendDetailPart(
+            detailParts,
+            warningCount !== null ? `告警 ${warningCount}` : ''
+        );
+
+        return {
+            id: event.id,
+            timestamp: event.timestamp,
+            title: '任务汇总',
+            detail: detailParts.join(' · '),
+            level: event.level
+        };
+    }
+
+    return null;
+}
+
+function getCouplingTaskEntryTone(
+    event: Admin12306TraceEvent
+): Admin12306CouplingTaskEntryTone {
+    if (event.kind === 'decision' && getTraceOperation(event) === 'coupled_group_detected') {
+        return 'success';
+    }
+
+    return getCouplingTaskToneByLevel(event.level);
+}
+
+function buildCouplingTaskResultEntry(
+    event: Admin12306TraceEvent
+): Admin12306CouplingTaskResultEntry | null {
+    const operation = getTraceOperation(event);
+    const trainCodes = parseEventTrainCodes(event);
+    const groupKey = buildCouplingTaskEntryKey(trainCodes);
+    const startAt = parseContextInteger(event.context.startAt);
+
+    if (operation === 'pending_group_resolved_single') {
+        const emuCodes = parseNormalizedCodes(event.context.emuCodes);
+        const detailParts: string[] = [];
+
+        appendDetailPart(
+            detailParts,
+            emuCodes[0] ? `${emuCodes[0]} 单编组` : ''
+        );
+
+        return {
+            id: event.id,
+            timestamp: event.timestamp,
+            title: '重联扫描结果',
+            result: '未检出',
+            detail: detailParts.join(' · '),
+            startAt,
+            groupKey,
+            emuCodes,
+            level: event.level,
+            tone: getCouplingTaskEntryTone(event)
+        };
+    }
+
+    if (
+        operation === 'coupled_group_detected' ||
+        operation === 'single_group_upgraded_to_coupled'
+    ) {
+        const emuCodes = parseNormalizedCodes(event.context.emuCodes);
+        const primaryEmuCode = emuCodes[0] ?? '';
+        const detailParts: string[] = [];
+
+        appendDetailPart(detailParts, buildCouplingDetailText(emuCodes));
+        appendDetailPart(
+            detailParts,
+            operation === 'single_group_upgraded_to_coupled'
+                ? '由单编组升级为重联'
+                : ''
+        );
+
+        return {
+            id: event.id,
+            timestamp: event.timestamp,
+            title: '重联扫描结果',
+            result: buildCouplingResultLabel(emuCodes, primaryEmuCode),
+            detail: detailParts.join(' · '),
+            startAt,
+            groupKey,
+            emuCodes,
+            level: event.level,
+            tone: getCouplingTaskEntryTone(event)
+        };
+    }
+
+    if (operation === 'coupling_scan_skipped_assigned') {
+        const candidateEmuCode = normalizeCode(
+            event.context.candidateEmuCode ?? ''
+        );
+        const detailParts: string[] = [];
+        const groupKeys = parseContextText(event.context.groupKeys);
+
+        appendDetailPart(
+            detailParts,
+            trainCodes.length > 0 ? `关联车次 ${trainCodes.join(' / ')}` : ''
+        );
+        appendDetailPart(
+            detailParts,
+            groupKeys ? `编组键 ${groupKeys}` : ''
+        );
+
+        return {
+            id: event.id,
+            timestamp: event.timestamp,
+            title: '跳过已分配候选',
+            result: candidateEmuCode || '已跳过',
+            detail: detailParts.join(' · '),
+            startAt,
+            groupKey,
+            emuCodes: candidateEmuCode ? [candidateEmuCode] : [],
+            level: event.level,
+            tone: getCouplingTaskEntryTone(event)
+        };
+    }
+
+    if (operation === 'coupling_scan_candidate_missing_seat_code') {
+        const candidateEmuCode = normalizeCode(
+            event.context.candidateEmuCode ?? ''
+        );
+
+        return {
+            id: event.id,
+            timestamp: event.timestamp,
+            title: '候选缺少席位码',
+            result: candidateEmuCode || '未提供',
+            detail: '',
+            startAt,
+            groupKey,
+            emuCodes: candidateEmuCode ? [candidateEmuCode] : [],
+            level: event.level,
+            tone: getCouplingTaskEntryTone(event)
+        };
+    }
+
+    if (operation === 'coupling_scan_candidate_request_failed') {
+        const candidateEmuCode = normalizeCode(
+            event.context.candidateEmuCode ?? ''
+        );
+        const seatCode = parseContextText(event.context.seatCode);
+
+        return {
+            id: event.id,
+            timestamp: event.timestamp,
+            title: '候选席位码请求失败',
+            result: candidateEmuCode || '请求失败',
+            detail: seatCode ? `席位码 ${seatCode}` : '',
+            startAt,
+            groupKey,
+            emuCodes: candidateEmuCode ? [candidateEmuCode] : [],
+            level: event.level,
+            tone: getCouplingTaskEntryTone(event)
+        };
+    }
+
+    if (operation === 'coupling_scan_unmatched_current_group') {
+        const candidateEmuCode = normalizeCode(
+            event.context.candidateEmuCode ?? ''
+        );
+        const scannedEmuCode = normalizeCode(event.context.scannedEmuCode ?? '');
+        const scannedTrainCode = normalizeCode(
+            event.context.scannedTrainCode ?? ''
+        );
+        const detailParts: string[] = [];
+
+        appendDetailPart(
+            detailParts,
+            scannedEmuCode ? `扫描编组 ${scannedEmuCode}` : ''
+        );
+        appendDetailPart(
+            detailParts,
+            candidateEmuCode ? `候选编组 ${candidateEmuCode}` : ''
+        );
+        appendDetailPart(
+            detailParts,
+            parseContextText(event.context.scannedTrainInternalCode)
+                ? `内部车次 ${parseContextText(event.context.scannedTrainInternalCode)}`
+                : ''
+        );
+
+        return {
+            id: event.id,
+            timestamp: event.timestamp,
+            title: '扫描结果未匹配当前待检车次',
+            result: scannedTrainCode || candidateEmuCode || '未匹配',
+            detail: detailParts.join(' · '),
+            startAt,
+            groupKey,
+            emuCodes: [candidateEmuCode, scannedEmuCode].filter(Boolean),
+            level: event.level,
+            tone: getCouplingTaskEntryTone(event)
+        };
+    }
+
+    if (operation === 'over_limit_prune_train_repeat_zero') {
+        const originalEmuCodes = parseNormalizedCodes(
+            event.context.originalEmuCodes
+        );
+        const removedEmuCodes = parseNormalizedCodes(event.context.removedEmuCodes);
+        const remainingEmuCodes = parseNormalizedCodes(
+            event.context.remainingEmuCodes
+        );
+        const detailParts: string[] = [];
+
+        appendDetailPart(
+            detailParts,
+            remainingEmuCodes.length > 0
+                ? `保留 ${remainingEmuCodes.join(' / ')}`
+                : ''
+        );
+        appendDetailPart(
+            detailParts,
+            originalEmuCodes.length > 0
+                ? `原始 ${originalEmuCodes.join(' / ')}`
+                : ''
+        );
+
+        return {
+            id: event.id,
+            timestamp: event.timestamp,
+            title: '超限编组裁剪',
+            result:
+                removedEmuCodes.length > 0
+                    ? `移除 ${removedEmuCodes.join(' / ')}`
+                    : '已裁剪',
+            detail: detailParts.join(' · '),
+            startAt,
+            groupKey,
+            emuCodes:
+                remainingEmuCodes.length > 0
+                    ? remainingEmuCodes
+                    : originalEmuCodes,
+            level: event.level,
+            tone: getCouplingTaskEntryTone(event)
+        };
+    }
+
+    if (operation === 'over_limit_after_prune_continue') {
+        const originalEmuCodes = parseNormalizedCodes(
+            event.context.originalEmuCodes
+        );
+        const remainingEmuCodes = parseNormalizedCodes(
+            event.context.remainingEmuCodes
+        );
+
+        return {
+            id: event.id,
+            timestamp: event.timestamp,
+            title: '超限编组仍继续保留',
+            result:
+                remainingEmuCodes.length > 0
+                    ? remainingEmuCodes.join(' / ')
+                    : '仍超限',
+            detail:
+                originalEmuCodes.length > 0
+                    ? `原始 ${originalEmuCodes.join(' / ')}`
+                    : '',
+            startAt,
+            groupKey,
+            emuCodes:
+                remainingEmuCodes.length > 0
+                    ? remainingEmuCodes
+                    : originalEmuCodes,
+            level: event.level,
+            tone: getCouplingTaskEntryTone(event)
+        };
+    }
+
+    if (operation === 'all_emu_codes_pruned') {
+        const originalEmuCodes = parseNormalizedCodes(
+            event.context.originalEmuCodes
+        );
+        const targetGroupKey = parseContextText(event.context.groupKey);
+
+        return {
+            id: event.id,
+            timestamp: event.timestamp,
+            title: '编组全部被裁剪',
+            result:
+                originalEmuCodes.length > 0
+                    ? originalEmuCodes.join(' / ')
+                    : '全部裁剪',
+            detail: targetGroupKey ? `编组键 ${targetGroupKey}` : '',
+            startAt,
+            groupKey,
+            emuCodes: originalEmuCodes,
+            level: event.level,
+            tone: getCouplingTaskEntryTone(event)
+        };
+    }
+
+    return null;
+}
+
+function compareCouplingTaskGroups(
+    left: Admin12306CouplingTaskTrainGroup,
+    right: Admin12306CouplingTaskTrainGroup
+) {
+    if (left.isUnassigned !== right.isUnassigned) {
+        return left.isUnassigned ? 1 : -1;
+    }
+
+    return (
+        left.primaryTrainCode.localeCompare(right.primaryTrainCode) ||
+        left.key.localeCompare(right.key)
+    );
+}
+
+function compareCouplingTaskSummaryItems(
+    left: Admin12306CouplingTaskSummaryItem,
+    right: Admin12306CouplingTaskSummaryItem
+) {
+    return left.timestamp - right.timestamp || left.id.localeCompare(right.id);
+}
+
+function compareCouplingTaskResultEntries(
+    left: Admin12306CouplingTaskResultEntry,
+    right: Admin12306CouplingTaskResultEntry
+) {
+    return left.timestamp - right.timestamp || left.id.localeCompare(right.id);
+}
+
+function get12306CouplingTaskMeta(
+    date: string,
+    taskId: number,
+    trace: MutableTraceSummary | null
+) {
+    if (!trace) {
+        return null;
+    }
+
+    const rawArgs = parseTraceRawArgs(trace);
+
+    return {
+        taskId,
+        date,
+        executor: trace.executor,
+        status: trace.status,
+        startedAt: trace.startedAt,
+        endedAt: trace.endedAt,
+        bureau: rawArgs.bureau,
+        model: rawArgs.model
+    };
+}
+
 function createTraceSummary(
     traceId: string,
     timestamp: number
@@ -903,11 +2220,98 @@ function resolveTraceSummary(
     return trace;
 }
 
+function isProbeTrainDepartureTrace(trace: MutableTraceSummary) {
+    return trace.executor === 'probe_train_departure';
+}
+
+function getProbeTrainDepartureTitle(trace: MutableTraceSummary) {
+    if (trace.allTrainCodes.length > 0) {
+        return trace.allTrainCodes.join(' / ');
+    }
+
+    if (trace.primaryTrainCode.length > 0) {
+        return trace.primaryTrainCode;
+    }
+
+    return trace.title;
+}
+
+function isProbeTrainDepartureNotRunning(trace: MutableTraceSummary) {
+    const expectedTrainCodes = normalizeTrainCodes(trace.allTrainCodes);
+    if (expectedTrainCodes.length === 0) {
+        return false;
+    }
+
+    const queriedTrainCodes = new Set<string>();
+    const missingCarCodeTrainCodes = new Set<string>();
+    const successfulTrainCodes = new Set<string>();
+
+    for (const event of trace.events) {
+        if (
+            event.kind !== 'request' ||
+            event.operation !== 'fetch_emu_info_by_route'
+        ) {
+            continue;
+        }
+
+        const trainCode = normalizeCode(event.context.trainCode ?? '');
+        if (trainCode.length === 0) {
+            continue;
+        }
+
+        queriedTrainCodes.add(trainCode);
+
+        if (normalizeCode(event.context.emuCode ?? '').length > 0) {
+            successfulTrainCodes.add(trainCode);
+            continue;
+        }
+
+        if (event.errorMessage === 'missing content.data or content.data.carCode') {
+            missingCarCodeTrainCodes.add(trainCode);
+        }
+    }
+
+    return expectedTrainCodes.every(
+        (trainCode) =>
+            queriedTrainCodes.has(trainCode) &&
+            missingCarCodeTrainCodes.has(trainCode) &&
+            !successfulTrainCodes.has(trainCode)
+    );
+}
+
+function getProbeTrainDepartureSubtitle(trace: MutableTraceSummary) {
+    if (trace.conflictCount > 0) {
+        return '冲突';
+    }
+
+    if (isProbeTrainDepartureNotRunning(trace)) {
+        return '今日不开行';
+    }
+
+    return '成功';
+}
+
+function toDisplayTraceSummary(trace: MutableTraceSummary) {
+    if (!isProbeTrainDepartureTrace(trace)) {
+        return {
+            title: trace.title,
+            subtitle: trace.subtitle
+        };
+    }
+
+    return {
+        title: getProbeTrainDepartureTitle(trace),
+        subtitle: getProbeTrainDepartureSubtitle(trace)
+    };
+}
+
 function toTraceListItem(trace: MutableTraceSummary): Admin12306TraceListItem {
+    const displayTrace = toDisplayTraceSummary(trace);
+
     return {
         traceId: trace.traceId,
-        title: trace.title,
-        subtitle: trace.subtitle,
+        title: displayTrace.title,
+        subtitle: displayTrace.subtitle,
         primaryTrainCode: trace.primaryTrainCode,
         allTrainCodes: [...trace.allTrainCodes],
         trainInternalCode: trace.trainInternalCode,
@@ -1253,6 +2657,168 @@ export function get12306TraceDetail(
         requestMetricsRetentionDays: retentionDays,
         requestMetricsRetained: retained,
         trace: trace ? toTraceDetailItem(trace) : null
+    };
+}
+
+export function get12306CouplingTask(
+    options: Get12306CouplingTaskOptions
+): Admin12306CouplingTaskResponse {
+    const retentionDays = getRequestMetricsConfig().retentionDays;
+    const retained = isDateRetained(options.date, retentionDays);
+    const emptyResponse: Admin12306CouplingTaskResponse = {
+        date: options.date,
+        taskId: options.taskId,
+        requestMetricsEnabled: is12306RequestMetricsEnabled(),
+        requestMetricsRetentionDays: retentionDays,
+        requestMetricsRetained: retained,
+        task: null,
+        summaries: [],
+        groups: []
+    };
+
+    if (!retained || !is12306RequestMetricsEnabled()) {
+        return emptyResponse;
+    }
+
+    const store = getRequestMetricsStore();
+    pruneRequestMetricDays(store);
+    const dayState = store.days.get(options.date);
+    if (!dayState) {
+        return emptyResponse;
+    }
+
+    const traces = Array.from(dayState.traces.values());
+    const taskTrace =
+        traces.find(
+            (trace) =>
+                trace.executor === 'detect_coupled_emu_group' &&
+                trace.taskId === options.taskId
+        ) ??
+        traces.find(
+            (trace) =>
+                trace.executor === 'detect_coupled_emu_group' &&
+                trace.events.some(
+                    (event) =>
+                        parseTrainTraceCouplingTaskId(event) === options.taskId
+                )
+        ) ??
+        null;
+
+    const summaries: Admin12306CouplingTaskSummaryItem[] = [];
+    const groupMap = new Map<string, Admin12306CouplingTaskTrainGroup>();
+
+    for (const trace of traces) {
+        for (const event of trace.events) {
+            if (parseTrainTraceCouplingTaskId(event) !== options.taskId) {
+                continue;
+            }
+
+            const summaryItem = buildCouplingTaskSummaryItem(event);
+            if (summaryItem) {
+                summaries.push(summaryItem);
+                continue;
+            }
+
+            const resultEntry = buildCouplingTaskResultEntry(event);
+            if (!resultEntry) {
+                continue;
+            }
+
+            const trainCodes = parseEventTrainCodes(event);
+            const groupKey = buildCouplingTaskEntryKey(trainCodes);
+            const group =
+                groupMap.get(groupKey) ??
+                (() => {
+                    const nextGroup: Admin12306CouplingTaskTrainGroup = {
+                        key: groupKey,
+                        primaryTrainCode: trainCodes[0] ?? '未关联车次',
+                        trainCodes,
+                        isUnassigned: trainCodes.length === 0,
+                        items: []
+                    };
+                    groupMap.set(groupKey, nextGroup);
+                    return nextGroup;
+                })();
+
+            group.items.push(resultEntry);
+        }
+    }
+
+    summaries.sort(compareCouplingTaskSummaryItems);
+    const groups = Array.from(groupMap.values())
+        .map((group) => ({
+            ...group,
+            items: [...group.items].sort(compareCouplingTaskResultEntries)
+        }))
+        .sort(compareCouplingTaskGroups);
+
+    return {
+        ...emptyResponse,
+        task: get12306CouplingTaskMeta(options.date, options.taskId, taskTrace),
+        summaries,
+        groups
+    };
+}
+
+export function search12306TrainTraceDays(
+    options: Search12306TrainTraceDaysOptions
+): Admin12306TrainTraceSearchResponse {
+    const retentionDays = getRequestMetricsConfig().retentionDays;
+    const queryTrainCode = normalizeCode(options.trainCode);
+    const requestedDateRetained = isDateRetained(options.date, retentionDays);
+    const searchableDates = requestedDateRetained
+        ? Array.from({ length: retentionDays }, (_, index) =>
+              shiftShanghaiDateString(options.date, -index)
+          ).filter((date) => isDateRetained(date, retentionDays))
+        : [];
+    const emptyResponse: Admin12306TrainTraceSearchResponse = {
+        date: options.date,
+        queryTrainCode,
+        searchedDayCount: searchableDates.length,
+        matchedDayCount: 0,
+        requestMetricsEnabled: is12306RequestMetricsEnabled(),
+        requestMetricsRetentionDays: retentionDays,
+        requestMetricsRetained: requestedDateRetained,
+        items: []
+    };
+
+    if (
+        queryTrainCode.length === 0 ||
+        !requestedDateRetained ||
+        !is12306RequestMetricsEnabled()
+    ) {
+        return emptyResponse;
+    }
+
+    const store = getRequestMetricsStore();
+    pruneRequestMetricDays(store);
+
+    const items: Admin12306TrainTraceDayItem[] = [];
+    for (const date of searchableDates) {
+        const dayState = store.days.get(date);
+        if (!dayState) {
+            continue;
+        }
+
+        const traces = Array.from(dayState.traces.values())
+            .filter((trace) => shouldIncludeTrace(trace, queryTrainCode))
+            .sort(compareTraceSummariesDescending);
+        if (traces.length === 0) {
+            continue;
+        }
+
+        const dayItem = buildTrainTraceDayItem(date, traces, queryTrainCode);
+        if (dayItem) {
+            items.push(dayItem);
+        }
+    }
+
+    items.sort((left, right) => right.date.localeCompare(left.date));
+
+    return {
+        ...emptyResponse,
+        matchedDayCount: items.length,
+        items
     };
 }
 

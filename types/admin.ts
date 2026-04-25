@@ -187,6 +187,112 @@ export interface Admin12306TraceDetailResponse {
     trace: Admin12306TraceDetailItem | null;
 }
 
+export type Admin12306TrainTraceResultStatus =
+    | 'single'
+    | 'coupled'
+    | 'pending'
+    | 'unknown';
+
+export type Admin12306TrainTraceSourceKind =
+    | 'route_query'
+    | 'reuse_status'
+    | 'coupling_scan'
+    | 'asset_resolve'
+    | 'history_validation';
+
+export interface Admin12306TrainTraceSourceRow {
+    id: string;
+    timestamp: number;
+    source: string;
+    result: string;
+    detail: string;
+    kind: Admin12306TrainTraceSourceKind;
+    level: Admin12306TraceEventLevel;
+    clickable: boolean;
+    actionType: 'open_coupling_task' | null;
+    couplingTaskId: number | null;
+    couplingTaskDate: string | null;
+}
+
+export interface Admin12306TrainTraceDayItem {
+    date: string;
+    queryTrainCode: string;
+    matchedTrainCodes: string[];
+    relatedEmuCodes: string[];
+    traceCount: number;
+    resultStatus: Admin12306TrainTraceResultStatus;
+    resultLabel: string;
+    rows: Admin12306TrainTraceSourceRow[];
+}
+
+export interface Admin12306TrainTraceSearchResponse {
+    date: string;
+    queryTrainCode: string;
+    searchedDayCount: number;
+    matchedDayCount: number;
+    requestMetricsEnabled: boolean;
+    requestMetricsRetentionDays: number;
+    requestMetricsRetained: boolean;
+    items: Admin12306TrainTraceDayItem[];
+}
+
+export type Admin12306CouplingTaskEntryTone =
+    | 'neutral'
+    | 'success'
+    | 'warning'
+    | 'danger';
+
+export interface Admin12306CouplingTaskSummaryItem {
+    id: string;
+    timestamp: number;
+    title: string;
+    detail: string;
+    level: Admin12306TraceEventLevel;
+}
+
+export interface Admin12306CouplingTaskResultEntry {
+    id: string;
+    timestamp: number;
+    title: string;
+    result: string;
+    detail: string;
+    startAt: number | null;
+    groupKey: string;
+    emuCodes: string[];
+    level: Admin12306TraceEventLevel;
+    tone: Admin12306CouplingTaskEntryTone;
+}
+
+export interface Admin12306CouplingTaskTrainGroup {
+    key: string;
+    primaryTrainCode: string;
+    trainCodes: string[];
+    isUnassigned: boolean;
+    items: Admin12306CouplingTaskResultEntry[];
+}
+
+export interface Admin12306CouplingTaskMeta {
+    taskId: number;
+    date: string;
+    executor: string;
+    status: Admin12306TraceStatus;
+    startedAt: number;
+    endedAt: number | null;
+    bureau: string;
+    model: string;
+}
+
+export interface Admin12306CouplingTaskResponse {
+    date: string;
+    taskId: number;
+    requestMetricsEnabled: boolean;
+    requestMetricsRetentionDays: number;
+    requestMetricsRetained: boolean;
+    task: Admin12306CouplingTaskMeta | null;
+    summaries: Admin12306CouplingTaskSummaryItem[];
+    groups: Admin12306CouplingTaskTrainGroup[];
+}
+
 export interface AdminPassiveAlertsResponse {
     date: string;
     logFile: string | null;

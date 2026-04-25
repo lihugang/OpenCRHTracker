@@ -11,7 +11,13 @@
             class="space-y-3">
             <article
                 class="rounded-[1rem] border px-4 py-4"
-                :class="getEventCardClass(node.event.kind, node.event.level)">
+                :class="
+                    getEventCardClass(
+                        node.event.kind,
+                        node.event.level,
+                        depth
+                    )
+                ">
                 <div
                     class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                     <div class="space-y-2">
@@ -124,6 +130,12 @@ const traceTimeFormatter = new Intl.DateTimeFormat('zh-CN', {
     minute: '2-digit',
     hour12: false
 });
+const traceContextTimeKeys = new Set([
+    'startAt',
+    'endAt',
+    'historicalStartAt',
+    'seatStartAt'
+]);
 
 const depth = computed(() => props.depth);
 
@@ -133,6 +145,19 @@ function formatTimestamp(timestamp: number) {
     }
 
     return traceTimeFormatter.format(new Date(timestamp * 1000));
+}
+
+function formatContextValue(key: string, value: string) {
+    if (!traceContextTimeKeys.has(key)) {
+        return value;
+    }
+
+    const parsedValue = Number.parseInt(value, 10);
+    if (!Number.isInteger(parsedValue) || parsedValue < 0) {
+        return value;
+    }
+
+    return formatTimestamp(parsedValue);
 }
 
 function getEventBadgeClass(
@@ -153,18 +178,53 @@ function getEventBadgeClass(
 
 function getEventCardClass(
     kind: Admin12306TraceEvent['kind'],
-    level: Admin12306TraceEvent['level']
+    level: Admin12306TraceEvent['level'],
+    currentDepth: number
 ) {
+    const depthToneIndex = Math.min(Math.max(currentDepth, 0), 3);
+
     if (level === 'ERROR') {
-        return 'border-rose-200 bg-rose-50/60';
+        return [
+            'border-rose-200',
+            [
+                'bg-rose-50/60',
+                'bg-rose-50/90',
+                'bg-rose-100/75',
+                'bg-rose-100/90'
+            ][depthToneIndex]
+        ];
     }
     if (level === 'WARN') {
-        return 'border-amber-200 bg-amber-50/60';
+        return [
+            'border-amber-200',
+            [
+                'bg-amber-50/60',
+                'bg-amber-50/90',
+                'bg-amber-100/70',
+                'bg-amber-100/85'
+            ][depthToneIndex]
+        ];
     }
     if (kind === 'summary') {
-        return 'border-emerald-200 bg-emerald-50/60';
+        return [
+            'border-emerald-200',
+            [
+                'bg-emerald-50/60',
+                'bg-emerald-50/90',
+                'bg-emerald-100/70',
+                'bg-emerald-100/85'
+            ][depthToneIndex]
+        ];
     }
-    return 'border-slate-200 bg-white/90';
+    return [
+        depthToneIndex >= 2 ? 'border-slate-300' : 'border-slate-200',
+        [
+            'bg-white/90',
+            'bg-slate-50/95',
+            'bg-slate-100/85',
+            'bg-slate-100/95'
+        ][depthToneIndex]
+    ];
 }
 
 function toEventContextEntries(context: Record<string, string>) {
@@ -173,7 +233,7 @@ function toEventContextEntries(context: Record<string, string>) {
         .slice(0, 12)
         .map(([key, value]) => ({
             key,
-            value
+            value: formatContextValue(key, value)
         }));
 }
 </script>

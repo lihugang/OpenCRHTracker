@@ -40,6 +40,7 @@ import {
     insertDailyEmuRoute
 } from '~/server/services/emuRoutesStore';
 import { notifyLookupStatusChanges } from '~/server/services/eventNotificationService';
+import { getCurrentTaskExecutionContext } from '~/server/services/taskExecutionContext';
 import { registerTaskExecutor } from '~/server/services/taskExecutorRegistry';
 import {
     getTodayScheduleCache,
@@ -78,6 +79,29 @@ interface MatchedEmuScanRecord {
 }
 
 let registered = false;
+
+function getCurrentDetectionTaskId(): number | null {
+    const currentTask = getCurrentTaskExecutionContext();
+    if (currentTask?.executor !== DETECT_COUPLED_EMU_GROUP_TASK_EXECUTOR) {
+        return null;
+    }
+
+    return currentTask.taskId;
+}
+
+function withDetectionTaskContext(
+    context: Record<string, unknown>
+): Record<string, unknown> {
+    const detectionTaskId = getCurrentDetectionTaskId();
+    if (detectionTaskId === null) {
+        return context;
+    }
+
+    return {
+        ...context,
+        detectionTaskId
+    };
+}
 
 function parseTaskArgs(raw: unknown): DetectCoupledEmuGroupTaskArgs {
     if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
@@ -333,6 +357,43 @@ function resolveTrackedGroupByTrainCode(
     return trackedGroup;
 }
 
+function collectTrackedGroupHintsByEmuCode(
+    emuCode: string,
+    dayStart: number,
+    nextDayStart: number,
+    cache: Map<string, TrackedTrainGroup | null>
+): {
+    trainCodes: string[];
+    groupKeys: string[];
+    startAts: number[];
+} {
+    const rows = listProbeStatusByEmuCodeInRange(emuCode, dayStart, nextDayStart);
+    const trainCodes = new Set<string>();
+    const groupKeys = new Set<string>();
+    const startAts = new Set<number>();
+
+    for (const row of rows) {
+        startAts.add(row.start_at);
+        const trackedGroup = resolveTrackedGroupByTrainCode(row.train_code, cache);
+        if (trackedGroup) {
+            for (const trainCode of trackedGroup.trainCodes) {
+                trainCodes.add(trainCode);
+            }
+            groupKeys.add(trackedGroup.group.trainKey);
+            startAts.add(trackedGroup.group.startAt);
+            continue;
+        }
+
+        trainCodes.add(normalizeCode(row.train_code));
+    }
+
+    return {
+        trainCodes: Array.from(trainCodes),
+        groupKeys: Array.from(groupKeys),
+        startAts: Array.from(startAts).sort((left, right) => left - right)
+    };
+}
+
 function collectPendingTrackedGroups(
     candidates: EmuListRecord[],
     dayStart: number,
@@ -380,7 +441,9 @@ async function scanUnassignedCandidates(
     bureau: string,
     model: string,
     candidates: EmuListRecord[],
-    cache: Map<string, TrackedTrainGroup | null>
+    cache: Map<string, TrackedTrainGroup | null>,
+    dayStart: number,
+    nextDayStart: number
 ): Promise<{
     matchedGroups: Map<string, TrackedTrainGroup>;
     matchedEmuScanRecordsByTrainKey: Map<string, Map<string, string>>;
@@ -406,6 +469,24 @@ async function scanUnassignedCandidates(
 
         if (isEmuAssignedToday(candidateEmuCode)) {
             skippedAssignedCount += 1;
+            const hint = collectTrackedGroupHintsByEmuCode(
+                candidateEmuCode,
+                dayStart,
+                nextDayStart,
+                cache
+            );
+            record12306TraceDecision({
+                title: '重联扫描跳过已分配编组',
+                operation: 'coupling_scan_skipped_assigned',
+                context: withDetectionTaskContext({
+                    bureau,
+                    model,
+                    candidateEmuCode,
+                    trainCodes: hint.trainCodes.join('/'),
+                    groupKeys: hint.groupKeys.join('/'),
+                    startAts: hint.startAts.join('/')
+                })
+            });
             continue;
         }
 
@@ -413,11 +494,32 @@ async function scanUnassignedCandidates(
             buildProbeAssetKey(candidate.model, candidate.trainSetNo)
         );
         if (!seatCode) {
+            record12306TraceConflict({
+                title: '重联扫描候选缺少座位码',
+                operation: 'coupling_scan_candidate_missing_seat_code',
+                level: 'WARN',
+                context: withDetectionTaskContext({
+                    bureau,
+                    model,
+                    candidateEmuCode
+                })
+            });
             continue;
         }
 
         const seatCodeResult = await fetchEMUInfoBySeatCode(seatCode);
         if (!seatCodeResult) {
+            record12306TraceConflict({
+                title: '重联扫描候选座位码请求失败',
+                operation: 'coupling_scan_candidate_request_failed',
+                level: 'WARN',
+                context: withDetectionTaskContext({
+                    bureau,
+                    model,
+                    candidateEmuCode,
+                    seatCode
+                })
+            });
             continue;
         }
 
@@ -431,6 +533,24 @@ async function scanUnassignedCandidates(
         );
         if (!trackedGroup) {
             warningCount += 1;
+            record12306TraceConflict({
+                title: '重联扫描结果未匹配待检测车次',
+                operation: 'coupling_scan_unmatched_current_group',
+                level: 'WARN',
+                context: withDetectionTaskContext({
+                    bureau,
+                    model,
+                    candidateEmuCode,
+                    scannedEmuCode,
+                    trainCodes: scannedTrainCode,
+                    scannedTrainCode,
+                    scannedTrainInternalCode: normalizeCode(
+                        seatCodeResult.route.internalCode
+                    ),
+                    startAt: seatCodeResult.route.startAt,
+                    endAt: seatCodeResult.route.endAt
+                })
+            });
             logger.debug(
                 `scan_unmatched_current_group bureau=${bureau} model=${model} emuCode=${scannedEmuCode} trainCode=${scannedTrainCode} trainInternalCode=${normalizeCode(seatCodeResult.route.internalCode)} startAt=${seatCodeResult.route.startAt} endAt=${seatCodeResult.route.endAt}`
             );
@@ -561,7 +681,7 @@ async function persistResolvedTrackedGroup(
                 title: '超限编组裁剪',
                 operation: 'over_limit_prune_train_repeat_zero',
                 level: 'WARN',
-                context: {
+                context: withDetectionTaskContext({
                     trainCodes: trainCodes.join('/'),
                     originalEmuCodes: originalEmuCodes.join('/'),
                     removedEmuCodes: removedEmuCodes.join('/'),
@@ -574,7 +694,7 @@ async function persistResolvedTrackedGroup(
                         cleanupState.deletedDailyRouteRows,
                     clearedAssignedEmuCodes:
                         cleanupState.clearedAssignedEmuCodes
-                }
+                })
             });
             logger.warn(
                 `over_limit_prune_train_repeat_zero trainCodes=${trainCodes.join('/')} originalEmuCodes=${originalEmuCodes.join('/')} removedEmuCodes=${removedEmuCodes.join('/')} remainingEmuCodes=${emuCodes.join('/')} startAt=${group.startAt} groupKey=${groupKey} deletedProbeStatusRows=${cleanupState.deletedProbeStatusRows} deletedDailyRouteRows=${cleanupState.deletedDailyRouteRows} clearedAssignedEmuCodes=${cleanupState.clearedAssignedEmuCodes}`
@@ -586,13 +706,13 @@ async function persistResolvedTrackedGroup(
                 title: '超限编组仍继续保留',
                 operation: 'over_limit_after_prune_continue',
                 level: 'WARN',
-                context: {
+                context: withDetectionTaskContext({
                     trainCodes: trainCodes.join('/'),
                     originalEmuCodes: originalEmuCodes.join('/'),
                     remainingEmuCodes: emuCodes.join('/'),
                     startAt: group.startAt,
                     groupKey
-                }
+                })
             });
             logger.warn(
                 `over_limit_after_prune_continue trainCodes=${trainCodes.join('/')} originalEmuCodes=${originalEmuCodes.join('/')} remainingEmuCodes=${emuCodes.join('/')} startAt=${group.startAt} groupKey=${groupKey}`
@@ -605,12 +725,12 @@ async function persistResolvedTrackedGroup(
             title: '编组全部被裁剪',
             operation: 'all_emu_codes_pruned',
             level: 'WARN',
-            context: {
+            context: withDetectionTaskContext({
                 trainCodes: trainCodes.join('/'),
                 originalEmuCodes: originalEmuCodes.join('/'),
                 startAt: group.startAt,
                 groupKey
-            }
+            })
         });
         logger.warn(
             `all_emu_codes_pruned trainCodes=${trainCodes.join('/')} originalEmuCodes=${originalEmuCodes.join('/')} startAt=${group.startAt} groupKey=${groupKey}`
@@ -676,12 +796,12 @@ async function persistResolvedTrackedGroup(
                 title: '单编组升级为重联',
                 operation: 'single_group_upgraded_to_coupled',
                 level: 'WARN',
-                context: {
+                context: withDetectionTaskContext({
                     trainCodes: trainCodes.join('/'),
                     emuCodes: emuCodes.join('/'),
                     startAt: group.startAt,
                     groupKey
-                }
+                })
             });
             logger.warn(
                 `single_group_upgraded_to_coupled trainCodes=${trainCodes.join('/')} emuCodes=${emuCodes.join('/')} startAt=${group.startAt} groupKey=${groupKey}`
@@ -690,12 +810,12 @@ async function persistResolvedTrackedGroup(
             record12306TraceDecision({
                 title: '检测到重联编组',
                 operation: 'coupled_group_detected',
-                context: {
+                context: withDetectionTaskContext({
                     trainCodes: trainCodes.join('/'),
                     emuCodes: emuCodes.join('/'),
                     startAt: group.startAt,
                     groupKey
-                }
+                })
             });
             logger.info(
                 `coupled_group_detected trainCodes=${trainCodes.join('/')} emuCodes=${emuCodes.join('/')} startAt=${group.startAt} groupKey=${groupKey}`
@@ -706,12 +826,12 @@ async function persistResolvedTrackedGroup(
         record12306TraceDecision({
             title: '待检测编组确认为单编组',
             operation: 'pending_group_resolved_single',
-            context: {
+            context: withDetectionTaskContext({
                 trainCodes: trainCodes.join('/'),
                 emuCodes: emuCodes.join('/'),
                 startAt: group.startAt,
                 groupKey
-            }
+            })
         });
         logger.info(
             `pending_group_resolved_single trainCodes=${trainCodes.join('/')} emuCodes=${emuCodes.join('/')} startAt=${group.startAt} groupKey=${groupKey}`
@@ -753,6 +873,15 @@ async function executeDetectCoupledEmuGroupTaskInternal(
             cooldownSeconds
         )
     ) {
+        record12306TraceDecision({
+            title: '重联扫描任务因冷却跳过',
+            operation: 'coupling_scan_skip_recent_detection',
+            context: withDetectionTaskContext({
+                bureau,
+                model: args.model,
+                cooldownSeconds
+            })
+        });
         logger.info(
             `skip_recent_detection bureau=${bureau} model=${args.model} cooldownSeconds=${cooldownSeconds}`
         );
@@ -764,6 +893,15 @@ async function executeDetectCoupledEmuGroupTaskInternal(
             buildBureauAndModelKey(bureau, args.model)
         ) ?? [];
     if (candidates.length === 0) {
+        record12306TraceConflict({
+            title: '重联扫描候选为空',
+            operation: 'coupling_scan_candidate_group_not_found',
+            level: 'WARN',
+            context: withDetectionTaskContext({
+                bureau,
+                model: args.model
+            })
+        });
         logger.warn(
             `candidate_group_not_found bureau=${bureau} model=${args.model}`
         );
@@ -789,7 +927,9 @@ async function executeDetectCoupledEmuGroupTaskInternal(
         bureau,
         args.model,
         candidates,
-        trackedGroupCache
+        trackedGroupCache,
+        dayStart,
+        nextDayStart
     );
 
     const scheduleRoutesByTrainCode = getTodayScheduleCache();
@@ -840,6 +980,21 @@ async function executeDetectCoupledEmuGroupTaskInternal(
     }
 
     markCoupledGroupDetected(bureau, args.model, nowSeconds);
+    record12306TraceDecision({
+        title: '重联扫描任务汇总',
+        operation: 'coupling_scan_task_summary',
+        context: withDetectionTaskContext({
+            bureau,
+            model: args.model,
+            candidates: candidates.length,
+            pendingGroups: pendingGroups.size,
+            matchedGroups: matchedGroups.size,
+            finalizedSingleGroups,
+            skippedAssigned: skippedAssignedCount,
+            scannedCount,
+            warningCount
+        })
+    });
     logger.info(
         `done bureau=${bureau} model=${args.model} candidates=${candidates.length} pendingGroups=${pendingGroups.size} matchedGroups=${matchedGroups.size} finalizedSingleGroups=${finalizedSingleGroups} skippedAssigned=${skippedAssignedCount} scanned=${scannedCount} warnings=${warningCount}`
     );
