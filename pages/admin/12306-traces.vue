@@ -224,21 +224,13 @@
                             </div>
 
                             <div
-                                class="mt-4 grid gap-3 text-sm text-slate-600 md:grid-cols-2 xl:grid-cols-4">
+                                class="mt-4 grid gap-3 text-sm text-slate-600 md:grid-cols-2 xl:grid-cols-3">
                                 <div>
                                     <p class="text-xs uppercase tracking-[0.18em] text-slate-400">
                                         主车次
                                     </p>
                                     <p class="mt-1 font-medium text-slate-900">
                                         {{ selectedTrace.primaryTrainCode || '--' }}
-                                    </p>
-                                </div>
-                                <div>
-                                    <p class="text-xs uppercase tracking-[0.18em] text-slate-400">
-                                        内部车次
-                                    </p>
-                                    <p class="mt-1 font-medium text-slate-900">
-                                        {{ selectedTrace.trainInternalCode || '--' }}
                                     </p>
                                 </div>
                                 <div>
@@ -267,84 +259,9 @@
                             </div>
                         </div>
 
-                        <div
-                            v-if="selectedTrace.events.length > 0"
-                            class="space-y-3">
-                            <article
-                                v-for="event in selectedTrace.events"
-                                :key="event.id"
-                                class="rounded-[1rem] border px-4 py-4"
-                                :class="getEventCardClass(event.kind, event.level)">
-                                <div
-                                    class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                                    <div class="space-y-2">
-                                        <div class="flex flex-wrap items-center gap-2">
-                                            <span
-                                                class="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.1em]"
-                                                :class="getEventBadgeClass(event.kind, event.level)">
-                                                {{ event.kind }}
-                                            </span>
-                                            <span
-                                                class="text-sm font-semibold text-slate-900">
-                                                {{ event.title }}
-                                            </span>
-                                        </div>
-                                        <p
-                                            v-if="event.message"
-                                            class="text-sm leading-6 text-slate-700">
-                                            {{ event.message }}
-                                        </p>
-                                    </div>
-                                    <div class="text-xs leading-5 text-slate-500">
-                                        <p>{{ formatTimestamp(event.timestamp) }}</p>
-                                        <p v-if="event.durationMs !== null">
-                                            {{ event.durationMs }} ms
-                                        </p>
-                                    </div>
-                                </div>
-
-                                <div
-                                    v-if="event.kind === 'request'"
-                                    class="mt-3 rounded-[0.9rem] bg-white/70 px-3 py-3 text-sm leading-6 text-slate-600">
-                                    <p>{{ event.method }} {{ event.url }}</p>
-                                    <p>
-                                        operation={{ event.operation }}
-                                        <template v-if="event.responseStatus !== null">
-                                            · status={{ event.responseStatus }}
-                                        </template>
-                                        <template v-if="event.errorCode">
-                                            · error={{ event.errorCode }}
-                                        </template>
-                                    </p>
-                                </div>
-
-                                <div
-                                    v-if="event.kind === 'function'"
-                                    class="mt-3 text-sm leading-6 text-slate-600">
-                                    函数：{{ event.functionName }} · 状态：{{ event.status }}
-                                </div>
-
-                                <div
-                                    v-if="event.kind === 'summary'"
-                                    class="mt-3 text-sm leading-6 text-slate-600">
-                                    最终状态：{{ event.status }}
-                                </div>
-
-                                <div
-                                    v-if="Object.keys(event.context).length > 0"
-                                    class="mt-3 grid gap-2 rounded-[0.9rem] bg-white/70 px-3 py-3 text-sm leading-6 text-slate-600 md:grid-cols-2">
-                                    <div
-                                        v-for="entry in toEventContextEntries(event.context)"
-                                        :key="`${event.id}:${entry.key}`"
-                                        class="min-w-0">
-                                        <span class="font-medium text-slate-900">
-                                            {{ entry.key }}
-                                        </span>
-                                        ：{{ entry.value }}
-                                    </div>
-                                </div>
-                            </article>
-                        </div>
+                        <Admin12306TraceTimelineTree
+                            v-if="traceTimelineNodes.length > 0"
+                            :nodes="traceTimelineNodes" />
 
                         <UiEmptyState
                             v-else
@@ -375,13 +292,18 @@ import type {
 import type { TrackerApiResponse } from '~/types/homepage';
 import { useAdminDateQuery } from '~/composables/useAdminDateQuery';
 import getApiErrorMessage from '~/utils/api/getApiErrorMessage';
-import formatTrackerTimestamp from '~/utils/time/formatTrackerTimestamp';
 
 definePageMeta({
     middleware: 'admin-required'
 });
 
 const TRACE_PAGE_LIMIT = 50;
+const traceTimeFormatter = new Intl.DateTimeFormat('zh-CN', {
+    timeZone: 'Asia/Shanghai',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+});
 
 const requestFetch = import.meta.server ? useRequestFetch() : $fetch;
 const { session } = useAuthState();
@@ -409,6 +331,51 @@ const canLoadMore = computed(
 const selectedTrace = computed<Admin12306TraceDetailItem | null>(
     () => detailData.value?.trace ?? null
 );
+
+interface TraceTimelineNode {
+    event: Admin12306TraceEvent;
+    children: TraceTimelineNode[];
+    originalIndex: number;
+}
+
+const traceTimelineNodes = computed<TraceTimelineNode[]>(() => {
+    const events = selectedTrace.value?.events ?? [];
+    if (events.length === 0) {
+        return [];
+    }
+
+    const nodes = events.map((event, originalIndex) => ({
+        event,
+        children: [] as TraceTimelineNode[],
+        originalIndex
+    }));
+    const functionNodes = new Map<string, TraceTimelineNode>();
+    for (const node of nodes) {
+        if (node.event.kind === 'function') {
+            functionNodes.set(node.event.invocationId, node);
+        }
+    }
+
+    const roots: TraceTimelineNode[] = [];
+    for (const node of nodes) {
+        const parentInvocationId = node.event.parentInvocationId;
+        if (!parentInvocationId) {
+            roots.push(node);
+            continue;
+        }
+
+        const parentNode = functionNodes.get(parentInvocationId);
+        if (parentNode && parentNode !== node) {
+            parentNode.children.push(node);
+            continue;
+        }
+
+        roots.push(node);
+    }
+
+    sortTraceTimelineNodes(roots);
+    return roots;
+});
 
 useSiteSeo({
     title: '12306 追踪 | Open CRH Tracker',
@@ -564,7 +531,27 @@ function formatTimestamp(timestamp: number) {
         return '--';
     }
 
-    return formatTrackerTimestamp(timestamp);
+    return traceTimeFormatter.format(new Date(timestamp * 1000));
+}
+
+function compareTraceTimelineNodes(
+    left: TraceTimelineNode,
+    right: TraceTimelineNode
+) {
+    if (left.event.timestamp !== right.event.timestamp) {
+        return left.event.timestamp - right.event.timestamp;
+    }
+
+    return left.originalIndex - right.originalIndex;
+}
+
+function sortTraceTimelineNodes(nodes: TraceTimelineNode[]) {
+    nodes.sort(compareTraceTimelineNodes);
+    for (const node of nodes) {
+        if (node.children.length > 0) {
+            sortTraceTimelineNodes(node.children);
+        }
+    }
 }
 
 function getTraceStatusBadgeClass(status: Admin12306TraceListItem['status']) {
@@ -580,45 +567,4 @@ function getTraceStatusBadgeClass(status: Admin12306TraceListItem['status']) {
     }
 }
 
-function getEventBadgeClass(
-    kind: Admin12306TraceEvent['kind'],
-    level: Admin12306TraceEvent['level']
-) {
-    if (level === 'ERROR') {
-        return 'bg-rose-100 text-rose-800';
-    }
-    if (level === 'WARN') {
-        return 'bg-amber-100 text-amber-800';
-    }
-    if (kind === 'summary') {
-        return 'bg-emerald-100 text-emerald-800';
-    }
-    return 'bg-slate-200 text-slate-700';
-}
-
-function getEventCardClass(
-    kind: Admin12306TraceEvent['kind'],
-    level: Admin12306TraceEvent['level']
-) {
-    if (level === 'ERROR') {
-        return 'border-rose-200 bg-rose-50/60';
-    }
-    if (level === 'WARN') {
-        return 'border-amber-200 bg-amber-50/60';
-    }
-    if (kind === 'summary') {
-        return 'border-emerald-200 bg-emerald-50/60';
-    }
-    return 'border-slate-200 bg-white/90';
-}
-
-function toEventContextEntries(context: Record<string, string>) {
-    return Object.entries(context)
-        .filter(([, value]) => value.trim().length > 0)
-        .slice(0, 12)
-        .map(([key, value]) => ({
-            key,
-            value
-        }));
-}
 </script>
