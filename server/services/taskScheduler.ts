@@ -5,6 +5,7 @@ import importSqlBatch from '~/server/utils/sql/importSqlBatch';
 import { createPreparedSqlStore } from '~/server/libs/database/prepared';
 import { getTaskExecutor } from '~/server/services/taskExecutorRegistry';
 import type { TaskRecord } from '~/server/services/taskQueue';
+import { runWithTaskExecutionContext } from '~/server/services/taskExecutionContext';
 import {
     estimateIdleTaskDurationMs,
     observeIdleTaskDurationMs
@@ -90,7 +91,9 @@ async function runSingleTask(task: TaskRecord): Promise<RunTaskResult> {
     }
 
     try {
-        await executor(parsedArguments.argumentsValue);
+        await runWithTaskExecutionContext(task, () =>
+            executor(parsedArguments.argumentsValue)
+        );
     } catch (error) {
         const message =
             error instanceof Error

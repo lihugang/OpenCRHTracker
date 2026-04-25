@@ -73,6 +73,7 @@
                         </p>
                         <p class="mt-2 text-3xl font-semibold text-slate-900">
                             {{
+                                requestMetricsEnabled &&
                                 requestMetricsRetained
                                     ? requestTotalCount
                                     : '--'
@@ -114,7 +115,13 @@
                         </div>
 
                         <div
-                            v-if="!requestMetricsRetained"
+                            v-if="!requestMetricsEnabled"
+                            class="rounded-[1rem] border border-slate-200 bg-slate-50/70 px-4 py-4 text-sm leading-6 text-slate-600">
+                            当前配置已关闭 12306 请求追踪，请求曲线与车次 trace 明细均不会记录。
+                        </div>
+
+                        <div
+                            v-else-if="!requestMetricsRetained"
                             class="rounded-[1rem] border border-slate-200 bg-slate-50/70 px-4 py-4 text-sm leading-6 text-slate-600">
                             所选日期超出请求计数保留范围，目前仅保留最近
                             {{ requestMetricsRetentionDays }} 天。
@@ -393,6 +400,9 @@ const requestBuckets = computed(
 const requestMetricsRetentionDays = computed(
     () => passiveAlertsData.value?.requestMetricsRetentionDays ?? 0
 );
+const requestMetricsEnabled = computed(
+    () => passiveAlertsData.value?.requestMetricsEnabled ?? true
+);
 const requestMetricsRetained = computed(
     () => passiveAlertsData.value?.requestMetricsRetained ?? true
 );
@@ -406,7 +416,9 @@ const requestTotalCount = computed(() =>
     requestBuckets.value.reduce((total, bucket) => total + bucket.total, 0)
 );
 const requestPeakSummary = computed(() =>
-    requestMetricsRetained.value
+    !requestMetricsEnabled.value
+        ? '已关闭'
+        : requestMetricsRetained.value
         ? `峰值 ${requestPeakCount.value} / 30 分钟`
         : `仅保留近 ${requestMetricsRetentionDays.value} 天`
 );

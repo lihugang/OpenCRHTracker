@@ -1,5 +1,11 @@
 import getLogger from '~/server/libs/log4js';
 import useConfig from '~/server/config';
+import {
+    record12306TraceConflict,
+    record12306TraceDecision,
+    record12306TraceSummary,
+    with12306TraceFunction
+} from '~/server/services/requestMetrics12306Trace';
 import { clearRecentCoupledGroupDetection } from '~/server/services/probeDetectionState';
 import {
     buildProbeAssetKey,
@@ -916,6 +922,26 @@ async function tryResolveOverlappingRoutes(
             assets,
             extraAffectedEmuCodesByTrainKey
         );
+        record12306TraceConflict({
+            title: '重叠交路移除未运行组',
+            operation: 'overlap_drop_not_running',
+            context: {
+                conflictEmuCode: mainEmuCode,
+                droppedGroups: formatTrainCodeGroups(notRunningGroups),
+                notRunningTrainCodes:
+                    uniqueNormalizedCodes(notRunningTrainCodes).join(','),
+                requestFailedTrainCodes:
+                    uniqueNormalizedCodes(requestFailedTrainCodes).join(','),
+                affectedEmuCodes:
+                    clearedNotRunningState.affectedEmuCodes.join(','),
+                deletedDailyRouteRows:
+                    clearedNotRunningState.deletedDailyRouteRows,
+                deletedProbeStatusRows:
+                    clearedNotRunningState.deletedProbeStatusRows,
+                downgradedProbeStatusRows:
+                    clearedNotRunningState.downgradedProbeStatusRows
+            }
+        });
         logger.info(
             `overlap_drop_not_running conflictEmuCode=${mainEmuCode} droppedGroups=${formatTrainCodeGroups(notRunningGroups)} notRunningTrainCodes=${uniqueNormalizedCodes(notRunningTrainCodes).join(',')} requestFailedTrainCodes=${uniqueNormalizedCodes(requestFailedTrainCodes).join(',')} affectedEmuCodes=${clearedNotRunningState.affectedEmuCodes.join(',')} deletedDailyRouteRows=${clearedNotRunningState.deletedDailyRouteRows} deletedProbeStatusRows=${clearedNotRunningState.deletedProbeStatusRows} downgradedProbeStatusRows=${clearedNotRunningState.downgradedProbeStatusRows}`
         );
@@ -960,6 +986,35 @@ async function tryResolveOverlappingRoutes(
     )
         ? logger.error.bind(logger)
         : logger.info.bind(logger);
+    record12306TraceConflict({
+        title: '重叠交路重新排队',
+        operation: 'overlap_requeue',
+        level: areAllGroupsRunning(
+            Array.from(impactedGroups.values()),
+            validationResults
+        )
+            ? 'ERROR'
+            : 'WARN',
+        context: {
+            conflictEmuCode: mainEmuCode,
+            conflictGroups: formatTrainCodeGroups(overlappingGroups),
+            conflictTimeRanges: formatOverlapTimeRanges(
+                currentGroup,
+                overlappingGroups
+            ),
+            notRunningTrainCodes:
+                uniqueNormalizedCodes(notRunningTrainCodes).join(','),
+            requestFailedTrainCodes:
+                uniqueNormalizedCodes(requestFailedTrainCodes).join(','),
+            requeuedGroups: formatTrainCodeGroups(
+                Array.from(impactedGroups.values())
+            ),
+            requeuedEmuCodes: clearedState.affectedEmuCodes.join(','),
+            deletedDailyRouteRows: clearedState.deletedDailyRouteRows,
+            deletedProbeStatusRows: clearedState.deletedProbeStatusRows,
+            requeueTaskIds: taskIds.join(',')
+        }
+    });
     overlapRequeueLog(
         `overlap_requeue conflictEmuCode=${mainEmuCode} conflictGroups=${formatTrainCodeGroups(overlappingGroups)} conflictTimeRanges=${formatOverlapTimeRanges(currentGroup, overlappingGroups)} notRunningTrainCodes=${uniqueNormalizedCodes(notRunningTrainCodes).join(',')} requestFailedTrainCodes=${uniqueNormalizedCodes(requestFailedTrainCodes).join(',')} requeuedGroups=${formatTrainCodeGroups(Array.from(impactedGroups.values()))} requeuedEmuCodes=${clearedState.affectedEmuCodes.join(',')} deletedDailyRouteRows=${clearedState.deletedDailyRouteRows} deletedProbeStatusRows=${clearedState.deletedProbeStatusRows} requeueTaskIds=${taskIds.join(',')}`
     );
@@ -1070,6 +1125,15 @@ async function tryReuseHistoricalProbeStatus(
         (knownGroup.finalStatus !== ProbeStatusValue.CoupledFormationResolved ||
             allEmuCodes.length <= 1)
     ) {
+        record12306TraceConflict({
+            title: '历史状态不完整，无法直接复用',
+            operation: 'reuse_historical_status_incomplete',
+            context: {
+                trainCode: args.trainCode,
+                mainEmuCode,
+                historicalStartAt: latestResolvedRow.start_at
+            }
+        });
         logger.warn(
             `reuse_historical_status_incomplete trainCode=${args.trainCode} mainEmuCode=${mainEmuCode} historicalStartAt=${latestResolvedRow.start_at}`
         );
@@ -1084,6 +1148,17 @@ async function tryReuseHistoricalProbeStatus(
         knownGroup.finalStatus,
         nowSeconds
     );
+    record12306TraceDecision({
+        title: '复用历史已解析状态',
+        operation: 'reuse_historical_status',
+        context: {
+            trainCode: args.trainCode,
+            mainEmuCode,
+            historicalStartAt: latestResolvedRow.start_at,
+            status: knownGroup.finalStatus,
+            emuCodes: allEmuCodes.length
+        }
+    });
     logger.info(
         `reuse_historical_status trainCode=${args.trainCode} mainEmuCode=${mainEmuCode} historicalStartAt=${latestResolvedRow.start_at} status=${knownGroup.finalStatus} emuCodes=${allEmuCodes.length}`
     );
@@ -1124,7 +1199,9 @@ async function probeEmuByTrainCodes(
     return null;
 }
 
-async function executeProbeTrainDepartureTask(rawArgs: unknown): Promise<void> {
+async function executeProbeTrainDepartureTaskInternal(
+    rawArgs: unknown
+): Promise<void> {
     ensureProbeStateForToday();
     const args = parseTaskArgs(rawArgs);
     const nowSeconds = getNowSeconds();
@@ -1161,12 +1238,32 @@ async function executeProbeTrainDepartureTask(rawArgs: unknown): Promise<void> {
                 { ...args, retry: nextRetry },
                 nowSeconds
             );
+            record12306TraceDecision({
+                title: 'route 探测失败后立即重试',
+                operation: 'route_probe_failed_requeue',
+                context: {
+                    trainCode: args.trainCode,
+                    retry: args.retry,
+                    nextRetry,
+                    nextTaskId,
+                    attemptedTrainCodes: allTrainCodes.join(',')
+                }
+            });
             logger.debug(
                 `route_probe_failed_requeue trainCode=${args.trainCode} retry=${args.retry} nextRetry=${nextRetry} nextTaskId=${nextTaskId} attemptedTrainCodes=${allTrainCodes.join(',')}`
             );
             return;
         }
 
+        record12306TraceConflict({
+            title: 'route 探测重试耗尽',
+            operation: 'route_probe_failed_exhausted',
+            context: {
+                trainCode: args.trainCode,
+                retry: args.retry,
+                attemptedTrainCodes: allTrainCodes.join(',')
+            }
+        });
         logger.warn(
             `route_probe_failed_exhausted trainCode=${args.trainCode} retry=${args.retry} attemptedTrainCodes=${allTrainCodes.join(',')}`
         );
@@ -1188,6 +1285,20 @@ async function executeProbeTrainDepartureTask(rawArgs: unknown): Promise<void> {
         const todayTrainCodesValidation =
             await validateTodayRunningForTrainCodes(allTrainCodes);
         if (todayTrainCodesValidation.state === 'not_running') {
+            record12306TraceDecision({
+                title: '历史近似命中但当前车次未运行',
+                operation: 'skip_historical_recent_same_assignment_not_running',
+                context: {
+                    trainCode: args.trainCode,
+                    probedTrainCode,
+                    mainEmuCode,
+                    historicalRecentMatchedTrainCodes:
+                        historicalRecentMatchingTrainCodes.join(','),
+                    checkedTrainCodes: allTrainCodes.join(','),
+                    notRunningTrainCodes:
+                        todayTrainCodesValidation.notRunningTrainCodes.join(',')
+                }
+            });
             logger.info(
                 `skip_historical_recent_same_assignment_not_running trainCode=${args.trainCode} probedTrainCode=${probedTrainCode} mainEmuCode=${mainEmuCode} historicalRecentMatchedTrainCodes=${historicalRecentMatchingTrainCodes.join(',')} checkedTrainCodes=${allTrainCodes.join(',')} notRunningTrainCodes=${todayTrainCodesValidation.notRunningTrainCodes.join(',')}`
             );
@@ -1202,10 +1313,42 @@ async function executeProbeTrainDepartureTask(rawArgs: unknown): Promise<void> {
                 mainEmuCode
             );
             if (seatCodeVerification.state === 'matched') {
+                record12306TraceDecision({
+                    title: '座位码校验通过',
+                    operation: 'seat_verify_pass',
+                    context: {
+                        trainCode: args.trainCode,
+                        probedTrainCode,
+                        mainEmuCode,
+                        runningTrainCode:
+                            todayTrainCodesValidation.runningTrainCode,
+                        reason: seatCodeVerification.reason,
+                        seatTrainCode: seatCodeVerification.seatTrainCode,
+                        seatInternalCode:
+                            seatCodeVerification.seatInternalCode,
+                        seatStartAt: seatCodeVerification.seatStartAt,
+                        historicalRecentMatchedTrainCodes:
+                            historicalRecentMatchingTrainCodes.join(',')
+                    }
+                });
                 logger.info(
                     `seat_verify_pass trainCode=${args.trainCode} probedTrainCode=${probedTrainCode} mainEmuCode=${mainEmuCode} runningTrainCode=${todayTrainCodesValidation.runningTrainCode} reason=${seatCodeVerification.reason} seatTrainCode=${seatCodeVerification.seatTrainCode} seatInternalCode=${seatCodeVerification.seatInternalCode} seatStartAt=${seatCodeVerification.seatStartAt} historicalRecentMatchedTrainCodes=${historicalRecentMatchingTrainCodes.join(',')}`
                 );
             } else if (seatCodeVerification.state === 'unavailable') {
+                record12306TraceDecision({
+                    title: '座位码不可用，继续后续流程',
+                    operation: 'seat_verify_unavailable_continue',
+                    context: {
+                        trainCode: args.trainCode,
+                        probedTrainCode,
+                        mainEmuCode,
+                        runningTrainCode:
+                            todayTrainCodesValidation.runningTrainCode,
+                        reason: seatCodeVerification.reason,
+                        historicalRecentMatchedTrainCodes:
+                            historicalRecentMatchingTrainCodes.join(',')
+                    }
+                });
                 logger.info(
                     `seat_verify_unavailable_continue trainCode=${args.trainCode} probedTrainCode=${probedTrainCode} mainEmuCode=${mainEmuCode} runningTrainCode=${todayTrainCodesValidation.runningTrainCode} reason=${seatCodeVerification.reason} historicalRecentMatchedTrainCodes=${historicalRecentMatchingTrainCodes.join(',')}`
                 );
@@ -1219,11 +1362,52 @@ async function executeProbeTrainDepartureTask(rawArgs: unknown): Promise<void> {
                     nowSeconds,
                     nextRetry
                 );
+                record12306TraceConflict({
+                    title: '座位码校验不一致，延迟重试',
+                    operation: 'seat_verify_mismatch_requeue',
+                    context: {
+                        trainCode: args.trainCode,
+                        probedTrainCode,
+                        mainEmuCode,
+                        runningTrainCode:
+                            todayTrainCodesValidation.runningTrainCode,
+                        retry: args.retry,
+                        nextRetry,
+                        nextTaskId,
+                        delaySeconds: overlapRetryDelaySeconds,
+                        reason: seatCodeVerification.reason,
+                        seatTrainCode: seatCodeVerification.seatTrainCode,
+                        seatInternalCode:
+                            seatCodeVerification.seatInternalCode,
+                        seatStartAt: seatCodeVerification.seatStartAt,
+                        historicalRecentMatchedTrainCodes:
+                            historicalRecentMatchingTrainCodes.join(',')
+                    }
+                });
                 logger.debug(
                     `seat_verify_mismatch_requeue trainCode=${args.trainCode} probedTrainCode=${probedTrainCode} mainEmuCode=${mainEmuCode} runningTrainCode=${todayTrainCodesValidation.runningTrainCode} retry=${args.retry} nextRetry=${nextRetry} nextTaskId=${nextTaskId} delaySeconds=${overlapRetryDelaySeconds} reason=${seatCodeVerification.reason} seatTrainCode=${seatCodeVerification.seatTrainCode} seatInternalCode=${seatCodeVerification.seatInternalCode} seatStartAt=${seatCodeVerification.seatStartAt} historicalRecentMatchedTrainCodes=${historicalRecentMatchingTrainCodes.join(',')}`
                 );
                 return;
             } else {
+                record12306TraceConflict({
+                    title: '座位码校验不一致且重试耗尽',
+                    operation: 'seat_verify_mismatch_exhausted',
+                    context: {
+                        trainCode: args.trainCode,
+                        probedTrainCode,
+                        mainEmuCode,
+                        runningTrainCode:
+                            todayTrainCodesValidation.runningTrainCode,
+                        retry: args.retry,
+                        reason: seatCodeVerification.reason,
+                        seatTrainCode: seatCodeVerification.seatTrainCode,
+                        seatInternalCode:
+                            seatCodeVerification.seatInternalCode,
+                        seatStartAt: seatCodeVerification.seatStartAt,
+                        historicalRecentMatchedTrainCodes:
+                            historicalRecentMatchingTrainCodes.join(',')
+                    }
+                });
                 logger.warn(
                     `seat_verify_mismatch_exhausted trainCode=${args.trainCode} probedTrainCode=${probedTrainCode} mainEmuCode=${mainEmuCode} runningTrainCode=${todayTrainCodesValidation.runningTrainCode} retry=${args.retry} reason=${seatCodeVerification.reason} seatTrainCode=${seatCodeVerification.seatTrainCode} seatInternalCode=${seatCodeVerification.seatInternalCode} seatStartAt=${seatCodeVerification.seatStartAt} historicalRecentMatchedTrainCodes=${historicalRecentMatchingTrainCodes.join(',')}`
                 );
@@ -1232,6 +1416,24 @@ async function executeProbeTrainDepartureTask(rawArgs: unknown): Promise<void> {
         }
 
         if (todayTrainCodesValidation.state === 'request_failed') {
+            record12306TraceDecision({
+                title: '历史近似命中，但当前运行校验请求失败，继续流程',
+                operation: 'continue_historical_recent_same_assignment_request_failed',
+                context: {
+                    trainCode: args.trainCode,
+                    probedTrainCode,
+                    mainEmuCode,
+                    historicalRecentMatchedTrainCodes:
+                        historicalRecentMatchingTrainCodes.join(','),
+                    checkedTrainCodes: allTrainCodes.join(','),
+                    requestFailedTrainCodes:
+                        todayTrainCodesValidation.requestFailedTrainCodes.join(
+                            ','
+                        ),
+                    notRunningTrainCodes:
+                        todayTrainCodesValidation.notRunningTrainCodes.join(',')
+                }
+            });
             logger.info(
                 `continue_historical_recent_same_assignment_request_failed trainCode=${args.trainCode} probedTrainCode=${probedTrainCode} mainEmuCode=${mainEmuCode} historicalRecentMatchedTrainCodes=${historicalRecentMatchingTrainCodes.join(',')} checkedTrainCodes=${allTrainCodes.join(',')} requestFailedTrainCodes=${todayTrainCodesValidation.requestFailedTrainCodes.join(',')} notRunningTrainCodes=${todayTrainCodesValidation.notRunningTrainCodes.join(',')}`
             );
@@ -1245,6 +1447,14 @@ async function executeProbeTrainDepartureTask(rawArgs: unknown): Promise<void> {
     }
 
     if (!mainRecord) {
+        record12306TraceDecision({
+            title: '未找到主编组资产，按单编组处理',
+            operation: 'main_emu_asset_not_found',
+            context: {
+                trainCode: args.trainCode,
+                mainEmuCode
+            }
+        });
         logger.warn(
             `main_emu_asset_not_found trainCode=${args.trainCode} mainEmuCode=${mainEmuCode}`
         );
@@ -1268,6 +1478,16 @@ async function executeProbeTrainDepartureTask(rawArgs: unknown): Promise<void> {
             ProbeStatusValue.SingleFormationResolved,
             nowSeconds
         );
+        record12306TraceDecision({
+            title: '主编组资产标记为非重联，直接解析为单编组',
+            operation: 'resolved_single_non_multiple',
+            context: {
+                trainCode: args.trainCode,
+                probedTrainCode,
+                mainEmuCode,
+                attemptedTrainCodes: allTrainCodes.length
+            }
+        });
         logger.info(
             `resolved_single_non_multiple trainCode=${args.trainCode} probedTrainCode=${probedTrainCode} mainEmuCode=${mainEmuCode} attemptedTrainCodes=${allTrainCodes.length}`
         );
@@ -1304,6 +1524,18 @@ async function executeProbeTrainDepartureTask(rawArgs: unknown): Promise<void> {
             knownGroup.finalStatus,
             nowSeconds
         );
+        record12306TraceDecision({
+            title: '复用现有 probe 状态完成解析',
+            operation: 'resolved_from_status',
+            context: {
+                trainCode: args.trainCode,
+                probedTrainCode,
+                mainEmuCode,
+                status: knownGroup.finalStatus,
+                emuCodes: knownGroup.emuCodes.length,
+                attemptedTrainCodes: allTrainCodes.length
+            }
+        });
         logger.info(
             `resolved_from_status trainCode=${args.trainCode} probedTrainCode=${probedTrainCode} mainEmuCode=${mainEmuCode} status=${knownGroup.finalStatus} emuCodes=${knownGroup.emuCodes.length} attemptedTrainCodes=${allTrainCodes.length}`
         );
@@ -1352,8 +1584,62 @@ async function executeProbeTrainDepartureTask(rawArgs: unknown): Promise<void> {
     markQueriedTrainKey(trainKey);
 
     const detectionTaskId = queueCoupledDetectionTask(mainRecord);
+    record12306TraceDecision({
+        title: '进入重联检测阶段',
+        operation: 'pending_coupling_detection',
+        context: {
+            trainCode: args.trainCode,
+            probedTrainCode,
+            mainEmuCode,
+            detectionTaskId,
+            attemptedTrainCodes: allTrainCodes.length
+        }
+    });
     logger.info(
         `pending_coupling_detection trainCode=${args.trainCode} probedTrainCode=${probedTrainCode} mainEmuCode=${mainEmuCode} detectionTaskId=${detectionTaskId} attemptedTrainCodes=${allTrainCodes.length}`
+    );
+}
+
+async function executeProbeTrainDepartureTask(rawArgs: unknown): Promise<void> {
+    const traceStartedAtMs = Date.now();
+    const parsedArgs = parseTaskArgs(rawArgs);
+    return with12306TraceFunction<void>(
+        {
+            title: '探测列车发车编组',
+            functionName: 'executeProbeTrainDepartureTask',
+            subject: {
+                primaryTrainCode: parsedArgs.trainCode,
+                allTrainCodes: [
+                    parsedArgs.trainCode,
+                    ...parsedArgs.allCodes
+                ],
+                trainInternalCode: parsedArgs.trainInternalCode,
+                startAt: parsedArgs.startAt,
+                traceSubtitle: 'probe_train_departure'
+            },
+            context: {
+                trainCode: parsedArgs.trainCode,
+                trainInternalCode: parsedArgs.trainInternalCode,
+                retry: parsedArgs.retry,
+                startAt: parsedArgs.startAt,
+                endAt: parsedArgs.endAt
+            }
+        },
+        async () => {
+            await executeProbeTrainDepartureTaskInternal(parsedArgs);
+            record12306TraceSummary({
+                title: '发车编组探测完成',
+                status: 'success',
+                level: 'INFO',
+                durationMs: Date.now() - traceStartedAtMs,
+                message: '完成 probe_train_departure 执行',
+                context: {
+                    trainCode: parsedArgs.trainCode,
+                    trainInternalCode: parsedArgs.trainInternalCode,
+                    retry: parsedArgs.retry
+                }
+            });
+        }
     );
 }
 

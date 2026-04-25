@@ -128,6 +128,7 @@ interface RuntimeAdminServerMetricsConfig {
 
 interface Runtime12306RequestMetricsConfig {
     file: string;
+    enabled: boolean;
     retentionDays: number;
     flushIntervalMinutes: number;
 }
@@ -1003,6 +1004,10 @@ function validateConfig(raw: unknown): Config {
                     file: asString(
                         runtimeRequestMetrics12306.file,
                         'data.runtime.requestMetrics12306.file'
+                    ),
+                    enabled: asBoolean(
+                        runtimeRequestMetrics12306.enabled,
+                        'data.runtime.requestMetrics12306.enabled'
                     ),
                     retentionDays: asInteger(
                         runtimeRequestMetrics12306.retentionDays,

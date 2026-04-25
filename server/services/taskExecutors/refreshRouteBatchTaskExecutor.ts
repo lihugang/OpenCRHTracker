@@ -1,5 +1,10 @@
 import getLogger from '~/server/libs/log4js';
 import useConfig from '~/server/config';
+import {
+    record12306TraceSummary,
+    runWith12306TraceScope,
+    with12306TraceFunction
+} from '~/server/services/requestMetrics12306Trace';
 import { registerTaskExecutor } from '~/server/services/taskExecutorRegistry';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
 import fetchRouteInfo from '~/server/utils/12306/network/fetchRouteInfo';
@@ -111,7 +116,7 @@ function applyGroupUpdate(
     return applied;
 }
 
-async function executeRefreshRouteBatchTask(rawArgs: unknown) {
+async function executeRefreshRouteBatchTaskInternal(rawArgs: unknown) {
     const config = useConfig();
     const batchSize = config.spider.scheduleProbe.refresh.batchSize;
     const retryAttempts = config.spider.scheduleProbe.retryAttempts;
@@ -161,10 +166,29 @@ async function executeRefreshRouteBatchTask(rawArgs: unknown) {
         processed += 1;
 
         const groupItemIndexes = groupIndex.get(groupKey) ?? [itemIndex];
-        const routeResult = await queryWithRetry(
-            () => fetchRouteInfo(item.code),
-            retryAttempts,
-            (result) => result.status === 'request_failed'
+        const routeResult = await runWith12306TraceScope(
+            {
+                primaryTrainCode: item.code,
+                allTrainCodes: groupItemIndexes.map(
+                    (index) => state.items[index]!.code
+                ),
+                trainInternalCode: item.internalCode,
+                startAt: item.startAt,
+                traceSubtitle: 'refresh route batch'
+            },
+            () =>
+                queryWithRetry(
+                    () => fetchRouteInfo(item.code),
+                    retryAttempts,
+                    (result) => result.status === 'request_failed',
+                    {
+                        title: '批量刷新 route 信息',
+                        context: {
+                            trainCode: item.code,
+                            groupSize: groupItemIndexes.length
+                        }
+                    }
+                )
         );
         totalAttempts += routeResult.attempts;
 
@@ -282,6 +306,32 @@ async function executeRefreshRouteBatchTask(rawArgs: unknown) {
     }
     logger.info(
         `done processed=${processed} success=${success} failed=${failed} changed=${changed} apiCalls=${totalAttempts} file=${scheduleFilePath}`
+    );
+}
+
+async function executeRefreshRouteBatchTask(rawArgs: unknown) {
+    const traceStartedAtMs = Date.now();
+    return with12306TraceFunction<void>(
+        {
+            title: '批量刷新 route 信息任务',
+            functionName: 'executeRefreshRouteBatchTask',
+            subject: {
+                traceKey: `refresh-route-batch:${Date.now()}`
+            },
+            context: {
+                rawArgs: JSON.stringify(rawArgs ?? null)
+            }
+        },
+        async () => {
+            await executeRefreshRouteBatchTaskInternal(rawArgs);
+            record12306TraceSummary({
+                title: '批量刷新 route 信息任务完成',
+                status: 'success',
+                level: 'INFO',
+                durationMs: Date.now() - traceStartedAtMs,
+                message: '完成 refresh_route_batch 执行'
+            });
+        }
     );
 }
 

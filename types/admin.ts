@@ -73,6 +73,120 @@ export interface Admin12306RequestBucket {
     byOperation: Record<string, number>;
 }
 
+export type Admin12306TraceStatus =
+    | 'running'
+    | 'success'
+    | 'warning'
+    | 'error';
+
+export type Admin12306TraceEventKind =
+    | 'function'
+    | 'request'
+    | 'conflict'
+    | 'decision'
+    | 'summary';
+
+export type Admin12306TraceEventLevel = 'INFO' | 'WARN' | 'ERROR';
+
+export interface Admin12306TraceEventBase {
+    id: string;
+    timestamp: number;
+    kind: Admin12306TraceEventKind;
+    level: Admin12306TraceEventLevel;
+    title: string;
+    message: string;
+    durationMs: number | null;
+    invocationId: string;
+    parentInvocationId: string | null;
+    context: Record<string, string>;
+}
+
+export interface Admin12306TraceFunctionEvent
+    extends Admin12306TraceEventBase {
+    kind: 'function';
+    functionName: string;
+    status: 'success' | 'warning' | 'error';
+}
+
+export interface Admin12306TraceRequestEvent extends Admin12306TraceEventBase {
+    kind: 'request';
+    operation: string;
+    requestType: 'query' | 'search';
+    method: string;
+    url: string;
+    responseStatus: number | null;
+    businessStatus: string;
+    errorCode: string;
+    errorMessage: string;
+}
+
+export interface Admin12306TraceConflictEvent
+    extends Admin12306TraceEventBase {
+    kind: 'conflict';
+    operation: string;
+}
+
+export interface Admin12306TraceDecisionEvent
+    extends Admin12306TraceEventBase {
+    kind: 'decision';
+    operation: string;
+}
+
+export interface Admin12306TraceSummaryEvent extends Admin12306TraceEventBase {
+    kind: 'summary';
+    status: Admin12306TraceStatus;
+}
+
+export type Admin12306TraceEvent =
+    | Admin12306TraceFunctionEvent
+    | Admin12306TraceRequestEvent
+    | Admin12306TraceConflictEvent
+    | Admin12306TraceDecisionEvent
+    | Admin12306TraceSummaryEvent;
+
+export interface Admin12306TraceListItem {
+    traceId: string;
+    title: string;
+    subtitle: string;
+    primaryTrainCode: string;
+    allTrainCodes: string[];
+    trainInternalCode: string;
+    startAt: number | null;
+    taskId: number | null;
+    executor: string;
+    status: Admin12306TraceStatus;
+    startedAt: number;
+    endedAt: number | null;
+    requestCount: number;
+    conflictCount: number;
+    functionCount: number;
+}
+
+export interface Admin12306TraceDetailItem extends Admin12306TraceListItem {
+    events: Admin12306TraceEvent[];
+}
+
+export interface Admin12306TraceListResponse {
+    date: string;
+    cursor: string;
+    nextCursor: string;
+    limit: number;
+    total: number;
+    filteredTotal: number;
+    requestMetricsEnabled: boolean;
+    requestMetricsRetentionDays: number;
+    requestMetricsRetained: boolean;
+    items: Admin12306TraceListItem[];
+}
+
+export interface Admin12306TraceDetailResponse {
+    date: string;
+    requestMetricsEnabled: boolean;
+    requestMetricsRetentionDays: number;
+    requestMetricsRetained: boolean;
+    trace: Admin12306TraceDetailItem | null;
+}
+
 export interface AdminPassiveAlertsResponse {
     date: string;
     logFile: string | null;
@@ -85,6 +199,7 @@ export interface AdminPassiveAlertsResponse {
     errorCount: number;
     topLoggers: AdminAlertLoggerCount[];
     typeCounts: AdminPassiveAlertTypeCount[];
+    requestMetricsEnabled: boolean;
     requestMetricsRetentionDays: number;
     requestMetricsRetained: boolean;
     requestBuckets: Admin12306RequestBucket[];

@@ -99,7 +99,8 @@
             },
             "requestMetrics12306": {
                 "file": "data/runtime/12306-request-metrics.json",
-                "retentionDays": 3,
+                "enabled": true,
+                "retentionDays": 7,
                 "flushIntervalMinutes": 10
             }
         }

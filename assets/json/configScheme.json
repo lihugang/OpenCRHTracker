@@ -379,6 +379,9 @@
                                     "type": "string",
                                     "minLength": 1
                                 },
+                                "enabled": {
+                                    "type": "boolean"
+                                },
                                 "retentionDays": {
                                     "type": "integer",
                                     "minimum": 1
@@ -390,6 +393,7 @@
                             },
                             "required": [
                                 "file",
+                                "enabled",
                                 "retentionDays",
                                 "flushIntervalMinutes"
                             ]

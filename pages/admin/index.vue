@@ -71,7 +71,23 @@
                             </p>
                             <p
                                 class="mt-2 text-3xl font-semibold text-slate-900">
-                                {{ requestPeakCount }}
+                                {{ requestPeakDisplay }}
+                            </p>
+                            <p
+                                v-if="
+                                    passiveAlertsData &&
+                                    !passiveAlertsData.requestMetricsEnabled
+                                "
+                                class="mt-2 text-xs text-slate-500">
+                                追踪已关闭
+                            </p>
+                            <p
+                                v-else-if="
+                                    passiveAlertsData &&
+                                    !passiveAlertsData.requestMetricsRetained
+                                "
+                                class="mt-2 text-xs text-slate-500">
+                                超出保留窗口
                             </p>
                         </div>
                     </div>
@@ -184,6 +200,20 @@
                                     class="mt-2 text-sm leading-6 text-slate-600">
                                     查看完整 warning/error 列表、高频来源和
                                     12306 请求曲线。
+                                </p>
+                            </button>
+
+                            <button
+                                type="button"
+                                class="w-full rounded-[1rem] border border-slate-200 bg-white/90 px-4 py-4 text-left transition hover:border-slate-300 hover:bg-slate-50/80"
+                                @click="goTo12306Traces">
+                                <p
+                                    class="text-base font-semibold text-slate-900">
+                                    12306 追踪
+                                </p>
+                                <p
+                                    class="mt-2 text-sm leading-6 text-slate-600">
+                                    查看每个车次信息获取的全过程，包括主要函数调用、12306 子请求和冲突事件。
                                 </p>
                             </button>
 
@@ -340,6 +370,16 @@ const requestPeakCount = computed(() =>
         0
     )
 );
+const requestPeakDisplay = computed(() => {
+    if (
+        !passiveAlertsData.value?.requestMetricsEnabled ||
+        !passiveAlertsData.value?.requestMetricsRetained
+    ) {
+        return '--';
+    }
+
+    return requestPeakCount.value;
+});
 const recentAlerts = computed(
     () => passiveAlertsData.value?.items.slice(0, 5) ?? []
 );
@@ -354,6 +394,12 @@ useSiteSeo({
 async function goToPassiveAlerts() {
     await navigateTo(
         buildAdminRoute('/admin/passive-alerts', selectedDateInput.value)
+    );
+}
+
+async function goTo12306Traces() {
+    await navigateTo(
+        buildAdminRoute('/admin/12306-traces', selectedDateInput.value)
     );
 }
 

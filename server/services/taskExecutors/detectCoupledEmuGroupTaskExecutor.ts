@@ -1,6 +1,13 @@
 import getLogger from '~/server/libs/log4js';
 import useConfig from '~/server/config';
 import {
+    record12306TraceConflict,
+    record12306TraceDecision,
+    record12306TraceSummary,
+    runWith12306TraceScope,
+    with12306TraceFunction
+} from '~/server/services/requestMetrics12306Trace';
+import {
     hasRecentCoupledGroupDetection,
     markCoupledGroupDetected
 } from '~/server/services/probeDetectionState';
@@ -550,12 +557,43 @@ async function persistResolvedTrackedGroup(
             emuCodes = originalEmuCodes.filter(
                 (emuCode) => !trainRepeatZeroEmuCodes.has(emuCode)
             );
+            record12306TraceConflict({
+                title: '超限编组裁剪',
+                operation: 'over_limit_prune_train_repeat_zero',
+                level: 'WARN',
+                context: {
+                    trainCodes: trainCodes.join('/'),
+                    originalEmuCodes: originalEmuCodes.join('/'),
+                    removedEmuCodes: removedEmuCodes.join('/'),
+                    remainingEmuCodes: emuCodes.join('/'),
+                    startAt: group.startAt,
+                    groupKey,
+                    deletedProbeStatusRows:
+                        cleanupState.deletedProbeStatusRows,
+                    deletedDailyRouteRows:
+                        cleanupState.deletedDailyRouteRows,
+                    clearedAssignedEmuCodes:
+                        cleanupState.clearedAssignedEmuCodes
+                }
+            });
             logger.warn(
                 `over_limit_prune_train_repeat_zero trainCodes=${trainCodes.join('/')} originalEmuCodes=${originalEmuCodes.join('/')} removedEmuCodes=${removedEmuCodes.join('/')} remainingEmuCodes=${emuCodes.join('/')} startAt=${group.startAt} groupKey=${groupKey} deletedProbeStatusRows=${cleanupState.deletedProbeStatusRows} deletedDailyRouteRows=${cleanupState.deletedDailyRouteRows} clearedAssignedEmuCodes=${cleanupState.clearedAssignedEmuCodes}`
             );
         }
 
         if (emuCodes.length > 2) {
+            record12306TraceConflict({
+                title: '超限编组仍继续保留',
+                operation: 'over_limit_after_prune_continue',
+                level: 'WARN',
+                context: {
+                    trainCodes: trainCodes.join('/'),
+                    originalEmuCodes: originalEmuCodes.join('/'),
+                    remainingEmuCodes: emuCodes.join('/'),
+                    startAt: group.startAt,
+                    groupKey
+                }
+            });
             logger.warn(
                 `over_limit_after_prune_continue trainCodes=${trainCodes.join('/')} originalEmuCodes=${originalEmuCodes.join('/')} remainingEmuCodes=${emuCodes.join('/')} startAt=${group.startAt} groupKey=${groupKey}`
             );
@@ -563,6 +601,17 @@ async function persistResolvedTrackedGroup(
     }
 
     if (emuCodes.length === 0) {
+        record12306TraceConflict({
+            title: '编组全部被裁剪',
+            operation: 'all_emu_codes_pruned',
+            level: 'WARN',
+            context: {
+                trainCodes: trainCodes.join('/'),
+                originalEmuCodes: originalEmuCodes.join('/'),
+                startAt: group.startAt,
+                groupKey
+            }
+        });
         logger.warn(
             `all_emu_codes_pruned trainCodes=${trainCodes.join('/')} originalEmuCodes=${originalEmuCodes.join('/')} startAt=${group.startAt} groupKey=${groupKey}`
         );
@@ -623,16 +672,47 @@ async function persistResolvedTrackedGroup(
 
     if (finalStatus === ProbeStatusValue.CoupledFormationResolved) {
         if (previousStatus === ProbeStatusValue.SingleFormationResolved) {
+            record12306TraceConflict({
+                title: '单编组升级为重联',
+                operation: 'single_group_upgraded_to_coupled',
+                level: 'WARN',
+                context: {
+                    trainCodes: trainCodes.join('/'),
+                    emuCodes: emuCodes.join('/'),
+                    startAt: group.startAt,
+                    groupKey
+                }
+            });
             logger.warn(
                 `single_group_upgraded_to_coupled trainCodes=${trainCodes.join('/')} emuCodes=${emuCodes.join('/')} startAt=${group.startAt} groupKey=${groupKey}`
             );
         } else {
+            record12306TraceDecision({
+                title: '检测到重联编组',
+                operation: 'coupled_group_detected',
+                context: {
+                    trainCodes: trainCodes.join('/'),
+                    emuCodes: emuCodes.join('/'),
+                    startAt: group.startAt,
+                    groupKey
+                }
+            });
             logger.info(
                 `coupled_group_detected trainCodes=${trainCodes.join('/')} emuCodes=${emuCodes.join('/')} startAt=${group.startAt} groupKey=${groupKey}`
             );
         }
         persistBackfilledCoupledRoutes(emuCodes, scheduleRoutesByTrainCode);
     } else if (previousStatus === ProbeStatusValue.PendingCouplingDetection) {
+        record12306TraceDecision({
+            title: '待检测编组确认为单编组',
+            operation: 'pending_group_resolved_single',
+            context: {
+                trainCodes: trainCodes.join('/'),
+                emuCodes: emuCodes.join('/'),
+                startAt: group.startAt,
+                groupKey
+            }
+        });
         logger.info(
             `pending_group_resolved_single trainCodes=${trainCodes.join('/')} emuCodes=${emuCodes.join('/')} startAt=${group.startAt} groupKey=${groupKey}`
         );
@@ -653,7 +733,7 @@ async function persistResolvedTrackedGroup(
     await notifyLookupStatusChanges(notificationCandidates);
 }
 
-async function executeDetectCoupledEmuGroupTask(
+async function executeDetectCoupledEmuGroupTaskInternal(
     rawArgs: unknown
 ): Promise<void> {
     ensureProbeStateForToday();
@@ -714,13 +794,23 @@ async function executeDetectCoupledEmuGroupTask(
 
     const scheduleRoutesByTrainCode = getTodayScheduleCache();
     for (const [trainKey, trackedGroup] of matchedGroups.entries()) {
-        await persistResolvedTrackedGroup(
-            trackedGroup,
-            collectMatchedEmuScanRecords(
-                matchedEmuScanRecordsByTrainKey.get(trainKey)
-            ),
-            scheduleRoutesByTrainCode,
-            nowSeconds
+        await runWith12306TraceScope(
+            {
+                primaryTrainCode: trackedGroup.group.trainCode,
+                allTrainCodes: trackedGroup.trainCodes,
+                trainInternalCode: trackedGroup.group.trainInternalCode,
+                startAt: trackedGroup.group.startAt,
+                traceSubtitle: 'detect coupled emu group'
+            },
+            () =>
+                persistResolvedTrackedGroup(
+                    trackedGroup,
+                    collectMatchedEmuScanRecords(
+                        matchedEmuScanRecordsByTrainKey.get(trainKey)
+                    ),
+                    scheduleRoutesByTrainCode,
+                    nowSeconds
+                )
         );
     }
 
@@ -730,11 +820,21 @@ async function executeDetectCoupledEmuGroupTask(
             continue;
         }
 
-        await persistResolvedTrackedGroup(
-            trackedGroup,
-            [],
-            scheduleRoutesByTrainCode,
-            nowSeconds
+        await runWith12306TraceScope(
+            {
+                primaryTrainCode: trackedGroup.group.trainCode,
+                allTrainCodes: trackedGroup.trainCodes,
+                trainInternalCode: trackedGroup.group.trainInternalCode,
+                startAt: trackedGroup.group.startAt,
+                traceSubtitle: 'detect coupled emu group'
+            },
+            () =>
+                persistResolvedTrackedGroup(
+                    trackedGroup,
+                    [],
+                    scheduleRoutesByTrainCode,
+                    nowSeconds
+                )
         );
         finalizedSingleGroups += 1;
     }
@@ -742,6 +842,34 @@ async function executeDetectCoupledEmuGroupTask(
     markCoupledGroupDetected(bureau, args.model, nowSeconds);
     logger.info(
         `done bureau=${bureau} model=${args.model} candidates=${candidates.length} pendingGroups=${pendingGroups.size} matchedGroups=${matchedGroups.size} finalizedSingleGroups=${finalizedSingleGroups} skippedAssigned=${skippedAssignedCount} scanned=${scannedCount} warnings=${warningCount}`
+    );
+}
+
+async function executeDetectCoupledEmuGroupTask(
+    rawArgs: unknown
+): Promise<void> {
+    const traceStartedAtMs = Date.now();
+    return with12306TraceFunction<void>(
+        {
+            title: '检测重联编组任务',
+            functionName: 'executeDetectCoupledEmuGroupTask',
+            subject: {
+                traceKey: `detect-coupled:${Date.now()}`
+            },
+            context: {
+                rawArgs: JSON.stringify(rawArgs ?? null)
+            }
+        },
+        async () => {
+            await executeDetectCoupledEmuGroupTaskInternal(rawArgs);
+            record12306TraceSummary({
+                title: '检测重联编组任务完成',
+                status: 'success',
+                level: 'INFO',
+                durationMs: Date.now() - traceStartedAtMs,
+                message: '完成 detect_coupled_emu_group 执行'
+            });
+        }
     );
 }
 

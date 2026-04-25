@@ -265,6 +265,10 @@ const navItems = [
         path: '/admin/passive-alerts'
     },
     {
+        label: '12306 追踪',
+        path: '/admin/12306-traces'
+    },
+    {
         label: '流量统计',
         path: '/admin/traffic'
     },
