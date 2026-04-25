@@ -502,7 +502,7 @@
                     <div
                         v-else
                         class="rounded-[1rem] border border-dashed border-slate-200 bg-white/70 px-4 py-4 text-sm leading-6 text-slate-500">
-                        暂无推断交路，后续可在交路索引更新后再查看。
+                        无交路表推断结果。
                     </div>
                 </div>
             </UiCard>
@@ -511,13 +511,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
-import type { TrackerApiResponse } from '~/types/homepage';
-import type {
-    CurrentTrainTimetableData,
-    CurrentTrainTimetableStop
-} from '~/types/lookup';
-import getApiErrorMessage from '~/utils/api/getApiErrorMessage';
+import { computed } from 'vue';
+import type { CurrentTrainTimetableStop } from '~/types/lookup';
 import { buildLookupPath } from '~/utils/lookup/lookupTarget';
 import formatShanghaiDateString from '~/utils/time/formatShanghaiDateString';
 
@@ -534,8 +529,6 @@ const DATE_LABEL_FORMATTER = new Intl.DateTimeFormat('zh-CN', {
     month: 'numeric',
     day: 'numeric'
 });
-
-const cachedTimetables = new Map<string, CurrentTrainTimetableData>();
 
 interface DisplayCirculationNode {
     key: string;
@@ -557,9 +550,10 @@ const emit = defineEmits<{
     'update:modelValue': [value: boolean];
 }>();
 
-const state = ref<'idle' | 'loading' | 'success' | 'empty' | 'error'>('idle');
-const timetable = ref<CurrentTrainTimetableData | null>(null);
-const errorMessage = ref('');
+const { state, timetable, errorMessage } = useCurrentTrainTimetable(
+    computed(() => props.trainCode),
+    computed(() => props.modelValue)
+);
 
 const columns = ['站序', '车次', '站名', '到点', '开点', '检票口'];
 
@@ -672,13 +666,13 @@ const responsibilitySummary = computed(() => {
         timetable.value?.passengerDepartment.trim() ?? '';
     const leadingText = [bureauName, trainDepartment]
         .filter((part) => part.length > 0)
-        .join('，');
+        .join(', ');
 
     if (passengerDepartment.length === 0) {
         return leadingText;
     }
 
-    return `${leadingText}，${passengerDepartment}`;
+    return `${leadingText}, ${passengerDepartment}`;
 });
 
 function normalizeComparableCode(code: string | null | undefined) {
@@ -719,55 +713,6 @@ function buildCirculationCodeLink(code: string) {
         code: normalizeComparableCode(code)
     });
 }
-
-watch(
-    () => [props.modelValue, props.trainCode] as const,
-    async ([isOpen, trainCode]) => {
-        if (!isOpen || trainCode.trim().length === 0) {
-            return;
-        }
-
-        const normalizedTrainCode = trainCode.trim().toUpperCase();
-        if (cachedTimetables.has(normalizedTrainCode)) {
-            timetable.value = cachedTimetables.get(normalizedTrainCode) ?? null;
-            state.value = timetable.value ? 'success' : 'empty';
-            errorMessage.value = '';
-            return;
-        }
-
-        state.value = 'loading';
-        errorMessage.value = '';
-
-        try {
-            const response = await $fetch<
-                TrackerApiResponse<CurrentTrainTimetableData>
-            >(
-                '/api/v1/timetable/train/' +
-                    encodeURIComponent(normalizedTrainCode)
-            );
-
-            if (!response.ok) {
-                throw {
-                    data: response
-                };
-            }
-
-            cachedTimetables.set(normalizedTrainCode, response.data);
-            timetable.value = response.data;
-            state.value = response.data.stops.length > 0 ? 'success' : 'empty';
-        } catch (error) {
-            timetable.value = null;
-            state.value = 'error';
-            errorMessage.value = getApiErrorMessage(
-                error,
-                '当前时刻表加载失败'
-            );
-        }
-    },
-    {
-        immediate: true
-    }
-);
 
 function formatNullableTime(timestamp: number | null) {
     if (timestamp === null || !Number.isFinite(timestamp)) {
