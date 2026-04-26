@@ -221,11 +221,15 @@ export default async function fetchEMUInfoBySeatCode(code: string) {
                 if (startDay !== currentDate) {
                     record12306TraceRequest({
                         title: '12306 座位码查询日期不匹配',
-                        subject: {
-                            primaryTrainCode: data.trainCode,
-                            allTrainCodes: [data.trainCode],
-                            trainInternalCode: data.trainNo
-                        },
+                        ...(hasParentTraceContext
+                            ? {}
+                            : {
+                                  subject: {
+                                      primaryTrainCode: data.trainCode,
+                                      allTrainCodes: [data.trainCode],
+                                      trainInternalCode: data.trainNo
+                                  }
+                              }),
                         requestType: 'query',
                         method: 'POST',
                         url,
@@ -285,12 +289,16 @@ export default async function fetchEMUInfoBySeatCode(code: string) {
 
                 record12306TraceRequest({
                     title: '12306 座位码查询成功',
-                    subject: {
-                        primaryTrainCode: data.trainCode,
-                        allTrainCodes: [data.trainCode],
-                        trainInternalCode: data.trainNo,
-                        startAt: result.route.startAt
-                    },
+                    ...(hasParentTraceContext
+                        ? {}
+                        : {
+                              subject: {
+                                  primaryTrainCode: data.trainCode,
+                                  allTrainCodes: [data.trainCode],
+                                  trainInternalCode: data.trainNo,
+                                  startAt: result.route.startAt
+                              }
+                          }),
                     requestType: 'query',
                     method: 'POST',
                     url,
