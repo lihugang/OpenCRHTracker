@@ -74,6 +74,13 @@ function restorePreservedRouteInfo(
     return true;
 }
 
+function buildScheduleEnrichGroupTraceKey(runId: string, item: ScheduleItem) {
+    const trainIdentifier =
+        normalizeCode(item.internalCode) || normalizeCode(item.code);
+    const startAt = typeof item.startAt === 'number' ? item.startAt : 'unknown';
+    return `schedule-enrich-group:${runId}:${trainIdentifier}:${startAt}`;
+}
+
 async function runScheduleProbeInternal(
     scheduleFilePath: string,
     state: ScheduleState,
@@ -265,6 +272,7 @@ async function runScheduleProbeInternal(
 
             const routeResult = await runWith12306TraceScope(
                 {
+                    traceKey: buildScheduleEnrichGroupTraceKey(runId, item),
                     primaryTrainCode: item.code,
                     allTrainCodes: groupItems.map((groupItem) => groupItem.code),
                     trainInternalCode: item.internalCode,

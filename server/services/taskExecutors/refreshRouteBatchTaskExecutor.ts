@@ -116,6 +116,15 @@ function applyGroupUpdate(
     return applied;
 }
 
+function buildRefreshRouteGroupTraceKey(
+    item: ScheduleState['items'][number]
+) {
+    const trainIdentifier =
+        normalizeCode(item.internalCode) || normalizeCode(item.code);
+    const startAt = typeof item.startAt === 'number' ? item.startAt : 'unknown';
+    return `refresh-route-group:${trainIdentifier}:${startAt}`;
+}
+
 async function executeRefreshRouteBatchTaskInternal(rawArgs: unknown) {
     const config = useConfig();
     const batchSize = config.spider.scheduleProbe.refresh.batchSize;
@@ -168,6 +177,7 @@ async function executeRefreshRouteBatchTaskInternal(rawArgs: unknown) {
         const groupItemIndexes = groupIndex.get(groupKey) ?? [itemIndex];
         const routeResult = await runWith12306TraceScope(
             {
+                traceKey: buildRefreshRouteGroupTraceKey(item),
                 primaryTrainCode: item.code,
                 allTrainCodes: groupItemIndexes.map(
                     (index) => state.items[index]!.code
