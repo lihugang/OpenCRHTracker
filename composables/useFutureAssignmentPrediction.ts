@@ -219,7 +219,8 @@ function buildRouteSegments(circulation: InferredCirculation) {
                 .filter((node) => node.primaryTrainCode.length > 0)
                 .filter((node) => node.node.startAt !== null)
                 .sort((left, right) => {
-                    const leftStartAt = left.node.startAt ?? Number.MAX_SAFE_INTEGER;
+                    const leftStartAt =
+                        left.node.startAt ?? Number.MAX_SAFE_INTEGER;
                     const rightStartAt =
                         right.node.startAt ?? Number.MAX_SAFE_INTEGER;
 
@@ -233,8 +234,8 @@ function buildRouteSegments(circulation: InferredCirculation) {
 
     return {
         routeNodes,
-        routeDays: routeDays.filter(
-            (routeDay): routeDay is RouteDaySegment => Boolean(routeDay)
+        routeDays: routeDays.filter((routeDay): routeDay is RouteDaySegment =>
+            Boolean(routeDay)
         )
     };
 }
@@ -262,16 +263,15 @@ async function fetchTrainHistoryRecords(
         return cachedRecords;
     }
 
-    const response = await requestFetch<TrackerApiResponse<TrainHistoryResponse>>(
-        '/api/v1/history/train/' + encodeURIComponent(normalizedTrainCode),
-        {
-            query: {
-                start: startAt,
-                end: endAt,
-                limit
-            }
+    const response = await requestFetch<
+        TrackerApiResponse<TrainHistoryResponse>
+    >('/api/v1/history/train/' + encodeURIComponent(normalizedTrainCode), {
+        query: {
+            start: startAt,
+            end: endAt,
+            limit
         }
-    );
+    });
 
     if (!response.ok) {
         throw {
@@ -295,7 +295,9 @@ async function fetchEmuHistoryRecords(
         return [];
     }
 
-    const cacheKey = [normalizedEmuCode, String(startAt), String(endAt)].join(':');
+    const cacheKey = [normalizedEmuCode, String(startAt), String(endAt)].join(
+        ':'
+    );
     const cachedRecords = emuHistoryCache.get(cacheKey);
     if (cachedRecords !== undefined) {
         return cachedRecords;
@@ -334,11 +336,16 @@ function matchEmuRecordToRouteNode(
     }
 
     const candidateNodes = routeNodes.filter((node) => {
-        if (normalizeComparableCode(node.node.internalCode) === normalizedTrainCode) {
+        if (
+            normalizeComparableCode(node.node.internalCode) ===
+            normalizedTrainCode
+        ) {
             return true;
         }
 
-        return normalizeCodeList(node.node.allCodes).includes(normalizedTrainCode);
+        return normalizeCodeList(node.node.allCodes).includes(
+            normalizedTrainCode
+        );
     });
 
     if (candidateNodes.length === 0) {
@@ -449,7 +456,9 @@ function buildEmuPredictedNodes(
     }
 
     return routeNodes
-        .filter((node) => node.routeNodeIndex > anchor.progress.currentNodeIndex)
+        .filter(
+            (node) => node.routeNodeIndex > anchor.progress.currentNodeIndex
+        )
         .map((node) => {
             const templateRouteDayOffset =
                 node.routeDayOffset - anchor.progress.currentRouteDayOffset;
@@ -474,7 +483,10 @@ function buildEmuPredictedNodes(
         );
 }
 
-function findMatchingRouteNodes(routeNodes: RouteNodeSegment[], codes: string[]) {
+function findMatchingRouteNodes(
+    routeNodes: RouteNodeSegment[],
+    codes: string[]
+) {
     const normalizedCodes = normalizeCodeList(codes);
     if (normalizedCodes.length === 0) {
         return [];
@@ -482,7 +494,9 @@ function findMatchingRouteNodes(routeNodes: RouteNodeSegment[], codes: string[])
 
     return routeNodes.filter((routeNode) => {
         const nodeCodes = normalizeCodeList([
-            ...(routeNode.node.internalCode ? [routeNode.node.internalCode] : []),
+            ...(routeNode.node.internalCode
+                ? [routeNode.node.internalCode]
+                : []),
             ...routeNode.node.allCodes
         ]);
 
@@ -490,7 +504,10 @@ function findMatchingRouteNodes(routeNodes: RouteNodeSegment[], codes: string[])
     });
 }
 
-function compareRouteNodePosition(left: RouteNodeSegment, right: RouteNodeSegment) {
+function compareRouteNodePosition(
+    left: RouteNodeSegment,
+    right: RouteNodeSegment
+) {
     if (left.routeDayOffset !== right.routeDayOffset) {
         return left.routeDayOffset - right.routeDayOffset;
     }
@@ -592,9 +609,8 @@ function buildTrainAlignedTimestamps(
     node: RouteNodeSegment,
     firstNodeHistoryDayBucket: number
 ) {
-    const firstRouteNodeReferenceTimestamp = getRouteNodeReferenceTimestamp(
-        firstRouteNode
-    );
+    const firstRouteNodeReferenceTimestamp =
+        getRouteNodeReferenceTimestamp(firstRouteNode);
     if (firstRouteNodeReferenceTimestamp === null) {
         return {
             predictedStartAt: null,
@@ -658,13 +674,18 @@ function findTrainCurrentCycleAnchorCandidate(
             })
         )
         .filter(
-            (
-                candidate
-            ): candidate is TrainCurrentCycleAnchorCandidate => candidate !== null
+            (candidate): candidate is TrainCurrentCycleAnchorCandidate =>
+                candidate !== null
         )
         .sort((left, right) => {
-            if (left.firstNodeHistoryDayBucket !== right.firstNodeHistoryDayBucket) {
-                return right.firstNodeHistoryDayBucket - left.firstNodeHistoryDayBucket;
+            if (
+                left.firstNodeHistoryDayBucket !==
+                right.firstNodeHistoryDayBucket
+            ) {
+                return (
+                    right.firstNodeHistoryDayBucket -
+                    left.firstNodeHistoryDayBucket
+                );
             }
 
             const predictedTimeCompare = comparePredictedTime(
@@ -707,8 +728,10 @@ function comparePredictedTime(
     right: FutureAssignmentPredictedEmuItem
 ) {
     const leftReference =
-        getPredictedReferenceTimestamp(left.predictedStartAt, left.predictedEndAt) ??
-        Number.MAX_SAFE_INTEGER;
+        getPredictedReferenceTimestamp(
+            left.predictedStartAt,
+            left.predictedEndAt
+        ) ?? Number.MAX_SAFE_INTEGER;
     const rightReference =
         getPredictedReferenceTimestamp(
             right.predictedStartAt,
@@ -778,10 +801,11 @@ function buildTrainPredictedEmus(
                         node,
                         anchorDayBucket
                     );
-                const predictedReferenceTimestamp = getPredictedReferenceTimestamp(
-                    predictedStartAt,
-                    predictedEndAt
-                );
+                const predictedReferenceTimestamp =
+                    getPredictedReferenceTimestamp(
+                        predictedStartAt,
+                        predictedEndAt
+                    );
 
                 if (predictedReferenceTimestamp === null) {
                     return null;
@@ -885,8 +909,10 @@ async function resolveTrainAnchor(
 
     return {
         progress: {
-            currentRouteDayOffset: trainAnchorHistoryQuery.firstRouteNode.routeDayOffset,
-            currentNodeIndex: trainAnchorHistoryQuery.firstRouteNode.routeNodeIndex,
+            currentRouteDayOffset:
+                trainAnchorHistoryQuery.firstRouteNode.routeDayOffset,
+            currentNodeIndex:
+                trainAnchorHistoryQuery.firstRouteNode.routeNodeIndex,
             resolvedBy:
                 actualDayOffsetFromToday === 0
                     ? 'today-history'
@@ -897,7 +923,8 @@ async function resolveTrainAnchor(
             actualDayOffsetFromToday
         },
         matchedNode: trainAnchorHistoryQuery.firstRouteNode,
-        matchedRecordStartAt: currentCycleAnchorCandidate.firstNodeHistoryRun.startAt,
+        matchedRecordStartAt:
+            currentCycleAnchorCandidate.firstNodeHistoryRun.startAt,
         firstRouteNode: trainAnchorHistoryQuery.firstRouteNode,
         currentRouteDayNumber,
         routeDayCount,
@@ -921,7 +948,9 @@ async function resolveEmuAnchor(
     );
 
     const matchedHistoryHits = historyRecords
-        .map((record) => matchEmuRecordToRouteNode(record, routeNodes, todayDayBucket))
+        .map((record) =>
+            matchEmuRecordToRouteNode(record, routeNodes, todayDayBucket)
+        )
         .filter((hit): hit is EmuNodeHistoryHit => hit !== null)
         .sort((left, right) => {
             if (left.record.startAt !== right.record.startAt) {
@@ -995,15 +1024,22 @@ export default function useFutureAssignmentPrediction(
     } = useCurrentTrainTimetable(normalizedAnchorTrainCode, activeSource);
 
     watch(
-        () => [
-            toValue(activeSource),
-            normalizedSourceType.value,
-            normalizedSourceCode.value,
-            normalizedAnchorTrainCode.value,
-            timetableState.value,
-            timetable.value?.inferredCirculation?.routeId ?? ''
-        ] as const,
-        async ([isActive, sourceType, sourceCode, anchorTrainCode, nextTimetableState]) => {
+        () =>
+            [
+                toValue(activeSource),
+                normalizedSourceType.value,
+                normalizedSourceCode.value,
+                normalizedAnchorTrainCode.value,
+                timetableState.value,
+                timetable.value?.inferredCirculation?.routeId ?? ''
+            ] as const,
+        async ([
+            isActive,
+            sourceType,
+            sourceCode,
+            anchorTrainCode,
+            nextTimetableState
+        ]) => {
             requestToken += 1;
             const activeToken = requestToken;
 
@@ -1023,7 +1059,10 @@ export default function useFutureAssignmentPrediction(
                 return;
             }
 
-            if (nextTimetableState === 'idle' || nextTimetableState === 'loading') {
+            if (
+                nextTimetableState === 'idle' ||
+                nextTimetableState === 'loading'
+            ) {
                 localState.value = 'loading';
                 return;
             }

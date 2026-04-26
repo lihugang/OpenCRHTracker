@@ -68,8 +68,7 @@ export default defineNuxtConfig({
                 output: {
                     manualChunks(id) {
                         if (id.includes('/components/')) {
-                            const componentPath =
-                                id.split('/components/')[1];
+                            const componentPath = id.split('/components/')[1];
                             if (!componentPath) {
                                 return 'components-common';
                             }

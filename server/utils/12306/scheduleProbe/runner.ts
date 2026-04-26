@@ -274,7 +274,9 @@ async function runScheduleProbeInternal(
                 {
                     traceKey: buildScheduleEnrichGroupTraceKey(runId, item),
                     primaryTrainCode: item.code,
-                    allTrainCodes: groupItems.map((groupItem) => groupItem.code),
+                    allTrainCodes: groupItems.map(
+                        (groupItem) => groupItem.code
+                    ),
                     trainInternalCode: item.internalCode,
                     startAt: item.startAt,
                     traceSubtitle: 'schedule enrich'
@@ -415,17 +417,16 @@ export default async function runScheduleProbe(
                     );
                     record12306TraceSummary({
                         title: '运行图探测完成',
-                        status:
-                            state.status === 'done' ? 'success' : 'warning',
-                        level:
-                            state.status === 'done' ? 'INFO' : 'WARN',
+                        status: state.status === 'done' ? 'success' : 'warning',
+                        level: state.status === 'done' ? 'INFO' : 'WARN',
                         message: '完成 runScheduleProbe',
                         context: {
                             runId,
                             status: state.status,
                             rawItems: state.stats.rawItems,
                             uniqueItems: state.stats.uniqueItems,
-                            failedKeywords: state.progress.failedKeywords.length,
+                            failedKeywords:
+                                state.progress.failedKeywords.length,
                             failedEnrichCodes:
                                 state.progress.failedEnrichCodes.length,
                             apiCalls: state.progress.counters.apiCalls,

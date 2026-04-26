@@ -317,189 +317,197 @@
                         <UiCard
                             :class="[
                                 'history-result-card',
-                                isRunningItem(item)
-                                    ? 'running-result-card'
-                                    : ''
+                                isRunningItem(item) ? 'running-result-card' : ''
                             ]"
                             :show-accent-bar="false"
                             variant="subtle">
                             <div class="space-y-3">
-                            <div class="flex items-start gap-3">
-                                <div
-                                    class="min-w-0 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-sm font-semibold text-crh-blue">
-                                    <template
-                                        v-for="(code, codeIndex) in item.codes"
-                                        :key="`${item.id}:mobile:${code}`">
-                                        <NuxtLink
-                                            :to="buildCodeLink(code)"
-                                            class="cursor-pointer transition hover:underline">
-                                            {{ formatCodeText(code) }}
-                                        </NuxtLink>
-                                        <span
-                                            v-if="
-                                                codeIndex <
-                                                item.codes.length - 1
-                                            "
-                                            class="text-slate-400">
-                                            {{ mergeSeparator }}
-                                        </span>
-                                    </template>
-                                </div>
-                            </div>
-
-                            <div
-                                class="rounded-[1rem] border border-slate-200 bg-white/90 px-4 py-3">
-                                <div class="flex items-center gap-3">
-                                    <div class="min-w-0 flex-1">
-                                        <p
-                                            class="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">
-                                            始发站
-                                        </p>
-                                        <p
-                                            :class="[
-                                                'mt-1 truncate text-sm font-medium',
-                                                getValueTextClass(
-                                                    isMissingText(
-                                                        item.startStation
-                                                    )
-                                                )
-                                            ]">
-                                            <LookupStationLink
-                                                :station-name="
-                                                    item.startStation
+                                <div class="flex items-start gap-3">
+                                    <div
+                                        class="min-w-0 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-sm font-semibold text-crh-blue">
+                                        <template
+                                            v-for="(
+                                                code, codeIndex
+                                            ) in item.codes"
+                                            :key="`${item.id}:mobile:${code}`">
+                                            <NuxtLink
+                                                :to="buildCodeLink(code)"
+                                                class="cursor-pointer transition hover:underline">
+                                                {{ formatCodeText(code) }}
+                                            </NuxtLink>
+                                            <span
+                                                v-if="
+                                                    codeIndex <
+                                                    item.codes.length - 1
                                                 "
-                                                :focus-train-codes="
-                                                    resolveStationFocusTrainCodes(
-                                                        item
-                                                    )
-                                                "
-                                                :fallback-text="
-                                                    formatStationText(
-                                                        item.startStation
-                                                    )
-                                                " />
-                                        </p>
-                                    </div>
-
-                                    <button
-                                        type="button"
-                                        class="shrink-0 flex min-w-[4.75rem] items-center gap-[0.35rem] text-slate-400 transition enabled:cursor-pointer enabled:hover:text-crh-blue disabled:cursor-default"
-                                        :disabled="!canOpenTimetable(item)"
-                                        :aria-label="'查看当前时刻表'"
-                                        @click="openTimetable(item)">
-                                        <span
-                                            class="h-px flex-1 bg-[linear-gradient(90deg,rgb(203_213_225),rgb(148_163_184))]"
-                                            aria-hidden="true" />
-                                        <span
-                                            class="text-[0.8rem] leading-none"
-                                            aria-hidden="true">
-                                            ->
-                                        </span>
-                                        <span
-                                            class="h-px flex-1 bg-[linear-gradient(90deg,rgb(203_213_225),rgb(148_163_184))]"
-                                            aria-hidden="true" />
-                                    </button>
-
-                                    <div class="min-w-0 flex-1 text-right">
-                                        <p
-                                            class="text-[11px] uppercase tracking-[0.18em] text-slate-400">
-                                            终到站
-                                        </p>
-                                        <p
-                                            :class="[
-                                                'mt-1 truncate text-sm font-medium',
-                                                getValueTextClass(
-                                                    isMissingText(
-                                                        item.endStation
-                                                    )
-                                                )
-                                            ]">
-                                            <LookupStationLink
-                                                :station-name="item.endStation"
-                                                :focus-train-codes="
-                                                    resolveStationFocusTrainCodes(
-                                                        item
-                                                    )
-                                                "
-                                                :fallback-text="
-                                                    formatStationText(
-                                                        item.endStation
-                                                    )
-                                                " />
-                                        </p>
+                                                class="text-slate-400">
+                                                {{ mergeSeparator }}
+                                            </span>
+                                        </template>
                                     </div>
                                 </div>
 
                                 <div
-                                    class="mt-3 flex items-center gap-3 border-t border-slate-100 pt-3">
-                                    <button
-                                        type="button"
-                                        class="min-w-0 flex-1 cursor-pointer text-left transition enabled:hover:text-crh-blue disabled:cursor-default"
-                                        :disabled="!canOpenTimetable(item)"
-                                        @click="openTimetable(item)">
-                                        <p
-                                            class="text-[11px] uppercase tracking-[0.18em] text-slate-400">
-                                            始发时间
-                                        </p>
-                                        <p
-                                            :class="[
-                                                'mt-1 font-mono text-sm',
-                                                getValueTextClass(
-                                                    isMissingTimestamp(
+                                    class="rounded-[1rem] border border-slate-200 bg-white/90 px-4 py-3">
+                                    <div class="flex items-center gap-3">
+                                        <div class="min-w-0 flex-1">
+                                            <p
+                                                class="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">
+                                                始发站
+                                            </p>
+                                            <p
+                                                :class="[
+                                                    'mt-1 truncate text-sm font-medium',
+                                                    getValueTextClass(
+                                                        isMissingText(
+                                                            item.startStation
+                                                        )
+                                                    )
+                                                ]">
+                                                <LookupStationLink
+                                                    :station-name="
+                                                        item.startStation
+                                                    "
+                                                    :focus-train-codes="
+                                                        resolveStationFocusTrainCodes(
+                                                            item
+                                                        )
+                                                    "
+                                                    :fallback-text="
+                                                        formatStationText(
+                                                            item.startStation
+                                                        )
+                                                    " />
+                                            </p>
+                                        </div>
+
+                                        <button
+                                            type="button"
+                                            class="shrink-0 flex min-w-[4.75rem] items-center gap-[0.35rem] text-slate-400 transition enabled:cursor-pointer enabled:hover:text-crh-blue disabled:cursor-default"
+                                            :disabled="!canOpenTimetable(item)"
+                                            :aria-label="'查看当前时刻表'"
+                                            @click="openTimetable(item)">
+                                            <span
+                                                class="h-px flex-1 bg-[linear-gradient(90deg,rgb(203_213_225),rgb(148_163_184))]"
+                                                aria-hidden="true" />
+                                            <span
+                                                class="text-[0.8rem] leading-none"
+                                                aria-hidden="true">
+                                                ->
+                                            </span>
+                                            <span
+                                                class="h-px flex-1 bg-[linear-gradient(90deg,rgb(203_213_225),rgb(148_163_184))]"
+                                                aria-hidden="true" />
+                                        </button>
+
+                                        <div class="min-w-0 flex-1 text-right">
+                                            <p
+                                                class="text-[11px] uppercase tracking-[0.18em] text-slate-400">
+                                                终到站
+                                            </p>
+                                            <p
+                                                :class="[
+                                                    'mt-1 truncate text-sm font-medium',
+                                                    getValueTextClass(
+                                                        isMissingText(
+                                                            item.endStation
+                                                        )
+                                                    )
+                                                ]">
+                                                <LookupStationLink
+                                                    :station-name="
+                                                        item.endStation
+                                                    "
+                                                    :focus-train-codes="
+                                                        resolveStationFocusTrainCodes(
+                                                            item
+                                                        )
+                                                    "
+                                                    :fallback-text="
+                                                        formatStationText(
+                                                            item.endStation
+                                                        )
+                                                    " />
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div
+                                        class="mt-3 flex items-center gap-3 border-t border-slate-100 pt-3">
+                                        <button
+                                            type="button"
+                                            class="min-w-0 flex-1 cursor-pointer text-left transition enabled:hover:text-crh-blue disabled:cursor-default"
+                                            :disabled="!canOpenTimetable(item)"
+                                            @click="openTimetable(item)">
+                                            <p
+                                                class="text-[11px] uppercase tracking-[0.18em] text-slate-400">
+                                                始发时间
+                                            </p>
+                                            <p
+                                                :class="[
+                                                    'mt-1 font-mono text-sm',
+                                                    getValueTextClass(
+                                                        isMissingTimestamp(
+                                                            item.startAt
+                                                        ),
+                                                        true
+                                                    )
+                                                ]">
+                                                {{
+                                                    formatTimeLabel(
                                                         item.startAt
-                                                    ),
-                                                    true
-                                                )
-                                            ]">
-                                            {{ formatTimeLabel(item.startAt) }}
-                                        </p>
-                                    </button>
+                                                    )
+                                                }}
+                                            </p>
+                                        </button>
 
-                                    <button
-                                        type="button"
-                                        class="flex basis-6 cursor-pointer items-center justify-center text-slate-400 transition enabled:hover:text-crh-blue disabled:cursor-default"
-                                        :disabled="!canOpenTimetable(item)"
-                                        :aria-label="'查看当前时刻表'"
-                                        @click="openTimetable(item)">
-                                        <span
-                                            class="h-px flex-1 bg-[linear-gradient(90deg,rgb(226_232_240),rgb(148_163_184))]"
-                                            aria-hidden="true" />
-                                        <span
-                                            class="px-1 text-[0.8rem] leading-none"
-                                            aria-hidden="true">
-                                            ->
-                                        </span>
-                                        <span
-                                            class="h-px flex-1 bg-[linear-gradient(90deg,rgb(226_232_240),rgb(148_163_184))]"
-                                            aria-hidden="true" />
-                                    </button>
+                                        <button
+                                            type="button"
+                                            class="flex basis-6 cursor-pointer items-center justify-center text-slate-400 transition enabled:hover:text-crh-blue disabled:cursor-default"
+                                            :disabled="!canOpenTimetable(item)"
+                                            :aria-label="'查看当前时刻表'"
+                                            @click="openTimetable(item)">
+                                            <span
+                                                class="h-px flex-1 bg-[linear-gradient(90deg,rgb(226_232_240),rgb(148_163_184))]"
+                                                aria-hidden="true" />
+                                            <span
+                                                class="px-1 text-[0.8rem] leading-none"
+                                                aria-hidden="true">
+                                                ->
+                                            </span>
+                                            <span
+                                                class="h-px flex-1 bg-[linear-gradient(90deg,rgb(226_232_240),rgb(148_163_184))]"
+                                                aria-hidden="true" />
+                                        </button>
 
-                                    <button
-                                        type="button"
-                                        class="min-w-0 flex-1 cursor-pointer text-right transition enabled:hover:text-crh-blue disabled:cursor-default"
-                                        :disabled="!canOpenTimetable(item)"
-                                        @click="openTimetable(item)">
-                                        <p
-                                            class="text-[11px] uppercase tracking-[0.18em] text-slate-400">
-                                            终到时间
-                                        </p>
-                                        <p
-                                            :class="[
-                                                'mt-1 font-mono text-sm',
-                                                getValueTextClass(
-                                                    isMissingTimestamp(
-                                                        item.endAt
-                                                    ),
-                                                    true
-                                                )
-                                            ]">
-                                            {{ formatTimeLabel(item.endAt) }}
-                                        </p>
-                                    </button>
+                                        <button
+                                            type="button"
+                                            class="min-w-0 flex-1 cursor-pointer text-right transition enabled:hover:text-crh-blue disabled:cursor-default"
+                                            :disabled="!canOpenTimetable(item)"
+                                            @click="openTimetable(item)">
+                                            <p
+                                                class="text-[11px] uppercase tracking-[0.18em] text-slate-400">
+                                                终到时间
+                                            </p>
+                                            <p
+                                                :class="[
+                                                    'mt-1 font-mono text-sm',
+                                                    getValueTextClass(
+                                                        isMissingTimestamp(
+                                                            item.endAt
+                                                        ),
+                                                        true
+                                                    )
+                                                ]">
+                                                {{
+                                                    formatTimeLabel(item.endAt)
+                                                }}
+                                            </p>
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    </UiCard>
+                        </UiCard>
                     </template>
                 </div>
 
@@ -980,6 +988,5 @@ function buildCodeLink(code: string) {
     .history-table-row--tinted:not(.running-result-row):hover > td {
         box-shadow: inset 0 0 0 999px rgba(191, 219, 254, 0.74);
     }
-
 }
 </style>

@@ -17,7 +17,12 @@ export default defineEventHandler(async (event) => {
             const rawTaskId = getRouterParam(event, 'taskId')?.trim() ?? '';
             const taskId = Number.parseInt(rawTaskId, 10);
 
-            ensure(/^\d{8}$/.test(date), 400, 'invalid_param', 'date 必须是 YYYYMMDD');
+            ensure(
+                /^\d{8}$/.test(date),
+                400,
+                'invalid_param',
+                'date 必须是 YYYYMMDD'
+            );
             ensure(
                 Number.isInteger(taskId) && taskId > 0,
                 400,

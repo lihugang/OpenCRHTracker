@@ -122,15 +122,18 @@
                                     v-for="item in userItems"
                                     :key="item.userId"
                                     class="transition hover:bg-slate-50/70">
-                                    <td class="px-4 py-3 text-sm text-slate-900">
+                                    <td
+                                        class="px-4 py-3 text-sm text-slate-900">
                                         <span class="font-semibold">
                                             {{ item.userId }}
                                         </span>
                                     </td>
-                                    <td class="px-4 py-3 text-sm text-slate-700">
+                                    <td
+                                        class="px-4 py-3 text-sm text-slate-700">
                                         {{ formatTimestamp(item.createdAt) }}
                                     </td>
-                                    <td class="px-4 py-3 text-sm text-slate-700">
+                                    <td
+                                        class="px-4 py-3 text-sm text-slate-700">
                                         {{ formatTimestamp(item.lastLoginAt) }}
                                     </td>
                                     <td

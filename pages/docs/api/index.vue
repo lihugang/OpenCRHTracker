@@ -33,7 +33,8 @@
                     </p>
                     <p class="text-sm leading-6 text-slate-600">
                         除鉴权和每日数据导出外其他接口都允许匿名访问和使用 API
-                        Key 访问。请打开用户页，切换选项卡至“开发”页，轻击“签发”按钮以获取您的
+                        Key
+                        访问。请打开用户页，切换选项卡至“开发”页，轻击“签发”按钮以获取您的
                         API Key。
                     </p>
                     <p class="font-mono text-xs text-slate-500">
@@ -140,11 +141,9 @@
 
                         <div class="flex flex-wrap gap-2">
                             <span
-                                v-for="
-                                    label in getDocsVisibleAuthModeLabels(
-                                        endpoint.authModes
-                                    )
-                                "
+                                v-for="label in getDocsVisibleAuthModeLabels(
+                                    endpoint.authModes
+                                )"
                                 :key="endpoint.slug + ':mode:' + label"
                                 class="inline-flex rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600">
                                 {{ label }}

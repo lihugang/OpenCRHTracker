@@ -12,11 +12,7 @@
             <article
                 class="rounded-[1rem] border px-4 py-4"
                 :class="
-                    getEventCardClass(
-                        node.event.kind,
-                        node.event.level,
-                        depth
-                    )
+                    getEventCardClass(node.event.kind, node.event.level, depth)
                 ">
                 <div
                     class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
@@ -77,8 +73,9 @@
                     v-if="node.event.kind === 'database'"
                     class="mt-3 rounded-[0.9rem] bg-white/70 px-3 py-3 text-sm leading-6 text-slate-600">
                     <p>
-                        database={{ node.event.database }} |
-                        table={{ node.event.table }}
+                        database={{ node.event.database }} | table={{
+                            node.event.table
+                        }}
                     </p>
                     <p>
                         operation={{ node.event.operation }}
@@ -98,7 +95,9 @@
                     v-if="Object.keys(node.event.context).length > 0"
                     class="mt-3 grid gap-2 rounded-[0.9rem] bg-white/70 px-3 py-3 text-sm leading-6 text-slate-600 md:grid-cols-2">
                     <div
-                        v-for="entry in toEventContextEntries(node.event.context)"
+                        v-for="entry in toEventContextEntries(
+                            node.event.context
+                        )"
                         :key="`${node.event.id}:${entry.key}`"
                         class="min-w-0">
                         <span class="font-medium text-slate-900">
@@ -236,12 +235,9 @@ function getEventCardClass(
     }
     return [
         depthToneIndex >= 2 ? 'border-slate-300' : 'border-slate-200',
-        [
-            'bg-white/90',
-            'bg-slate-50/95',
-            'bg-slate-100/85',
-            'bg-slate-100/95'
-        ][depthToneIndex]
+        ['bg-white/90', 'bg-slate-50/95', 'bg-slate-100/85', 'bg-slate-100/95'][
+            depthToneIndex
+        ]
     ];
 }
 

@@ -502,10 +502,7 @@ function parseDailyTimesHHmm(value: unknown, name: string) {
 
     const dedupedDailyTimesHHmm = new Set<string>();
     const dailyTimesHHmm = rawDailyTimesHHmm.map((item, index) => {
-        const dailyTimeHHmm = asPlainString(
-            item,
-            `${name}[${index}]`
-        ).trim();
+        const dailyTimeHHmm = asPlainString(item, `${name}[${index}]`).trim();
         assert(
             dailyTimeHHmm.length > 0,
             `${name}[${index}] must be a non-empty string`

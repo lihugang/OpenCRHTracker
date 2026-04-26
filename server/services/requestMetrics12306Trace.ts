@@ -154,12 +154,14 @@ function toTraceSubjectSample(
             Number.isInteger(subject.taskId) &&
             subject.taskId >= 0
                 ? subject.taskId
-                : currentTask?.taskId ?? null,
+                : (currentTask?.taskId ?? null),
         executor: subject?.executor?.trim() || currentTask?.executor || ''
     };
 }
 
-function mergeSubjectContext(subject?: TraceSubjectContext): TraceSubjectContext {
+function mergeSubjectContext(
+    subject?: TraceSubjectContext
+): TraceSubjectContext {
     const current = traceContextStorage.getStore();
     const currentTask = getCurrentTaskExecutionContext();
 
@@ -202,7 +204,7 @@ function appendEvent(sample: Append12306TraceEventSample) {
             randomUUID(),
         parentInvocationId:
             typeof sample.parentInvocationId === 'undefined'
-                ? currentTraceContext?.invocationId ?? null
+                ? (currentTraceContext?.invocationId ?? null)
                 : sample.parentInvocationId,
         ...toTraceSubjectSample(
             mergeSubjectContext({
@@ -259,7 +261,9 @@ export async function with12306TraceFunction<T>(
                         options.getSuccessStatus?.(result) ?? 'success',
                     level: options.getSuccessLevel?.(result) ?? 'INFO',
                     message:
-                        options.getSuccessMessage?.(result) ?? options.message ?? '',
+                        options.getSuccessMessage?.(result) ??
+                        options.message ??
+                        '',
                     context: {
                         ...(options.context ?? {}),
                         ...(options.getSuccessContext?.(result) ?? {})

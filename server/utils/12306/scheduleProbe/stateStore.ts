@@ -581,7 +581,11 @@ export function loadActiveScheduleState(
     }
 
     const building = document.building;
-    if (building && building.date === today && hasUsableTimetableData(building)) {
+    if (
+        building &&
+        building.date === today &&
+        hasUsableTimetableData(building)
+    ) {
         return cloneScheduleState(building);
     }
 

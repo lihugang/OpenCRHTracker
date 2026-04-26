@@ -8,9 +8,7 @@ import {
     getTodayScheduleProbeGroups,
     getTodayScheduleTimetableByTrainCode
 } from '~/server/services/todayScheduleCache';
-import {
-    getRelativeDateString
-} from '~/server/utils/date/getCurrentDateString';
+import { getRelativeDateString } from '~/server/utils/date/getCurrentDateString';
 import {
     getShanghaiDayStartUnixSeconds,
     SHANGHAI_OFFSET_MS
@@ -123,7 +121,9 @@ function uniqueNormalizedCodes(codes: string[]) {
         }
     }
 
-    return [...normalizedCodes].sort((left, right) => left.localeCompare(right));
+    return [...normalizedCodes].sort((left, right) =>
+        left.localeCompare(right)
+    );
 }
 
 function buildFallbackNodeMeta(trainCode: string): CirculationNodeMeta {
@@ -147,7 +147,10 @@ function buildTrainCodeNodeMetaMap() {
         const normalizedInternalCode = normalizeCode(group.trainInternalCode);
         if (normalizedInternalCode.length === 0) {
             for (const trainCode of allCodes) {
-                nodeMetaByTrainCode.set(trainCode, buildFallbackNodeMeta(trainCode));
+                nodeMetaByTrainCode.set(
+                    trainCode,
+                    buildFallbackNodeMeta(trainCode)
+                );
             }
             continue;
         }
@@ -418,7 +421,8 @@ function buildCirculation(
                 previousNode === null ? null : [...previousNode.allCodes],
             incomingWeight: incomingEdge?.weight ?? null,
             incomingSupportCount: incomingEdge?.count ?? null,
-            outgoingTrainCodes: nextNode === null ? null : [...nextNode.allCodes],
+            outgoingTrainCodes:
+                nextNode === null ? null : [...nextNode.allCodes],
             outgoingWeight: outgoingEdge?.weight ?? null,
             outgoingSupportCount: outgoingEdge?.count ?? null
         });
@@ -455,9 +459,7 @@ function buildLookupByTrainCode(circulations: InternalInferredCirculation[]) {
     return lookupByTrainCode;
 }
 
-function resolvePublicNodeTimetable(
-    node: InternalInferredCirculationNode
-) {
+function resolvePublicNodeTimetable(node: InternalInferredCirculationNode) {
     const candidateTrainCodes = uniqueNormalizedCodes([
         node.trainCode,
         ...node.allCodes
@@ -530,7 +532,10 @@ function buildCirculationsFromGraph(
         while (true) {
             routeNodeIds.push(currentNodeId);
             visitedInRoute.set(currentNodeId, routeNodeIds.length - 1);
-            const outgoingEdge = getTopEdge(outgoingEdgesByNodeId, currentNodeId);
+            const outgoingEdge = getTopEdge(
+                outgoingEdgesByNodeId,
+                currentNodeId
+            );
 
             if (
                 !outgoingEdge ||
@@ -818,8 +823,9 @@ function getInternalInferredCirculationsByTrainCodes(
     const resultsByRouteId = new Map<string, InternalInferredCirculation>();
 
     for (const trainCode of normalizedTrainCodes) {
-        for (const circulation of activeCache.lookupByTrainCode.get(trainCode) ??
-            []) {
+        for (const circulation of activeCache.lookupByTrainCode.get(
+            trainCode
+        ) ?? []) {
             resultsByRouteId.set(circulation.routeId, circulation);
         }
     }
@@ -832,7 +838,8 @@ function getInternalInferredCirculationsByTrainCodes(
 export function getInferredCirculationByTrainCodes(
     trainCodes: string[]
 ): InferredCirculation | null {
-    const circulation = getInternalInferredCirculationsByTrainCodes(trainCodes)[0];
+    const circulation =
+        getInternalInferredCirculationsByTrainCodes(trainCodes)[0];
     return circulation ? toPublicInferredCirculation(circulation) : null;
 }
 

@@ -40,7 +40,8 @@
             <div
                 v-else-if="!responseData || !hasRenderableContent"
                 class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-4 py-4 text-sm leading-6 text-slate-600">
-                没有找到该重联扫描任务的可展示结果。旧 trace 数据如果未记录任务号，将无法打开任务弹窗。
+                没有找到该重联扫描任务的可展示结果。旧 trace
+                数据如果未记录任务号，将无法打开任务弹窗。
             </div>
 
             <template v-else>
@@ -52,24 +53,43 @@
                         <div class="flex items-center gap-2">
                             <span
                                 class="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em]"
-                                :class="getTaskStatusClass(responseData.task.status)">
-                                {{ getTaskStatusLabel(responseData.task.status) }}
+                                :class="
+                                    getTaskStatusClass(responseData.task.status)
+                                ">
+                                {{
+                                    getTaskStatusLabel(responseData.task.status)
+                                }}
                             </span>
                             <span class="text-sm font-semibold text-slate-900">
                                 #{{ responseData.task.taskId }}
                             </span>
                         </div>
-                        <div class="mt-3 space-y-1.5 text-sm leading-6 text-slate-600">
-                            <p>执行器：{{ responseData.task.executor || '--' }}</p>
-                            <p>担当局：{{ responseData.task.bureau || '--' }}</p>
+                        <div
+                            class="mt-3 space-y-1.5 text-sm leading-6 text-slate-600">
+                            <p>
+                                执行器：{{ responseData.task.executor || '--' }}
+                            </p>
+                            <p>
+                                担当局：{{ responseData.task.bureau || '--' }}
+                            </p>
                             <p>车型：{{ responseData.task.model || '--' }}</p>
                         </div>
                     </div>
 
                     <div
                         class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-4 py-4 text-sm leading-6 text-slate-600">
-                        <p>开始时间：{{ formatTimestamp(responseData.task.startedAt) || '--' }}</p>
-                        <p>结束时间：{{ formatTimestamp(responseData.task.endedAt) || '--' }}</p>
+                        <p>
+                            开始时间：{{
+                                formatTimestamp(responseData.task.startedAt) ||
+                                '--'
+                            }}
+                        </p>
+                        <p>
+                            结束时间：{{
+                                formatTimestamp(responseData.task.endedAt) ||
+                                '--'
+                            }}
+                        </p>
                         <p>汇总条目：{{ responseData.summaries.length }}</p>
                         <p>结果分组：{{ responseData.groups.length }}</p>
                     </div>
@@ -83,7 +103,8 @@
                             任务汇总
                         </h3>
                         <p class="text-sm leading-6 text-slate-600">
-                            展示本次 `detect_coupled_emu_group` 任务本身的总结与跳过原因。
+                            展示本次 `detect_coupled_emu_group`
+                            任务本身的总结与跳过原因。
                         </p>
                     </div>
 
@@ -92,22 +113,27 @@
                             v-for="item in responseData.summaries"
                             :key="item.id"
                             class="rounded-[1rem] border border-slate-200 bg-white/90 px-4 py-4 shadow-sm">
-                            <div class="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                            <div
+                                class="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
                                 <div class="space-y-1">
-                                    <p class="text-sm font-semibold text-slate-900">
+                                    <p
+                                        class="text-sm font-semibold text-slate-900">
                                         {{ item.title }}
                                     </p>
                                     <p class="text-sm leading-6 text-slate-600">
                                         {{ item.detail || '--' }}
                                     </p>
                                 </div>
-                                <div class="flex items-center gap-2 text-xs text-slate-500">
+                                <div
+                                    class="flex items-center gap-2 text-xs text-slate-500">
                                     <span
                                         class="inline-flex items-center rounded-full px-2.5 py-1 font-semibold uppercase tracking-[0.08em]"
                                         :class="getLevelClass(item.level)">
                                         {{ item.level }}
                                     </span>
-                                    <span>{{ formatTimestamp(item.timestamp) || '--' }}</span>
+                                    <span>{{
+                                        formatTimestamp(item.timestamp) || '--'
+                                    }}</span>
                                 </div>
                             </div>
                         </article>
@@ -129,9 +155,11 @@
                             v-for="group in responseData.groups"
                             :key="group.key"
                             class="rounded-[1rem] border border-slate-200 bg-white/90 px-4 py-4 shadow-sm">
-                            <div class="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                            <div
+                                class="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
                                 <div class="space-y-1">
-                                    <div class="flex flex-wrap items-center gap-2">
+                                    <div
+                                        class="flex flex-wrap items-center gap-2">
                                         <span
                                             class="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em]"
                                             :class="
@@ -139,13 +167,20 @@
                                                     ? 'bg-slate-200 text-slate-700'
                                                     : 'bg-sky-100 text-sky-800'
                                             ">
-                                            {{ group.isUnassigned ? '未关联车次' : '车次分组' }}
-                                        </span>
-                                        <h4 class="text-base font-semibold text-slate-900">
                                             {{
                                                 group.isUnassigned
                                                     ? '未关联车次'
-                                                    : group.trainCodes.join(' / ')
+                                                    : '车次分组'
+                                            }}
+                                        </span>
+                                        <h4
+                                            class="text-base font-semibold text-slate-900">
+                                            {{
+                                                group.isUnassigned
+                                                    ? '未关联车次'
+                                                    : group.trainCodes.join(
+                                                          ' / '
+                                                      )
                                             }}
                                         </h4>
                                     </div>
@@ -160,32 +195,51 @@
                                     v-for="item in group.items"
                                     :key="item.id"
                                     class="rounded-[0.9rem] border border-slate-200 bg-slate-50/80 px-3.5 py-3">
-                                    <div class="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                                    <div
+                                        class="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
                                         <div class="space-y-1.5">
-                                            <div class="flex flex-wrap items-center gap-2">
+                                            <div
+                                                class="flex flex-wrap items-center gap-2">
                                                 <span
                                                     class="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em]"
-                                                    :class="getToneClass(item.tone)">
+                                                    :class="
+                                                        getToneClass(item.tone)
+                                                    ">
                                                     {{ item.title }}
                                                 </span>
-                                                <span class="text-sm font-semibold text-slate-900">
+                                                <span
+                                                    class="text-sm font-semibold text-slate-900">
                                                     {{ item.result }}
                                                 </span>
                                             </div>
-                                            <p class="text-sm leading-6 text-slate-600">
+                                            <p
+                                                class="text-sm leading-6 text-slate-600">
                                                 {{ item.detail || '--' }}
                                             </p>
                                             <p
                                                 v-if="item.emuCodes.length > 0"
                                                 class="text-sm leading-6 text-slate-500">
-                                                编组：{{ item.emuCodes.join(' / ') }}
+                                                编组：{{
+                                                    item.emuCodes.join(' / ')
+                                                }}
                                             </p>
                                         </div>
-                                        <div class="text-sm leading-6 text-slate-500">
-                                            <p>{{ formatTimestamp(item.timestamp) || '--' }}</p>
+                                        <div
+                                            class="text-sm leading-6 text-slate-500">
+                                            <p>
+                                                {{
+                                                    formatTimestamp(
+                                                        item.timestamp
+                                                    ) || '--'
+                                                }}
+                                            </p>
                                             <p>
                                                 发车：
-                                                {{ formatTimestamp(item.startAt) || '--' }}
+                                                {{
+                                                    formatTimestamp(
+                                                        item.startAt
+                                                    ) || '--'
+                                                }}
                                             </p>
                                         </div>
                                     </div>
@@ -203,7 +257,11 @@
 import { computed, ref, watch } from 'vue';
 import UiBottomSheet from '~/components/ui/UiBottomSheet.vue';
 import UiModal from '~/components/ui/UiModal.vue';
-import type { Admin12306CouplingTaskResponse, Admin12306TraceEventLevel, Admin12306TraceStatus } from '~/types/admin';
+import type {
+    Admin12306CouplingTaskResponse,
+    Admin12306TraceEventLevel,
+    Admin12306TraceStatus
+} from '~/types/admin';
 import type { TrackerApiResponse } from '~/types/homepage';
 import getApiErrorMessage from '~/utils/api/getApiErrorMessage';
 import formatTrackerTimestamp from '~/utils/time/formatTrackerTimestamp';
@@ -234,9 +292,9 @@ const modalDescription = computed(() =>
 const hasRenderableContent = computed(() => {
     return Boolean(
         responseData.value &&
-            (responseData.value.task ||
-                responseData.value.summaries.length > 0 ||
-                responseData.value.groups.length > 0)
+        (responseData.value.task ||
+            responseData.value.summaries.length > 0 ||
+            responseData.value.groups.length > 0)
     );
 });
 
@@ -341,7 +399,9 @@ function getLevelClass(level: Admin12306TraceEventLevel) {
     }
 }
 
-function getToneClass(tone: Admin12306CouplingTaskResponse['groups'][number]['items'][number]['tone']) {
+function getToneClass(
+    tone: Admin12306CouplingTaskResponse['groups'][number]['items'][number]['tone']
+) {
     switch (tone) {
         case 'success':
             return 'bg-emerald-100 text-emerald-800';

@@ -37,8 +37,7 @@
                 <div
                     v-if="timetableNotice"
                     class="rounded-[1rem] border border-slate-200 bg-white/80 px-4 py-3">
-                    <p
-                        class="text-xs tracking-[0.16em] text-slate-400">
+                    <p class="text-xs tracking-[0.16em] text-slate-400">
                         时刻表
                     </p>
                     <p class="mt-2 text-sm leading-6 text-crh-grey-dark">
@@ -239,7 +238,8 @@
                             v-for="(node, index) in circulationNodes"
                             :key="`desktop:${node.key}`"
                             class="flex gap-3">
-                            <div class="flex w-7 shrink-0 flex-col items-center">
+                            <div
+                                class="flex w-7 shrink-0 flex-col items-center">
                                 <span
                                     :class="[
                                         'inline-flex h-7 w-7 items-center justify-center rounded-full border text-xs font-semibold transition',
@@ -272,10 +272,16 @@
                                     <div
                                         class="min-w-0 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-sm font-semibold">
                                         <template
-                                            v-for="(code, codeIndex) in node.allCodes"
+                                            v-for="(
+                                                code, codeIndex
+                                            ) in node.allCodes"
                                             :key="`${node.key}:desktop:${code}`">
                                             <span
-                                                v-if="isCurrentCirculationCode(code)"
+                                                v-if="
+                                                    isCurrentCirculationCode(
+                                                        code
+                                                    )
+                                                "
                                                 :class="
                                                     node.isCurrent
                                                         ? 'text-crh-blue'
@@ -285,7 +291,11 @@
                                             </span>
                                             <NuxtLink
                                                 v-else
-                                                :to="buildCirculationCodeLink(code)"
+                                                :to="
+                                                    buildCirculationCodeLink(
+                                                        code
+                                                    )
+                                                "
                                                 :class="[
                                                     'transition hover:underline',
                                                     node.isCurrent
@@ -295,7 +305,10 @@
                                                 {{ code }}
                                             </NuxtLink>
                                             <span
-                                                v-if="codeIndex < node.allCodes.length - 1"
+                                                v-if="
+                                                    codeIndex <
+                                                    node.allCodes.length - 1
+                                                "
                                                 class="text-slate-400">
                                                 /
                                             </span>
@@ -316,9 +329,12 @@
                                             class="text-[11px] uppercase tracking-[0.16em] text-slate-400">
                                             始发 / 终到
                                         </p>
-                                        <p class="mt-1 text-sm font-medium text-crh-grey-dark">
+                                        <p
+                                            class="mt-1 text-sm font-medium text-crh-grey-dark">
                                             <LookupStationLink
-                                                :station-name="node.startStation"
+                                                :station-name="
+                                                    node.startStation
+                                                "
                                                 :focus-train-codes="
                                                     resolveCirculationNodeFocusTrainCodes(
                                                         node
@@ -345,7 +361,9 @@
                                         </p>
                                         <p
                                             class="mt-1 font-mono text-sm text-slate-500">
-                                            {{ formatNullableTime(node.startAt) }}
+                                            {{
+                                                formatNullableTime(node.startAt)
+                                            }}
                                             <span class="mx-1">-></span>
                                             {{ formatNullableTime(node.endAt) }}
                                         </p>
@@ -362,7 +380,8 @@
                             v-for="(node, index) in circulationNodes"
                             :key="`mobile:${node.key}`"
                             class="flex gap-3">
-                            <div class="flex w-7 shrink-0 flex-col items-center">
+                            <div
+                                class="flex w-7 shrink-0 flex-col items-center">
                                 <span
                                     :class="[
                                         'inline-flex h-7 w-7 items-center justify-center rounded-full border text-xs font-semibold transition',
@@ -398,19 +417,33 @@
                                         <div
                                             class="min-w-0 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-sm font-semibold text-crh-blue">
                                             <template
-                                                v-for="(code, codeIndex) in node.allCodes"
+                                                v-for="(
+                                                    code, codeIndex
+                                                ) in node.allCodes"
                                                 :key="`${node.key}:${code}`">
-                                                <span v-if="isCurrentCirculationCode(code)">
+                                                <span
+                                                    v-if="
+                                                        isCurrentCirculationCode(
+                                                            code
+                                                        )
+                                                    ">
                                                     {{ code }}
                                                 </span>
                                                 <NuxtLink
                                                     v-else
-                                                    :to="buildCirculationCodeLink(code)"
+                                                    :to="
+                                                        buildCirculationCodeLink(
+                                                            code
+                                                        )
+                                                    "
                                                     class="transition hover:underline">
                                                     {{ code }}
                                                 </NuxtLink>
                                                 <span
-                                                    v-if="codeIndex < node.allCodes.length - 1"
+                                                    v-if="
+                                                        codeIndex <
+                                                        node.allCodes.length - 1
+                                                    "
                                                     class="text-slate-400">
                                                     /
                                                 </span>
@@ -440,7 +473,9 @@
                                                 <p
                                                     class="mt-1 truncate text-sm font-medium text-crh-grey-dark">
                                                     <LookupStationLink
-                                                        :station-name="node.startStation"
+                                                        :station-name="
+                                                            node.startStation
+                                                        "
                                                         :focus-train-codes="
                                                             resolveCirculationNodeFocusTrainCodes(
                                                                 node
@@ -458,7 +493,9 @@
                                                 <p
                                                     class="mt-1 truncate text-sm font-medium text-crh-grey-dark">
                                                     <LookupStationLink
-                                                        :station-name="node.endStation"
+                                                        :station-name="
+                                                            node.endStation
+                                                        "
                                                         :focus-train-codes="
                                                             resolveCirculationNodeFocusTrainCodes(
                                                                 node
@@ -478,7 +515,11 @@
                                                 </p>
                                                 <p
                                                     class="mt-1 font-mono text-sm text-slate-500">
-                                                    {{ formatNullableTime(node.startAt) }}
+                                                    {{
+                                                        formatNullableTime(
+                                                            node.startAt
+                                                        )
+                                                    }}
                                                 </p>
                                             </div>
 
@@ -489,7 +530,11 @@
                                                 </p>
                                                 <p
                                                     class="mt-1 font-mono text-sm text-slate-500">
-                                                    {{ formatNullableTime(node.endAt) }}
+                                                    {{
+                                                        formatNullableTime(
+                                                            node.endAt
+                                                        )
+                                                    }}
                                                 </p>
                                             </div>
                                         </div>
@@ -593,7 +638,9 @@ const timetableFocusTrainCodes = computed(() => {
     ]);
 });
 
-const inferredCirculation = computed(() => timetable.value?.inferredCirculation ?? null);
+const inferredCirculation = computed(
+    () => timetable.value?.inferredCirculation ?? null
+);
 
 const currentCirculationTrainCodeSet = computed(() => {
     return new Set(
@@ -704,7 +751,9 @@ function resolveCirculationNodeFocusTrainCodes(node: DisplayCirculationNode) {
 }
 
 function isCurrentCirculationCode(code: string) {
-    return currentCirculationTrainCodeSet.value.has(normalizeComparableCode(code));
+    return currentCirculationTrainCodeSet.value.has(
+        normalizeComparableCode(code)
+    );
 }
 
 function buildCirculationCodeLink(code: string) {

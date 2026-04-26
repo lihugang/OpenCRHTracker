@@ -177,10 +177,7 @@ export function getNextExecutionTimeByDailyTimesInShanghaiSeconds(
             nowMs,
             dailyTimeHHmm
         );
-        if (
-            nextExecutionTime === null ||
-            executionTime < nextExecutionTime
-        ) {
+        if (nextExecutionTime === null || executionTime < nextExecutionTime) {
             nextExecutionTime = executionTime;
         }
     }

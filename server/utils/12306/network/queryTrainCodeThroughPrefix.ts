@@ -40,14 +40,12 @@ interface TrainCodeResponse {
 const config = useConfig();
 
 export default async function queryTrainCodeThroughPrefix(prefix: string) {
-    return with12306TraceFunction<
-        Array<{
-            route: {
-                code: string;
-                internalCode: string;
-            };
-        }> | null
-    >(
+    return with12306TraceFunction<Array<{
+        route: {
+            code: string;
+            internalCode: string;
+        };
+    }> | null>(
         {
             title: '按前缀搜索车次',
             functionName: 'queryTrainCodeThroughPrefix',
@@ -157,7 +155,10 @@ export default async function queryTrainCodeThroughPrefix(prefix: string) {
                     message: '请求抛出异常',
                     context: {
                         keyword: prefix,
-                        error: error instanceof Error ? error.message : String(error)
+                        error:
+                            error instanceof Error
+                                ? error.message
+                                : String(error)
                     },
                     errorMessage:
                         error instanceof Error ? error.message : String(error)

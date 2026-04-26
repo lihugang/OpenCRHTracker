@@ -297,7 +297,10 @@ function findDynamicRouteTemplate(kind: RequestMetricKind, pathname: string) {
         }
 
         let matched = true;
-        for (const [index, templateSegment] of routeTemplate.segments.entries()) {
+        for (const [
+            index,
+            templateSegment
+        ] of routeTemplate.segments.entries()) {
             const pathnameSegment = pathnameSegments[index];
             if (!pathnameSegment) {
                 matched = false;
@@ -422,7 +425,10 @@ function approximatePercentileDurationMs(
     }
 
     const normalizedPercentile = Math.min(1, Math.max(0, percentile));
-    const targetCount = Math.max(1, Math.ceil(totalCount * normalizedPercentile));
+    const targetCount = Math.max(
+        1,
+        Math.ceil(totalCount * normalizedPercentile)
+    );
     let currentCount = 0;
 
     for (const [index, count] of histogram.entries()) {
@@ -529,7 +535,10 @@ function mergeRouteMetrics(
         targetMetrics.requestCount += sourceMetrics.requestCount;
         targetMetrics.durationTotalMs += sourceMetrics.durationTotalMs;
 
-        for (const [index, count] of sourceMetrics.durationHistogram.entries()) {
+        for (const [
+            index,
+            count
+        ] of sourceMetrics.durationHistogram.entries()) {
             targetMetrics.durationHistogram[index] =
                 (targetMetrics.durationHistogram[index] ?? 0) + count;
         }
@@ -546,7 +555,10 @@ function toBucketSnapshot(
         startAt: bucket.startAt,
         endAt: bucket.startAt + bucketSeconds - 1,
         systemSampleCount: bucket.systemSampleCount,
-        cpuPercent: toAveragedValue(bucket.cpuPercentTotal, bucket.cpuSampleCount),
+        cpuPercent: toAveragedValue(
+            bucket.cpuPercentTotal,
+            bucket.cpuSampleCount
+        ),
         memoryUsedRatio: toAveragedValue(
             bucket.memoryUsedRatioTotal,
             bucket.systemSampleCount
@@ -665,7 +677,11 @@ function isValidHistogram(rawValue: unknown) {
 }
 
 function isValidRouteMetricsMap(rawValue: unknown) {
-    if (typeof rawValue !== 'object' || rawValue === null || Array.isArray(rawValue)) {
+    if (
+        typeof rawValue !== 'object' ||
+        rawValue === null ||
+        Array.isArray(rawValue)
+    ) {
         return false;
     }
 
@@ -779,7 +795,10 @@ function restoreStoreFromDisk(): ServerMetricsStoreContainer | null {
             return null;
         }
 
-        for (const [index, serializedBucket] of serializedWindow.buckets.entries()) {
+        for (const [
+            index,
+            serializedBucket
+        ] of serializedWindow.buckets.entries()) {
             if (
                 typeof serializedBucket !== 'object' ||
                 serializedBucket === null ||
@@ -804,12 +823,16 @@ function restoreStoreFromDisk(): ServerMetricsStoreContainer | null {
                 !isFiniteNonNegativeNumber(serializedBucket.load1mTotal) ||
                 !Number.isInteger(serializedBucket.ssrRequestCount) ||
                 serializedBucket.ssrRequestCount < 0 ||
-                !isFiniteNonNegativeNumber(serializedBucket.ssrDurationTotalMs) ||
+                !isFiniteNonNegativeNumber(
+                    serializedBucket.ssrDurationTotalMs
+                ) ||
                 !isValidHistogram(serializedBucket.ssrDurationHistogram) ||
                 !isValidRouteMetricsMap(serializedBucket.ssrRoutes) ||
                 !Number.isInteger(serializedBucket.apiRequestCount) ||
                 serializedBucket.apiRequestCount < 0 ||
-                !isFiniteNonNegativeNumber(serializedBucket.apiDurationTotalMs) ||
+                !isFiniteNonNegativeNumber(
+                    serializedBucket.apiDurationTotalMs
+                ) ||
                 !isValidHistogram(serializedBucket.apiDurationHistogram) ||
                 !isValidRouteMetricsMap(serializedBucket.apiRoutes)
             ) {
@@ -827,8 +850,7 @@ function restoreStoreFromDisk(): ServerMetricsStoreContainer | null {
                 serializedBucket.memoryUsedBytesTotal;
             targetBucket.memoryTotalBytesTotal =
                 serializedBucket.memoryTotalBytesTotal;
-            targetBucket.load1mSampleCount =
-                serializedBucket.load1mSampleCount;
+            targetBucket.load1mSampleCount = serializedBucket.load1mSampleCount;
             targetBucket.load1mTotal = serializedBucket.load1mTotal;
             targetBucket.ssrRequestCount = serializedBucket.ssrRequestCount;
             targetBucket.ssrDurationTotalMs =
@@ -954,7 +976,9 @@ function getStore() {
         globalScope.__openCrhAdminServerMetricsStore =
             restoredStore ?? createEmptyStore();
         if (!restoredStore) {
-            logger.info('admin server metrics store initialized from empty state');
+            logger.info(
+                'admin server metrics store initialized from empty state'
+            );
         }
     }
 
@@ -973,10 +997,11 @@ function buildWindowSnapshot(
     const firstBucketStart =
         lastBucketStart -
         (windowState.bucketCount - 1) * windowState.bucketSeconds;
-    const aggregatedRoutes: Record<RequestMetricKind, RouteMetricsCollection> = {
-        ssr: {},
-        api: {}
-    };
+    const aggregatedRoutes: Record<RequestMetricKind, RouteMetricsCollection> =
+        {
+            ssr: {},
+            api: {}
+        };
 
     let cpuPercentBucket: AdminServerMetricsPeak | null = null;
     let memoryUsedRatioBucket: AdminServerMetricsPeak | null = null;
@@ -1123,12 +1148,20 @@ export function recordAdminServerMetricsRequestDuration(
             bucket.ssrRequestCount += 1;
             bucket.ssrDurationTotalMs += durationMs;
             observeDurationHistogram(bucket.ssrDurationHistogram, durationMs);
-            recordRouteMetrics(bucket.ssrRoutes, normalizedPathname, durationMs);
+            recordRouteMetrics(
+                bucket.ssrRoutes,
+                normalizedPathname,
+                durationMs
+            );
         } else {
             bucket.apiRequestCount += 1;
             bucket.apiDurationTotalMs += durationMs;
             observeDurationHistogram(bucket.apiDurationHistogram, durationMs);
-            recordRouteMetrics(bucket.apiRoutes, normalizedPathname, durationMs);
+            recordRouteMetrics(
+                bucket.apiRoutes,
+                normalizedPathname,
+                durationMs
+            );
         }
     }
 

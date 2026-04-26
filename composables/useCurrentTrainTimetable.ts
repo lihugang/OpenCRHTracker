@@ -17,7 +17,9 @@ export default function useCurrentTrainTimetable(
     const timetable = ref<CurrentTrainTimetableData | null>(null);
     const errorMessage = ref('');
     const normalizedTrainCode = computed(() =>
-        String(toValue(trainCodeSource) ?? '').trim().toUpperCase()
+        String(toValue(trainCodeSource) ?? '')
+            .trim()
+            .toUpperCase()
     );
     let requestToken = 0;
 
@@ -56,9 +58,7 @@ export default function useCurrentTrainTimetable(
             try {
                 const response = await requestFetch<
                     TrackerApiResponse<CurrentTrainTimetableData>
-                >(
-                    '/api/v1/timetable/train/' + encodeURIComponent(trainCode)
-                );
+                >('/api/v1/timetable/train/' + encodeURIComponent(trainCode));
 
                 if (!response.ok) {
                     throw {
@@ -72,7 +72,8 @@ export default function useCurrentTrainTimetable(
 
                 cachedTimetables.set(trainCode, response.data);
                 timetable.value = response.data;
-                state.value = response.data.stops.length > 0 ? 'success' : 'empty';
+                state.value =
+                    response.data.stops.length > 0 ? 'success' : 'empty';
             } catch (error) {
                 if (activeToken !== requestToken) {
                     return;

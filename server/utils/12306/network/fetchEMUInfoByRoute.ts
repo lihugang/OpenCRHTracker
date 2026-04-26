@@ -47,16 +47,14 @@ const logger = getLogger('12306-network:fetch-emu-info-by-route');
 export default async function fetchEMUInfoByRoute(route: string) {
     const url =
         'https://mobile.12306.cn/wxxcx/openplatform-inner/miniprogram/wifiapps/appFrontEnd/v2/lounge/open-smooth-common/trainStyleBatch/getCarDetail';
-    return with12306TraceFunction<
-        {
-            route: {
-                code: string;
-            };
-            emu: {
-                code: string;
-            };
-        } | null
-    >(
+    return with12306TraceFunction<{
+        route: {
+            code: string;
+        };
+        emu: {
+            code: string;
+        };
+    } | null>(
         {
             title: '按车次获取编组信息',
             functionName: 'fetchEMUInfoByRoute',
@@ -80,7 +78,8 @@ export default async function fetchEMUInfoByRoute(route: string) {
             try {
                 await waitFor12306RequestSlot('query');
                 // 12306 endpoint requires a non-empty carCode placeholder; value does not affect query result.
-                const routeProbeCarCode = config.spider.params.routeProbeCarCode;
+                const routeProbeCarCode =
+                    config.spider.params.routeProbeCarCode;
                 const response = await fetch(
                     `${url}?carCode=${encodeURIComponent(routeProbeCarCode)}&trainCode=${route}&runningDay=${getCurrentDateString()}&reqType=form`,
                     {
@@ -145,7 +144,8 @@ export default async function fetchEMUInfoByRoute(route: string) {
                         context: {
                             trainCode: route
                         },
-                        errorMessage: 'missing content.data or content.data.carCode'
+                        errorMessage:
+                            'missing content.data or content.data.carCode'
                     });
                     log12306RequestFailure({
                         logger,
@@ -209,7 +209,10 @@ export default async function fetchEMUInfoByRoute(route: string) {
                     message: '请求抛出异常',
                     context: {
                         trainCode: route,
-                        error: error instanceof Error ? error.message : String(error)
+                        error:
+                            error instanceof Error
+                                ? error.message
+                                : String(error)
                     },
                     errorMessage:
                         error instanceof Error ? error.message : String(error)

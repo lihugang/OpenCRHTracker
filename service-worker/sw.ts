@@ -56,7 +56,9 @@ function resolveNotificationUrl(value: unknown) {
     }
 }
 
-function parsePushNotificationPayload(event: PushEvent): PushNotificationPayload {
+function parsePushNotificationPayload(
+    event: PushEvent
+): PushNotificationPayload {
     if (!event.data) {
         return {};
     }

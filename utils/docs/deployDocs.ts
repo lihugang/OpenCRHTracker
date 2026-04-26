@@ -679,8 +679,7 @@ export const deployDocsSections: DocsContentSection[] = [
                         path: 'task.referenceModel',
                         valueType: 'object',
                         required: true,
-                        description:
-                            '参考车型索引重建任务的配置项。',
+                        description: '参考车型索引重建任务的配置项。',
                         notes: [
                             'windowDays 用于设置历史窗口天数，当前默认值为 14。',
                             'batchSize 用于设置扫描 daily_emu_routes 时的分页批大小，当前默认值为 1000。',
@@ -692,8 +691,7 @@ export const deployDocsSections: DocsContentSection[] = [
                         path: 'task.circulation',
                         valueType: 'object',
                         required: true,
-                        description:
-                            '列车交路推断索引重建任务的配置项。',
+                        description: '列车交路推断索引重建任务的配置项。',
                         notes: [
                             'windowDays 用于设置交路推断历史窗口天数，当前默认值为 14。',
                             'batchSize 用于流式扫描 daily_emu_routes 时的分页批大小，当前默认值为 2000。',

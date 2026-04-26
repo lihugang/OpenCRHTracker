@@ -93,8 +93,7 @@ export default async function buildTodaySchedule(): Promise<BuildScheduleResult>
                         failedKeywords: result.failedKeywords.length,
                         failedEnrichCodes: result.failedEnrichCodes.length
                     }),
-                    getSuccessLevel: (result) =>
-                        result.ok ? 'INFO' : 'WARN',
+                    getSuccessLevel: (result) => (result.ok ? 'INFO' : 'WARN'),
                     getSuccessStatus: (result) =>
                         result.ok ? 'success' : 'warning'
                 },

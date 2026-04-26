@@ -270,7 +270,9 @@ function normalizeLevel(value?: Admin12306TraceEventLevel) {
     return value ?? 'INFO';
 }
 
-function toStatusFromLevel(level: Admin12306TraceEventLevel): Admin12306TraceStatus {
+function toStatusFromLevel(
+    level: Admin12306TraceEventLevel
+): Admin12306TraceStatus {
     switch (level) {
         case 'ERROR':
             return 'error';
@@ -569,7 +571,9 @@ function serializeStore(
                         requestCount: trace.requestCount,
                         conflictCount: trace.conflictCount,
                         functionCount: trace.functionCount,
-                        events: [...trace.events].sort(compareTraceEventsAscending)
+                        events: [...trace.events].sort(
+                            compareTraceEventsAscending
+                        )
                     }))
             }))
     };
@@ -703,7 +707,10 @@ function buildTraceSubjectKeys(sample: Append12306TraceEventSample) {
         typeof sample.executor === 'string' &&
         sample.executor.trim().length > 0
     ) {
-        pushSubjectKey(subjectKeys, `task:${sample.executor.trim()}:${sample.taskId}`);
+        pushSubjectKey(
+            subjectKeys,
+            `task:${sample.executor.trim()}:${sample.taskId}`
+        );
     }
 
     return Array.from(subjectKeys);
@@ -733,7 +740,9 @@ function buildCursor(trace: MutableTraceSummary) {
     return `${trace.startedAt}:${trace.traceId}`;
 }
 
-function parseTraceCursor(rawValue: string | undefined): TraceCursorPoint | null {
+function parseTraceCursor(
+    rawValue: string | undefined
+): TraceCursorPoint | null {
     if (!rawValue) {
         return null;
     }
@@ -791,9 +800,7 @@ function formatHistoricalDateContext(value: unknown) {
     return formatShanghaiDateString(timestamp * 1000);
 }
 
-function toStatusLabel(
-    status: Admin12306TrainTraceResultStatus
-): string {
+function toStatusLabel(status: Admin12306TrainTraceResultStatus): string {
     switch (status) {
         case 'single':
             return '单编组';
@@ -837,10 +844,7 @@ function parseProbeStatusResult(value: unknown): {
     }
 }
 
-function buildCouplingResultLabel(
-    emuCodes: string[],
-    primaryEmuCode: string
-) {
+function buildCouplingResultLabel(emuCodes: string[], primaryEmuCode: string) {
     if (emuCodes.length === 0) {
         return '重联';
     }
@@ -1004,7 +1008,10 @@ function eventMatchesTrainCode(
     event: Admin12306TraceEvent,
     queryTrainCode: string
 ) {
-    if (event.kind === 'request' && event.operation === 'fetch_emu_info_by_route') {
+    if (
+        event.kind === 'request' &&
+        event.operation === 'fetch_emu_info_by_route'
+    ) {
         const eventTrainCode = normalizeCode(event.context.trainCode ?? '');
         return (
             eventTrainCode.length > 0 &&
@@ -1061,20 +1068,28 @@ function buildTrainTraceSourceRow(
     trace: MutableTraceSummary,
     event: Admin12306TraceEvent,
     queryTrainCode: string
-): (Admin12306TrainTraceSourceRow & {
-    resultStatus: Admin12306TrainTraceResultStatus;
-    relatedEmuCodes: string[];
-}) | null {
+):
+    | (Admin12306TrainTraceSourceRow & {
+          resultStatus: Admin12306TrainTraceResultStatus;
+          relatedEmuCodes: string[];
+      })
+    | null {
     if (!eventMatchesTrainCode(trace, event, queryTrainCode)) {
         return null;
     }
 
-    if (event.kind === 'request' && event.operation === 'fetch_emu_info_by_route') {
+    if (
+        event.kind === 'request' &&
+        event.operation === 'fetch_emu_info_by_route'
+    ) {
         const queriedTrainCode = normalizeCode(event.context.trainCode ?? '');
         const emuCode = normalizeCode(event.context.emuCode ?? '');
         const detailParts: string[] = [];
 
-        if (queriedTrainCode.length > 0 && queriedTrainCode !== queryTrainCode) {
+        if (
+            queriedTrainCode.length > 0 &&
+            queriedTrainCode !== queryTrainCode
+        ) {
             appendDetailPart(detailParts, `实际命中 ${queriedTrainCode}`);
         }
         if (emuCode.length === 0) {
@@ -1099,7 +1114,10 @@ function buildTrainTraceSourceRow(
     }
 
     if (event.kind === 'decision' || event.kind === 'conflict') {
-        if (event.operation === 'skip_historical_recent_same_assignment_not_running') {
+        if (
+            event.operation ===
+            'skip_historical_recent_same_assignment_not_running'
+        ) {
             const historicalTrainCodes = parseNormalizedCodes(
                 event.context.historicalRecentMatchedTrainCodes
             );
@@ -1139,10 +1157,7 @@ function buildTrainTraceSourceRow(
             const detailParts: string[] = [];
             const reason = formatHistoryValidationReason(event.context.reason);
 
-            appendDetailPart(
-                detailParts,
-                reason ? `复核方式 ${reason}` : ''
-            );
+            appendDetailPart(detailParts, reason ? `复核方式 ${reason}` : '');
             appendDetailPart(
                 detailParts,
                 normalizeCode(event.context.runningTrainCode ?? '')
@@ -1395,7 +1410,9 @@ function buildTrainTraceSourceRow(
             relatedEmuCodes:
                 emuCodeList.length > 0
                     ? emuCodeList
-                    : (mainEmuCode ? [mainEmuCode] : [])
+                    : mainEmuCode
+                      ? [mainEmuCode]
+                      : []
         };
     }
 
@@ -1515,7 +1532,9 @@ function buildTrainTraceDayItem(
 ): Admin12306TrainTraceDayItem | null {
     const sourceRows = traces
         .flatMap((trace) =>
-            trace.events.map((event) => buildTrainTraceSourceRow(trace, event, queryTrainCode))
+            trace.events.map((event) =>
+                buildTrainTraceSourceRow(trace, event, queryTrainCode)
+            )
         )
         .filter(
             (
@@ -1584,7 +1603,9 @@ function buildTrainTraceDayItem(
 }
 
 function parseContextText(value: unknown) {
-    return typeof value === 'string' ? value.trim() : String(value ?? '').trim();
+    return typeof value === 'string'
+        ? value.trim()
+        : String(value ?? '').trim();
 }
 
 function parseTraceRawArgs(trace: MutableTraceSummary | null) {
@@ -1726,7 +1747,10 @@ function buildCouplingTaskSummaryItem(
 function getCouplingTaskEntryTone(
     event: Admin12306TraceEvent
 ): Admin12306CouplingTaskEntryTone {
-    if (event.kind === 'decision' && getTraceOperation(event) === 'coupled_group_detected') {
+    if (
+        event.kind === 'decision' &&
+        getTraceOperation(event) === 'coupled_group_detected'
+    ) {
         return 'success';
     }
 
@@ -1805,10 +1829,7 @@ function buildCouplingTaskResultEntry(
             detailParts,
             trainCodes.length > 0 ? `关联车次 ${trainCodes.join(' / ')}` : ''
         );
-        appendDetailPart(
-            detailParts,
-            groupKeys ? `编组键 ${groupKeys}` : ''
-        );
+        appendDetailPart(detailParts, groupKeys ? `编组键 ${groupKeys}` : '');
 
         return {
             id: event.id,
@@ -1867,7 +1888,9 @@ function buildCouplingTaskResultEntry(
         const candidateEmuCode = normalizeCode(
             event.context.candidateEmuCode ?? ''
         );
-        const scannedEmuCode = normalizeCode(event.context.scannedEmuCode ?? '');
+        const scannedEmuCode = normalizeCode(
+            event.context.scannedEmuCode ?? ''
+        );
         const scannedTrainCode = normalizeCode(
             event.context.scannedTrainCode ?? ''
         );
@@ -1906,7 +1929,9 @@ function buildCouplingTaskResultEntry(
         const originalEmuCodes = parseNormalizedCodes(
             event.context.originalEmuCodes
         );
-        const removedEmuCodes = parseNormalizedCodes(event.context.removedEmuCodes);
+        const removedEmuCodes = parseNormalizedCodes(
+            event.context.removedEmuCodes
+        );
         const remainingEmuCodes = parseNormalizedCodes(
             event.context.remainingEmuCodes
         );
@@ -2168,7 +2193,9 @@ function resolveTraceSummary(
         trace.allTrainCodes = normalizeTrainCodes([
             ...trace.allTrainCodes,
             ...allTrainCodes,
-            ...(trace.primaryTrainCode.length > 0 ? [trace.primaryTrainCode] : []),
+            ...(trace.primaryTrainCode.length > 0
+                ? [trace.primaryTrainCode]
+                : []),
             ...(primaryTrainCode.length > 0 ? [primaryTrainCode] : [])
         ]);
     } else if (primaryTrainCode.length > 0) {
@@ -2189,7 +2216,10 @@ function resolveTraceSummary(
     if (executor.length > 0) {
         trace.executor = executor;
     }
-    if (typeof sample.traceTitle === 'string' && sample.traceTitle.trim().length > 0) {
+    if (
+        typeof sample.traceTitle === 'string' &&
+        sample.traceTitle.trim().length > 0
+    ) {
         trace.title = sample.traceTitle.trim();
     }
     if (
@@ -2269,7 +2299,10 @@ function isProbeTrainDepartureNotRunning(trace: MutableTraceSummary) {
             continue;
         }
 
-        if (event.errorMessage === 'missing content.data or content.data.carCode') {
+        if (
+            event.errorMessage ===
+            'missing content.data or content.data.carCode'
+        ) {
             missingCarCodeTrainCodes.add(trainCode);
         }
     }
@@ -2330,7 +2363,9 @@ function toTraceListItem(trace: MutableTraceSummary): Admin12306TraceListItem {
     };
 }
 
-function toTraceDetailItem(trace: MutableTraceSummary): Admin12306TraceDetailItem {
+function toTraceDetailItem(
+    trace: MutableTraceSummary
+): Admin12306TraceDetailItem {
     return {
         ...toTraceListItem(trace),
         events: [...trace.events].sort(compareTraceEventsAscending)
@@ -2394,7 +2429,11 @@ export function record12306RequestMetric(
     }
 
     const dayState = getOrCreateDayState(store, date);
-    appendRequestMetricBucket(dayState, timestamp, normalizeOperation(sample.operation));
+    appendRequestMetricBucket(
+        dayState,
+        timestamp,
+        normalizeOperation(sample.operation)
+    );
     store.dirty = true;
 }
 
@@ -2462,7 +2501,8 @@ export function append12306TraceEvent(
                 ...baseEvent,
                 kind: 'function',
                 functionName:
-                    normalizeOptionalText(sample.functionName) || normalizedOperation,
+                    normalizeOptionalText(sample.functionName) ||
+                    normalizedOperation,
                 status: sample.functionStatus ?? 'success'
             };
             trace.functionCount += 1;
@@ -2473,7 +2513,8 @@ export function append12306TraceEvent(
                 kind: 'request',
                 operation: normalizedOperation,
                 requestType: sample.requestType ?? 'query',
-                method: normalizeOptionalText(sample.method).toUpperCase() || 'GET',
+                method:
+                    normalizeOptionalText(sample.method).toUpperCase() || 'GET',
                 url: normalizeOptionalText(sample.url),
                 responseStatus: normalizeOptionalInteger(sample.responseStatus),
                 businessStatus: normalizeOptionalText(
@@ -2655,7 +2696,8 @@ export function get12306TraceDetail(
 
     const store = getRequestMetricsStore();
     pruneRequestMetricDays(store);
-    const trace = store.days.get(options.date)?.traces.get(options.traceId) ?? null;
+    const trace =
+        store.days.get(options.date)?.traces.get(options.traceId) ?? null;
 
     return {
         date: options.date,

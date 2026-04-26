@@ -34,10 +34,13 @@
                     :key="`api-key-skeleton:${index}`"
                     class="dashboard-skeleton-surface animate-pulse rounded-[1.15rem] border px-5 py-4">
                     <div class="dashboard-skeleton-block h-4 w-24 rounded" />
-                    <div class="dashboard-skeleton-block-muted mt-3 h-4 w-56 rounded" />
+                    <div
+                        class="dashboard-skeleton-block-muted mt-3 h-4 w-56 rounded" />
                     <div class="mt-4 grid gap-2 sm:grid-cols-2">
-                        <div class="dashboard-skeleton-block-muted h-3 w-28 rounded" />
-                        <div class="dashboard-skeleton-block-muted h-3 w-24 rounded" />
+                        <div
+                            class="dashboard-skeleton-block-muted h-3 w-28 rounded" />
+                        <div
+                            class="dashboard-skeleton-block-muted h-3 w-24 rounded" />
                     </div>
                 </div>
             </div>

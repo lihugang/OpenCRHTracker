@@ -312,7 +312,8 @@ export default async function fetchRouteInfo(
                         responseStatus: response.status,
                         businessStatus: json.status,
                         errorCode: 'invalid_response',
-                        errorMessage: 'missing train detail stopTime or trainNo',
+                        errorMessage:
+                            'missing train detail stopTime or trainNo',
                         durationMs: Date.now() - requestStartedAtMs,
                         level: 'WARN',
                         message: '响应缺少 trainNo 或 stopTime',
@@ -393,7 +394,9 @@ export default async function fetchRouteInfo(
                         primaryTrainCode: route,
                         allTrainCodes: uniqueNormalizedCodes([
                             route,
-                            ...json.data.trainDetail.stationTrainCodeAll.split('/')
+                            ...json.data.trainDetail.stationTrainCodeAll.split(
+                                '/'
+                            )
                         ]),
                         trainInternalCode: json.data.trainNo,
                         startAt
@@ -423,7 +426,9 @@ export default async function fetchRouteInfo(
                         code: route,
                         allCodes: uniqueNormalizedCodes([
                             route,
-                            ...json.data.trainDetail.stationTrainCodeAll.split('/')
+                            ...json.data.trainDetail.stationTrainCodeAll.split(
+                                '/'
+                            )
                         ]),
                         internalCode: json.data.trainNo,
                         bureauCode: routeMetadata.bureauCode,
@@ -452,7 +457,10 @@ export default async function fetchRouteInfo(
                     message: '请求抛出异常',
                     context: {
                         trainCode: route,
-                        error: error instanceof Error ? error.message : String(error)
+                        error:
+                            error instanceof Error
+                                ? error.message
+                                : String(error)
                     },
                     errorMessage:
                         error instanceof Error ? error.message : String(error)
@@ -504,7 +512,10 @@ function normalizeOptionalField(value: string | undefined): string {
 
 function resolveRouteMetadata(
     rawStops: RouteInfoResponse['data']['trainDetail']['stopTime']
-): Pick<RouteInfoData, 'bureauCode' | 'trainDepartment' | 'passengerDepartment'> {
+): Pick<
+    RouteInfoData,
+    'bureauCode' | 'trainDepartment' | 'passengerDepartment'
+> {
     const metadata: Pick<
         RouteInfoData,
         'bureauCode' | 'trainDepartment' | 'passengerDepartment'

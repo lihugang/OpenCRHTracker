@@ -101,20 +101,18 @@ export default async function fetchEMUInfoBySeatCode(code: string) {
 
     const url =
         'https://mobile.12306.cn/wxxcx/wechat/main/travelServiceDecodeQrcode';
-    return with12306TraceFunction<
-        {
-            route: {
-                code: string;
-                internalCode: string;
-                startAt: number;
-                endAt: number;
-                trainRepeat: string;
-            };
-            emu: {
-                code: string;
-            };
-        } | null
-    >(
+    return with12306TraceFunction<{
+        route: {
+            code: string;
+            internalCode: string;
+            startAt: number;
+            endAt: number;
+            trainRepeat: string;
+        };
+        emu: {
+            code: string;
+        };
+    } | null>(
         {
             title: '按座位码获取编组信息',
             functionName: 'fetchEMUInfoBySeatCode',
@@ -200,7 +198,8 @@ export default async function fetchEMUInfoBySeatCode(code: string) {
                         context: {
                             seatCode: normalizedCode
                         },
-                        errorMessage: 'missing data, data.carCode, or data.trainNo'
+                        errorMessage:
+                            'missing data, data.carCode, or data.trainNo'
                     });
                     log12306RequestFailure({
                         logger,
@@ -332,7 +331,10 @@ export default async function fetchEMUInfoBySeatCode(code: string) {
                     message: '请求抛出异常',
                     context: {
                         seatCode: normalizedCode,
-                        error: error instanceof Error ? error.message : String(error)
+                        error:
+                            error instanceof Error
+                                ? error.message
+                                : String(error)
                     },
                     errorMessage:
                         error instanceof Error ? error.message : String(error)

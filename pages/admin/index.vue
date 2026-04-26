@@ -213,7 +213,8 @@
                                 </p>
                                 <p
                                     class="mt-2 text-sm leading-6 text-slate-600">
-                                    查看每个车次信息获取的全过程，包括主要函数调用、12306 子请求和冲突事件。
+                                    查看每个车次信息获取的全过程，包括主要函数调用、12306
+                                    子请求和冲突事件。
                                 </p>
                             </button>
 
@@ -256,8 +257,9 @@
                                 </p>
                                 <p
                                     class="mt-2 text-sm leading-6 text-slate-600">
-                                    查看近 4 小时和 24 小时的 CPU、内存、系统负载与
-                                    SSR / API 处理时长走势。
+                                    查看近 4 小时和 24 小时的
+                                    CPU、内存、系统负载与 SSR / API
+                                    处理时长走势。
                                 </p>
                             </button>
                         </div>

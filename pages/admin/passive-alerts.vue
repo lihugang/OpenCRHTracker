@@ -73,8 +73,7 @@
                         </p>
                         <p class="mt-2 text-3xl font-semibold text-slate-900">
                             {{
-                                requestMetricsEnabled &&
-                                requestMetricsRetained
+                                requestMetricsEnabled && requestMetricsRetained
                                     ? requestTotalCount
                                     : '--'
                             }}
@@ -117,7 +116,8 @@
                         <div
                             v-if="!requestMetricsEnabled"
                             class="rounded-[1rem] border border-slate-200 bg-slate-50/70 px-4 py-4 text-sm leading-6 text-slate-600">
-                            当前配置已关闭 12306 请求追踪，请求曲线与车次 trace 明细均不会记录。
+                            当前配置已关闭 12306 请求追踪，请求曲线与车次 trace
+                            明细均不会记录。
                         </div>
 
                         <div
@@ -419,8 +419,8 @@ const requestPeakSummary = computed(() =>
     !requestMetricsEnabled.value
         ? '已关闭'
         : requestMetricsRetained.value
-        ? `峰值 ${requestPeakCount.value} / 30 分钟`
-        : `仅保留近 ${requestMetricsRetentionDays.value} 天`
+          ? `峰值 ${requestPeakCount.value} / 30 分钟`
+          : `仅保留近 ${requestMetricsRetentionDays.value} 天`
 );
 const requestAxisLabels = computed(() =>
     requestBuckets.value

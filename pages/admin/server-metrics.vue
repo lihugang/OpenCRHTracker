@@ -32,13 +32,17 @@
                                     class="text-2xl font-semibold text-slate-900">
                                     相对时间窗口
                                 </h2>
-                                <p class="max-w-3xl text-sm leading-6 text-slate-700">
-                                    监控数据会持续写入 runtime 文件并在重启后尽量恢复。
-                                    SSR / API 延迟图显示 Avg、P50、P75、P95 四条曲线，
-                                    Top 5 路径会跟随当前窗口切换。
+                                <p
+                                    class="max-w-3xl text-sm leading-6 text-slate-700">
+                                    监控数据会持续写入 runtime
+                                    文件并在重启后尽量恢复。 SSR / API
+                                    延迟图显示 Avg、P50、P75、P95 四条曲线， Top
+                                    5 路径会跟随当前窗口切换。
                                 </p>
-                                <p class="max-w-3xl text-xs leading-5 text-sky-700">
-                                    慢路径会优先按动态路由模板聚合，例如 /train/:code 和
+                                <p
+                                    class="max-w-3xl text-xs leading-5 text-sky-700">
+                                    慢路径会优先按动态路由模板聚合，例如
+                                    /train/:code 和
                                     /api/v1/feedback/topics/:id。
                                 </p>
                             </div>
@@ -54,7 +58,8 @@
                                         class="mt-2 text-sm font-semibold text-slate-900">
                                         {{
                                             formatTimestamp(
-                                                serverMetricsData?.startedAt ?? 0
+                                                serverMetricsData?.startedAt ??
+                                                    0
                                             )
                                         }}
                                     </dd>
@@ -134,8 +139,7 @@
                                     </p>
                                     <p class="text-xs leading-5 text-slate-500">
                                         {{
-                                            serverMetricsData
-                                                ?.loadAverageSupported
+                                            serverMetricsData?.loadAverageSupported
                                                 ? 'Load 1m 为 1 分钟 load average。'
                                                 : '当前平台不支持 load average，Load 1m 将显示为 --。'
                                         }}
@@ -200,7 +204,11 @@
                                     </p>
                                     <p
                                         class="mt-2 text-2xl font-semibold text-slate-900">
-                                        {{ activeWindow.isPartial ? '部分' : '完整' }}
+                                        {{
+                                            activeWindow.isPartial
+                                                ? '部分'
+                                                : '完整'
+                                        }}
                                     </p>
                                 </div>
                             </div>
@@ -226,7 +234,8 @@
                                                 </h3>
                                             </div>
 
-                                            <div class="text-left md:text-right">
+                                            <div
+                                                class="text-left md:text-right">
                                                 <p
                                                     class="text-3xl font-semibold text-slate-900">
                                                     {{ card.valueLabel }}
@@ -246,28 +255,35 @@
                                                 preserveAspectRatio="none"
                                                 aria-hidden="true">
                                                 <line
-                                                    v-for="guide in card.chart.guides"
+                                                    v-for="guide in card.chart
+                                                        .guides"
                                                     :key="`${card.key}:guide:${guide}`"
                                                     x1="14"
-                                                    :x2="String(CHART_WIDTH - 14)"
+                                                    :x2="
+                                                        String(CHART_WIDTH - 14)
+                                                    "
                                                     :y1="String(guide)"
                                                     :y2="String(guide)"
                                                     class="metric-chart__guide" />
                                                 <path
-                                                    v-for="series in card.chart.series"
+                                                    v-for="series in card.chart
+                                                        .series"
                                                     :key="`${card.key}:${series.label}`"
                                                     :d="series.path"
                                                     :stroke="series.stroke"
                                                     class="metric-chart__line" />
                                                 <rect
-                                                    v-for="band in card.chart.hoverBands"
+                                                    v-for="band in card.chart
+                                                        .hoverBands"
                                                     :key="`${card.key}:${band.key}`"
                                                     :x="band.x"
                                                     y="0"
                                                     :width="band.width"
                                                     :height="CHART_HEIGHT"
                                                     class="metric-chart__hover">
-                                                    <title>{{ band.title }}</title>
+                                                    <title>
+                                                        {{ band.title }}
+                                                    </title>
                                                 </rect>
                                             </svg>
 
@@ -281,7 +297,8 @@
                                             </div>
                                         </div>
 
-                                        <p class="text-xs leading-5 text-slate-500">
+                                        <p
+                                            class="text-xs leading-5 text-slate-500">
                                             峰值桶：{{ card.peakLabel }}
                                         </p>
                                     </div>
@@ -309,7 +326,8 @@
                                                 </h3>
                                             </div>
 
-                                            <div class="text-left md:text-right">
+                                            <div
+                                                class="text-left md:text-right">
                                                 <p
                                                     class="text-3xl font-semibold text-slate-900">
                                                     {{
@@ -359,8 +377,11 @@
                                                             backgroundColor:
                                                                 series.stroke
                                                         }" />
-                                                    <span>{{ series.label }}</span>
-                                                    <span class="text-slate-400">
+                                                    <span>{{
+                                                        series.label
+                                                    }}</span>
+                                                    <span
+                                                        class="text-slate-400">
                                                         {{
                                                             formatDurationMs(
                                                                 series.latestValue
@@ -376,28 +397,35 @@
                                                 preserveAspectRatio="none"
                                                 aria-hidden="true">
                                                 <line
-                                                    v-for="guide in card.chart.guides"
+                                                    v-for="guide in card.chart
+                                                        .guides"
                                                     :key="`${card.key}:guide:${guide}`"
                                                     x1="14"
-                                                    :x2="String(CHART_WIDTH - 14)"
+                                                    :x2="
+                                                        String(CHART_WIDTH - 14)
+                                                    "
                                                     :y1="String(guide)"
                                                     :y2="String(guide)"
                                                     class="metric-chart__guide" />
                                                 <path
-                                                    v-for="series in card.chart.series"
+                                                    v-for="series in card.chart
+                                                        .series"
                                                     :key="`${card.key}:${series.label}`"
                                                     :d="series.path"
                                                     :stroke="series.stroke"
                                                     class="metric-chart__line" />
                                                 <rect
-                                                    v-for="band in card.chart.hoverBands"
+                                                    v-for="band in card.chart
+                                                        .hoverBands"
                                                     :key="`${card.key}:${band.key}`"
                                                     :x="band.x"
                                                     y="0"
                                                     :width="band.width"
                                                     :height="CHART_HEIGHT"
                                                     class="metric-chart__hover">
-                                                    <title>{{ band.title }}</title>
+                                                    <title>
+                                                        {{ band.title }}
+                                                    </title>
                                                 </rect>
                                             </svg>
 
@@ -426,8 +454,7 @@
 
                                             <div
                                                 class="overflow-hidden rounded-[1rem] border border-slate-200 bg-white/90">
-                                                <div
-                                                    class="overflow-x-auto">
+                                                <div class="overflow-x-auto">
                                                     <table
                                                         class="min-w-full text-sm">
                                                         <thead
@@ -516,7 +543,8 @@
                                                             </tr>
                                                             <tr
                                                                 v-if="
-                                                                    card.topRoutes
+                                                                    card
+                                                                        .topRoutes
                                                                         .length ===
                                                                     0
                                                                 ">
@@ -690,7 +718,10 @@ const {
 
 const serverMetricsErrorMessage = computed(() =>
     serverMetricsError.value
-        ? getApiErrorMessage(serverMetricsError.value, '加载服务器监控数据失败。')
+        ? getApiErrorMessage(
+              serverMetricsError.value,
+              '加载服务器监控数据失败。'
+          )
         : ''
 );
 
@@ -1041,7 +1072,10 @@ useSiteSeo({
     noindex: true
 });
 
-function getMetricValue(bucket: AdminServerMetricsBucket, key: MetricSeriesKey) {
+function getMetricValue(
+    bucket: AdminServerMetricsBucket,
+    key: MetricSeriesKey
+) {
     return bucket[key];
 }
 
@@ -1154,7 +1188,9 @@ function buildChartModel(
             label: seriesDefinition.label,
             stroke: seriesDefinition.stroke,
             path: buildChartPath(
-                buckets.map((bucket) => getMetricValue(bucket, seriesDefinition.seriesKey)),
+                buckets.map((bucket) =>
+                    getMetricValue(bucket, seriesDefinition.seriesKey)
+                ),
                 maxValue
             )
         }))

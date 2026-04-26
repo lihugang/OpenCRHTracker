@@ -31,11 +31,9 @@
 
                             <div class="flex flex-wrap gap-2">
                                 <span
-                                    v-for="
-                                        label in getDocsVisibleAuthModeLabels(
-                                            endpoint.authModes
-                                        )
-                                    "
+                                    v-for="label in getDocsVisibleAuthModeLabels(
+                                        endpoint.authModes
+                                    )"
                                     :key="endpoint.slug + ':mode:' + label"
                                     class="inline-flex rounded-full border border-white/70 bg-white/80 px-3 py-1 text-xs font-medium text-slate-700">
                                     {{ label }}

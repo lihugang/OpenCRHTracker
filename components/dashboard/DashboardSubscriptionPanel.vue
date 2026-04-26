@@ -41,8 +41,7 @@
 
             <div class="motion-divider" />
 
-            <section
-                class="dashboard-soft-surface rounded-[1.2rem] border p-5">
+            <section class="dashboard-soft-surface rounded-[1.2rem] border p-5">
                 <div class="space-y-3">
                     <div class="flex flex-wrap items-center gap-2">
                         <span
@@ -225,8 +224,7 @@
         <div
             v-if="renameTarget"
             class="space-y-4">
-            <div
-                class="dashboard-soft-surface rounded-[1rem] border px-4 py-4">
+            <div class="dashboard-soft-surface rounded-[1rem] border px-4 py-4">
                 <p
                     class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
                     当前设备

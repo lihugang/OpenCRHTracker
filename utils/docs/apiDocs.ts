@@ -296,7 +296,9 @@ function formatCostValue(value: number) {
     return Number.isInteger(value) ? String(value) : value.toFixed(2);
 }
 
-function formatCostRounding(rounding: DocsApiRuntimeConfig['cost']['perRecord'][keyof DocsApiRuntimeConfig['cost']['perRecord']]['rounding']) {
+function formatCostRounding(
+    rounding: DocsApiRuntimeConfig['cost']['perRecord'][keyof DocsApiRuntimeConfig['cost']['perRecord']]['rounding']
+) {
     if (rounding === 'ceil') {
         return '向上取整';
     }

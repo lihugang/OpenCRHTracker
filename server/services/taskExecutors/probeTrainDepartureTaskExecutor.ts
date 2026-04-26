@@ -930,8 +930,9 @@ async function tryResolveOverlappingRoutes(
                 droppedGroups: formatTrainCodeGroups(notRunningGroups),
                 notRunningTrainCodes:
                     uniqueNormalizedCodes(notRunningTrainCodes).join(','),
-                requestFailedTrainCodes:
-                    uniqueNormalizedCodes(requestFailedTrainCodes).join(','),
+                requestFailedTrainCodes: uniqueNormalizedCodes(
+                    requestFailedTrainCodes
+                ).join(','),
                 affectedEmuCodes:
                     clearedNotRunningState.affectedEmuCodes.join(','),
                 deletedDailyRouteRows:
@@ -1004,8 +1005,9 @@ async function tryResolveOverlappingRoutes(
             ),
             notRunningTrainCodes:
                 uniqueNormalizedCodes(notRunningTrainCodes).join(','),
-            requestFailedTrainCodes:
-                uniqueNormalizedCodes(requestFailedTrainCodes).join(','),
+            requestFailedTrainCodes: uniqueNormalizedCodes(
+                requestFailedTrainCodes
+            ).join(','),
             requeuedGroups: formatTrainCodeGroups(
                 Array.from(impactedGroups.values())
             ),
@@ -1325,8 +1327,7 @@ async function executeProbeTrainDepartureTaskInternal(
                             todayTrainCodesValidation.runningTrainCode,
                         reason: seatCodeVerification.reason,
                         seatTrainCode: seatCodeVerification.seatTrainCode,
-                        seatInternalCode:
-                            seatCodeVerification.seatInternalCode,
+                        seatInternalCode: seatCodeVerification.seatInternalCode,
                         seatStartAt: seatCodeVerification.seatStartAt,
                         historicalRecentMatchedTrainCodes:
                             historicalRecentMatchingTrainCodes.join(',')
@@ -1378,8 +1379,7 @@ async function executeProbeTrainDepartureTaskInternal(
                         delaySeconds: overlapRetryDelaySeconds,
                         reason: seatCodeVerification.reason,
                         seatTrainCode: seatCodeVerification.seatTrainCode,
-                        seatInternalCode:
-                            seatCodeVerification.seatInternalCode,
+                        seatInternalCode: seatCodeVerification.seatInternalCode,
                         seatStartAt: seatCodeVerification.seatStartAt,
                         historicalRecentMatchedTrainCodes:
                             historicalRecentMatchingTrainCodes.join(',')
@@ -1402,8 +1402,7 @@ async function executeProbeTrainDepartureTaskInternal(
                         retry: args.retry,
                         reason: seatCodeVerification.reason,
                         seatTrainCode: seatCodeVerification.seatTrainCode,
-                        seatInternalCode:
-                            seatCodeVerification.seatInternalCode,
+                        seatInternalCode: seatCodeVerification.seatInternalCode,
                         seatStartAt: seatCodeVerification.seatStartAt,
                         historicalRecentMatchedTrainCodes:
                             historicalRecentMatchingTrainCodes.join(',')
@@ -1419,7 +1418,8 @@ async function executeProbeTrainDepartureTaskInternal(
         if (todayTrainCodesValidation.state === 'request_failed') {
             record12306TraceDecision({
                 title: '历史近似命中，但当前运行校验请求失败，继续流程',
-                operation: 'continue_historical_recent_same_assignment_request_failed',
+                operation:
+                    'continue_historical_recent_same_assignment_request_failed',
                 context: {
                     trainCode: args.trainCode,
                     probedTrainCode,
@@ -1612,10 +1612,7 @@ async function executeProbeTrainDepartureTask(rawArgs: unknown): Promise<void> {
             subject: {
                 traceTitle: '执行任务',
                 primaryTrainCode: parsedArgs.trainCode,
-                allTrainCodes: [
-                    parsedArgs.trainCode,
-                    ...parsedArgs.allCodes
-                ],
+                allTrainCodes: [parsedArgs.trainCode, ...parsedArgs.allCodes],
                 trainInternalCode: parsedArgs.trainInternalCode,
                 startAt: parsedArgs.startAt,
                 traceSubtitle: 'probe_train_departure'

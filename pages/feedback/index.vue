@@ -663,7 +663,8 @@
                     <div
                         v-if="isUnofficialInstanceFeedbackBlocked"
                         class="rounded-[1rem] border border-rose-200 bg-rose-50/80 px-4 py-4 text-sm leading-6 text-rose-900">
-                        当前站点不是 Open CRH Tracker 官方站点，反馈功能已被禁用。请前往
+                        当前站点不是 Open CRH Tracker
+                        官方站点，反馈功能已被禁用。请前往
                         <a
                             :href="officialFeedbackUrl"
                             class="font-semibold underline decoration-current underline-offset-4 transition hover:text-rose-700"
@@ -1531,23 +1532,20 @@ async function loadTopics(reset = true) {
     }
 }
 
-watch(
-    [isAuthenticated, canManageFeedback, () => route.query.view],
-    () => {
-        const requestedView =
-            typeof route.query.view === 'string' ? route.query.view : '';
-        const nextView = resolveRequestedView();
+watch([isAuthenticated, canManageFeedback, () => route.query.view], () => {
+    const requestedView =
+        typeof route.query.view === 'string' ? route.query.view : '';
+    const nextView = resolveRequestedView();
 
-        if (
-            (currentView.value === 'mine' && !isAuthenticated.value) ||
-            (currentView.value === 'all' && !canManageFeedback.value) ||
-            ((requestedView === 'mine' || requestedView === 'all') &&
-                currentView.value !== nextView)
-        ) {
-            currentView.value = nextView;
-        }
+    if (
+        (currentView.value === 'mine' && !isAuthenticated.value) ||
+        (currentView.value === 'all' && !canManageFeedback.value) ||
+        ((requestedView === 'mine' || requestedView === 'all') &&
+            currentView.value !== nextView)
+    ) {
+        currentView.value = nextView;
     }
-);
+});
 
 watch(filterPrimaryType, (nextValue) => {
     if (!nextValue) {

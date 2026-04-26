@@ -132,7 +132,10 @@
                                 <div
                                     v-else-if="suggestionsState === 'error'"
                                     class="px-4 py-3 text-sm text-status-delayed">
-                                    {{ suggestionsErrorMessage || suggestionLoadErrorFallback }}
+                                    {{
+                                        suggestionsErrorMessage ||
+                                        suggestionLoadErrorFallback
+                                    }}
                                 </div>
 
                                 <div
@@ -553,9 +556,7 @@ const isTeleportMenuActive = computed(
 const shouldUseDetailStickyFallbackProfile = computed(
     () => props.overlayFallbackProfile === 'detail-sticky'
 );
-const inlineMenuStyle = computed<LookupMenuStyle>(() =>
-    buildLookupMenuStyle()
-);
+const inlineMenuStyle = computed<LookupMenuStyle>(() => buildLookupMenuStyle());
 const teleportMenuStyle = computed<LookupMenuStyle>(() =>
     buildLookupMenuStyle(menuStyle.value)
 );
@@ -783,7 +784,9 @@ function clamp(value: number, min: number, max: number) {
     return Math.min(Math.max(value, min), max);
 }
 
-function buildLookupMenuStyle(baseStyle?: CSSProperties | null): LookupMenuStyle {
+function buildLookupMenuStyle(
+    baseStyle?: CSSProperties | null
+): LookupMenuStyle {
     return {
         ...(baseStyle ?? {}),
         ...(codeColumnWidthPx.value === null
@@ -806,7 +809,10 @@ function getActiveMenuElement() {
     return inlineMenuRef.value;
 }
 
-function restoreCodeColumnWidthStyle(menuElement: HTMLElement, widthValue: string) {
+function restoreCodeColumnWidthStyle(
+    menuElement: HTMLElement,
+    widthValue: string
+) {
     if (widthValue.length > 0) {
         menuElement.style.setProperty('--lookup-code-column-width', widthValue);
         return;
@@ -816,7 +822,11 @@ function restoreCodeColumnWidthStyle(menuElement: HTMLElement, widthValue: strin
 }
 
 function measureCodeColumnWidth() {
-    if (!import.meta.client || !shouldShowMenu.value || menuEntries.value.length === 0) {
+    if (
+        !import.meta.client ||
+        !shouldShowMenu.value ||
+        menuEntries.value.length === 0
+    ) {
         codeColumnWidthPx.value = null;
         return;
     }
@@ -898,8 +908,7 @@ async function handleWindowResize() {
 function buildInlineMenuSamplePoints(rect: DOMRect) {
     const viewportWidth =
         window.visualViewport?.width ?? document.documentElement.clientWidth;
-    const viewportHeight =
-        window.visualViewport?.height ?? window.innerHeight;
+    const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
     const minX = rect.left + MENU_SAMPLE_INSET_PX;
     const maxX = rect.right - MENU_SAMPLE_INSET_PX;
     const minY = rect.top + MENU_SAMPLE_INSET_PX;
@@ -919,14 +928,8 @@ function buildInlineMenuSamplePoints(rect: DOMRect) {
         MENU_SAMPLE_X_RATIOS.map((ratio) => {
             const rawX = rect.left + rect.width * ratio;
             const rawY = rect.top + offset;
-            const x =
-                minX <= maxX
-                    ? clamp(rawX, minX, maxX)
-                    : fallbackX;
-            const y =
-                minY <= maxY
-                    ? clamp(rawY, minY, maxY)
-                    : fallbackY;
+            const x = minX <= maxX ? clamp(rawX, minX, maxX) : fallbackX;
+            const y = minY <= maxY ? clamp(rawY, minY, maxY) : fallbackY;
 
             return {
                 x: clamp(
@@ -992,7 +995,11 @@ function waitForAnimationFrame() {
 }
 
 function syncMenuPosition() {
-    if (!import.meta.client || !shouldRenderTeleportMenu.value || !rootRef.value) {
+    if (
+        !import.meta.client ||
+        !shouldRenderTeleportMenu.value ||
+        !rootRef.value
+    ) {
         return;
     }
 
@@ -1003,8 +1010,7 @@ function syncMenuPosition() {
 
     const viewportWidth =
         window.visualViewport?.width ?? document.documentElement.clientWidth;
-    const viewportHeight =
-        window.visualViewport?.height ?? window.innerHeight;
+    const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
     const maxMenuWidth = Math.max(
         viewportWidth - MENU_FALLBACK_VIEWPORT_PADDING_PX * 2,
         0

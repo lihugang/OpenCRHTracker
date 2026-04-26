@@ -25,7 +25,10 @@ function readHeaderValue(
 
 export default function getClientIp(event: H3Event) {
     for (const headerName of useConfig().api.clientIpHeaders) {
-        const resolvedValue = readHeaderValue(event.node.req.headers, headerName);
+        const resolvedValue = readHeaderValue(
+            event.node.req.headers,
+            headerName
+        );
         if (!resolvedValue) {
             continue;
         }

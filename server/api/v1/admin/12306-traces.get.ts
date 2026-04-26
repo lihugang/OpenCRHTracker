@@ -1,7 +1,5 @@
 import { defineEventHandler, getQuery } from 'h3';
-import {
-    list12306TraceListItems
-} from '~/server/services/requestMetrics12306Store';
+import { list12306TraceListItems } from '~/server/services/requestMetrics12306Store';
 import parseLimit from '~/server/utils/api/query/parseLimit';
 import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';

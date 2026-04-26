@@ -22,12 +22,7 @@ export default defineEventHandler(async (event) => {
                 'invalid_param',
                 'date 不符合 YYYYMMDD'
             );
-            ensure(
-                traceId.length > 0,
-                400,
-                'invalid_param',
-                'traceId 为空'
-            );
+            ensure(traceId.length > 0, 400, 'invalid_param', 'traceId 为空');
 
             return get12306TraceDetail({
                 date,

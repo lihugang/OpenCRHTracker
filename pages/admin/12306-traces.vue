@@ -29,10 +29,12 @@
                                     class="text-xs font-semibold uppercase tracking-[0.22em] text-sky-700">
                                     Train Search
                                 </p>
-                                <h2 class="text-2xl font-semibold text-slate-900">
+                                <h2
+                                    class="text-2xl font-semibold text-slate-900">
                                     车次来源追踪
                                 </h2>
-                                <p class="max-w-3xl text-sm leading-6 text-slate-700">
+                                <p
+                                    class="max-w-3xl text-sm leading-6 text-slate-700">
                                     输入车次后，页面会从截止日期开始，向前搜索保留窗口内的
                                     12306 trace，并按天整理为来源表格。
                                 </p>
@@ -60,7 +62,10 @@
                                     <p
                                         class="mt-2 text-sm font-semibold text-slate-900">
                                         最近
-                                        {{ searchData?.requestMetricsRetentionDays ?? 0 }}
+                                        {{
+                                            searchData?.requestMetricsRetentionDays ??
+                                            0
+                                        }}
                                         天
                                     </p>
                                 </div>
@@ -100,7 +105,9 @@
                         <UiButton
                             type="button"
                             variant="secondary"
-                            :disabled="!activeTrainCodeFilter && !trainCodeInput"
+                            :disabled="
+                                !activeTrainCodeFilter && !trainCodeInput
+                            "
                             @click="clearSearch">
                             清空
                         </UiButton>
@@ -120,8 +127,7 @@
 
                     <div
                         v-else-if="
-                            searchData &&
-                            !searchData.requestMetricsEnabled
+                            searchData && !searchData.requestMetricsEnabled
                         "
                         class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-4 py-4 text-sm leading-6 text-slate-600">
                         当前配置已关闭 12306 trace 记录，无法展示车次来源表。
@@ -129,8 +135,7 @@
 
                     <div
                         v-else-if="
-                            searchData &&
-                            !searchData.requestMetricsRetained
+                            searchData && !searchData.requestMetricsRetained
                         "
                         class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-4 py-4 text-sm leading-6 text-slate-600">
                         当前截止日期超出 trace 保留窗口。当前仅保留最近
@@ -212,7 +217,11 @@
                                 <div class="flex flex-wrap items-center gap-2">
                                     <span
                                         class="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.1em]"
-                                        :class="getResultBadgeClass(day.resultStatus)">
+                                        :class="
+                                            getResultBadgeClass(
+                                                day.resultStatus
+                                            )
+                                        ">
                                         {{ day.resultLabel }}
                                     </span>
                                     <span
@@ -222,7 +231,8 @@
                                 </div>
                                 <p class="text-sm leading-6 text-slate-600">
                                     命中 {{ day.traceCount }} 条 trace
-                                    <template v-if="day.matchedTrainCodes.length > 0">
+                                    <template
+                                        v-if="day.matchedTrainCodes.length > 0">
                                         ，关联车次：
                                         {{ day.matchedTrainCodes.join(' / ') }}
                                     </template>
@@ -230,7 +240,9 @@
                                 <p
                                     v-if="day.relatedEmuCodes.length > 0"
                                     class="text-sm leading-6 text-slate-500">
-                                    关联编组：{{ day.relatedEmuCodes.join(' / ') }}
+                                    关联编组：{{
+                                        day.relatedEmuCodes.join(' / ')
+                                    }}
                                 </p>
                             </div>
 
@@ -273,7 +285,8 @@
                                             class="whitespace-nowrap px-4 py-3 text-sm font-medium text-slate-900">
                                             {{ formatRowTime(row.timestamp) }}
                                         </td>
-                                        <td class="px-4 py-3 text-sm text-slate-700">
+                                        <td
+                                            class="px-4 py-3 text-sm text-slate-700">
                                             <button
                                                 v-if="
                                                     row.clickable &&
@@ -282,7 +295,11 @@
                                                 "
                                                 type="button"
                                                 class="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] transition hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
-                                                :class="getSourceBadgeClass(row.kind)"
+                                                :class="
+                                                    getSourceBadgeClass(
+                                                        row.kind
+                                                    )
+                                                "
                                                 @click="
                                                     openCouplingTaskModal(row)
                                                 ">
@@ -291,16 +308,22 @@
                                             <span
                                                 v-else
                                                 class="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em]"
-                                                :class="getSourceBadgeClass(row.kind)">
+                                                :class="
+                                                    getSourceBadgeClass(
+                                                        row.kind
+                                                    )
+                                                ">
                                                 {{ row.source }}
                                             </span>
                                         </td>
-                                        <td class="px-4 py-3 text-sm text-slate-900">
+                                        <td
+                                            class="px-4 py-3 text-sm text-slate-900">
                                             <span class="font-semibold">
                                                 {{ row.result }}
                                             </span>
                                         </td>
-                                        <td class="px-4 py-3 text-sm text-slate-600">
+                                        <td
+                                            class="px-4 py-3 text-sm text-slate-600">
                                             {{ row.detail || '--' }}
                                         </td>
                                     </tr>
@@ -488,7 +511,9 @@ function closeCouplingTaskModal() {
     selectedCouplingTaskDate.value = '';
 }
 
-function openCouplingTaskModal(row: Admin12306TrainTraceDayItem['rows'][number]) {
+function openCouplingTaskModal(
+    row: Admin12306TrainTraceDayItem['rows'][number]
+) {
     if (
         row.actionType !== 'open_coupling_task' ||
         !row.couplingTaskId ||
@@ -520,7 +545,9 @@ function formatDayLabel(date: string) {
     const day = Number.parseInt(date.slice(6, 8), 10);
 
     return dayLabelFormatter.format(
-        new Date(`${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}T00:00:00+08:00`)
+        new Date(
+            `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}T00:00:00+08:00`
+        )
     );
 }
 

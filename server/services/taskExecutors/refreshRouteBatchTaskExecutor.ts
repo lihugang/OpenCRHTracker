@@ -116,9 +116,7 @@ function applyGroupUpdate(
     return applied;
 }
 
-function buildRefreshRouteGroupTraceKey(
-    item: ScheduleState['items'][number]
-) {
+function buildRefreshRouteGroupTraceKey(item: ScheduleState['items'][number]) {
     const trainIdentifier =
         normalizeCode(item.internalCode) || normalizeCode(item.code);
     const startAt = typeof item.startAt === 'number' ? item.startAt : 'unknown';

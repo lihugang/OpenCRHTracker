@@ -2306,7 +2306,8 @@ export const developerDocsOpenApi = {
                                             containsLoopBreak: false,
                                             nodes: [
                                                 {
-                                                    internalCode: '38000G208500',
+                                                    internalCode:
+                                                        '38000G208500',
                                                     allCodes: ['G2085'],
                                                     startStation: '青岛北',
                                                     endStation: '杭州西',
@@ -2318,7 +2319,8 @@ export const developerDocsOpenApi = {
                                                     outgoingSupportCount: 14
                                                 },
                                                 {
-                                                    internalCode: '390000G5120C',
+                                                    internalCode:
+                                                        '390000G5120C',
                                                     allCodes: ['G512'],
                                                     startStation: '汉口',
                                                     endStation: '北京西',
@@ -2330,7 +2332,8 @@ export const developerDocsOpenApi = {
                                                     outgoingSupportCount: 13
                                                 },
                                                 {
-                                                    internalCode: '240000G34910',
+                                                    internalCode:
+                                                        '240000G34910',
                                                     allCodes: ['G349'],
                                                     startStation: '北京西',
                                                     endStation: '郑州东',
@@ -2342,8 +2345,12 @@ export const developerDocsOpenApi = {
                                                     outgoingSupportCount: 13
                                                 },
                                                 {
-                                                    internalCode: '4E000G228800',
-                                                    allCodes: ['G2288', 'G2289'],
+                                                    internalCode:
+                                                        '4E000G228800',
+                                                    allCodes: [
+                                                        'G2288',
+                                                        'G2289'
+                                                    ],
                                                     startStation: '郑州东',
                                                     endStation: '青岛北',
                                                     startAt: 1776613200,
@@ -2354,8 +2361,12 @@ export const developerDocsOpenApi = {
                                                     outgoingSupportCount: 14
                                                 },
                                                 {
-                                                    internalCode: '40000G182401',
-                                                    allCodes: ['G1821', 'G1824'],
+                                                    internalCode:
+                                                        '40000G182401',
+                                                    allCodes: [
+                                                        'G1821',
+                                                        'G1824'
+                                                    ],
                                                     startStation: '青岛北',
                                                     endStation: '上海虹桥',
                                                     startAt: 1776498000,
@@ -2366,7 +2377,8 @@ export const developerDocsOpenApi = {
                                                     outgoingSupportCount: 13
                                                 },
                                                 {
-                                                    internalCode: '5L00000G8400',
+                                                    internalCode:
+                                                        '5L00000G8400',
                                                     allCodes: ['G84', 'G85'],
                                                     startStation: '上海虹桥',
                                                     endStation: '北京南',

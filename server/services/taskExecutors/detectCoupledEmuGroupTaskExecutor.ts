@@ -373,14 +373,21 @@ function collectTrackedGroupHintsByEmuCode(
     groupKeys: string[];
     startAts: number[];
 } {
-    const rows = listProbeStatusByEmuCodeInRange(emuCode, dayStart, nextDayStart);
+    const rows = listProbeStatusByEmuCodeInRange(
+        emuCode,
+        dayStart,
+        nextDayStart
+    );
     const trainCodes = new Set<string>();
     const groupKeys = new Set<string>();
     const startAts = new Set<number>();
 
     for (const row of rows) {
         startAts.add(row.start_at);
-        const trackedGroup = resolveTrackedGroupByTrainCode(row.train_code, cache);
+        const trackedGroup = resolveTrackedGroupByTrainCode(
+            row.train_code,
+            cache
+        );
         if (trackedGroup) {
             for (const trainCode of trackedGroup.trainCodes) {
                 trainCodes.add(trainCode);
@@ -694,10 +701,8 @@ async function persistResolvedTrackedGroup(
                     remainingEmuCodes: emuCodes.join('/'),
                     startAt: group.startAt,
                     groupKey,
-                    deletedProbeStatusRows:
-                        cleanupState.deletedProbeStatusRows,
-                    deletedDailyRouteRows:
-                        cleanupState.deletedDailyRouteRows,
+                    deletedProbeStatusRows: cleanupState.deletedProbeStatusRows,
+                    deletedDailyRouteRows: cleanupState.deletedDailyRouteRows,
                     clearedAssignedEmuCodes:
                         cleanupState.clearedAssignedEmuCodes
                 })

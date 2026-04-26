@@ -78,15 +78,22 @@
                                 <div
                                     class="min-w-0 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-sm font-semibold text-crh-blue">
                                     <template
-                                        v-for="(emuCode, emuCodeIndex) in item.emuCodes"
+                                        v-for="(
+                                            emuCode, emuCodeIndex
+                                        ) in item.emuCodes"
                                         :key="`${item.key}:${emuCode}`">
                                         <NuxtLink
-                                            :to="buildPredictionEmuLink(emuCode)"
+                                            :to="
+                                                buildPredictionEmuLink(emuCode)
+                                            "
                                             class="transition hover:underline">
                                             {{ emuCode }}
                                         </NuxtLink>
                                         <span
-                                            v-if="emuCodeIndex < item.emuCodes.length - 1"
+                                            v-if="
+                                                emuCodeIndex <
+                                                item.emuCodes.length - 1
+                                            "
                                             class="text-slate-400">
                                             重联
                                         </span>
@@ -96,11 +103,20 @@
                                 <div class="flex flex-wrap items-center gap-2">
                                     <span
                                         class="inline-flex items-center rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-500">
-                                        {{ formatFutureDayLabel(item.dayOffsetFromToday) }}
+                                        {{
+                                            formatFutureDayLabel(
+                                                item.dayOffsetFromToday
+                                            )
+                                        }}
                                     </span>
                                     <span
                                         class="inline-flex items-center rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-500">
-                                        {{ formatPredictionDateTag(item.predictedStartAt, item.predictedEndAt) }}
+                                        {{
+                                            formatPredictionDateTag(
+                                                item.predictedStartAt,
+                                                item.predictedEndAt
+                                            )
+                                        }}
                                     </span>
                                 </div>
                             </div>
@@ -116,12 +132,16 @@
                                         class="mt-1 text-sm font-medium text-crh-grey-dark">
                                         <LookupStationLink
                                             :station-name="item.startStation"
-                                            :focus-train-codes="predictionFocusTrainCodes"
+                                            :focus-train-codes="
+                                                predictionFocusTrainCodes
+                                            "
                                             fallback-text="--" />
                                         <span class="mx-1">-></span>
                                         <LookupStationLink
                                             :station-name="item.endStation"
-                                            :focus-train-codes="predictionFocusTrainCodes"
+                                            :focus-train-codes="
+                                                predictionFocusTrainCodes
+                                            "
                                             fallback-text="--" />
                                     </p>
                                 </div>
@@ -134,9 +154,17 @@
                                     </p>
                                     <p
                                         class="mt-1 font-mono text-sm text-slate-500">
-                                        {{ formatNullableTime(item.predictedStartAt) }}
+                                        {{
+                                            formatNullableTime(
+                                                item.predictedStartAt
+                                            )
+                                        }}
                                         <span class="mx-1">-></span>
-                                        {{ formatNullableTime(item.predictedEndAt) }}
+                                        {{
+                                            formatNullableTime(
+                                                item.predictedEndAt
+                                            )
+                                        }}
                                     </p>
                                 </div>
                             </div>
@@ -173,7 +201,9 @@
                                 <div
                                     class="min-w-0 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-sm font-semibold text-crh-blue">
                                     <template
-                                        v-for="(code, codeIndex) in node.allCodes"
+                                        v-for="(
+                                            code, codeIndex
+                                        ) in node.allCodes"
                                         :key="`${node.key}:${code}`">
                                         <NuxtLink
                                             :to="buildPredictionCodeLink(code)"
@@ -181,7 +211,10 @@
                                             {{ code }}
                                         </NuxtLink>
                                         <span
-                                            v-if="codeIndex < node.allCodes.length - 1"
+                                            v-if="
+                                                codeIndex <
+                                                node.allCodes.length - 1
+                                            "
                                             class="text-slate-400">
                                             /
                                         </span>
@@ -191,11 +224,20 @@
                                 <div class="flex flex-wrap items-center gap-2">
                                     <span
                                         class="inline-flex items-center rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-500">
-                                        {{ formatFutureDayLabel(node.dayOffsetFromToday) }}
+                                        {{
+                                            formatFutureDayLabel(
+                                                node.dayOffsetFromToday
+                                            )
+                                        }}
                                     </span>
                                     <span
                                         class="inline-flex items-center rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-500">
-                                        {{ formatPredictionDateTag(node.predictedStartAt, node.predictedEndAt) }}
+                                        {{
+                                            formatPredictionDateTag(
+                                                node.predictedStartAt,
+                                                node.predictedEndAt
+                                            )
+                                        }}
                                     </span>
                                 </div>
                             </div>
@@ -237,9 +279,17 @@
                                     </p>
                                     <p
                                         class="mt-1 font-mono text-sm text-slate-500">
-                                        {{ formatNullableTime(node.predictedStartAt) }}
+                                        {{
+                                            formatNullableTime(
+                                                node.predictedStartAt
+                                            )
+                                        }}
                                         <span class="mx-1">-></span>
-                                        {{ formatNullableTime(node.predictedEndAt) }}
+                                        {{
+                                            formatNullableTime(
+                                                node.predictedEndAt
+                                            )
+                                        }}
                                     </p>
                                 </div>
                             </div>
@@ -300,7 +350,9 @@ const modalTitle = computed(() => {
     const displayCodes =
         timetable.value?.allCodes ??
         (Array.isArray(props.displayCodes) ? props.displayCodes : []);
-    const titleSuffix = isTrainSource.value ? '未来担当车组预测' : '未来担当预测';
+    const titleSuffix = isTrainSource.value
+        ? '未来担当车组预测'
+        : '未来担当预测';
 
     if (displayCodes.length > 0) {
         return `${displayCodes.join(' / ')} ${titleSuffix}`;
@@ -312,9 +364,7 @@ const modalTitle = computed(() => {
 });
 
 const unresolvedTitle = computed(() => {
-    return props.sourceType === 'emu'
-        ? '无数据'
-        : '暂时无法找到当前周期锚点';
+    return props.sourceType === 'emu' ? '无数据' : '暂时无法找到当前周期锚点';
 });
 
 const unresolvedDescription = computed(() => {

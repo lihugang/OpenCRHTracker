@@ -73,11 +73,7 @@ export interface Admin12306RequestBucket {
     byOperation: Record<string, number>;
 }
 
-export type Admin12306TraceStatus =
-    | 'running'
-    | 'success'
-    | 'warning'
-    | 'error';
+export type Admin12306TraceStatus = 'running' | 'success' | 'warning' | 'error';
 
 export type Admin12306TraceEventKind =
     | 'function'
@@ -102,8 +98,7 @@ export interface Admin12306TraceEventBase {
     context: Record<string, string>;
 }
 
-export interface Admin12306TraceFunctionEvent
-    extends Admin12306TraceEventBase {
+export interface Admin12306TraceFunctionEvent extends Admin12306TraceEventBase {
     kind: 'function';
     functionName: string;
     status: 'success' | 'warning' | 'error';
@@ -121,20 +116,17 @@ export interface Admin12306TraceRequestEvent extends Admin12306TraceEventBase {
     errorMessage: string;
 }
 
-export interface Admin12306TraceConflictEvent
-    extends Admin12306TraceEventBase {
+export interface Admin12306TraceConflictEvent extends Admin12306TraceEventBase {
     kind: 'conflict';
     operation: string;
 }
 
-export interface Admin12306TraceDecisionEvent
-    extends Admin12306TraceEventBase {
+export interface Admin12306TraceDecisionEvent extends Admin12306TraceEventBase {
     kind: 'decision';
     operation: string;
 }
 
-export interface Admin12306TraceDatabaseEvent
-    extends Admin12306TraceEventBase {
+export interface Admin12306TraceDatabaseEvent extends Admin12306TraceEventBase {
     kind: 'database';
     operation: string;
     database: string;
