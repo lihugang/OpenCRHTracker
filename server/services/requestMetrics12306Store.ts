@@ -2342,18 +2342,11 @@ function shouldIncludeTrace(
         return true;
     }
 
-    if (trace.primaryTrainCode.includes(trainCodeFilter)) {
+    if (trace.primaryTrainCode === trainCodeFilter) {
         return true;
     }
-    if (trace.trainInternalCode.includes(trainCodeFilter)) {
-        return true;
-    }
-    if (trace.title.toUpperCase().includes(trainCodeFilter)) {
-        return true;
-    }
-    return trace.allTrainCodes.some((trainCode) =>
-        trainCode.includes(trainCodeFilter)
-    );
+
+    return trace.allTrainCodes.includes(trainCodeFilter);
 }
 
 function appendRequestMetricBucket(

@@ -80,6 +80,12 @@ interface MatchedEmuScanRecord {
 
 let registered = false;
 
+function buildGroupTraceKey(trackedGroup: TrackedTrainGroup) {
+    const group = trackedGroup.group;
+    const trainIdentifier = group.trainInternalCode || group.trainCode;
+    return `detect-coupled-group:${trainIdentifier}:${group.startAt}`;
+}
+
 function getCurrentDetectionTaskId(): number | null {
     const currentTask = getCurrentTaskExecutionContext();
     if (currentTask?.executor !== DETECT_COUPLED_EMU_GROUP_TASK_EXECUTOR) {
@@ -936,6 +942,7 @@ async function executeDetectCoupledEmuGroupTaskInternal(
     for (const [trainKey, trackedGroup] of matchedGroups.entries()) {
         await runWith12306TraceScope(
             {
+                traceKey: buildGroupTraceKey(trackedGroup),
                 primaryTrainCode: trackedGroup.group.trainCode,
                 allTrainCodes: trackedGroup.trainCodes,
                 trainInternalCode: trackedGroup.group.trainInternalCode,
@@ -962,6 +969,7 @@ async function executeDetectCoupledEmuGroupTaskInternal(
 
         await runWith12306TraceScope(
             {
+                traceKey: buildGroupTraceKey(trackedGroup),
                 primaryTrainCode: trackedGroup.group.trainCode,
                 allTrainCodes: trackedGroup.trainCodes,
                 trainInternalCode: trackedGroup.group.trainInternalCode,
