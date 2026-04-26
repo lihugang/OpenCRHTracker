@@ -84,6 +84,7 @@ export type Admin12306TraceEventKind =
     | 'request'
     | 'conflict'
     | 'decision'
+    | 'database'
     | 'summary';
 
 export type Admin12306TraceEventLevel = 'INFO' | 'WARN' | 'ERROR';
@@ -132,6 +133,15 @@ export interface Admin12306TraceDecisionEvent
     operation: string;
 }
 
+export interface Admin12306TraceDatabaseEvent
+    extends Admin12306TraceEventBase {
+    kind: 'database';
+    operation: string;
+    database: string;
+    table: string;
+    changes: number | null;
+}
+
 export interface Admin12306TraceSummaryEvent extends Admin12306TraceEventBase {
     kind: 'summary';
     status: Admin12306TraceStatus;
@@ -142,6 +152,7 @@ export type Admin12306TraceEvent =
     | Admin12306TraceRequestEvent
     | Admin12306TraceConflictEvent
     | Admin12306TraceDecisionEvent
+    | Admin12306TraceDatabaseEvent
     | Admin12306TraceSummaryEvent;
 
 export interface Admin12306TraceListItem {

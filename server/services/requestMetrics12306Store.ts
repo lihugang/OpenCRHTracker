@@ -173,6 +173,9 @@ export interface Append12306TraceEventSample {
     businessStatus?: unknown;
     errorCode?: unknown;
     errorMessage?: unknown;
+    database?: string;
+    table?: string;
+    changes?: number | null;
     functionName?: string;
     functionStatus?: 'success' | 'warning' | 'error';
     summaryStatus?: Admin12306TraceStatus;
@@ -2506,6 +2509,16 @@ export function append12306TraceEvent(
                 ...baseEvent,
                 kind: 'decision',
                 operation: normalizedOperation
+            };
+            break;
+        case 'database':
+            event = {
+                ...baseEvent,
+                kind: 'database',
+                operation: normalizedOperation,
+                database: normalizeOptionalText(sample.database),
+                table: normalizeOptionalText(sample.table),
+                changes: normalizeOptionalInteger(sample.changes)
             };
             break;
         case 'summary':

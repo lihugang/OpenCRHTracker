@@ -74,6 +74,21 @@
                 </div>
 
                 <div
+                    v-if="node.event.kind === 'database'"
+                    class="mt-3 rounded-[0.9rem] bg-white/70 px-3 py-3 text-sm leading-6 text-slate-600">
+                    <p>
+                        database={{ node.event.database }} |
+                        table={{ node.event.table }}
+                    </p>
+                    <p>
+                        operation={{ node.event.operation }}
+                        <template v-if="node.event.changes !== null">
+                            | changes={{ node.event.changes }}
+                        </template>
+                    </p>
+                </div>
+
+                <div
                     v-if="node.event.kind === 'summary'"
                     class="mt-3 text-sm leading-6 text-slate-600">
                     最终状态：{{ node.event.status }}
@@ -172,6 +187,9 @@ function getEventBadgeClass(
     }
     if (kind === 'summary') {
         return 'bg-emerald-100 text-emerald-800';
+    }
+    if (kind === 'database') {
+        return 'bg-sky-100 text-sky-800';
     }
     return 'bg-slate-200 text-slate-700';
 }

@@ -1,5 +1,6 @@
 import '~/server/libs/database/emu';
 import { createPreparedSqlStore } from '~/server/libs/database/prepared';
+import { record12306TraceDatabase } from '~/server/services/requestMetrics12306Trace';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
 import importSqlBatch from '~/server/utils/sql/importSqlBatch';
 
@@ -40,6 +41,8 @@ const emuRouteStatements = createPreparedSqlStore<EmuRouteSqlKey>({
     scope: 'emu/queries',
     sql: emuRouteSql
 });
+const EMU_TRACKED_DATABASE_NAME = 'EMUTracked';
+const DAILY_EMU_ROUTES_TABLE_NAME = 'daily_emu_routes';
 
 const DEFAULT_CURSOR_POINT: CursorPoint = {
     startAt: Number.MAX_SAFE_INTEGER,
@@ -54,15 +57,34 @@ export function insertDailyEmuRoute(
     startAt: number,
     endAt: number
 ): void {
-    emuRouteStatements.run(
+    const normalizedTrainCode = normalizeCode(trainCode);
+    const normalizedEmuCode = normalizeCode(emuCode);
+    const normalizedStartStationName = startStationName.trim();
+    const normalizedEndStationName = endStationName.trim();
+    const result = emuRouteStatements.run(
         'insertDailyEmuRoute',
-        normalizeCode(trainCode),
-        normalizeCode(emuCode),
-        startStationName.trim(),
-        endStationName.trim(),
+        normalizedTrainCode,
+        normalizedEmuCode,
+        normalizedStartStationName,
+        normalizedEndStationName,
         startAt,
         endAt
     );
+    record12306TraceDatabase({
+        title: 'Insert daily EMU route',
+        operation: 'insert_daily_emu_route',
+        database: EMU_TRACKED_DATABASE_NAME,
+        table: DAILY_EMU_ROUTES_TABLE_NAME,
+        changes: result.changes,
+        context: {
+            trainCode: normalizedTrainCode,
+            emuCode: normalizedEmuCode,
+            startStationName: normalizedStartStationName,
+            endStationName: normalizedEndStationName,
+            startAt,
+            endAt
+        }
+    });
 }
 
 export function listHistoryByTrainPaged(
@@ -172,6 +194,18 @@ export function deleteDailyRoutesByTrainCodeInRange(
         startAt,
         endAtExclusive
     );
+    record12306TraceDatabase({
+        title: 'Delete daily EMU routes by train range',
+        operation: 'delete_daily_routes_by_train_code_in_range',
+        database: EMU_TRACKED_DATABASE_NAME,
+        table: DAILY_EMU_ROUTES_TABLE_NAME,
+        changes: result.changes,
+        context: {
+            trainCode: normalizedTrainCode,
+            startAt,
+            endAtExclusive
+        }
+    });
     return result.changes;
 }
 
@@ -197,6 +231,18 @@ export function deleteDailyRouteByTrainCodeAndEmuCodeAtStartAt(
         normalizedEmuCode,
         startAt
     );
+    record12306TraceDatabase({
+        title: 'Delete daily EMU route by train and EMU',
+        operation: 'delete_daily_route_by_train_code_and_emu_code_at_start_at',
+        database: EMU_TRACKED_DATABASE_NAME,
+        table: DAILY_EMU_ROUTES_TABLE_NAME,
+        changes: result.changes,
+        context: {
+            trainCode: normalizedTrainCode,
+            emuCode: normalizedEmuCode,
+            startAt
+        }
+    });
     return result.changes;
 }
 
@@ -217,6 +263,16 @@ export function deleteDailyRouteById(id: number): number {
     }
 
     const result = emuRouteStatements.run('deleteDailyRouteById', id);
+    record12306TraceDatabase({
+        title: 'Delete daily EMU route by id',
+        operation: 'delete_daily_route_by_id',
+        database: EMU_TRACKED_DATABASE_NAME,
+        table: DAILY_EMU_ROUTES_TABLE_NAME,
+        changes: result.changes,
+        context: {
+            id
+        }
+    });
     return result.changes;
 }
 

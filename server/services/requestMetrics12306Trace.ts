@@ -70,6 +70,19 @@ interface TraceSimpleEventOptions {
     message?: string;
 }
 
+interface TraceDatabaseEventOptions {
+    title: string;
+    subject?: TraceSubjectContext;
+    context?: Record<string, unknown>;
+    durationMs?: number;
+    operation: string;
+    database: string;
+    table: string;
+    changes?: number | null;
+    level?: Admin12306TraceEventLevel;
+    message?: string;
+}
+
 interface TraceSummaryOptions {
     title: string;
     subject?: TraceSubjectContext;
@@ -337,6 +350,29 @@ export function record12306TraceDecision(options: TraceSimpleEventOptions) {
         context: options.context,
         durationMs: options.durationMs,
         operation: options.operation,
+        level: options.level ?? 'INFO',
+        ...toTraceSubjectSample(
+            mergeSubjectContext(options.subject),
+            getCurrentTaskExecutionContext()
+        )
+    });
+}
+
+export function record12306TraceDatabase(options: TraceDatabaseEventOptions) {
+    if (!hasCurrent12306TraceContext()) {
+        return;
+    }
+
+    appendEvent({
+        kind: 'database',
+        title: options.title,
+        message: options.message,
+        context: options.context,
+        durationMs: options.durationMs,
+        operation: options.operation,
+        database: options.database,
+        table: options.table,
+        changes: options.changes,
         level: options.level ?? 'INFO',
         ...toTraceSubjectSample(
             mergeSubjectContext(options.subject),
