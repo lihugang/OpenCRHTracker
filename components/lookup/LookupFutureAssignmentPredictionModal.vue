@@ -26,8 +26,8 @@
         <UiEmptyState
             v-else-if="state === 'empty'"
             eyebrow="No Data"
-            title="当前暂无可用于预测的交路时刻表"
-            description="请确认锚定车次存在当日时刻表，或车组最近有可用于定位交路的担当记录。" />
+            title="无数据"
+            description="" />
 
         <div
             v-else-if="timetable"
@@ -35,8 +35,8 @@
             <UiEmptyState
                 v-if="predictionState === 'no_circulation'"
                 eyebrow="No Route"
-                title="暂无可用交路推断"
-                description="当前锚定车次还没有稳定的交路推断结果，暂时无法生成未来担当预测。" />
+                title="无数据"
+                description="" />
 
             <UiEmptyState
                 v-else-if="predictionState === 'unresolved'"
@@ -364,13 +364,11 @@ const modalTitle = computed(() => {
 });
 
 const unresolvedTitle = computed(() => {
-    return props.sourceType === 'emu' ? '无数据' : '暂时无法找到当前周期锚点';
+    return '无数据';
 });
 
 const unresolvedDescription = computed(() => {
-    return props.sourceType === 'emu'
-        ? ''
-        : '未找到交路首节点在当前周期范围内的可用历史记录，暂时无法推算这趟车在当前窗口内的未来担当车组。';
+    return '';
 });
 
 const noFutureTitle = computed(() => {
