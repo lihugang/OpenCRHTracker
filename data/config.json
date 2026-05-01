@@ -86,7 +86,8 @@
             "EMUTracked": "data/emu.db",
             "users": "data/users.db",
             "feedback": "data/feedback.db",
-            "trainProvenance": "data/train-provenance.db"
+            "trainProvenance": "data/train-provenance.db",
+            "timetableHistory": "data/timetable-history.db"
         },
         "runtime": {
             "adminTraffic": {

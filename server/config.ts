@@ -164,7 +164,12 @@ export interface Config {
             schedule: AssetConfig;
         };
         databases: Record<
-            'task' | 'EMUTracked' | 'users' | 'feedback' | 'trainProvenance',
+            | 'task'
+            | 'EMUTracked'
+            | 'users'
+            | 'feedback'
+            | 'trainProvenance'
+            | 'timetableHistory',
             string
         >;
         runtime: {
@@ -975,6 +980,13 @@ function validateConfig(raw: unknown): Config {
                         : asString(
                               databases.trainProvenance,
                               'data.databases.trainProvenance'
+                          ),
+                timetableHistory:
+                    databases.timetableHistory === undefined
+                        ? 'data/timetable-history.db'
+                        : asString(
+                              databases.timetableHistory,
+                              'data.databases.timetableHistory'
                           )
             },
             runtime: {

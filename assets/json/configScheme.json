@@ -321,13 +321,18 @@
                         "trainProvenance": {
                             "type": "string",
                             "minLength": 1
+                        },
+                        "timetableHistory": {
+                            "type": "string",
+                            "minLength": 1
                         }
                     },
                     "required": [
                         "task",
                         "EMUTracked",
                         "users",
-                        "feedback"
+                        "feedback",
+                        "timetableHistory"
                     ]
                 },
                 "runtime": {

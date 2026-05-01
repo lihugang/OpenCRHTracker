@@ -1,6 +1,7 @@
 import getLogger from '~/server/libs/log4js';
 import useConfig from '~/server/config';
 import { registerTaskExecutor } from '~/server/services/taskExecutorRegistry';
+import { syncConfirmedTimetableHistoryForPublishedState } from '~/server/services/timetableHistoryStore';
 import {
     markCurrentTrainProvenanceTaskSkipped,
     recordCurrentTrainProvenanceEventsForTrainCodes
@@ -316,13 +317,23 @@ async function executeRefreshRouteBatchTaskInternal(rawArgs: unknown) {
             );
         } else {
             let appliedGroups = 0;
+            const appliedConfirmedTrainCodes: string[] = [];
             for (const update of groupUpdates) {
                 if (applyGroupUpdate(latestState, update)) {
                     appliedGroups += 1;
+                    appliedConfirmedTrainCodes.push(...update.codes);
                 }
             }
             if (appliedGroups > 0) {
                 savePublishedScheduleState(scheduleFilePath, latestState);
+                const syncResult = syncConfirmedTimetableHistoryForPublishedState(
+                    latestState,
+                    appliedConfirmedTrainCodes,
+                    getNowSeconds()
+                );
+                logger.info(
+                    `history_sync date=${latestState.date} confirmedGroups=${syncResult.confirmedGroups} confirmedTrainCodes=${syncResult.confirmedTrainCodes} skippedGroups=${syncResult.skippedGroups} createdContents=${syncResult.createdContents} insertedCoverages=${syncResult.insertedCoverages} updatedCoverages=${syncResult.updatedCoverages} deletedCoverages=${syncResult.deletedCoverages} noopedCoverages=${syncResult.noopedCoverages}`
+                );
             }
         }
     }
