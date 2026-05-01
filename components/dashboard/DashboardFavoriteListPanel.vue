@@ -57,7 +57,7 @@
                     <div class="flex items-start justify-between gap-4">
                         <NuxtLink
                             :to="buildLookupPath(item)"
-                            class="min-w-0 flex-1 space-y-1 transition hover:text-crh-blue">
+                            class="block min-w-0 flex-1 space-y-1 text-left transition hover:text-crh-blue">
                             <p class="text-base font-semibold text-slate-900">
                                 {{ item.code }}
                             </p>

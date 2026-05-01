@@ -57,7 +57,8 @@
                                     type="button"
                                     :class="getPanelButtonClass(panel.id)"
                                     @click="setPanel(panel.id)">
-                                    <span class="flex items-center gap-3">
+                                    <span
+                                        class="flex min-w-0 flex-1 items-center gap-3 text-left">
                                         <span
                                             aria-hidden="true"
                                             class="h-5 w-1 rounded-full transition"
@@ -1168,8 +1169,8 @@ function hasClientScope(grantedScopes: string[], requiredScope: string) {
 
 function getPanelButtonClass(panelId: DashboardPanelId) {
     return panelId === currentPanelId.value
-        ? 'dashboard-nav-active group w-full rounded-[0.95rem] border px-3.5 py-3 transition'
-        : 'group w-full rounded-[0.95rem] border border-transparent bg-transparent px-3.5 py-3 text-slate-600 transition hover:border-white/70 hover:bg-white/60 hover:text-slate-900 hover:backdrop-blur-sm hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]';
+        ? 'dashboard-nav-active group flex w-full items-center rounded-[0.95rem] border px-3.5 py-3 text-left transition'
+        : 'group flex w-full items-center rounded-[0.95rem] border border-transparent bg-transparent px-3.5 py-3 text-left text-slate-600 transition hover:border-white/70 hover:bg-white/60 hover:text-slate-900 hover:backdrop-blur-sm hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]';
 }
 
 function getPanelSheetOptionClass(panelId: DashboardPanelId) {
