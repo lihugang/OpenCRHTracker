@@ -1,9 +1,4 @@
 import getLogger from '~/server/libs/log4js';
-import {
-    record12306TraceSummary,
-    runWith12306TraceScope,
-    with12306TraceFunction
-} from '~/server/services/requestMetrics12306Trace';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
 import fetchRouteInfo from '../network/fetchRouteInfo';
 import queryTrainCodeThroughPrefix from '../network/queryTrainCodeThroughPrefix';
@@ -74,13 +69,6 @@ function restorePreservedRouteInfo(
     return true;
 }
 
-function buildScheduleEnrichGroupTraceKey(runId: string, item: ScheduleItem) {
-    const trainIdentifier =
-        normalizeCode(item.internalCode) || normalizeCode(item.code);
-    const startAt = typeof item.startAt === 'number' ? item.startAt : 'unknown';
-    return `schedule-enrich-group:${runId}:${trainIdentifier}:${startAt}`;
-}
-
 async function runScheduleProbeInternal(
     scheduleFilePath: string,
     state: ScheduleState,
@@ -118,25 +106,9 @@ async function runScheduleProbeInternal(
             const keyword = state.progress.discoverQueue.shift()!;
             queuedSet.delete(keyword);
 
-            const searchResult = await runWith12306TraceScope(
-                {
-                    traceKey: `schedule-probe:discover:${runId}:${keyword}`,
-                    traceTitle: `运行图关键词 ${keyword}`,
-                    traceSubtitle: 'schedule discover'
-                },
-                () =>
-                    queryWithRetry(
-                        () => queryTrainCodeThroughPrefix(keyword),
-                        config.retryAttempts,
-                        undefined,
-                        {
-                            title: '运行图 discover 查询',
-                            context: {
-                                keyword,
-                                runId
-                            }
-                        }
-                    )
+            const searchResult = await queryWithRetry(
+                () => queryTrainCodeThroughPrefix(keyword),
+                config.retryAttempts
             );
             state.progress.counters.apiCalls += searchResult.attempts;
             state.progress.counters.apiRetries += Math.max(
@@ -270,31 +242,10 @@ async function runScheduleProbeInternal(
                 continue;
             }
 
-            const routeResult = await runWith12306TraceScope(
-                {
-                    traceKey: buildScheduleEnrichGroupTraceKey(runId, item),
-                    primaryTrainCode: item.code,
-                    allTrainCodes: groupItems.map(
-                        (groupItem) => groupItem.code
-                    ),
-                    trainInternalCode: item.internalCode,
-                    startAt: item.startAt,
-                    traceSubtitle: 'schedule enrich'
-                },
-                () =>
-                    queryWithRetry(
-                        () => fetchRouteInfo(item.code),
-                        config.retryAttempts,
-                        (result) => result.status === 'request_failed',
-                        {
-                            title: '运行图 enrich 查询',
-                            context: {
-                                runId,
-                                trainCode: item.code,
-                                groupSize: groupItems.length
-                            }
-                        }
-                    )
+            const routeResult = await queryWithRetry(
+                () => fetchRouteInfo(item.code),
+                config.retryAttempts,
+                (result) => result.status === 'request_failed'
             );
             state.progress.counters.apiCalls += routeResult.attempts;
             state.progress.counters.apiRetries += Math.max(
@@ -389,51 +340,11 @@ export default async function runScheduleProbe(
     runId: string,
     preservedItemsByCode?: Map<string, ScheduleItem>
 ): Promise<void> {
-    return runWith12306TraceScope(
-        {
-            traceKey: `build-schedule:${runId}`,
-            traceTitle: `运行图探测 ${state.date}`,
-            traceSubtitle: 'runScheduleProbe'
-        },
-        async () =>
-            with12306TraceFunction<void>(
-                {
-                    title: '运行图探测',
-                    functionName: 'runScheduleProbe',
-                    context: {
-                        runId,
-                        date: state.date,
-                        file: scheduleFilePath,
-                        phase: state.progress.phase
-                    }
-                },
-                async () => {
-                    await runScheduleProbeInternal(
-                        scheduleFilePath,
-                        state,
-                        config,
-                        runId,
-                        preservedItemsByCode
-                    );
-                    record12306TraceSummary({
-                        title: '运行图探测完成',
-                        status: state.status === 'done' ? 'success' : 'warning',
-                        level: state.status === 'done' ? 'INFO' : 'WARN',
-                        message: '完成 runScheduleProbe',
-                        context: {
-                            runId,
-                            status: state.status,
-                            rawItems: state.stats.rawItems,
-                            uniqueItems: state.stats.uniqueItems,
-                            failedKeywords:
-                                state.progress.failedKeywords.length,
-                            failedEnrichCodes:
-                                state.progress.failedEnrichCodes.length,
-                            apiCalls: state.progress.counters.apiCalls,
-                            apiRetries: state.progress.counters.apiRetries
-                        }
-                    });
-                }
-            )
+    await runScheduleProbeInternal(
+        scheduleFilePath,
+        state,
+        config,
+        runId,
+        preservedItemsByCode
     );
 }

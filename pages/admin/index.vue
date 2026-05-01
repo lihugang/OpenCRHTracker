@@ -67,27 +67,11 @@
                             class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-4 py-4">
                             <p
                                 class="text-xs uppercase tracking-[0.18em] text-slate-400">
-                                请求峰值
+                                Error 数
                             </p>
                             <p
-                                class="mt-2 text-3xl font-semibold text-slate-900">
-                                {{ requestPeakDisplay }}
-                            </p>
-                            <p
-                                v-if="
-                                    passiveAlertsData &&
-                                    !passiveAlertsData.requestMetricsEnabled
-                                "
-                                class="mt-2 text-xs text-slate-500">
-                                追踪已关闭
-                            </p>
-                            <p
-                                v-else-if="
-                                    passiveAlertsData &&
-                                    !passiveAlertsData.requestMetricsRetained
-                                "
-                                class="mt-2 text-xs text-slate-500">
-                                超出保留窗口
+                                class="mt-2 text-3xl font-semibold text-rose-700">
+                                {{ passiveAlertsData?.errorCount ?? 0 }}
                             </p>
                         </div>
                     </div>
@@ -100,8 +84,7 @@
                                     最近告警
                                 </h3>
                                 <p class="text-sm leading-6 text-slate-500">
-                                    这里只预览最新 5
-                                    条，完整列表请进入被动告警页查看。
+                                    这里只预览最新 5 条，完整列表请进入被动告警页查看。
                                 </p>
                             </div>
 
@@ -198,23 +181,7 @@
                                 </p>
                                 <p
                                     class="mt-2 text-sm leading-6 text-slate-600">
-                                    查看完整 warning/error 列表、高频来源和
-                                    12306 请求曲线。
-                                </p>
-                            </button>
-
-                            <button
-                                type="button"
-                                class="w-full rounded-[1rem] border border-slate-200 bg-white/90 px-4 py-4 text-left transition hover:border-slate-300 hover:bg-slate-50/80"
-                                @click="goTo12306Traces">
-                                <p
-                                    class="text-base font-semibold text-slate-900">
-                                    12306 追踪
-                                </p>
-                                <p
-                                    class="mt-2 text-sm leading-6 text-slate-600">
-                                    查看每个车次信息获取的全过程，包括主要函数调用、12306
-                                    子请求和冲突事件。
+                                    查看完整 warning/error 列表和高频来源。
                                 </p>
                             </button>
 
@@ -242,7 +209,7 @@
                                 </p>
                                 <p
                                     class="mt-2 text-sm leading-6 text-slate-600">
-                                    查看 3h、24h 和 7days 窗口内的网站请求、API
+                                    查看 3h、24h 和 7 天窗口内的网站请求、API
                                     调用、独立访客和活跃用户走势。
                                 </p>
                             </button>
@@ -257,9 +224,8 @@
                                 </p>
                                 <p
                                     class="mt-2 text-sm leading-6 text-slate-600">
-                                    查看近 4 小时和 24 小时的
-                                    CPU、内存、系统负载与 SSR / API
-                                    处理时长走势。
+                                    查看近 4 小时和 24 小时的 CPU、内存、系统负载与
+                                    SSR / API 处理时长走势。
                                 </p>
                             </button>
                         </div>
@@ -366,22 +332,6 @@ const passiveAlertsErrorMessage = computed(() =>
         ? getApiErrorMessage(passiveAlertsError.value, '加载管理员概览失败。')
         : ''
 );
-const requestPeakCount = computed(() =>
-    (passiveAlertsData.value?.requestBuckets ?? []).reduce(
-        (maxValue, bucket) => Math.max(maxValue, bucket.total),
-        0
-    )
-);
-const requestPeakDisplay = computed(() => {
-    if (
-        !passiveAlertsData.value?.requestMetricsEnabled ||
-        !passiveAlertsData.value?.requestMetricsRetained
-    ) {
-        return '--';
-    }
-
-    return requestPeakCount.value;
-});
 const recentAlerts = computed(
     () => passiveAlertsData.value?.items.slice(0, 5) ?? []
 );
@@ -396,12 +346,6 @@ useSiteSeo({
 async function goToPassiveAlerts() {
     await navigateTo(
         buildAdminRoute('/admin/passive-alerts', selectedDateInput.value)
-    );
-}
-
-async function goTo12306Traces() {
-    await navigateTo(
-        buildAdminRoute('/admin/12306-traces', selectedDateInput.value)
     );
 }
 

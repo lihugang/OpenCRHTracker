@@ -4,7 +4,7 @@
         :today-date-input-value="todayDateInputValue"
         :session="session"
         title="被动告警"
-        description="读取所选日期的 warning 与 error 日志，并查看聚合后的 12306 请求计数曲线。">
+        description="读取所选日期的 warning 与 error 日志。">
         <template #toolbar>
             <UiButton
                 type="button"
@@ -27,11 +27,11 @@
                             被动告警
                         </p>
                         <h2 class="text-2xl font-semibold text-slate-900">
-                            日志与请求曲线
+                            日志告警
                         </h2>
                         <p class="text-sm leading-6 text-slate-600">
                             正在读取 {{ selectedDateYmd }} 的日志，并汇总
-                            warning、error 与 12306 请求计数。
+                            warning 与 error。
                         </p>
                     </div>
 
@@ -45,6 +45,16 @@
                 </div>
 
                 <div class="grid gap-3 md:grid-cols-3">
+                    <div
+                        class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-4 py-4">
+                        <p
+                            class="text-xs uppercase tracking-[0.18em] text-slate-500">
+                            告警总数
+                        </p>
+                        <p class="mt-2 text-3xl font-semibold text-slate-900">
+                            {{ passiveAlertsData?.filteredTotal ?? 0 }}
+                        </p>
+                    </div>
                     <div
                         class="rounded-[1rem] border border-amber-200 bg-amber-50/70 px-4 py-4">
                         <p
@@ -65,20 +75,6 @@
                             {{ passiveAlertsData?.errorCount ?? 0 }}
                         </p>
                     </div>
-                    <div
-                        class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-4 py-4">
-                        <p
-                            class="text-xs uppercase tracking-[0.18em] text-slate-500">
-                            12306 请求数
-                        </p>
-                        <p class="mt-2 text-3xl font-semibold text-slate-900">
-                            {{
-                                requestMetricsEnabled && requestMetricsRetained
-                                    ? requestTotalCount
-                                    : '--'
-                            }}
-                        </p>
-                    </div>
                 </div>
 
                 <div
@@ -97,70 +93,6 @@
                 </div>
 
                 <template v-else>
-                    <div class="space-y-3">
-                        <div class="flex items-center justify-between gap-4">
-                            <div class="space-y-1">
-                                <h3
-                                    class="text-lg font-semibold text-slate-900">
-                                    12306 请求曲线
-                                </h3>
-                                <p class="text-sm leading-6 text-slate-500">
-                                    当前仅展示曲线，暂未自动判断异常涨幅。
-                                </p>
-                            </div>
-                            <p class="text-sm text-slate-500">
-                                {{ requestPeakSummary }}
-                            </p>
-                        </div>
-
-                        <div
-                            v-if="!requestMetricsEnabled"
-                            class="rounded-[1rem] border border-slate-200 bg-slate-50/70 px-4 py-4 text-sm leading-6 text-slate-600">
-                            当前配置已关闭 12306 请求追踪，请求曲线与车次 trace
-                            明细均不会记录。
-                        </div>
-
-                        <div
-                            v-else-if="!requestMetricsRetained"
-                            class="rounded-[1rem] border border-slate-200 bg-slate-50/70 px-4 py-4 text-sm leading-6 text-slate-600">
-                            所选日期超出请求计数保留范围，目前仅保留最近
-                            {{ requestMetricsRetentionDays }} 天。
-                        </div>
-
-                        <div
-                            v-else-if="
-                                requestBuckets.length > 0 &&
-                                requestPeakCount > 0
-                            "
-                            class="space-y-3 rounded-[1rem] border border-slate-200 bg-slate-50/70 px-4 py-4">
-                            <div class="request-chart">
-                                <div
-                                    v-for="bucket in requestBuckets"
-                                    :key="bucket.startAt"
-                                    class="request-chart__bar"
-                                    :style="{
-                                        height: `${getRequestBarHeight(bucket)}%`
-                                    }"
-                                    :title="getRequestBucketTitle(bucket)" />
-                            </div>
-                            <div
-                                class="grid grid-cols-4 text-xs text-slate-400 sm:grid-cols-8">
-                                <span
-                                    v-for="label in requestAxisLabels"
-                                    :key="label.value"
-                                    class="text-center">
-                                    {{ label.label }}
-                                </span>
-                            </div>
-                        </div>
-
-                        <UiEmptyState
-                            v-else
-                            eyebrow="无流量"
-                            title="暂无 12306 请求曲线"
-                            description="所选日期还没有请求计数数据。" />
-                    </div>
-
                     <div class="space-y-3">
                         <div class="space-y-1">
                             <h3 class="text-lg font-semibold text-slate-900">
@@ -212,7 +144,7 @@
                             <div class="w-full lg:max-w-xs">
                                 <UiField
                                     label="告警类型"
-                                    help="仅影响下方告警列表，不影响统计与曲线。">
+                                    help="仅影响下方告警列表，不影响统计与高频来源。">
                                     <UiSelect
                                         v-model="selectedAlertType"
                                         :disabled="alertTypeOptions.length <= 1"
@@ -332,7 +264,6 @@
 
 <script setup lang="ts">
 import type {
-    Admin12306RequestBucket,
     AdminPassiveAlertLevel,
     AdminPassiveAlertsResponse
 } from '~/types/admin';
@@ -394,46 +325,10 @@ const canLoadMore = computed(
         !isLoadingMore.value &&
         !loadMoreErrorMessage.value
 );
-const requestBuckets = computed(
-    () => passiveAlertsData.value?.requestBuckets ?? []
-);
-const requestMetricsRetentionDays = computed(
-    () => passiveAlertsData.value?.requestMetricsRetentionDays ?? 0
-);
-const requestMetricsEnabled = computed(
-    () => passiveAlertsData.value?.requestMetricsEnabled ?? true
-);
-const requestMetricsRetained = computed(
-    () => passiveAlertsData.value?.requestMetricsRetained ?? true
-);
-const requestPeakCount = computed(() =>
-    requestBuckets.value.reduce(
-        (maxValue, bucket) => Math.max(maxValue, bucket.total),
-        0
-    )
-);
-const requestTotalCount = computed(() =>
-    requestBuckets.value.reduce((total, bucket) => total + bucket.total, 0)
-);
-const requestPeakSummary = computed(() =>
-    !requestMetricsEnabled.value
-        ? '已关闭'
-        : requestMetricsRetained.value
-          ? `峰值 ${requestPeakCount.value} / 30 分钟`
-          : `仅保留近 ${requestMetricsRetentionDays.value} 天`
-);
-const requestAxisLabels = computed(() =>
-    requestBuckets.value
-        .filter((_, index) => index % 6 === 0)
-        .map((bucket) => ({
-            value: bucket.startAt,
-            label: formatTimeLabel(bucket.startAt)
-        }))
-);
 
 useSiteSeo({
     title: '被动告警 | Open CRH Tracker',
-    description: '查看被动告警与 12306 请求计数曲线。',
+    description: '查看被动告警列表与高频来源。',
     path: '/admin/passive-alerts',
     noindex: true
 });
@@ -611,56 +506,9 @@ function formatTimestamp(timestamp: number) {
     return formatTrackerTimestamp(timestamp);
 }
 
-function formatTimeLabel(timestamp: number) {
-    const formatted = formatTrackerTimestamp(timestamp);
-    const timePart = formatted.split(' ')[1] ?? formatted;
-    return timePart.slice(0, 5);
-}
-
-function getRequestBarHeight(bucket: Admin12306RequestBucket) {
-    if (requestPeakCount.value <= 0) {
-        return 0;
-    }
-
-    return Math.max(6, (bucket.total / requestPeakCount.value) * 100);
-}
-
-function getRequestBucketTitle(bucket: Admin12306RequestBucket) {
-    const operationSummary = Object.entries(bucket.byOperation)
-        .sort((left, right) => right[1] - left[1])
-        .map(([operation, count]) => `${operation}: ${count}`)
-        .join(', ');
-
-    return (
-        `${formatTimeLabel(bucket.startAt)} - ${formatTimeLabel(bucket.endAt)}: ${bucket.total}` +
-        (operationSummary ? ` (${operationSummary})` : '')
-    );
-}
-
 function getAlertLevelBadgeClass(level: AdminPassiveAlertLevel) {
     return level === 'ERROR'
         ? 'inline-flex items-center rounded-full bg-rose-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-rose-800'
         : 'inline-flex items-center rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-amber-800';
 }
 </script>
-
-<style scoped>
-.request-chart {
-    display: grid;
-    grid-template-columns: repeat(48, minmax(0, 1fr));
-    align-items: end;
-    gap: 0.25rem;
-    min-height: 12rem;
-}
-
-.request-chart__bar {
-    min-height: 0.5rem;
-    border-radius: 9999px 9999px 0.35rem 0.35rem;
-    background: linear-gradient(
-        180deg,
-        rgba(0, 82, 155, 0.92) 0%,
-        rgba(73, 126, 166, 0.72) 100%
-    );
-    box-shadow: 0 8px 18px -14px rgba(0, 82, 155, 0.75);
-}
-</style>

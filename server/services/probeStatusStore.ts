@@ -1,6 +1,5 @@
 import '~/server/libs/database/emu';
 import { createPreparedSqlStore } from '~/server/libs/database/prepared';
-import { record12306TraceDatabase } from '~/server/services/requestMetrics12306Trace';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
 import importSqlBatch from '~/server/utils/sql/importSqlBatch';
 
@@ -44,9 +43,6 @@ const probeStatusStatements = createPreparedSqlStore<ProbeStatusSqlKey>({
     scope: 'emu/queries',
     sql: probeStatusSql
 });
-const EMU_TRACKED_DATABASE_NAME = 'EMUTracked';
-const PROBE_STATUS_TABLE_NAME = 'probe_status';
-
 function normalizeTrainCode(trainCode: string): string {
     return normalizeCode(trainCode);
 }
@@ -195,20 +191,6 @@ export function insertProbeStatus(
         startAt,
         status
     );
-    record12306TraceDatabase({
-        title: 'Insert probe status',
-        operation: 'insert_probe_status',
-        database: EMU_TRACKED_DATABASE_NAME,
-        table: PROBE_STATUS_TABLE_NAME,
-        changes: result.changes,
-        context: {
-            trainCode: normalizedTrainCode,
-            emuCode: normalizedEmuCode,
-            startAt,
-            status,
-            insertedId: Number(result.lastInsertRowid)
-        }
-    });
     return Number(result.lastInsertRowid);
 }
 
@@ -270,18 +252,6 @@ export function updateProbeStatusByEmuCode(
         normalizedEmuCode,
         startAt
     );
-    record12306TraceDatabase({
-        title: 'Update probe status by EMU',
-        operation: 'update_probe_status_by_emu_code',
-        database: EMU_TRACKED_DATABASE_NAME,
-        table: PROBE_STATUS_TABLE_NAME,
-        changes: result.changes,
-        context: {
-            emuCode: normalizedEmuCode,
-            startAt,
-            status
-        }
-    });
     return result.changes;
 }
 
@@ -301,18 +271,6 @@ export function updateProbeStatusByTrainCode(
         normalizedTrainCode,
         startAt
     );
-    record12306TraceDatabase({
-        title: 'Update probe status by train',
-        operation: 'update_probe_status_by_train_code',
-        database: EMU_TRACKED_DATABASE_NAME,
-        table: PROBE_STATUS_TABLE_NAME,
-        changes: result.changes,
-        context: {
-            trainCode: normalizedTrainCode,
-            startAt,
-            status
-        }
-    });
     return result.changes;
 }
 
@@ -335,31 +293,11 @@ export function updateProbeStatusByTrainCodeAndEmuCode(
         normalizedEmuCode,
         startAt
     );
-    record12306TraceDatabase({
-        title: 'Update probe status by train and EMU',
-        operation: 'update_probe_status_by_train_code_and_emu_code',
-        database: EMU_TRACKED_DATABASE_NAME,
-        table: PROBE_STATUS_TABLE_NAME,
-        changes: result.changes,
-        context: {
-            trainCode: normalizedTrainCode,
-            emuCode: normalizedEmuCode,
-            startAt,
-            status
-        }
-    });
     return result.changes;
 }
 
 export function clearProbeStatus(): number {
     const result = probeStatusStatements.run('clearProbeStatus');
-    record12306TraceDatabase({
-        title: 'Clear probe status',
-        operation: 'clear_probe_status',
-        database: EMU_TRACKED_DATABASE_NAME,
-        table: PROBE_STATUS_TABLE_NAME,
-        changes: result.changes
-    });
     return result.changes;
 }
 
@@ -384,18 +322,6 @@ export function deleteProbeStatusByTrainCodeInRange(
         startAt,
         endAtExclusive
     );
-    record12306TraceDatabase({
-        title: 'Delete probe status by train range',
-        operation: 'delete_probe_status_by_train_code_in_range',
-        database: EMU_TRACKED_DATABASE_NAME,
-        table: PROBE_STATUS_TABLE_NAME,
-        changes: result.changes,
-        context: {
-            trainCode: normalizedTrainCode,
-            startAt,
-            endAtExclusive
-        }
-    });
     return result.changes;
 }
 
@@ -421,17 +347,5 @@ export function deleteProbeStatusByTrainCodeAndEmuCodeAtStartAt(
         normalizedEmuCode,
         startAt
     );
-    record12306TraceDatabase({
-        title: 'Delete probe status by train and EMU',
-        operation: 'delete_probe_status_by_train_code_and_emu_code_at_start_at',
-        database: EMU_TRACKED_DATABASE_NAME,
-        table: PROBE_STATUS_TABLE_NAME,
-        changes: result.changes,
-        context: {
-            trainCode: normalizedTrainCode,
-            emuCode: normalizedEmuCode,
-            startAt
-        }
-    });
     return result.changes;
 }

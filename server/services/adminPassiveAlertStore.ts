@@ -5,7 +5,6 @@ import type {
     AdminPassiveAlertItem,
     AdminPassiveAlertsResponse
 } from '~/types/admin';
-import { get12306RequestMetricsSnapshot } from '~/server/services/requestMetrics12306Store';
 
 const ALERT_LINE_PATTERN =
     /^\[(?<timestamp>[^\]]+)\] \[(?<level>[A-Z]+)\] (?<logger>[^ ]+) - (?<message>.*)$/;
@@ -97,7 +96,6 @@ export function readPassiveAlerts(
 ): AdminPassiveAlertsResponse {
     const { date, type, limit, cursor, rawCursor } = options;
     const { filePath, text } = readLogText(date);
-    const requestMetrics = get12306RequestMetricsSnapshot(date);
     const allAlerts: ParsedPassiveAlertItem[] = [];
     const loggerCounts = new Map<string, number>();
     let warnCount = 0;
@@ -201,10 +199,6 @@ export function readPassiveAlerts(
 
                 return left.type.localeCompare(right.type, 'zh-CN');
             }),
-        requestMetricsEnabled: requestMetrics.requestMetricsEnabled,
-        requestMetricsRetentionDays: requestMetrics.requestMetricsRetentionDays,
-        requestMetricsRetained: requestMetrics.requestMetricsRetained,
-        requestBuckets: requestMetrics.requestBuckets,
         items: pageItems.map(({ lineIndex: _lineIndex, ...item }) => item)
     };
 }

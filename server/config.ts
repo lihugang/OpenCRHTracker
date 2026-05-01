@@ -126,13 +126,6 @@ interface RuntimeAdminServerMetricsConfig {
     sampleIntervalSeconds: number;
 }
 
-interface Runtime12306RequestMetricsConfig {
-    file: string;
-    enabled: boolean;
-    retentionDays: number;
-    flushIntervalMinutes: number;
-}
-
 export interface Config {
     spider: {
         userAgent: string;
@@ -169,7 +162,6 @@ export interface Config {
         runtime: {
             adminTraffic: RuntimeAdminTrafficConfig;
             adminServerMetrics: RuntimeAdminServerMetricsConfig;
-            requestMetrics12306: Runtime12306RequestMetricsConfig;
         };
     };
     user: {
@@ -572,10 +564,6 @@ function validateConfig(raw: unknown): Config {
     const runtimeAdminServerMetrics = asObject(
         runtime.adminServerMetrics,
         'data.runtime.adminServerMetrics'
-    );
-    const runtimeRequestMetrics12306 = asObject(
-        runtime.requestMetrics12306,
-        'data.runtime.requestMetrics12306'
     );
 
     const user = asObject(root.user, 'user');
@@ -994,26 +982,6 @@ function validateConfig(raw: unknown): Config {
                     sampleIntervalSeconds: asInteger(
                         runtimeAdminServerMetrics.sampleIntervalSeconds,
                         'data.runtime.adminServerMetrics.sampleIntervalSeconds',
-                        1
-                    )
-                },
-                requestMetrics12306: {
-                    file: asString(
-                        runtimeRequestMetrics12306.file,
-                        'data.runtime.requestMetrics12306.file'
-                    ),
-                    enabled: asBoolean(
-                        runtimeRequestMetrics12306.enabled,
-                        'data.runtime.requestMetrics12306.enabled'
-                    ),
-                    retentionDays: asInteger(
-                        runtimeRequestMetrics12306.retentionDays,
-                        'data.runtime.requestMetrics12306.retentionDays',
-                        1
-                    ),
-                    flushIntervalMinutes: asInteger(
-                        runtimeRequestMetrics12306.flushIntervalMinutes,
-                        'data.runtime.requestMetrics12306.flushIntervalMinutes',
                         1
                     )
                 }
