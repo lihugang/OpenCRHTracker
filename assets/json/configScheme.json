@@ -317,6 +317,10 @@
                         "feedback": {
                             "type": "string",
                             "minLength": 1
+                        },
+                        "trainProvenance": {
+                            "type": "string",
+                            "minLength": 1
                         }
                     },
                     "required": [
@@ -369,6 +373,23 @@
                                 "file",
                                 "flushIntervalMinutes",
                                 "sampleIntervalSeconds"
+                            ]
+                        },
+                        "trainProvenance": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "enabled": {
+                                    "type": "boolean"
+                                },
+                                "retentionDays": {
+                                    "type": "integer",
+                                    "minimum": 1
+                                }
+                            },
+                            "required": [
+                                "enabled",
+                                "retentionDays"
                             ]
                         }
                     },

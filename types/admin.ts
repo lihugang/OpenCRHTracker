@@ -257,3 +257,130 @@ export interface AdminRevokeAllWebappTokensResponse {
     revokedAt: number;
     revokedCurrentSession: boolean;
 }
+
+export type AdminTrainProvenanceTaskRunStatus =
+    | 'running'
+    | 'success'
+    | 'failed'
+    | 'skipped';
+
+export type AdminTrainProvenanceLatestStatus =
+    | 'unknown'
+    | 'pending'
+    | 'single'
+    | 'coupled';
+
+export interface AdminTrainProvenanceDeparture {
+    startAt: number;
+    endAt: number | null;
+    startStation: string;
+    endStation: string;
+    latestStatus: AdminTrainProvenanceLatestStatus;
+    emuCodes: string[];
+}
+
+export type AdminTrainProvenanceConflictState =
+    | 'running'
+    | 'not_running'
+    | 'request_failed';
+
+export interface AdminTrainProvenanceConflictCurrentGroup {
+    trainCodes: string[];
+    startAt: number | null;
+    endAt: number | null;
+    startStation: string;
+    endStation: string;
+}
+
+export interface AdminTrainProvenanceConflictGroup {
+    trainCodes: string[];
+    startAt: number | null;
+    endAt: number | null;
+    overlapStartAt: number | null;
+    overlapEndAt: number | null;
+    startStation: string;
+    endStation: string;
+    state: AdminTrainProvenanceConflictState;
+}
+
+export interface AdminTrainProvenanceConflictDetail {
+    mode: 'requeued' | 'dropped';
+    currentGroup: AdminTrainProvenanceConflictCurrentGroup | null;
+    conflictGroups: AdminTrainProvenanceConflictGroup[];
+}
+
+export type AdminTrainProvenanceCouplingScanState = 'queued' | 'resolved';
+
+export interface AdminTrainProvenanceCouplingScanDetail {
+    state: AdminTrainProvenanceCouplingScanState;
+    queuedSchedulerTaskId: number | null;
+    queuedTaskRunId: number | null;
+    resultSchedulerTaskId: number | null;
+    resultTaskRunId: number | null;
+    canOpenDetail: boolean;
+}
+
+export interface AdminTrainProvenanceEvent {
+    id: number;
+    taskRunId: number;
+    schedulerTaskId: number;
+    executor: string;
+    taskStatus: AdminTrainProvenanceTaskRunStatus;
+    createdAt: number;
+    trainCode: string;
+    startAt: number | null;
+    emuCode: string;
+    relatedTrainCode: string;
+    relatedEmuCode: string;
+    eventType: string;
+    result: string;
+    summary: string;
+    linkedSchedulerTaskId: number | null;
+    linkedTaskRunId: number | null;
+    conflictDetail: AdminTrainProvenanceConflictDetail | null;
+    couplingScan: AdminTrainProvenanceCouplingScanDetail | null;
+    payload: unknown;
+}
+
+export interface AdminTrainProvenanceResponse {
+    enabled: boolean;
+    retentionDays: number;
+    date: string;
+    trainCode: string;
+    selectedStartAt: number | null;
+    departures: AdminTrainProvenanceDeparture[];
+    timeline: AdminTrainProvenanceEvent[];
+}
+
+export interface AdminCouplingScanTaskRunSummary {
+    id: number;
+    schedulerTaskId: number;
+    executor: string;
+    status: AdminTrainProvenanceTaskRunStatus;
+    startedAt: number;
+    finishedAt: number | null;
+    serviceDate: string;
+    taskArgs: unknown;
+}
+
+export interface AdminCouplingScanCandidate {
+    id: number;
+    candidateOrder: number;
+    candidateEmuCode: string;
+    status: string;
+    reason: string;
+    scannedTrainCode: string;
+    scannedInternalCode: string;
+    scannedStartAt: number | null;
+    matchedTrainCode: string;
+    matchedStartAt: number | null;
+    trainRepeat: string;
+    detail: unknown;
+    createdAt: number;
+}
+
+export interface AdminCouplingScanDetailResponse {
+    enabled: boolean;
+    taskRun: AdminCouplingScanTaskRunSummary | null;
+    candidates: AdminCouplingScanCandidate[];
+}

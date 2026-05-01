@@ -35,16 +35,26 @@ import {
 import { notifyLookupStatusChanges } from '~/server/services/eventNotificationService';
 import { registerTaskExecutor } from '~/server/services/taskExecutorRegistry';
 import {
+    markCurrentTrainProvenanceTaskSkipped,
+    recordCurrentCouplingScanCandidate,
+    recordCurrentTrainProvenanceEvent,
+    recordCurrentTrainProvenanceEventsForTrainCodes
+} from '~/server/services/trainProvenanceRecorder';
+import {
     getTodayScheduleCache,
     getTodayScheduleProbeGroupByTrainCode,
     type TodayScheduleProbeGroup,
     type TodayScheduleRoute
 } from '~/server/services/todayScheduleCache';
-import fetchEMUInfoBySeatCode from '~/server/utils/12306/network/fetchEMUInfoBySeatCode';
+import fetchEMUInfoBySeatCode, {
+    type FetchSeatCodeFailureResult
+} from '~/server/utils/12306/network/fetchEMUInfoBySeatCode';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
 import uniqueNormalizedCodes from '~/server/utils/12306/uniqueNormalizedCodes';
 import { getShanghaiDayStartUnixSeconds } from '~/server/utils/date/shanghaiDateTime';
-import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
+import getCurrentDateString, {
+    formatShanghaiDateString
+} from '~/server/utils/date/getCurrentDateString';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
 
 export const DETECT_COUPLED_EMU_GROUP_TASK_EXECUTOR =
@@ -98,6 +108,22 @@ function parseTaskArgs(raw: unknown): DetectCoupledEmuGroupTaskArgs {
 
 function buildBureauAndModelKey(bureau: string, model: string): string {
     return `${bureau.trim()}#${normalizeCode(model)}`;
+}
+
+function toSeatCodeRequestFailedReason(
+    failure: FetchSeatCodeFailureResult
+):
+    | 'seat_code_request_failed_network_error'
+    | 'seat_code_request_failed_not_enabled'
+    | 'seat_code_request_failed_other' {
+    switch (failure.reason) {
+        case 'network_error':
+            return 'seat_code_request_failed_network_error';
+        case 'seat_code_not_enabled':
+            return 'seat_code_request_failed_not_enabled';
+        default:
+            return 'seat_code_request_failed_other';
+    }
 }
 
 function getCurrentDayWindow(): {
@@ -437,7 +463,8 @@ async function scanUnassignedCandidates(
     let scannedCount = 0;
     let warningCount = 0;
 
-    for (const candidate of candidates) {
+    for (const [index, candidate] of candidates.entries()) {
+        const candidateOrder = index + 1;
         const candidateEmuCode = buildCandidateEmuCode(candidate);
         if (candidateEmuCode.length === 0) {
             continue;
@@ -451,6 +478,16 @@ async function scanUnassignedCandidates(
                 nextDayStart,
                 cache
             );
+            recordCurrentCouplingScanCandidate({
+                candidateOrder,
+                serviceDate: getCurrentDateString(),
+                bureau,
+                model,
+                candidateEmuCode,
+                status: 'skipped',
+                reason: 'already_assigned',
+                detail: hint
+            });
             continue;
         }
 
@@ -458,11 +495,30 @@ async function scanUnassignedCandidates(
             buildProbeAssetKey(candidate.model, candidate.trainSetNo)
         );
         if (!seatCode) {
+            recordCurrentCouplingScanCandidate({
+                candidateOrder,
+                serviceDate: getCurrentDateString(),
+                bureau,
+                model,
+                candidateEmuCode,
+                status: 'skipped',
+                reason: 'seat_code_missing'
+            });
             continue;
         }
 
         const seatCodeResult = await fetchEMUInfoBySeatCode(seatCode);
-        if (!seatCodeResult) {
+        if (seatCodeResult.status !== 'success') {
+            recordCurrentCouplingScanCandidate({
+                candidateOrder,
+                serviceDate: getCurrentDateString(),
+                bureau,
+                model,
+                candidateEmuCode,
+                status: 'request_failed',
+                reason: toSeatCodeRequestFailedReason(seatCodeResult),
+                detail: seatCodeResult
+            });
             continue;
         }
 
@@ -476,12 +532,46 @@ async function scanUnassignedCandidates(
         );
         if (!trackedGroup) {
             warningCount += 1;
+            recordCurrentCouplingScanCandidate({
+                candidateOrder,
+                serviceDate: getCurrentDateString(),
+                bureau,
+                model,
+                candidateEmuCode,
+                status: 'unmatched',
+                reason: 'route_not_tracked',
+                scannedTrainCode,
+                scannedInternalCode: normalizeCode(
+                    seatCodeResult.route.internalCode
+                ),
+                scannedStartAt: seatCodeResult.route.startAt,
+                detail: {
+                    routeEndAt: seatCodeResult.route.endAt
+                }
+            });
             logger.debug(
                 `scan_unmatched_current_group bureau=${bureau} model=${model} emuCode=${scannedEmuCode} trainCode=${scannedTrainCode} trainInternalCode=${normalizeCode(seatCodeResult.route.internalCode)} startAt=${seatCodeResult.route.startAt} endAt=${seatCodeResult.route.endAt}`
             );
             continue;
         }
 
+        recordCurrentCouplingScanCandidate({
+            candidateOrder,
+            serviceDate: formatShanghaiDateString(
+                trackedGroup.group.startAt * 1000
+            ),
+            bureau,
+            model,
+            candidateEmuCode,
+            status: 'matched',
+            reason: 'tracked_group_matched',
+            scannedTrainCode,
+            scannedInternalCode: normalizeCode(seatCodeResult.route.internalCode),
+            scannedStartAt: seatCodeResult.route.startAt,
+            matchedTrainCode: trackedGroup.group.trainCode,
+            matchedStartAt: trackedGroup.group.startAt,
+            trainRepeat: seatCodeResult.route.trainRepeat
+        });
         matchedGroups.set(trackedGroup.group.trainKey, trackedGroup);
         const matchedEmuScanRecords =
             matchedEmuScanRecordsByTrainKey.get(trackedGroup.group.trainKey) ??
@@ -684,10 +774,40 @@ async function persistResolvedTrackedGroup(
             );
         }
         persistBackfilledCoupledRoutes(emuCodes, scheduleRoutesByTrainCode);
+        recordCurrentTrainProvenanceEventsForTrainCodes(trainCodes, {
+            serviceDate: formatShanghaiDateString(group.startAt * 1000),
+            startAt: group.startAt,
+            emuCode: emuCodes[0] ?? '',
+            eventType: 'coupling_group_resolved_coupled',
+            result:
+                previousStatus === ProbeStatusValue.SingleFormationResolved
+                    ? 'upgraded_from_single'
+                    : 'matched',
+            payload: {
+                emuCodes,
+                startStation,
+                endStation,
+                endAt,
+                matchedEmuScanRecords
+            }
+        });
     } else if (previousStatus === ProbeStatusValue.PendingCouplingDetection) {
         logger.info(
             `pending_group_resolved_single trainCodes=${trainCodes.join('/')} emuCodes=${emuCodes.join('/')} startAt=${group.startAt} groupKey=${groupKey}`
         );
+        recordCurrentTrainProvenanceEventsForTrainCodes(trainCodes, {
+            serviceDate: formatShanghaiDateString(group.startAt * 1000),
+            startAt: group.startAt,
+            emuCode: emuCodes[0] ?? '',
+            eventType: 'coupling_group_resolved_single',
+            result: 'finalized_single',
+            payload: {
+                emuCodes,
+                startStation,
+                endStation,
+                endAt
+            }
+        });
     }
 
     const trainKey = buildTrainKey(
@@ -725,6 +845,7 @@ async function executeDetectCoupledEmuGroupTaskInternal(
             cooldownSeconds
         )
     ) {
+        markCurrentTrainProvenanceTaskSkipped('recent_detection_cooldown');
         logger.info(
             `skip_recent_detection bureau=${bureau} model=${args.model} cooldownSeconds=${cooldownSeconds}`
         );
@@ -736,6 +857,7 @@ async function executeDetectCoupledEmuGroupTaskInternal(
             buildBureauAndModelKey(bureau, args.model)
         ) ?? [];
     if (candidates.length === 0) {
+        markCurrentTrainProvenanceTaskSkipped('candidate_group_not_found');
         logger.warn(
             `candidate_group_not_found bureau=${bureau} model=${args.model}`
         );
@@ -751,6 +873,17 @@ async function executeDetectCoupledEmuGroupTaskInternal(
         nextDayStart,
         trackedGroupCache
     );
+    recordCurrentTrainProvenanceEvent({
+        serviceDate: getCurrentDateString(),
+        eventType: 'coupling_scan_started',
+        result: 'running',
+        payload: {
+            bureau,
+            model: args.model,
+            candidateCount: candidates.length,
+            pendingGroupCount: pendingGroups.size
+        }
+    });
     const {
         matchedGroups,
         matchedEmuScanRecordsByTrainKey,
@@ -794,6 +927,22 @@ async function executeDetectCoupledEmuGroupTaskInternal(
     }
 
     markCoupledGroupDetected(bureau, args.model, nowSeconds);
+    recordCurrentTrainProvenanceEvent({
+        serviceDate: getCurrentDateString(),
+        eventType: 'coupling_scan_completed',
+        result: 'done',
+        payload: {
+            bureau,
+            model: args.model,
+            candidateCount: candidates.length,
+            pendingGroupCount: pendingGroups.size,
+            matchedGroupCount: matchedGroups.size,
+            finalizedSingleGroups,
+            skippedAssignedCount,
+            scannedCount,
+            warningCount
+        }
+    });
     logger.info(
         `done bureau=${bureau} model=${args.model} candidates=${candidates.length} pendingGroups=${pendingGroups.size} matchedGroups=${matchedGroups.size} finalizedSingleGroups=${finalizedSingleGroups} skippedAssigned=${skippedAssignedCount} scanned=${scannedCount} warnings=${warningCount}`
     );

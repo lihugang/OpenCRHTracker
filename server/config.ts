@@ -126,6 +126,11 @@ interface RuntimeAdminServerMetricsConfig {
     sampleIntervalSeconds: number;
 }
 
+interface RuntimeTrainProvenanceConfig {
+    enabled: boolean;
+    retentionDays: number;
+}
+
 export interface Config {
     spider: {
         userAgent: string;
@@ -158,10 +163,14 @@ export interface Config {
             QRCode: RefreshableAssetConfig;
             schedule: AssetConfig;
         };
-        databases: Record<'task' | 'EMUTracked' | 'users' | 'feedback', string>;
+        databases: Record<
+            'task' | 'EMUTracked' | 'users' | 'feedback' | 'trainProvenance',
+            string
+        >;
         runtime: {
             adminTraffic: RuntimeAdminTrafficConfig;
             adminServerMetrics: RuntimeAdminServerMetricsConfig;
+            trainProvenance: RuntimeTrainProvenanceConfig;
         };
     };
     user: {
@@ -565,6 +574,10 @@ function validateConfig(raw: unknown): Config {
         runtime.adminServerMetrics,
         'data.runtime.adminServerMetrics'
     );
+    const runtimeTrainProvenance = asOptionalObject(
+        runtime.trainProvenance,
+        'data.runtime.trainProvenance'
+    );
 
     const user = asObject(root.user, 'user');
     const userScrypt = asObject(user.scrypt, 'user.scrypt');
@@ -955,7 +968,14 @@ function validateConfig(raw: unknown): Config {
                 feedback: asString(
                     databases.feedback,
                     'data.databases.feedback'
-                )
+                ),
+                trainProvenance:
+                    databases.trainProvenance === undefined
+                        ? 'data/train-provenance.db'
+                        : asString(
+                              databases.trainProvenance,
+                              'data.databases.trainProvenance'
+                          )
             },
             runtime: {
                 adminTraffic: {
@@ -984,6 +1004,23 @@ function validateConfig(raw: unknown): Config {
                         'data.runtime.adminServerMetrics.sampleIntervalSeconds',
                         1
                     )
+                },
+                trainProvenance: {
+                    enabled:
+                        runtimeTrainProvenance === undefined
+                            ? true
+                            : asBoolean(
+                                  runtimeTrainProvenance.enabled,
+                                  'data.runtime.trainProvenance.enabled'
+                              ),
+                    retentionDays:
+                        runtimeTrainProvenance === undefined
+                            ? 7
+                            : asInteger(
+                                  runtimeTrainProvenance.retentionDays,
+                                  'data.runtime.trainProvenance.retentionDays',
+                                  1
+                              )
                 }
             }
         },

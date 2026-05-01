@@ -277,6 +277,10 @@ const navItems = [
         path: '/admin/anomaly-scan'
     },
     {
+        label: '12306 来源追踪',
+        path: '/admin/train-provenance'
+    },
+    {
         label: 'WebApp Token',
         path: '/admin/webapp-tokens'
     },

@@ -202,6 +202,20 @@
                             <button
                                 type="button"
                                 class="w-full rounded-[1rem] border border-slate-200 bg-white/90 px-4 py-4 text-left transition hover:border-slate-300 hover:bg-slate-50/80"
+                                @click="goToTrainProvenance">
+                                <p
+                                    class="text-base font-semibold text-slate-900">
+                                    12306 来源追踪
+                                </p>
+                                <p
+                                    class="mt-2 text-sm leading-6 text-slate-600">
+                                    查看某日某车次的探测来源、判定路径，以及关联的重联扫描结果。
+                                </p>
+                            </button>
+
+                            <button
+                                type="button"
+                                class="w-full rounded-[1rem] border border-slate-200 bg-white/90 px-4 py-4 text-left transition hover:border-slate-300 hover:bg-slate-50/80"
                                 @click="goToTraffic">
                                 <p
                                     class="text-base font-semibold text-slate-900">
@@ -352,6 +366,12 @@ async function goToPassiveAlerts() {
 async function goToAnomalyScan() {
     await navigateTo(
         buildAdminRoute('/admin/anomaly-scan', selectedDateInput.value)
+    );
+}
+
+async function goToTrainProvenance() {
+    await navigateTo(
+        buildAdminRoute('/admin/train-provenance', selectedDateInput.value)
     );
 }
 

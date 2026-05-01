@@ -6,6 +6,10 @@ import {
     enqueueTasks,
     type EnqueueTaskInput
 } from '~/server/services/taskQueue';
+import {
+    markCurrentTrainProvenanceTaskSkipped,
+    recordCurrentTrainProvenanceEventsForTrainCodes
+} from '~/server/services/trainProvenanceRecorder';
 import { loadPublishedScheduleState } from '~/server/utils/12306/scheduleProbe/stateStore';
 import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
@@ -26,6 +30,7 @@ async function executeDispatchDailyProbeTasks(): Promise<void> {
     const now = getNowSeconds();
 
     if (!scheduleState) {
+        markCurrentTrainProvenanceTaskSkipped('schedule_not_found');
         logger.warn(
             `schedule_not_found file=${config.data.assets.schedule.file}`
         );
@@ -34,6 +39,7 @@ async function executeDispatchDailyProbeTasks(): Promise<void> {
 
     const currentDate = getCurrentDateString();
     if (scheduleState.date !== currentDate) {
+        markCurrentTrainProvenanceTaskSkipped('schedule_not_current');
         logger.warn(
             `skip_non_current_schedule scheduleDate=${scheduleState.date} currentDate=${currentDate} file=${config.data.assets.schedule.file}`
         );
@@ -62,6 +68,33 @@ async function executeDispatchDailyProbeTasks(): Promise<void> {
     }
 
     const taskIds = enqueueTasks(tasksToEnqueue);
+    for (const [index, group] of Array.from(
+        getTodayScheduleProbeGroups().values()
+    ).entries()) {
+        const createdTaskId = taskIds[index];
+        if (!createdTaskId) {
+            continue;
+        }
+
+        recordCurrentTrainProvenanceEventsForTrainCodes(
+            [group.trainCode, ...group.allCodes],
+            {
+                serviceDate: scheduleState.date,
+                startAt: group.startAt,
+                eventType: 'probe_task_dispatched',
+                result: 'queued',
+                linkedSchedulerTaskId: createdTaskId,
+                payload: {
+                    executor: PROBE_TRAIN_DEPARTURE_TASK_EXECUTOR,
+                    executionTime: tasksToEnqueue[index]?.executionTime ?? now,
+                    allTrainCodes: [group.trainCode, ...group.allCodes],
+                    startStation: group.startStation,
+                    endStation: group.endStation,
+                    retry: defaultRetry
+                }
+            }
+        );
+    }
     logger.info(
         `done date=${scheduleState.date} groups=${getTodayScheduleProbeGroups().size} createdTasks=${tasksToEnqueue.length} defaultRetry=${defaultRetry} firstTaskId=${taskIds[0] ?? 'null'}`
     );

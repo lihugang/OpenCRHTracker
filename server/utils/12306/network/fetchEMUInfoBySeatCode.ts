@@ -63,23 +63,76 @@ const logger = getLogger('12306-network:fetch-emu-info-by-seat-code');
 interface CachedSeatCodeResult {
     expiresAt: number;
     startDay: string;
-    value: {
-        route: {
-            code: string;
-            internalCode: string;
-            startAt: number;
-            endAt: number;
-            trainRepeat: string;
-        };
-        emu: {
-            code: string;
-        };
-    };
+    value: FetchSeatCodeSuccessResult;
 }
 
 const cachedSeatCodeResults = new Map<string, CachedSeatCodeResult>();
 
-export default async function fetchEMUInfoBySeatCode(code: string) {
+export type FetchSeatCodeFailureReason =
+    | 'network_error'
+    | 'seat_code_not_enabled'
+    | 'other_error';
+
+export interface FetchSeatCodeSuccessResult {
+    status: 'success';
+    route: {
+        code: string;
+        internalCode: string;
+        startAt: number;
+        endAt: number;
+        trainRepeat: string;
+    };
+    emu: {
+        code: string;
+    };
+}
+
+export interface FetchSeatCodeFailureResult {
+    status: 'request_failed';
+    reason: FetchSeatCodeFailureReason;
+    errorCode: string;
+    errorMsg: string;
+    businessStatus: boolean | null;
+    detail: string;
+}
+
+export type FetchSeatCodeResult =
+    | FetchSeatCodeSuccessResult
+    | FetchSeatCodeFailureResult;
+
+function buildFailureResult(
+    reason: FetchSeatCodeFailureReason,
+    options: {
+        errorCode?: string;
+        errorMsg?: string;
+        businessStatus?: boolean | null;
+        detail?: string;
+    } = {}
+): FetchSeatCodeFailureResult {
+    return {
+        status: 'request_failed',
+        reason,
+        errorCode: options.errorCode?.trim() ?? '',
+        errorMsg: options.errorMsg?.trim() ?? '',
+        businessStatus:
+            typeof options.businessStatus === 'boolean'
+                ? options.businessStatus
+                : null,
+        detail: options.detail?.trim() ?? ''
+    };
+}
+
+function isSeatCodeNotEnabledResponse(json: EMUInfoResponse): boolean {
+    return (
+        json.status === false &&
+        json.errorCode === '1006' &&
+        json.errorMsg.includes('暂未开通畅行码服务')
+    );
+}
+
+export default async function fetchEMUInfoBySeatCode(
+    code: string
+): Promise<FetchSeatCodeResult> {
     const normalizedCode = code.trim();
     const nowSeconds = getNowSeconds();
     const currentDate = getCurrentDateString();
@@ -117,10 +170,35 @@ export default async function fetchEMUInfoBySeatCode(code: string) {
                 responseStatus: response.status,
                 responseOk: response.ok
             });
-            return null;
+            return buildFailureResult('network_error', {
+                detail: `http_failed status=${response.status}`
+            });
         }
 
         const json: EMUInfoResponse = await response.json();
+        if (isSeatCodeNotEnabledResponse(json)) {
+            log12306RequestFailure({
+                logger,
+                level: 'debug',
+                operation: 'seat_code_not_enabled',
+                url,
+                context: {
+                    seatCode: normalizedCode
+                },
+                responseStatus: response.status,
+                responseOk: response.ok,
+                businessStatus: json.status,
+                errorCode: json.errorCode,
+                errorMsg: json.errorMsg
+            });
+            return buildFailureResult('seat_code_not_enabled', {
+                errorCode: json.errorCode,
+                errorMsg: json.errorMsg,
+                businessStatus: json.status,
+                detail: 'seat code service is not enabled for this train'
+            });
+        }
+
         const data = json.data;
         const emuCode = data?.carCode?.trim();
         const startDay = data?.startDay?.trim() ?? '';
@@ -140,7 +218,12 @@ export default async function fetchEMUInfoBySeatCode(code: string) {
                 errorMsg: json.errorMsg,
                 detail: 'missing data, data.carCode, or data.trainNo'
             });
-            return null;
+            return buildFailureResult('other_error', {
+                errorCode: json.errorCode,
+                errorMsg: json.errorMsg,
+                businessStatus: json.status,
+                detail: 'missing data, data.carCode, or data.trainNo'
+            });
         }
         if (startDay !== currentDate) {
             log12306RequestFailure({
@@ -160,12 +243,18 @@ export default async function fetchEMUInfoBySeatCode(code: string) {
                 errorMsg: json.errorMsg,
                 detail: 'seat route startDay is not current day'
             });
-            return null;
+            return buildFailureResult('other_error', {
+                errorCode: json.errorCode,
+                errorMsg: json.errorMsg,
+                businessStatus: json.status,
+                detail: 'seat route startDay is not current day'
+            });
         }
 
         const canonicalEmuCode = await resolveCanonicalEmuCode(emuCode);
 
-        const result = {
+        const result: FetchSeatCodeSuccessResult = {
+            status: 'success',
             route: {
                 code: data.trainCode, // G xxxx
                 internalCode: data.trainNo,
@@ -203,6 +292,8 @@ export default async function fetchEMUInfoBySeatCode(code: string) {
             },
             error
         });
-        return null;
+        return buildFailureResult('network_error', {
+            detail: error instanceof Error ? error.message : String(error)
+        });
     }
 }

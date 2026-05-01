@@ -10,44 +10,17 @@ export const adminServerMetricsRouteTemplates = {
         { template: '/emu/:code', segments: ['emu', ':code'] },
         { template: '/feedback/:id', segments: ['feedback', ':id'] },
         { template: '/station/:name', segments: ['station', ':name'] },
-        { template: '/train/:code', segments: ['train', ':code'] }
+        { template: '/train/:code', segments: ['train', ':code'] },
     ],
     api: [
-        {
-            template: '/api/v1/feedback/topics/:id/messages',
-            segments: ['api', 'v1', 'feedback', 'topics', ':id', 'messages']
-        },
-        {
-            template: '/api/v1/auth/api-keys/:revokeId',
-            segments: ['api', 'v1', 'auth', 'api-keys', ':revokeId']
-        },
-        {
-            template: '/api/v1/auth/subscriptions/:id',
-            segments: ['api', 'v1', 'auth', 'subscriptions', ':id']
-        },
-        {
-            template: '/api/v1/exports/daily/:date',
-            segments: ['api', 'v1', 'exports', 'daily', ':date']
-        },
-        {
-            template: '/api/v1/feedback/topics/:id',
-            segments: ['api', 'v1', 'feedback', 'topics', ':id']
-        },
-        {
-            template: '/api/v1/history/emu/:emuCode',
-            segments: ['api', 'v1', 'history', 'emu', ':emuCode']
-        },
-        {
-            template: '/api/v1/history/train/:trainCode',
-            segments: ['api', 'v1', 'history', 'train', ':trainCode']
-        },
-        {
-            template: '/api/v1/timetable/station/:stationName',
-            segments: ['api', 'v1', 'timetable', 'station', ':stationName']
-        },
-        {
-            template: '/api/v1/timetable/train/:trainCode',
-            segments: ['api', 'v1', 'timetable', 'train', ':trainCode']
-        }
+        { template: '/api/v1/feedback/topics/:id/messages', segments: ['api', 'v1', 'feedback', 'topics', ':id', 'messages'] },
+        { template: '/api/v1/auth/api-keys/:revokeId', segments: ['api', 'v1', 'auth', 'api-keys', ':revokeId'] },
+        { template: '/api/v1/auth/subscriptions/:id', segments: ['api', 'v1', 'auth', 'subscriptions', ':id'] },
+        { template: '/api/v1/exports/daily/:date', segments: ['api', 'v1', 'exports', 'daily', ':date'] },
+        { template: '/api/v1/feedback/topics/:id', segments: ['api', 'v1', 'feedback', 'topics', ':id'] },
+        { template: '/api/v1/history/emu/:emuCode', segments: ['api', 'v1', 'history', 'emu', ':emuCode'] },
+        { template: '/api/v1/history/train/:trainCode', segments: ['api', 'v1', 'history', 'train', ':trainCode'] },
+        { template: '/api/v1/timetable/station/:stationName', segments: ['api', 'v1', 'timetable', 'station', ':stationName'] },
+        { template: '/api/v1/timetable/train/:trainCode', segments: ['api', 'v1', 'timetable', 'train', ':trainCode'] },
     ]
 } satisfies Record<'ssr' | 'api', AdminServerMetricsRouteTemplate[]>;

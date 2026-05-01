@@ -85,7 +85,8 @@
             "task": "data/task.db",
             "EMUTracked": "data/emu.db",
             "users": "data/users.db",
-            "feedback": "data/feedback.db"
+            "feedback": "data/feedback.db",
+            "trainProvenance": "data/train-provenance.db"
         },
         "runtime": {
             "adminTraffic": {
@@ -96,6 +97,10 @@
                 "file": "data/runtime/admin-server-metrics.json",
                 "flushIntervalMinutes": 10,
                 "sampleIntervalSeconds": 60
+            },
+            "trainProvenance": {
+                "enabled": true,
+                "retentionDays": 7
             }
         }
     },

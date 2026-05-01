@@ -25,9 +25,10 @@ export function createTaskExecutionContext(
 
 export function runWithTaskExecutionContext<T>(
     task: TaskRecord,
-    callback: () => T
+    callback: (context: TaskExecutionContextValue) => T
 ): T {
-    return taskExecutionContext.run(createTaskExecutionContext(task), callback);
+    const context = createTaskExecutionContext(task);
+    return taskExecutionContext.run(context, () => callback(context));
 }
 
 export function getCurrentTaskExecutionContext() {

@@ -10,6 +10,7 @@ import {
     estimateIdleTaskDurationMs,
     observeIdleTaskDurationMs
 } from '~/server/services/idleTaskEstimator';
+import { runWithTrainProvenanceTaskContext } from '~/server/services/trainProvenanceRecorder';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
 
 const logger = getLogger('task-scheduler');
@@ -91,8 +92,12 @@ async function runSingleTask(task: TaskRecord): Promise<RunTaskResult> {
     }
 
     try {
-        await runWithTaskExecutionContext(task, () =>
-            executor(parsedArguments.argumentsValue)
+        await runWithTaskExecutionContext(task, (executionContext) =>
+            runWithTrainProvenanceTaskContext(
+                executionContext,
+                parsedArguments.argumentsValue,
+                () => executor(parsedArguments.argumentsValue)
+            )
         );
     } catch (error) {
         const message =

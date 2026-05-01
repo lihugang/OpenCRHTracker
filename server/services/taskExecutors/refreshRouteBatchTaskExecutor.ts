@@ -1,6 +1,10 @@
 import getLogger from '~/server/libs/log4js';
 import useConfig from '~/server/config';
 import { registerTaskExecutor } from '~/server/services/taskExecutorRegistry';
+import {
+    markCurrentTrainProvenanceTaskSkipped,
+    recordCurrentTrainProvenanceEventsForTrainCodes
+} from '~/server/services/trainProvenanceRecorder';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
 import fetchRouteInfo from '~/server/utils/12306/network/fetchRouteInfo';
 import queryWithRetry from '~/server/utils/12306/scheduleProbe/queryWithRetry';
@@ -16,7 +20,10 @@ import {
 } from '~/server/utils/12306/scheduleProbe/stateStore';
 import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
-import { toShanghaiDayOffsetFromUnixSeconds } from '~/server/utils/date/shanghaiDateTime';
+import {
+    toShanghaiDayOffsetFromUnixSeconds,
+    toUnixSecondsFromShanghaiDayOffset
+} from '~/server/utils/date/shanghaiDateTime';
 import type { ScheduleState } from '~/server/utils/12306/scheduleProbe/types';
 
 export const REFRESH_ROUTE_BATCH_TASK_EXECUTOR = 'refresh_route_batch';
@@ -117,6 +124,7 @@ async function executeRefreshRouteBatchTaskInternal(rawArgs: unknown) {
     const retryAttempts = config.spider.scheduleProbe.retryAttempts;
     const args = parseTaskArgs(rawArgs, batchSize);
     if (args.codes.length === 0) {
+        markCurrentTrainProvenanceTaskSkipped('empty_codes');
         logger.info('skip empty_codes');
         return;
     }
@@ -124,11 +132,13 @@ async function executeRefreshRouteBatchTaskInternal(rawArgs: unknown) {
     const scheduleFilePath = config.data.assets.schedule.file;
     const state = loadPublishedScheduleState(scheduleFilePath);
     if (!state) {
+        markCurrentTrainProvenanceTaskSkipped('schedule_not_found');
         logger.warn(`skip schedule_not_found file=${scheduleFilePath}`);
         return;
     }
     const currentDate = getCurrentDateString();
     if (state.date !== currentDate) {
+        markCurrentTrainProvenanceTaskSkipped('schedule_not_current');
         logger.warn(
             `skip_non_current_schedule scheduleDate=${state.date} currentDate=${currentDate} file=${scheduleFilePath}`
         );
@@ -170,6 +180,28 @@ async function executeRefreshRouteBatchTaskInternal(rawArgs: unknown) {
 
         if (!routeResult.ok || routeResult.data.status !== 'running') {
             failed += 1;
+            recordCurrentTrainProvenanceEventsForTrainCodes(
+                [item.code, ...item.allCodes],
+                {
+                    serviceDate: state.date,
+                    startAt:
+                        item.startAt === null
+                            ? null
+                            : toUnixSecondsFromShanghaiDayOffset(
+                                  state.date,
+                                  item.startAt
+                              ),
+                    eventType: 'route_refresh_failed',
+                    result: routeResult.ok
+                        ? routeResult.data.status
+                        : 'request_failed',
+                    payload: {
+                        requestedCodes: args.codes,
+                        attempts: routeResult.attempts,
+                        groupCodes: [item.code, ...item.allCodes]
+                    }
+                }
+            );
             logger.debug(
                 `refresh_failed code=${item.code} attempts=${routeResult.attempts} groupSize=${groupItemIndexes.length}`
             );
@@ -253,6 +285,23 @@ async function executeRefreshRouteBatchTaskInternal(rawArgs: unknown) {
         if (groupChanged) {
             changed += 1;
         }
+
+        recordCurrentTrainProvenanceEventsForTrainCodes(nextAllCodes, {
+            serviceDate: state.date,
+            startAt: routeResult.data.route.startAt,
+            eventType: 'route_refresh_succeeded',
+            result: groupChanged ? 'changed' : 'unchanged',
+            payload: {
+                requestedCodes: args.codes,
+                attempts: routeResult.attempts,
+                startStation: nextStartStation,
+                endStation: nextEndStation,
+                endAt: routeResult.data.route.endAt,
+                allTrainCodes: nextAllCodes,
+                bureauCode: nextBureauCode,
+                internalCode: refreshedInternalCode
+            }
+        });
     }
 
     if (mutated) {

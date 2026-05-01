@@ -2,6 +2,7 @@ import getLogger from '~/server/libs/log4js';
 import useConfig from '~/server/config';
 import { ensureEmuDatabaseSchema } from '~/server/libs/database/emu';
 import { ensureTaskDatabaseSchema } from '~/server/libs/database/task';
+import { ensureTrainProvenanceDatabaseSchema } from '~/server/libs/database/trainProvenance';
 import { estimateIdleTaskDurationMs } from '~/server/services/idleTaskEstimator';
 import { listDailyRecordsAll } from '~/server/services/emuRoutesStore';
 import { clearProbeStatus } from '~/server/services/probeStatusStore';
@@ -15,6 +16,7 @@ import {
 } from '~/server/services/taskQueue';
 import { loadProbeAssets } from '~/server/services/probeAssetStore';
 import { warmHistoricalRecentTrainEmuIndex } from '~/server/services/historicalRecentTrainEmuIndexStore';
+import { cleanupExpiredTrainProvenance } from '~/server/services/trainProvenanceStore';
 import {
     BUILD_SCHEDULE_TASK_EXECUTOR,
     registerBuildScheduleTaskExecutor
@@ -176,6 +178,8 @@ export default defineNitroPlugin(async () => {
     try {
         ensureTaskDatabaseSchema();
         ensureEmuDatabaseSchema();
+        ensureTrainProvenanceDatabaseSchema();
+        cleanupExpiredTrainProvenance();
         await loadProbeAssets();
         try {
             warmHistoricalRecentTrainEmuIndex();
