@@ -314,16 +314,12 @@ export function insertDailyEmuRoute(
     }
 
     const identityLink = resolveTimetableIdentityLink(normalizedTrainCode, startAt);
-    if (identityLink.timetableId !== null) {
-        emuRouteStatements.run(
-            'deleteDailyRouteByTrainCodeAndEmuCodeAtStartAt',
-            normalizedTrainCode,
-            normalizedEmuCode,
-            identityLink.serviceDate,
-            null,
-            null
-        );
-    }
+    emuRouteStatements.run(
+        'deleteDailyRouteByTrainCodeAndEmuCodeAtStartAt',
+        normalizedTrainCode,
+        normalizedEmuCode,
+        identityLink.serviceDate
+    );
 
     emuRouteStatements.run(
         'insertDailyEmuRoute',
@@ -379,14 +375,12 @@ export function deleteDailyRouteByTrainCodeAndEmuCodeAtStartAt(
         return 0;
     }
 
-    const identityLink = resolveTimetableIdentityLink(normalizedTrainCode, startAt);
+    const serviceDate = normalizeServiceDateFromTimestamp(startAt);
     const result = emuRouteStatements.run(
         'deleteDailyRouteByTrainCodeAndEmuCodeAtStartAt',
         normalizedTrainCode,
         normalizedEmuCode,
-        identityLink.serviceDate,
-        identityLink.timetableId,
-        identityLink.timetableId
+        serviceDate
     );
     return result.changes;
 }

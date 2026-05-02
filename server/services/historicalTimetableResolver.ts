@@ -58,6 +58,7 @@ export interface HydratedHistoricalRouteSummary {
 export interface TimetableIdentityLink {
     serviceDate: string;
     timetableId: number | null;
+    resolution: 'exact' | 'latest_fallback' | 'unresolved';
 }
 
 export interface HistoricalRouteSummaryMatchInput {
@@ -255,9 +256,36 @@ export function resolveTimetableIdentityLink(
     trainCode: string,
     startAt: number
 ): TimetableIdentityLink {
+    const serviceDate = getServiceDateFromUnixSeconds(startAt);
+    const exactTimetableId = resolveTimetableIdByTrainCodeAndServiceDate(
+        trainCode,
+        serviceDate
+    );
+    if (exactTimetableId !== null) {
+        return {
+            serviceDate,
+            timetableId: exactTimetableId,
+            resolution: 'exact'
+        };
+    }
+
+    const latestCoverage =
+        getLatestTimetableHistoryCoverageByTrainCodeAtOrBeforeDate(
+            normalizeCode(trainCode),
+            serviceDate
+        );
+    if (latestCoverage) {
+        return {
+            serviceDate,
+            timetableId: latestCoverage.content_id,
+            resolution: 'latest_fallback'
+        };
+    }
+
     return {
-        serviceDate: getServiceDateFromUnixSeconds(startAt),
-        timetableId: resolveTimetableIdByTrainCodeAndStartAt(trainCode, startAt)
+        serviceDate,
+        timetableId: null,
+        resolution: 'unresolved'
     };
 }
 
