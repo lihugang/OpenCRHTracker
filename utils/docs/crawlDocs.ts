@@ -128,7 +128,8 @@ export const crawlDocsSections: DocsContentSection[] = [
                 title: '更新时刻表阶段',
                 items: [
                     '对上一步得到的车次按组处理，调用 12306 查车次时刻表接口回填列车的出发时间、站点和终到时间、站点以及 12306 内部车次号。',
-                    '如果之前的时刻表文件里已经有可复用的线路信息，buildTodaySchedule 会优先复用，减少冷启动请求量。'
+                    '如果之前的时刻表文件里已经有可复用的线路信息，buildTodaySchedule 会优先复用，减少冷启动请求量。',
+                    '只有 enrich 阶段真正成功抓到 routeInfo 并在 promoteBuildingScheduleState 之后写回 published 的车次组，才会被记为“已确认”的历史时刻表；仅复用昨天的 route 信息不会续写历史 coverage。'
                 ]
             },
             {
@@ -140,6 +141,7 @@ export const crawlDocsSections: DocsContentSection[] = [
                     '  -> buildTodaySchedule',
                     '  -> runScheduleProbe(discover -> enrich)',
                     '  -> promoteBuildingScheduleState',
+                    '  -> sync confirmed timetable history',
                     '  -> enqueue dispatch_daily_probe_tasks',
                     '  -> enqueue next build_today_schedule'
                 ].join('\n')
@@ -162,7 +164,8 @@ export const crawlDocsSections: DocsContentSection[] = [
                 items: [
                     'generate_route_refresh_tasks 把待刷新列车信息拆成多批车次号，每批创建一个 refresh_route_batch。',
                     'refresh_route_batch 会再次调用 12306 查车次时刻表接口并把最新线路信息写回时刻表文件。',
-                    '为了避免与其它更新竞争，refresh_route_batch 在保存前会重新读取最新时刻表信息，再按组应用更新。'
+                    '为了避免与其它更新竞争，refresh_route_batch 在保存前会重新读取最新时刻表信息，再按组应用更新。',
+                    '只有 refresh_route_batch 成功保存到 published 的车次组才会同步进入内部历史时刻表库；如果同日补刷后 hash 未变化，就只续写或保持已确认 coverage，不会重复创建内容。'
                 ]
             },
             {
@@ -329,7 +332,19 @@ export const crawlDocsSections: DocsContentSection[] = [
                         description:
                             'published schedule 和 building schedule 都围绕这个资产文件读写，todayScheduleCache 也会观察它的修改时间。',
                         notes: [
-                            '文件路径必须可读写，私有部署时建议放在持久化 data 目录内。'
+                            '文件路径必须可读写，私有部署时建议放在持久化 data 目录内。',
+                            '内部历史时刻表不会直接把整份 schedule.json 当作快照归档，而是在确认过的车次组落盘后提取规范化 stops 内容写入独立数据库。'
+                        ]
+                    },
+                    {
+                        path: 'data.databases.timetableHistory',
+                        valueType: 'string',
+                        required: true,
+                        description:
+                            '内部历史时刻表积累数据库文件路径，保存规范化后的时刻表内容和按 service date 压缩的 coverage 段。',
+                        notes: [
+                            '只有 build enrich 成功或 refresh_route_batch 成功落盘的车次组才会写入。',
+                            '中间有未确认日期缺口时，不会跨缺口续写 coverage。'
                         ]
                     },
                     {
