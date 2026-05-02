@@ -78,6 +78,8 @@ export interface FetchSeatCodeSuccessResult {
     route: {
         code: string;
         internalCode: string;
+        startDay: string;
+        endDay: string;
         startAt: number;
         endAt: number;
         trainRepeat: string;
@@ -87,6 +89,16 @@ export interface FetchSeatCodeSuccessResult {
     };
 }
 
+export interface FetchSeatCodeRouteSnapshot {
+    code: string;
+    internalCode: string;
+    startDay: string;
+    endDay: string;
+    startAt: number;
+    endAt: number;
+    trainRepeat: string;
+}
+
 export interface FetchSeatCodeFailureResult {
     status: 'request_failed';
     reason: FetchSeatCodeFailureReason;
@@ -94,6 +106,7 @@ export interface FetchSeatCodeFailureResult {
     errorMsg: string;
     businessStatus: boolean | null;
     detail: string;
+    route: FetchSeatCodeRouteSnapshot | null;
 }
 
 export type FetchSeatCodeResult =
@@ -107,6 +120,7 @@ function buildFailureResult(
         errorMsg?: string;
         businessStatus?: boolean | null;
         detail?: string;
+        route?: FetchSeatCodeRouteSnapshot | null;
     } = {}
 ): FetchSeatCodeFailureResult {
     return {
@@ -118,7 +132,40 @@ function buildFailureResult(
             typeof options.businessStatus === 'boolean'
                 ? options.businessStatus
                 : null,
-        detail: options.detail?.trim() ?? ''
+        detail: options.detail?.trim() ?? '',
+        route: options.route ?? null
+    };
+}
+
+function buildRouteSnapshot(
+    data: EMUInfoResponse['data'] | undefined
+): FetchSeatCodeRouteSnapshot | null {
+    const startDay = data?.startDay?.trim() ?? '';
+    const endDay = data?.endDay?.trim() ?? '';
+    const startTime = data?.startTime?.trim() ?? '';
+    const endTime = data?.endTime?.trim() ?? '';
+    const trainCode = data?.trainCode?.trim() ?? '';
+    const trainNo = data?.trainNo?.trim() ?? '';
+
+    if (
+        startDay.length === 0 ||
+        endDay.length === 0 ||
+        startTime.length === 0 ||
+        endTime.length === 0 ||
+        trainCode.length === 0 ||
+        trainNo.length === 0
+    ) {
+        return null;
+    }
+
+    return {
+        code: trainCode,
+        internalCode: trainNo,
+        startDay,
+        endDay,
+        startAt: getShanghaiUnixSecondsFromDateAndTime(startDay, startTime),
+        endAt: getShanghaiUnixSecondsFromDateAndTime(endDay, endTime),
+        trainRepeat: data?.trainRepeat?.trim() ?? ''
     };
 }
 
@@ -200,6 +247,7 @@ export default async function fetchEMUInfoBySeatCode(
         }
 
         const data = json.data;
+        const routeSnapshot = buildRouteSnapshot(data);
         const emuCode = data?.carCode?.trim();
         const startDay = data?.startDay?.trim() ?? '';
         if (!emuCode || !data?.trainNo) {
@@ -222,7 +270,8 @@ export default async function fetchEMUInfoBySeatCode(
                 errorCode: json.errorCode,
                 errorMsg: json.errorMsg,
                 businessStatus: json.status,
-                detail: 'missing data, data.carCode, or data.trainNo'
+                detail: 'missing data, data.carCode, or data.trainNo',
+                route: routeSnapshot
             });
         }
         if (startDay !== currentDate) {
@@ -247,7 +296,8 @@ export default async function fetchEMUInfoBySeatCode(
                 errorCode: json.errorCode,
                 errorMsg: json.errorMsg,
                 businessStatus: json.status,
-                detail: 'seat route startDay is not current day'
+                detail: 'seat route startDay is not current day',
+                route: routeSnapshot
             });
         }
 
@@ -258,6 +308,8 @@ export default async function fetchEMUInfoBySeatCode(
             route: {
                 code: data.trainCode, // G xxxx
                 internalCode: data.trainNo,
+                startDay,
+                endDay: data.endDay?.trim() ?? '',
                 startAt: getShanghaiUnixSecondsFromDateAndTime(
                     startDay,
                     data.startTime

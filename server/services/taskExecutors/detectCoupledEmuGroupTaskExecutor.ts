@@ -546,7 +546,17 @@ async function scanUnassignedCandidates(
                 ),
                 scannedStartAt: seatCodeResult.route.startAt,
                 detail: {
-                    routeEndAt: seatCodeResult.route.endAt
+                    route: {
+                        code: scannedTrainCode,
+                        internalCode: normalizeCode(
+                            seatCodeResult.route.internalCode
+                        ),
+                        startDay: seatCodeResult.route.startDay,
+                        endDay: seatCodeResult.route.endDay,
+                        startAt: seatCodeResult.route.startAt,
+                        endAt: seatCodeResult.route.endAt,
+                        trainRepeat: seatCodeResult.route.trainRepeat
+                    }
                 }
             });
             logger.debug(

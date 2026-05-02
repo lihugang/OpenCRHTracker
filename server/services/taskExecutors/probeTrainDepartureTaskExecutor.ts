@@ -1237,6 +1237,9 @@ async function tryReuseHistoricalProbeStatus(
         mainEmuCode,
         latestResolvedRow.start_at
     );
+    const historicalTrainCodes = uniqueNormalizedCodes(
+        historicalRows.map((row) => row.train_code)
+    );
     const allEmuCodes =
         knownGroup.emuCodes.length > 0 ? knownGroup.emuCodes : [mainEmuCode];
     if (
@@ -1255,6 +1258,7 @@ async function tryReuseHistoricalProbeStatus(
                 historicalStartAt: latestResolvedRow.start_at,
                 historicalStatus: latestResolvedRow.status,
                 knownFinalStatus: knownGroup.finalStatus,
+                historicalTrainCodes,
                 emuCodes: allEmuCodes
             }
         });
@@ -1287,6 +1291,7 @@ async function tryReuseHistoricalProbeStatus(
         payload: {
             historicalStartAt: latestResolvedRow.start_at,
             historicalStatus: latestResolvedRow.status,
+            historicalTrainCodes,
             emuCodes: allEmuCodes
         }
     });

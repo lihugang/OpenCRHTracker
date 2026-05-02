@@ -1,8 +1,10 @@
 import {
+    listDailyRoutesByEmuCodeInRange,
     listDailyRoutesByTrainCodeInRange,
     type DailyEmuRouteRow
 } from '~/server/services/emuRoutesStore';
 import {
+    listProbeStatusByEmuCode,
     listProbeStatusByTrainCodeInRange,
     ProbeStatusValue,
     type ProbeStatusRow
@@ -14,22 +16,31 @@ import {
     listCouplingScanCandidatesByTaskRunId,
     listTrainProvenanceDepartureStartAts,
     listTrainProvenanceEventsByDateAndTrainCode,
+    type CouplingScanCandidateRecord,
     type TrainProvenanceEventRecord
 } from '~/server/services/trainProvenanceStore';
+import {
+    getTodayScheduleCache,
+    type TodayScheduleRoute
+} from '~/server/services/todayScheduleCache';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
 import getDayTimestampRange from '~/server/utils/date/getDayTimestampRange';
+import { formatShanghaiDateString } from '~/server/utils/date/getCurrentDateString';
 import type {
     AdminCouplingScanCandidate,
     AdminCouplingScanDetailResponse,
     AdminCouplingScanTaskRunSummary,
     AdminTrainProvenanceCouplingScanDetail,
+    AdminTrainProvenanceCoupledResolutionDetail,
     AdminTrainProvenanceConflictCurrentGroup,
     AdminTrainProvenanceConflictDetail,
     AdminTrainProvenanceConflictGroup,
     AdminTrainProvenanceConflictState,
     AdminTrainProvenanceDeparture,
     AdminTrainProvenanceEvent,
+    AdminTrainProvenanceHistoricalReuseDetail,
     AdminTrainProvenanceLatestStatus,
+    AdminTrainRouteSnapshot,
     AdminTrainProvenanceResponse
 } from '~/types/admin';
 
@@ -108,6 +119,454 @@ function getStringArray(value: unknown): string[] {
     return Array.isArray(value)
         ? value.filter((item): item is string => typeof item === 'string')
         : [];
+}
+
+function normalizeTrainCodeList(trainCodes: string[]): string[] {
+    return Array.from(
+        new Set(
+            trainCodes
+                .map((trainCode) => normalizeCode(trainCode))
+                .filter((trainCode) => trainCode.length > 0)
+        )
+    ).sort();
+}
+
+function formatServiceDateFromStartAt(startAt: number | null): string {
+    return startAt !== null && startAt > 0
+        ? formatShanghaiDateString(startAt * 1000)
+        : '';
+}
+
+function buildTrainRouteSnapshot(input: {
+    serviceDate?: string;
+    trainCodes?: string[];
+    internalCode?: string;
+    startAt?: number | null;
+    endAt?: number | null;
+    startStation?: string;
+    endStation?: string;
+    cacheStatus?: AdminTrainRouteSnapshot['cacheStatus'];
+    cacheNote?: string;
+}): AdminTrainRouteSnapshot | null {
+    const trainCodes = normalizeTrainCodeList(input.trainCodes ?? []);
+    const startAt = getOptionalInteger(input.startAt);
+    const endAt = getOptionalInteger(input.endAt);
+    const startStation = (input.startStation ?? '').trim();
+    const endStation = (input.endStation ?? '').trim();
+    const internalCode = normalizeCode(input.internalCode ?? '');
+    const serviceDate =
+        /^\d{8}$/.test(input.serviceDate ?? '')
+            ? (input.serviceDate as string)
+            : formatServiceDateFromStartAt(startAt);
+
+    if (
+        trainCodes.length === 0 &&
+        internalCode.length === 0 &&
+        startAt === null &&
+        endAt === null &&
+        startStation.length === 0 &&
+        endStation.length === 0 &&
+        serviceDate.length === 0
+    ) {
+        return null;
+    }
+
+    return {
+        serviceDate,
+        trainCodes,
+        internalCode,
+        startAt,
+        endAt,
+        startStation,
+        endStation,
+        cacheStatus: input.cacheStatus ?? 'not_applicable',
+        cacheNote: (input.cacheNote ?? '').trim()
+    };
+}
+
+function getTodayScheduleRouteByTrainCodes(
+    trainCodes: string[]
+): TodayScheduleRoute | null {
+    const todayScheduleRoutes = getTodayScheduleCache();
+    for (const trainCode of normalizeTrainCodeList(trainCodes)) {
+        const route = todayScheduleRoutes.get(trainCode);
+        if (route) {
+            return route;
+        }
+    }
+
+    return null;
+}
+
+function fillRouteStationsFromTodayCache(
+    snapshot: AdminTrainRouteSnapshot | null
+): AdminTrainRouteSnapshot | null {
+    if (!snapshot) {
+        return null;
+    }
+
+    if (snapshot.startStation.length > 0 && snapshot.endStation.length > 0) {
+        return snapshot;
+    }
+
+    const todayRoute = getTodayScheduleRouteByTrainCodes(snapshot.trainCodes);
+    if (!todayRoute) {
+        return {
+            ...snapshot,
+            cacheStatus: 'miss',
+            cacheNote: '今日时刻表未命中缓存'
+        };
+    }
+
+    return {
+        ...snapshot,
+        startStation: snapshot.startStation || todayRoute.startStation,
+        endStation: snapshot.endStation || todayRoute.endStation,
+        cacheStatus: 'hit',
+        cacheNote:
+            snapshot.cacheNote || '已使用今日时刻表补充站点'
+    };
+}
+
+function buildGroupedRouteSnapshots(
+    rows: DailyEmuRouteRow[]
+): AdminTrainRouteSnapshot[] {
+    const groups = new Map<
+        string,
+        {
+            trainCodes: Set<string>;
+            startAt: number;
+            endAt: number;
+            startStation: string;
+            endStation: string;
+        }
+    >();
+
+    for (const row of rows) {
+        const key = [
+            row.start_at,
+            row.end_at,
+            row.start_station_name,
+            row.end_station_name
+        ].join('#');
+        const currentGroup = groups.get(key) ?? {
+            trainCodes: new Set<string>(),
+            startAt: row.start_at,
+            endAt: row.end_at,
+            startStation: row.start_station_name,
+            endStation: row.end_station_name
+        };
+        currentGroup.trainCodes.add(row.train_code);
+        groups.set(key, currentGroup);
+    }
+
+    return Array.from(groups.values())
+        .map((group) =>
+            buildTrainRouteSnapshot({
+                serviceDate: formatServiceDateFromStartAt(group.startAt),
+                trainCodes: Array.from(group.trainCodes),
+                startAt: group.startAt,
+                endAt: group.endAt,
+                startStation: group.startStation,
+                endStation: group.endStation
+            })
+        )
+        .filter(
+            (snapshot): snapshot is AdminTrainRouteSnapshot => snapshot !== null
+        )
+        .sort((left, right) => {
+            const leftStartAt = left.startAt ?? Number.MAX_SAFE_INTEGER;
+            const rightStartAt = right.startAt ?? Number.MAX_SAFE_INTEGER;
+            return leftStartAt - rightStartAt;
+        });
+}
+
+function listRouteRowsByTrainCodesAtStart(
+    trainCodes: string[],
+    startAt: number
+): DailyEmuRouteRow[] {
+    if (!Number.isInteger(startAt) || startAt <= 0) {
+        return [];
+    }
+
+    const rowsById = new Map<number, DailyEmuRouteRow>();
+    for (const trainCode of normalizeTrainCodeList(trainCodes)) {
+        const rows = listDailyRoutesByTrainCodeInRange(
+            trainCode,
+            startAt,
+            startAt + 1
+        );
+        for (const row of rows) {
+            rowsById.set(row.id, row);
+        }
+    }
+
+    return Array.from(rowsById.values());
+}
+
+function resolveExactRouteSnapshot(
+    trainCodes: string[],
+    startAt: number | null,
+    serviceDate = '',
+    internalCode = ''
+): AdminTrainRouteSnapshot | null {
+    const normalizedTrainCodes = normalizeTrainCodeList(trainCodes);
+    const normalizedStartAt = getOptionalInteger(startAt);
+    if (normalizedTrainCodes.length === 0 && normalizedStartAt === null) {
+        return null;
+    }
+
+    if (normalizedStartAt !== null) {
+        const routeRows = listRouteRowsByTrainCodesAtStart(
+            normalizedTrainCodes,
+            normalizedStartAt
+        );
+        const groupedSnapshots = buildGroupedRouteSnapshots(routeRows);
+        if (groupedSnapshots.length > 0) {
+            return {
+                ...groupedSnapshots[0]!,
+                internalCode: normalizeCode(internalCode)
+            };
+        }
+    }
+
+    return buildTrainRouteSnapshot({
+        serviceDate,
+        trainCodes: normalizedTrainCodes,
+        internalCode,
+        startAt: normalizedStartAt,
+        endAt: null,
+        startStation: '',
+        endStation: ''
+    });
+}
+
+interface SeatCodeRoutePayload {
+    code: string;
+    internalCode: string;
+    startDay: string;
+    endDay: string;
+    startAt: number | null;
+    endAt: number | null;
+    trainRepeat: string;
+}
+
+function toSeatCodeRoutePayload(value: unknown): SeatCodeRoutePayload | null {
+    const payload = getPayloadObject(value);
+    if (!payload) {
+        return null;
+    }
+
+    const code = normalizeCode(getOptionalString(payload.code) ?? '');
+    const internalCode = normalizeCode(
+        getOptionalString(payload.internalCode) ?? ''
+    );
+    const startAt = getOptionalInteger(payload.startAt);
+    const endAt = getOptionalInteger(payload.endAt);
+    const startDayRaw = getOptionalString(payload.startDay) ?? '';
+    const endDayRaw = getOptionalString(payload.endDay) ?? '';
+    const startDay =
+        /^\d{8}$/.test(startDayRaw) && startDayRaw.length > 0
+            ? startDayRaw
+            : formatServiceDateFromStartAt(startAt);
+    const endDay =
+        /^\d{8}$/.test(endDayRaw) && endDayRaw.length > 0
+            ? endDayRaw
+            : formatServiceDateFromStartAt(endAt);
+
+    if (
+        code.length === 0 &&
+        internalCode.length === 0 &&
+        startAt === null &&
+        endAt === null &&
+        startDay.length === 0 &&
+        endDay.length === 0
+    ) {
+        return null;
+    }
+
+    return {
+        code,
+        internalCode,
+        startDay,
+        endDay,
+        startAt,
+        endAt,
+        trainRepeat: (getOptionalString(payload.trainRepeat) ?? '').trim()
+    };
+}
+
+function getDetailRouteEndAt(detail: unknown): number | null {
+    const payload = getPayloadObject(detail);
+    return getOptionalInteger(payload?.routeEndAt);
+}
+
+function extractHistoricalReuseDetail(
+    event: TrainProvenanceEventRecord
+): AdminTrainProvenanceHistoricalReuseDetail | null {
+    if (event.eventType !== 'historical_reuse_selected') {
+        return null;
+    }
+
+    const payload = getPayloadObject(event.payload);
+    const historicalStartAt = getOptionalInteger(payload?.historicalStartAt);
+    const emuCodes = getStringArray(payload?.emuCodes).map((emuCode) =>
+        normalizeCode(emuCode)
+    );
+    const payloadTrainCodes = getStringArray(payload?.historicalTrainCodes);
+    const routeRows =
+        historicalStartAt === null
+            ? []
+            : listProbeStatusByEmuCode(event.emuCode, historicalStartAt);
+    const historicalTrainCodes = normalizeTrainCodeList([
+        ...payloadTrainCodes,
+        ...routeRows.map((row) => row.train_code)
+    ]);
+    const historicalRoute = fillRouteStationsFromTodayCache(
+        resolveExactRouteSnapshot(
+            historicalTrainCodes,
+            historicalStartAt,
+            formatServiceDateFromStartAt(historicalStartAt)
+        )
+    );
+
+    return {
+        historicalRoute,
+        resultStatus: event.result === 'coupled' ? 'coupled' : 'single',
+        emuCodes: normalizeTrainCodeList(emuCodes)
+    };
+}
+
+function extractCoupledResolutionDetail(
+    event: TrainProvenanceEventRecord
+): AdminTrainProvenanceCoupledResolutionDetail | null {
+    if (event.eventType !== 'coupling_group_resolved_coupled') {
+        return null;
+    }
+
+    const payload = getPayloadObject(event.payload);
+    const emuCodes = normalizeTrainCodeList(getStringArray(payload?.emuCodes));
+    const route =
+        fillRouteStationsFromTodayCache(
+            buildTrainRouteSnapshot({
+                serviceDate: formatServiceDateFromStartAt(event.startAt),
+                trainCodes:
+                    getTodayScheduleRouteByTrainCodes([event.trainCode])
+                        ?.allCodes ?? [event.trainCode],
+                startAt: event.startAt,
+                endAt: getOptionalInteger(payload?.endAt),
+                startStation: getOptionalString(payload?.startStation) ?? '',
+                endStation: getOptionalString(payload?.endStation) ?? ''
+            })
+        ) ?? null;
+
+    return {
+        route,
+        emuCodes,
+        upgradedFromSingle: event.result === 'upgraded_from_single'
+    };
+}
+
+function formatRouteTrainCodes(snapshot: AdminTrainRouteSnapshot | null): string {
+    return snapshot && snapshot.trainCodes.length > 0
+        ? snapshot.trainCodes.join(' / ')
+        : '--';
+}
+
+function formatEmuCodes(emuCodes: string[]): string {
+    const normalizedCodes = normalizeTrainCodeList(emuCodes);
+    return normalizedCodes.length > 0 ? normalizedCodes.join(' / ') : '--';
+}
+
+function resolveScannedRoute(
+    candidate: CouplingScanCandidateRecord
+): AdminTrainRouteSnapshot | null {
+    const detailPayload = getPayloadObject(candidate.detail);
+    const routePayload =
+        toSeatCodeRoutePayload(detailPayload?.route) ??
+        toSeatCodeRoutePayload(candidate.detail);
+    const baseSnapshot =
+        buildTrainRouteSnapshot({
+            serviceDate:
+                routePayload?.startDay || candidate.serviceDate,
+            trainCodes: [
+                routePayload?.code || candidate.scannedTrainCode
+            ].filter((trainCode) => trainCode.length > 0),
+            internalCode:
+                routePayload?.internalCode || candidate.scannedInternalCode,
+            startAt: routePayload?.startAt ?? candidate.scannedStartAt,
+            endAt:
+                routePayload?.endAt ?? getDetailRouteEndAt(candidate.detail),
+            startStation: '',
+            endStation: ''
+        }) ??
+        null;
+
+    return fillRouteStationsFromTodayCache(baseSnapshot);
+}
+
+function resolveMatchedRoute(
+    candidate: CouplingScanCandidateRecord
+): AdminTrainRouteSnapshot | null {
+    if (
+        candidate.matchedTrainCode.length === 0 &&
+        candidate.matchedStartAt === null
+    ) {
+        return null;
+    }
+
+    return fillRouteStationsFromTodayCache(
+        resolveExactRouteSnapshot(
+            [candidate.matchedTrainCode],
+            candidate.matchedStartAt,
+            formatServiceDateFromStartAt(candidate.matchedStartAt)
+        )
+    );
+}
+
+function resolveOccupiedRoutes(
+    candidate: CouplingScanCandidateRecord
+): AdminTrainRouteSnapshot[] {
+    if (candidate.reason !== 'already_assigned') {
+        return [];
+    }
+
+    const occupiedDayRange = getDayTimestampRange(candidate.serviceDate);
+    const routeRows = listDailyRoutesByEmuCodeInRange(
+        candidate.candidateEmuCode,
+        occupiedDayRange.startAt,
+        occupiedDayRange.endAt + 1
+    );
+    const occupiedSnapshots = buildGroupedRouteSnapshots(routeRows);
+    if (occupiedSnapshots.length > 0) {
+        return occupiedSnapshots;
+    }
+
+    const detailPayload = getPayloadObject(candidate.detail);
+    const hintedTrainCodes = getStringArray(detailPayload?.trainCodes);
+    const hintedStartAts = Array.isArray(detailPayload?.startAts)
+        ? detailPayload.startAts
+              .map((startAt) => getOptionalInteger(startAt))
+              .filter((startAt): startAt is number => startAt !== null)
+        : [];
+
+    if (hintedTrainCodes.length === 0 && hintedStartAts.length === 0) {
+        return [];
+    }
+
+    return hintedStartAts
+        .map((startAt) =>
+            fillRouteStationsFromTodayCache(
+                resolveExactRouteSnapshot(
+                    hintedTrainCodes,
+                    startAt,
+                    formatServiceDateFromStartAt(startAt)
+                )
+            )
+        )
+        .filter(
+            (snapshot): snapshot is AdminTrainRouteSnapshot => snapshot !== null
+        );
 }
 
 function isConflictState(
@@ -277,6 +736,10 @@ function formatSeatCodeFailureReasonText(detail: unknown): string {
             : '畅行码未启用';
     }
 
+    if (extraDetail === 'seat route startDay is not current day') {
+        return '列车发车时间不是当前日期';
+    }
+
     const parts = [errorCode, errorMsg, extraDetail].filter(
         (item) => item.length > 0
     );
@@ -340,7 +803,9 @@ function buildPendingCouplingScanSummary(
 
 function formatEventSummary(
     event: TrainProvenanceEventRecord,
-    conflictDetail: AdminTrainProvenanceConflictDetail | null
+    conflictDetail: AdminTrainProvenanceConflictDetail | null,
+    historicalReuse: AdminTrainProvenanceHistoricalReuseDetail | null,
+    coupledResolution: AdminTrainProvenanceCoupledResolutionDetail | null
 ): string {
     const payload = getPayloadObject(event.payload);
     const linkedTaskText =
@@ -370,6 +835,13 @@ function formatEventSummary(
             }
             return '冲突交路未运行，已清理冲突记录';
         case 'historical_reuse_selected':
+            if (historicalReuse?.historicalRoute) {
+                const resultLabel =
+                    historicalReuse.resultStatus === 'coupled'
+                        ? '重联结果'
+                        : '单组结果';
+                return `复用了历史 ${formatRouteTrainCodes(historicalReuse.historicalRoute)} 的${resultLabel}（${formatEmuCodes(historicalReuse.emuCodes)}）`;
+            }
             return event.result === 'coupled'
                 ? '复用了历史重联结果'
                 : '复用了历史单组结果';
@@ -396,6 +868,11 @@ function formatEventSummary(
         case 'coupling_group_resolved_single':
             return '重联扫描结束，判定为单组';
         case 'coupling_group_resolved_coupled':
+            if (coupledResolution && coupledResolution.emuCodes.length > 0) {
+                return event.result === 'upgraded_from_single'
+                    ? `重联扫描结束，结果升级为 ${formatEmuCodes(coupledResolution.emuCodes)} 重联`
+                    : `重联扫描结束，判定为 ${formatEmuCodes(coupledResolution.emuCodes)} 重联`;
+            }
             return event.result === 'upgraded_from_single'
                 ? '重联扫描结束，结果升级为重联'
                 : '重联扫描结束，判定为重联';
@@ -421,6 +898,8 @@ function toTimelineEvent(
     event: TrainProvenanceEventRecord
 ): AdminTrainProvenanceEvent {
     const conflictDetail = extractConflictDetail(event);
+    const historicalReuse = extractHistoricalReuseDetail(event);
+    const coupledResolution = extractCoupledResolutionDetail(event);
 
     return {
         id: event.id,
@@ -436,11 +915,18 @@ function toTimelineEvent(
         relatedEmuCode: event.relatedEmuCode,
         eventType: event.eventType,
         result: event.result,
-        summary: formatEventSummary(event, conflictDetail),
+        summary: formatEventSummary(
+            event,
+            conflictDetail,
+            historicalReuse,
+            coupledResolution
+        ),
         linkedSchedulerTaskId: event.linkedSchedulerTaskId,
         linkedTaskRunId: event.linkedTaskRunId,
         conflictDetail,
         couplingScan: null,
+        historicalReuse,
+        coupledResolution,
         payload: event.payload
     };
 }
@@ -615,6 +1101,7 @@ export function getAdminCouplingScanDetail(
         (candidate) => ({
             id: candidate.id,
             candidateOrder: candidate.candidateOrder,
+            serviceDate: candidate.serviceDate,
             candidateEmuCode: candidate.candidateEmuCode,
             status: candidate.status,
             reason: formatCouplingScanCandidateReason(
@@ -627,6 +1114,9 @@ export function getAdminCouplingScanDetail(
             matchedTrainCode: candidate.matchedTrainCode,
             matchedStartAt: candidate.matchedStartAt,
             trainRepeat: candidate.trainRepeat,
+            scannedRoute: resolveScannedRoute(candidate),
+            matchedRoute: resolveMatchedRoute(candidate),
+            occupiedRoutes: resolveOccupiedRoutes(candidate),
             detail: candidate.detail,
             createdAt: candidate.createdAt
         })

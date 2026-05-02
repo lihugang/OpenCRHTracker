@@ -278,7 +278,11 @@
                                                         item
                                                     )
                                                 ">
-                                                扫描结果
+                                                {{
+                                                    getCouplingScanActionLabel(
+                                                        item
+                                                    )
+                                                }}
                                             </UiButton>
                                             <span
                                                 v-if="
@@ -400,6 +404,178 @@
                                                 </article>
                                             </div>
                                         </div>
+
+                                        <div
+                                            v-if="item.historicalReuse"
+                                            class="rounded-[0.875rem] border border-slate-200 bg-slate-50/80 px-4 py-4">
+                                            <div class="space-y-3">
+                                                <div
+                                                    class="flex flex-col gap-1 lg:flex-row lg:items-center lg:justify-between">
+                                                    <p
+                                                        class="text-sm font-semibold text-slate-900">
+                                                        历史复用
+                                                    </p>
+                                                    <p
+                                                        class="text-xs leading-5 text-slate-500">
+                                                        结果：{{
+                                                            getHistoricalReuseResultLabel(
+                                                                item
+                                                                    .historicalReuse
+                                                                    .resultStatus
+                                                            )
+                                                        }}
+                                                    </p>
+                                                </div>
+
+                                                <p
+                                                    class="text-sm leading-6 text-slate-600">
+                                                    车组：{{
+                                                        formatEmuCodeList(
+                                                            item.historicalReuse
+                                                                .emuCodes
+                                                        )
+                                                    }}
+                                                </p>
+
+                                                <div
+                                                    v-if="
+                                                        item.historicalReuse
+                                                            .historicalRoute
+                                                    "
+                                                    class="rounded-[0.75rem] border border-white/80 bg-white/90 px-3 py-3">
+                                                    <p
+                                                        class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                                                        复用的历史车次
+                                                    </p>
+                                                    <p
+                                                        class="mt-1 text-sm font-semibold text-slate-900">
+                                                        {{
+                                                            formatRouteSnapshotTrainCodes(
+                                                                item
+                                                                    .historicalReuse
+                                                                    .historicalRoute
+                                                            )
+                                                        }}
+                                                    </p>
+                                                    <p
+                                                        class="text-sm leading-6 text-slate-600">
+                                                        {{
+                                                            formatRouteSnapshotSchedule(
+                                                                item
+                                                                    .historicalReuse
+                                                                    .historicalRoute
+                                                            )
+                                                        }}
+                                                    </p>
+                                                    <p
+                                                        class="text-sm leading-6 text-slate-600">
+                                                        {{
+                                                            formatRouteSnapshotStations(
+                                                                item
+                                                                    .historicalReuse
+                                                                    .historicalRoute
+                                                            )
+                                                        }}
+                                                    </p>
+                                                    <p
+                                                        v-if="
+                                                            item.historicalReuse
+                                                                .historicalRoute
+                                                                .cacheNote
+                                                        "
+                                                        class="text-xs leading-5"
+                                                        :class="
+                                                            getRouteSnapshotNoteClass(
+                                                                item
+                                                                    .historicalReuse
+                                                                    .historicalRoute
+                                                            )
+                                                        ">
+                                                        {{
+                                                            item.historicalReuse
+                                                                .historicalRoute
+                                                                .cacheNote
+                                                        }}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div
+                                            v-if="item.coupledResolution"
+                                            class="rounded-[0.875rem] border border-blue-200 bg-blue-50/70 px-4 py-4">
+                                            <div class="space-y-3">
+                                                <div
+                                                    class="flex flex-col gap-1 lg:flex-row lg:items-center lg:justify-between">
+                                                    <p
+                                                        class="text-sm font-semibold text-slate-900">
+                                                        重联判定
+                                                    </p>
+                                                    <p
+                                                        v-if="
+                                                            item
+                                                                .coupledResolution
+                                                                .upgradedFromSingle
+                                                        "
+                                                        class="text-xs leading-5 text-blue-700">
+                                                        由单组升级
+                                                    </p>
+                                                </div>
+
+                                                <p
+                                                    class="text-sm leading-6 text-slate-600">
+                                                    判定为：{{
+                                                        formatEmuCodeList(
+                                                            item
+                                                                .coupledResolution
+                                                                .emuCodes
+                                                        )
+                                                    }}
+                                                </p>
+
+                                                <div
+                                                    v-if="
+                                                        item.coupledResolution
+                                                            .route
+                                                    "
+                                                    class="rounded-[0.75rem] border border-white/80 bg-white/90 px-3 py-3">
+                                                    <p
+                                                        class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                                                        当前班次
+                                                    </p>
+                                                    <p
+                                                        class="mt-1 text-sm font-semibold text-slate-900">
+                                                        {{
+                                                            formatRouteSnapshotTrainCodes(
+                                                                item
+                                                                    .coupledResolution
+                                                                    .route
+                                                            )
+                                                        }}
+                                                    </p>
+                                                    <p
+                                                        class="text-sm leading-6 text-slate-600">
+                                                        {{
+                                                            formatRouteSnapshotSchedule(
+                                                                item
+                                                                    .coupledResolution
+                                                                    .route
+                                                            )
+                                                        }}
+                                                    </p>
+                                                    <p
+                                                        class="text-sm leading-6 text-slate-600">
+                                                        {{
+                                                            formatRouteSnapshotStations(
+                                                                item
+                                                                    .coupledResolution
+                                                                    .route
+                                                            )
+                                                        }}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </article>
                             </div>
@@ -466,55 +642,167 @@
                             v-for="item in couplingDetailData.candidates"
                             :key="item.id"
                             class="rounded-[1rem] border border-slate-200 bg-white/90 px-4 py-4">
-                            <div
-                                class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                                <div class="space-y-2">
-                                    <div
-                                        class="flex flex-wrap items-center gap-2">
-                                        <span
-                                            :class="
-                                                getCandidateStatusBadgeClass(
-                                                    item.status
-                                                )
-                                            ">
-                                            {{
-                                                getCandidateStatusLabel(
-                                                    item.status
-                                                )
-                                            }}
-                                        </span>
-                                        <span
-                                            class="text-sm font-semibold text-slate-900">
-                                            {{ item.candidateEmuCode }}
-                                        </span>
+                            <div class="space-y-4">
+                                <div
+                                    class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                                    <div class="space-y-2">
+                                        <div
+                                            class="flex flex-wrap items-center gap-2">
+                                            <span
+                                                :class="
+                                                    getCandidateStatusBadgeClass(
+                                                        item.status
+                                                    )
+                                                ">
+                                                {{
+                                                    getCandidateStatusLabel(
+                                                        item.status
+                                                    )
+                                                }}
+                                            </span>
+                                            <span
+                                                class="text-sm font-semibold text-slate-900">
+                                                {{ item.candidateEmuCode }}
+                                            </span>
+                                        </div>
+                                        <p
+                                            class="text-sm leading-6 text-slate-600">
+                                            原因：{{ item.reason || '--' }}
+                                        </p>
                                     </div>
-                                    <p class="text-sm leading-6 text-slate-600">
-                                        原因：{{ item.reason || '--' }}
-                                    </p>
-                                    <p class="text-sm leading-6 text-slate-600">
-                                        扫描车次：{{
-                                            item.scannedTrainCode || '--'
-                                        }}
-                                        <span v-if="item.matchedTrainCode">
-                                            / 匹配车次：{{
-                                                item.matchedTrainCode
-                                            }}
-                                        </span>
-                                    </p>
+
+                                    <div
+                                        class="text-sm leading-6 text-slate-500">
+                                        <p>#{{ item.candidateOrder }}</p>
+                                        <p>{{ formatTimestamp(item.createdAt) }}</p>
+                                    </div>
                                 </div>
 
-                                <div class="text-sm leading-6 text-slate-500">
-                                    <p>#{{ item.candidateOrder }}</p>
-                                    <p>
+                                <div
+                                    v-if="item.scannedRoute"
+                                    class="rounded-[0.875rem] border border-slate-200 bg-slate-50/80 px-4 py-4">
+                                    <p
+                                        class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                                        扫描到的车次
+                                    </p>
+                                    <p
+                                        class="mt-1 text-sm font-semibold text-slate-900">
                                         {{
-                                            formatTimestamp(
-                                                item.scannedStartAt ?? 0
+                                            formatRouteSnapshotTrainCodes(
+                                                item.scannedRoute
                                             )
                                         }}
                                     </p>
-                                    <p v-if="item.trainRepeat">
+                                    <p class="text-sm leading-6 text-slate-600">
+                                        {{
+                                            formatRouteSnapshotSchedule(
+                                                item.scannedRoute
+                                            )
+                                        }}
+                                    </p>
+                                    <p class="text-sm leading-6 text-slate-600">
+                                        {{
+                                            formatRouteSnapshotStations(
+                                                item.scannedRoute
+                                            )
+                                        }}
+                                    </p>
+                                    <p
+                                        v-if="item.scannedRoute.internalCode"
+                                        class="text-xs leading-5 text-slate-500">
+                                        trainNo:
+                                        {{ item.scannedRoute.internalCode }}
+                                    </p>
+                                    <p
+                                        v-if="item.trainRepeat"
+                                        class="text-xs leading-5 text-slate-500">
                                         trainRepeat: {{ item.trainRepeat }}
                                     </p>
+                                    <p
+                                        v-if="item.scannedRoute.cacheNote"
+                                        class="text-xs leading-5"
+                                        :class="
+                                            getRouteSnapshotNoteClass(
+                                                item.scannedRoute
+                                            )
+                                        ">
+                                        {{ item.scannedRoute.cacheNote }}
+                                    </p>
+                                </div>
+
+                                <div
+                                    v-if="item.matchedRoute"
+                                    class="rounded-[0.875rem] border border-emerald-200 bg-emerald-50/70 px-4 py-4">
+                                    <p
+                                        class="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
+                                        当前追踪车次
+                                    </p>
+                                    <p
+                                        class="mt-1 text-sm font-semibold text-slate-900">
+                                        {{
+                                            formatRouteSnapshotTrainCodes(
+                                                item.matchedRoute
+                                            )
+                                        }}
+                                    </p>
+                                    <p class="text-sm leading-6 text-slate-600">
+                                        {{
+                                            formatRouteSnapshotSchedule(
+                                                item.matchedRoute
+                                            )
+                                        }}
+                                    </p>
+                                    <p class="text-sm leading-6 text-slate-600">
+                                        {{
+                                            formatRouteSnapshotStations(
+                                                item.matchedRoute
+                                            )
+                                        }}
+                                    </p>
+                                </div>
+
+                                <div
+                                    v-if="item.occupiedRoutes.length > 0"
+                                    class="rounded-[0.875rem] border border-amber-200 bg-amber-50/70 px-4 py-4">
+                                    <div class="space-y-3">
+                                        <p
+                                            class="text-sm font-semibold text-slate-900">
+                                            今日占用情况
+                                        </p>
+                                        <article
+                                            v-for="(
+                                                occupiedRoute, occupiedIndex
+                                            ) in item.occupiedRoutes"
+                                            :key="
+                                                `${item.id}:occupied:${occupiedIndex}`
+                                            "
+                                            class="rounded-[0.75rem] border border-white/80 bg-white/90 px-3 py-3">
+                                            <p
+                                                class="text-sm font-semibold text-slate-900">
+                                                {{
+                                                    formatRouteSnapshotTrainCodes(
+                                                        occupiedRoute
+                                                    )
+                                                }}
+                                            </p>
+                                            <p
+                                                class="text-sm leading-6 text-slate-600">
+                                                {{
+                                                    formatRouteSnapshotSchedule(
+                                                        occupiedRoute
+                                                    )
+                                                }}
+                                            </p>
+                                            <p
+                                                class="text-sm leading-6 text-slate-600">
+                                                {{
+                                                    formatRouteSnapshotStations(
+                                                        occupiedRoute
+                                                    )
+                                                }}
+                                            </p>
+                                        </article>
+                                    </div>
                                 </div>
                             </div>
                         </article>
@@ -537,6 +825,7 @@ import type {
     AdminTrainProvenanceEvent,
     AdminTrainProvenanceLatestStatus,
     AdminTrainProvenanceResponse,
+    AdminTrainRouteSnapshot,
     AdminTrainProvenanceTaskRunStatus
 } from '~/types/admin';
 import type { TrackerApiResponse } from '~/types/homepage';
@@ -865,6 +1154,94 @@ function formatTimestamp(timestamp: number) {
     }
 
     return formatTrackerTimestamp(timestamp);
+}
+
+function formatServiceDate(serviceDate: string) {
+    if (!/^\d{8}$/.test(serviceDate)) {
+        return '--';
+    }
+
+    return `${serviceDate.slice(0, 4)}-${serviceDate.slice(4, 6)}-${serviceDate.slice(6, 8)}`;
+}
+
+function formatEmuCodeList(emuCodes: string[]) {
+    return emuCodes.length > 0 ? emuCodes.join(' / ') : '--';
+}
+
+function formatRouteSnapshotTrainCodes(route: AdminTrainRouteSnapshot | null) {
+    return route && route.trainCodes.length > 0
+        ? route.trainCodes.join(' / ')
+        : '--';
+}
+
+function formatRouteSnapshotTimeRange(route: AdminTrainRouteSnapshot | null) {
+    if (!route) {
+        return '--';
+    }
+
+    const startText =
+        route.startAt !== null && route.startAt > 0
+            ? formatShanghaiTime(route.startAt)
+            : '--';
+    const endText =
+        route.endAt !== null && route.endAt > 0
+            ? formatShanghaiTime(route.endAt)
+            : '--';
+
+    if (startText === '--' && endText === '--') {
+        return '--';
+    }
+
+    return `${startText}-${endText}`;
+}
+
+function formatRouteSnapshotSchedule(route: AdminTrainRouteSnapshot | null) {
+    if (!route) {
+        return '--';
+    }
+
+    const parts = [];
+    if (route.serviceDate) {
+        parts.push(formatServiceDate(route.serviceDate));
+    }
+
+    const timeRange = formatRouteSnapshotTimeRange(route);
+    if (timeRange !== '--') {
+        parts.push(timeRange);
+    }
+
+    return parts.length > 0 ? parts.join(' / ') : '--';
+}
+
+function formatRouteSnapshotStations(route: AdminTrainRouteSnapshot | null) {
+    if (!route) {
+        return '--';
+    }
+
+    if (!route.startStation && !route.endStation) {
+        return '--';
+    }
+
+    return `${route.startStation || '--'} 至 ${route.endStation || '--'}`;
+}
+
+function getRouteSnapshotNoteClass(route: AdminTrainRouteSnapshot | null) {
+    if (!route) {
+        return 'text-slate-500';
+    }
+
+    switch (route.cacheStatus) {
+        case 'hit':
+            return 'text-emerald-700';
+        case 'miss':
+            return 'text-amber-700';
+        default:
+            return 'text-slate-500';
+    }
+}
+
+function getHistoricalReuseResultLabel(resultStatus: 'single' | 'coupled') {
+    return resultStatus === 'coupled' ? '重联' : '单组';
 }
 
 function formatConflictTrainCodes(trainCodes: string[]) {

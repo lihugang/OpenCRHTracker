@@ -320,6 +320,30 @@ export interface AdminTrainProvenanceCouplingScanDetail {
     canOpenDetail: boolean;
 }
 
+export interface AdminTrainRouteSnapshot {
+    serviceDate: string;
+    trainCodes: string[];
+    internalCode: string;
+    startAt: number | null;
+    endAt: number | null;
+    startStation: string;
+    endStation: string;
+    cacheStatus: 'hit' | 'miss' | 'not_applicable';
+    cacheNote: string;
+}
+
+export interface AdminTrainProvenanceHistoricalReuseDetail {
+    historicalRoute: AdminTrainRouteSnapshot | null;
+    resultStatus: 'single' | 'coupled';
+    emuCodes: string[];
+}
+
+export interface AdminTrainProvenanceCoupledResolutionDetail {
+    route: AdminTrainRouteSnapshot | null;
+    emuCodes: string[];
+    upgradedFromSingle: boolean;
+}
+
 export interface AdminTrainProvenanceEvent {
     id: number;
     taskRunId: number;
@@ -339,6 +363,8 @@ export interface AdminTrainProvenanceEvent {
     linkedTaskRunId: number | null;
     conflictDetail: AdminTrainProvenanceConflictDetail | null;
     couplingScan: AdminTrainProvenanceCouplingScanDetail | null;
+    historicalReuse: AdminTrainProvenanceHistoricalReuseDetail | null;
+    coupledResolution: AdminTrainProvenanceCoupledResolutionDetail | null;
     payload: unknown;
 }
 
@@ -366,6 +392,7 @@ export interface AdminCouplingScanTaskRunSummary {
 export interface AdminCouplingScanCandidate {
     id: number;
     candidateOrder: number;
+    serviceDate: string;
     candidateEmuCode: string;
     status: string;
     reason: string;
@@ -375,6 +402,9 @@ export interface AdminCouplingScanCandidate {
     matchedTrainCode: string;
     matchedStartAt: number | null;
     trainRepeat: string;
+    scannedRoute: AdminTrainRouteSnapshot | null;
+    matchedRoute: AdminTrainRouteSnapshot | null;
+    occupiedRoutes: AdminTrainRouteSnapshot[];
     detail: unknown;
     createdAt: number;
 }
