@@ -285,7 +285,7 @@ const navItems = [
         path: '/admin/webapp-tokens'
     },
     {
-        label: '任务创建',
+        label: '任务',
         path: '/admin/tasks'
     }
 ] as const;

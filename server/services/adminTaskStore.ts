@@ -1,5 +1,7 @@
 import getLogger from '~/server/libs/log4js';
 import useConfig from '~/server/config';
+import importSqlBatch from '~/server/utils/sql/importSqlBatch';
+import { createPreparedSqlStore } from '~/server/libs/database/prepared';
 import { estimateIdleTaskDurationMs } from '~/server/services/idleTaskEstimator';
 import {
     enqueueTask,
@@ -16,10 +18,30 @@ import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
 import type {
     AdminCreateTaskResponse,
-    AdminCreateTaskRequest
+    AdminCreateTaskRequest,
+    AdminTaskOverviewResponse
 } from '~/types/admin';
 
 const logger = getLogger('admin-task-store');
+
+type AdminTaskSqlKey = 'selectTaskOverviewCounts';
+
+interface AdminTaskOverviewCountsRow {
+    remainingTotal: number;
+    remainingWithin10Minutes: number;
+    remainingWithin30Minutes: number;
+    remainingWithin1Hour: number;
+}
+
+const adminTaskSql = importSqlBatch('tasks/queries') as Record<
+    AdminTaskSqlKey,
+    string
+>;
+const adminTaskStatements = createPreparedSqlStore<AdminTaskSqlKey>({
+    dbName: 'task',
+    scope: 'admin-task-store',
+    sql: adminTaskSql
+});
 
 interface CreatedTaskRecord {
     taskId: number;
@@ -165,4 +187,29 @@ export function createAdminTask(
             request satisfies never;
             throw new Error('Unsupported admin task type');
     }
+}
+
+export function getAdminTaskOverview(
+    asOf = getNowSeconds()
+): AdminTaskOverviewResponse {
+    const counts =
+        adminTaskStatements.get<AdminTaskOverviewCountsRow>(
+            'selectTaskOverviewCounts',
+            asOf + 10 * 60,
+            asOf + 30 * 60,
+            asOf + 60 * 60
+        ) ?? {
+            remainingTotal: 0,
+            remainingWithin10Minutes: 0,
+            remainingWithin30Minutes: 0,
+            remainingWithin1Hour: 0
+        };
+
+    return {
+        asOf,
+        remainingTotal: counts.remainingTotal,
+        remainingWithin10Minutes: counts.remainingWithin10Minutes,
+        remainingWithin30Minutes: counts.remainingWithin30Minutes,
+        remainingWithin1Hour: counts.remainingWithin1Hour
+    };
 }

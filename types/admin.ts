@@ -251,6 +251,14 @@ export interface AdminCreateTaskResponse {
     normalizedTrainCodes?: string[];
 }
 
+export interface AdminTaskOverviewResponse {
+    asOf: number;
+    remainingTotal: number;
+    remainingWithin10Minutes: number;
+    remainingWithin30Minutes: number;
+    remainingWithin1Hour: number;
+}
+
 export interface AdminRevokeAllWebappTokensResponse {
     issuer: 'webapp';
     revokedCount: number;
