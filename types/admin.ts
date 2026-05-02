@@ -376,6 +376,59 @@ export interface AdminTrainProvenanceEvent {
     payload: unknown;
 }
 
+export type AdminTrainDataRequestType =
+    | 'search_train_code'
+    | 'fetch_route_info'
+    | 'fetch_emu_by_route'
+    | 'fetch_emu_by_seat_code';
+
+export interface AdminTrainDataRequestMetrics {
+    total: number;
+    success: number;
+    failure: number;
+    successRate: number | null;
+}
+
+export interface AdminTrainDataRequestComparison {
+    compareTotal: number;
+    compareSuccess: number;
+    compareFailure: number;
+    totalDelta: number;
+    successDelta: number;
+    failureDelta: number;
+    totalChangeRatio: number | null;
+    successChangeRatio: number | null;
+    failureChangeRatio: number | null;
+}
+
+export interface AdminTrainDataRequestSummary
+    extends AdminTrainDataRequestMetrics,
+        AdminTrainDataRequestComparison {}
+
+export interface AdminTrainDataRequestTypeSummary
+    extends AdminTrainDataRequestSummary {
+    type: AdminTrainDataRequestType;
+}
+
+export interface AdminTrainDataRequestHourBucket
+    extends AdminTrainDataRequestSummary {
+    hour: number;
+    startAt: number;
+    endAt: number;
+    types: AdminTrainDataRequestTypeSummary[];
+}
+
+export interface AdminTrainDataRequestStatsResponse {
+    enabled: boolean;
+    retentionDays: number;
+    date: string;
+    compareDate: string;
+    asOf: number;
+    totals: AdminTrainDataRequestSummary;
+    types: AdminTrainDataRequestTypeSummary[];
+    hours: AdminTrainDataRequestHourBucket[];
+}
+
 export interface AdminTrainProvenanceResponse {
     enabled: boolean;
     retentionDays: number;

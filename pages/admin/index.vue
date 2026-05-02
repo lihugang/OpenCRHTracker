@@ -205,11 +205,11 @@
                                 @click="goToTrainProvenance">
                                 <p
                                     class="text-base font-semibold text-slate-900">
-                                    12306 来源追踪
+                                    12306 数据
                                 </p>
                                 <p
                                     class="mt-2 text-sm leading-6 text-slate-600">
-                                    查看某日某车次的探测来源、判定路径，以及关联的重联扫描结果。
+                                    查看某日的请求统计，并按车次追踪探测来源、判定路径和重联扫描结果。
                                 </p>
                             </button>
 

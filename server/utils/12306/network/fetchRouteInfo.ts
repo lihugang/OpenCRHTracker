@@ -1,5 +1,6 @@
 import useConfig from '~/server/config';
 import getLogger from '~/server/libs/log4js';
+import { record12306RequestHourlyStat } from '~/server/services/trainProvenanceStore';
 import uniqueNormalizedCodes from '~/server/utils/12306/uniqueNormalizedCodes';
 import getCurrentDateString from '../../date/getCurrentDateString';
 import { getShanghaiUnixSecondsFromDateAndTime } from '../../date/shanghaiDateTime';
@@ -145,6 +146,10 @@ export default async function fetchRouteInfo(
             method: 'POST'
         });
         if (!response.ok) {
+            record12306RequestHourlyStat({
+                requestType: 'fetch_route_info',
+                isSuccess: false
+            });
             log12306RequestFailure({
                 logger,
                 operation: 'http_failed',
@@ -162,6 +167,10 @@ export default async function fetchRouteInfo(
 
         const json: RouteInfoResponse = await response.json();
         if (!json.status) {
+            record12306RequestHourlyStat({
+                requestType: 'fetch_route_info',
+                isSuccess: false
+            });
             log12306RequestFailure({
                 logger,
                 operation: 'business_failed',
@@ -213,6 +222,10 @@ export default async function fetchRouteInfo(
         const startStation = stops.at(0);
         const endStation = stops.at(-1);
         if (!startStation || !endStation || !json.data?.trainNo) {
+            record12306RequestHourlyStat({
+                requestType: 'fetch_route_info',
+                isSuccess: false
+            });
             log12306RequestFailure({
                 logger,
                 level: 'debug',
@@ -238,6 +251,10 @@ export default async function fetchRouteInfo(
         const startAt = startStation.departAt ?? startStation.arriveAt;
         const endAt = endStation.arriveAt ?? endStation.departAt;
         if (startAt === null || endAt === null) {
+            record12306RequestHourlyStat({
+                requestType: 'fetch_route_info',
+                isSuccess: false
+            });
             log12306RequestFailure({
                 logger,
                 operation: 'invalid_response',
@@ -259,6 +276,10 @@ export default async function fetchRouteInfo(
             };
         }
 
+        record12306RequestHourlyStat({
+            requestType: 'fetch_route_info',
+            isSuccess: true
+        });
         return {
             status: 'running',
             route: {
@@ -279,6 +300,10 @@ export default async function fetchRouteInfo(
             }
         };
     } catch (error) {
+        record12306RequestHourlyStat({
+            requestType: 'fetch_route_info',
+            isSuccess: false
+        });
         log12306RequestFailure({
             logger,
             operation: 'request_exception',

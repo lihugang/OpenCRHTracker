@@ -13,6 +13,7 @@ import {
     getTrainProvenanceRuntimeConfig,
     getTrainProvenanceTaskRunById,
     isTrainProvenanceEnabled,
+    list12306RequestHourlyStatsInRange,
     listCouplingScanCandidatesByTaskRunId,
     listTrainProvenanceDepartureStartAts,
     listTrainProvenanceEventsByDateAndTrainCode,
@@ -26,10 +27,17 @@ import {
 import normalizeCode from '~/server/utils/12306/normalizeCode';
 import getDayTimestampRange from '~/server/utils/date/getDayTimestampRange';
 import { formatShanghaiDateString } from '~/server/utils/date/getCurrentDateString';
+import { getShanghaiDayStartUnixSeconds } from '~/server/utils/date/shanghaiDateTime';
+import getNowSeconds from '~/server/utils/time/getNowSeconds';
 import type {
     AdminCouplingScanCandidate,
     AdminCouplingScanDetailResponse,
     AdminCouplingScanTaskRunSummary,
+    AdminTrainDataRequestHourBucket,
+    AdminTrainDataRequestStatsResponse,
+    AdminTrainDataRequestSummary,
+    AdminTrainDataRequestType,
+    AdminTrainDataRequestTypeSummary,
     AdminTrainProvenanceCouplingScanDetail,
     AdminTrainProvenanceCoupledResolutionDetail,
     AdminTrainProvenanceConflictCurrentGroup,
@@ -985,6 +993,242 @@ function enrichCouplingScanTimeline(
             couplingScan
         };
     });
+}
+
+const REQUEST_STAT_DAY_SECONDS = 24 * 60 * 60;
+const REQUEST_STAT_HOUR_SECONDS = 60 * 60;
+const ADMIN_TRAIN_DATA_REQUEST_TYPES: AdminTrainDataRequestType[] = [
+    'search_train_code',
+    'fetch_route_info',
+    'fetch_emu_by_route',
+    'fetch_emu_by_seat_code'
+];
+
+interface RequestMetricAccumulator {
+    total: number;
+    success: number;
+    failure: number;
+}
+
+interface RequestMetricsAccumulator extends RequestMetricAccumulator {
+    byType: Map<AdminTrainDataRequestType, RequestMetricAccumulator>;
+}
+
+function createRequestMetricAccumulator(): RequestMetricAccumulator {
+    return {
+        total: 0,
+        success: 0,
+        failure: 0
+    };
+}
+
+function createRequestMetricsAccumulator(): RequestMetricsAccumulator {
+    return {
+        ...createRequestMetricAccumulator(),
+        byType: new Map(
+            ADMIN_TRAIN_DATA_REQUEST_TYPES.map((requestType) => [
+                requestType,
+                createRequestMetricAccumulator()
+            ])
+        )
+    };
+}
+
+function addRequestCount(
+    target: RequestMetricsAccumulator,
+    requestType: AdminTrainDataRequestType,
+    isSuccess: boolean,
+    requestCount: number
+) {
+    if (requestCount <= 0) {
+        return;
+    }
+
+    target.total += requestCount;
+    if (isSuccess) {
+        target.success += requestCount;
+    } else {
+        target.failure += requestCount;
+    }
+
+    const typeBucket = target.byType.get(requestType);
+    if (!typeBucket) {
+        return;
+    }
+
+    typeBucket.total += requestCount;
+    if (isSuccess) {
+        typeBucket.success += requestCount;
+    } else {
+        typeBucket.failure += requestCount;
+    }
+}
+
+function toSuccessRate(total: number, success: number): number | null {
+    return total > 0 ? success / total : null;
+}
+
+function toChangeRatio(
+    currentValue: number,
+    compareValue: number
+): number | null {
+    if (compareValue <= 0) {
+        return null;
+    }
+
+    return (currentValue - compareValue) / compareValue;
+}
+
+function buildRequestSummary(
+    current: RequestMetricAccumulator,
+    compare: RequestMetricAccumulator
+): AdminTrainDataRequestSummary {
+    return {
+        total: current.total,
+        success: current.success,
+        failure: current.failure,
+        successRate: toSuccessRate(current.total, current.success),
+        compareTotal: compare.total,
+        compareSuccess: compare.success,
+        compareFailure: compare.failure,
+        totalDelta: current.total - compare.total,
+        successDelta: current.success - compare.success,
+        failureDelta: current.failure - compare.failure,
+        totalChangeRatio: toChangeRatio(current.total, compare.total),
+        successChangeRatio: toChangeRatio(current.success, compare.success),
+        failureChangeRatio: toChangeRatio(current.failure, compare.failure)
+    };
+}
+
+function buildRequestTypeSummaries(
+    current: RequestMetricsAccumulator,
+    compare: RequestMetricsAccumulator
+): AdminTrainDataRequestTypeSummary[] {
+    return ADMIN_TRAIN_DATA_REQUEST_TYPES.map((requestType) => {
+        const currentMetric = current.byType.get(requestType)!;
+        const compareMetric = compare.byType.get(requestType)!;
+
+        return {
+            type: requestType,
+            ...buildRequestSummary(currentMetric, compareMetric)
+        };
+    });
+}
+
+export function getAdminTrainRequestStats(
+    date: string
+): AdminTrainDataRequestStatsResponse {
+    const runtimeConfig = getTrainProvenanceRuntimeConfig();
+    const compareDate = /^\d{8}$/.test(date)
+        ? formatShanghaiDateString(
+              (getShanghaiDayStartUnixSeconds(date) - REQUEST_STAT_DAY_SECONDS) *
+                  1000
+          )
+        : '';
+
+    if (!isTrainProvenanceEnabled()) {
+        return {
+            enabled: false,
+            retentionDays: runtimeConfig.retentionDays,
+            date,
+            compareDate,
+            asOf: getNowSeconds(),
+            totals: buildRequestSummary(
+                createRequestMetricAccumulator(),
+                createRequestMetricAccumulator()
+            ),
+            types: [],
+            hours: []
+        };
+    }
+
+    if (!/^\d{8}$/.test(date)) {
+        return {
+            enabled: true,
+            retentionDays: runtimeConfig.retentionDays,
+            date,
+            compareDate,
+            asOf: getNowSeconds(),
+            totals: buildRequestSummary(
+                createRequestMetricAccumulator(),
+                createRequestMetricAccumulator()
+            ),
+            types: [],
+            hours: []
+        };
+    }
+
+    const currentDayStart = getShanghaiDayStartUnixSeconds(date);
+    const compareDayStart = currentDayStart - REQUEST_STAT_DAY_SECONDS;
+    const queryEndAt = currentDayStart + REQUEST_STAT_DAY_SECONDS;
+    const rows = list12306RequestHourlyStatsInRange(compareDayStart, queryEndAt);
+    const currentHours = Array.from({ length: 24 }, () =>
+        createRequestMetricsAccumulator()
+    );
+    const compareHours = Array.from({ length: 24 }, () =>
+        createRequestMetricsAccumulator()
+    );
+    const currentTotals = createRequestMetricsAccumulator();
+    const compareTotals = createRequestMetricsAccumulator();
+
+    for (const row of rows) {
+        const isCurrentDay = row.serviceDate === date;
+        const isCompareDay = row.serviceDate === compareDate;
+        if (!isCurrentDay && !isCompareDay) {
+            continue;
+        }
+
+        const dayStart = isCurrentDay ? currentDayStart : compareDayStart;
+        const hourIndex = Math.floor(
+            (row.bucketStart - dayStart) / REQUEST_STAT_HOUR_SECONDS
+        );
+        if (hourIndex < 0 || hourIndex >= 24) {
+            continue;
+        }
+
+        const hourTarget = isCurrentDay
+            ? currentHours[hourIndex]!
+            : compareHours[hourIndex]!;
+        const totalTarget = isCurrentDay ? currentTotals : compareTotals;
+
+        addRequestCount(
+            hourTarget,
+            row.requestType,
+            row.isSuccess,
+            row.requestCount
+        );
+        addRequestCount(
+            totalTarget,
+            row.requestType,
+            row.isSuccess,
+            row.requestCount
+        );
+    }
+
+    const hours: AdminTrainDataRequestHourBucket[] = currentHours.map(
+        (currentHour, hourIndex) => ({
+            hour: hourIndex,
+            startAt: currentDayStart + hourIndex * REQUEST_STAT_HOUR_SECONDS,
+            endAt:
+                currentDayStart + (hourIndex + 1) * REQUEST_STAT_HOUR_SECONDS,
+            ...buildRequestSummary(currentHour, compareHours[hourIndex]!),
+            types: buildRequestTypeSummaries(
+                currentHour,
+                compareHours[hourIndex]!
+            )
+        })
+    );
+
+    return {
+        enabled: true,
+        retentionDays: runtimeConfig.retentionDays,
+        date,
+        compareDate,
+        asOf: getNowSeconds(),
+        totals: buildRequestSummary(currentTotals, compareTotals),
+        types: buildRequestTypeSummaries(currentTotals, compareTotals),
+        hours
+    };
 }
 
 export function getAdminTrainProvenance(

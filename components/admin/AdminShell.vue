@@ -277,7 +277,7 @@ const navItems = [
         path: '/admin/anomaly-scan'
     },
     {
-        label: '12306 来源追踪',
+        label: '12306 数据',
         path: '/admin/train-provenance'
     },
     {

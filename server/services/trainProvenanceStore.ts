@@ -14,10 +14,19 @@ export type TrainProvenanceTaskRunStatus =
     | 'failed'
     | 'skipped';
 
+export type TrainProvenanceRequestStatType =
+    | 'search_train_code'
+    | 'fetch_route_info'
+    | 'fetch_emu_by_route'
+    | 'fetch_emu_by_seat_code';
+
 type TrainProvenanceSqlKey =
+    | 'cleanupExpiredRequestHourlyStats'
     | 'cleanupExpiredTaskRuns'
+    | 'incrementRequestHourlyStat'
     | 'insertCouplingScanCandidate'
     | 'insertProvenanceEvent'
+    | 'selectRequestHourlyStatsInRange'
     | 'selectCouplingScanCandidatesByTaskRunId'
     | 'selectDepartureStartAtsByDateAndTrainCode'
     | 'selectEventsByDateAndTrainCode'
@@ -82,6 +91,15 @@ interface CouplingScanCandidateRow {
     created_at: number;
 }
 
+interface RequestHourlyStatRow {
+    bucket_start: number;
+    service_date: string;
+    request_type: TrainProvenanceRequestStatType;
+    is_success: number;
+    request_count: number;
+    updated_at: number;
+}
+
 export interface TrainProvenanceTaskRunRecord {
     id: number;
     schedulerTaskId: number;
@@ -138,6 +156,15 @@ export interface CouplingScanCandidateRecord {
     createdAt: number;
 }
 
+export interface TrainProvenanceRequestHourlyStatRecord {
+    bucketStart: number;
+    serviceDate: string;
+    requestType: TrainProvenanceRequestStatType;
+    isSuccess: boolean;
+    requestCount: number;
+    updatedAt: number;
+}
+
 export interface StartTrainProvenanceTaskRunInput {
     schedulerTaskId: number;
     executor: string;
@@ -185,7 +212,14 @@ export interface RecordCouplingScanCandidateInput {
     createdAt?: number;
 }
 
+export interface Record12306RequestHourlyStatInput {
+    requestType: TrainProvenanceRequestStatType;
+    isSuccess: boolean;
+    timestamp?: number;
+}
+
 const CLEANUP_INTERVAL_SECONDS = 60 * 60;
+const REQUEST_STAT_BUCKET_SECONDS = 60 * 60;
 
 const trainProvenanceSql = importSqlBatch(
     'train-provenance/queries'
@@ -302,6 +336,23 @@ function toCouplingScanCandidateRecord(
     };
 }
 
+function toRequestHourlyStatRecord(
+    row: RequestHourlyStatRow
+): TrainProvenanceRequestHourlyStatRecord {
+    return {
+        bucketStart: row.bucket_start,
+        serviceDate: row.service_date,
+        requestType: row.request_type,
+        isSuccess: row.is_success === 1,
+        requestCount: row.request_count,
+        updatedAt: row.updated_at
+    };
+}
+
+function toHourlyBucketStart(timestamp: number): number {
+    return timestamp - (timestamp % REQUEST_STAT_BUCKET_SECONDS);
+}
+
 export function getTrainProvenanceRuntimeConfig() {
     return useConfig().data.runtime.trainProvenance;
 }
@@ -313,12 +364,16 @@ export function isTrainProvenanceEnabled() {
 export function cleanupExpiredTrainProvenance(nowSeconds = getNowSeconds()): number {
     const retentionDays = getTrainProvenanceRuntimeConfig().retentionDays;
     const cutoffSeconds = nowSeconds - retentionDays * 24 * 60 * 60;
-    const result = trainProvenanceStatements.run(
+    const taskRunResult = trainProvenanceStatements.run(
         'cleanupExpiredTaskRuns',
         cutoffSeconds
     );
+    const requestStatResult = trainProvenanceStatements.run(
+        'cleanupExpiredRequestHourlyStats',
+        cutoffSeconds
+    );
     lastCleanupAt = nowSeconds;
-    return result.changes;
+    return taskRunResult.changes + requestStatResult.changes;
 }
 
 export function maybeCleanupExpiredTrainProvenance(
@@ -433,6 +488,23 @@ export function recordCouplingScanCandidate(
     );
 }
 
+export function record12306RequestHourlyStat(
+    input: Record12306RequestHourlyStatInput
+) {
+    const timestamp = input.timestamp ?? getNowSeconds();
+    const bucketStart = toHourlyBucketStart(timestamp);
+    maybeCleanupExpiredTrainProvenance(timestamp);
+
+    trainProvenanceStatements.run(
+        'incrementRequestHourlyStat',
+        bucketStart,
+        formatShanghaiDateString(bucketStart * 1000),
+        input.requestType,
+        input.isSuccess ? 1 : 0,
+        timestamp
+    );
+}
+
 export function getTrainProvenanceTaskRunById(taskRunId: number) {
     maybeCleanupExpiredTrainProvenance();
     if (!Number.isInteger(taskRunId) || taskRunId <= 0) {
@@ -500,4 +572,27 @@ export function listCouplingScanCandidatesByTaskRunId(taskRunId: number) {
             taskRunId
         )
         .map(toCouplingScanCandidateRecord);
+}
+
+export function list12306RequestHourlyStatsInRange(
+    startAt: number,
+    endAt: number
+) {
+    maybeCleanupExpiredTrainProvenance();
+    if (
+        !Number.isInteger(startAt) ||
+        !Number.isInteger(endAt) ||
+        startAt < 0 ||
+        endAt <= startAt
+    ) {
+        return [];
+    }
+
+    return trainProvenanceStatements
+        .all<RequestHourlyStatRow>(
+            'selectRequestHourlyStatsInRange',
+            startAt,
+            endAt
+        )
+        .map(toRequestHourlyStatRecord);
 }

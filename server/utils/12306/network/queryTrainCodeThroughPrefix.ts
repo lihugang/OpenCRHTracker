@@ -1,4 +1,5 @@
 import useConfig from '~/server/config';
+import { record12306RequestHourlyStat } from '~/server/services/trainProvenanceStore';
 import waitFor12306RequestSlot from '../requestLimiter';
 import parseJsonpToJson from '../../json/parseJsonpToJson';
 
@@ -47,15 +48,30 @@ export default async function queryTrainCodeThroughPrefix(prefix: string) {
             },
             method: 'GET'
         });
+        if (!response.ok) {
+            record12306RequestHourlyStat({
+                requestType: 'search_train_code',
+                isSuccess: false
+            });
+            return null;
+        }
         const rawText = await response.text();
         const json = parseJsonpToJson<TrainCodeResponse>(
             rawText,
             config.spider.params.jsonpCallback
         );
         if (!json.status) {
+            record12306RequestHourlyStat({
+                requestType: 'search_train_code',
+                isSuccess: false
+            });
             return null;
         }
 
+        record12306RequestHourlyStat({
+            requestType: 'search_train_code',
+            isSuccess: true
+        });
         return json.data.map((item) => {
             return {
                 route: {
@@ -65,6 +81,10 @@ export default async function queryTrainCodeThroughPrefix(prefix: string) {
             };
         });
     } catch {
+        record12306RequestHourlyStat({
+            requestType: 'search_train_code',
+            isSuccess: false
+        });
         return null;
     }
 }

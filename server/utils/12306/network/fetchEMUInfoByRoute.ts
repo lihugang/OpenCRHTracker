@@ -1,6 +1,7 @@
 import useConfig from '~/server/config';
 import getLogger from '~/server/libs/log4js';
 import { resolveCanonicalEmuCode } from '~/server/services/probeAssetStore';
+import { record12306RequestHourlyStat } from '~/server/services/trainProvenanceStore';
 import getCurrentDateString from '../../date/getCurrentDateString';
 import log12306RequestFailure from './log12306RequestFailure';
 import waitFor12306RequestSlot from '../requestLimiter';
@@ -58,6 +59,10 @@ export default async function fetchEMUInfoByRoute(route: string) {
             }
         );
         if (!response.ok) {
+            record12306RequestHourlyStat({
+                requestType: 'fetch_emu_by_route',
+                isSuccess: false
+            });
             log12306RequestFailure({
                 logger,
                 operation: 'http_failed',
@@ -75,6 +80,10 @@ export default async function fetchEMUInfoByRoute(route: string) {
         const contentData = json.content?.data;
         const emuCode = contentData?.carCode?.trim();
         if (!emuCode) {
+            record12306RequestHourlyStat({
+                requestType: 'fetch_emu_by_route',
+                isSuccess: false
+            });
             log12306RequestFailure({
                 logger,
                 level: 'debug',
@@ -94,6 +103,10 @@ export default async function fetchEMUInfoByRoute(route: string) {
 
         const canonicalEmuCode = await resolveCanonicalEmuCode(emuCode);
 
+        record12306RequestHourlyStat({
+            requestType: 'fetch_emu_by_route',
+            isSuccess: true
+        });
         return {
             route: {
                 code: route // G xxxx
@@ -103,6 +116,10 @@ export default async function fetchEMUInfoByRoute(route: string) {
             }
         };
     } catch (error) {
+        record12306RequestHourlyStat({
+            requestType: 'fetch_emu_by_route',
+            isSuccess: false
+        });
         log12306RequestFailure({
             logger,
             operation: 'request_exception',

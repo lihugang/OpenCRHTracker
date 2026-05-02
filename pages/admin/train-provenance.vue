@@ -3,31 +3,424 @@
         v-model:date-input="selectedDateInput"
         :today-date-input-value="todayDateInputValue"
         :session="session"
-        title="12306 来源追踪"
-        description="按日期和车次查看探测来源、判定路径，以及关联的重联扫描结果。">
+        title="12306 数据"
+        description="查看某日的 12306 请求统计，并按车次追踪探测来源、判定路径和重联扫描结果。">
         <template #toolbar>
             <UiButton
                 type="button"
                 variant="secondary"
-                :loading="provenanceStatus === 'pending'"
-                @click="refreshProvenance()">
-                刷新
+                :loading="isRefreshingPage"
+                @click="refreshAll()">
+                刷新数据
             </UiButton>
         </template>
 
         <div class="space-y-6">
             <UiCard :show-accent-bar="false">
                 <div class="space-y-6">
+                    <div
+                        class="rounded-[1rem] border border-sky-200 bg-sky-50/80 px-5 py-4">
+                        <div
+                            class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                            <div class="space-y-2">
+                                <p
+                                    class="text-xs font-semibold uppercase tracking-[0.22em] text-sky-700">
+                                    12306 Data
+                                </p>
+                                <h2 class="text-2xl font-semibold text-slate-900">
+                                    当日请求统计
+                                </h2>
+                                <p class="text-sm leading-6 text-slate-700">
+                                    按小时汇总所有实际外发的 12306 请求，只记录请求类型和是否成功；默认保留
+                                    {{
+                                        requestStatsData?.retentionDays ??
+                                        provenanceData?.retentionDays ??
+                                        7
+                                    }}
+                                    天，并和前一天同小时对比。
+                                </p>
+                            </div>
+
+                            <dl class="grid gap-3 sm:grid-cols-2">
+                                <div
+                                    class="rounded-[0.95rem] border border-white/80 bg-white/85 px-4 py-3">
+                                    <dt
+                                        class="text-xs uppercase tracking-[0.18em] text-slate-400">
+                                        对比日期
+                                    </dt>
+                                    <dd
+                                        class="mt-2 text-sm font-semibold text-slate-900">
+                                        {{ requestStatsData?.compareDate || '--' }}
+                                    </dd>
+                                </div>
+                                <div
+                                    class="rounded-[0.95rem] border border-white/80 bg-white/85 px-4 py-3">
+                                    <dt
+                                        class="text-xs uppercase tracking-[0.18em] text-slate-400">
+                                        最新统计时间
+                                    </dt>
+                                    <dd
+                                        class="mt-2 text-sm font-semibold text-slate-900">
+                                        {{
+                                            formatTimestamp(
+                                                requestStatsData?.asOf ?? 0
+                                            )
+                                        }}
+                                    </dd>
+                                </div>
+                            </dl>
+                        </div>
+                    </div>
+
+                    <div
+                        v-if="requestStatsErrorMessage"
+                        class="rounded-[1rem] border border-rose-200 bg-rose-50/80 px-4 py-4 text-sm leading-6 text-rose-700">
+                        {{ requestStatsErrorMessage }}
+                    </div>
+
+                    <div
+                        v-else-if="requestStatsStatus === 'pending' && !requestStatsData"
+                        class="space-y-3">
+                        <div
+                            v-for="index in 4"
+                            :key="`train-request-stats-loading:${index}`"
+                            class="h-28 animate-pulse rounded-[1rem] bg-slate-100/90" />
+                    </div>
+
+                    <UiEmptyState
+                        v-else-if="requestStatsData && !requestStatsData.enabled"
+                        eyebrow="已禁用"
+                        title="12306 数据当前已关闭"
+                        description="可在 config.json 中重新启用 trainProvenance 记录。" />
+
+                    <template v-else-if="requestStatsData">
+                        <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                            <div
+                                class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-4 py-4">
+                                <p
+                                    class="text-xs uppercase tracking-[0.18em] text-slate-400">
+                                    当日总请求
+                                </p>
+                                <p
+                                    class="mt-2 text-3xl font-semibold text-slate-900">
+                                    {{ formatNumber(requestStatsData.totals.total) }}
+                                </p>
+                                <p class="mt-2 text-xs text-slate-500">
+                                    同比
+                                    {{
+                                        formatSignedNumber(
+                                            requestStatsData.totals.totalDelta
+                                        )
+                                    }}
+                                    /
+                                    {{
+                                        formatSignedPercent(
+                                            requestStatsData.totals
+                                                .totalChangeRatio
+                                        )
+                                    }}
+                                </p>
+                            </div>
+                            <div
+                                class="rounded-[1rem] border border-emerald-200 bg-emerald-50/80 px-4 py-4">
+                                <p
+                                    class="text-xs uppercase tracking-[0.18em] text-emerald-700">
+                                    成功请求
+                                </p>
+                                <p
+                                    class="mt-2 text-3xl font-semibold text-emerald-900">
+                                    {{
+                                        formatNumber(
+                                            requestStatsData.totals.success
+                                        )
+                                    }}
+                                </p>
+                                <p class="mt-2 text-xs text-emerald-700">
+                                    成功率
+                                    {{
+                                        formatPercent(
+                                            requestStatsData.totals.successRate
+                                        )
+                                    }}
+                                </p>
+                            </div>
+                            <div
+                                class="rounded-[1rem] border border-rose-200 bg-rose-50/80 px-4 py-4">
+                                <p
+                                    class="text-xs uppercase tracking-[0.18em] text-rose-700">
+                                    失败请求
+                                </p>
+                                <p
+                                    class="mt-2 text-3xl font-semibold text-rose-900">
+                                    {{
+                                        formatNumber(
+                                            requestStatsData.totals.failure
+                                        )
+                                    }}
+                                </p>
+                                <p class="mt-2 text-xs text-rose-700">
+                                    同比
+                                    {{
+                                        formatSignedNumber(
+                                            requestStatsData.totals.failureDelta
+                                        )
+                                    }}
+                                    /
+                                    {{
+                                        formatSignedPercent(
+                                            requestStatsData.totals
+                                                .failureChangeRatio
+                                        )
+                                    }}
+                                </p>
+                            </div>
+                            <div
+                                class="rounded-[1rem] border border-slate-200 bg-white/90 px-4 py-4">
+                                <p
+                                    class="text-xs uppercase tracking-[0.18em] text-slate-400">
+                                    前一日同日总量
+                                </p>
+                                <p
+                                    class="mt-2 text-3xl font-semibold text-slate-900">
+                                    {{
+                                        formatNumber(
+                                            requestStatsData.totals.compareTotal
+                                        )
+                                    }}
+                                </p>
+                                <p class="mt-2 text-xs text-slate-500">
+                                    日期 {{ requestStatsData.compareDate }}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="space-y-4">
+                            <div class="space-y-1">
+                                <p
+                                    class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                                    Hourly
+                                </p>
+                                <h3 class="text-xl font-semibold text-slate-900">
+                                    每小时总请求量
+                                </h3>
+                                <p class="text-sm leading-6 text-slate-500">
+                                    绿色为成功请求，红色为失败请求；悬停可查看该小时与前一天同小时的对比。
+                                </p>
+                            </div>
+
+                            <div
+                                class="rounded-[1rem] border border-slate-200 bg-slate-50/70 px-4 py-4">
+                                <div
+                                    class="grid h-40 items-end gap-2"
+                                    :style="{
+                                        gridTemplateColumns: `repeat(${Math.max(requestHourBuckets.length, 1)}, minmax(0, 1fr))`
+                                    }">
+                                    <div
+                                        v-for="bucket in requestHourBuckets"
+                                        :key="`request-hour:${bucket.hour}`"
+                                        class="flex min-w-0 items-end"
+                                        :title="getRequestBucketTitle(bucket)">
+                                        <div
+                                            class="flex w-full flex-col justify-end overflow-hidden rounded-[0.9rem] bg-slate-200/75"
+                                            :style="{
+                                                height: `${getRequestHourBarHeight(bucket.total, requestPeakTotal)}%`
+                                            }">
+                                            <div
+                                                class="bg-rose-300/90"
+                                                :style="{
+                                                    height: `${getRequestStackSegmentHeight(bucket.failure, bucket.total)}%`
+                                                }" />
+                                            <div
+                                                class="bg-emerald-400/90"
+                                                :style="{
+                                                    height: `${getRequestStackSegmentHeight(bucket.success, bucket.total)}%`
+                                                }" />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div
+                                    class="mt-3 flex items-center justify-between gap-2 text-[11px] text-slate-400">
+                                    <span
+                                        v-for="label in requestChartAxisLabels"
+                                        :key="`request-axis:${label.value}`">
+                                        {{ label.label }}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="space-y-4">
+                            <div class="space-y-1">
+                                <p
+                                    class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                                    Types
+                                </p>
+                                <h3 class="text-xl font-semibold text-slate-900">
+                                    按请求类型拆分
+                                </h3>
+                            </div>
+
+                            <div class="grid gap-4 xl:grid-cols-2">
+                                <UiCard
+                                    v-for="summary in requestTypeSummaries"
+                                    :key="summary.type"
+                                    :show-accent-bar="false"
+                                    class="border border-slate-200">
+                                    <div class="space-y-5">
+                                        <div
+                                            class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                                            <div class="space-y-1">
+                                                <p
+                                                    class="text-xs font-semibold uppercase tracking-[0.22em]"
+                                                    :class="
+                                                        getRequestTypeAccentClass(
+                                                            summary.type
+                                                        )
+                                                    ">
+                                                    {{
+                                                        getRequestTypeEyebrow(
+                                                            summary.type
+                                                        )
+                                                    }}
+                                                </p>
+                                                <h3
+                                                    class="text-xl font-semibold text-slate-900">
+                                                    {{
+                                                        getRequestTypeLabel(
+                                                            summary.type
+                                                        )
+                                                    }}
+                                                </h3>
+                                            </div>
+
+                                            <div class="text-left md:text-right">
+                                                <p
+                                                    class="text-3xl font-semibold text-slate-900">
+                                                    {{ formatNumber(summary.total) }}
+                                                </p>
+                                                <p
+                                                    class="mt-1 text-xs text-slate-500">
+                                                    成功率
+                                                    {{
+                                                        formatPercent(
+                                                            summary.successRate
+                                                        )
+                                                    }}
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <div
+                                            class="grid gap-3 rounded-[1rem] border border-slate-200 bg-slate-50/70 px-4 py-4 sm:grid-cols-3">
+                                            <div>
+                                                <p
+                                                    class="text-xs uppercase tracking-[0.18em] text-slate-400">
+                                                    成功
+                                                </p>
+                                                <p
+                                                    class="mt-2 text-lg font-semibold text-emerald-800">
+                                                    {{
+                                                        formatNumber(
+                                                            summary.success
+                                                        )
+                                                    }}
+                                                </p>
+                                            </div>
+                                            <div>
+                                                <p
+                                                    class="text-xs uppercase tracking-[0.18em] text-slate-400">
+                                                    失败
+                                                </p>
+                                                <p
+                                                    class="mt-2 text-lg font-semibold text-rose-800">
+                                                    {{
+                                                        formatNumber(
+                                                            summary.failure
+                                                        )
+                                                    }}
+                                                </p>
+                                            </div>
+                                            <div>
+                                                <p
+                                                    class="text-xs uppercase tracking-[0.18em] text-slate-400">
+                                                    同比
+                                                </p>
+                                                <p
+                                                    class="mt-2 text-lg font-semibold text-slate-900">
+                                                    {{
+                                                        formatSignedNumber(
+                                                            summary.totalDelta
+                                                        )
+                                                    }}
+                                                </p>
+                                                <p
+                                                    class="mt-1 text-xs text-slate-500">
+                                                    {{
+                                                        formatSignedPercent(
+                                                            summary.totalChangeRatio
+                                                        )
+                                                    }}
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <div
+                                            class="rounded-[1rem] border border-slate-200 bg-white/90 px-4 py-4">
+                                            <div
+                                                class="grid h-32 items-end gap-2"
+                                                :style="{
+                                                    gridTemplateColumns: `repeat(${Math.max(requestHourBuckets.length, 1)}, minmax(0, 1fr))`
+                                                }">
+                                                <div
+                                                    v-for="bucket in requestHourBuckets"
+                                                    :key="`${summary.type}:${bucket.hour}`"
+                                                    class="flex min-w-0 items-end"
+                                                    :title="
+                                                        getRequestTypeBucketTitle(
+                                                            bucket,
+                                                            summary.type
+                                                        )
+                                                    ">
+                                                    <div
+                                                        class="flex w-full flex-col justify-end overflow-hidden rounded-[0.85rem] bg-slate-200/75"
+                                                        :style="{
+                                                            height: `${getRequestHourBarHeight(getRequestTypeBucket(bucket, summary.type).total, getRequestTypePeakTotal(summary.type))}%`
+                                                        }">
+                                                        <div
+                                                            class="bg-rose-300/90"
+                                                            :style="{
+                                                                height: `${getRequestStackSegmentHeight(getRequestTypeBucket(bucket, summary.type).failure, getRequestTypeBucket(bucket, summary.type).total)}%`
+                                                            }" />
+                                                        <div
+                                                            class="bg-emerald-400/90"
+                                                            :style="{
+                                                                height: `${getRequestStackSegmentHeight(getRequestTypeBucket(bucket, summary.type).success, getRequestTypeBucket(bucket, summary.type).total)}%`
+                                                            }" />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </UiCard>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </UiCard>
+
+            <UiCard :show-accent-bar="false">
+                <div class="space-y-6">
                     <div class="space-y-2">
                         <p
                             class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
-                            Query
+                            Provenance
                         </p>
                         <h2 class="text-2xl font-semibold text-slate-900">
-                            查询某日某车次
+                            按车次查看来源追踪
                         </h2>
                         <p class="text-sm leading-6 text-slate-600">
-                            默认保留 {{ provenanceData?.retentionDays ?? 7 }} 天。
+                            输入车次后，可以查看该车次在所选日期的探测来源、判定路径和重联扫描结果。
                         </p>
                     </div>
 
@@ -819,6 +1212,10 @@ import UiModal from '~/components/ui/UiModal.vue';
 import { useAdminDateQuery } from '~/composables/useAdminDateQuery';
 import type {
     AdminCouplingScanDetailResponse,
+    AdminTrainDataRequestHourBucket,
+    AdminTrainDataRequestStatsResponse,
+    AdminTrainDataRequestType,
+    AdminTrainDataRequestTypeSummary,
     AdminTrainProvenanceConflictCurrentGroup,
     AdminTrainProvenanceConflictState,
     AdminTrainProvenanceDeparture,
@@ -844,6 +1241,21 @@ const router = useRouter();
 const { session } = useAuthState();
 const { selectedDateInput, selectedDateYmd, todayDateInputValue } =
     await useAdminDateQuery();
+const EMPTY_REQUEST_METRICS = {
+    total: 0,
+    success: 0,
+    failure: 0,
+    successRate: null,
+    compareTotal: 0,
+    compareSuccess: 0,
+    compareFailure: 0,
+    totalDelta: 0,
+    successDelta: 0,
+    failureDelta: 0,
+    totalChangeRatio: null,
+    successChangeRatio: null,
+    failureChangeRatio: null
+} satisfies Omit<AdminTrainDataRequestTypeSummary, 'type'>;
 
 const trainCodeInput = ref(readQueryString(route.query.trainCode));
 const isSubmittingSearch = ref(false);
@@ -926,6 +1338,38 @@ async function fetchTrainProvenance() {
     return response.data;
 }
 
+async function fetchTrainRequestStats() {
+    const response = await requestFetch<
+        TrackerApiResponse<AdminTrainDataRequestStatsResponse>
+    >('/api/v1/admin/train-provenance/request-stats', {
+        retry: 0,
+        query: {
+            date: selectedDateYmd.value
+        }
+    });
+
+    if (!response.ok) {
+        throw {
+            data: response
+        };
+    }
+
+    return response.data;
+}
+
+const {
+    data: requestStatsData,
+    status: requestStatsStatus,
+    error: requestStatsError,
+    refresh: refreshRequestStats
+} = await useAsyncData(
+    'admin-train-provenance-request-stats',
+    fetchTrainRequestStats,
+    {
+        watch: [selectedDateYmd]
+    }
+);
+
 const {
     data: provenanceData,
     status: provenanceStatus,
@@ -935,6 +1379,40 @@ const {
     watch: [selectedDateYmd, normalizedTrainCodeQuery, requestedStartAt]
 });
 
+const requestStatsErrorMessage = computed(() =>
+    requestStatsError.value
+        ? getApiErrorMessage(
+              requestStatsError.value,
+              '12306 请求统计加载失败。'
+          )
+        : ''
+);
+const requestHourBuckets = computed<AdminTrainDataRequestHourBucket[]>(
+    () => requestStatsData.value?.hours ?? []
+);
+const requestTypeSummaries = computed<AdminTrainDataRequestTypeSummary[]>(
+    () => requestStatsData.value?.types ?? []
+);
+const requestPeakTotal = computed(() =>
+    requestHourBuckets.value.reduce(
+        (currentMax, bucket) =>
+            bucket.total > currentMax ? bucket.total : currentMax,
+        0
+    )
+);
+const requestChartAxisLabels = computed(() =>
+    requestHourBuckets.value
+        .filter((bucket) => bucket.hour % 4 === 0 || bucket.hour === 23)
+        .map((bucket) => ({
+            value: bucket.hour,
+            label: `${String(bucket.hour).padStart(2, '0')}:00`
+        }))
+);
+const isRefreshingPage = computed(
+    () =>
+        requestStatsStatus.value === 'pending' ||
+        provenanceStatus.value === 'pending'
+);
 const provenanceErrorMessage = computed(() =>
     provenanceError.value
         ? getApiErrorMessage(provenanceError.value, '来源追踪加载失败。')
@@ -951,8 +1429,8 @@ const timelineItems = computed<AdminTrainProvenanceEvent[]>(
 );
 
 useSiteSeo({
-    title: '12306 来源追踪 | Open CRH Tracker',
-    description: '查看某日某车次的 12306 探测来源与重联扫描结果。',
+    title: '12306 数据 | Open CRH Tracker',
+    description: '查看 12306 请求统计，并按车次追踪探测来源与重联扫描结果。',
     path: '/admin/train-provenance',
     noindex: true
 });
@@ -983,6 +1461,10 @@ onMounted(() => {
 onBeforeUnmount(() => {
     dialogMediaQuery.value?.removeEventListener('change', handleViewportChange);
 });
+
+async function refreshAll() {
+    await Promise.all([refreshRequestStats(), refreshProvenance()]);
+}
 
 async function submitSearch() {
     isSubmittingSearch.value = true;
@@ -1109,6 +1591,113 @@ function getCouplingScanActionLabel(item: AdminTrainProvenanceEvent) {
     return '扫描结果';
 }
 
+function getRequestTypeLabel(type: AdminTrainDataRequestType) {
+    switch (type) {
+        case 'search_train_code':
+            return '车次检索';
+        case 'fetch_route_info':
+            return '交路查询';
+        case 'fetch_emu_by_route':
+            return '按车次取车组';
+        case 'fetch_emu_by_seat_code':
+            return '畅行码查车组';
+        default:
+            return type;
+    }
+}
+
+function getRequestTypeEyebrow(type: AdminTrainDataRequestType) {
+    switch (type) {
+        case 'search_train_code':
+            return 'Search';
+        case 'fetch_route_info':
+            return 'Route';
+        case 'fetch_emu_by_route':
+            return 'Route EMU';
+        case 'fetch_emu_by_seat_code':
+            return 'Seat Code';
+        default:
+            return 'Type';
+    }
+}
+
+function getRequestTypeAccentClass(type: AdminTrainDataRequestType) {
+    switch (type) {
+        case 'search_train_code':
+            return 'text-sky-700';
+        case 'fetch_route_info':
+            return 'text-blue-700';
+        case 'fetch_emu_by_route':
+            return 'text-amber-700';
+        case 'fetch_emu_by_seat_code':
+            return 'text-emerald-700';
+        default:
+            return 'text-slate-700';
+    }
+}
+
+function getRequestHourBarHeight(total: number, peakTotal: number) {
+    if (peakTotal <= 0 || total <= 0) {
+        return 0;
+    }
+
+    return Math.max(6, (total / peakTotal) * 100);
+}
+
+function getRequestStackSegmentHeight(value: number, total: number) {
+    if (total <= 0 || value <= 0) {
+        return 0;
+    }
+
+    return (value / total) * 100;
+}
+
+function getRequestTypeBucket(
+    bucket: AdminTrainDataRequestHourBucket,
+    type: AdminTrainDataRequestType
+) {
+    return (
+        bucket.types.find((item) => item.type === type) ?? {
+            type,
+            ...EMPTY_REQUEST_METRICS
+        }
+    );
+}
+
+function getRequestTypePeakTotal(type: AdminTrainDataRequestType) {
+    return requestHourBuckets.value.reduce((currentMax, bucket) => {
+        const typeBucket = getRequestTypeBucket(bucket, type);
+        return typeBucket.total > currentMax ? typeBucket.total : currentMax;
+    }, 0);
+}
+
+function getRequestBucketTitle(bucket: AdminTrainDataRequestHourBucket) {
+    return [
+        `${String(bucket.hour).padStart(2, '0')}:00 - ${String((bucket.hour + 1) % 24).padStart(2, '0')}:00`,
+        `总请求 ${formatNumber(bucket.total)}`,
+        `成功 ${formatNumber(bucket.success)}`,
+        `失败 ${formatNumber(bucket.failure)}`,
+        `前一日同小时 ${formatNumber(bucket.compareTotal)}`,
+        `同比 ${formatSignedNumber(bucket.totalDelta)} / ${formatSignedPercent(bucket.totalChangeRatio)}`
+    ].join('\n');
+}
+
+function getRequestTypeBucketTitle(
+    bucket: AdminTrainDataRequestHourBucket,
+    type: AdminTrainDataRequestType
+) {
+    const typeBucket = getRequestTypeBucket(bucket, type);
+
+    return [
+        `${getRequestTypeLabel(type)} · ${String(bucket.hour).padStart(2, '0')}:00 - ${String((bucket.hour + 1) % 24).padStart(2, '0')}:00`,
+        `总请求 ${formatNumber(typeBucket.total)}`,
+        `成功 ${formatNumber(typeBucket.success)}`,
+        `失败 ${formatNumber(typeBucket.failure)}`,
+        `前一日同小时 ${formatNumber(typeBucket.compareTotal)}`,
+        `同比 ${formatSignedNumber(typeBucket.totalDelta)} / ${formatSignedPercent(typeBucket.totalChangeRatio)}`
+    ].join('\n');
+}
+
 function getLinkedTaskHintText(item: AdminTrainProvenanceEvent) {
     const couplingScan = item.couplingScan;
     if (couplingScan) {
@@ -1154,6 +1743,40 @@ function formatTimestamp(timestamp: number) {
     }
 
     return formatTrackerTimestamp(timestamp);
+}
+
+function formatNumber(value: number) {
+    return value.toLocaleString('zh-CN');
+}
+
+function formatPercent(value: number | null) {
+    if (value === null) {
+        return '--';
+    }
+
+    return `${(value * 100).toFixed(1)}%`;
+}
+
+function formatSignedNumber(value: number) {
+    const formatted = formatNumber(Math.abs(value));
+    if (value === 0) {
+        return formatted;
+    }
+
+    return `${value > 0 ? '+' : '-'}${formatted}`;
+}
+
+function formatSignedPercent(value: number | null) {
+    if (value === null) {
+        return '--';
+    }
+
+    const percent = `${(Math.abs(value) * 100).toFixed(1)}%`;
+    if (value === 0) {
+        return percent;
+    }
+
+    return `${value > 0 ? '+' : '-'}${percent}`;
 }
 
 function formatServiceDate(serviceDate: string) {
