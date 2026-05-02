@@ -31,447 +31,454 @@
         <div
             v-else-if="timetable"
             class="flex flex-col gap-5">
-            <div class="order-2 space-y-5">
-                <div class="motion-divider" />
+            <div class="order-1 space-y-5">
+                <div class="grid gap-3 sm:grid-cols-2">
+                    <UiCard
+                        :show-accent-bar="false"
+                        variant="subtle">
+                        <p
+                            class="text-xs uppercase tracking-[0.16em] text-slate-400">
+                            车次
+                        </p>
+                        <p
+                            class="mt-2 font-mono text-sm font-semibold text-crh-blue">
+                            {{ timetable.allCodes.join(' / ') }}
+                        </p>
+                    </UiCard>
 
-                <div
-                    v-if="timetableNotice"
-                    class="rounded-[1rem] border border-slate-200 bg-white/80 px-4 py-3">
-                    <p class="text-xs tracking-[0.16em] text-slate-400">
-                        时刻表
-                    </p>
-                    <p class="mt-2 text-sm leading-6 text-crh-grey-dark">
-                        {{ timetableNotice }}
-                    </p>
+                    <UiCard
+                        :show-accent-bar="false"
+                        variant="subtle">
+                        <p
+                            class="text-xs uppercase tracking-[0.16em] text-slate-400">
+                            始发 / 终到
+                        </p>
+                        <p class="mt-2 text-sm font-medium text-crh-grey-dark">
+                            <LookupStationLink
+                                :station-name="timetable.startStation"
+                                :focus-train-codes="timetableFocusTrainCodes"
+                                fallback-text="--" />
+                            <span class="mx-1">-></span>
+                            <LookupStationLink
+                                :station-name="timetable.endStation"
+                                :focus-train-codes="timetableFocusTrainCodes"
+                                fallback-text="--" />
+                        </p>
+                    </UiCard>
+
+                    <UiCard
+                        v-if="responsibilitySummary"
+                        :show-accent-bar="false"
+                        variant="subtle"
+                        class="sm:col-span-2">
+                        <p
+                            class="text-xs uppercase tracking-[0.16em] text-slate-400">
+                            担当
+                        </p>
+                        <p class="mt-2 text-sm font-medium text-crh-grey-dark">
+                            {{ responsibilitySummary }}
+                        </p>
+                    </UiCard>
                 </div>
-            </div>
 
-            <div class="order-3 grid gap-3 sm:grid-cols-2">
-                <UiCard
-                    :show-accent-bar="false"
-                    variant="subtle">
-                    <p
-                        class="text-xs uppercase tracking-[0.16em] text-slate-400">
-                        车次
-                    </p>
-                    <p
-                        class="mt-2 font-mono text-sm font-semibold text-crh-blue">
-                        {{ timetable.allCodes.join(' / ') }}
-                    </p>
-                </UiCard>
-
-                <UiCard
-                    :show-accent-bar="false"
-                    variant="subtle">
-                    <p
-                        class="text-xs uppercase tracking-[0.16em] text-slate-400">
-                        始发 / 终到
-                    </p>
-                    <p class="mt-2 text-sm font-medium text-crh-grey-dark">
-                        <LookupStationLink
-                            :station-name="timetable.startStation"
-                            :focus-train-codes="timetableFocusTrainCodes"
-                            fallback-text="--" />
-                        <span class="mx-1">-></span>
-                        <LookupStationLink
-                            :station-name="timetable.endStation"
-                            :focus-train-codes="timetableFocusTrainCodes"
-                            fallback-text="--" />
-                    </p>
-                </UiCard>
-
-                <UiCard
-                    v-if="responsibilitySummary"
-                    :show-accent-bar="false"
-                    variant="subtle"
-                    class="sm:col-span-2">
-                    <p
-                        class="text-xs uppercase tracking-[0.16em] text-slate-400">
-                        担当
-                    </p>
-                    <p class="mt-2 text-sm font-medium text-crh-grey-dark">
-                        {{ responsibilitySummary }}
-                    </p>
-                </UiCard>
-            </div>
-
-            <div
-                class="order-4 hidden overflow-hidden rounded-[1.25rem] border border-slate-200 md:block">
-                <table
-                    class="min-w-full border-separate border-spacing-0 bg-white/90">
-                    <thead>
-                        <tr class="bg-slate-50/80 text-left">
-                            <th
-                                v-for="column in columns"
-                                :key="column"
-                                class="border-b border-slate-200 px-4 py-3 text-xs font-medium uppercase tracking-[0.16em] text-slate-400">
-                                {{ column }}
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr
-                            v-for="stop in timetable.stops"
-                            :key="'desktop:' + stop.stationNo"
-                            class="align-top">
-                            <td
-                                class="border-b border-slate-100 px-4 py-3 font-mono text-sm text-slate-500 last:border-b-0">
-                                {{ stop.stationNo }}
-                            </td>
-                            <td
-                                class="border-b border-slate-100 px-4 py-3 font-mono text-sm text-slate-500 last:border-b-0">
-                                {{ stop.stationTrainCode || '--' }}
-                            </td>
-                            <td
-                                class="border-b border-slate-100 px-4 py-3 text-sm font-medium text-crh-grey-dark last:border-b-0">
-                                <LookupStationLink
-                                    :station-name="stop.stationName"
-                                    :focus-train-codes="
-                                        resolveStopFocusTrainCodes(stop)
-                                    "
-                                    fallback-text="--" />
-                            </td>
-                            <td
-                                class="border-b border-slate-100 px-4 py-3 font-mono text-sm text-slate-500 last:border-b-0">
-                                {{ formatNullableTime(stop.arriveAt) }}
-                            </td>
-                            <td
-                                class="border-b border-slate-100 px-4 py-3 font-mono text-sm text-slate-500 last:border-b-0">
-                                {{ formatNullableTime(stop.departAt) }}
-                            </td>
-                            <td
-                                class="border-b border-slate-100 px-4 py-3 text-sm text-slate-500 last:border-b-0">
-                                {{ stop.wicket || '--' }}
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-
-            <div class="order-5 space-y-2.5 md:hidden">
-                <UiCard
-                    v-for="stop in timetable.stops"
-                    :key="'mobile:' + stop.stationNo"
-                    :show-accent-bar="false"
-                    variant="subtle">
-                    <div class="space-y-3">
-                        <div class="flex items-start justify-between gap-3">
-                            <div class="min-w-0">
-                                <p
-                                    class="text-xs uppercase tracking-[0.16em] text-slate-400">
-                                    第 {{ stop.stationNo }} 站
-                                </p>
-                                <p
-                                    class="mt-1 text-sm font-semibold text-crh-grey-dark">
-                                    <LookupStationLink
-                                        :station-name="stop.stationName"
-                                        :focus-train-codes="
-                                            resolveStopFocusTrainCodes(stop)
-                                        "
-                                        fallback-text="--" />
-                                </p>
-                            </div>
-                            <span class="font-mono text-xs text-slate-400">
-                                {{ stop.stationTrainCode || '--' }}
-                            </span>
-                        </div>
-
-                        <div class="grid grid-cols-2 gap-3">
-                            <div>
-                                <p
-                                    class="text-[11px] uppercase tracking-[0.16em] text-slate-400">
-                                    到点
-                                </p>
-                                <p
-                                    class="mt-1 font-mono text-sm text-slate-500">
-                                    {{ formatNullableTime(stop.arriveAt) }}
-                                </p>
-                            </div>
-                            <div>
-                                <p
-                                    class="text-[11px] uppercase tracking-[0.16em] text-slate-400">
-                                    开点
-                                </p>
-                                <p
-                                    class="mt-1 font-mono text-sm text-slate-500">
-                                    {{ formatNullableTime(stop.departAt) }}
-                                </p>
-                            </div>
-                            <div>
-                                <p
-                                    class="text-[11px] uppercase tracking-[0.16em] text-slate-400">
-                                    车次
-                                </p>
-                                <p
-                                    class="mt-1 font-mono text-sm text-slate-500">
-                                    {{ stop.stationTrainCode || '--' }}
-                                </p>
-                            </div>
-                            <div>
-                                <p
-                                    class="text-[11px] uppercase tracking-[0.16em] text-slate-400">
-                                    检票口
-                                </p>
-                                <p class="mt-1 text-sm text-slate-500">
-                                    {{ stop.wicket || '--' }}
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                </UiCard>
+                <div class="motion-divider" />
             </div>
 
             <UiCard
-                class="order-1"
+                class="order-4"
                 :show-accent-bar="false"
                 variant="subtle">
                 <div class="space-y-4">
-                    <p
-                        class="text-xs uppercase tracking-[0.16em] text-slate-400">
-                        交路表
-                    </p>
-
-                    <div
-                        v-if="circulationNodes.length > 0"
-                        class="hidden space-y-3 md:block">
-                        <div
-                            v-for="(node, index) in circulationNodes"
-                            :key="`desktop:${node.key}`"
-                            class="flex gap-3">
-                            <div
-                                class="flex w-7 shrink-0 flex-col items-center">
-                                <span
-                                    :class="[
-                                        'inline-flex h-7 w-7 items-center justify-center rounded-full border text-xs font-semibold transition',
-                                        node.isCurrent
-                                            ? 'border-crh-blue bg-crh-blue text-white shadow-[0_6px_16px_-10px_rgba(0,82,155,0.85)]'
-                                            : 'border-slate-200 bg-white text-slate-500'
-                                    ]">
-                                    {{ index + 1 }}
-                                </span>
-                                <span
-                                    v-if="index + 1 < circulationNodes.length"
-                                    :class="[
-                                        'mt-2 min-h-6 w-px flex-1',
-                                        node.isCurrent
-                                            ? 'bg-crh-blue/30'
-                                            : 'bg-slate-200'
-                                    ]"
-                                    aria-hidden="true" />
-                            </div>
-
-                            <div
-                                :class="[
-                                    'min-w-0 flex-1 rounded-[1rem] border px-4 py-3 transition',
-                                    node.isCurrent
-                                        ? 'border-crh-blue/20 bg-blue-50/80 shadow-[0_14px_30px_-24px_rgba(0,82,155,0.55)]'
-                                        : 'border-slate-200 bg-white/90'
-                                ]">
-                                <div
-                                    class="flex flex-wrap items-start justify-between gap-3">
-                                    <div
-                                        class="min-w-0 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-sm font-semibold">
-                                        <template
-                                            v-for="(
-                                                code, codeIndex
-                                            ) in node.allCodes"
-                                            :key="`${node.key}:desktop:${code}`">
-                                            <span
-                                                v-if="
-                                                    isCurrentCirculationCode(
-                                                        code
-                                                    )
-                                                "
-                                                :class="
-                                                    node.isCurrent
-                                                        ? 'text-crh-blue'
-                                                        : 'text-crh-grey-dark'
-                                                ">
-                                                {{ code }}
-                                            </span>
-                                            <NuxtLink
-                                                v-else
-                                                :to="
-                                                    buildCirculationCodeLink(
-                                                        code
-                                                    )
-                                                "
-                                                :class="[
-                                                    'transition hover:underline',
-                                                    node.isCurrent
-                                                        ? 'text-crh-blue'
-                                                        : 'text-crh-grey-dark hover:text-crh-blue'
-                                                ]">
-                                                {{ code }}
-                                            </NuxtLink>
-                                            <span
-                                                v-if="
-                                                    codeIndex <
-                                                    node.allCodes.length - 1
-                                                "
-                                                class="text-slate-400">
-                                                /
-                                            </span>
-                                        </template>
-                                    </div>
-
-                                    <span
-                                        v-if="node.isCurrent"
-                                        class="inline-flex items-center rounded-full border border-crh-blue/20 bg-white/80 px-2.5 py-1 text-xs font-medium text-crh-blue">
-                                        当前车次
-                                    </span>
-                                </div>
-
-                                <div class="mt-3 grid gap-3 sm:grid-cols-2">
-                                    <div
-                                        class="rounded-[0.9rem] border border-slate-200/80 bg-white/70 px-3 py-3">
-                                        <p
-                                            class="text-[11px] uppercase tracking-[0.16em] text-slate-400">
-                                            始发 / 终到
-                                        </p>
-                                        <p
-                                            class="mt-1 text-sm font-medium text-crh-grey-dark">
-                                            <LookupStationLink
-                                                :station-name="
-                                                    node.startStation
-                                                "
-                                                :focus-train-codes="
-                                                    resolveCirculationNodeFocusTrainCodes(
-                                                        node
-                                                    )
-                                                "
-                                                fallback-text="--" />
-                                            <span class="mx-1">-></span>
-                                            <LookupStationLink
-                                                :station-name="node.endStation"
-                                                :focus-train-codes="
-                                                    resolveCirculationNodeFocusTrainCodes(
-                                                        node
-                                                    )
-                                                "
-                                                fallback-text="--" />
-                                        </p>
-                                    </div>
-
-                                    <div
-                                        class="rounded-[0.9rem] border border-slate-200/80 bg-white/70 px-3 py-3">
-                                        <p
-                                            class="text-[11px] uppercase tracking-[0.16em] text-slate-400">
-                                            始发时间 / 终到时间
-                                        </p>
-                                        <p
-                                            class="mt-1 font-mono text-sm text-slate-500">
-                                            {{
-                                                formatNullableTime(node.startAt)
-                                            }}
-                                            <span class="mx-1">-></span>
-                                            {{ formatNullableTime(node.endAt) }}
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
+                    <div class="flex items-start justify-between gap-3">
+                        <div class="min-w-0">
+                            <p
+                                class="text-xs uppercase tracking-[0.16em] text-slate-400">
+                                时刻表
+                            </p>
+                            <p
+                                v-if="!isTimetableExpanded"
+                                class="mt-2 text-sm text-slate-500">
+                                {{ timetableSummaryLabel }}
+                            </p>
                         </div>
+
+                        <button
+                            type="button"
+                            class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:border-slate-300 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-crh-blue/25 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+                            :class="
+                                isTimetableExpanded
+                                    ? 'border-crh-blue/20 text-crh-blue'
+                                    : ''
+                            "
+                            :aria-controls="timetableSectionId"
+                            :aria-expanded="isTimetableExpanded ? 'true' : 'false'"
+                            :aria-label="
+                                isTimetableExpanded ? '折叠时刻表' : '展开时刻表'
+                            "
+                            @click="toggleTimetableExpanded">
+                            <svg
+                                aria-hidden="true"
+                                viewBox="0 0 20 20"
+                                fill="none"
+                                class="h-4 w-4 transition-transform duration-200 ease-out"
+                                :class="isTimetableExpanded ? 'rotate-180' : ''">
+                                <path
+                                    d="M5 7.5L10 12.5L15 7.5"
+                                    stroke="currentColor"
+                                    stroke-width="1.8"
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round" />
+                            </svg>
+                        </button>
                     </div>
 
-                    <div
-                        v-if="circulationNodes.length > 0"
-                        class="space-y-2.5 md:hidden">
+                    <p
+                        v-if="timetableNotice && isTimetableExpanded"
+                        class="text-sm leading-6 text-slate-700">
+                        {{ timetableNotice }}
+                    </p>
+
+                    <Transition
+                        enter-active-class="transition duration-200 ease-out"
+                        enter-from-class="translate-y-2 opacity-0 motion-reduce:translate-y-0"
+                        enter-to-class="translate-y-0 opacity-100"
+                        leave-active-class="transition duration-180 ease-out"
+                        leave-from-class="translate-y-0 opacity-100"
+                        leave-to-class="translate-y-1 opacity-0 motion-reduce:translate-y-0">
                         <div
-                            v-for="(node, index) in circulationNodes"
-                            :key="`mobile:${node.key}`"
-                            class="flex gap-3">
+                            v-if="isTimetableExpanded"
+                            :id="timetableSectionId"
+                            class="space-y-2.5">
                             <div
-                                class="flex w-7 shrink-0 flex-col items-center">
-                                <span
-                                    :class="[
-                                        'inline-flex h-7 w-7 items-center justify-center rounded-full border text-xs font-semibold transition',
-                                        node.isCurrent
-                                            ? 'border-crh-blue bg-crh-blue text-white shadow-[0_6px_16px_-10px_rgba(0,82,155,0.85)]'
-                                            : 'border-slate-200 bg-white text-slate-500'
-                                    ]">
-                                    {{ index + 1 }}
-                                </span>
-                                <span
-                                    v-if="index + 1 < circulationNodes.length"
-                                    :class="[
-                                        'mt-2 min-h-6 w-px flex-1',
-                                        node.isCurrent
-                                            ? 'bg-crh-blue/30'
-                                            : 'bg-slate-200'
-                                    ]"
-                                    aria-hidden="true" />
+                                class="hidden overflow-hidden rounded-[1.25rem] border border-slate-200 md:block">
+                                <table
+                                    class="min-w-full border-separate border-spacing-0 bg-white/90">
+                                    <thead>
+                                        <tr class="bg-slate-50/80 text-left">
+                                            <th
+                                                v-for="column in columns"
+                                                :key="column"
+                                                class="border-b border-slate-200 px-4 py-3 text-xs font-medium uppercase tracking-[0.16em] text-slate-400">
+                                                {{ column }}
+                                            </th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr
+                                            v-for="stop in timetable.stops"
+                                            :key="'desktop:' + stop.stationNo"
+                                            class="align-top">
+                                            <td
+                                                class="border-b border-slate-100 px-4 py-3 font-mono text-sm text-slate-500 last:border-b-0">
+                                                {{ stop.stationNo }}
+                                            </td>
+                                            <td
+                                                class="border-b border-slate-100 px-4 py-3 font-mono text-sm text-slate-500 last:border-b-0">
+                                                {{ stop.stationTrainCode || '--' }}
+                                            </td>
+                                            <td
+                                                class="border-b border-slate-100 px-4 py-3 text-sm font-medium text-crh-grey-dark last:border-b-0">
+                                                <LookupStationLink
+                                                    :station-name="
+                                                        stop.stationName
+                                                    "
+                                                    :focus-train-codes="
+                                                        resolveStopFocusTrainCodes(
+                                                            stop
+                                                        )
+                                                    "
+                                                    fallback-text="--" />
+                                            </td>
+                                            <td
+                                                class="border-b border-slate-100 px-4 py-3 font-mono text-sm text-slate-500 last:border-b-0">
+                                                {{
+                                                    formatNullableTime(
+                                                        stop.arriveAt
+                                                    )
+                                                }}
+                                            </td>
+                                            <td
+                                                class="border-b border-slate-100 px-4 py-3 font-mono text-sm text-slate-500 last:border-b-0">
+                                                {{
+                                                    formatNullableTime(
+                                                        stop.departAt
+                                                    )
+                                                }}
+                                            </td>
+                                            <td
+                                                class="border-b border-slate-100 px-4 py-3 text-sm text-slate-500 last:border-b-0">
+                                                {{ stop.wicket || '--' }}
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
                             </div>
 
-                            <UiCard
-                                :show-accent-bar="false"
-                                variant="subtle"
-                                :class="[
-                                    'min-w-0 flex-1',
-                                    node.isCurrent
-                                        ? 'border-crh-blue/20 bg-blue-50/60 shadow-[0_14px_30px_-24px_rgba(0,82,155,0.55)]'
-                                        : ''
-                                ]">
-                                <div class="space-y-3">
-                                    <div
-                                        class="flex items-start justify-between gap-3">
+                            <div class="space-y-2.5 md:hidden">
+                                <UiCard
+                                    v-for="stop in timetable.stops"
+                                    :key="'mobile:' + stop.stationNo"
+                                    :show-accent-bar="false"
+                                    variant="subtle">
+                                    <div class="space-y-3">
                                         <div
-                                            class="min-w-0 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-sm font-semibold text-crh-blue">
-                                            <template
-                                                v-for="(
-                                                    code, codeIndex
-                                                ) in node.allCodes"
-                                                :key="`${node.key}:${code}`">
-                                                <span
-                                                    v-if="
-                                                        isCurrentCirculationCode(
-                                                            code
-                                                        )
-                                                    ">
-                                                    {{ code }}
-                                                </span>
-                                                <NuxtLink
-                                                    v-else
-                                                    :to="
-                                                        buildCirculationCodeLink(
-                                                            code
-                                                        )
-                                                    "
-                                                    class="transition hover:underline">
-                                                    {{ code }}
-                                                </NuxtLink>
-                                                <span
-                                                    v-if="
-                                                        codeIndex <
-                                                        node.allCodes.length - 1
-                                                    "
-                                                    class="text-slate-400">
-                                                    /
-                                                </span>
-                                            </template>
+                                            class="flex items-start justify-between gap-3">
+                                            <div class="min-w-0">
+                                                <p
+                                                    class="text-xs uppercase tracking-[0.16em] text-slate-400">
+                                                    第 {{ stop.stationNo }} 站
+                                                </p>
+                                                <p
+                                                    class="mt-1 text-sm font-semibold text-crh-grey-dark">
+                                                    <LookupStationLink
+                                                        :station-name="
+                                                            stop.stationName
+                                                        "
+                                                        :focus-train-codes="
+                                                            resolveStopFocusTrainCodes(
+                                                                stop
+                                                            )
+                                                        "
+                                                        fallback-text="--" />
+                                                </p>
+                                            </div>
+                                            <span
+                                                class="font-mono text-xs text-slate-400">
+                                                {{ stop.stationTrainCode || '--' }}
+                                            </span>
                                         </div>
 
+                                        <div class="grid grid-cols-2 gap-3">
+                                            <div>
+                                                <p
+                                                    class="text-[11px] uppercase tracking-[0.16em] text-slate-400">
+                                                    到点
+                                                </p>
+                                                <p
+                                                    class="mt-1 font-mono text-sm text-slate-500">
+                                                    {{
+                                                        formatNullableTime(
+                                                            stop.arriveAt
+                                                        )
+                                                    }}
+                                                </p>
+                                            </div>
+                                            <div>
+                                                <p
+                                                    class="text-[11px] uppercase tracking-[0.16em] text-slate-400">
+                                                    开点
+                                                </p>
+                                                <p
+                                                    class="mt-1 font-mono text-sm text-slate-500">
+                                                    {{
+                                                        formatNullableTime(
+                                                            stop.departAt
+                                                        )
+                                                    }}
+                                                </p>
+                                            </div>
+                                            <div>
+                                                <p
+                                                    class="text-[11px] uppercase tracking-[0.16em] text-slate-400">
+                                                    车次
+                                                </p>
+                                                <p
+                                                    class="mt-1 font-mono text-sm text-slate-500">
+                                                    {{ stop.stationTrainCode || '--' }}
+                                                </p>
+                                            </div>
+                                            <div>
+                                                <p
+                                                    class="text-[11px] uppercase tracking-[0.16em] text-slate-400">
+                                                    检票口
+                                                </p>
+                                                <p
+                                                    class="mt-1 text-sm text-slate-500">
+                                                    {{ stop.wicket || '--' }}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </UiCard>
+                            </div>
+                        </div>
+                    </Transition>
+                </div>
+            </UiCard>
+
+            <UiCard
+                class="order-2"
+                :show-accent-bar="false"
+                variant="subtle">
+                <div class="space-y-4">
+                    <div class="flex items-start justify-between gap-3">
+                        <div class="min-w-0">
+                            <p
+                                class="text-xs uppercase tracking-[0.16em] text-slate-400">
+                                交路表
+                            </p>
+                            <p
+                                v-if="
+                                    !isCirculationExpanded &&
+                                    circulationNodes.length > 0
+                                "
+                                class="mt-2 text-sm text-slate-500">
+                                {{ circulationSummaryLabel }}
+                            </p>
+                        </div>
+
+                        <button
+                            v-if="circulationNodes.length > 0"
+                            type="button"
+                            class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:border-slate-300 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-crh-blue/25 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+                            :class="
+                                isCirculationExpanded
+                                    ? 'border-crh-blue/20 text-crh-blue'
+                                    : ''
+                            "
+                            :aria-controls="circulationSectionId"
+                            :aria-expanded="
+                                isCirculationExpanded ? 'true' : 'false'
+                            "
+                            :aria-label="
+                                isCirculationExpanded ? '折叠交路表' : '展开交路表'
+                            "
+                            @click="toggleCirculationExpanded">
+                            <svg
+                                aria-hidden="true"
+                                viewBox="0 0 20 20"
+                                fill="none"
+                                class="h-4 w-4 transition-transform duration-200 ease-out"
+                                :class="
+                                    isCirculationExpanded ? 'rotate-180' : ''
+                                ">
+                                <path
+                                    d="M5 7.5L10 12.5L15 7.5"
+                                    stroke="currentColor"
+                                    stroke-width="1.8"
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round" />
+                            </svg>
+                        </button>
+                    </div>
+
+                    <Transition
+                        enter-active-class="transition duration-200 ease-out"
+                        enter-from-class="translate-y-2 opacity-0 motion-reduce:translate-y-0"
+                        enter-to-class="translate-y-0 opacity-100"
+                        leave-active-class="transition duration-180 ease-out"
+                        leave-from-class="translate-y-0 opacity-100"
+                        leave-to-class="translate-y-1 opacity-0 motion-reduce:translate-y-0">
+                        <div
+                            v-if="
+                                isCirculationExpanded &&
+                                circulationNodes.length > 0
+                            "
+                            :id="circulationSectionId"
+                            class="space-y-3">
+                            <div class="hidden space-y-3 md:block">
+                                <div
+                                    v-for="(node, index) in circulationNodes"
+                                    :key="`desktop:${node.key}`"
+                                    class="flex gap-3">
+                                    <div
+                                        class="flex w-7 shrink-0 flex-col items-center">
                                         <span
-                                            v-if="node.isCurrent"
-                                            class="inline-flex items-center rounded-full border border-crh-blue/20 bg-white px-2.5 py-1 text-xs font-medium text-crh-blue">
-                                            当前车次
+                                            :class="[
+                                                'inline-flex h-7 w-7 items-center justify-center rounded-full border text-xs font-semibold transition',
+                                                node.isCurrent
+                                                    ? 'border-crh-blue bg-crh-blue text-white shadow-[0_6px_16px_-10px_rgba(0,82,155,0.85)]'
+                                                    : 'border-slate-200 bg-white text-slate-500'
+                                            ]">
+                                            {{ index + 1 }}
                                         </span>
+                                        <span
+                                            v-if="
+                                                index + 1 <
+                                                circulationNodes.length
+                                            "
+                                            :class="[
+                                                'mt-2 min-h-6 w-px flex-1',
+                                                node.isCurrent
+                                                    ? 'bg-crh-blue/30'
+                                                    : 'bg-slate-200'
+                                            ]"
+                                            aria-hidden="true" />
                                     </div>
 
                                     <div
                                         :class="[
-                                            'rounded-[1rem] border bg-white/90 px-4 py-3',
+                                            'min-w-0 flex-1 rounded-[1rem] border px-4 py-3 transition',
                                             node.isCurrent
-                                                ? 'border-crh-blue/20'
-                                                : 'border-slate-200'
+                                                ? 'border-crh-blue/20 bg-blue-50/80 shadow-[0_14px_30px_-24px_rgba(0,82,155,0.55)]'
+                                                : 'border-slate-200 bg-white/90'
                                         ]">
-                                        <div class="grid grid-cols-2 gap-3">
-                                            <div class="min-w-0">
+                                        <div
+                                            class="flex flex-wrap items-start justify-between gap-3">
+                                            <div
+                                                class="min-w-0 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-sm font-semibold">
+                                                <template
+                                                    v-for="(
+                                                        code, codeIndex
+                                                    ) in node.allCodes"
+                                                    :key="`${node.key}:desktop:${code}`">
+                                                    <span
+                                                        v-if="
+                                                            isCurrentCirculationCode(
+                                                                code
+                                                            )
+                                                        "
+                                                        :class="
+                                                            node.isCurrent
+                                                                ? 'text-crh-blue'
+                                                                : 'text-crh-grey-dark'
+                                                        ">
+                                                        {{ code }}
+                                                    </span>
+                                                    <NuxtLink
+                                                        v-else
+                                                        :to="
+                                                            buildCirculationCodeLink(
+                                                                code
+                                                            )
+                                                        "
+                                                        :class="[
+                                                            'transition hover:underline',
+                                                            node.isCurrent
+                                                                ? 'text-crh-blue'
+                                                                : 'text-crh-grey-dark hover:text-crh-blue'
+                                                        ]">
+                                                        {{ code }}
+                                                    </NuxtLink>
+                                                    <span
+                                                        v-if="
+                                                            codeIndex <
+                                                            node.allCodes.length -
+                                                                1
+                                                        "
+                                                        class="text-slate-400">
+                                                        /
+                                                    </span>
+                                                </template>
+                                            </div>
+
+                                            <span
+                                                v-if="node.isCurrent"
+                                                class="inline-flex items-center rounded-full border border-crh-blue/20 bg-white/80 px-2.5 py-1 text-xs font-medium text-crh-blue">
+                                                当前车次
+                                            </span>
+                                        </div>
+
+                                        <div
+                                            class="mt-3 grid gap-3 sm:grid-cols-2">
+                                            <div
+                                                class="rounded-[0.9rem] border border-slate-200/80 bg-white/70 px-3 py-3">
                                                 <p
-                                                    class="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">
-                                                    始发站
+                                                    class="text-[11px] uppercase tracking-[0.16em] text-slate-400">
+                                                    始发 / 终到
                                                 </p>
                                                 <p
-                                                    class="mt-1 truncate text-sm font-medium text-crh-grey-dark">
+                                                    class="mt-1 text-sm font-medium text-crh-grey-dark">
                                                     <LookupStationLink
                                                         :station-name="
                                                             node.startStation
@@ -482,16 +489,7 @@
                                                             )
                                                         "
                                                         fallback-text="--" />
-                                                </p>
-                                            </div>
-
-                                            <div class="min-w-0 text-right">
-                                                <p
-                                                    class="text-[11px] uppercase tracking-[0.18em] text-slate-400">
-                                                    终到站
-                                                </p>
-                                                <p
-                                                    class="mt-1 truncate text-sm font-medium text-crh-grey-dark">
+                                                    <span class="mx-1">-></span>
                                                     <LookupStationLink
                                                         :station-name="
                                                             node.endStation
@@ -504,14 +502,12 @@
                                                         fallback-text="--" />
                                                 </p>
                                             </div>
-                                        </div>
 
-                                        <div
-                                            class="mt-3 grid grid-cols-2 gap-3 border-t border-slate-100 pt-3">
-                                            <div class="min-w-0">
+                                            <div
+                                                class="rounded-[0.9rem] border border-slate-200/80 bg-white/70 px-3 py-3">
                                                 <p
-                                                    class="text-[11px] uppercase tracking-[0.18em] text-slate-400">
-                                                    始发时间
+                                                    class="text-[11px] uppercase tracking-[0.16em] text-slate-400">
+                                                    始发时间 / 终到时间
                                                 </p>
                                                 <p
                                                     class="mt-1 font-mono text-sm text-slate-500">
@@ -520,16 +516,7 @@
                                                             node.startAt
                                                         )
                                                     }}
-                                                </p>
-                                            </div>
-
-                                            <div class="min-w-0 text-right">
-                                                <p
-                                                    class="text-[11px] uppercase tracking-[0.18em] text-slate-400">
-                                                    终到时间
-                                                </p>
-                                                <p
-                                                    class="mt-1 font-mono text-sm text-slate-500">
+                                                    <span class="mx-1">-></span>
                                                     {{
                                                         formatNullableTime(
                                                             node.endAt
@@ -540,23 +527,201 @@
                                         </div>
                                     </div>
                                 </div>
-                            </UiCard>
+                            </div>
+
+                            <div class="space-y-2.5 md:hidden">
+                                <div
+                                    v-for="(node, index) in circulationNodes"
+                                    :key="`mobile:${node.key}`"
+                                    class="flex gap-3">
+                                    <div
+                                        class="flex w-7 shrink-0 flex-col items-center">
+                                        <span
+                                            :class="[
+                                                'inline-flex h-7 w-7 items-center justify-center rounded-full border text-xs font-semibold transition',
+                                                node.isCurrent
+                                                    ? 'border-crh-blue bg-crh-blue text-white shadow-[0_6px_16px_-10px_rgba(0,82,155,0.85)]'
+                                                    : 'border-slate-200 bg-white text-slate-500'
+                                            ]">
+                                            {{ index + 1 }}
+                                        </span>
+                                        <span
+                                            v-if="
+                                                index + 1 <
+                                                circulationNodes.length
+                                            "
+                                            :class="[
+                                                'mt-2 min-h-6 w-px flex-1',
+                                                node.isCurrent
+                                                    ? 'bg-crh-blue/30'
+                                                    : 'bg-slate-200'
+                                            ]"
+                                            aria-hidden="true" />
+                                    </div>
+
+                                    <UiCard
+                                        :show-accent-bar="false"
+                                        variant="subtle"
+                                        :class="[
+                                            'min-w-0 flex-1',
+                                            node.isCurrent
+                                                ? 'border-crh-blue/20 bg-blue-50/60 shadow-[0_14px_30px_-24px_rgba(0,82,155,0.55)]'
+                                                : ''
+                                        ]">
+                                        <div class="space-y-3">
+                                            <div
+                                                class="flex items-start justify-between gap-3">
+                                                <div
+                                                    class="min-w-0 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-sm font-semibold text-crh-blue">
+                                                    <template
+                                                        v-for="(
+                                                            code, codeIndex
+                                                        ) in node.allCodes"
+                                                        :key="`${node.key}:${code}`">
+                                                        <span
+                                                            v-if="
+                                                                isCurrentCirculationCode(
+                                                                    code
+                                                                )
+                                                            ">
+                                                            {{ code }}
+                                                        </span>
+                                                        <NuxtLink
+                                                            v-else
+                                                            :to="
+                                                                buildCirculationCodeLink(
+                                                                    code
+                                                                )
+                                                            "
+                                                            class="transition hover:underline">
+                                                            {{ code }}
+                                                        </NuxtLink>
+                                                        <span
+                                                            v-if="
+                                                                codeIndex <
+                                                                node.allCodes.length -
+                                                                    1
+                                                            "
+                                                            class="text-slate-400">
+                                                            /
+                                                        </span>
+                                                    </template>
+                                                </div>
+
+                                                <span
+                                                    v-if="node.isCurrent"
+                                                    class="inline-flex items-center rounded-full border border-crh-blue/20 bg-white px-2.5 py-1 text-xs font-medium text-crh-blue">
+                                                    当前车次
+                                                </span>
+                                            </div>
+
+                                            <div
+                                                :class="[
+                                                    'rounded-[1rem] border bg-white/90 px-4 py-3',
+                                                    node.isCurrent
+                                                        ? 'border-crh-blue/20'
+                                                        : 'border-slate-200'
+                                                ]">
+                                                <div
+                                                    class="grid grid-cols-2 gap-3">
+                                                    <div class="min-w-0">
+                                                        <p
+                                                            class="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">
+                                                            始发站
+                                                        </p>
+                                                        <p
+                                                            class="mt-1 truncate text-sm font-medium text-crh-grey-dark">
+                                                            <LookupStationLink
+                                                                :station-name="
+                                                                    node.startStation
+                                                                "
+                                                                :focus-train-codes="
+                                                                    resolveCirculationNodeFocusTrainCodes(
+                                                                        node
+                                                                    )
+                                                                "
+                                                                fallback-text="--" />
+                                                        </p>
+                                                    </div>
+
+                                                    <div
+                                                        class="min-w-0 text-right">
+                                                        <p
+                                                            class="text-[11px] uppercase tracking-[0.18em] text-slate-400">
+                                                            终到站
+                                                        </p>
+                                                        <p
+                                                            class="mt-1 truncate text-sm font-medium text-crh-grey-dark">
+                                                            <LookupStationLink
+                                                                :station-name="
+                                                                    node.endStation
+                                                                "
+                                                                :focus-train-codes="
+                                                                    resolveCirculationNodeFocusTrainCodes(
+                                                                        node
+                                                                    )
+                                                                "
+                                                                fallback-text="--" />
+                                                        </p>
+                                                    </div>
+                                                </div>
+
+                                                <div
+                                                    class="mt-3 grid grid-cols-2 gap-3 border-t border-slate-100 pt-3">
+                                                    <div class="min-w-0">
+                                                        <p
+                                                            class="text-[11px] uppercase tracking-[0.18em] text-slate-400">
+                                                            始发时间
+                                                        </p>
+                                                        <p
+                                                            class="mt-1 font-mono text-sm text-slate-500">
+                                                            {{
+                                                                formatNullableTime(
+                                                                    node.startAt
+                                                                )
+                                                            }}
+                                                        </p>
+                                                    </div>
+
+                                                    <div
+                                                        class="min-w-0 text-right">
+                                                        <p
+                                                            class="text-[11px] uppercase tracking-[0.18em] text-slate-400">
+                                                            终到时间
+                                                        </p>
+                                                        <p
+                                                            class="mt-1 font-mono text-sm text-slate-500">
+                                                            {{
+                                                                formatNullableTime(
+                                                                    node.endAt
+                                                                )
+                                                            }}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </UiCard>
+                                </div>
+                            </div>
                         </div>
-                    </div>
+                    </Transition>
 
                     <div
-                        v-else
+                        v-if="circulationNodes.length === 0"
                         class="rounded-[1rem] border border-dashed border-slate-200 bg-white/70 px-4 py-4 text-sm leading-6 text-slate-500">
                         无交路表推断结果。
                     </div>
                 </div>
             </UiCard>
+
+            <div class="order-3 motion-divider" />
         </div>
     </UiModal>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import type { CurrentTrainTimetableStop } from '~/types/lookup';
 import { buildLookupPath } from '~/utils/lookup/lookupTarget';
 import formatShanghaiDateString from '~/utils/time/formatShanghaiDateString';
@@ -574,6 +739,15 @@ const DATE_LABEL_FORMATTER = new Intl.DateTimeFormat('zh-CN', {
     month: 'numeric',
     day: 'numeric'
 });
+const SECTION_STATE_STORAGE_KEY =
+    'opencrhtracker:lookup-current-timetable-modal-sections';
+const timetableSectionId = 'lookup-current-timetable-section';
+const circulationSectionId = 'lookup-current-circulation-section';
+
+interface PersistedSectionState {
+    timetableExpanded: boolean;
+    circulationExpanded: boolean;
+}
 
 interface DisplayCirculationNode {
     key: string;
@@ -601,6 +775,8 @@ const { state, timetable, errorMessage } = useCurrentTrainTimetable(
 );
 
 const columns = ['站序', '车次', '站名', '到点', '开点', '检票口'];
+const isTimetableExpanded = ref(true);
+const isCirculationExpanded = ref(true);
 
 const modalTitle = computed(() => {
     if (timetable.value) {
@@ -701,6 +877,12 @@ const circulationNodes = computed<DisplayCirculationNode[]>(() => {
         isCurrent: index === currentCirculationNodeIndex.value
     }));
 });
+const timetableSummaryLabel = computed(() => {
+    return `${timetable.value?.stops.length ?? 0} 站`;
+});
+const circulationSummaryLabel = computed(() => {
+    return `${circulationNodes.value.length} 段交路`;
+});
 
 const responsibilitySummary = computed(() => {
     const bureauName = timetable.value?.bureauName.trim() ?? '';
@@ -724,6 +906,77 @@ const responsibilitySummary = computed(() => {
 
 function normalizeComparableCode(code: string | null | undefined) {
     return typeof code === 'string' ? code.trim().toUpperCase() : '';
+}
+
+function readPersistedSectionState(): PersistedSectionState {
+    if (!import.meta.client) {
+        return {
+            timetableExpanded: true,
+            circulationExpanded: true
+        };
+    }
+
+    try {
+        const rawValue = window.localStorage.getItem(SECTION_STATE_STORAGE_KEY);
+        if (!rawValue) {
+            return {
+                timetableExpanded: true,
+                circulationExpanded: true
+            };
+        }
+
+        const parsed = JSON.parse(rawValue);
+        if (typeof parsed !== 'object' || parsed === null) {
+            return {
+                timetableExpanded: true,
+                circulationExpanded: true
+            };
+        }
+
+        return {
+            timetableExpanded:
+                typeof parsed.timetableExpanded === 'boolean'
+                    ? parsed.timetableExpanded
+                    : true,
+            circulationExpanded:
+                typeof parsed.circulationExpanded === 'boolean'
+                    ? parsed.circulationExpanded
+                    : true
+        };
+    } catch {
+        return {
+            timetableExpanded: true,
+            circulationExpanded: true
+        };
+    }
+}
+
+function persistSectionState() {
+    if (!import.meta.client) {
+        return;
+    }
+
+    try {
+        window.localStorage.setItem(
+            SECTION_STATE_STORAGE_KEY,
+            JSON.stringify({
+                timetableExpanded: isTimetableExpanded.value,
+                circulationExpanded: isCirculationExpanded.value
+            } satisfies PersistedSectionState)
+        );
+    } catch {
+        // Keep the current in-memory state even if storage is unavailable.
+    }
+}
+
+function toggleTimetableExpanded() {
+    isTimetableExpanded.value = !isTimetableExpanded.value;
+    persistSectionState();
+}
+
+function toggleCirculationExpanded() {
+    isCirculationExpanded.value = !isCirculationExpanded.value;
+    persistSectionState();
 }
 
 function normalizeTrainCodes(codes: string[]) {
@@ -814,4 +1067,10 @@ function formatCalendarDateLabel(timestamp: number) {
 
     return ` ${year} 年 ${month} 月 ${day} 日`;
 }
+
+onMounted(() => {
+    const persistedState = readPersistedSectionState();
+    isTimetableExpanded.value = persistedState.timetableExpanded;
+    isCirculationExpanded.value = persistedState.circulationExpanded;
+});
 </script>
