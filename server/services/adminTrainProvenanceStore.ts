@@ -75,13 +75,16 @@ function toLatestStatus(
 function toDeparture(
     startAt: number,
     routeRows: DailyEmuRouteRow[],
-    probeRows: ProbeStatusRow[]
+    probeRows: ProbeStatusRow[],
+    fallbackRoute: AdminTrainRouteSnapshot | null,
+    fallbackEmuCodes: string[]
 ): AdminTrainProvenanceDeparture {
     const firstRouteRow = routeRows[0] ?? null;
     const emuCodes = Array.from(
         new Set([
             ...routeRows.map((row) => row.emu_code),
-            ...probeRows.map((row) => row.emu_code)
+            ...probeRows.map((row) => row.emu_code),
+            ...fallbackEmuCodes
         ])
     ).sort();
 
@@ -90,9 +93,11 @@ function toDeparture(
         endAt:
             routeRows.length > 0
                 ? Math.max(...routeRows.map((row) => row.end_at))
-                : null,
-        startStation: firstRouteRow?.start_station_name ?? '',
-        endStation: firstRouteRow?.end_station_name ?? '',
+                : fallbackRoute?.endAt ?? null,
+        startStation:
+            firstRouteRow?.start_station_name || fallbackRoute?.startStation || '',
+        endStation:
+            firstRouteRow?.end_station_name || fallbackRoute?.endStation || '',
         latestStatus: toLatestStatus(probeRows),
         emuCodes
     };
@@ -532,6 +537,65 @@ function resolveMatchedRoute(
     );
 }
 
+function resolveDirectHitEventRoute(
+    event: TrainProvenanceEventRecord
+): AdminTrainRouteSnapshot | null {
+    if (event.eventType !== 'coupling_scan_candidate_direct_hit') {
+        return null;
+    }
+
+    const payload = getPayloadObject(event.payload);
+    const routePayload =
+        toSeatCodeRoutePayload(payload?.scannedRoute) ??
+        toSeatCodeRoutePayload(payload?.route);
+    const trainCodes = normalizeTrainCodeList(
+        getStringArray(payload?.directHitTrainCodes)
+    );
+    const snapshot =
+        buildTrainRouteSnapshot({
+            serviceDate:
+                routePayload?.startDay || formatServiceDateFromStartAt(event.startAt),
+            trainCodes:
+                trainCodes.length > 0
+                    ? trainCodes
+                    : [
+                          routePayload?.code ||
+                              event.relatedTrainCode ||
+                              event.trainCode
+                      ].filter((trainCode) => trainCode.length > 0),
+            internalCode: routePayload?.internalCode ?? '',
+            startAt: event.startAt ?? routePayload?.startAt ?? null,
+            endAt: routePayload?.endAt ?? null,
+            startStation: '',
+            endStation: ''
+        }) ?? null;
+
+    return fillRouteStationsFromTodayCache(snapshot);
+}
+
+function buildDepartureFallback(events: TrainProvenanceEventRecord[]): {
+    route: AdminTrainRouteSnapshot | null;
+    emuCodes: string[];
+} {
+    const directHitEvents = events.filter(
+        (event) => event.eventType === 'coupling_scan_candidate_direct_hit'
+    );
+    const route =
+        directHitEvents.length > 0
+            ? resolveDirectHitEventRoute(directHitEvents[0]!)
+            : null;
+    const emuCodes = normalizeTrainCodeList(
+        directHitEvents
+            .map((event) => event.emuCode)
+            .filter((emuCode) => emuCode.length > 0)
+    );
+
+    return {
+        route,
+        emuCodes
+    };
+}
+
 function resolveOccupiedRoutes(
     candidate: CouplingScanCandidateRecord
 ): AdminTrainRouteSnapshot[] {
@@ -809,6 +873,21 @@ function buildPendingCouplingScanSummary(
     return '已排入重联扫描队列';
 }
 
+function formatDirectHitEventSummary(
+    event: TrainProvenanceEventRecord
+): string {
+    const payload = getPayloadObject(event.payload);
+    const scannedRoute =
+        toSeatCodeRoutePayload(payload?.scannedRoute) ??
+        toSeatCodeRoutePayload(payload?.route);
+    const scannedTrainCode =
+        scannedRoute?.code || event.relatedTrainCode || event.trainCode;
+
+    return event.result === 'matched'
+        ? `閲嶈仈鎵弿鐩存帴鎵埌 ${scannedTrainCode}锛屽凡鍛戒腑褰撳墠杩借釜鍒嗙粍`
+        : `閲嶈仈鎵弿鐩存帴鎵埌 ${scannedTrainCode}锛屼絾褰撳墠杞︽鏈撼鍏ユ湰娆¤拷韪垽瀹?`;
+}
+
 function formatEventSummary(
     event: TrainProvenanceEventRecord,
     conflictDetail: AdminTrainProvenanceConflictDetail | null,
@@ -908,6 +987,26 @@ function toTimelineEvent(
     const conflictDetail = extractConflictDetail(event);
     const historicalReuse = extractHistoricalReuseDetail(event);
     const coupledResolution = extractCoupledResolutionDetail(event);
+    const couplingScan =
+        event.eventType === 'coupling_scan_candidate_direct_hit'
+            ? {
+                  state: 'resolved' as const,
+                  queuedSchedulerTaskId: null,
+                  queuedTaskRunId: null,
+                  resultSchedulerTaskId: event.schedulerTaskId,
+                  resultTaskRunId: event.taskRunId,
+                  canOpenDetail: true
+              }
+            : null;
+    const summary =
+        event.eventType === 'coupling_scan_candidate_direct_hit'
+            ? formatDirectHitEventSummary(event)
+            : formatEventSummary(
+                  event,
+                  conflictDetail,
+                  historicalReuse,
+                  coupledResolution
+              );
 
     return {
         id: event.id,
@@ -923,16 +1022,11 @@ function toTimelineEvent(
         relatedEmuCode: event.relatedEmuCode,
         eventType: event.eventType,
         result: event.result,
-        summary: formatEventSummary(
-            event,
-            conflictDetail,
-            historicalReuse,
-            coupledResolution
-        ),
+        summary,
         linkedSchedulerTaskId: event.linkedSchedulerTaskId,
         linkedTaskRunId: event.linkedTaskRunId,
         conflictDetail,
-        couplingScan: null,
+        couplingScan,
         historicalReuse,
         coupledResolution,
         payload: event.payload
@@ -1264,6 +1358,11 @@ export function getAdminTrainProvenance(
     }
 
     const dayRange = getDayTimestampRange(date);
+    const allTimelineRecords = listTrainProvenanceEventsByDateAndTrainCode(
+        date,
+        normalizedTrainCode,
+        null
+    );
     const departureStartAts = listTrainProvenanceDepartureStartAts(
         date,
         normalizedTrainCode
@@ -1278,14 +1377,31 @@ export function getAdminTrainProvenance(
         dayRange.startAt,
         dayRange.endAt + 1
     );
+    const timelineRecordsByStartAt = new Map<number, TrainProvenanceEventRecord[]>();
 
-    const departures = departureStartAts.map((candidateStartAt) =>
-        toDeparture(
+    for (const event of allTimelineRecords) {
+        if (event.startAt === null) {
+            continue;
+        }
+
+        const currentEvents = timelineRecordsByStartAt.get(event.startAt) ?? [];
+        currentEvents.push(event);
+        timelineRecordsByStartAt.set(event.startAt, currentEvents);
+    }
+
+    const departures = departureStartAts.map((candidateStartAt) => {
+        const fallback = buildDepartureFallback(
+            timelineRecordsByStartAt.get(candidateStartAt) ?? []
+        );
+
+        return toDeparture(
             candidateStartAt,
             routeRows.filter((row) => row.start_at === candidateStartAt),
-            probeRows.filter((row) => row.start_at === candidateStartAt)
-        )
-    );
+            probeRows.filter((row) => row.start_at === candidateStartAt),
+            fallback.route,
+            fallback.emuCodes
+        );
+    });
     const selectedStartAt =
         startAt !== null && departureStartAts.includes(startAt)
             ? startAt
@@ -1296,11 +1412,9 @@ export function getAdminTrainProvenance(
         selectedStartAt === null
             ? []
             : enrichCouplingScanTimeline(
-                  listTrainProvenanceEventsByDateAndTrainCode(
-                      date,
-                      normalizedTrainCode,
-                      selectedStartAt
-                  ).map(toTimelineEvent)
+                  allTimelineRecords
+                      .filter((event) => event.startAt === selectedStartAt)
+                      .map(toTimelineEvent)
               );
 
     return {

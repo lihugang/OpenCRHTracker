@@ -1969,6 +1969,8 @@ function getEventResultLabel(result: string) {
             return '畅行码未启用';
         case 'seat_code_request_failed_other':
             return '畅行码查询失败：其他错误';
+        case 'unmatched':
+            return '未匹配';
         default:
             return result || '--';
     }
