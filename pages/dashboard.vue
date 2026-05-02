@@ -8,8 +8,9 @@
 
         <div
             class="relative mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
-            <div class="grid gap-6 lg:grid-cols-[15rem_minmax(0,1fr)]">
-                <aside class="hidden lg:block">
+            <div
+                class="grid gap-6 lg:grid-cols-[15rem_minmax(0,1fr)] lg:items-start">
+                <aside class="hidden lg:col-start-1 lg:row-start-2 lg:block">
                     <UiCard
                         :show-accent-bar="false"
                         class="dashboard-glass-card sticky top-24">
@@ -78,7 +79,14 @@
                     </UiCard>
                 </aside>
 
-                <div class="space-y-6">
+                <div class="hidden px-1 lg:col-start-2 lg:row-start-1 lg:block">
+                    <h2
+                        class="text-3xl font-semibold tracking-tight text-slate-900">
+                        {{ currentPanelDefinition.headerTitle }}
+                    </h2>
+                </div>
+
+                <div class="space-y-6 lg:col-start-2 lg:row-start-2">
                     <UiCard
                         :show-accent-bar="false"
                         class="dashboard-glass-card lg:hidden">
@@ -158,13 +166,6 @@
                             </button>
                         </div>
                     </UiCard>
-
-                    <div class="hidden px-1 lg:block">
-                        <h2
-                            class="text-3xl font-semibold tracking-tight text-slate-900">
-                            {{ currentPanelDefinition.headerTitle }}
-                        </h2>
-                    </div>
 
                     <Transition
                         mode="out-in"
