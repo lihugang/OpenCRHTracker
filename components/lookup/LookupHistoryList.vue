@@ -190,15 +190,31 @@
                                     <NuxtLink
                                         v-if="
                                             shouldShowExportDateLink(
+                                                item.serviceDate,
                                                 item.startAt
                                             )
                                         "
-                                        :to="buildExportDateLink(item.startAt)"
+                                        :to="
+                                            buildExportDateLink(
+                                                item.serviceDate,
+                                                item.startAt
+                                            )
+                                        "
                                         class="history-date-link">
-                                        {{ formatDateLabel(item.startAt) }}
+                                        {{
+                                            formatDateLabel(
+                                                item.serviceDate,
+                                                item.startAt
+                                            )
+                                        }}
                                     </NuxtLink>
                                     <span v-else>
-                                        {{ formatDateLabel(item.startAt) }}
+                                        {{
+                                            formatDateLabel(
+                                                item.serviceDate,
+                                                item.startAt
+                                            )
+                                        }}
                                     </span>
                                 </td>
                                 <td
@@ -232,7 +248,7 @@
                                         )
                                     ]">
                                     <LookupStationLink
-                                        :station-name="item.startStation"
+                                        :station-name="item.startStation || ''"
                                         :focus-train-codes="
                                             resolveStationFocusTrainCodes(item)
                                         "
@@ -264,7 +280,7 @@
                                         )
                                     ]">
                                     <LookupStationLink
-                                        :station-name="item.endStation"
+                                        :station-name="item.endStation || ''"
                                         :focus-train-codes="
                                             resolveStationFocusTrainCodes(item)
                                         "
@@ -304,13 +320,33 @@
                                 index === 0 ? 'pt-0' : 'pt-3'
                             ]">
                             <NuxtLink
-                                v-if="shouldShowExportDateLink(item.startAt)"
-                                :to="buildExportDateLink(item.startAt)"
+                                v-if="
+                                    shouldShowExportDateLink(
+                                        item.serviceDate,
+                                        item.startAt
+                                    )
+                                "
+                                :to="
+                                    buildExportDateLink(
+                                        item.serviceDate,
+                                        item.startAt
+                                    )
+                                "
                                 class="history-date-link">
-                                {{ formatDateLabel(item.startAt) }}
+                                {{
+                                    formatDateLabel(
+                                        item.serviceDate,
+                                        item.startAt
+                                    )
+                                }}
                             </NuxtLink>
                             <span v-else>
-                                {{ formatDateLabel(item.startAt) }}
+                                {{
+                                    formatDateLabel(
+                                        item.serviceDate,
+                                        item.startAt
+                                    )
+                                }}
                             </span>
                         </div>
 
@@ -366,7 +402,7 @@
                                                 ]">
                                                 <LookupStationLink
                                                     :station-name="
-                                                        item.startStation
+                                                        item.startStation || ''
                                                     "
                                                     :focus-train-codes="
                                                         resolveStationFocusTrainCodes(
@@ -416,7 +452,7 @@
                                                 ]">
                                                 <LookupStationLink
                                                     :station-name="
-                                                        item.endStation
+                                                        item.endStation || ''
                                                     "
                                                     :focus-train-codes="
                                                         resolveStationFocusTrainCodes(
@@ -575,10 +611,12 @@ import { buildLookupPath } from '~/utils/lookup/lookupTarget';
 
 interface GroupedHistoryListItem {
     id: string;
-    startAt: number;
-    endAt: number;
-    startStation: string;
-    endStation: string;
+    serviceDate: string;
+    timetableId: number | null;
+    startAt: number | null;
+    endAt: number | null;
+    startStation: string | null;
+    endStation: string | null;
     codes: string[];
 }
 
@@ -600,6 +638,8 @@ const TIME_FORMATTER = new Intl.DateTimeFormat('zh-CN', {
     minute: '2-digit',
     hour12: false
 });
+
+const EMPTY_PLACEHOLDER = '-';
 
 const props = defineProps<{
     type: LookupTargetType;
@@ -651,7 +691,12 @@ const groupedItems = computed<DisplayHistoryListItem[]>(() => {
     const groups = new Map<string, GroupedHistoryListItem>();
 
     for (const item of props.items) {
-        const groupKey = `${item.startAt}:${item.endAt}`;
+        const groupKey = [
+            item.serviceDate,
+            item.timetableId ?? 'null',
+            item.startAt ?? 'null',
+            item.endAt ?? 'null'
+        ].join(':');
         const existingGroup = groups.get(groupKey);
 
         if (existingGroup) {
@@ -678,6 +723,8 @@ const groupedItems = computed<DisplayHistoryListItem[]>(() => {
 
         groups.set(groupKey, {
             id: item.id,
+            serviceDate: item.serviceDate,
+            timetableId: item.timetableId,
             startAt: item.startAt,
             endAt: item.endAt,
             startStation: item.startStation,
@@ -691,7 +738,7 @@ const groupedItems = computed<DisplayHistoryListItem[]>(() => {
     let dateBandIndex = -1;
 
     return groupedValues.map((item) => {
-        const dateKey = buildDateKey(item.startAt);
+        const dateKey = buildDateKey(item.serviceDate, item.startAt);
 
         if (dateKey !== currentDateKey) {
             currentDateKey = dateKey;
@@ -831,46 +878,58 @@ onBeforeUnmount(() => {
     disconnectSentinelObserver();
 });
 
-function isMissingTimestamp(timestamp: number) {
-    return !Number.isFinite(timestamp) || timestamp <= 0;
+function isMissingTimestamp(timestamp: number | null) {
+    return timestamp === null || !Number.isFinite(timestamp) || timestamp <= 0;
 }
 
-function isMissingText(value: string) {
+function isMissingText(value: string | null) {
+    if (typeof value !== 'string') {
+        return true;
+    }
+
     return value.trim().length === 0;
 }
 
-function formatDateLabel(timestamp: number) {
-    if (isMissingTimestamp(timestamp)) {
-        return '暂无日期';
+function formatDateLabel(serviceDate: string, timestamp: number | null) {
+    if (/^\d{8}$/.test(serviceDate)) {
+        return `${serviceDate.slice(0, 4)}/${serviceDate.slice(4, 6)}/${serviceDate.slice(6, 8)}`;
     }
 
-    return DATE_FORMATTER.format(new Date(timestamp * 1000));
+    if (isMissingTimestamp(timestamp)) {
+        return EMPTY_PLACEHOLDER;
+    }
+
+    return DATE_FORMATTER.format(new Date((timestamp ?? 0) * 1000));
 }
 
-function buildDateKey(timestamp: number) {
+function buildDateKey(serviceDate: string, timestamp: number | null) {
+    if (/^\d{8}$/.test(serviceDate)) {
+        return serviceDate;
+    }
+
     if (isMissingTimestamp(timestamp)) {
         return '__missing__';
     }
 
-    return DATE_FORMATTER.format(new Date(timestamp * 1000));
+    return DATE_FORMATTER.format(new Date((timestamp ?? 0) * 1000));
 }
 
-function formatTimeLabel(timestamp: number) {
+function formatTimeLabel(timestamp: number | null) {
     if (isMissingTimestamp(timestamp)) {
-        return '未采集';
+        return EMPTY_PLACEHOLDER;
     }
 
-    return TIME_FORMATTER.format(new Date(timestamp * 1000));
+    return TIME_FORMATTER.format(new Date((timestamp ?? 0) * 1000));
 }
 
 function formatCodeText(value: string) {
-    const normalized = value.trim();
-    return normalized.length > 0 ? normalized : '未采集';
+    const normalized = typeof value === 'string' ? value.trim() : '';
+    return normalized.length > 0 ? normalized : EMPTY_PLACEHOLDER;
 }
 
-function formatStationText(value: string) {
-    const normalized = value.trim();
-    return normalized.length > 0 ? normalized : '暂无站点信息';
+function formatStationText(value: string | null) {
+    const normalized = typeof value === 'string' ? value.trim() : '';
+    return normalized.length > 0 ? normalized : EMPTY_PLACEHOLDER;
 }
 
 function shouldShowMobileDateHeader(
@@ -885,6 +944,10 @@ function shouldShowMobileDateHeader(
 }
 
 function isRunningItem(item: GroupedHistoryListItem) {
+    if (item.startAt === null || item.endAt === null) {
+        return false;
+    }
+
     return isTimestampRangeActive(
         item.startAt,
         item.endAt,
@@ -902,17 +965,27 @@ function getValueTextClass(isMissing: boolean, monospace = false) {
         : 'text-slate-400 italic';
 }
 
-function shouldShowExportDateLink(timestamp: number) {
+function shouldShowExportDateLink(
+    serviceDate: string,
+    timestamp: number | null
+) {
+    const date =
+        /^\d{8}$/.test(serviceDate)
+            ? serviceDate
+            : formatShanghaiDateString(timestamp ?? 0);
+
     return (
         isAuthenticated.value &&
-        !isMissingTimestamp(timestamp) &&
-        formatShanghaiDateString(timestamp) !==
-            formatShanghaiDateString(currentUnixSeconds.value)
+        /^\d{8}$/.test(date) &&
+        date !== formatShanghaiDateString(currentUnixSeconds.value)
     );
 }
 
-function buildExportDateLink(timestamp: number) {
-    const date = formatShanghaiDateString(timestamp);
+function buildExportDateLink(serviceDate: string, timestamp: number | null) {
+    const date =
+        /^\d{8}$/.test(serviceDate)
+            ? serviceDate
+            : formatShanghaiDateString(timestamp ?? 0);
 
     return {
         path: '/exports/daily',

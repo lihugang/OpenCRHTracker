@@ -1,4 +1,4 @@
-SELECT id, train_code, emu_code, start_at, status
+SELECT id, train_code, emu_code, service_date, timetable_id, status
 FROM probe_status
-WHERE emu_code = ? AND start_at >= ? AND start_at < ?
-ORDER BY start_at ASC, id ASC;
+WHERE emu_code = ? AND service_date >= ? AND service_date <= ?
+ORDER BY service_date ASC, id ASC;

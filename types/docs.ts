@@ -189,12 +189,14 @@ export interface DocsApiCostRuntimeConfig {
     minimumRequestCost: number;
     fixed: {
         authMe: number;
-        timetableTrain: number;
+        timetableTrainCurrent: number;
+        timetableTrainHistory: number;
         exportDailyIndex: number;
         exportDaily: number;
     };
     perRecord: {
         recordsDaily: DocsApiPerRecordCostRule;
+        timetableTrainHistory: DocsApiPerRecordCostRule;
         timetableStation: DocsApiPerRecordCostRule;
         historyTrain: DocsApiPerRecordCostRule;
         historyEmu: DocsApiPerRecordCostRule;

@@ -41,7 +41,12 @@ export const API_SCOPES = {
     },
     timetable: {
         train: {
-            read: 'api.timetable.train.read'
+            current: {
+                read: 'api.timetable.train.current.read'
+            },
+            history: {
+                read: 'api.timetable.train.history.read'
+            }
         },
         station: {
             read: 'api.timetable.station.read'

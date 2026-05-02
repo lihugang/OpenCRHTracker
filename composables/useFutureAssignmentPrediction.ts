@@ -1,7 +1,12 @@
 import { computed, ref, toValue, watch, type MaybeRefOrGetter } from 'vue';
+import {
+    hydrateEmuHistoryRecords,
+    hydrateTrainHistoryRecords,
+    type HydratedEmuHistoryRecord,
+    type HydratedTrainHistoryRecord
+} from '~/composables/useHistoricalTimetableContent';
 import type { TrackerApiResponse } from '~/types/homepage';
 import type {
-    EmuHistoryRecord,
     EmuHistoryResponse,
     FutureAssignmentDisplayAnchor,
     FutureAssignmentPredictedEmuItem,
@@ -13,7 +18,6 @@ import type {
     InferredCirculation,
     InferredCirculationNode,
     RecentAssignmentsState,
-    TrainHistoryRecord,
     TrainHistoryResponse
 } from '~/types/lookup';
 import getApiErrorMessage from '~/utils/api/getApiErrorMessage';
@@ -75,15 +79,15 @@ interface TrainHistoryRun {
 
 interface EmuNodeHistoryHit {
     node: RouteNodeSegment;
-    record: EmuHistoryRecord;
+    record: HydratedEmuHistoryRecord;
 }
 
 type EmuNodeHistoryCandidate = EmuNodeHistoryHit & {
     difference: number;
 };
 
-const trainHistoryCache = new Map<string, TrainHistoryRecord[]>();
-const emuHistoryCache = new Map<string, EmuHistoryRecord[]>();
+const trainHistoryCache = new Map<string, HydratedTrainHistoryRecord[]>();
+const emuHistoryCache = new Map<string, HydratedEmuHistoryRecord[]>();
 
 function normalizeComparableCode(code: string | null | undefined) {
     return typeof code === 'string' ? code.trim().toUpperCase() : '';
@@ -279,7 +283,11 @@ async function fetchTrainHistoryRecords(
         };
     }
 
-    const items = [...response.data.items];
+    const items = await hydrateTrainHistoryRecords(
+        requestFetch,
+        normalizedTrainCode,
+        response.data.items
+    );
     trainHistoryCache.set(cacheKey, items);
     return items;
 }
@@ -320,16 +328,23 @@ async function fetchEmuHistoryRecords(
         };
     }
 
-    const items = [...response.data.items];
+    const items = await hydrateEmuHistoryRecords(
+        requestFetch,
+        response.data.items
+    );
     emuHistoryCache.set(cacheKey, items);
     return items;
 }
 
 function matchEmuRecordToRouteNode(
-    record: EmuHistoryRecord,
+    record: HydratedEmuHistoryRecord,
     routeNodes: RouteNodeSegment[],
     todayDayBucket: number
 ): EmuNodeHistoryHit | null {
+    if (record.startAt === null) {
+        return null;
+    }
+
     const normalizedTrainCode = normalizeComparableCode(record.trainCode);
     if (normalizedTrainCode.length === 0) {
         return null;
@@ -545,10 +560,14 @@ function getTrainAnchorHistoryQuery(
     };
 }
 
-function buildTrainHistoryRuns(records: TrainHistoryRecord[]) {
+function buildTrainHistoryRuns(records: HydratedTrainHistoryRecord[]) {
     const runs = new Map<string, TrainHistoryRun>();
 
     for (const record of records) {
+        if (record.startAt === null || record.endAt === null) {
+            continue;
+        }
+
         const runKey = `${record.startAt}:${record.endAt}`;
         const normalizedEmuCode = normalizeComparableCode(record.emuCode);
         const existingRun = runs.get(runKey);
@@ -563,16 +582,16 @@ function buildTrainHistoryRuns(records: TrainHistoryRecord[]) {
 
             if (
                 existingRun.startStation.trim().length === 0 &&
-                record.startStation.trim().length > 0
+                (record.startStation ?? '').trim().length > 0
             ) {
-                existingRun.startStation = record.startStation;
+                existingRun.startStation = record.startStation ?? '';
             }
 
             if (
                 existingRun.endStation.trim().length === 0 &&
-                record.endStation.trim().length > 0
+                (record.endStation ?? '').trim().length > 0
             ) {
-                existingRun.endStation = record.endStation;
+                existingRun.endStation = record.endStation ?? '';
             }
 
             continue;
@@ -583,8 +602,8 @@ function buildTrainHistoryRuns(records: TrainHistoryRecord[]) {
             startAt: record.startAt,
             endAt: record.endAt,
             emuCodes: normalizedEmuCode.length > 0 ? [normalizedEmuCode] : [],
-            startStation: record.startStation,
-            endStation: record.endStation
+            startStation: record.startStation ?? '',
+            endStation: record.endStation ?? ''
         });
     }
 
@@ -953,8 +972,12 @@ async function resolveEmuAnchor(
         )
         .filter((hit): hit is EmuNodeHistoryHit => hit !== null)
         .sort((left, right) => {
-            if (left.record.startAt !== right.record.startAt) {
-                return right.record.startAt - left.record.startAt;
+            const leftStartAt = left.record.startAt ?? Number.MIN_SAFE_INTEGER;
+            const rightStartAt =
+                right.record.startAt ?? Number.MIN_SAFE_INTEGER;
+
+            if (leftStartAt !== rightStartAt) {
+                return rightStartAt - leftStartAt;
             }
 
             return right.node.routeNodeIndex - left.node.routeNodeIndex;
@@ -965,8 +988,9 @@ async function resolveEmuAnchor(
         return null;
     }
 
+    const matchedRecordStartAt = latestMatchedHit.record.startAt ?? 0;
     const actualDayOffsetFromToday =
-        getShanghaiDayBucket(latestMatchedHit.record.startAt) - todayDayBucket;
+        getShanghaiDayBucket(matchedRecordStartAt) - todayDayBucket;
 
     return {
         progress: {
@@ -980,7 +1004,7 @@ async function resolveEmuAnchor(
             actualDayOffsetFromToday
         },
         matchedNode: latestMatchedHit.node,
-        matchedRecordStartAt: latestMatchedHit.record.startAt
+        matchedRecordStartAt
     } satisfies RouteAnchor;
 }
 

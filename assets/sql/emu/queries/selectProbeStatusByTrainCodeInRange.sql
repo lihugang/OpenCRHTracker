@@ -2,10 +2,11 @@ SELECT
     id,
     train_code,
     emu_code,
-    start_at,
+    service_date,
+    timetable_id,
     status
 FROM probe_status
 WHERE train_code = ?
-  AND start_at >= ?
-  AND start_at < ?
-ORDER BY start_at ASC, id ASC;
+  AND service_date >= ?
+  AND service_date <= ?
+ORDER BY service_date ASC, id ASC;

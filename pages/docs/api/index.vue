@@ -1,15 +1,15 @@
 <template>
     <DocsShell
-        eyebrow="DOCS"
+        eyebrow="文档"
         title="API 文档"
-        description="这套文档由仓库内维护的 OpenAPI 元数据驱动，包括鉴权接口、车次车组历史查询和每日数据导出。">
+        description="这套文档由仓库内维护的 OpenAPI 元数据驱动，覆盖鉴权、历史查询、时刻表和每日数据导出接口。">
         <div
             class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]">
             <UiCard :show-accent-bar="false">
                 <div class="space-y-3">
                     <p
                         class="text-xs font-medium uppercase tracking-[0.18em] text-crh-blue/80">
-                        BASE PATH
+                        基础路径
                     </p>
                     <p class="text-sm leading-6 text-slate-600">
                         所有 API 接口都以
@@ -29,12 +29,12 @@
                 <div class="space-y-3">
                     <p
                         class="text-xs font-medium uppercase tracking-[0.18em] text-crh-blue/80">
-                        AUTH
+                        鉴权方式
                     </p>
                     <p class="text-sm leading-6 text-slate-600">
-                        除鉴权和每日数据导出外其他接口都允许匿名访问和使用 API
-                        Key
-                        访问。请打开用户页，切换选项卡至“开发”页，轻击“签发”按钮以获取您的
+                        除鉴权接口和每日数据导出外，其他接口默认都支持匿名访问，也支持使用
+                        API Key
+                        访问。请打开用户页并切换到“开发”页，点击“签发”按钮获取您的
                         API Key。
                     </p>
                     <p class="font-mono text-xs text-slate-500">
@@ -47,7 +47,7 @@
                 <div class="space-y-3">
                     <p
                         class="text-xs font-medium uppercase tracking-[0.18em] text-crh-blue/80">
-                        API TOKEN
+                        额度响应头
                     </p>
                     <p class="text-sm leading-6 text-slate-600">
                         每次响应都可能通过响应头返回剩余额度、请求耗额和重试等待时间。
@@ -68,7 +68,7 @@
                 <div class="space-y-2">
                     <p
                         class="text-xs font-medium uppercase tracking-[0.2em] text-crh-blue/80">
-                        AGREEMENT
+                        响应约定
                     </p>
                     <h2 class="text-2xl font-semibold text-slate-900">
                         统一响应结构
@@ -201,7 +201,7 @@ definePageMeta({
 useSiteSeo({
     title: 'API 文档 | Open CRH Tracker',
     description:
-        'OpenCRHTracker API 文档，提供会话、记录、历史和导出接口的文档和实时调试功能。',
+        'OpenCRHTracker API 文档，提供鉴权、记录、历史、时刻表和导出接口的文档与实时调试功能。',
     path: '/docs/api'
 });
 </script>

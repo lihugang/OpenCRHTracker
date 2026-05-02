@@ -1,7 +1,7 @@
 import { defineEventHandler, getQuery, getRouterParam } from 'h3';
 import {
     buildNextCursor,
-    listHistoryByTrainPaged
+    listHistoryLightByTrainPaged
 } from '~/server/services/emuRoutesStore';
 import getPerRecordCost from '~/server/utils/api/cost/getPerRecordCost';
 import executeApi from '~/server/utils/api/executor/executeApi';
@@ -25,7 +25,7 @@ export default defineEventHandler(async (event) => {
                 setCacheControl(
                     successEvent,
                     getHistoryResponseCacheControlMaxAge(
-                        parseCursor(data.cursor, 'cursor')?.startAt
+                        parseCursor(data.cursor, 'cursor')?.serviceDate
                     )
                 )
         },
@@ -44,7 +44,7 @@ export default defineEventHandler(async (event) => {
             const end = parseOptionalTimestamp(query.end, 'end');
             const cursor = parseCursor(query.cursor, 'cursor');
             const limit = parseLimit(event);
-            const rows = listHistoryByTrainPaged(
+            const rows = listHistoryLightByTrainPaged(
                 trainCode,
                 start ?? 0,
                 end ?? Number.MAX_SAFE_INTEGER,
@@ -60,12 +60,10 @@ export default defineEventHandler(async (event) => {
                 limit,
                 nextCursor: buildNextCursor(rows, limit),
                 items: rows.map((row) => ({
-                    startAt: row.start_at,
-                    endAt: row.end_at,
                     id: String(row.id),
+                    serviceDate: row.service_date,
+                    timetableId: row.timetable_id,
                     emuCode: row.emu_code,
-                    startStation: row.start_station_name,
-                    endStation: row.end_station_name,
                     line: []
                 }))
             };

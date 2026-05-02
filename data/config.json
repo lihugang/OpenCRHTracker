@@ -219,7 +219,8 @@
                 "api.records.daily.read",
                 "api.history.train.read",
                 "api.history.emu.read",
-                "api.timetable.train.read",
+                "api.timetable.train.current.read",
+                "api.timetable.train.history.read",
                 "api.exports.daily.read",
                 "api.feedback.read",
                 "api.feedback.create",
@@ -231,7 +232,8 @@
                 "api.records.daily.read",
                 "api.history.train.read",
                 "api.history.emu.read",
-                "api.timetable.train.read",
+                "api.timetable.train.current.read",
+                "api.timetable.train.history.read",
                 "api.exports.daily.read",
                 "api.feedback.read",
                 "api.feedback.create",
@@ -253,7 +255,8 @@
                 "api.records.daily.read",
                 "api.history.train.read",
                 "api.history.emu.read",
-                "api.timetable.train.read",
+                "api.timetable.train.current.read",
+                "api.timetable.train.history.read",
                 "api.exports.daily.read",
                 "api.timetable.station.read"
             ]
@@ -316,7 +319,8 @@
             "authUpdateSubscription": 1,
             "authDeleteSubscription": 1,
             "searchIndex": 1,
-            "timetableTrain": 1,
+            "timetableTrainCurrent": 1,
+            "timetableTrainHistory": 1,
             "exportDailyIndex": 2,
             "exportDaily": 50,
             "authChangePassword": 5
@@ -331,6 +335,10 @@
                 "rounding": "ceil"
             },
             "recordsDaily": {
+                "unitCost": 0.05,
+                "rounding": "ceil"
+            },
+            "timetableTrainHistory": {
                 "unitCost": 0.05,
                 "rounding": "ceil"
             },

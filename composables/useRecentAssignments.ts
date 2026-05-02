@@ -1,12 +1,15 @@
 import { computed, ref, toValue, watch, type MaybeRefOrGetter } from 'vue';
+import {
+    hydrateEmuHistoryRecords,
+    hydrateTrainHistoryRecords,
+    toLookupHistoryListItems
+} from '~/composables/useHistoricalTimetableContent';
 import type { TrackerApiResponse } from '~/types/homepage';
 import type {
-    EmuHistoryRecord,
     EmuHistoryResponse,
     LookupHistoryListItem,
     LookupTarget,
     RecentAssignmentsState,
-    TrainHistoryRecord,
     TrainHistoryResponse
 } from '~/types/lookup';
 import getApiErrorMessage from '~/utils/api/getApiErrorMessage';
@@ -14,8 +17,12 @@ import getApiErrorMessage from '~/utils/api/getApiErrorMessage';
 const REQUEST_LIMIT = 20;
 
 type HistoryPageResponse = TrainHistoryResponse | EmuHistoryResponse;
+type HistoryPageResult = {
+    response: HistoryPageResponse;
+    items: LookupHistoryListItem[];
+};
 type HistoryRequestOptions = {
-    query?: ReturnType<typeof buildHistoryQuery>;
+    query?: Record<string, number | string | undefined>;
 };
 type RequestFetch = <T>(
     request: string,
@@ -46,7 +53,16 @@ async function fetchTrainHistoryPage(
         };
     }
 
-    return response.data;
+    const items = await hydrateTrainHistoryRecords(
+        requestFetch,
+        target.code,
+        response.data.items
+    );
+
+    return {
+        response: response.data,
+        items: toLookupHistoryListItems('train', items)
+    } satisfies HistoryPageResult;
 }
 
 async function fetchEmuHistoryPage(
@@ -67,29 +83,15 @@ async function fetchEmuHistoryPage(
         };
     }
 
-    return response.data;
-}
+    const items = await hydrateEmuHistoryRecords(
+        requestFetch,
+        response.data.items
+    );
 
-function toTrainHistoryListItems(items: TrainHistoryRecord[]) {
-    return items.map<LookupHistoryListItem>((item) => ({
-        id: item.id,
-        startAt: item.startAt,
-        endAt: item.endAt,
-        code: item.emuCode,
-        startStation: item.startStation,
-        endStation: item.endStation
-    }));
-}
-
-function toEmuHistoryListItems(items: EmuHistoryRecord[]) {
-    return items.map<LookupHistoryListItem>((item) => ({
-        id: item.id,
-        startAt: item.startAt,
-        endAt: item.endAt,
-        code: item.trainCode,
-        startStation: item.startStation,
-        endStation: item.endStation
-    }));
+    return {
+        response: response.data,
+        items: toLookupHistoryListItems('emu', items)
+    } satisfies HistoryPageResult;
 }
 
 async function fetchPage(
@@ -100,12 +102,6 @@ async function fetchPage(
     return target.type === 'train'
         ? fetchTrainHistoryPage(requestFetch, target, cursor)
         : fetchEmuHistoryPage(requestFetch, target, cursor);
-}
-
-function mapResponseItems(target: LookupTarget, response: HistoryPageResponse) {
-    return target.type === 'train'
-        ? toTrainHistoryListItems(response.items as TrainHistoryRecord[])
-        : toEmuHistoryListItems(response.items as EmuHistoryRecord[]);
 }
 
 function isResponseForTarget(
@@ -145,7 +141,7 @@ export function useRecentHistoryList(
     );
 
     const { data, error, pending, refresh } =
-        useAsyncData<HistoryPageResponse | null>(
+        useAsyncData<HistoryPageResult | null>(
             asyncDataKey,
             async () => {
                 const target = toValue(targetSource);
@@ -164,23 +160,16 @@ export function useRecentHistoryList(
 
     const initialResponse = computed(() => {
         const target = toValue(targetSource);
+        const response = data.value?.response ?? null;
 
-        if (!target || !isResponseForTarget(target, data.value)) {
+        if (!target || !isResponseForTarget(target, response)) {
             return null;
         }
 
-        return data.value;
+        return response;
     });
 
-    const initialItems = computed(() => {
-        const target = toValue(targetSource);
-
-        if (!target || !initialResponse.value) {
-            return [];
-        }
-
-        return mapResponseItems(target, initialResponse.value);
-    });
+    const initialItems = computed(() => data.value?.items ?? []);
 
     const items = computed(() => [...initialItems.value, ...extraItems.value]);
 
@@ -304,24 +293,21 @@ export function useRecentHistoryList(
         loadMoreErrorMessage.value = '';
 
         try {
-            const response = await fetchPage(requestFetch, target, cursor);
+            const result = await fetchPage(requestFetch, target, cursor);
 
             if (currentRequestVersion !== requestVersion.value) {
                 return;
             }
 
-            extraItems.value = [
-                ...extraItems.value,
-                ...mapResponseItems(target, response)
-            ];
-            manualNextCursor.value = response.nextCursor ?? '';
-        } catch (error) {
+            extraItems.value = [...extraItems.value, ...result.items];
+            manualNextCursor.value = result.response.nextCursor ?? '';
+        } catch (loadMoreError) {
             if (currentRequestVersion !== requestVersion.value) {
                 return;
             }
 
             loadMoreErrorMessage.value = getApiErrorMessage(
-                error,
+                loadMoreError,
                 '加载更多历史记录失败，请稍后重试。'
             );
         } finally {

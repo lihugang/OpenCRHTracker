@@ -1156,7 +1156,11 @@
                             "type": "integer",
                             "minimum": 0
                         },
-                        "timetableTrain": {
+                        "timetableTrainCurrent": {
+                            "type": "integer",
+                            "minimum": 0
+                        },
+                        "timetableTrainHistory": {
                             "type": "integer",
                             "minimum": 0
                         },
@@ -1187,7 +1191,8 @@
                         "authUpdateSubscription",
                         "authDeleteSubscription",
                         "searchIndex",
-                        "timetableTrain",
+                        "timetableTrainCurrent",
+                        "timetableTrainHistory",
                         "exportDailyIndex",
                         "exportDaily"
                     ]
@@ -1205,6 +1210,9 @@
                         "recordsDaily": {
                             "$ref": "#/definitions/perRecordRule"
                         },
+                        "timetableTrainHistory": {
+                            "$ref": "#/definitions/perRecordRule"
+                        },
                         "timetableStation": {
                             "$ref": "#/definitions/perRecordRule"
                         }
@@ -1213,6 +1221,7 @@
                         "historyEmu",
                         "historyTrain",
                         "recordsDaily",
+                        "timetableTrainHistory",
                         "timetableStation"
                     ]
                 }

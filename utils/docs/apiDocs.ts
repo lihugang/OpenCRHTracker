@@ -35,12 +35,17 @@ export const DEFAULT_DOCS_API_RUNTIME_CONFIG: DocsApiRuntimeConfig = {
         minimumRequestCost: 1,
         fixed: {
             authMe: 1,
-            timetableTrain: 1,
+            timetableTrainCurrent: 1,
+            timetableTrainHistory: 1,
             exportDailyIndex: 2,
             exportDaily: 50
         },
         perRecord: {
             recordsDaily: {
+                unitCost: 0.05,
+                rounding: 'ceil'
+            },
+            timetableTrainHistory: {
                 unitCost: 0.05,
                 rounding: 'ceil'
             },
@@ -63,7 +68,9 @@ export const DEFAULT_DOCS_API_RUNTIME_CONFIG: DocsApiRuntimeConfig = {
 const PUBLIC_DOCS_API_SLUGS = new Set<string>([
     'auth-me',
     'records-daily',
-    'timetable-train',
+    'timetable-train-current',
+    'timetable-train-history',
+    'timetable-train-history-detail',
     'timetable-station',
     'history-train',
     'history-emu',
@@ -260,7 +267,8 @@ const tagDescriptionMap = new Map(
 
 const FIXED_COST_ENDPOINT_KEYS = {
     'auth-me': 'authMe',
-    'timetable-train': 'timetableTrain',
+    'timetable-train-current': 'timetableTrainCurrent',
+    'timetable-train-history-detail': 'timetableTrainHistory',
     'exports-daily-index': 'exportDailyIndex',
     'exports-daily-date': 'exportDaily'
 } as const satisfies Record<
@@ -270,6 +278,7 @@ const FIXED_COST_ENDPOINT_KEYS = {
 
 const PER_RECORD_COST_ENDPOINT_KEYS = {
     'records-daily': 'recordsDaily',
+    'timetable-train-history': 'timetableTrainHistory',
     'timetable-station': 'timetableStation',
     'history-train': 'historyTrain',
     'history-emu': 'historyEmu'

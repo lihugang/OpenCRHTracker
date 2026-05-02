@@ -2,11 +2,9 @@ SELECT
     id,
     train_code,
     emu_code,
-    start_station_name,
-    end_station_name,
-    start_at,
-    end_at
+    service_date,
+    timetable_id
 FROM daily_emu_routes
-WHERE start_at >= ?
-  AND start_at <= ?
-ORDER BY start_at DESC, id DESC;
+WHERE service_date >= ?
+  AND service_date <= ?
+ORDER BY service_date DESC, id DESC;

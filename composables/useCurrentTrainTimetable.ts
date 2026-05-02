@@ -58,7 +58,11 @@ export default function useCurrentTrainTimetable(
             try {
                 const response = await requestFetch<
                     TrackerApiResponse<CurrentTrainTimetableData>
-                >('/api/v1/timetable/train/' + encodeURIComponent(trainCode));
+                >(
+                    '/api/v1/timetable/train/' +
+                        encodeURIComponent(trainCode) +
+                        '/current'
+                );
 
                 if (!response.ok) {
                     throw {

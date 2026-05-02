@@ -1,4 +1,4 @@
 DELETE FROM daily_emu_routes
 WHERE train_code = ?
-  AND start_at >= ?
-  AND start_at < ?;
+  AND service_date >= ?
+  AND service_date <= ?;

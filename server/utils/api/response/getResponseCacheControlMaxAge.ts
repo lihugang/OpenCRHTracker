@@ -1,6 +1,5 @@
 import useConfig from '~/server/config';
 import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
-import { getShanghaiDayStartUnixSeconds } from '~/server/utils/date/shanghaiDateTime';
 
 export function getDailyResponseCacheControlMaxAge(date: string): number {
     const cache = useConfig().api.cache;
@@ -24,19 +23,17 @@ export function getMonthlyResponseCacheControlMaxAge(
 }
 
 export function getHistoryResponseCacheControlMaxAge(
-    cursorStartAt: number | null | undefined
+    cursorServiceDate: string | null | undefined
 ): number {
     const cache = useConfig().api.cache;
     if (
-        !Number.isInteger(cursorStartAt) ||
-        cursorStartAt === null ||
-        cursorStartAt === undefined
+        typeof cursorServiceDate !== 'string' ||
+        !/^\d{8}$/.test(cursorServiceDate)
     ) {
         return cache.currentDayMaxAgeSeconds;
     }
 
-    const todayStartAt = getShanghaiDayStartUnixSeconds(getCurrentDateString());
-    return cursorStartAt < todayStartAt
+    return cursorServiceDate < getCurrentDateString()
         ? cache.historicalMaxAgeSeconds
         : cache.currentDayMaxAgeSeconds;
 }

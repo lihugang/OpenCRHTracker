@@ -18,8 +18,8 @@ export default defineEventHandler(async (event) => {
         event,
         {
             cors: true,
-            requiredScopes: [API_SCOPES.timetable.train.read],
-            fixedCost: getFixedCost('timetableTrain'),
+            requiredScopes: [API_SCOPES.timetable.train.current.read],
+            fixedCost: getFixedCost('timetableTrainCurrent'),
             successHeaders: (successEvent) =>
                 setCacheControl(successEvent, cacheMaxAge)
         },

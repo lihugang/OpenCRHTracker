@@ -34,22 +34,19 @@ export interface LookupIndexResponse {
     items: LookupSuggestItem[];
 }
 
-export interface TrainHistoryRecord {
-    id: string;
-    startAt: number;
-    endAt: number;
-    emuCode: string;
-    startStation: string;
-    endStation: string;
+export interface HistoricalTimetableRef {
+    serviceDate: string;
+    timetableId: number | null;
 }
 
-export interface EmuHistoryRecord {
+export interface TrainHistoryRecord extends HistoricalTimetableRef {
     id: string;
-    startAt: number;
-    endAt: number;
+    emuCode: string;
+}
+
+export interface EmuHistoryRecord extends HistoricalTimetableRef {
+    id: string;
     trainCode: string;
-    startStation: string;
-    endStation: string;
 }
 
 export interface StationTimetableRecord {
@@ -88,11 +85,25 @@ export interface StationTimetableResponse extends HistoryResponseBase<StationTim
 
 export interface LookupHistoryListItem {
     id: string;
-    startAt: number;
-    endAt: number;
+    serviceDate: string;
+    timetableId: number | null;
+    startAt: number | null;
+    endAt: number | null;
     code: string;
-    startStation: string;
-    endStation: string;
+    startStation: string | null;
+    endStation: string | null;
+}
+
+export interface TrainTimetableHistoryListItem {
+    id: number;
+    historyId: number;
+    serviceDateStart: string;
+    serviceDateEndExclusive: string;
+}
+
+export interface TrainTimetableHistoryListResponse
+    extends HistoryResponseBase<TrainTimetableHistoryListItem> {
+    trainCode: string;
 }
 
 export interface CurrentTrainTimetableStop {
@@ -104,6 +115,25 @@ export interface CurrentTrainTimetableStop {
     wicket: string;
     isStart: boolean;
     isEnd: boolean;
+}
+
+export interface HistoricalTimetableStop {
+    stationNo: number;
+    stationName: string;
+    arriveOffset: number | null;
+    departOffset: number | null;
+    stationTrainCode: string;
+    isStart: boolean;
+    isEnd: boolean;
+}
+
+export interface HistoricalTimetableData {
+    historyId: number;
+    startStation: string | null;
+    endStation: string | null;
+    startOffset: number | null;
+    endOffset: number | null;
+    stops: HistoricalTimetableStop[];
 }
 
 export interface InferredCirculationNode {

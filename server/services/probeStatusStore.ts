@@ -1,23 +1,30 @@
 import '~/server/libs/database/emu';
 import { createPreparedSqlStore } from '~/server/libs/database/prepared';
+import {
+    hydrateHistoricalRouteSummary,
+    resolveTimetableIdentityLink
+} from '~/server/services/historicalTimetableResolver';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
+import { formatShanghaiDateString } from '~/server/utils/date/getCurrentDateString';
 import importSqlBatch from '~/server/utils/sql/importSqlBatch';
 
 export enum ProbeStatusValue {
-    // The record has been persisted, but the coupling result is still pending.
     PendingCouplingDetection = 1,
-    // The record has been verified as a single trainset formation.
     SingleFormationResolved = 2,
-    // The record has been verified as a coupled trainset formation.
     CoupledFormationResolved = 3
 }
 
-export interface ProbeStatusRow {
+interface RawProbeStatusRow {
     id: number;
     train_code: string;
     emu_code: string;
-    start_at: number;
+    service_date: string;
+    timetable_id: number | null;
     status: ProbeStatusValue;
+}
+
+export interface ProbeStatusRow extends RawProbeStatusRow {
+    start_at: number;
 }
 
 type ProbeStatusSqlKey =
@@ -43,12 +50,83 @@ const probeStatusStatements = createPreparedSqlStore<ProbeStatusSqlKey>({
     scope: 'emu/queries',
     sql: probeStatusSql
 });
+
 function normalizeTrainCode(trainCode: string): string {
     return normalizeCode(trainCode);
 }
 
 function normalizeEmuCode(emuCode: string): string {
     return normalizeCode(emuCode);
+}
+
+function normalizeServiceDateFromTimestamp(timestampSeconds: number) {
+    if (
+        !Number.isFinite(timestampSeconds) ||
+        !Number.isInteger(timestampSeconds) ||
+        timestampSeconds <= 0
+    ) {
+        return '19700101';
+    }
+
+    return formatShanghaiDateString(timestampSeconds * 1000);
+}
+
+function normalizeInclusiveServiceDateRange(
+    startAt: number,
+    endAt: number,
+    endExclusive = false
+) {
+    const normalizedStartAt =
+        Number.isInteger(startAt) && startAt > 0 ? startAt : 1;
+    const effectiveEndAt = endExclusive ? endAt - 1 : endAt;
+    const normalizedEndAt =
+        !Number.isFinite(effectiveEndAt) ||
+        !Number.isInteger(effectiveEndAt) ||
+        effectiveEndAt <= 0 ||
+        effectiveEndAt >= Number.MAX_SAFE_INTEGER / 2
+            ? '99991231'
+            : normalizeServiceDateFromTimestamp(effectiveEndAt);
+
+    return {
+        startServiceDate: normalizeServiceDateFromTimestamp(normalizedStartAt),
+        endServiceDate: normalizedEndAt
+    };
+}
+
+function hydrateRow(row: RawProbeStatusRow): ProbeStatusRow {
+    const hydratedSummary = hydrateHistoricalRouteSummary(
+        row.service_date,
+        row.timetable_id
+    );
+
+    return {
+        ...row,
+        start_at: hydratedSummary.start_at ?? 0
+    };
+}
+
+function hydrateRows(rows: RawProbeStatusRow[]) {
+    return rows.map(hydrateRow);
+}
+
+function isRowWithinRange(
+    row: ProbeStatusRow,
+    startAt: number,
+    endAt: number,
+    endExclusive = false
+) {
+    if (row.start_at > 0) {
+        return endExclusive
+            ? row.start_at >= startAt && row.start_at < endAt
+            : row.start_at >= startAt && row.start_at <= endAt;
+    }
+
+    const { startServiceDate, endServiceDate } = normalizeInclusiveServiceDateRange(
+        startAt,
+        endAt,
+        endExclusive
+    );
+    return row.service_date >= startServiceDate && row.service_date <= endServiceDate;
 }
 
 function getHighestProbeStatus(rows: ProbeStatusRow[]): ProbeStatusValue | 0 {
@@ -59,20 +137,28 @@ function getHighestProbeStatus(rows: ProbeStatusRow[]): ProbeStatusValue | 0 {
     );
 }
 
+function updateProbeStatusRowById(id: number, status: ProbeStatusValue) {
+    return probeStatusStatements.run('updateProbeStatusByTrainCodeAndEmuCode', status, id)
+        .changes;
+}
+
 export function listProbeStatusByEmuCode(
     emuCode: string,
     startAt: number
 ): ProbeStatusRow[] {
     const normalizedEmuCode = normalizeEmuCode(emuCode);
-    if (normalizedEmuCode.length === 0) {
+    if (normalizedEmuCode.length === 0 || !Number.isInteger(startAt) || startAt < 0) {
         return [];
     }
 
-    return probeStatusStatements.all<ProbeStatusRow>(
-        'selectProbeStatusByEmuCode',
-        normalizedEmuCode,
-        startAt
-    );
+    const serviceDate = normalizeServiceDateFromTimestamp(startAt);
+    return hydrateRows(
+        probeStatusStatements.all<RawProbeStatusRow>(
+            'selectProbeStatusByEmuCode',
+            normalizedEmuCode,
+            serviceDate
+        )
+    ).filter((row) => row.start_at === startAt);
 }
 
 export function getProbeStatusByEmuCodeValue(emuCode: string, startAt: number) {
@@ -94,12 +180,19 @@ export function listProbeStatusByEmuCodeInRange(
         return [];
     }
 
-    return probeStatusStatements.all<ProbeStatusRow>(
-        'selectProbeStatusByEmuCodeInRange',
-        normalizedEmuCode,
+    const { startServiceDate, endServiceDate } = normalizeInclusiveServiceDateRange(
         startAt,
-        endAtExclusive
+        endAtExclusive,
+        true
     );
+    return hydrateRows(
+        probeStatusStatements.all<RawProbeStatusRow>(
+            'selectProbeStatusByEmuCodeInRange',
+            normalizedEmuCode,
+            startServiceDate,
+            endServiceDate
+        )
+    ).filter((row) => isRowWithinRange(row, startAt, endAtExclusive, true));
 }
 
 export function listProbeStatusByTrainCode(
@@ -107,15 +200,18 @@ export function listProbeStatusByTrainCode(
     startAt: number
 ): ProbeStatusRow[] {
     const normalizedTrainCode = normalizeTrainCode(trainCode);
-    if (normalizedTrainCode.length === 0) {
+    if (normalizedTrainCode.length === 0 || !Number.isInteger(startAt) || startAt < 0) {
         return [];
     }
 
-    return probeStatusStatements.all<ProbeStatusRow>(
-        'selectProbeStatusByTrainCode',
-        normalizedTrainCode,
-        startAt
-    );
+    const serviceDate = normalizeServiceDateFromTimestamp(startAt);
+    return hydrateRows(
+        probeStatusStatements.all<RawProbeStatusRow>(
+            'selectProbeStatusByTrainCode',
+            normalizedTrainCode,
+            serviceDate
+        )
+    ).filter((row) => row.start_at === startAt);
 }
 
 export function getProbeStatusByTrainCodeValue(
@@ -142,12 +238,19 @@ export function listProbeStatusByTrainCodeInRange(
         return [];
     }
 
-    return probeStatusStatements.all<ProbeStatusRow>(
-        'selectProbeStatusByTrainCodeInRange',
-        normalizedTrainCode,
+    const { startServiceDate, endServiceDate } = normalizeInclusiveServiceDateRange(
         startAt,
-        endAtExclusive
+        endAtExclusive,
+        true
     );
+    return hydrateRows(
+        probeStatusStatements.all<RawProbeStatusRow>(
+            'selectProbeStatusByTrainCodeInRange',
+            normalizedTrainCode,
+            startServiceDate,
+            endServiceDate
+        )
+    ).filter((row) => isRowWithinRange(row, startAt, endAtExclusive, true));
 }
 
 export function getLatestResolvedProbeStatusByEmuCodeBefore(
@@ -163,13 +266,25 @@ export function getLatestResolvedProbeStatusByEmuCodeBefore(
         return null;
     }
 
-    return (
-        probeStatusStatements.get<ProbeStatusRow>(
+    const serviceDate = normalizeServiceDateFromTimestamp(startAtExclusive);
+    const candidateRows = hydrateRows(
+        probeStatusStatements.all<RawProbeStatusRow>(
             'selectLatestResolvedProbeStatusByEmuCodeBefore',
             normalizedEmuCode,
-            startAtExclusive
-        ) ?? null
-    );
+            serviceDate
+        )
+    )
+        .filter((row) => row.start_at > 0 && row.start_at < startAtExclusive)
+        .sort((left, right) => {
+            const leftStartAt = left.start_at ?? Number.MIN_SAFE_INTEGER;
+            const rightStartAt = right.start_at ?? Number.MIN_SAFE_INTEGER;
+            if (leftStartAt !== rightStartAt) {
+                return rightStartAt - leftStartAt;
+            }
+            return right.id - left.id;
+        });
+
+    return candidateRows[0] ?? null;
 }
 
 export function insertProbeStatus(
@@ -184,11 +299,24 @@ export function insertProbeStatus(
         return 0;
     }
 
+    const identityLink = resolveTimetableIdentityLink(normalizedTrainCode, startAt);
+    if (identityLink.timetableId !== null) {
+        probeStatusStatements.run(
+            'deleteProbeStatusByTrainCodeAndEmuCodeAtStartAt',
+            normalizedTrainCode,
+            normalizedEmuCode,
+            identityLink.serviceDate,
+            null,
+            null
+        );
+    }
+
     const result = probeStatusStatements.run(
         'insertProbeStatus',
         normalizedTrainCode,
         normalizedEmuCode,
-        startAt,
+        identityLink.serviceDate,
+        identityLink.timetableId,
         status
     );
     return Number(result.lastInsertRowid);
@@ -227,12 +355,7 @@ export function ensureProbeStatus(
         return 'unchanged';
     }
 
-    updateProbeStatusByTrainCodeAndEmuCode(
-        normalizedTrainCode,
-        normalizedEmuCode,
-        startAt,
-        status
-    );
+    updateProbeStatusRowById(existing.id, status);
     return 'updated';
 }
 
@@ -241,18 +364,10 @@ export function updateProbeStatusByEmuCode(
     startAt: number,
     status: ProbeStatusValue
 ): number {
-    const normalizedEmuCode = normalizeEmuCode(emuCode);
-    if (normalizedEmuCode.length === 0) {
-        return 0;
-    }
-
-    const result = probeStatusStatements.run(
-        'updateProbeStatusByEmuCode',
-        status,
-        normalizedEmuCode,
-        startAt
+    return listProbeStatusByEmuCode(emuCode, startAt).reduce(
+        (changes, row) => changes + updateProbeStatusRowById(row.id, status),
+        0
     );
-    return result.changes;
 }
 
 export function updateProbeStatusByTrainCode(
@@ -260,18 +375,10 @@ export function updateProbeStatusByTrainCode(
     startAt: number,
     status: ProbeStatusValue
 ): number {
-    const normalizedTrainCode = normalizeTrainCode(trainCode);
-    if (normalizedTrainCode.length === 0) {
-        return 0;
-    }
-
-    const result = probeStatusStatements.run(
-        'updateProbeStatusByTrainCode',
-        status,
-        normalizedTrainCode,
-        startAt
+    return listProbeStatusByTrainCode(trainCode, startAt).reduce(
+        (changes, row) => changes + updateProbeStatusRowById(row.id, status),
+        0
     );
-    return result.changes;
 }
 
 export function updateProbeStatusByTrainCodeAndEmuCode(
@@ -280,20 +387,14 @@ export function updateProbeStatusByTrainCodeAndEmuCode(
     startAt: number,
     status: ProbeStatusValue
 ): number {
-    const normalizedTrainCode = normalizeTrainCode(trainCode);
-    const normalizedEmuCode = normalizeEmuCode(emuCode);
-    if (normalizedTrainCode.length === 0 || normalizedEmuCode.length === 0) {
+    const matchingRow = listProbeStatusByTrainCode(trainCode, startAt).find(
+        (row) => row.emu_code === normalizeEmuCode(emuCode)
+    );
+    if (!matchingRow) {
         return 0;
     }
 
-    const result = probeStatusStatements.run(
-        'updateProbeStatusByTrainCodeAndEmuCode',
-        status,
-        normalizedTrainCode,
-        normalizedEmuCode,
-        startAt
-    );
-    return result.changes;
+    return updateProbeStatusRowById(matchingRow.id, status);
 }
 
 export function clearProbeStatus(): number {
@@ -316,11 +417,16 @@ export function deleteProbeStatusByTrainCodeInRange(
         return 0;
     }
 
+    const { startServiceDate, endServiceDate } = normalizeInclusiveServiceDateRange(
+        startAt,
+        endAtExclusive,
+        true
+    );
     const result = probeStatusStatements.run(
         'deleteProbeStatusByTrainCodeInRange',
         normalizedTrainCode,
-        startAt,
-        endAtExclusive
+        startServiceDate,
+        endServiceDate
     );
     return result.changes;
 }
@@ -341,11 +447,14 @@ export function deleteProbeStatusByTrainCodeAndEmuCodeAtStartAt(
         return 0;
     }
 
+    const identityLink = resolveTimetableIdentityLink(normalizedTrainCode, startAt);
     const result = probeStatusStatements.run(
         'deleteProbeStatusByTrainCodeAndEmuCodeAtStartAt',
         normalizedTrainCode,
         normalizedEmuCode,
-        startAt
+        identityLink.serviceDate,
+        identityLink.timetableId,
+        identityLink.timetableId
     );
     return result.changes;
 }

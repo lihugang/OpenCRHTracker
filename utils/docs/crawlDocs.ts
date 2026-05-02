@@ -88,7 +88,7 @@ export const crawlDocsSections: DocsContentSection[] = [
                 type: 'list',
                 title: '接口行为',
                 items: [
-                    '当前不新增独立公开接口，而是把 inferredCirculation 直接并入 /api/v1/timetable/train/{trainCode} 的响应。',
+                    '当前不新增独立公开接口，而是把 inferredCirculation 直接并入 /api/v1/timetable/train/{trainCode}/current 的响应。',
                     '当前只为今日时刻表中存在的车次返回推断交路结果；如果索引里不存在该车次，就不会附带交路数据。'
                 ]
             },

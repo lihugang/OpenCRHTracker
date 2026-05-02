@@ -306,7 +306,8 @@ export interface Config {
             authUpdateSubscription: number;
             authDeleteSubscription: number;
             searchIndex: number;
-            timetableTrain: number;
+            timetableTrainCurrent: number;
+            timetableTrainHistory: number;
             exportDailyIndex: number;
             exportDaily: number;
         };
@@ -314,6 +315,7 @@ export interface Config {
             historyEmu: CostPerRecordRule;
             historyTrain: CostPerRecordRule;
             recordsDaily: CostPerRecordRule;
+            timetableTrainHistory: CostPerRecordRule;
             timetableStation: CostPerRecordRule;
         };
     };
@@ -806,6 +808,10 @@ function validateConfig(raw: unknown): Config {
     const recordsDaily = asObject(
         costPerRecord.recordsDaily,
         'cost.perRecord.recordsDaily'
+    );
+    const timetableTrainHistory = asObject(
+        costPerRecord.timetableTrainHistory,
+        'cost.perRecord.timetableTrainHistory'
     );
     const timetableStation = asObject(
         costPerRecord.timetableStation,
@@ -1514,9 +1520,14 @@ function validateConfig(raw: unknown): Config {
                     'cost.fixed.searchIndex',
                     0
                 ),
-                timetableTrain: asNumber(
-                    costFixed.timetableTrain,
-                    'cost.fixed.timetableTrain',
+                timetableTrainCurrent: asNumber(
+                    costFixed.timetableTrainCurrent,
+                    'cost.fixed.timetableTrainCurrent',
+                    0
+                ),
+                timetableTrainHistory: asNumber(
+                    costFixed.timetableTrainHistory,
+                    'cost.fixed.timetableTrainHistory',
                     0
                 ),
                 exportDailyIndex: asNumber(
@@ -1562,6 +1573,17 @@ function validateConfig(raw: unknown): Config {
                     rounding: asRounding(
                         recordsDaily.rounding,
                         'cost.perRecord.recordsDaily.rounding'
+                    )
+                },
+                timetableTrainHistory: {
+                    unitCost: asNumber(
+                        timetableTrainHistory.unitCost,
+                        'cost.perRecord.timetableTrainHistory.unitCost',
+                        0
+                    ),
+                    rounding: asRounding(
+                        timetableTrainHistory.rounding,
+                        'cost.perRecord.timetableTrainHistory.rounding'
                     )
                 },
                 timetableStation: {

@@ -16,7 +16,7 @@ import { getShanghaiDayStartUnixSeconds } from '~/server/utils/date/shanghaiDate
 import importSqlBatch from '~/server/utils/sql/importSqlBatch';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
 
-interface TimetableHistoryContentRow {
+export interface TimetableHistoryContentRow {
     id: number;
     hash: string;
     timetable_json: string;
@@ -24,7 +24,7 @@ interface TimetableHistoryContentRow {
     created_at: number;
 }
 
-interface TimetableHistoryCoverageRow {
+export interface TimetableHistoryCoverageRow {
     id: number;
     train_code: string;
     service_date_start: number;
@@ -32,6 +32,11 @@ interface TimetableHistoryCoverageRow {
     content_id: number;
     created_at: number;
     updated_at: number;
+}
+
+export interface TimetableHistoryCursorPoint {
+    serviceDate: string;
+    id: number;
 }
 
 interface CanonicalTimetableStop {
@@ -50,8 +55,11 @@ type TimetableHistorySqlKey =
     | 'deleteCoverageById'
     | 'insertContent'
     | 'insertCoverage'
+    | 'selectContentById'
     | 'selectContentByHash'
+    | 'selectCoverageByTrainCodeAtDate'
     | 'selectCoveragesByTrainCode'
+    | 'selectCoveragesByTrainCodePaged'
     | 'selectLatestCoverageByTrainCodeAtOrBeforeDate'
     | 'updateCoverageContentById'
     | 'updateCoverageEndById';
@@ -87,12 +95,106 @@ const timetableHistoryStatements = createPreparedSqlStore<TimetableHistorySqlKey
     }
 );
 
+const DEFAULT_TIMETABLE_HISTORY_CURSOR_POINT: TimetableHistoryCursorPoint = {
+    serviceDate: '99991231',
+    id: Number.MAX_SAFE_INTEGER
+};
+
 function normalizeServiceDateInteger(serviceDate: string): number {
     if (!/^\d{8}$/.test(serviceDate)) {
         throw new Error(`invalid_service_date ${serviceDate}`);
     }
 
     return Number.parseInt(serviceDate, 10);
+}
+
+export function normalizeTimetableHistoryServiceDate(serviceDate: string) {
+    return normalizeServiceDateInteger(serviceDate);
+}
+
+export function formatTimetableHistoryServiceDate(serviceDate: number) {
+    return formatServiceDateInteger(serviceDate);
+}
+
+export function getTimetableHistoryContentById(contentId: number) {
+    if (!Number.isInteger(contentId) || contentId <= 0) {
+        return null;
+    }
+
+    return (
+        timetableHistoryStatements.get<TimetableHistoryContentRow>(
+            'selectContentById',
+            contentId
+        ) ?? null
+    );
+}
+
+export function getTimetableHistoryCoverageByTrainCodeAtDate(
+    trainCode: string,
+    serviceDate: string
+) {
+    const normalizedTrainCode = normalizeCode(trainCode);
+    if (normalizedTrainCode.length === 0) {
+        return null;
+    }
+
+    const normalizedServiceDate = normalizeServiceDateInteger(serviceDate);
+    return (
+        timetableHistoryStatements.get<TimetableHistoryCoverageRow>(
+            'selectCoverageByTrainCodeAtDate',
+            normalizedTrainCode,
+            normalizedServiceDate,
+            normalizedServiceDate
+        ) ?? null
+    );
+}
+
+export function getLatestTimetableHistoryCoverageByTrainCodeAtOrBeforeDate(
+    trainCode: string,
+    serviceDate: string
+) {
+    const normalizedTrainCode = normalizeCode(trainCode);
+    if (normalizedTrainCode.length === 0) {
+        return null;
+    }
+
+    const normalizedServiceDate = normalizeServiceDateInteger(serviceDate);
+    return (
+        timetableHistoryStatements.get<TimetableHistoryCoverageRow>(
+            'selectLatestCoverageByTrainCodeAtOrBeforeDate',
+            normalizedTrainCode,
+            normalizedServiceDate
+        ) ?? null
+    );
+}
+
+export function listTimetableHistoryCoveragesByTrainCodePaged(
+    trainCode: string,
+    cursor: TimetableHistoryCursorPoint | null,
+    limit: number
+) {
+    const normalizedTrainCode = normalizeCode(trainCode);
+    if (
+        normalizedTrainCode.length === 0 ||
+        !Number.isInteger(limit) ||
+        limit <= 0
+    ) {
+        return [];
+    }
+
+    const cursorPoint = cursor ?? DEFAULT_TIMETABLE_HISTORY_CURSOR_POINT;
+    const cursorServiceDate = normalizeServiceDateInteger(
+        cursorPoint.serviceDate
+    );
+
+    return timetableHistoryStatements.all<TimetableHistoryCoverageRow>(
+        'selectCoveragesByTrainCodePaged',
+        normalizedTrainCode,
+        cursorServiceDate,
+        cursorServiceDate,
+        cursorPoint.id,
+        limit
+    );
 }
 
 function formatServiceDateInteger(serviceDate: number): string {

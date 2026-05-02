@@ -615,39 +615,25 @@ export const developerDocsOpenApi = {
             },
             TrainHistoryItem: {
                 type: 'object',
-                required: [
-                    'startAt',
-                    'endAt',
-                    'id',
-                    'emuCode',
-                    'startStation',
-                    'endStation',
-                    'line'
-                ],
+                required: ['id', 'serviceDate', 'timetableId', 'emuCode', 'line'],
                 properties: {
-                    startAt: {
-                        type: 'integer',
-                        example: 1774060020
-                    },
-                    endAt: {
-                        type: 'integer',
-                        example: 1774089060
-                    },
                     id: {
                         type: 'string',
-                        example: '5201314'
+                        example: '512596'
+                    },
+                    serviceDate: {
+                        type: 'string',
+                        pattern: '^\\d{8}$',
+                        example: '20260424'
+                    },
+                    timetableId: {
+                        type: 'integer',
+                        nullable: true,
+                        example: 5479
                     },
                     emuCode: {
                         type: 'string',
-                        example: 'CRH2C-1-2070'
-                    },
-                    startStation: {
-                        type: 'string',
-                        example: '上海'
-                    },
-                    endStation: {
-                        type: 'string',
-                        example: '上海南'
+                        example: 'CR400BF-A-5156'
                     },
                     line: {
                         type: 'array',
@@ -678,17 +664,17 @@ export const developerDocsOpenApi = {
                         properties: {
                             trainCode: {
                                 type: 'string',
-                                example: 'G8388'
+                                example: 'G512'
                             },
                             start: {
                                 type: 'integer',
                                 nullable: true,
-                                example: 1774060020
+                                example: null
                             },
                             end: {
                                 type: 'integer',
                                 nullable: true,
-                                example: 1774089060
+                                example: null
                             },
                             cursor: {
                                 type: 'string',
@@ -696,11 +682,11 @@ export const developerDocsOpenApi = {
                             },
                             limit: {
                                 type: 'integer',
-                                example: 20
+                                example: 2
                             },
                             nextCursor: {
                                 type: 'string',
-                                example: '1741996800:913251'
+                                example: '20260423:496651'
                             },
                             items: {
                                 type: 'array',
@@ -718,39 +704,25 @@ export const developerDocsOpenApi = {
             },
             EmuHistoryItem: {
                 type: 'object',
-                required: [
-                    'startAt',
-                    'endAt',
-                    'id',
-                    'trainCode',
-                    'startStation',
-                    'endStation',
-                    'line'
-                ],
+                required: ['id', 'serviceDate', 'timetableId', 'trainCode', 'line'],
                 properties: {
-                    startAt: {
-                        type: 'integer',
-                        example: 1774060020
-                    },
-                    endAt: {
-                        type: 'integer',
-                        example: 1774089060
-                    },
                     id: {
                         type: 'string',
-                        example: '5201314'
+                        example: '528425'
+                    },
+                    serviceDate: {
+                        type: 'string',
+                        pattern: '^\\d{8}$',
+                        example: '20260425'
+                    },
+                    timetableId: {
+                        type: 'integer',
+                        nullable: true,
+                        example: 6373
                     },
                     trainCode: {
                         type: 'string',
-                        example: 'G8388'
-                    },
-                    startStation: {
-                        type: 'string',
-                        example: '上海'
-                    },
-                    endStation: {
-                        type: 'string',
-                        example: '上海南'
+                        example: 'G1824'
                     },
                     line: {
                         type: 'array',
@@ -781,17 +753,17 @@ export const developerDocsOpenApi = {
                         properties: {
                             emuCode: {
                                 type: 'string',
-                                example: 'CR400AF-C-2214'
+                                example: 'CR400BF-A-5156'
                             },
                             start: {
                                 type: 'integer',
                                 nullable: true,
-                                example: 1774076820
+                                example: null
                             },
                             end: {
                                 type: 'integer',
                                 nullable: true,
-                                example: 1774080540
+                                example: null
                             },
                             cursor: {
                                 type: 'string',
@@ -799,11 +771,11 @@ export const developerDocsOpenApi = {
                             },
                             limit: {
                                 type: 'integer',
-                                example: 20
+                                example: 2
                             },
                             nextCursor: {
                                 type: 'string',
-                                example: '1741996800:913251'
+                                example: '20260425:528424'
                             },
                             items: {
                                 type: 'array',
@@ -1204,6 +1176,184 @@ export const developerDocsOpenApi = {
                     }
                 }
             },
+            TrainTimetableHistoryListItem: {
+                type: 'object',
+                required: [
+                    'id',
+                    'historyId',
+                    'serviceDateStart',
+                    'serviceDateEndExclusive'
+                ],
+                properties: {
+                    id: {
+                        type: 'integer',
+                        example: 6845
+                    },
+                    historyId: {
+                        type: 'integer',
+                        example: 5479
+                    },
+                    serviceDateStart: {
+                        type: 'string',
+                        pattern: '^\\d{8}$',
+                        example: '20260502'
+                    },
+                    serviceDateEndExclusive: {
+                        type: 'string',
+                        pattern: '^\\d{8}$',
+                        example: '20260503'
+                    }
+                }
+            },
+            TrainTimetableHistoryListResponse: {
+                type: 'object',
+                required: ['ok', 'data', 'error'],
+                properties: {
+                    ok: {
+                        type: 'boolean',
+                        example: true
+                    },
+                    data: {
+                        type: 'object',
+                        required: [
+                            'trainCode',
+                            'cursor',
+                            'limit',
+                            'nextCursor',
+                            'items'
+                        ],
+                        properties: {
+                            trainCode: {
+                                type: 'string',
+                                example: 'G512'
+                            },
+                            cursor: {
+                                type: 'string',
+                                example: ''
+                            },
+                            limit: {
+                                type: 'integer',
+                                example: 2
+                            },
+                            nextCursor: {
+                                type: 'string',
+                                example: ''
+                            },
+                            items: {
+                                type: 'array',
+                                items: {
+                                    $ref: '#/components/schemas/TrainTimetableHistoryListItem'
+                                }
+                            }
+                        }
+                    },
+                    error: {
+                        type: 'string',
+                        example: ''
+                    }
+                }
+            },
+            HistoricalTimetableStop: {
+                type: 'object',
+                required: [
+                    'stationNo',
+                    'stationName',
+                    'arriveOffset',
+                    'departOffset',
+                    'stationTrainCode',
+                    'isStart',
+                    'isEnd'
+                ],
+                properties: {
+                    stationNo: {
+                        type: 'integer',
+                        example: 1
+                    },
+                    stationName: {
+                        type: 'string',
+                        example: '汉口'
+                    },
+                    arriveOffset: {
+                        type: 'integer',
+                        nullable: true,
+                        example: null
+                    },
+                    departOffset: {
+                        type: 'integer',
+                        nullable: true,
+                        example: 47340
+                    },
+                    stationTrainCode: {
+                        type: 'string',
+                        example: 'G512'
+                    },
+                    isStart: {
+                        type: 'boolean',
+                        example: true
+                    },
+                    isEnd: {
+                        type: 'boolean',
+                        example: false
+                    }
+                }
+            },
+            HistoricalTimetableDetailResponse: {
+                type: 'object',
+                required: ['ok', 'data', 'error'],
+                properties: {
+                    ok: {
+                        type: 'boolean',
+                        example: true
+                    },
+                    data: {
+                        type: 'object',
+                        required: [
+                            'historyId',
+                            'startStation',
+                            'endStation',
+                            'startOffset',
+                            'endOffset',
+                            'stops'
+                        ],
+                        properties: {
+                            historyId: {
+                                type: 'integer',
+                                example: 5479
+                            },
+                            startStation: {
+                                type: 'string',
+                                nullable: true,
+                                example: '汉口'
+                            },
+                            endStation: {
+                                type: 'string',
+                                nullable: true,
+                                example: '北京西'
+                            },
+                            startOffset: {
+                                type: 'integer',
+                                nullable: true,
+                                example: 47340
+                            },
+                            endOffset: {
+                                type: 'integer',
+                                nullable: true,
+                                example: 66060
+                            },
+                            stops: {
+                                type: 'array',
+                                items: {
+                                    $ref: '#/components/schemas/HistoricalTimetableStop'
+                                }
+                            }
+                        }
+                    },
+                    error: {
+                        type: 'string',
+                        example: ''
+                    }
+                }
+            },
             StationTimetableItem: {
                 type: 'object',
                 required: [
@@ -1219,37 +1369,37 @@ export const developerDocsOpenApi = {
                 properties: {
                     trainCode: {
                         type: 'string',
-                        example: 'G12'
+                        example: 'C2001'
                     },
                     allCodes: {
                         type: 'array',
                         items: {
                             type: 'string'
                         },
-                        example: ['G12', 'G13']
+                        example: ['C2001']
                     },
                     arriveAt: {
                         type: 'integer',
                         nullable: true,
-                        example: 1774063560
+                        example: 1777673640
                     },
                     departAt: {
                         type: 'integer',
                         nullable: true,
-                        example: 1774063920
+                        example: 1777673640
                     },
                     startStation: {
                         type: 'string',
-                        example: '上海虹桥'
+                        example: '北京南'
                     },
                     endStation: {
                         type: 'string',
-                        example: '北京南'
+                        example: '天津'
                     },
                     updatedAt: {
                         type: 'integer',
                         nullable: true,
-                        example: 1774059000
+                        example: 1776492498
                     },
                     referenceModels: {
                         type: 'array',
@@ -1258,8 +1408,8 @@ export const developerDocsOpenApi = {
                         },
                         example: [
                             {
-                                model: 'CR400AF-Z',
-                                weightedShare: 0.625
+                                model: 'CR400BF-S',
+                                weightedShare: 1
                             }
                         ]
                     }
@@ -1293,12 +1443,12 @@ export const developerDocsOpenApi = {
                             },
                             limit: {
                                 type: 'integer',
-                                example: 40
+                                example: 1
                             },
                             nextCursor: {
                                 type: 'string',
                                 nullable: true,
-                                example: '600:1774063920:G12:3:1774050000'
+                                example: '22440:1777673640:C2001:1:1777673640'
                             },
                             items: {
                                 type: 'array',
@@ -2245,7 +2395,7 @@ export const developerDocsOpenApi = {
                 ]
             }
         },
-        '/timetable/train/{trainCode}': {
+        '/timetable/train/{trainCode}/current': {
             get: {
                 operationId: 'currentTrainTimetable',
                 tags: ['Timetable'],
@@ -2277,15 +2427,15 @@ export const developerDocsOpenApi = {
                                 example: {
                                     ok: true,
                                     data: {
-                                        updatedAt: 1774893900,
+                                        updatedAt: 1776602294,
                                         requestTrainCode: 'G512',
                                         trainCode: 'G512',
                                         internalCode: '390000G5120C',
                                         allCodes: ['G512'],
                                         bureauCode: 'N',
                                         bureauName: '武汉局集团',
-                                        trainDepartment: '武汉动车段',
-                                        passengerDepartment: '武汉客运段',
+                                        trainDepartment: '郑州动车段',
+                                        passengerDepartment: '郑州客运段',
                                         referenceModels: [
                                             {
                                                 model: 'CR400BF-A',
@@ -2294,29 +2444,29 @@ export const developerDocsOpenApi = {
                                         ],
                                         startStation: '汉口',
                                         endStation: '北京西',
-                                        startAt: 1776575340,
-                                        endAt: 1776594060,
+                                        startAt: 1777698540,
+                                        endAt: 1777717260,
                                         inferredCirculation: {
-                                            routeId: 'circulation_ed7147d7',
-                                            windowStart: 1775404800,
-                                            windowEnd: 1776614399,
+                                            routeId: 'circulation_a0ee45fa',
+                                            windowStart: 1776528000,
+                                            windowEnd: 1777737599,
                                             threshold: 0.8,
                                             lowestLinkWeight: 1,
-                                            lowestLinkSupportCount: 13,
+                                            lowestLinkSupportCount: 6,
                                             containsLoopBreak: false,
                                             nodes: [
                                                 {
                                                     internalCode:
                                                         '38000G208500',
                                                     allCodes: ['G2085'],
-                                                    startStation: '青岛北',
-                                                    endStation: '杭州西',
-                                                    startAt: 1776419400,
-                                                    endAt: 1776437280,
+                                                    startStation: '郑州东',
+                                                    endStation: '汉口',
+                                                    startAt: 1777687260,
+                                                    endAt: 1777697340,
                                                     incomingWeight: null,
                                                     incomingSupportCount: null,
                                                     outgoingWeight: 1,
-                                                    outgoingSupportCount: 14
+                                                    outgoingSupportCount: 6
                                                 },
                                                 {
                                                     internalCode:
@@ -2324,68 +2474,23 @@ export const developerDocsOpenApi = {
                                                     allCodes: ['G512'],
                                                     startStation: '汉口',
                                                     endStation: '北京西',
-                                                    startAt: 1776575340,
-                                                    endAt: 1776594060,
+                                                    startAt: 1777698540,
+                                                    endAt: 1777717260,
                                                     incomingWeight: 1,
-                                                    incomingSupportCount: 14,
+                                                    incomingSupportCount: 6,
                                                     outgoingWeight: 1,
-                                                    outgoingSupportCount: 13
+                                                    outgoingSupportCount: 6
                                                 },
                                                 {
                                                     internalCode:
                                                         '240000G34910',
                                                     allCodes: ['G349'],
                                                     startStation: '北京西',
-                                                    endStation: '郑州东',
-                                                    startAt: 1776597000,
-                                                    endAt: 1776610500,
+                                                    endStation: '武汉',
+                                                    startAt: 1777719300,
+                                                    endAt: 1777734180,
                                                     incomingWeight: 1,
-                                                    incomingSupportCount: 13,
-                                                    outgoingWeight: 1,
-                                                    outgoingSupportCount: 13
-                                                },
-                                                {
-                                                    internalCode:
-                                                        '4E000G228800',
-                                                    allCodes: [
-                                                        'G2288',
-                                                        'G2289'
-                                                    ],
-                                                    startStation: '郑州东',
-                                                    endStation: '青岛北',
-                                                    startAt: 1776613200,
-                                                    endAt: 1776630600,
-                                                    incomingWeight: 1,
-                                                    incomingSupportCount: 13,
-                                                    outgoingWeight: 1,
-                                                    outgoingSupportCount: 14
-                                                },
-                                                {
-                                                    internalCode:
-                                                        '40000G182401',
-                                                    allCodes: [
-                                                        'G1821',
-                                                        'G1824'
-                                                    ],
-                                                    startStation: '青岛北',
-                                                    endStation: '上海虹桥',
-                                                    startAt: 1776498000,
-                                                    endAt: 1776517200,
-                                                    incomingWeight: 1,
-                                                    incomingSupportCount: 14,
-                                                    outgoingWeight: 1,
-                                                    outgoingSupportCount: 13
-                                                },
-                                                {
-                                                    internalCode:
-                                                        '5L00000G8400',
-                                                    allCodes: ['G84', 'G85'],
-                                                    startStation: '上海虹桥',
-                                                    endStation: '北京南',
-                                                    startAt: 1776521400,
-                                                    endAt: 1776540000,
-                                                    incomingWeight: 1,
-                                                    incomingSupportCount: 13,
+                                                    incomingSupportCount: 6,
                                                     outgoingWeight: null,
                                                     outgoingSupportCount: null
                                                 }
@@ -2395,8 +2500,8 @@ export const developerDocsOpenApi = {
                                             {
                                                 stationNo: 1,
                                                 stationName: '汉口',
-                                                arriveAt: 1776575340,
-                                                departAt: 1776575340,
+                                                arriveAt: 1777698540,
+                                                departAt: 1777698540,
                                                 stationTrainCode: 'G512',
                                                 wicket: '二楼11B检票口',
                                                 isStart: true,
@@ -2405,8 +2510,8 @@ export const developerDocsOpenApi = {
                                             {
                                                 stationNo: 2,
                                                 stationName: '许昌东',
-                                                arriveAt: 1776581040,
-                                                departAt: 1776581760,
+                                                arriveAt: 1777704240,
+                                                departAt: 1777704960,
                                                 stationTrainCode: 'G512',
                                                 wicket: '一层检票口',
                                                 isStart: false,
@@ -2415,8 +2520,8 @@ export const developerDocsOpenApi = {
                                             {
                                                 stationNo: 3,
                                                 stationName: '郑州东',
-                                                arriveAt: 1776583140,
-                                                departAt: 1776583320,
+                                                arriveAt: 1777706340,
+                                                departAt: 1777706520,
                                                 stationTrainCode: 'G512',
                                                 wicket: '6A_7A,6B_7B',
                                                 isStart: false,
@@ -2425,8 +2530,8 @@ export const developerDocsOpenApi = {
                                             {
                                                 stationNo: 4,
                                                 stationName: '高邑西',
-                                                arriveAt: 1776588120,
-                                                departAt: 1776588240,
+                                                arriveAt: 1777711320,
+                                                departAt: 1777711440,
                                                 stationTrainCode: 'G512',
                                                 wicket: '检票口1',
                                                 isStart: false,
@@ -2435,8 +2540,8 @@ export const developerDocsOpenApi = {
                                             {
                                                 stationNo: 5,
                                                 stationName: '石家庄',
-                                                arriveAt: 1776589140,
-                                                departAt: 1776589320,
+                                                arriveAt: 1777712340,
+                                                departAt: 1777712520,
                                                 stationTrainCode: 'G512',
                                                 wicket: '14B15B',
                                                 isStart: false,
@@ -2445,8 +2550,8 @@ export const developerDocsOpenApi = {
                                             {
                                                 stationNo: 6,
                                                 stationName: '保定东',
-                                                arriveAt: 1776591420,
-                                                departAt: 1776591540,
+                                                arriveAt: 1777714620,
+                                                departAt: 1777714740,
                                                 stationTrainCode: 'G512',
                                                 wicket: '进站检票口,进站检票口2',
                                                 isStart: false,
@@ -2455,8 +2560,8 @@ export const developerDocsOpenApi = {
                                             {
                                                 stationNo: 7,
                                                 stationName: '北京西',
-                                                arriveAt: 1776594060,
-                                                departAt: 1776594060,
+                                                arriveAt: 1777717260,
+                                                departAt: 1777717260,
                                                 stationTrainCode: 'G512',
                                                 wicket: '',
                                                 isStart: false,
@@ -2516,11 +2621,11 @@ export const developerDocsOpenApi = {
                         }
                     }
                 },
-                'x-slug': 'timetable-train',
+                'x-slug': 'timetable-train-current',
                 'x-group': '时刻表',
                 'x-sort-order': 25,
                 'x-auth-modes': ['anonymous', 'cookie', 'apiKey'],
-                'x-required-scopes': ['api.timetable.train.read'],
+                'x-required-scopes': ['api.timetable.train.current.read'],
                 'x-examples': [
                     {
                         id: 'timetable-by-train-code',
@@ -2529,7 +2634,297 @@ export const developerDocsOpenApi = {
                             '读取当天一趟车次的完整经停表，可用于详情页弹窗展示。',
                         authMode: 'anonymous',
                         pathParams: {
-                            trainCode: 'G8388'
+                            trainCode: 'G512'
+                        }
+                    }
+                ]
+            }
+        },
+        '/timetable/train/{trainCode}/history': {
+            get: {
+                operationId: 'trainTimetableHistory',
+                tags: ['Timetable'],
+                summary: '按车次分页读取历史时刻表清单',
+                description:
+                    '返回指定车次的历史时刻表覆盖范围列表。',
+                parameters: [
+                    {
+                        $ref: '#/components/parameters/TrainCodeParam'
+                    },
+                    {
+                        $ref: '#/components/parameters/LimitQuery'
+                    },
+                    {
+                        $ref: '#/components/parameters/CursorQuery'
+                    }
+                ],
+                security: [{}, { bearerAuth: [] }, { cookieAuth: [] }],
+                responses: {
+                    '200': {
+                        description: '一页历史时刻表清单数据。',
+                        headers: {
+                            'x-api-remain': {
+                                $ref: '#/components/headers/ApiRemain'
+                            },
+                            'x-api-cost': {
+                                $ref: '#/components/headers/ApiCost'
+                            }
+                        },
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    $ref: '#/components/schemas/TrainTimetableHistoryListResponse'
+                                },
+                                example: {
+                                    ok: true,
+                                    data: {
+                                        trainCode: 'G512',
+                                        cursor: '',
+                                        limit: 2,
+                                        nextCursor: '',
+                                        items: [
+                                            {
+                                                id: 6845,
+                                                historyId: 5479,
+                                                serviceDateStart: '20260502',
+                                                serviceDateEndExclusive:
+                                                    '20260503'
+                                            }
+                                        ]
+                                    },
+                                    error: ''
+                                }
+                            }
+                        }
+                    },
+                    '400': {
+                        description: '路径参数或分页参数无效。',
+                        headers: {
+                            'x-api-remain': {
+                                $ref: '#/components/headers/ApiRemain'
+                            },
+                            'x-api-cost': {
+                                $ref: '#/components/headers/ApiCost'
+                            }
+                        },
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    $ref: '#/components/schemas/ApiFailureResponse'
+                                },
+                                example: {
+                                    ok: false,
+                                    data: 'cursor 必须是 "serviceDate:id" 格式',
+                                    error: 'invalid_param'
+                                }
+                            }
+                        }
+                    }
+                },
+                'x-slug': 'timetable-train-history',
+                'x-group': '时刻表',
+                'x-sort-order': 26,
+                'x-auth-modes': ['anonymous', 'cookie', 'apiKey'],
+                'x-required-scopes': ['api.timetable.train.history.read'],
+                'x-examples': [
+                    {
+                        id: 'train-history-first-page',
+                        label: '历史清单',
+                        summary:
+                            '读取指定车次最近可用的历史时刻表覆盖范围列表。',
+                        authMode: 'anonymous',
+                        pathParams: {
+                            trainCode: 'G512'
+                        },
+                        query: {
+                            limit: '2'
+                        }
+                    }
+                ]
+            }
+        },
+        '/timetable/train/{trainCode}/history/{historyId}': {
+            get: {
+                operationId: 'historicalTrainTimetableDetail',
+                tags: ['Timetable'],
+                summary: '读取车次历史时刻表内容',
+                description:
+                    '读取时刻表内容。',
+                parameters: [
+                    {
+                        $ref: '#/components/parameters/TrainCodeParam'
+                    },
+                    {
+                        name: 'historyId',
+                        in: 'path',
+                        required: true,
+                        description:
+                            '历史时刻表内容 ID，由历史时刻表清单接口返回。',
+                        schema: {
+                            type: 'integer',
+                            minimum: 1
+                        },
+                        example: 5479
+                    }
+                ],
+                security: [{}, { bearerAuth: [] }, { cookieAuth: [] }],
+                responses: {
+                    '200': {
+                        description: '历史时刻表详情。',
+                        headers: {
+                            'x-api-remain': {
+                                $ref: '#/components/headers/ApiRemain'
+                            },
+                            'x-api-cost': {
+                                $ref: '#/components/headers/ApiCost'
+                            }
+                        },
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    $ref: '#/components/schemas/HistoricalTimetableDetailResponse'
+                                },
+                                example: {
+                                    ok: true,
+                                    data: {
+                                        historyId: 5479,
+                                        startStation: '汉口',
+                                        endStation: '北京西',
+                                        startOffset: 47340,
+                                        endOffset: 66060,
+                                        stops: [
+                                            {
+                                                stationNo: 1,
+                                                stationName: '汉口',
+                                                arriveOffset: 47340,
+                                                departOffset: 47340,
+                                                stationTrainCode: 'G512',
+                                                isStart: true,
+                                                isEnd: false
+                                            },
+                                            {
+                                                stationNo: 2,
+                                                stationName: '许昌东',
+                                                arriveOffset: 53040,
+                                                departOffset: 53760,
+                                                stationTrainCode: 'G512',
+                                                isStart: false,
+                                                isEnd: false
+                                            },
+                                            {
+                                                stationNo: 3,
+                                                stationName: '郑州东',
+                                                arriveOffset: 55140,
+                                                departOffset: 55320,
+                                                stationTrainCode: 'G512',
+                                                isStart: false,
+                                                isEnd: false
+                                            },
+                                            {
+                                                stationNo: 4,
+                                                stationName: '高邑西',
+                                                arriveOffset: 60120,
+                                                departOffset: 60240,
+                                                stationTrainCode: 'G512',
+                                                isStart: false,
+                                                isEnd: false
+                                            },
+                                            {
+                                                stationNo: 5,
+                                                stationName: '石家庄',
+                                                arriveOffset: 61140,
+                                                departOffset: 61320,
+                                                stationTrainCode: 'G512',
+                                                isStart: false,
+                                                isEnd: false
+                                            },
+                                            {
+                                                stationNo: 6,
+                                                stationName: '保定东',
+                                                arriveOffset: 63420,
+                                                departOffset: 63540,
+                                                stationTrainCode: 'G512',
+                                                isStart: false,
+                                                isEnd: false
+                                            },
+                                            {
+                                                stationNo: 7,
+                                                stationName: '北京西',
+                                                arriveOffset: 66060,
+                                                departOffset: 66060,
+                                                stationTrainCode: 'G512',
+                                                isStart: false,
+                                                isEnd: true
+                                            }
+                                        ]
+                                    },
+                                    error: ''
+                                }
+                            }
+                        }
+                    },
+                    '400': {
+                        description: '路径参数无效。',
+                        headers: {
+                            'x-api-remain': {
+                                $ref: '#/components/headers/ApiRemain'
+                            },
+                            'x-api-cost': {
+                                $ref: '#/components/headers/ApiCost'
+                            }
+                        },
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    $ref: '#/components/schemas/ApiFailureResponse'
+                                },
+                                example: {
+                                    ok: false,
+                                    data: 'historyId 必须是正整数。',
+                                    error: 'invalid_param'
+                                }
+                            }
+                        }
+                    },
+                    '404': {
+                        description: '指定的历史时刻表不存在。',
+                        headers: {
+                            'x-api-remain': {
+                                $ref: '#/components/headers/ApiRemain'
+                            },
+                            'x-api-cost': {
+                                $ref: '#/components/headers/ApiCost'
+                            }
+                        },
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    $ref: '#/components/schemas/ApiFailureResponse'
+                                },
+                                example: {
+                                    ok: false,
+                                    data: '历史时刻表不存在',
+                                    error: 'not_found'
+                                }
+                            }
+                        }
+                    }
+                },
+                'x-slug': 'timetable-train-history-detail',
+                'x-group': '时刻表',
+                'x-sort-order': 27,
+                'x-auth-modes': ['anonymous', 'cookie', 'apiKey'],
+                'x-required-scopes': ['api.timetable.train.history.read'],
+                'x-examples': [
+                    {
+                        id: 'train-history-detail',
+                        label: '历史详情',
+                        summary:
+                            '根据历史清单返回的 historyId 读取一份不可变的历史时刻表内容。',
+                        authMode: 'anonymous',
+                        pathParams: {
+                            trainCode: 'G512',
+                            historyId: '5479'
                         }
                     }
                 ]
@@ -2569,12 +2964,40 @@ export const developerDocsOpenApi = {
                             'application/json': {
                                 schema: {
                                     $ref: '#/components/schemas/StationTimetableResponse'
+                                },
+                                example: {
+                                    ok: true,
+                                    data: {
+                                        stationName: '北京南',
+                                        cursor: '',
+                                        limit: 1,
+                                        nextCursor:
+                                            '22440:1777673640:C2001:1:1777673640',
+                                        items: [
+                                            {
+                                                trainCode: 'C2001',
+                                                allCodes: ['C2001'],
+                                                arriveAt: 1777673640,
+                                                departAt: 1777673640,
+                                                startStation: '北京南',
+                                                endStation: '天津',
+                                                updatedAt: 1776492498,
+                                                referenceModels: [
+                                                    {
+                                                        model: 'CR400BF-S',
+                                                        weightedShare: 1
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    },
+                                    error: ''
                                 }
                             }
                         }
                     },
                     '400': {
-                        description: 'Invalid path or query parameters.',
+                        description: '路径参数或分页参数无效。',
                         headers: {
                             'x-api-remain': {
                                 $ref: '#/components/headers/ApiRemain'
@@ -2636,7 +3059,7 @@ export const developerDocsOpenApi = {
                             stationName: '北京南'
                         },
                         query: {
-                            limit: '40'
+                            limit: '1'
                         }
                     },
                     {
@@ -2649,8 +3072,8 @@ export const developerDocsOpenApi = {
                             stationName: '北京南'
                         },
                         query: {
-                            limit: '40',
-                            cursor: '1774063920:G12:3:1774050000'
+                            limit: '1',
+                            cursor: '22440:1777673640:C2001:1:1777673640'
                         }
                     }
                 ]
@@ -2661,7 +3084,8 @@ export const developerDocsOpenApi = {
                 operationId: 'historyTrain',
                 tags: ['History'],
                 summary: '按车次查询历史',
-                description: '返回单个车次的历史车底记录。',
+                description:
+                    '返回单个车次的历史担当轻量记录，包含 serviceDate、timetableId 和 emuCode。',
                 parameters: [
                     {
                         $ref: '#/components/parameters/TrainCodeParam'
@@ -2695,6 +3119,34 @@ export const developerDocsOpenApi = {
                             'application/json': {
                                 schema: {
                                     $ref: '#/components/schemas/TrainHistoryResponse'
+                                },
+                                example: {
+                                    ok: true,
+                                    data: {
+                                        trainCode: 'G512',
+                                        start: null,
+                                        end: null,
+                                        cursor: '',
+                                        limit: 2,
+                                        nextCursor: '20260423:496651',
+                                        items: [
+                                            {
+                                                id: '512596',
+                                                serviceDate: '20260424',
+                                                timetableId: 5479,
+                                                emuCode: 'CR400BF-A-5156',
+                                                line: []
+                                            },
+                                            {
+                                                id: '496651',
+                                                serviceDate: '20260423',
+                                                timetableId: 5479,
+                                                emuCode: 'CR400BF-A-5159',
+                                                line: []
+                                            }
+                                        ]
+                                    },
+                                    error: ''
                                 }
                             }
                         }
@@ -2730,17 +3182,15 @@ export const developerDocsOpenApi = {
                 'x-required-scopes': ['api.history.train.read'],
                 'x-examples': [
                     {
-                        id: 'train-window',
-                        label: '时间窗口',
-                        summary: '按时间范围查询单个车次的历史记录。',
+                        id: 'train-first-page',
+                        label: '第一页',
+                        summary: '读取单个车次最新的历史担当记录。',
                         authMode: 'anonymous',
                         pathParams: {
-                            trainCode: 'G8388'
+                            trainCode: 'G512'
                         },
                         query: {
-                            start: '0',
-                            end: '9999999999',
-                            limit: '20'
+                            limit: '2'
                         }
                     },
                     {
@@ -2749,11 +3199,11 @@ export const developerDocsOpenApi = {
                         summary: '使用 cursor 继续读取同一车次的后续历史记录。',
                         authMode: 'anonymous',
                         pathParams: {
-                            trainCode: 'C2725'
+                            trainCode: 'G512'
                         },
                         query: {
-                            limit: '20',
-                            cursor: '1775272680:180756'
+                            limit: '2',
+                            cursor: '20260423:496651'
                         }
                     }
                 ]
@@ -2764,7 +3214,8 @@ export const developerDocsOpenApi = {
                 operationId: 'historyEmu',
                 tags: ['History'],
                 summary: '按车组查询历史',
-                description: '返回单个车组的历史担当记录。',
+                description:
+                    '返回单个车组的历史担当轻量记录，包含 serviceDate、timetableId 和 trainCode。',
                 parameters: [
                     {
                         $ref: '#/components/parameters/EmuCodeParam'
@@ -2802,20 +3253,25 @@ export const developerDocsOpenApi = {
                                 example: {
                                     ok: true,
                                     data: {
-                                        emuCode: 'CR400AF-C-2214',
-                                        start: 0,
-                                        end: 9999999999,
+                                        emuCode: 'CR400BF-A-5156',
+                                        start: null,
+                                        end: null,
                                         cursor: '',
-                                        limit: 1,
-                                        nextCursor: '1775388780:207709',
+                                        limit: 2,
+                                        nextCursor: '20260425:528424',
                                         items: [
                                             {
-                                                startAt: 1775388780,
-                                                endAt: 1775393040,
-                                                id: '207709',
-                                                trainCode: 'C2739',
-                                                startStation: '北京西',
-                                                endStation: '雄安',
+                                                id: '528425',
+                                                serviceDate: '20260425',
+                                                timetableId: 6373,
+                                                trainCode: 'G1824',
+                                                line: []
+                                            },
+                                            {
+                                                id: '528424',
+                                                serviceDate: '20260425',
+                                                timetableId: 6373,
+                                                trainCode: 'G1821',
                                                 line: []
                                             }
                                         ]
@@ -2856,17 +3312,15 @@ export const developerDocsOpenApi = {
                 'x-required-scopes': ['api.history.emu.read'],
                 'x-examples': [
                     {
-                        id: 'emu-window',
-                        label: '时间窗口',
-                        summary: '按时间范围查询单个车组的历史记录。',
+                        id: 'emu-first-page',
+                        label: '第一页',
+                        summary: '读取单个车组最新的历史担当记录。',
                         authMode: 'anonymous',
                         pathParams: {
-                            emuCode: 'CR400AF-C-2214'
+                            emuCode: 'CR400BF-A-5156'
                         },
                         query: {
-                            start: '0',
-                            end: '9999999999',
-                            limit: '20'
+                            limit: '2'
                         }
                     },
                     {
@@ -2876,11 +3330,11 @@ export const developerDocsOpenApi = {
                             '使用服务端 cursor 继续读取同一车组的后续历史记录。',
                         authMode: 'anonymous',
                         pathParams: {
-                            emuCode: 'CR400AF-C-2214'
+                            emuCode: 'CR400BF-A-5156'
                         },
                         query: {
-                            limit: '20',
-                            cursor: '1775211900:166909'
+                            limit: '2',
+                            cursor: '20260425:528424'
                         }
                     }
                 ]

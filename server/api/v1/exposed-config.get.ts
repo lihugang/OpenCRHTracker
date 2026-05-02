@@ -48,7 +48,10 @@ export default defineEventHandler(async (event) => {
                         minimumRequestCost: 1,
                         fixed: {
                             authMe: config.cost.fixed.authMe,
-                            timetableTrain: config.cost.fixed.timetableTrain,
+                            timetableTrainCurrent:
+                                config.cost.fixed.timetableTrainCurrent,
+                            timetableTrainHistory:
+                                config.cost.fixed.timetableTrainHistory,
                             exportDailyIndex:
                                 config.cost.fixed.exportDailyIndex,
                             exportDaily: config.cost.fixed.exportDaily
@@ -59,6 +62,14 @@ export default defineEventHandler(async (event) => {
                                     config.cost.perRecord.recordsDaily.unitCost,
                                 rounding:
                                     config.cost.perRecord.recordsDaily.rounding
+                            },
+                            timetableTrainHistory: {
+                                unitCost:
+                                    config.cost.perRecord.timetableTrainHistory
+                                        .unitCost,
+                                rounding:
+                                    config.cost.perRecord.timetableTrainHistory
+                                        .rounding
                             },
                             timetableStation: {
                                 unitCost:

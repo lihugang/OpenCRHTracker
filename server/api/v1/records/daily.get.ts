@@ -1,7 +1,7 @@
 import { defineEventHandler, getQuery } from 'h3';
 import {
     buildNextCursor,
-    listDailyRecordsPaged
+    listDailyRecordLightPaged
 } from '~/server/services/emuRoutesStore';
 import getPerRecordCost from '~/server/utils/api/cost/getPerRecordCost';
 import executeApi from '~/server/utils/api/executor/executeApi';
@@ -41,7 +41,7 @@ export default defineEventHandler(async (event) => {
             const cursor = parseCursor(query.cursor, 'cursor');
             const limit = parseLimit(event);
             const dayRange = getDayTimestampRange(date);
-            const rows = listDailyRecordsPaged(
+            const lightRows = listDailyRecordLightPaged(
                 dayRange.startAt,
                 dayRange.endAt,
                 cursor,
@@ -52,15 +52,13 @@ export default defineEventHandler(async (event) => {
                 date,
                 cursor: typeof query.cursor === 'string' ? query.cursor : '',
                 limit,
-                nextCursor: buildNextCursor(rows, limit),
-                items: rows.map((row) => ({
-                    startAt: row.start_at,
-                    endAt: row.end_at,
+                nextCursor: buildNextCursor(lightRows, limit),
+                items: lightRows.map((row) => ({
                     id: String(row.id),
+                    serviceDate: row.service_date,
+                    timetableId: row.timetable_id,
                     emuCode: row.emu_code,
                     trainCode: row.train_code,
-                    startStation: row.start_station_name,
-                    endStation: row.end_station_name,
                     line: []
                 }))
             };

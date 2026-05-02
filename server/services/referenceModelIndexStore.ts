@@ -12,7 +12,7 @@ import {
 import { getShanghaiDayStartUnixSeconds } from '~/server/utils/date/shanghaiDateTime';
 
 interface CursorPoint {
-    startAt: number;
+    serviceDate: string;
     id: number;
 }
 
@@ -147,7 +147,7 @@ function readWindowRunBuckets(
 
         const lastRow = rows[rows.length - 1]!;
         cursor = {
-            startAt: lastRow.start_at,
+            serviceDate: lastRow.service_date,
             id: lastRow.id
         };
     }
