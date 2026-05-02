@@ -11,6 +11,7 @@ export interface EnsureAssetOptions {
     defaultContent: string;
     forceRefresh?: boolean;
     allowProvider?: boolean;
+    validateContent?: (content: string) => void;
 }
 
 export interface EnsureAssetResult {
@@ -163,7 +164,8 @@ export async function ensureAssetFile(
     const {
         forceRefresh = false,
         allowProvider = true,
-        defaultContent
+        defaultContent,
+        validateContent
     } = options;
     const config = getAssetConfig(key);
     const filePath = getAssetFilePath(key);
@@ -182,6 +184,20 @@ export async function ensureAssetFile(
             });
             if (response.ok) {
                 const content = await response.text();
+                if (validateContent) {
+                    try {
+                        validateContent(content);
+                    } catch (error) {
+                        const message =
+                            error instanceof Error
+                                ? `${error.name}: ${error.message}`
+                                : String(error);
+                        logger.warn(
+                            `provider_validation_failed key=${key} file=${filePath} provider=${config.provider} error=${message}`
+                        );
+                        throw error;
+                    }
+                }
                 writeTextFileAtomically(filePath, content);
                 logger.info(
                     `ensured key=${key} source=provider file=${filePath} provider=${config.provider}`

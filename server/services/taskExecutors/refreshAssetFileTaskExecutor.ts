@@ -2,7 +2,7 @@ import getLogger from '~/server/libs/log4js';
 import useConfig from '~/server/config';
 import {
     invalidateProbeAssetsCache,
-    parseEmuListAssetText
+    validateDownloadedEmuListAssetText
 } from '~/server/services/probeAssetStore';
 import { registerTaskExecutor } from '~/server/services/taskExecutorRegistry';
 import { enqueueTask } from '~/server/services/taskQueue';
@@ -79,7 +79,7 @@ async function executeRefreshAssetTask(
             definition.key === 'EMUList'
                 ? {
                       validateContent: (content) => {
-                          parseEmuListAssetText(content);
+                          validateDownloadedEmuListAssetText(content);
                       }
                   }
                 : {}

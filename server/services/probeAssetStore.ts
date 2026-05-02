@@ -201,6 +201,14 @@ export function parseEmuListAssetText(text: string): EmuListRecord[] {
     return emuList;
 }
 
+export function validateDownloadedEmuListAssetText(text: string): void {
+    if (text.trim().length === 0) {
+        throw new Error('EMUList asset content must not be empty');
+    }
+
+    parseEmuListAssetText(text);
+}
+
 function buildProbeAssets(
     emuList: EmuListRecord[],
     rawQrCodeRecords: RawQrCodeRecord[]
@@ -265,7 +273,8 @@ export async function loadProbeAssets(): Promise<ProbeAssets> {
     const [emuAsset, qrCodeAsset] = await Promise.all([
         ensureAssetFile('EMUList', {
             defaultContent: '',
-            allowProvider: true
+            allowProvider: true,
+            validateContent: validateDownloadedEmuListAssetText
         }),
         ensureAssetFile('QRCode', {
             defaultContent: '',
