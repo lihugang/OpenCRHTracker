@@ -8,6 +8,8 @@ interface RunningEmuRecord {
     lastSeenAt: number;
 }
 
+export interface AssignedEmuStateRecord extends RunningEmuRecord {}
+
 interface ProbeRuntimeSnapshotRow {
     trainCode: string;
     emuCode: string;
@@ -158,6 +160,36 @@ export function rehydrateProbeRuntimeState(
 export function isEmuAssignedToday(emuCode: string): boolean {
     const normalizedEmuCode = normalizeCode(emuCode);
     return assignedTodayEmuState.has(normalizedEmuCode);
+}
+
+export function getAssignedEmuState(
+    emuCode: string
+): AssignedEmuStateRecord | null {
+    const normalizedEmuCode = normalizeCode(emuCode);
+    if (normalizedEmuCode.length === 0) {
+        return null;
+    }
+
+    const record = assignedTodayEmuState.get(normalizedEmuCode);
+    return record ? { ...record } : null;
+}
+
+export function listAssignedEmuCodesByTrainKey(trainKey: string): string[] {
+    const normalizedTrainKey = trainKey.trim();
+    if (normalizedTrainKey.length === 0) {
+        return [];
+    }
+
+    const emuCodes: string[] = [];
+    for (const [emuCode, record] of assignedTodayEmuState.entries()) {
+        if (record.trainKey !== normalizedTrainKey) {
+            continue;
+        }
+
+        emuCodes.push(emuCode);
+    }
+
+    return emuCodes;
 }
 
 export function markEmuCodesAssignedToday(

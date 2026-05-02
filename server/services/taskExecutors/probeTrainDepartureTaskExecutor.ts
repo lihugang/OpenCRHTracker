@@ -12,7 +12,9 @@ import {
     clearQueriedTrainKey,
     clearRunningEmuStateByTrainKey,
     ensureProbeStateForToday,
+    getAssignedEmuState,
     hasQueriedTrainKey,
+    listAssignedEmuCodesByTrainKey,
     markQueriedTrainKey,
     markEmuCodesAssignedToday
 } from '~/server/services/probeRuntimeState';
@@ -762,6 +764,192 @@ function collectKnownStatusGroup(
         emuCodes: Array.from(emuCodes),
         finalStatus
     };
+}
+
+function collectKnownStatusGroupForServiceDate(
+    rows: ProbeStatusRow[],
+    currentEmuCode: string,
+    startAt: number,
+    serviceDate: string
+): KnownStatusGroup {
+    const { dayStart, nextDayStart } = getCurrentDayWindow();
+    const emuCodes = new Set<string>([currentEmuCode]);
+    let finalStatus: ProbeStatusValue = rows.some(
+        (row) => row.status === ProbeStatusValue.CoupledFormationResolved
+    )
+        ? ProbeStatusValue.CoupledFormationResolved
+        : ProbeStatusValue.SingleFormationResolved;
+
+    for (const row of rows) {
+        emuCodes.add(row.emu_code);
+    }
+
+    if (finalStatus === ProbeStatusValue.CoupledFormationResolved) {
+        for (const row of rows) {
+            const relatedRows = listProbeStatusByTrainCodeInRange(
+                row.train_code,
+                dayStart,
+                nextDayStart
+            ).filter(
+                (candidate) =>
+                    candidate.start_at === startAt ||
+                    (candidate.start_at === 0 &&
+                        candidate.service_date === serviceDate)
+            );
+            for (const relatedRow of relatedRows) {
+                emuCodes.add(relatedRow.emu_code);
+            }
+        }
+    }
+
+    return {
+        emuCodes: Array.from(emuCodes),
+        finalStatus
+    };
+}
+
+function getResolvedCurrentStatusRows(
+    mainEmuCode: string,
+    startAt: number
+): ProbeStatusRow[] {
+    const directRows = listProbeStatusByEmuCode(mainEmuCode, startAt);
+    if (
+        directRows.some(
+            (row) =>
+                row.status === ProbeStatusValue.SingleFormationResolved ||
+                row.status === ProbeStatusValue.CoupledFormationResolved
+        )
+    ) {
+        return directRows;
+    }
+
+    const assignedState = getAssignedEmuState(mainEmuCode);
+    if (!assignedState || assignedState.startAt !== startAt) {
+        return [];
+    }
+
+    const { dayStart, nextDayStart } = getCurrentDayWindow();
+    const serviceDate = formatShanghaiDateString(startAt * 1000);
+    return listProbeStatusByEmuCodeInRange(mainEmuCode, dayStart, nextDayStart).filter(
+        (row) =>
+            (row.status === ProbeStatusValue.SingleFormationResolved ||
+                row.status === ProbeStatusValue.CoupledFormationResolved) &&
+            (row.start_at === startAt ||
+                (row.start_at === 0 && row.service_date === serviceDate))
+    );
+}
+
+function collectResolvedRowsForAssignedEmuCodes(
+    emuCodes: string[],
+    dayStart: number,
+    nextDayStart: number
+): ProbeStatusRow[] {
+    const rowsByKey = new Map<string, ProbeStatusRow>();
+
+    for (const emuCode of uniqueNormalizedCodes(emuCodes)) {
+        for (const row of listProbeStatusByEmuCodeInRange(
+            emuCode,
+            dayStart,
+            nextDayStart
+        )) {
+            if (
+                row.status !== ProbeStatusValue.SingleFormationResolved &&
+                row.status !== ProbeStatusValue.CoupledFormationResolved
+            ) {
+                continue;
+            }
+
+            const rowKey = [
+                row.train_code,
+                row.emu_code,
+                row.service_date,
+                row.timetable_id ?? 'null'
+            ].join('#');
+            if (!rowsByKey.has(rowKey)) {
+                rowsByKey.set(rowKey, row);
+            }
+        }
+    }
+
+    return Array.from(rowsByKey.values());
+}
+
+async function tryAutoMergeResolvedInternalGroup(
+    args: ProbeTrainDepartureTaskArgs,
+    trainKey: string,
+    allTrainCodes: string[],
+    mainEmuCode: string,
+    nowSeconds: number
+): Promise<boolean> {
+    if (args.trainInternalCode.length === 0) {
+        return false;
+    }
+
+    const assignedEmuCodes = listAssignedEmuCodesByTrainKey(trainKey).filter(
+        (emuCode) => emuCode !== mainEmuCode
+    );
+    if (assignedEmuCodes.length === 0) {
+        return false;
+    }
+
+    const { dayStart, nextDayStart } = getCurrentDayWindow();
+    const resolvedRows = collectResolvedRowsForAssignedEmuCodes(
+        assignedEmuCodes,
+        dayStart,
+        nextDayStart
+    );
+    if (resolvedRows.length === 0) {
+        return false;
+    }
+
+    const mergedFromEmuCodes = uniqueNormalizedCodes(
+        resolvedRows.map((row) => row.emu_code)
+    ).filter((emuCode) => emuCode !== mainEmuCode);
+    if (mergedFromEmuCodes.length === 0) {
+        return false;
+    }
+
+    const mergedEmuCodes = uniqueNormalizedCodes([
+        mainEmuCode,
+        ...mergedFromEmuCodes
+    ]);
+    if (mergedEmuCodes.length <= 1) {
+        return false;
+    }
+
+    const mergedFromTrainCodes = uniqueNormalizedCodes(
+        resolvedRows.map((row) => row.train_code)
+    );
+    const mergedTrainCodes = uniqueNormalizedCodes([
+        ...allTrainCodes,
+        ...mergedFromTrainCodes
+    ]);
+
+    await applyResolvedResult(
+        args,
+        trainKey,
+        mergedTrainCodes,
+        mergedEmuCodes,
+        ProbeStatusValue.CoupledFormationResolved,
+        nowSeconds
+    );
+    recordCurrentTrainProvenanceEventsForTrainCodes(mergedTrainCodes, {
+        serviceDate: formatShanghaiDateString(args.startAt * 1000),
+        startAt: args.startAt,
+        emuCode: mainEmuCode,
+        eventType: 'resolved_from_status',
+        result: 'coupled',
+        payload: {
+            source: 'internal_code_auto_merge',
+            emuCodes: mergedEmuCodes,
+            mergedFromEmuCodes,
+            mergedFromTrainCodes
+        }
+    });
+    logger.info(
+        `resolved_internal_code_auto_merge trainCode=${args.trainCode} trainInternalCode=${args.trainInternalCode} mainEmuCode=${mainEmuCode} mergedEmuCodes=${mergedEmuCodes.join('/')} mergedTrainCodes=${mergedTrainCodes.join('/')} assignedEmuCodes=${assignedEmuCodes.join('/')}`
+    );
+    return true;
 }
 
 async function validateConflictGroupRunningState(
@@ -1602,6 +1790,18 @@ async function executeProbeTrainDepartureTaskInternal(
         return;
     }
 
+    if (
+        await tryAutoMergeResolvedInternalGroup(
+            args,
+            trainKey,
+            allTrainCodes,
+            mainEmuCode,
+            nowSeconds
+        )
+    ) {
+        return;
+    }
+
     if (!mainRecord) {
         logger.warn(
             `main_emu_asset_not_found trainCode=${args.trainCode} mainEmuCode=${mainEmuCode}`
@@ -1652,34 +1852,41 @@ async function executeProbeTrainDepartureTaskInternal(
         return;
     }
 
-    const existingRows = listProbeStatusByEmuCode(mainEmuCode, args.startAt);
-    if (
-        existingRows.some(
-            (row) =>
-                row.status === ProbeStatusValue.SingleFormationResolved ||
-                row.status === ProbeStatusValue.CoupledFormationResolved
-        )
-    ) {
+    const existingRows = getResolvedCurrentStatusRows(
+        mainEmuCode,
+        args.startAt
+    );
+    if (existingRows.length > 0) {
         const knownGroup = collectKnownStatusGroup(
-            existingRows,
-            mainEmuCode,
-            args.startAt
-        );
-        for (const emuCode of knownGroup.emuCodes) {
+                existingRows,
+                mainEmuCode,
+                args.startAt,
+            );
+        const effectiveKnownGroup = existingRows.every(
+            (row) => row.start_at === args.startAt
+        )
+            ? knownGroup
+            : collectKnownStatusGroupForServiceDate(
+                  existingRows,
+                  mainEmuCode,
+                  args.startAt,
+                  serviceDate
+              );
+        for (const emuCode of effectiveKnownGroup.emuCodes) {
             updateProbeStatusByEmuCode(
                 emuCode,
                 args.startAt,
-                knownGroup.finalStatus
+                effectiveKnownGroup.finalStatus
             );
         }
         await applyResolvedResult(
             args,
             trainKey,
             allTrainCodes,
-            knownGroup.emuCodes.length > 0
-                ? knownGroup.emuCodes
+            effectiveKnownGroup.emuCodes.length > 0
+                ? effectiveKnownGroup.emuCodes
                 : [mainEmuCode],
-            knownGroup.finalStatus,
+            effectiveKnownGroup.finalStatus,
             nowSeconds
         );
         recordCurrentTrainProvenanceEventsForTrainCodes(allTrainCodes, {
@@ -1688,16 +1895,16 @@ async function executeProbeTrainDepartureTaskInternal(
             emuCode: mainEmuCode,
             eventType: 'resolved_from_status',
             result:
-                knownGroup.finalStatus ===
+                effectiveKnownGroup.finalStatus ===
                 ProbeStatusValue.CoupledFormationResolved
                     ? 'coupled'
                     : 'single',
             payload: {
-                emuCodes: knownGroup.emuCodes
+                emuCodes: effectiveKnownGroup.emuCodes
             }
         });
         logger.info(
-            `resolved_from_status trainCode=${args.trainCode} probedTrainCode=${probedTrainCode} mainEmuCode=${mainEmuCode} status=${knownGroup.finalStatus} emuCodes=${knownGroup.emuCodes.length} attemptedTrainCodes=${allTrainCodes.length}`
+            `resolved_from_status trainCode=${args.trainCode} probedTrainCode=${probedTrainCode} mainEmuCode=${mainEmuCode} status=${effectiveKnownGroup.finalStatus} emuCodes=${effectiveKnownGroup.emuCodes.length} attemptedTrainCodes=${allTrainCodes.length}`
         );
         return;
     }

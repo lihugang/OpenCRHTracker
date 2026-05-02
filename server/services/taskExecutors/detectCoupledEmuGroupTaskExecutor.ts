@@ -43,6 +43,7 @@ import {
 import {
     getTodayScheduleCache,
     getTodayScheduleProbeGroupByTrainCode,
+    getTodayScheduleProbeGroupByTrainInternalCode,
     type TodayScheduleProbeGroup,
     type TodayScheduleRoute
 } from '~/server/services/todayScheduleCache';
@@ -466,9 +467,30 @@ function collectPendingTrackedGroups(
 }
 
 function resolveDirectHitTrainTarget(
+    scannedTrainInternalCode: string,
     scannedTrainCode: string,
     fallbackStartAt: number
 ): DirectHitTrainTarget | null {
+    const normalizedTrainInternalCode = normalizeCode(scannedTrainInternalCode);
+    if (normalizedTrainInternalCode.length > 0) {
+        const internalCodeGroup = getTodayScheduleProbeGroupByTrainInternalCode(
+            normalizedTrainInternalCode
+        );
+        if (internalCodeGroup) {
+            return {
+                trainCodes: uniqueNormalizedCodes([
+                    internalCodeGroup.trainCode,
+                    ...internalCodeGroup.allCodes
+                ]),
+                startAt: internalCodeGroup.startAt,
+                serviceDate: formatShanghaiDateString(
+                    internalCodeGroup.startAt * 1000
+                ),
+                scheduleGroup: internalCodeGroup
+            };
+        }
+    }
+
     const normalizedTrainCode = normalizeCode(scannedTrainCode);
     if (normalizedTrainCode.length === 0) {
         return null;
@@ -511,6 +533,7 @@ function recordDirectHitTrainProvenanceEvent(input: {
     trackedGroup: TrackedTrainGroup | null;
 }): void {
     const target = resolveDirectHitTrainTarget(
+        input.scannedTrainInternalCode,
         input.scannedTrainCode,
         input.scannedStartAt
     );

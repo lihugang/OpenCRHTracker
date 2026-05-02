@@ -63,6 +63,7 @@ interface TodayScheduleCache {
     timetablesByTrainCode: Map<string, TodayScheduleTimetable>;
     groupsByTrainKey: Map<string, TodayScheduleProbeGroup>;
     groupKeysByTrainCode: Map<string, string>;
+    groupKeysByTrainInternalCode: Map<string, string>;
     stationRowsByStationName: Map<string, TodayScheduleStationIndexRow[]>;
 }
 
@@ -90,6 +91,7 @@ function rebuildCache(): TodayScheduleCache {
     const timetablesByTrainCode = new Map<string, TodayScheduleTimetable>();
     const groupsByTrainKey = new Map<string, TodayScheduleProbeGroup>();
     const groupKeysByTrainCode = new Map<string, string>();
+    const groupKeysByTrainInternalCode = new Map<string, string>();
     const stationRowsByStationName = new Map<
         string,
         TodayScheduleStationIndexRow[]
@@ -209,6 +211,13 @@ function rebuildCache(): TodayScheduleCache {
             for (const aliasCode of timetable.allCodes) {
                 groupKeysByTrainCode.set(aliasCode, trainKey);
             }
+
+            if (
+                trainInternalCode.length > 0 &&
+                !groupKeysByTrainInternalCode.has(trainInternalCode)
+            ) {
+                groupKeysByTrainInternalCode.set(trainInternalCode, trainKey);
+            }
         }
     }
 
@@ -231,6 +240,7 @@ function rebuildCache(): TodayScheduleCache {
         timetablesByTrainCode,
         groupsByTrainKey,
         groupKeysByTrainCode,
+        groupKeysByTrainInternalCode,
         stationRowsByStationName
     };
     return cached;
@@ -298,6 +308,25 @@ export function getTodayScheduleProbeGroupByTrainCode(
     }
 
     const trainKey = activeCache.groupKeysByTrainCode.get(normalizedTrainCode);
+    if (!trainKey) {
+        return null;
+    }
+
+    return activeCache.groupsByTrainKey.get(trainKey) ?? null;
+}
+
+export function getTodayScheduleProbeGroupByTrainInternalCode(
+    trainInternalCode: string
+): TodayScheduleProbeGroup | null {
+    const activeCache = getActiveCache();
+    const normalizedTrainInternalCode = normalizeCode(trainInternalCode);
+    if (normalizedTrainInternalCode.length === 0) {
+        return null;
+    }
+
+    const trainKey = activeCache.groupKeysByTrainInternalCode.get(
+        normalizedTrainInternalCode
+    );
     if (!trainKey) {
         return null;
     }
