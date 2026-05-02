@@ -32,9 +32,9 @@ export interface HydratedEmuHistoryRecord
 
 const SHANGHAI_OFFSET_MS = 8 * 60 * 60 * 1000;
 const DEFAULT_CONCURRENCY = 6;
-const timetableContentCache = new Map<string, HistoricalTimetableData | null>();
+const timetableContentCache = new Map<number, HistoricalTimetableData | null>();
 const timetableContentRequestCache = new Map<
-    string,
+    number,
     Promise<HistoricalTimetableData | null>
 >();
 
@@ -42,8 +42,8 @@ function normalizeTrainCode(trainCode: string) {
     return trainCode.trim().toUpperCase();
 }
 
-function buildTimetableContentCacheKey(trainCode: string, historyId: number) {
-    return `${normalizeTrainCode(trainCode)}:${historyId}`;
+function buildTimetableContentCacheKey(historyId: number) {
+    return historyId;
 }
 
 function getShanghaiDayStartUnixSeconds(serviceDate: string) {
@@ -68,10 +68,9 @@ async function fetchHistoricalTimetableContent(
         return null;
     }
 
-    const cacheKey = buildTimetableContentCacheKey(
-        normalizedTrainCode,
-        historyId
-    );
+    // The backend resolves immutable historical timetable content by historyId,
+    // so alias train codes can safely reuse the same cached response.
+    const cacheKey = buildTimetableContentCacheKey(historyId);
     const cached = timetableContentCache.get(cacheKey);
     if (cached !== undefined) {
         return cached;
