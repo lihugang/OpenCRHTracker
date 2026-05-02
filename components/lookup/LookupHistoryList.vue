@@ -969,10 +969,9 @@ function shouldShowExportDateLink(
     serviceDate: string,
     timestamp: number | null
 ) {
-    const date =
-        /^\d{8}$/.test(serviceDate)
-            ? serviceDate
-            : formatShanghaiDateString(timestamp ?? 0);
+    const date = /^\d{8}$/.test(serviceDate)
+        ? serviceDate
+        : formatShanghaiDateString(timestamp ?? 0);
 
     return (
         isAuthenticated.value &&
@@ -982,10 +981,9 @@ function shouldShowExportDateLink(
 }
 
 function buildExportDateLink(serviceDate: string, timestamp: number | null) {
-    const date =
-        /^\d{8}$/.test(serviceDate)
-            ? serviceDate
-            : formatShanghaiDateString(timestamp ?? 0);
+    const date = /^\d{8}$/.test(serviceDate)
+        ? serviceDate
+        : formatShanghaiDateString(timestamp ?? 0);
 
     return {
         path: '/exports/daily',

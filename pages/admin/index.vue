@@ -84,7 +84,8 @@
                                     最近告警
                                 </h3>
                                 <p class="text-sm leading-6 text-slate-500">
-                                    这里只预览最新 5 条，完整列表请进入被动告警页查看。
+                                    这里只预览最新 5
+                                    条，完整列表请进入被动告警页查看。
                                 </p>
                             </div>
 
@@ -238,8 +239,9 @@
                                 </p>
                                 <p
                                     class="mt-2 text-sm leading-6 text-slate-600">
-                                    查看近 4 小时和 24 小时的 CPU、内存、系统负载与
-                                    SSR / API 处理时长走势。
+                                    查看近 4 小时和 24 小时的
+                                    CPU、内存、系统负载与 SSR / API
+                                    处理时长走势。
                                 </p>
                             </button>
                         </div>

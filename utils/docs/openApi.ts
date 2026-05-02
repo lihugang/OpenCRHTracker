@@ -615,7 +615,13 @@ export const developerDocsOpenApi = {
             },
             TrainHistoryItem: {
                 type: 'object',
-                required: ['id', 'serviceDate', 'timetableId', 'emuCode', 'line'],
+                required: [
+                    'id',
+                    'serviceDate',
+                    'timetableId',
+                    'emuCode',
+                    'line'
+                ],
                 properties: {
                     id: {
                         type: 'string',
@@ -704,7 +710,13 @@ export const developerDocsOpenApi = {
             },
             EmuHistoryItem: {
                 type: 'object',
-                required: ['id', 'serviceDate', 'timetableId', 'trainCode', 'line'],
+                required: [
+                    'id',
+                    'serviceDate',
+                    'timetableId',
+                    'trainCode',
+                    'line'
+                ],
                 properties: {
                     id: {
                         type: 'string',
@@ -2645,8 +2657,7 @@ export const developerDocsOpenApi = {
                 operationId: 'trainTimetableHistory',
                 tags: ['Timetable'],
                 summary: '按车次分页读取历史时刻表清单',
-                description:
-                    '返回指定车次的历史时刻表覆盖范围列表。',
+                description: '返回指定车次的历史时刻表覆盖范围列表。',
                 parameters: [
                     {
                         $ref: '#/components/parameters/TrainCodeParam'
@@ -2748,8 +2759,7 @@ export const developerDocsOpenApi = {
                 operationId: 'historicalTrainTimetableDetail',
                 tags: ['Timetable'],
                 summary: '读取车次历史时刻表内容',
-                description:
-                    '读取时刻表内容。',
+                description: '读取时刻表内容。',
                 parameters: [
                     {
                         $ref: '#/components/parameters/TrainCodeParam'

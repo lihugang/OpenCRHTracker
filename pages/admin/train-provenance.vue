@@ -27,11 +27,13 @@
                                     class="text-xs font-semibold uppercase tracking-[0.22em] text-sky-700">
                                     12306 Data
                                 </p>
-                                <h2 class="text-2xl font-semibold text-slate-900">
+                                <h2
+                                    class="text-2xl font-semibold text-slate-900">
                                     当日请求统计
                                 </h2>
                                 <p class="text-sm leading-6 text-slate-700">
-                                    按小时汇总所有实际外发的 12306 请求，只记录请求类型和是否成功；默认保留
+                                    按小时汇总所有实际外发的 12306
+                                    请求，只记录请求类型和是否成功；默认保留
                                     {{
                                         requestStatsData?.retentionDays ??
                                         provenanceData?.retentionDays ??
@@ -50,7 +52,10 @@
                                     </dt>
                                     <dd
                                         class="mt-2 text-sm font-semibold text-slate-900">
-                                        {{ requestStatsData?.compareDate || '--' }}
+                                        {{
+                                            requestStatsData?.compareDate ||
+                                            '--'
+                                        }}
                                     </dd>
                                 </div>
                                 <div
@@ -79,7 +84,10 @@
                     </div>
 
                     <div
-                        v-else-if="requestStatsStatus === 'pending' && !requestStatsData"
+                        v-else-if="
+                            requestStatsStatus === 'pending' &&
+                            !requestStatsData
+                        "
                         class="space-y-3">
                         <div
                             v-for="index in 4"
@@ -88,7 +96,9 @@
                     </div>
 
                     <UiEmptyState
-                        v-else-if="requestStatsData && !requestStatsData.enabled"
+                        v-else-if="
+                            requestStatsData && !requestStatsData.enabled
+                        "
                         eyebrow="已禁用"
                         title="12306 数据当前已关闭"
                         description="可在 config.json 中重新启用 trainProvenance 记录。" />
@@ -103,7 +113,11 @@
                                 </p>
                                 <p
                                     class="mt-2 text-3xl font-semibold text-slate-900">
-                                    {{ formatNumber(requestStatsData.totals.total) }}
+                                    {{
+                                        formatNumber(
+                                            requestStatsData.totals.total
+                                        )
+                                    }}
                                 </p>
                                 <p class="mt-2 text-xs text-slate-500">
                                     同比
@@ -200,7 +214,8 @@
                                     class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
                                     Hourly
                                 </p>
-                                <h3 class="text-xl font-semibold text-slate-900">
+                                <h3
+                                    class="text-xl font-semibold text-slate-900">
                                     每小时总请求量
                                 </h3>
                                 <p class="text-sm leading-6 text-slate-500">
@@ -256,7 +271,8 @@
                                     class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
                                     Types
                                 </p>
-                                <h3 class="text-xl font-semibold text-slate-900">
+                                <h3
+                                    class="text-xl font-semibold text-slate-900">
                                     按请求类型拆分
                                 </h3>
                             </div>
@@ -294,10 +310,15 @@
                                                 </h3>
                                             </div>
 
-                                            <div class="text-left md:text-right">
+                                            <div
+                                                class="text-left md:text-right">
                                                 <p
                                                     class="text-3xl font-semibold text-slate-900">
-                                                    {{ formatNumber(summary.total) }}
+                                                    {{
+                                                        formatNumber(
+                                                            summary.total
+                                                        )
+                                                    }}
                                                 </p>
                                                 <p
                                                     class="mt-1 text-xs text-slate-500">
@@ -442,7 +463,9 @@
                             <UiButton
                                 type="button"
                                 variant="secondary"
-                                :disabled="normalizedTrainCodeInput.length === 0"
+                                :disabled="
+                                    normalizedTrainCodeInput.length === 0
+                                "
                                 @click="clearSearch">
                                 清空
                             </UiButton>
@@ -469,7 +492,9 @@
                     </div>
 
                     <div
-                        v-else-if="provenanceStatus === 'pending' && !provenanceData"
+                        v-else-if="
+                            provenanceStatus === 'pending' && !provenanceData
+                        "
                         class="space-y-3">
                         <div
                             v-for="index in 4"
@@ -510,7 +535,8 @@
                                     class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
                                     Departures
                                 </p>
-                                <h3 class="text-xl font-semibold text-slate-900">
+                                <h3
+                                    class="text-xl font-semibold text-slate-900">
                                     当日班次
                                 </h3>
                             </div>
@@ -533,11 +559,17 @@
                                             <div class="space-y-1">
                                                 <p
                                                     class="text-sm font-semibold text-slate-900">
-                                                    {{ formatTimestamp(item.startAt) }}
-                                                </p>
-                                                <p class="text-sm text-slate-600">
                                                     {{
-                                                        item.startStation || '--'
+                                                        formatTimestamp(
+                                                            item.startAt
+                                                        )
+                                                    }}
+                                                </p>
+                                                <p
+                                                    class="text-sm text-slate-600">
+                                                    {{
+                                                        item.startStation ||
+                                                        '--'
                                                     }}
                                                     至
                                                     {{
@@ -559,7 +591,8 @@
                                             </span>
                                         </div>
 
-                                        <p class="text-sm leading-6 text-slate-600">
+                                        <p
+                                            class="text-sm leading-6 text-slate-600">
                                             车组：
                                             {{
                                                 item.emuCodes.length > 0
@@ -578,7 +611,8 @@
                                     class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
                                     Timeline
                                 </p>
-                                <h3 class="text-xl font-semibold text-slate-900">
+                                <h3
+                                    class="text-xl font-semibold text-slate-900">
                                     来源时间线
                                 </h3>
                             </div>
@@ -631,7 +665,8 @@
                                                     <span
                                                         v-if="item.result"
                                                         class="text-slate-400">
-                                                        / {{
+                                                        /
+                                                        {{
                                                             getEventResultLabel(
                                                                 item.result
                                                             )
@@ -642,8 +677,18 @@
 
                                             <div
                                                 class="text-sm leading-6 text-slate-500">
-                                                <p>{{ formatTimestamp(item.createdAt) }}</p>
-                                                <p>任务 #{{ item.schedulerTaskId }}</p>
+                                                <p>
+                                                    {{
+                                                        formatTimestamp(
+                                                            item.createdAt
+                                                        )
+                                                    }}
+                                                </p>
+                                                <p>
+                                                    任务 #{{
+                                                        item.schedulerTaskId
+                                                    }}
+                                                </p>
                                                 <p v-if="item.emuCode">
                                                     车组：{{ item.emuCode }}
                                                 </p>
@@ -733,9 +778,7 @@
                                                         conflictGroup, index
                                                     ) in item.conflictDetail
                                                         .conflictGroups"
-                                                    :key="
-                                                        `${item.id}:conflict:${index}`
-                                                    "
+                                                    :key="`${item.id}:conflict:${index}`"
                                                     class="rounded-[0.75rem] border border-white/80 bg-white/90 px-3 py-3">
                                                     <div
                                                         class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -1016,10 +1059,15 @@
                     <div
                         class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-4 py-4 text-sm leading-6 text-slate-700">
                         <p>
-                            扫描任务 #{{ couplingDetailData.taskRun?.schedulerTaskId ?? '--' }}
+                            扫描任务 #{{
+                                couplingDetailData.taskRun?.schedulerTaskId ??
+                                '--'
+                            }}
                         </p>
                         <p>
-                            状态：{{ couplingDetailData.taskRun?.status ?? '--' }}
+                            状态：{{
+                                couplingDetailData.taskRun?.status ?? '--'
+                            }}
                         </p>
                         <p>
                             开始：{{
@@ -1067,7 +1115,11 @@
                                     <div
                                         class="text-sm leading-6 text-slate-500">
                                         <p>#{{ item.candidateOrder }}</p>
-                                        <p>{{ formatTimestamp(item.createdAt) }}</p>
+                                        <p>
+                                            {{
+                                                formatTimestamp(item.createdAt)
+                                            }}
+                                        </p>
                                     </div>
                                 </div>
 
@@ -1166,9 +1218,7 @@
                                             v-for="(
                                                 occupiedRoute, occupiedIndex
                                             ) in item.occupiedRoutes"
-                                            :key="
-                                                `${item.id}:occupied:${occupiedIndex}`
-                                            "
+                                            :key="`${item.id}:occupied:${occupiedIndex}`"
                                             class="rounded-[0.75rem] border border-white/80 bg-white/90 px-3 py-3">
                                             <p
                                                 class="text-sm font-semibold text-slate-900">
@@ -1583,7 +1633,8 @@ function getCouplingScanActionLabel(item: AdminTrainProvenanceEvent) {
         couplingScan.state === 'queued' &&
         couplingScan.queuedSchedulerTaskId !== null &&
         couplingScan.resultSchedulerTaskId !== null &&
-        couplingScan.queuedSchedulerTaskId !== couplingScan.resultSchedulerTaskId
+        couplingScan.queuedSchedulerTaskId !==
+            couplingScan.resultSchedulerTaskId
     ) {
         return '实际结果';
     }
@@ -1879,10 +1930,7 @@ function formatConflictStations(startStation: string, endStation: string) {
     return `${startStation || '--'} 至 ${endStation || '--'}`;
 }
 
-function formatConflictTimeRange(
-    startAt: number | null,
-    endAt: number | null
-) {
+function formatConflictTimeRange(startAt: number | null, endAt: number | null) {
     if (
         !Number.isFinite(startAt ?? NaN) ||
         !Number.isFinite(endAt ?? NaN) ||
@@ -2004,7 +2052,9 @@ function getDepartureStatusLabel(status: AdminTrainProvenanceLatestStatus) {
     }
 }
 
-function getDepartureStatusBadgeClass(status: AdminTrainProvenanceLatestStatus) {
+function getDepartureStatusBadgeClass(
+    status: AdminTrainProvenanceLatestStatus
+) {
     switch (status) {
         case 'pending':
             return 'inline-flex items-center rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-amber-800';

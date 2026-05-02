@@ -56,7 +56,8 @@ function toLatestStatus(
     rows: ProbeStatusRow[]
 ): AdminTrainProvenanceLatestStatus {
     const highestStatus = rows.reduce<number>(
-        (currentMax, row) => (row.status > currentMax ? row.status : currentMax),
+        (currentMax, row) =>
+            row.status > currentMax ? row.status : currentMax,
         0
     );
 
@@ -93,9 +94,11 @@ function toDeparture(
         endAt:
             routeRows.length > 0
                 ? Math.max(...routeRows.map((row) => row.end_at))
-                : fallbackRoute?.endAt ?? null,
+                : (fallbackRoute?.endAt ?? null),
         startStation:
-            firstRouteRow?.start_station_name || fallbackRoute?.startStation || '',
+            firstRouteRow?.start_station_name ||
+            fallbackRoute?.startStation ||
+            '',
         endStation:
             firstRouteRow?.end_station_name || fallbackRoute?.endStation || '',
         latestStatus: toLatestStatus(probeRows),
@@ -167,10 +170,9 @@ function buildTrainRouteSnapshot(input: {
     const startStation = (input.startStation ?? '').trim();
     const endStation = (input.endStation ?? '').trim();
     const internalCode = normalizeCode(input.internalCode ?? '');
-    const serviceDate =
-        /^\d{8}$/.test(input.serviceDate ?? '')
-            ? (input.serviceDate as string)
-            : formatServiceDateFromStartAt(startAt);
+    const serviceDate = /^\d{8}$/.test(input.serviceDate ?? '')
+        ? (input.serviceDate as string)
+        : formatServiceDateFromStartAt(startAt);
 
     if (
         trainCodes.length === 0 &&
@@ -236,8 +238,7 @@ function fillRouteStationsFromTodayCache(
         startStation: snapshot.startStation || todayRoute.startStation,
         endStation: snapshot.endStation || todayRoute.endStation,
         cacheStatus: 'hit',
-        cacheNote:
-            snapshot.cacheNote || '已使用今日时刻表补充站点'
+        cacheNote: snapshot.cacheNote || '已使用今日时刻表补充站点'
     };
 }
 
@@ -463,9 +464,8 @@ function extractCoupledResolutionDetail(
         fillRouteStationsFromTodayCache(
             buildTrainRouteSnapshot({
                 serviceDate: formatServiceDateFromStartAt(event.startAt),
-                trainCodes:
-                    getTodayScheduleRouteByTrainCodes([event.trainCode])
-                        ?.allCodes ?? [event.trainCode],
+                trainCodes: getTodayScheduleRouteByTrainCodes([event.trainCode])
+                    ?.allCodes ?? [event.trainCode],
                 startAt: event.startAt,
                 endAt: getOptionalInteger(payload?.endAt),
                 startStation: getOptionalString(payload?.startStation) ?? '',
@@ -480,7 +480,9 @@ function extractCoupledResolutionDetail(
     };
 }
 
-function formatRouteTrainCodes(snapshot: AdminTrainRouteSnapshot | null): string {
+function formatRouteTrainCodes(
+    snapshot: AdminTrainRouteSnapshot | null
+): string {
     return snapshot && snapshot.trainCodes.length > 0
         ? snapshot.trainCodes.join(' / ')
         : '--';
@@ -500,20 +502,17 @@ function resolveScannedRoute(
         toSeatCodeRoutePayload(candidate.detail);
     const baseSnapshot =
         buildTrainRouteSnapshot({
-            serviceDate:
-                routePayload?.startDay || candidate.serviceDate,
+            serviceDate: routePayload?.startDay || candidate.serviceDate,
             trainCodes: [
                 routePayload?.code || candidate.scannedTrainCode
             ].filter((trainCode) => trainCode.length > 0),
             internalCode:
                 routePayload?.internalCode || candidate.scannedInternalCode,
             startAt: routePayload?.startAt ?? candidate.scannedStartAt,
-            endAt:
-                routePayload?.endAt ?? getDetailRouteEndAt(candidate.detail),
+            endAt: routePayload?.endAt ?? getDetailRouteEndAt(candidate.detail),
             startStation: '',
             endStation: ''
-        }) ??
-        null;
+        }) ?? null;
 
     return fillRouteStationsFromTodayCache(baseSnapshot);
 }
@@ -554,7 +553,8 @@ function resolveDirectHitEventRoute(
     const snapshot =
         buildTrainRouteSnapshot({
             serviceDate:
-                routePayload?.startDay || formatServiceDateFromStartAt(event.startAt),
+                routePayload?.startDay ||
+                formatServiceDateFromStartAt(event.startAt),
             trainCodes:
                 trainCodes.length > 0
                     ? trainCodes
@@ -726,9 +726,8 @@ function extractConflictDetail(
         ? payload.conflictGroups
               .map((item) => toConflictGroup(item))
               .filter(
-                  (
-                      item
-                  ): item is AdminTrainProvenanceConflictGroup => item !== null
+                  (item): item is AdminTrainProvenanceConflictGroup =>
+                      item !== null
               )
         : [];
 
@@ -737,8 +736,7 @@ function extractConflictDetail(
     }
 
     return {
-        mode:
-            event.eventType === 'overlap_requeued' ? 'requeued' : 'dropped',
+        mode: event.eventType === 'overlap_requeued' ? 'requeued' : 'dropped',
         currentGroup,
         conflictGroups
     };
@@ -1215,7 +1213,8 @@ export function getAdminTrainRequestStats(
     const runtimeConfig = getTrainProvenanceRuntimeConfig();
     const compareDate = /^\d{8}$/.test(date)
         ? formatShanghaiDateString(
-              (getShanghaiDayStartUnixSeconds(date) - REQUEST_STAT_DAY_SECONDS) *
+              (getShanghaiDayStartUnixSeconds(date) -
+                  REQUEST_STAT_DAY_SECONDS) *
                   1000
           )
         : '';
@@ -1255,7 +1254,10 @@ export function getAdminTrainRequestStats(
     const currentDayStart = getShanghaiDayStartUnixSeconds(date);
     const compareDayStart = currentDayStart - REQUEST_STAT_DAY_SECONDS;
     const queryEndAt = currentDayStart + REQUEST_STAT_DAY_SECONDS;
-    const rows = list12306RequestHourlyStatsInRange(compareDayStart, queryEndAt);
+    const rows = list12306RequestHourlyStatsInRange(
+        compareDayStart,
+        queryEndAt
+    );
     const currentHours = Array.from({ length: 24 }, () =>
         createRequestMetricsAccumulator()
     );
@@ -1377,7 +1379,10 @@ export function getAdminTrainProvenance(
         dayRange.startAt,
         dayRange.endAt + 1
     );
-    const timelineRecordsByStartAt = new Map<number, TrainProvenanceEventRecord[]>();
+    const timelineRecordsByStartAt = new Map<
+        number,
+        TrainProvenanceEventRecord[]
+    >();
 
     for (const event of allTimelineRecords) {
         if (event.startAt === null) {

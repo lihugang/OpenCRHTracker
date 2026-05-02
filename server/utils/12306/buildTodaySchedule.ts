@@ -133,7 +133,8 @@ export default async function buildTodaySchedule(): Promise<BuildScheduleResult>
     );
 
     if (publishPending) {
-        const confirmedTrainCodes = listConfirmedTrainCodesFromBuildState(state);
+        const confirmedTrainCodes =
+            listConfirmedTrainCodesFromBuildState(state);
         const promotedState = promoteBuildingScheduleState(
             scheduleFilePath,
             state

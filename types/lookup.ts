@@ -101,8 +101,7 @@ export interface TrainTimetableHistoryListItem {
     serviceDateEndExclusive: string;
 }
 
-export interface TrainTimetableHistoryListResponse
-    extends HistoryResponseBase<TrainTimetableHistoryListItem> {
+export interface TrainTimetableHistoryListResponse extends HistoryResponseBase<TrainTimetableHistoryListItem> {
     trainCode: string;
 }
 

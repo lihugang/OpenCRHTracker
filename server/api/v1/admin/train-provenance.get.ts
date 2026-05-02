@@ -40,8 +40,7 @@ export default defineEventHandler(async (event) => {
                     ? null
                     : Number.parseInt(rawStartAt, 10);
             ensure(
-                startAt === null ||
-                    (Number.isInteger(startAt) && startAt > 0),
+                startAt === null || (Number.isInteger(startAt) && startAt > 0),
                 400,
                 'invalid_param',
                 'startAt 必须是正整数时间戳'

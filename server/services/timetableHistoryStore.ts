@@ -2,16 +2,18 @@ import { createHash } from 'node:crypto';
 import '~/server/libs/database/timetableHistory';
 import { createPreparedSqlStore } from '~/server/libs/database/prepared';
 import { useTimetableHistoryDatabase } from '~/server/libs/database/timetableHistory';
-import { buildCodeIndex, buildGroupIndex, getGroupKey } from '~/server/utils/12306/scheduleProbe/taskHelpers';
+import {
+    buildCodeIndex,
+    buildGroupIndex,
+    getGroupKey
+} from '~/server/utils/12306/scheduleProbe/taskHelpers';
 import type {
     ScheduleState,
     ScheduleStop
 } from '~/server/utils/12306/scheduleProbe/types';
 import uniqueNormalizedCodes from '~/server/utils/12306/uniqueNormalizedCodes';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
-import {
-    formatShanghaiDateString
-} from '~/server/utils/date/getCurrentDateString';
+import { formatShanghaiDateString } from '~/server/utils/date/getCurrentDateString';
 import { getShanghaiDayStartUnixSeconds } from '~/server/utils/date/shanghaiDateTime';
 import importSqlBatch from '~/server/utils/sql/importSqlBatch';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
@@ -87,13 +89,12 @@ const timetableHistorySql = importSqlBatch(
     'timetable-history/queries'
 ) as Record<TimetableHistorySqlKey, string>;
 
-const timetableHistoryStatements = createPreparedSqlStore<TimetableHistorySqlKey>(
-    {
+const timetableHistoryStatements =
+    createPreparedSqlStore<TimetableHistorySqlKey>({
         dbName: 'timetableHistory',
         scope: 'timetable-history/queries',
         sql: timetableHistorySql
-    }
-);
+    });
 
 const DEFAULT_TIMETABLE_HISTORY_CURSOR_POINT: TimetableHistoryCursorPoint = {
     serviceDate: '99991231',
@@ -256,7 +257,9 @@ function buildCanonicalTimetablePayload(
     };
 }
 
-function stringifyCanonicalTimetablePayload(payload: CanonicalTimetablePayload) {
+function stringifyCanonicalTimetablePayload(
+    payload: CanonicalTimetablePayload
+) {
     return JSON.stringify(payload);
 }
 
@@ -271,10 +274,11 @@ function ensureContentRow(
     nowSeconds: number,
     stats: SyncCoverageStats
 ) {
-    const existingRow = timetableHistoryStatements.get<TimetableHistoryContentRow>(
-        'selectContentByHash',
-        hash
-    );
+    const existingRow =
+        timetableHistoryStatements.get<TimetableHistoryContentRow>(
+            'selectContentByHash',
+            hash
+        );
     if (existingRow) {
         if (existingRow.timetable_json !== timetableJson) {
             throw new Error(`timetable_history_hash_collision hash=${hash}`);
@@ -290,10 +294,11 @@ function ensureContentRow(
         nowSeconds
     );
 
-    const insertedRow = timetableHistoryStatements.get<TimetableHistoryContentRow>(
-        'selectContentByHash',
-        hash
-    );
+    const insertedRow =
+        timetableHistoryStatements.get<TimetableHistoryContentRow>(
+            'selectContentByHash',
+            hash
+        );
     if (!insertedRow) {
         throw new Error(`timetable_history_content_insert_failed hash=${hash}`);
     }
@@ -355,10 +360,7 @@ function updateCoverageContent(
     stats.updatedCoverages += 1;
 }
 
-function deleteCoverage(
-    coverageId: number,
-    stats: SyncCoverageStats
-) {
+function deleteCoverage(coverageId: number, stats: SyncCoverageStats) {
     timetableHistoryStatements.run('deleteCoverageById', coverageId);
     stats.deletedCoverages += 1;
 }
@@ -393,7 +395,8 @@ function normalizeAdjacentCoverages(
             deleteCoverage(currentRow.id, stats);
             previousRow = {
                 ...previousRow,
-                service_date_end_exclusive: currentRow.service_date_end_exclusive,
+                service_date_end_exclusive:
+                    currentRow.service_date_end_exclusive,
                 updated_at: nowSeconds
             };
             continue;
@@ -484,9 +487,8 @@ export function syncConfirmedTimetableHistoryForPublishedState(
     confirmedTrainCodes: string[],
     nowSeconds = getNowSeconds()
 ): TimetableHistorySyncResult {
-    const normalizedConfirmedTrainCodes = uniqueNormalizedCodes(
-        confirmedTrainCodes
-    );
+    const normalizedConfirmedTrainCodes =
+        uniqueNormalizedCodes(confirmedTrainCodes);
     const result: TimetableHistorySyncResult = {
         confirmedGroups: 0,
         confirmedTrainCodes: normalizedConfirmedTrainCodes.length,

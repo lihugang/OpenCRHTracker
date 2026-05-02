@@ -496,9 +496,8 @@ function resolveDirectHitTrainTarget(
         return null;
     }
 
-    const scheduleGroup = getTodayScheduleProbeGroupByTrainCode(
-        normalizedTrainCode
-    );
+    const scheduleGroup =
+        getTodayScheduleProbeGroupByTrainCode(normalizedTrainCode);
     if (scheduleGroup) {
         return {
             trainCodes: uniqueNormalizedCodes([
@@ -765,7 +764,9 @@ async function scanUnassignedCandidates(
             status: 'matched',
             reason: 'tracked_group_matched',
             scannedTrainCode,
-            scannedInternalCode: normalizeCode(seatCodeResult.route.internalCode),
+            scannedInternalCode: normalizeCode(
+                seatCodeResult.route.internalCode
+            ),
             scannedStartAt: seatCodeResult.route.startAt,
             matchedTrainCode: trackedGroup.group.trainCode,
             matchedStartAt: trackedGroup.group.startAt,
@@ -863,7 +864,12 @@ function persistResolvedUntrackedGroups(
         );
 
         for (const emuCode of emuCodes) {
-            ensureProbeStatus(group.trainCode, emuCode, group.startAt, finalStatus);
+            ensureProbeStatus(
+                group.trainCode,
+                emuCode,
+                group.startAt,
+                finalStatus
+            );
         }
         persistDailyRoutes(
             [group.trainCode],

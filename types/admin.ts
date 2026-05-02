@@ -402,16 +402,13 @@ export interface AdminTrainDataRequestComparison {
 }
 
 export interface AdminTrainDataRequestSummary
-    extends AdminTrainDataRequestMetrics,
-        AdminTrainDataRequestComparison {}
+    extends AdminTrainDataRequestMetrics, AdminTrainDataRequestComparison {}
 
-export interface AdminTrainDataRequestTypeSummary
-    extends AdminTrainDataRequestSummary {
+export interface AdminTrainDataRequestTypeSummary extends AdminTrainDataRequestSummary {
     type: AdminTrainDataRequestType;
 }
 
-export interface AdminTrainDataRequestHourBucket
-    extends AdminTrainDataRequestSummary {
+export interface AdminTrainDataRequestHourBucket extends AdminTrainDataRequestSummary {
     hour: number;
     startAt: number;
     endAt: number;

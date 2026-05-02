@@ -29,7 +29,8 @@
                                 剩余任务概览
                             </h2>
                             <p class="text-sm leading-6 text-slate-600">
-                                统计当前任务队列中的未完成任务，10 分钟、30 分钟和 1
+                                统计当前任务队列中的未完成任务，10 分钟、30
+                                分钟和 1
                                 小时均为累计口径，并包含已超时但仍未执行的任务。
                             </p>
                         </div>
@@ -40,7 +41,8 @@
                                 class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
                                 As Of
                             </p>
-                            <p class="mt-2 text-lg font-semibold text-slate-900">
+                            <p
+                                class="mt-2 text-lg font-semibold text-slate-900">
                                 {{
                                     formatTimestamp(taskOverviewData?.asOf ?? 0)
                                 }}
@@ -58,7 +60,10 @@
                     </div>
 
                     <div
-                        v-else-if="taskOverviewStatus === 'pending' && !taskOverviewData"
+                        v-else-if="
+                            taskOverviewStatus === 'pending' &&
+                            !taskOverviewData
+                        "
                         class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                         <div
                             v-for="index in 4"
@@ -77,7 +82,8 @@
                                 class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
                                 {{ metric.eyebrow }}
                             </p>
-                            <p class="mt-2 text-3xl font-semibold text-slate-900">
+                            <p
+                                class="mt-2 text-3xl font-semibold text-slate-900">
                                 {{ formatNumber(metric.value) }}
                             </p>
                             <p class="mt-2 text-sm leading-6 text-slate-500">
@@ -145,7 +151,8 @@
                                     <p class="font-semibold">
                                         {{ exportTaskResponse.summary }}
                                     </p>
-                                    <div class="mt-3 space-y-1 text-emerald-900">
+                                    <div
+                                        class="mt-3 space-y-1 text-emerald-900">
                                         <p>
                                             任务 ID：{{
                                                 exportTaskResponse.createdTasks
@@ -168,7 +175,9 @@
                                 <div class="flex justify-end">
                                     <UiButton
                                         type="button"
-                                        :loading="exportTaskStatus === 'pending'"
+                                        :loading="
+                                            exportTaskStatus === 'pending'
+                                        "
                                         @click="createExportTask">
                                         创建导出补跑任务
                                     </UiButton>
@@ -210,7 +219,8 @@
                                         class="text-xs uppercase tracking-[0.18em] text-slate-400">
                                         预览
                                     </p>
-                                    <p class="mt-2 text-sm leading-6 text-slate-700">
+                                    <p
+                                        class="mt-2 text-sm leading-6 text-slate-700">
                                         已识别
                                         {{ normalizedTrainCodesPreview.length }}
                                         个车次
@@ -218,7 +228,8 @@
                                     <p
                                         class="mt-2 break-all text-sm leading-6 text-slate-500">
                                         {{
-                                            normalizedTrainCodesPreview.length > 0
+                                            normalizedTrainCodesPreview.length >
+                                            0
                                                 ? normalizedTrainCodesPreview.join(
                                                       ' / '
                                                   )
@@ -239,7 +250,8 @@
                                     <p class="font-semibold">
                                         {{ refreshTaskResponse.summary }}
                                     </p>
-                                    <div class="mt-3 space-y-1 text-emerald-900">
+                                    <div
+                                        class="mt-3 space-y-1 text-emerald-900">
                                         <p>
                                             创建任务数：{{
                                                 refreshTaskResponse.createdCount
@@ -265,7 +277,9 @@
                                 <div class="flex justify-end">
                                     <UiButton
                                         type="button"
-                                        :loading="refreshTaskStatus === 'pending'"
+                                        :loading="
+                                            refreshTaskStatus === 'pending'
+                                        "
                                         @click="createRefreshTask">
                                         创建立即刷新任务
                                     </UiButton>

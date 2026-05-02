@@ -221,15 +221,17 @@ export interface Record12306RequestHourlyStatInput {
 const CLEANUP_INTERVAL_SECONDS = 60 * 60;
 const REQUEST_STAT_BUCKET_SECONDS = 60 * 60;
 
-const trainProvenanceSql = importSqlBatch(
-    'train-provenance/queries'
-) as Record<TrainProvenanceSqlKey, string>;
-const trainProvenanceStatements =
-    createPreparedSqlStore<TrainProvenanceSqlKey>({
+const trainProvenanceSql = importSqlBatch('train-provenance/queries') as Record<
+    TrainProvenanceSqlKey,
+    string
+>;
+const trainProvenanceStatements = createPreparedSqlStore<TrainProvenanceSqlKey>(
+    {
         dbName: 'trainProvenance',
         scope: 'train-provenance/queries',
         sql: trainProvenanceSql
-    });
+    }
+);
 
 let lastCleanupAt = 0;
 
@@ -265,14 +267,20 @@ function normalizeServiceDate(
         return serviceDate;
     }
 
-    if (typeof startAt === 'number' && Number.isInteger(startAt) && startAt > 0) {
+    if (
+        typeof startAt === 'number' &&
+        Number.isInteger(startAt) &&
+        startAt > 0
+    ) {
         return formatShanghaiDateString(startAt * 1000);
     }
 
     return getCurrentDateString();
 }
 
-function toTaskRunRecord(row: TrainProvenanceTaskRunRow): TrainProvenanceTaskRunRecord {
+function toTaskRunRecord(
+    row: TrainProvenanceTaskRunRow
+): TrainProvenanceTaskRunRecord {
     return {
         id: row.id,
         schedulerTaskId: row.scheduler_task_id,
@@ -290,7 +298,9 @@ function toTaskRunRecord(row: TrainProvenanceTaskRunRow): TrainProvenanceTaskRun
     };
 }
 
-function toEventRecord(row: TrainProvenanceEventRow): TrainProvenanceEventRecord {
+function toEventRecord(
+    row: TrainProvenanceEventRow
+): TrainProvenanceEventRecord {
     return {
         id: row.id,
         taskRunId: row.task_run_id,
@@ -361,7 +371,9 @@ export function isTrainProvenanceEnabled() {
     return getTrainProvenanceRuntimeConfig().enabled;
 }
 
-export function cleanupExpiredTrainProvenance(nowSeconds = getNowSeconds()): number {
+export function cleanupExpiredTrainProvenance(
+    nowSeconds = getNowSeconds()
+): number {
     const retentionDays = getTrainProvenanceRuntimeConfig().retentionDays;
     const cutoffSeconds = nowSeconds - retentionDays * 24 * 60 * 60;
     const taskRunResult = trainProvenanceStatements.run(

@@ -228,7 +228,10 @@ async function executeRefreshRouteBatchTaskInternal(rawArgs: unknown) {
             routeResult.data.route.trainDepartment.trim();
         const nextPassengerDepartment =
             routeResult.data.route.passengerDepartment.trim();
-        const nextStops = toScheduleStops(state.date, routeResult.data.route.stops);
+        const nextStops = toScheduleStops(
+            state.date,
+            routeResult.data.route.stops
+        );
         let groupChanged = false;
         for (const index of groupItemIndexes) {
             const groupItem = state.items[index]!;
@@ -326,11 +329,12 @@ async function executeRefreshRouteBatchTaskInternal(rawArgs: unknown) {
             }
             if (appliedGroups > 0) {
                 savePublishedScheduleState(scheduleFilePath, latestState);
-                const syncResult = syncConfirmedTimetableHistoryForPublishedState(
-                    latestState,
-                    appliedConfirmedTrainCodes,
-                    getNowSeconds()
-                );
+                const syncResult =
+                    syncConfirmedTimetableHistoryForPublishedState(
+                        latestState,
+                        appliedConfirmedTrainCodes,
+                        getNowSeconds()
+                    );
                 logger.info(
                     `history_sync date=${latestState.date} confirmedGroups=${syncResult.confirmedGroups} confirmedTrainCodes=${syncResult.confirmedTrainCodes} skippedGroups=${syncResult.skippedGroups} createdContents=${syncResult.createdContents} insertedCoverages=${syncResult.insertedCoverages} updatedCoverages=${syncResult.updatedCoverages} deletedCoverages=${syncResult.deletedCoverages} noopedCoverages=${syncResult.noopedCoverages}`
                 );

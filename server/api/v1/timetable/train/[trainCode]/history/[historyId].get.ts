@@ -49,12 +49,7 @@ export default defineEventHandler(async (event) => {
             );
 
             const timetable = getHistoricalTimetableContent(historyId);
-            ensure(
-                timetable !== null,
-                404,
-                'not_found',
-                '历史时刻表不存在'
-            );
+            ensure(timetable !== null, 404, 'not_found', '历史时刻表不存在');
 
             setHeader(event, 'ETag', `"history-timetable-${historyId}"`);
 

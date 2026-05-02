@@ -111,9 +111,13 @@
                                     : ''
                             "
                             :aria-controls="timetableSectionId"
-                            :aria-expanded="isTimetableExpanded ? 'true' : 'false'"
+                            :aria-expanded="
+                                isTimetableExpanded ? 'true' : 'false'
+                            "
                             :aria-label="
-                                isTimetableExpanded ? '折叠时刻表' : '展开时刻表'
+                                isTimetableExpanded
+                                    ? '折叠时刻表'
+                                    : '展开时刻表'
                             "
                             @click="toggleTimetableExpanded">
                             <svg
@@ -121,7 +125,9 @@
                                 viewBox="0 0 20 20"
                                 fill="none"
                                 class="h-4 w-4 transition-transform duration-200 ease-out"
-                                :class="isTimetableExpanded ? 'rotate-180' : ''">
+                                :class="
+                                    isTimetableExpanded ? 'rotate-180' : ''
+                                ">
                                 <path
                                     d="M5 7.5L10 12.5L15 7.5"
                                     stroke="currentColor"
@@ -174,7 +180,10 @@
                                             </td>
                                             <td
                                                 class="border-b border-slate-100 px-4 py-3 font-mono text-sm text-slate-500 last:border-b-0">
-                                                {{ stop.stationTrainCode || '--' }}
+                                                {{
+                                                    stop.stationTrainCode ||
+                                                    '--'
+                                                }}
                                             </td>
                                             <td
                                                 class="border-b border-slate-100 px-4 py-3 text-sm font-medium text-crh-grey-dark last:border-b-0">
@@ -244,7 +253,10 @@
                                             </div>
                                             <span
                                                 class="font-mono text-xs text-slate-400">
-                                                {{ stop.stationTrainCode || '--' }}
+                                                {{
+                                                    stop.stationTrainCode ||
+                                                    '--'
+                                                }}
                                             </span>
                                         </div>
 
@@ -284,7 +296,10 @@
                                                 </p>
                                                 <p
                                                     class="mt-1 font-mono text-sm text-slate-500">
-                                                    {{ stop.stationTrainCode || '--' }}
+                                                    {{
+                                                        stop.stationTrainCode ||
+                                                        '--'
+                                                    }}
                                                 </p>
                                             </div>
                                             <div>
@@ -341,7 +356,9 @@
                                 isCirculationExpanded ? 'true' : 'false'
                             "
                             :aria-label="
-                                isCirculationExpanded ? '折叠交路表' : '展开交路表'
+                                isCirculationExpanded
+                                    ? '折叠交路表'
+                                    : '展开交路表'
                             "
                             @click="toggleCirculationExpanded">
                             <svg
@@ -453,7 +470,8 @@
                                                     <span
                                                         v-if="
                                                             codeIndex <
-                                                            node.allCodes.length -
+                                                            node.allCodes
+                                                                .length -
                                                                 1
                                                         "
                                                         class="text-slate-400">
@@ -599,7 +617,8 @@
                                                         <span
                                                             v-if="
                                                                 codeIndex <
-                                                                node.allCodes.length -
+                                                                node.allCodes
+                                                                    .length -
                                                                     1
                                                             "
                                                             class="text-slate-400">

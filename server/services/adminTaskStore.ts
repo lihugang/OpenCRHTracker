@@ -192,18 +192,17 @@ export function createAdminTask(
 export function getAdminTaskOverview(
     asOf = getNowSeconds()
 ): AdminTaskOverviewResponse {
-    const counts =
-        adminTaskStatements.get<AdminTaskOverviewCountsRow>(
-            'selectTaskOverviewCounts',
-            asOf + 10 * 60,
-            asOf + 30 * 60,
-            asOf + 60 * 60
-        ) ?? {
-            remainingTotal: 0,
-            remainingWithin10Minutes: 0,
-            remainingWithin30Minutes: 0,
-            remainingWithin1Hour: 0
-        };
+    const counts = adminTaskStatements.get<AdminTaskOverviewCountsRow>(
+        'selectTaskOverviewCounts',
+        asOf + 10 * 60,
+        asOf + 30 * 60,
+        asOf + 60 * 60
+    ) ?? {
+        remainingTotal: 0,
+        remainingWithin10Minutes: 0,
+        remainingWithin30Minutes: 0,
+        remainingWithin1Hour: 0
+    };
 
     return {
         asOf,

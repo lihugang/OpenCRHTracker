@@ -212,7 +212,9 @@ export default async function fetchRouteInfo(
                     stationName: stop.stationName.trim(),
                     arriveAt,
                     departAt,
-                    stationTrainCode: stop.stationTrainCode.trim().toUpperCase(),
+                    stationTrainCode: stop.stationTrainCode
+                        .trim()
+                        .toUpperCase(),
                     wicket: normalizeOptionalField(stop.wicket),
                     isStart: index === 0,
                     isEnd: index === rawStops.length - 1

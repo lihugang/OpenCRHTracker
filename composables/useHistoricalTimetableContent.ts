@@ -23,12 +23,10 @@ export interface HydratedHistoryFields {
 }
 
 export interface HydratedTrainHistoryRecord
-    extends TrainHistoryRecord,
-        HydratedHistoryFields {}
+    extends TrainHistoryRecord, HydratedHistoryFields {}
 
 export interface HydratedEmuHistoryRecord
-    extends EmuHistoryRecord,
-        HydratedHistoryFields {}
+    extends EmuHistoryRecord, HydratedHistoryFields {}
 
 const SHANGHAI_OFFSET_MS = 8 * 60 * 60 * 1000;
 const DEFAULT_CONCURRENCY = 6;
@@ -171,8 +169,13 @@ async function resolveHydratedHistoryFields(
         serviceDate,
         timetableId,
         startAt:
-            timetable.startOffset === null ? null : dayStart + timetable.startOffset,
-        endAt: timetable.endOffset === null ? null : dayStart + timetable.endOffset,
+            timetable.startOffset === null
+                ? null
+                : dayStart + timetable.startOffset,
+        endAt:
+            timetable.endOffset === null
+                ? null
+                : dayStart + timetable.endOffset,
         startStation: timetable.startStation,
         endStation: timetable.endStation
     };
@@ -219,7 +222,10 @@ export function toLookupHistoryListItems(
         timetableId: item.timetableId,
         startAt: item.startAt,
         endAt: item.endAt,
-        code: type === 'train' ? (item as HydratedTrainHistoryRecord).emuCode : (item as HydratedEmuHistoryRecord).trainCode,
+        code:
+            type === 'train'
+                ? (item as HydratedTrainHistoryRecord).emuCode
+                : (item as HydratedEmuHistoryRecord).trainCode,
         startStation: item.startStation,
         endStation: item.endStation
     }));

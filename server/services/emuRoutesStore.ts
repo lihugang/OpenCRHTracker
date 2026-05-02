@@ -122,15 +122,17 @@ function isRowWithinRange(
     }
 
     const rowServiceDate = row.service_date;
-    const { startServiceDate, endServiceDate } = normalizeInclusiveServiceDateRange(
-        startAt,
-        endAt,
-        endExclusive
+    const { startServiceDate, endServiceDate } =
+        normalizeInclusiveServiceDateRange(startAt, endAt, endExclusive);
+    return (
+        rowServiceDate >= startServiceDate && rowServiceDate <= endServiceDate
     );
-    return rowServiceDate >= startServiceDate && rowServiceDate <= endServiceDate;
 }
 
-function sortRowsAscendingByStartAt(left: DailyEmuRouteRow, right: DailyEmuRouteRow) {
+function sortRowsAscendingByStartAt(
+    left: DailyEmuRouteRow,
+    right: DailyEmuRouteRow
+) {
     const leftStartAt = left.start_at ?? Number.MAX_SAFE_INTEGER;
     const rightStartAt = right.start_at ?? Number.MAX_SAFE_INTEGER;
 
@@ -210,7 +212,13 @@ export function listHistoryLightByTrainPaged(
     cursor: CursorPoint | null,
     limit: number
 ) {
-    return selectRawHistoryByTrainPaged(trainCode, startAt, endAt, cursor, limit);
+    return selectRawHistoryByTrainPaged(
+        trainCode,
+        startAt,
+        endAt,
+        cursor,
+        limit
+    );
 }
 
 export function listDailyRoutesByEmuCodeInRange(
@@ -228,11 +236,8 @@ export function listDailyRoutesByEmuCodeInRange(
         return [];
     }
 
-    const { startServiceDate, endServiceDate } = normalizeInclusiveServiceDateRange(
-        startAt,
-        endAtExclusive,
-        true
-    );
+    const { startServiceDate, endServiceDate } =
+        normalizeInclusiveServiceDateRange(startAt, endAtExclusive, true);
     return hydrateRows(
         emuRouteStatements.all<RawDailyEmuRouteRow>(
             'selectDailyRoutesByEmuCodeInRange',
@@ -260,11 +265,8 @@ export function listDailyRoutesByTrainCodeInRange(
         return [];
     }
 
-    const { startServiceDate, endServiceDate } = normalizeInclusiveServiceDateRange(
-        startAt,
-        endAtExclusive,
-        true
-    );
+    const { startServiceDate, endServiceDate } =
+        normalizeInclusiveServiceDateRange(startAt, endAtExclusive, true);
     return hydrateRows(
         emuRouteStatements.all<RawDailyEmuRouteRow>(
             'selectDailyRoutesByTrainCodeInRange',
@@ -313,7 +315,10 @@ export function insertDailyEmuRoute(
         return;
     }
 
-    const identityLink = resolveTimetableIdentityLink(normalizedTrainCode, startAt);
+    const identityLink = resolveTimetableIdentityLink(
+        normalizedTrainCode,
+        startAt
+    );
     emuRouteStatements.run(
         'deleteDailyRouteByTrainCodeAndEmuCodeAtStartAt',
         normalizedTrainCode,
@@ -345,11 +350,8 @@ export function deleteDailyRoutesByTrainCodeInRange(
         return 0;
     }
 
-    const { startServiceDate, endServiceDate } = normalizeInclusiveServiceDateRange(
-        startAt,
-        endAtExclusive,
-        true
-    );
+    const { startServiceDate, endServiceDate } =
+        normalizeInclusiveServiceDateRange(startAt, endAtExclusive, true);
     const result = emuRouteStatements.run(
         'deleteDailyRoutesByTrainCodeInRange',
         normalizedTrainCode,
@@ -391,19 +393,25 @@ export function getDailyRecordById(id: number): DailyEmuRouteRow | null {
     }
 
     const row =
-        emuRouteStatements.get<RawDailyEmuRouteRow>('selectDailyRecordById', id) ??
-        null;
+        emuRouteStatements.get<RawDailyEmuRouteRow>(
+            'selectDailyRecordById',
+            id
+        ) ?? null;
     return row ? hydrateRow(row) : null;
 }
 
-export function getDailyRecordLightById(id: number): RawDailyEmuRouteRow | null {
+export function getDailyRecordLightById(
+    id: number
+): RawDailyEmuRouteRow | null {
     if (!Number.isInteger(id) || id <= 0) {
         return null;
     }
 
     return (
-        emuRouteStatements.get<RawDailyEmuRouteRow>('selectDailyRecordById', id) ??
-        null
+        emuRouteStatements.get<RawDailyEmuRouteRow>(
+            'selectDailyRecordById',
+            id
+        ) ?? null
     );
 }
 
@@ -476,7 +484,10 @@ export function listDailyRecordsAll(
     ).filter((row) => isRowWithinRange(row, startAt, endAt));
 }
 
-export function buildNextCursor(rows: Array<Pick<DailyEmuRouteRow, 'service_date' | 'id'>>, limit: number): string {
+export function buildNextCursor(
+    rows: Array<Pick<DailyEmuRouteRow, 'service_date' | 'id'>>,
+    limit: number
+): string {
     if (rows.length < limit || rows.length === 0) {
         return '';
     }

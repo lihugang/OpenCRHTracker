@@ -69,7 +69,10 @@ export interface HistoricalRouteSummaryMatchInput {
     endAt: number;
 }
 
-const timetableContentCache = new Map<number, HistoricalTimetableContent | null>();
+const timetableContentCache = new Map<
+    number,
+    HistoricalTimetableContent | null
+>();
 
 function normalizeOptionalInteger(value: unknown): number | null {
     return typeof value === 'number' && Number.isInteger(value) && value >= 0
@@ -85,7 +88,9 @@ function normalizeStationText(value: string | null | undefined) {
     return value.trim();
 }
 
-function parseStoredCanonicalPayload(rawJson: string): StoredCanonicalTimetablePayload {
+function parseStoredCanonicalPayload(
+    rawJson: string
+): StoredCanonicalTimetablePayload {
     const parsed = JSON.parse(rawJson) as { stops?: unknown };
     const rawStops = Array.isArray(parsed.stops) ? parsed.stops : [];
     const stops: StoredCanonicalTimetableStop[] = [];

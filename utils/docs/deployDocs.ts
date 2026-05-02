@@ -358,7 +358,7 @@ export const deployDocsSections: DocsContentSection[] = [
                             'CPU、内存和系统负载会按这个周期采样。',
                             'SSR/API 时长与路径级延迟聚合仍按请求完成时实时入桶。'
                         ]
-                    },
+                    }
                 ]
             },
             {

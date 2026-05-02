@@ -129,8 +129,7 @@ interface TrainProvenanceConflictCurrentGroupPayload {
     endStation: string;
 }
 
-interface TrainProvenanceConflictGroupPayload
-    extends TrainProvenanceConflictCurrentGroupPayload {
+interface TrainProvenanceConflictGroupPayload extends TrainProvenanceConflictCurrentGroupPayload {
     overlapStartAt: number;
     overlapEndAt: number;
     state: ConflictGroupRouteState;
@@ -830,7 +829,11 @@ function getResolvedCurrentStatusRows(
 
     const { dayStart, nextDayStart } = getCurrentDayWindow();
     const serviceDate = formatShanghaiDateString(startAt * 1000);
-    return listProbeStatusByEmuCodeInRange(mainEmuCode, dayStart, nextDayStart).filter(
+    return listProbeStatusByEmuCodeInRange(
+        mainEmuCode,
+        dayStart,
+        nextDayStart
+    ).filter(
         (row) =>
             (row.status === ProbeStatusValue.SingleFormationResolved ||
                 row.status === ProbeStatusValue.CoupledFormationResolved) &&
@@ -1165,9 +1168,8 @@ async function tryResolveOverlappingRoutes(
     const requestFailedTrainCodes = validationResults.flatMap(
         (result) => result.requestFailedTrainCodes
     );
-    const conflictStateByTrainKey = buildConflictStateByTrainKey(
-        validationResults
-    );
+    const conflictStateByTrainKey =
+        buildConflictStateByTrainKey(validationResults);
 
     if (notRunningGroups.length > 0) {
         const extraAffectedEmuCodesByTrainKey = new Map<string, string[]>();
@@ -1197,7 +1199,9 @@ async function tryResolveOverlappingRoutes(
                 currentGroup:
                     buildTrainProvenanceConflictCurrentGroupPayload(group),
                 conflictGroups: allConflictGroups
-                    .filter((candidate) => candidate.trainKey !== group.trainKey)
+                    .filter(
+                        (candidate) => candidate.trainKey !== group.trainKey
+                    )
                     .map((candidate) =>
                         buildTrainProvenanceConflictGroupPayload(
                             group,
@@ -1209,7 +1213,8 @@ async function tryResolveOverlappingRoutes(
                 droppedTrainKeys: notRunningGroups.map(
                     (candidate) => candidate.trainKey
                 ),
-                notRunningTrainCodes: uniqueNormalizedCodes(notRunningTrainCodes),
+                notRunningTrainCodes:
+                    uniqueNormalizedCodes(notRunningTrainCodes),
                 requestFailedTrainCodes: uniqueNormalizedCodes(
                     requestFailedTrainCodes
                 ),
@@ -1274,7 +1279,8 @@ async function tryResolveOverlappingRoutes(
         eventType: 'overlap_requeued',
         result: 'requeued',
         payload: {
-            currentGroup: buildTrainProvenanceConflictCurrentGroupPayload(group),
+            currentGroup:
+                buildTrainProvenanceConflictCurrentGroupPayload(group),
             conflictGroups: impactedGroupItems
                 .filter((candidate) => candidate.trainKey !== group.trainKey)
                 .map((candidate) =>
@@ -1680,15 +1686,14 @@ async function executeProbeTrainDepartureTaskInternal(
                     serviceDate,
                     startAt: args.startAt,
                     emuCode: mainEmuCode,
-                    relatedTrainCode: todayTrainCodesValidation.runningTrainCode,
+                    relatedTrainCode:
+                        todayTrainCodesValidation.runningTrainCode,
                     eventType: 'seat_verification_passed',
                     result: seatCodeVerification.reason,
                     payload: {
-                        matchedTrainCodes:
-                            historicalRecentMatchingTrainCodes,
+                        matchedTrainCodes: historicalRecentMatchingTrainCodes,
                         seatTrainCode: seatCodeVerification.seatTrainCode,
-                        seatInternalCode:
-                            seatCodeVerification.seatInternalCode,
+                        seatInternalCode: seatCodeVerification.seatInternalCode,
                         seatStartAt: seatCodeVerification.seatStartAt
                     }
                 });
@@ -1700,12 +1705,12 @@ async function executeProbeTrainDepartureTaskInternal(
                     serviceDate,
                     startAt: args.startAt,
                     emuCode: mainEmuCode,
-                    relatedTrainCode: todayTrainCodesValidation.runningTrainCode,
+                    relatedTrainCode:
+                        todayTrainCodesValidation.runningTrainCode,
                     eventType: 'seat_verification_unavailable',
                     result: seatCodeVerification.reason,
                     payload: {
-                        matchedTrainCodes:
-                            historicalRecentMatchingTrainCodes,
+                        matchedTrainCodes: historicalRecentMatchingTrainCodes,
                         seatCodeFailure:
                             seatCodeVerification.seatCodeFailureDetail ?? null
                     }
@@ -1727,18 +1732,17 @@ async function executeProbeTrainDepartureTaskInternal(
                     serviceDate,
                     startAt: args.startAt,
                     emuCode: mainEmuCode,
-                    relatedTrainCode: todayTrainCodesValidation.runningTrainCode,
+                    relatedTrainCode:
+                        todayTrainCodesValidation.runningTrainCode,
                     eventType: 'seat_verification_mismatch_requeued',
                     result: seatCodeVerification.reason,
                     linkedSchedulerTaskId: nextTaskId,
                     payload: {
                         retry: args.retry,
                         nextRetry,
-                        matchedTrainCodes:
-                            historicalRecentMatchingTrainCodes,
+                        matchedTrainCodes: historicalRecentMatchingTrainCodes,
                         seatTrainCode: seatCodeVerification.seatTrainCode,
-                        seatInternalCode:
-                            seatCodeVerification.seatInternalCode,
+                        seatInternalCode: seatCodeVerification.seatInternalCode,
                         seatStartAt: seatCodeVerification.seatStartAt
                     }
                 });
@@ -1754,16 +1758,15 @@ async function executeProbeTrainDepartureTaskInternal(
                     serviceDate,
                     startAt: args.startAt,
                     emuCode: mainEmuCode,
-                    relatedTrainCode: todayTrainCodesValidation.runningTrainCode,
+                    relatedTrainCode:
+                        todayTrainCodesValidation.runningTrainCode,
                     eventType: 'seat_verification_mismatch_exhausted',
                     result: seatCodeVerification.reason,
                     payload: {
                         retry: args.retry,
-                        matchedTrainCodes:
-                            historicalRecentMatchingTrainCodes,
+                        matchedTrainCodes: historicalRecentMatchingTrainCodes,
                         seatTrainCode: seatCodeVerification.seatTrainCode,
-                        seatInternalCode:
-                            seatCodeVerification.seatInternalCode,
+                        seatInternalCode: seatCodeVerification.seatInternalCode,
                         seatStartAt: seatCodeVerification.seatStartAt
                     }
                 });
@@ -1858,10 +1861,10 @@ async function executeProbeTrainDepartureTaskInternal(
     );
     if (existingRows.length > 0) {
         const knownGroup = collectKnownStatusGroup(
-                existingRows,
-                mainEmuCode,
-                args.startAt,
-            );
+            existingRows,
+            mainEmuCode,
+            args.startAt
+        );
         const effectiveKnownGroup = existingRows.every(
             (row) => row.start_at === args.startAt
         )
