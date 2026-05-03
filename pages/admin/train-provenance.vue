@@ -1019,6 +1019,151 @@
                     </template>
                 </div>
             </UiCard>
+
+            <UiCard :show-accent-bar="false">
+                <div class="space-y-6">
+                    <div class="space-y-2">
+                        <p
+                            class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                            Coupling Tasks
+                        </p>
+                        <h2 class="text-2xl font-semibold text-slate-900">
+                            当日重联扫描任务
+                        </h2>
+                        <p class="text-sm leading-6 text-slate-600">
+                            展示所选日期的全部重联扫描任务，按开始时间升序排列，并可直接查看扫描详情。
+                        </p>
+                    </div>
+
+                    <div
+                        v-if="
+                            couplingScanTaskListStatus === 'pending' &&
+                            !couplingScanTaskListData
+                        "
+                        class="space-y-3">
+                        <div
+                            v-for="index in 4"
+                            :key="`coupling-scan-task-list-loading:${index}`"
+                            class="h-24 animate-pulse rounded-[1rem] bg-slate-100/90" />
+                    </div>
+
+                    <UiEmptyState
+                        v-else-if="couplingScanTaskListErrorMessage"
+                        eyebrow="加载失败"
+                        title="重联扫描任务加载失败"
+                        :description="couplingScanTaskListErrorMessage"
+                        tone="danger">
+                        <UiButton
+                            type="button"
+                            variant="secondary"
+                            @click="refreshCouplingScanTaskList()">
+                            重试
+                        </UiButton>
+                    </UiEmptyState>
+
+                    <UiEmptyState
+                        v-else-if="
+                            couplingScanTaskListData &&
+                            !couplingScanTaskListData.enabled
+                        "
+                        eyebrow="已禁用"
+                        title="重联扫描记录当前已关闭"
+                        description="可在 config.json 中重新启用 trainProvenance 记录。" />
+
+                    <UiEmptyState
+                        v-else-if="couplingScanTaskItems.length === 0"
+                        eyebrow="无任务"
+                        title="当天没有重联扫描任务"
+                        description="当前日期下还没有可展示的重联扫描任务记录。" />
+
+                    <div
+                        v-else
+                        class="space-y-3">
+                        <article
+                            v-for="item in couplingScanTaskItems"
+                            :key="item.taskRunId"
+                            class="rounded-[1rem] border border-slate-200 bg-white/90 px-4 py-4 shadow-sm">
+                            <div class="space-y-4">
+                                <div
+                                    class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                                    <div class="space-y-2">
+                                        <div
+                                            class="flex flex-wrap items-center gap-2">
+                                            <span
+                                                :class="
+                                                    getTaskStatusBadgeClass(
+                                                        item.status
+                                                    )
+                                                ">
+                                                {{
+                                                    getTaskStatusLabel(
+                                                        item.status
+                                                    )
+                                                }}
+                                            </span>
+                                            <span
+                                                class="text-sm font-medium text-slate-500">
+                                                {{ item.executor }}
+                                            </span>
+                                        </div>
+                                        <h3
+                                            class="text-lg font-semibold text-slate-900">
+                                            {{
+                                                item.bureau || '--'
+                                            }}
+                                            /
+                                            {{
+                                                item.model || '--'
+                                            }}
+                                        </h3>
+                                        <p
+                                            class="text-sm leading-6 text-slate-600">
+                                            扫描任务 #{{
+                                                item.schedulerTaskId
+                                            }}
+                                        </p>
+                                    </div>
+
+                                    <div
+                                        class="text-sm leading-6 text-slate-500 lg:text-right">
+                                        <p>
+                                            开始：{{
+                                                formatTimestamp(
+                                                    item.startedAt
+                                                )
+                                            }}
+                                        </p>
+                                        <p>
+                                            结束：{{
+                                                formatTimestamp(
+                                                    item.finishedAt ?? 0
+                                                )
+                                            }}
+                                        </p>
+                                        <p>
+                                            Task Run #{{ item.taskRunId }}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div class="flex flex-wrap items-center gap-3">
+                                    <UiButton
+                                        type="button"
+                                        variant="secondary"
+                                        size="sm"
+                                        @click="
+                                            openCouplingScanDetail(
+                                                item.taskRunId
+                                            )
+                                        ">
+                                        查看详情
+                                    </UiButton>
+                                </div>
+                            </div>
+                        </article>
+                    </div>
+                </div>
+            </UiCard>
         </div>
 
         <component
@@ -1262,6 +1407,8 @@ import UiModal from '~/components/ui/UiModal.vue';
 import { useAdminDateQuery } from '~/composables/useAdminDateQuery';
 import type {
     AdminCouplingScanDetailResponse,
+    AdminCouplingScanTaskListItem,
+    AdminCouplingScanTaskListResponse,
     AdminTrainDataRequestHourBucket,
     AdminTrainDataRequestStatsResponse,
     AdminTrainDataRequestType,
@@ -1407,6 +1554,25 @@ async function fetchTrainRequestStats() {
     return response.data;
 }
 
+async function fetchCouplingScanTaskList() {
+    const response = await requestFetch<
+        TrackerApiResponse<AdminCouplingScanTaskListResponse>
+    >('/api/v1/admin/train-provenance/coupling-scan-tasks', {
+        retry: 0,
+        query: {
+            date: selectedDateYmd.value
+        }
+    });
+
+    if (!response.ok) {
+        throw {
+            data: response
+        };
+    }
+
+    return response.data;
+}
+
 const {
     data: requestStatsData,
     status: requestStatsStatus,
@@ -1428,6 +1594,19 @@ const {
 } = await useAsyncData('admin-train-provenance', fetchTrainProvenance, {
     watch: [selectedDateYmd, normalizedTrainCodeQuery, requestedStartAt]
 });
+
+const {
+    data: couplingScanTaskListData,
+    status: couplingScanTaskListStatus,
+    error: couplingScanTaskListError,
+    refresh: refreshCouplingScanTaskList
+} = await useAsyncData(
+    'admin-train-provenance-coupling-scan-tasks',
+    fetchCouplingScanTaskList,
+    {
+        watch: [selectedDateYmd]
+    }
+);
 
 const requestStatsErrorMessage = computed(() =>
     requestStatsError.value
@@ -1461,11 +1640,20 @@ const requestChartAxisLabels = computed(() =>
 const isRefreshingPage = computed(
     () =>
         requestStatsStatus.value === 'pending' ||
-        provenanceStatus.value === 'pending'
+        provenanceStatus.value === 'pending' ||
+        couplingScanTaskListStatus.value === 'pending'
 );
 const provenanceErrorMessage = computed(() =>
     provenanceError.value
         ? getApiErrorMessage(provenanceError.value, '来源追踪加载失败。')
+        : ''
+);
+const couplingScanTaskListErrorMessage = computed(() =>
+    couplingScanTaskListError.value
+        ? getApiErrorMessage(
+              couplingScanTaskListError.value,
+              '重联扫描任务加载失败。'
+          )
         : ''
 );
 const departureItems = computed<AdminTrainProvenanceDeparture[]>(
@@ -1476,6 +1664,9 @@ const activeStartAt = computed(
 );
 const timelineItems = computed<AdminTrainProvenanceEvent[]>(
     () => provenanceData.value?.timeline ?? []
+);
+const couplingScanTaskItems = computed<AdminCouplingScanTaskListItem[]>(
+    () => couplingScanTaskListData.value?.items ?? []
 );
 
 useSiteSeo({
@@ -1513,7 +1704,11 @@ onBeforeUnmount(() => {
 });
 
 async function refreshAll() {
-    await Promise.all([refreshRequestStats(), refreshProvenance()]);
+    await Promise.all([
+        refreshRequestStats(),
+        refreshProvenance(),
+        refreshCouplingScanTaskList()
+    ]);
 }
 
 async function submitSearch() {
@@ -2077,6 +2272,21 @@ function getTaskStatusBadgeClass(status: AdminTrainProvenanceTaskRunStatus) {
             return 'inline-flex items-center rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-amber-800';
         default:
             return 'inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-700';
+    }
+}
+
+function getTaskStatusLabel(status: AdminTrainProvenanceTaskRunStatus) {
+    switch (status) {
+        case 'running':
+            return '运行中';
+        case 'success':
+            return '成功';
+        case 'failed':
+            return '失败';
+        case 'skipped':
+            return '跳过';
+        default:
+            return status;
     }
 }
 

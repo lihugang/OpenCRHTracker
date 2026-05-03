@@ -15,6 +15,7 @@ import {
     isTrainProvenanceEnabled,
     list12306RequestHourlyStatsInRange,
     listCouplingScanCandidatesByTaskRunId,
+    listTrainProvenanceTaskRunsByDateAndExecutor,
     listTrainProvenanceDepartureStartAts,
     listTrainProvenanceEventsByDateAndTrainCode,
     type CouplingScanCandidateRecord,
@@ -32,6 +33,8 @@ import getNowSeconds from '~/server/utils/time/getNowSeconds';
 import type {
     AdminCouplingScanCandidate,
     AdminCouplingScanDetailResponse,
+    AdminCouplingScanTaskListItem,
+    AdminCouplingScanTaskListResponse,
     AdminCouplingScanTaskRunSummary,
     AdminTrainDataRequestHourBucket,
     AdminTrainDataRequestStatsResponse,
@@ -51,6 +54,8 @@ import type {
     AdminTrainRouteSnapshot,
     AdminTrainProvenanceResponse
 } from '~/types/admin';
+
+const COUPLING_SCAN_TASK_EXECUTOR = 'detect_coupled_emu_group';
 
 function toLatestStatus(
     rows: ProbeStatusRow[]
@@ -413,6 +418,18 @@ function toSeatCodeRoutePayload(value: unknown): SeatCodeRoutePayload | null {
 function getDetailRouteEndAt(detail: unknown): number | null {
     const payload = getPayloadObject(detail);
     return getOptionalInteger(payload?.routeEndAt);
+}
+
+function extractCouplingScanTaskArgs(taskArgs: unknown): {
+    bureau: string;
+    model: string;
+} {
+    const payload = getPayloadObject(taskArgs);
+
+    return {
+        bureau: (getOptionalString(payload?.bureau) ?? '').trim(),
+        model: normalizeCode(getOptionalString(payload?.model) ?? '')
+    };
 }
 
 function extractHistoricalReuseDetail(
@@ -1489,5 +1506,57 @@ export function getAdminCouplingScanDetail(
         enabled: true,
         taskRun: taskRunSummary,
         candidates: candidateItems
+    };
+}
+
+export function getAdminCouplingScanTaskList(
+    date: string
+): AdminCouplingScanTaskListResponse {
+    const runtimeConfig = getTrainProvenanceRuntimeConfig();
+
+    if (!isTrainProvenanceEnabled()) {
+        return {
+            enabled: false,
+            retentionDays: runtimeConfig.retentionDays,
+            date,
+            items: []
+        };
+    }
+
+    if (!/^\d{8}$/.test(date)) {
+        return {
+            enabled: true,
+            retentionDays: runtimeConfig.retentionDays,
+            date,
+            items: []
+        };
+    }
+
+    const items: AdminCouplingScanTaskListItem[] =
+        listTrainProvenanceTaskRunsByDateAndExecutor(
+            date,
+            COUPLING_SCAN_TASK_EXECUTOR
+        ).map((taskRun) => {
+            const taskArgs = extractCouplingScanTaskArgs(taskRun.taskArgs);
+
+            return {
+                taskRunId: taskRun.id,
+                schedulerTaskId: taskRun.schedulerTaskId,
+                executor: taskRun.executor,
+                status: taskRun.status,
+                startedAt: taskRun.startedAt,
+                finishedAt: taskRun.finishedAt,
+                serviceDate: taskRun.serviceDate,
+                bureau: taskArgs.bureau,
+                model: taskArgs.model,
+                taskArgs: taskRun.taskArgs
+            };
+        });
+
+    return {
+        enabled: true,
+        retentionDays: runtimeConfig.retentionDays,
+        date,
+        items
     };
 }

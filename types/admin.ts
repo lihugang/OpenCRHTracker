@@ -463,6 +463,19 @@ export interface AdminCouplingScanTaskRunSummary {
     taskArgs: unknown;
 }
 
+export interface AdminCouplingScanTaskListItem {
+    taskRunId: number;
+    schedulerTaskId: number;
+    executor: string;
+    status: AdminTrainProvenanceTaskRunStatus;
+    startedAt: number;
+    finishedAt: number | null;
+    serviceDate: string;
+    bureau: string;
+    model: string;
+    taskArgs: unknown;
+}
+
 export interface AdminCouplingScanCandidate {
     id: number;
     candidateOrder: number;
@@ -487,4 +500,11 @@ export interface AdminCouplingScanDetailResponse {
     enabled: boolean;
     taskRun: AdminCouplingScanTaskRunSummary | null;
     candidates: AdminCouplingScanCandidate[];
+}
+
+export interface AdminCouplingScanTaskListResponse {
+    enabled: boolean;
+    retentionDays: number;
+    date: string;
+    items: AdminCouplingScanTaskListItem[];
 }

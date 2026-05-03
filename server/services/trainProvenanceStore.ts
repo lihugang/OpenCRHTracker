@@ -31,6 +31,7 @@ type TrainProvenanceSqlKey =
     | 'selectDepartureStartAtsByDateAndTrainCode'
     | 'selectEventsByDateAndTrainCode'
     | 'selectTaskRunById'
+    | 'selectTaskRunsByDateAndExecutor'
     | 'selectTaskRunBySchedulerTaskId'
     | 'updateTaskRunFinished'
     | 'upsertTaskRunStart';
@@ -528,6 +529,25 @@ export function getTrainProvenanceTaskRunById(taskRunId: number) {
         taskRunId
     );
     return row ? toTaskRunRecord(row) : null;
+}
+
+export function listTrainProvenanceTaskRunsByDateAndExecutor(
+    date: string,
+    executor: string
+) {
+    maybeCleanupExpiredTrainProvenance();
+    const normalizedExecutor = executor.trim();
+    if (!/^\d{8}$/.test(date) || normalizedExecutor.length === 0) {
+        return [];
+    }
+
+    return trainProvenanceStatements
+        .all<TrainProvenanceTaskRunRow>(
+            'selectTaskRunsByDateAndExecutor',
+            date,
+            normalizedExecutor
+        )
+        .map(toTaskRunRecord);
 }
 
 export function listTrainProvenanceDepartureStartAts(
