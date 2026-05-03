@@ -229,7 +229,7 @@ function fillRouteStationsFromTodayCache(
         return {
             ...snapshot,
             cacheStatus: 'miss',
-            cacheNote: '今日时刻表未命中缓存'
+            cacheNote: '未查询到时刻表相关内容'
         };
     }
 
@@ -238,7 +238,7 @@ function fillRouteStationsFromTodayCache(
         startStation: snapshot.startStation || todayRoute.startStation,
         endStation: snapshot.endStation || todayRoute.endStation,
         cacheStatus: 'hit',
-        cacheNote: snapshot.cacheNote || '已使用今日时刻表补充站点'
+        cacheNote: snapshot.cacheNote || '时刻表查询成功'
     };
 }
 
@@ -559,10 +559,10 @@ function resolveDirectHitEventRoute(
                 trainCodes.length > 0
                     ? trainCodes
                     : [
-                          routePayload?.code ||
-                              event.relatedTrainCode ||
-                              event.trainCode
-                      ].filter((trainCode) => trainCode.length > 0),
+                        routePayload?.code ||
+                        event.relatedTrainCode ||
+                        event.trainCode
+                    ].filter((trainCode) => trainCode.length > 0),
             internalCode: routePayload?.internalCode ?? '',
             startAt: event.startAt ?? routePayload?.startAt ?? null,
             endAt: routePayload?.endAt ?? null,
@@ -618,8 +618,8 @@ function resolveOccupiedRoutes(
     const hintedTrainCodes = getStringArray(detailPayload?.trainCodes);
     const hintedStartAts = Array.isArray(detailPayload?.startAts)
         ? detailPayload.startAts
-              .map((startAt) => getOptionalInteger(startAt))
-              .filter((startAt): startAt is number => startAt !== null)
+            .map((startAt) => getOptionalInteger(startAt))
+            .filter((startAt): startAt is number => startAt !== null)
         : [];
 
     if (hintedTrainCodes.length === 0 && hintedStartAts.length === 0) {
@@ -724,11 +724,11 @@ function extractConflictDetail(
     const currentGroup = toConflictCurrentGroup(payload.currentGroup);
     const conflictGroups = Array.isArray(payload.conflictGroups)
         ? payload.conflictGroups
-              .map((item) => toConflictGroup(item))
-              .filter(
-                  (item): item is AdminTrainProvenanceConflictGroup =>
-                      item !== null
-              )
+            .map((item) => toConflictGroup(item))
+            .filter(
+                (item): item is AdminTrainProvenanceConflictGroup =>
+                    item !== null
+            )
         : [];
 
     if (!currentGroup && conflictGroups.length === 0) {
@@ -835,9 +835,9 @@ function formatCouplingScanCandidateReason(
         case 'seat_code_request_failed_other':
             return formatSeatCodeFailureReasonText(detail);
         case 'route_not_tracked':
-            return '扫描到的车次不在当前追踪范围';
+            return '扫描到的车次未发车';
         case 'tracked_group_matched':
-            return '已匹配到当前追踪车次';
+            return '已匹配到当前车次';
         default:
             return reason.trim() || '--';
     }
@@ -854,7 +854,7 @@ function buildPendingCouplingScanSummary(
     detail: AdminTrainProvenanceCouplingScanDetail | null
 ): string {
     if (!detail) {
-        return '已排入重联扫描队列';
+        return '已进入重联扫描队列';
     }
 
     if (detail.resultSchedulerTaskId !== null) {
@@ -862,13 +862,13 @@ function buildPendingCouplingScanSummary(
             detail.queuedSchedulerTaskId !== null &&
             detail.queuedSchedulerTaskId === detail.resultSchedulerTaskId
         ) {
-            return `已排入重联扫描队列，任务 #${detail.resultSchedulerTaskId} 已完成`;
+            return `已进入重联扫描队列，任务 #${detail.resultSchedulerTaskId} 已完成`;
         }
 
-        return `已排入重联扫描队列，实际完成任务 #${detail.resultSchedulerTaskId}`;
+        return `已进入重联扫描队列，实际完成任务 #${detail.resultSchedulerTaskId}`;
     }
 
-    return '已排入重联扫描队列';
+    return '已进入重联扫描队列';
 }
 
 function formatDirectHitEventSummary(
@@ -882,8 +882,8 @@ function formatDirectHitEventSummary(
         scannedRoute?.code || event.relatedTrainCode || event.trainCode;
 
     return event.result === 'matched'
-        ? `閲嶈仈鎵弿鐩存帴鎵埌 ${scannedTrainCode}锛屽凡鍛戒腑褰撳墠杩借釜鍒嗙粍`
-        : `閲嶈仈鎵弿鐩存帴鎵埌 ${scannedTrainCode}锛屼絾褰撳墠杞︽鏈撼鍏ユ湰娆¤拷韪垽瀹?`;
+        ? `重联扫描 ${scannedTrainCode}，包含当前车次`
+        : `重联扫描 ${scannedTrainCode}，未包含当前车次`;
 }
 
 function formatEventSummary(
@@ -895,16 +895,16 @@ function formatEventSummary(
     const payload = getPayloadObject(event.payload);
     const linkedTaskText =
         event.linkedSchedulerTaskId !== null
-            ? `，扫描任务 #${event.linkedSchedulerTaskId}`
+            ? `扫描任务[#${event.linkedSchedulerTaskId}] `
             : '';
 
     switch (event.eventType) {
         case 'probe_task_dispatched':
-            return `已创建探测任务${linkedTaskText}`;
+            return `${linkedTaskText}，已创建发车探测任务，${new Date(event.startAt ?? 0).toLocaleString('zh-CN')}`;
         case 'probe_task_skipped':
-            return `探测任务已跳过：${event.result || 'skip'}`;
+            return `发车探测任务已跳过：${event.result || 'skip'}`;
         case 'route_probe_succeeded':
-            return `已通过 ${event.relatedTrainCode || event.trainCode} 查询到车组 ${event.emuCode || '--'}`;
+            return `发车探测任务：${event.relatedTrainCode || event.trainCode} 查询到车组 ${event.emuCode || '--'}`;
         case 'route_probe_request_failed':
             return event.result === 'requeued'
                 ? `12306 探测失败，已重新排队`
@@ -935,13 +935,13 @@ function formatEventSummary(
         case 'historical_recent_assignment_skipped':
             return '同车组历史命中，但当日未在运行，已跳过';
         case 'seat_verification_passed':
-            return '席位码校验通过';
+            return '畅行码校验通过';
         case 'seat_verification_unavailable':
-            return '席位码校验不可用，继续当前判断';
+            return '畅行码校验不可用，继续当前判断';
         case 'seat_verification_mismatch_requeued':
-            return `席位码校验不一致，已重新排队`;
+            return `畅行码校验不一致，已重新排队`;
         case 'seat_verification_mismatch_exhausted':
-            return '席位码校验不一致，重试已耗尽';
+            return '畅行码校验不一致，重试已耗尽';
         case 'resolved_single':
             return '已判定为单组';
         case 'resolved_from_status':
@@ -963,10 +963,10 @@ function formatEventSummary(
                 : '重联扫描结束，判定为重联';
         case 'route_refresh_succeeded':
             return event.result === 'changed'
-                ? 'route info 刷新成功并更新了交路'
-                : 'route info 刷新成功，无交路变化';
+                ? '线路信息刷新成功并更新了时刻表'
+                : '线路信息刷新成功，无时刻表变化';
         case 'route_refresh_failed':
-            return `route info 刷新失败：${event.result || 'request_failed'}`;
+            return `线路信息刷新失败：${event.result || 'request_failed'}`;
         case 'coupling_scan_started':
             return `重联扫描开始`;
         case 'coupling_scan_completed':
@@ -988,23 +988,23 @@ function toTimelineEvent(
     const couplingScan =
         event.eventType === 'coupling_scan_candidate_direct_hit'
             ? {
-                  state: 'resolved' as const,
-                  queuedSchedulerTaskId: null,
-                  queuedTaskRunId: null,
-                  resultSchedulerTaskId: event.schedulerTaskId,
-                  resultTaskRunId: event.taskRunId,
-                  canOpenDetail: true
-              }
+                state: 'resolved' as const,
+                queuedSchedulerTaskId: null,
+                queuedTaskRunId: null,
+                resultSchedulerTaskId: event.schedulerTaskId,
+                resultTaskRunId: event.taskRunId,
+                canOpenDetail: true
+            }
             : null;
     const summary =
         event.eventType === 'coupling_scan_candidate_direct_hit'
             ? formatDirectHitEventSummary(event)
             : formatEventSummary(
-                  event,
-                  conflictDetail,
-                  historicalReuse,
-                  coupledResolution
-              );
+                event,
+                conflictDetail,
+                historicalReuse,
+                coupledResolution
+            );
 
     return {
         id: event.id,
@@ -1213,10 +1213,10 @@ export function getAdminTrainRequestStats(
     const runtimeConfig = getTrainProvenanceRuntimeConfig();
     const compareDate = /^\d{8}$/.test(date)
         ? formatShanghaiDateString(
-              (getShanghaiDayStartUnixSeconds(date) -
-                  REQUEST_STAT_DAY_SECONDS) *
-                  1000
-          )
+            (getShanghaiDayStartUnixSeconds(date) -
+                REQUEST_STAT_DAY_SECONDS) *
+            1000
+        )
         : '';
 
     if (!isTrainProvenanceEnabled()) {
@@ -1411,16 +1411,16 @@ export function getAdminTrainProvenance(
         startAt !== null && departureStartAts.includes(startAt)
             ? startAt
             : departures.length === 1
-              ? departures[0]!.startAt
-              : null;
+                ? departures[0]!.startAt
+                : null;
     const timeline =
         selectedStartAt === null
             ? []
             : enrichCouplingScanTimeline(
-                  allTimelineRecords
-                      .filter((event) => event.startAt === selectedStartAt)
-                      .map(toTimelineEvent)
-              );
+                allTimelineRecords
+                    .filter((event) => event.startAt === selectedStartAt)
+                    .map(toTimelineEvent)
+            );
 
     return {
         enabled: true,
@@ -1449,15 +1449,15 @@ export function getAdminCouplingScanDetail(
 
     const taskRunSummary: AdminCouplingScanTaskRunSummary | null = taskRun
         ? {
-              id: taskRun.id,
-              schedulerTaskId: taskRun.schedulerTaskId,
-              executor: taskRun.executor,
-              status: taskRun.status,
-              startedAt: taskRun.startedAt,
-              finishedAt: taskRun.finishedAt,
-              serviceDate: taskRun.serviceDate,
-              taskArgs: taskRun.taskArgs
-          }
+            id: taskRun.id,
+            schedulerTaskId: taskRun.schedulerTaskId,
+            executor: taskRun.executor,
+            status: taskRun.status,
+            startedAt: taskRun.startedAt,
+            finishedAt: taskRun.finishedAt,
+            serviceDate: taskRun.serviceDate,
+            taskArgs: taskRun.taskArgs
+        }
         : null;
 
     const candidateItems: AdminCouplingScanCandidate[] = candidates.map(
