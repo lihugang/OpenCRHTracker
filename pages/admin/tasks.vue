@@ -110,7 +110,7 @@
                         </p>
                     </div>
 
-                    <div class="grid gap-6 xl:grid-cols-2">
+                    <div class="grid gap-6 xl:grid-cols-3">
                         <div
                             class="rounded-[1rem] border border-slate-200 bg-white/90 px-5 py-5">
                             <div class="space-y-6">
@@ -286,6 +286,118 @@
                                 </div>
                             </div>
                         </div>
+
+                        <div
+                            class="rounded-[1rem] border border-slate-200 bg-white/90 px-5 py-5">
+                            <div class="space-y-6">
+                                <div class="space-y-2">
+                                    <p
+                                        class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                                        Coupling
+                                    </p>
+                                    <h3
+                                        class="text-xl font-semibold text-slate-900">
+                                        手动新增重联扫描任务
+                                    </h3>
+                                    <p class="text-sm leading-6 text-slate-600">
+                                        由服务端提供铁路局和车型选项，提交后立即入队一次重联扫描。
+                                    </p>
+                                </div>
+
+                                <UiField
+                                    label="铁路局"
+                                    help="选项来自当前服务端加载的 EMU 资产。">
+                                    <UiSelect
+                                        v-model="selectedCouplingScanBureau"
+                                        :disabled="
+                                            couplingScanBureauOptions.length ===
+                                            0
+                                        "
+                                        placeholder="暂无可用铁路局"
+                                        mobile-sheet-title="选择铁路局"
+                                        mobile-sheet-eyebrow="BUREAU"
+                                        :options="couplingScanBureauOptions" />
+                                </UiField>
+
+                                <UiField
+                                    label="车型"
+                                    help="会根据当前铁路局自动筛选可用车型。">
+                                    <UiSelect
+                                        v-model="selectedCouplingScanModel"
+                                        :disabled="
+                                            currentCouplingScanModelOptions.length ===
+                                            0
+                                        "
+                                        placeholder="暂无可用车型"
+                                        mobile-sheet-title="选择车型"
+                                        mobile-sheet-eyebrow="MODEL"
+                                        :options="
+                                            currentCouplingScanModelOptions
+                                        " />
+                                </UiField>
+
+                                <div
+                                    class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-4 py-4">
+                                    <p
+                                        class="text-xs uppercase tracking-[0.18em] text-slate-400">
+                                        预览
+                                    </p>
+                                    <p
+                                        class="mt-2 text-sm leading-6 text-slate-700">
+                                        {{
+                                            canCreateCouplingScanTask
+                                                ? `${selectedCouplingScanBureau} / ${selectedCouplingScanModel}`
+                                                : '当前没有可提交的重联扫描组合'
+                                        }}
+                                    </p>
+                                </div>
+
+                                <div
+                                    v-if="couplingScanTaskErrorMessage"
+                                    class="rounded-[1rem] border border-rose-200 bg-rose-50/80 px-4 py-4 text-sm leading-6 text-rose-700">
+                                    {{ couplingScanTaskErrorMessage }}
+                                </div>
+
+                                <div
+                                    v-else-if="couplingScanTaskResponse"
+                                    class="rounded-[1rem] border border-emerald-200 bg-emerald-50/80 px-4 py-4 text-sm leading-6 text-emerald-800">
+                                    <p class="font-semibold">
+                                        {{ couplingScanTaskResponse.summary }}
+                                    </p>
+                                    <div
+                                        class="mt-3 space-y-1 text-emerald-900">
+                                        <p>
+                                            任务 ID：{{
+                                                couplingScanTaskResponse.createdTasks
+                                                    .map((item) => item.taskId)
+                                                    .join('、')
+                                            }}
+                                        </p>
+                                        <p>
+                                            执行时间：{{
+                                                formatExecutionTime(
+                                                    couplingScanTaskResponse
+                                                        .createdTasks[0]
+                                                        ?.executionTime ?? 0
+                                                )
+                                            }}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div class="flex justify-end">
+                                    <UiButton
+                                        type="button"
+                                        :disabled="!canCreateCouplingScanTask"
+                                        :loading="
+                                            couplingScanTaskStatus === 'pending'
+                                        "
+                                        @click="createCouplingScanTask">
+                                        创建重联扫描任务
+                                    </UiButton>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </UiCard>
@@ -297,6 +409,8 @@
 import type {
     AdminCreateTaskRequest,
     AdminCreateTaskResponse,
+    AdminCouplingScanOptionGroup,
+    AdminDetectCoupledEmuGroupNowTaskRequest,
     AdminTaskOverviewResponse,
     AdminRefreshRouteInfoNowTaskRequest,
     AdminRegenerateDailyExportTaskRequest
@@ -318,6 +432,8 @@ const { selectedDateInput, todayDateInputValue } = await useAdminDateQuery();
 
 const exportDateInput = ref(selectedDateInput.value);
 const refreshTrainCodesInput = ref('');
+const selectedCouplingScanBureau = ref('');
+const selectedCouplingScanModel = ref('');
 
 const exportTaskStatus = ref<TaskRequestStatus>('idle');
 const exportTaskErrorMessage = ref('');
@@ -326,6 +442,10 @@ const exportTaskResponse = ref<AdminCreateTaskResponse | null>(null);
 const refreshTaskStatus = ref<TaskRequestStatus>('idle');
 const refreshTaskErrorMessage = ref('');
 const refreshTaskResponse = ref<AdminCreateTaskResponse | null>(null);
+
+const couplingScanTaskStatus = ref<TaskRequestStatus>('idle');
+const couplingScanTaskErrorMessage = ref('');
+const couplingScanTaskResponse = ref<AdminCreateTaskResponse | null>(null);
 
 async function fetchTaskOverview() {
     const response = await requestFetch<
@@ -370,6 +490,35 @@ const normalizedTrainCodesPreview = computed(() =>
         )
     )
 );
+const couplingScanOptions = computed<AdminCouplingScanOptionGroup[]>(
+    () => taskOverviewData.value?.couplingScanOptions ?? []
+);
+const couplingScanBureauOptions = computed(() =>
+    couplingScanOptions.value.map((group) => ({
+        value: group.bureau,
+        label: group.bureau
+    }))
+);
+const selectedCouplingScanOptionGroup = computed(
+    () =>
+        couplingScanOptions.value.find(
+            (group) => group.bureau === selectedCouplingScanBureau.value
+        ) ?? null
+);
+const currentCouplingScanModelOptions = computed(() =>
+    (selectedCouplingScanOptionGroup.value?.models ?? []).map((model) => ({
+        value: model,
+        label: model
+    }))
+);
+const canCreateCouplingScanTask = computed(
+    () =>
+        selectedCouplingScanBureau.value.trim().length > 0 &&
+        selectedCouplingScanModel.value.trim().length > 0 &&
+        currentCouplingScanModelOptions.value.some(
+            (option) => option.value === selectedCouplingScanModel.value
+        )
+);
 const taskOverviewErrorMessage = computed(() =>
     taskOverviewError.value
         ? getApiErrorMessage(taskOverviewError.value, '加载任务概览失败。')
@@ -397,6 +546,38 @@ const overviewMetrics = computed(() => [
         value: taskOverviewData.value?.remainingWithin1Hour ?? 0
     }
 ]);
+
+function syncCouplingScanSelections() {
+    const groups = couplingScanOptions.value;
+    if (groups.length === 0) {
+        selectedCouplingScanBureau.value = '';
+        selectedCouplingScanModel.value = '';
+        return;
+    }
+
+    const hasSelectedBureau = groups.some(
+        (group) => group.bureau === selectedCouplingScanBureau.value
+    );
+    if (!hasSelectedBureau) {
+        selectedCouplingScanBureau.value = groups[0]?.bureau ?? '';
+    }
+
+    const currentModels =
+        groups.find(
+            (group) => group.bureau === selectedCouplingScanBureau.value
+        )?.models ?? [];
+    if (!currentModels.includes(selectedCouplingScanModel.value)) {
+        selectedCouplingScanModel.value = currentModels[0] ?? '';
+    }
+}
+
+watch(couplingScanOptions, syncCouplingScanSelections, {
+    immediate: true
+});
+
+watch(selectedCouplingScanBureau, () => {
+    syncCouplingScanSelections();
+});
 
 async function postAdminTask(body: AdminCreateTaskRequest) {
     const { data, error } = await useCsrfFetch<
@@ -486,6 +667,41 @@ async function createRefreshTask() {
     }
 }
 
+async function createCouplingScanTask() {
+    if (!canCreateCouplingScanTask.value) {
+        couplingScanTaskErrorMessage.value = '当前没有可提交的重联扫描组合。';
+        return;
+    }
+
+    couplingScanTaskStatus.value = 'pending';
+    couplingScanTaskErrorMessage.value = '';
+    couplingScanTaskResponse.value = null;
+
+    const body: AdminDetectCoupledEmuGroupNowTaskRequest = {
+        type: 'detect_coupled_emu_group_now',
+        payload: {
+            bureau: selectedCouplingScanBureau.value,
+            model: selectedCouplingScanModel.value
+        }
+    };
+
+    try {
+        couplingScanTaskResponse.value = await postAdminTask(body);
+        try {
+            await refreshTaskOverview();
+        } catch {
+            // Keep the creation success state visible even if overview refresh fails.
+        }
+    } catch (error) {
+        couplingScanTaskErrorMessage.value = getApiErrorMessage(
+            error,
+            '创建重联扫描任务失败。'
+        );
+    } finally {
+        couplingScanTaskStatus.value = 'idle';
+    }
+}
+
 function formatExecutionTime(timestamp: number) {
     if (!Number.isFinite(timestamp) || timestamp <= 0) {
         return '--';
@@ -509,7 +725,7 @@ function formatNumber(value: number) {
 useSiteSeo({
     title: '任务 | Open CRH Tracker',
     description:
-        '管理员任务页，用于查看剩余任务概览，并手动补跑导出文件和立即刷新车次 route info。',
+        '管理员任务页，用于查看剩余任务概览，并手动补跑导出文件、立即刷新车次 route info，以及新增重联扫描任务。',
     path: '/admin/tasks',
     noindex: true
 });

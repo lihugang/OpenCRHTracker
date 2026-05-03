@@ -8,8 +8,11 @@ import {
     enqueueTasks,
     type EnqueueTaskInput
 } from '~/server/services/taskQueue';
+import { DETECT_COUPLED_EMU_GROUP_TASK_EXECUTOR } from '~/server/services/taskExecutors/detectCoupledEmuGroupTaskExecutor';
 import { EXPORT_DAILY_RECORDS_MANUAL_TASK_EXECUTOR } from '~/server/services/taskExecutors/exportDailyRecordsTaskExecutor';
+import { loadProbeAssets } from '~/server/services/probeAssetStore';
 import { REFRESH_ROUTE_BATCH_TASK_EXECUTOR } from '~/server/services/taskExecutors/refreshRouteBatchTaskExecutor';
+import normalizeCode from '~/server/utils/12306/normalizeCode';
 import { loadPublishedScheduleState } from '~/server/utils/12306/scheduleProbe/stateStore';
 import { splitIntoBatches } from '~/server/utils/12306/scheduleProbe/taskHelpers';
 import uniqueNormalizedCodes from '~/server/utils/12306/uniqueNormalizedCodes';
@@ -19,6 +22,7 @@ import getNowSeconds from '~/server/utils/time/getNowSeconds';
 import type {
     AdminCreateTaskResponse,
     AdminCreateTaskRequest,
+    AdminCouplingScanOptionGroup,
     AdminTaskOverviewResponse
 } from '~/types/admin';
 
@@ -49,6 +53,11 @@ interface CreatedTaskRecord {
     executionTime: number;
 }
 
+interface NormalizedCouplingScanTarget {
+    bureau: string;
+    model: string;
+}
+
 function toCreatedTaskRecords(
     taskIds: readonly number[],
     executor: string,
@@ -67,6 +76,80 @@ function estimateRefreshRouteBatchTaskDurationMs(batchSize: number): number {
         REFRESH_ROUTE_BATCH_TASK_EXECUTOR,
         batchSize * queryMinIntervalMs
     );
+}
+
+function buildBureauAndModelKey(bureau: string, model: string): string {
+    return `${bureau.trim()}#${normalizeCode(model)}`;
+}
+
+function compareByZhCnLocale(left: string, right: string): number {
+    return left.localeCompare(right, 'zh-CN');
+}
+
+async function listAdminCouplingScanOptions(): Promise<
+    AdminCouplingScanOptionGroup[]
+> {
+    const assets = await loadProbeAssets();
+    const modelsByBureau = new Map<string, Set<string>>();
+
+    for (const record of assets.emuList) {
+        const bureau = record.bureau.trim();
+        const model = normalizeCode(record.model);
+        if (bureau.length === 0 || model.length === 0) {
+            continue;
+        }
+
+        const currentModels = modelsByBureau.get(bureau);
+        if (currentModels) {
+            currentModels.add(model);
+            continue;
+        }
+
+        modelsByBureau.set(bureau, new Set([model]));
+    }
+
+    return Array.from(modelsByBureau.entries())
+        .sort(([leftBureau], [rightBureau]) =>
+            compareByZhCnLocale(leftBureau, rightBureau)
+        )
+        .map(([bureau, models]) => ({
+            bureau,
+            models: Array.from(models).sort(compareByZhCnLocale)
+        }));
+}
+
+async function normalizeCouplingScanTarget(
+    bureau: string,
+    model: string
+): Promise<NormalizedCouplingScanTarget> {
+    const normalizedBureau = bureau.trim();
+    const normalizedModel = normalizeCode(model);
+    ensure(
+        normalizedBureau.length > 0,
+        400,
+        'invalid_param',
+        'bureau 必须是非空字符串'
+    );
+    ensure(
+        normalizedModel.length > 0,
+        400,
+        'invalid_param',
+        'model 必须是非空字符串'
+    );
+
+    const assets = await loadProbeAssets();
+    const groupKey = buildBureauAndModelKey(normalizedBureau, normalizedModel);
+    ensure(
+        assets.emuListByBureauAndModel.has(groupKey),
+        400,
+        'invalid_param',
+        'bureau 和 model 组合无效或已过期'
+    );
+
+    return {
+        bureau: normalizedBureau,
+        model: normalizedModel
+    };
 }
 
 function assertPublishedScheduleReadyForRefresh(): void {
@@ -175,23 +258,58 @@ function createRefreshRouteInfoNowTask(
     };
 }
 
-export function createAdminTask(
+async function createDetectCoupledEmuGroupNowTask(
+    request: Extract<
+        AdminCreateTaskRequest,
+        { type: 'detect_coupled_emu_group_now' }
+    >
+): Promise<AdminCreateTaskResponse> {
+    const target = await normalizeCouplingScanTarget(
+        request.payload.bureau,
+        request.payload.model
+    );
+    const executionTime = getNowSeconds();
+    const taskId = enqueueTask(
+        DETECT_COUPLED_EMU_GROUP_TASK_EXECUTOR,
+        target,
+        executionTime
+    );
+
+    logger.info(
+        `admin_task_created type=${request.type} executor=${DETECT_COUPLED_EMU_GROUP_TASK_EXECUTOR} taskId=${taskId} bureau=${target.bureau} model=${target.model}`
+    );
+
+    return {
+        type: request.type,
+        createdCount: 1,
+        createdTasks: toCreatedTaskRecords(
+            [taskId],
+            DETECT_COUPLED_EMU_GROUP_TASK_EXECUTOR,
+            executionTime
+        ),
+        summary: `已创建 1 个重联扫描任务，将立即扫描 ${target.bureau} 的 ${target.model} 车组。`
+    };
+}
+
+export async function createAdminTask(
     request: AdminCreateTaskRequest
-): AdminCreateTaskResponse {
+): Promise<AdminCreateTaskResponse> {
     switch (request.type) {
         case 'regenerate_daily_export':
             return createRegenerateDailyExportTask(request);
         case 'refresh_route_info_now':
             return createRefreshRouteInfoNowTask(request);
+        case 'detect_coupled_emu_group_now':
+            return createDetectCoupledEmuGroupNowTask(request);
         default:
             request satisfies never;
             throw new Error('Unsupported admin task type');
     }
 }
 
-export function getAdminTaskOverview(
+export async function getAdminTaskOverview(
     asOf = getNowSeconds()
-): AdminTaskOverviewResponse {
+): Promise<AdminTaskOverviewResponse> {
     const counts = adminTaskStatements.get<AdminTaskOverviewCountsRow>(
         'selectTaskOverviewCounts',
         asOf + 10 * 60,
@@ -203,12 +321,14 @@ export function getAdminTaskOverview(
         remainingWithin30Minutes: 0,
         remainingWithin1Hour: 0
     };
+    const couplingScanOptions = await listAdminCouplingScanOptions();
 
     return {
         asOf,
         remainingTotal: counts.remainingTotal,
         remainingWithin10Minutes: counts.remainingWithin10Minutes,
         remainingWithin30Minutes: counts.remainingWithin30Minutes,
-        remainingWithin1Hour: counts.remainingWithin1Hour
+        remainingWithin1Hour: counts.remainingWithin1Hour,
+        couplingScanOptions
     };
 }

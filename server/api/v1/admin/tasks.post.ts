@@ -62,6 +62,32 @@ function parseRequestBody(body: CreateAdminTaskBody): AdminCreateTaskRequest {
                 }
             };
         }
+        case 'detect_coupled_emu_group_now': {
+            const bureau =
+                typeof payload.bureau === 'string' ? payload.bureau.trim() : '';
+            const model =
+                typeof payload.model === 'string' ? payload.model.trim() : '';
+            ensure(
+                bureau.length > 0,
+                400,
+                'invalid_param',
+                'bureau 必须是非空字符串'
+            );
+            ensure(
+                model.length > 0,
+                400,
+                'invalid_param',
+                'model 必须是非空字符串'
+            );
+
+            return {
+                type,
+                payload: {
+                    bureau,
+                    model
+                }
+            };
+        }
         default:
             ensure(false, 400, 'invalid_param', 'type 必须是受支持的任务类型');
     }
@@ -83,7 +109,7 @@ export default defineEventHandler(async (event) => {
                 '请求体必须是 JSON 对象'
             );
 
-            return createAdminTask(parseRequestBody(body));
+            return await createAdminTask(parseRequestBody(body));
         }
     );
 });

@@ -216,7 +216,8 @@ export interface AdminServerMetricsResponse {
 
 export type AdminTaskTemplateType =
     | 'regenerate_daily_export'
-    | 'refresh_route_info_now';
+    | 'refresh_route_info_now'
+    | 'detect_coupled_emu_group_now';
 
 export interface AdminCreatedTask {
     taskId: number;
@@ -238,9 +239,18 @@ export interface AdminRefreshRouteInfoNowTaskRequest {
     };
 }
 
+export interface AdminDetectCoupledEmuGroupNowTaskRequest {
+    type: 'detect_coupled_emu_group_now';
+    payload: {
+        bureau: string;
+        model: string;
+    };
+}
+
 export type AdminCreateTaskRequest =
     | AdminRegenerateDailyExportTaskRequest
-    | AdminRefreshRouteInfoNowTaskRequest;
+    | AdminRefreshRouteInfoNowTaskRequest
+    | AdminDetectCoupledEmuGroupNowTaskRequest;
 
 export interface AdminCreateTaskResponse {
     type: AdminTaskTemplateType;
@@ -251,12 +261,18 @@ export interface AdminCreateTaskResponse {
     normalizedTrainCodes?: string[];
 }
 
+export interface AdminCouplingScanOptionGroup {
+    bureau: string;
+    models: string[];
+}
+
 export interface AdminTaskOverviewResponse {
     asOf: number;
     remainingTotal: number;
     remainingWithin10Minutes: number;
     remainingWithin30Minutes: number;
     remainingWithin1Hour: number;
+    couplingScanOptions: AdminCouplingScanOptionGroup[];
 }
 
 export interface AdminRevokeAllWebappTokensResponse {

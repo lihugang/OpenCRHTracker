@@ -11,7 +11,7 @@ export default defineEventHandler(async (event) => {
             requiredScopes: [API_SCOPES.admin]
         },
         async () => {
-            return getAdminTaskOverview();
+            return await getAdminTaskOverview();
         }
     );
 });
