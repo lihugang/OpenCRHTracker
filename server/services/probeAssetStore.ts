@@ -1,5 +1,6 @@
 import fs from 'fs';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
+import { getAssetFilePath } from '~/server/utils/dataAssets/store';
 import { ensureAssetFile } from '~/server/utils/dataAssets/store';
 import parseJsonlToJson from '~/server/utils/json/parseJsonlToJson';
 
@@ -209,6 +210,10 @@ export function validateDownloadedEmuListAssetText(text: string): void {
     parseEmuListAssetText(text);
 }
 
+export function validateDownloadedQrCodeAssetText(text: string): void {
+    parseJsonlToJson<RawQrCodeRecord>(text);
+}
+
 function buildProbeAssets(
     emuList: EmuListRecord[],
     rawQrCodeRecords: RawQrCodeRecord[]
@@ -284,6 +289,22 @@ export async function loadProbeAssets(): Promise<ProbeAssets> {
 
     const emuJsonlText = fs.readFileSync(emuAsset.filePath, 'utf8');
     const qrCodeJsonlText = fs.readFileSync(qrCodeAsset.filePath, 'utf8');
+    const emuList = parseEmuListAssetText(emuJsonlText);
+    const rawQrCodeRecords = parseJsonlToJson<RawQrCodeRecord>(qrCodeJsonlText);
+
+    cached = buildProbeAssets(emuList, rawQrCodeRecords);
+    return cached;
+}
+
+export function preloadProbeAssetsFromLocalFiles(): ProbeAssets {
+    const emuFilePath = getAssetFilePath('EMUList');
+    const qrCodeFilePath = getAssetFilePath('QRCode');
+    const emuJsonlText = fs.readFileSync(emuFilePath, 'utf8');
+    const qrCodeJsonlText = fs.readFileSync(qrCodeFilePath, 'utf8');
+
+    validateDownloadedEmuListAssetText(emuJsonlText);
+    validateDownloadedQrCodeAssetText(qrCodeJsonlText);
+
     const emuList = parseEmuListAssetText(emuJsonlText);
     const rawQrCodeRecords = parseJsonlToJson<RawQrCodeRecord>(qrCodeJsonlText);
 

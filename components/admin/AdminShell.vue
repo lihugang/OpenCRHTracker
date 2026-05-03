@@ -281,6 +281,10 @@ const navItems = [
         path: '/admin/train-provenance'
     },
     {
+        label: '配置文件',
+        path: '/admin/config-files'
+    },
+    {
         label: 'WebApp Token',
         path: '/admin/webapp-tokens'
     },

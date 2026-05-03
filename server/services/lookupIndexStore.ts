@@ -250,3 +250,7 @@ export function getLookupIndex() {
 
     return rebuildCache().items;
 }
+
+export function invalidateLookupIndexCache(): void {
+    cached = null;
+}

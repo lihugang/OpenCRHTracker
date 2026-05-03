@@ -334,6 +334,10 @@ export function getTodayScheduleProbeGroupByTrainInternalCode(
     return activeCache.groupsByTrainKey.get(trainKey) ?? null;
 }
 
+export function invalidateTodayScheduleCache(): void {
+    cached = null;
+}
+
 function getActiveCache(): TodayScheduleCache {
     const config = useConfig();
     const currentDate = getCurrentDateString();

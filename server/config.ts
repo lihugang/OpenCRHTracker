@@ -1756,11 +1756,25 @@ function resolveConfigPath(): string {
     throw new Error(`Config file not found. Tried: ${candidates.join(', ')}`);
 }
 
+export function getResolvedConfigPath(): string {
+    return resolveConfigPath();
+}
+
+export function invalidateConfigCache(): void {
+    config = null;
+}
+
+export function reloadConfig(): Config {
+    const configPath = resolveConfigPath();
+    const raw = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    const nextConfig = validateConfig(raw);
+    config = nextConfig;
+    return nextConfig;
+}
+
 export default function useConfig() {
     if (!config) {
-        const configPath = resolveConfigPath();
-        const raw = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-        config = validateConfig(raw);
+        reloadConfig();
     }
     return config!;
 }

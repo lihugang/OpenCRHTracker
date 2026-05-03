@@ -140,6 +140,38 @@ export interface AdminUsersResponse {
     items: AdminUserListItem[];
 }
 
+export type AdminConfigFileTarget = 'config' | 'EMUList' | 'QRCode';
+
+export type AdminConfigFileAction = 'reload_local' | 'refresh_remote';
+
+export interface AdminConfigFileItem {
+    target: AdminConfigFileTarget;
+    title: string;
+    description: string;
+    filePath: string;
+    provider: string | null;
+    exists: boolean;
+    modifiedAt: number | null;
+    supportedActions: AdminConfigFileAction[];
+}
+
+export interface AdminConfigFilesResponse {
+    asOf: number;
+    items: AdminConfigFileItem[];
+}
+
+export interface AdminConfigFileActionRequest {
+    target: AdminConfigFileTarget;
+    action: AdminConfigFileAction;
+}
+
+export interface AdminConfigFileActionResponse {
+    target: AdminConfigFileTarget;
+    action: AdminConfigFileAction;
+    summary: string;
+    item: AdminConfigFileItem;
+}
+
 export type AdminServerMetricsWindow = '4h' | '24h';
 
 export interface AdminServerMetricsPeak {
