@@ -19,6 +19,7 @@ export default function useAuthState() {
     const session = useState<AuthSession | null>('auth-session', () => null);
     const hydrated = useState('auth-session-hydrated', () => false);
     const initialized = useState('auth-session-initialized', () => false);
+    const refreshPendingCount = useState('auth-session-refresh-pending', () => 0);
 
     function setSession(nextSession: AuthSession) {
         session.value = nextSession;
@@ -30,6 +31,8 @@ export default function useAuthState() {
 
     async function refreshSession() {
         const requestFetch = import.meta.server ? useRequestFetch() : $fetch;
+
+        refreshPendingCount.value += 1;
 
         try {
             const response = await requestFetch<
@@ -62,6 +65,11 @@ export default function useAuthState() {
             }
 
             return session.value;
+        } finally {
+            refreshPendingCount.value = Math.max(
+                0,
+                refreshPendingCount.value - 1
+            );
         }
     }
 
@@ -84,6 +92,7 @@ export default function useAuthState() {
     return {
         session,
         hydrated: computed(() => hydrated.value),
+        isRefreshing: computed(() => refreshPendingCount.value > 0),
         isAuthenticated: computed(() => session.value !== null),
         setSession,
         clearSession,

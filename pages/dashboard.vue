@@ -180,6 +180,8 @@
                             <DashboardGeneralCard
                                 :session="session"
                                 :can-change-password="canChangePassword"
+                                :can-read-settings="canReadSettings"
+                                :can-write-settings="canWriteSettings"
                                 v-model:current-password="
                                     changePasswordForm.currentPassword
                                 "
@@ -189,11 +191,26 @@
                                 v-model:confirm-new-password="
                                     changePasswordForm.confirmNewPassword
                                 "
+                                :save-search-history="
+                                    userPreference.saveSearchHistory
+                                "
+                                :is-updating-user-preference="
+                                    isUpdatingUserPreference
+                                "
+                                :user-preference-message="
+                                    resolvedUserPreferenceMessage
+                                "
+                                :user-preference-tone="
+                                    resolvedUserPreferenceTone
+                                "
                                 :is-changing-password="isChangingPassword"
                                 :change-password-message="changePasswordMessage"
                                 :change-password-tone="changePasswordTone"
                                 :is-logging-out="isLoggingOut"
                                 :logout-error-message="logoutErrorMessage"
+                                @toggle-save-search-history="
+                                    toggleSaveSearchHistory
+                                "
                                 @change-password="changePassword"
                                 @logout="logout" />
                         </div>
@@ -753,6 +770,9 @@ const scopeLabelMap: Record<string, string> = {
     'api.auth.me.read': '读取当前会话',
     'api.auth.password': '密码',
     'api.auth.password.update': '修改密码',
+    'api.auth.settings': '设置',
+    'api.auth.settings.read': '读取设置',
+    'api.auth.settings.write': '修改设置',
     'api.auth.api-keys': 'API 密钥',
     'api.auth.api-keys.read': '读取密钥',
     'api.auth.api-keys.create': '签发密钥',
@@ -802,6 +822,15 @@ const router = useRouter();
 const { session, clearSession, setSession } = useAuthState();
 const requestFetch = import.meta.server ? useRequestFetch() : $fetch;
 const {
+    userPreference,
+    state: userSettingsState,
+    errorMessage: userSettingsErrorMessage,
+    canReadSettings,
+    canWriteSettings,
+    updateUserPreference
+} = useUserSettings();
+const { clearRecentSearches } = useRecentLookupSearches();
+const {
     items: favoriteItems,
     maxEntries: favoriteMaxEntries,
     state: favoritesState,
@@ -840,6 +869,8 @@ const logoutErrorMessage = ref('');
 const isLoggingOut = ref(false);
 const changePasswordMessage = ref('');
 const changePasswordTone = ref<'success' | 'error'>('success');
+const userPreferenceMessage = ref('');
+const userPreferenceTone = ref<'success' | 'error'>('success');
 const isChangingPassword = ref(false);
 const isPanelSheetOpen = ref(false);
 const revokeTarget = ref<AuthApiKeyListItem | null>(null);
@@ -1042,6 +1073,9 @@ const canSubmitIssueForm = computed(
 );
 const isApiKeysLoading = computed(() => apiKeysStatus.value === 'pending');
 const isFavoritesLoading = computed(() => favoritesState.value === 'loading');
+const isUpdatingUserPreference = computed(
+    () => userSettingsState.value === 'loading'
+);
 const isEventSubscriptionsLoading = computed(
     () => eventSubscriptionsState.value === 'loading'
 );
@@ -1086,6 +1120,20 @@ const canIssueApiKeys = computed(() =>
 );
 const canRevokeApiKeys = computed(() =>
     hasClientScope(session.value?.scopes ?? [], REVOKE_SCOPE)
+);
+const resolvedUserPreferenceMessage = computed(() => {
+    if (userPreferenceMessage.value) {
+        return userPreferenceMessage.value;
+    }
+
+    return userSettingsState.value === 'error' ? userSettingsErrorMessage.value : '';
+});
+const resolvedUserPreferenceTone = computed<'success' | 'error'>(() =>
+    userPreferenceMessage.value
+        ? userPreferenceTone.value
+        : userSettingsState.value === 'error'
+          ? 'error'
+          : 'success'
 );
 const issueActiveFromTimestamp = computed(() =>
     parseDateTimeLocalValue(issueForm.activeFrom)
@@ -1446,6 +1494,11 @@ function clearChangePasswordState() {
     changePasswordTone.value = 'success';
 }
 
+function clearUserPreferenceState() {
+    userPreferenceMessage.value = '';
+    userPreferenceTone.value = 'success';
+}
+
 function setChangePasswordState(message: string, tone: 'success' | 'error') {
     changePasswordMessage.value = message;
     changePasswordTone.value = tone;
@@ -1550,6 +1603,40 @@ async function logout() {
     } finally {
         isLoggingOut.value = false;
     }
+}
+
+async function toggleSaveSearchHistory() {
+    if (
+        isUpdatingUserPreference.value ||
+        !canReadSettings.value ||
+        !canWriteSettings.value
+    ) {
+        return;
+    }
+
+    const nextSaveSearchHistory = !userPreference.value.saveSearchHistory;
+
+    clearUserPreferenceState();
+
+    const ok = await updateUserPreference({
+        saveSearchHistory: nextSaveSearchHistory
+    });
+
+    if (!ok) {
+        userPreferenceTone.value = 'error';
+        userPreferenceMessage.value =
+            userSettingsErrorMessage.value || '保存设置失败，请稍后重试。';
+        return;
+    }
+
+    if (!nextSaveSearchHistory) {
+        clearRecentSearches();
+    }
+
+    userPreferenceTone.value = 'success';
+    userPreferenceMessage.value = nextSaveSearchHistory
+        ? '已开启保存搜索记录。'
+        : '已关闭保存搜索记录，并清空当前设备上的最近搜索。';
 }
 
 async function confirmRevoke() {

@@ -34,6 +34,90 @@
                 <div class="space-y-2">
                     <p
                         class="text-xs font-medium uppercase tracking-[0.26em] text-crh-blue/80">
+                        Preferences
+                    </p>
+                    <h3 class="text-xl font-semibold text-slate-900">
+                        偏好
+                    </h3>
+                </div>
+
+                <div class="motion-divider opacity-70" />
+
+                <button
+                    type="button"
+                    role="checkbox"
+                    :aria-checked="saveSearchHistory ? 'true' : 'false'"
+                    :disabled="
+                        !canReadSettings ||
+                        !canWriteSettings ||
+                        isUpdatingUserPreference
+                    "
+                    :class="[
+                        'flex w-full items-start gap-3 rounded-[1rem] border px-4 py-4 text-left text-sm leading-6 transition disabled:cursor-not-allowed disabled:opacity-60',
+                        saveSearchHistory
+                            ? 'border-crh-blue/20 bg-blue-50/60 text-slate-800'
+                            : 'border-slate-200 bg-white/80 text-slate-700 hover:border-slate-300 hover:bg-slate-50/80'
+                    ]"
+                    @click="emit('toggleSaveSearchHistory')">
+                    <span
+                        aria-hidden="true"
+                        class="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition"
+                        :class="
+                            saveSearchHistory
+                                ? 'border-crh-blue bg-crh-blue text-white shadow-[0_6px_16px_-10px_rgba(0,82,155,0.85)]'
+                                : 'border-slate-300 bg-white text-transparent'
+                        ">
+                        <svg
+                            viewBox="0 0 20 20"
+                            fill="none"
+                            class="h-3.5 w-3.5">
+                            <path
+                                d="M5 10.5L8.5 14L15 7.5"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round" />
+                        </svg>
+                    </span>
+                    <span class="min-w-0">
+                        <span class="block text-sm font-semibold text-slate-900">
+                            保存搜索记录
+                        </span>
+                    </span>
+                </button>
+
+                <p
+                    v-if="!canReadSettings"
+                    class="rounded-[1rem] border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm leading-6 text-amber-800">
+                    当前会话不包含 <code>api.auth.settings.read</code>
+                    权限，无法读取当前设置。
+                </p>
+
+                <p
+                    v-else-if="!canWriteSettings"
+                    class="rounded-[1rem] border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm leading-6 text-amber-800">
+                    当前会话不包含 <code>api.auth.settings.write</code>
+                    权限，无法修改该设置。
+                </p>
+
+                <p
+                    v-if="userPreferenceMessage"
+                    :class="userPreferenceMessageClass">
+                    <span
+                        aria-hidden="true"
+                        class="font-semibold">
+                        {{ userPreferenceTone === 'error' ? '[!]' : '[+]' }}
+                    </span>
+                    {{ userPreferenceMessage }}
+                </p>
+            </div>
+        </UiCard>
+
+        <UiCard :show-accent-bar="false">
+            <div class="space-y-5">
+                <div class="space-y-2">
+                    <p
+                        class="text-xs font-medium uppercase tracking-[0.26em] text-crh-blue/80">
                         Security
                     </p>
                     <h3 class="text-xl font-semibold text-slate-900">
@@ -192,9 +276,15 @@ import safeFocus from '~/utils/safeFocus';
 const props = defineProps<{
     session: AuthSession | null;
     canChangePassword: boolean;
+    canReadSettings: boolean;
+    canWriteSettings: boolean;
     currentPassword: string;
     newPassword: string;
     confirmNewPassword: string;
+    saveSearchHistory: boolean;
+    isUpdatingUserPreference: boolean;
+    userPreferenceMessage: string;
+    userPreferenceTone: 'success' | 'error';
     isChangingPassword: boolean;
     changePasswordMessage: string;
     changePasswordTone: 'success' | 'error';
@@ -206,6 +296,7 @@ const emit = defineEmits<{
     'update:currentPassword': [value: string];
     'update:newPassword': [value: string];
     'update:confirmNewPassword': [value: string];
+    toggleSaveSearchHistory: [];
     changePassword: [];
     logout: [];
 }>();
@@ -224,6 +315,12 @@ const confirmNewPasswordInputRef = ref<HTMLInputElement | null>(null);
 
 const changePasswordMessageClass = computed(() =>
     props.changePasswordTone === 'error'
+        ? 'flex items-center gap-1.5 pl-1 text-xs leading-5 text-[#E53E3E]'
+        : 'flex items-center gap-1.5 pl-1 text-xs leading-5 text-emerald-600'
+);
+
+const userPreferenceMessageClass = computed(() =>
+    props.userPreferenceTone === 'error'
         ? 'flex items-center gap-1.5 pl-1 text-xs leading-5 text-[#E53E3E]'
         : 'flex items-center gap-1.5 pl-1 text-xs leading-5 text-emerald-600'
 );

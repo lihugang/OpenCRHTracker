@@ -45,6 +45,10 @@ export interface AuthSubscriptionItem {
     userAgent: string;
 }
 
+export interface AuthUserPreference {
+    saveSearchHistory: boolean;
+}
+
 export interface AuthMeResponse {
     user: {
         userId: string;
@@ -102,6 +106,11 @@ export interface AuthFavoritesResponse {
     userId: string;
     maxEntries: number;
     items: FavoriteLookupItem[];
+}
+
+export interface AuthSettingsResponse {
+    userId: string;
+    userPreference: AuthUserPreference;
 }
 
 export interface AuthSubscriptionListResponse {

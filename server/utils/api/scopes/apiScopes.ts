@@ -9,6 +9,10 @@ export const API_SCOPES = {
         password: {
             update: 'api.auth.password.update'
         },
+        settings: {
+            read: 'api.auth.settings.read',
+            write: 'api.auth.settings.write'
+        },
         apiKeys: {
             read: 'api.auth.api-keys.read',
             create: 'api.auth.api-keys.create',

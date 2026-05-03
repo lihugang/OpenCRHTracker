@@ -241,6 +241,8 @@
                 "api.auth.me.read",
                 "api.auth.logout",
                 "api.auth.password.update",
+                "api.auth.settings.read",
+                "api.auth.settings.write",
                 "api.auth.api-keys.read",
                 "api.auth.api-keys.create",
                 "api.auth.api-keys.revoke",

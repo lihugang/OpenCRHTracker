@@ -157,71 +157,127 @@
                                             {{ section.title }}
                                         </div>
 
-                                        <button
+                                        <div
                                             v-for="entry in section.entries"
                                             :key="`${section.id}:${entry.key}`"
-                                            type="button"
                                             :data-suggestion-index="entry.index"
                                             :class="[
-                                                'grid w-full grid-cols-[var(--lookup-code-column-width,max-content)_minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1 px-4 py-3 text-left transition',
+                                                'flex items-start gap-1 rounded-xl px-2 py-1 transition',
                                                 activeIndex === entry.index
                                                     ? 'bg-blue-50 text-crh-blue'
                                                     : 'text-crh-grey-dark hover:bg-slate-50'
                                             ]"
-                                            @mousedown.prevent
                                             @mouseenter="
                                                 activeIndex = entry.index
-                                            "
-                                            @click="
-                                                selectSuggestion(entry.item)
                                             ">
-                                            <span
-                                                data-suggestion-code
-                                                class="block min-w-0 whitespace-nowrap text-sm font-semibold">
-                                                {{ entry.item.code }}
-                                            </span>
-                                            <span
-                                                class="flex min-w-0 flex-col gap-1.5">
+                                            <button
+                                                type="button"
+                                                :class="[
+                                                    'min-w-0 flex-1 items-start gap-x-3 gap-y-1 rounded-[inherit] px-2 py-2 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-crh-blue/20',
+                                                    entry.canRemoveRecent
+                                                        ? 'grid grid-cols-[var(--lookup-code-column-width,max-content)_minmax(0,1fr)]'
+                                                        : 'grid grid-cols-[var(--lookup-code-column-width,max-content)_minmax(0,1fr)_auto]'
+                                                ]"
+                                                @mousedown.prevent
+                                                @click="
+                                                    selectSuggestion(entry.item)
+                                                ">
                                                 <span
-                                                    v-if="
-                                                        getSuggestionSubtitle(
-                                                            entry.item
-                                                        )
-                                                    "
-                                                    class="min-w-0 truncate text-xs text-slate-500">
-                                                    {{
-                                                        getSuggestionSubtitle(
-                                                            entry.item
-                                                        )
-                                                    }}
+                                                    data-suggestion-code
+                                                    class="block min-w-0 whitespace-nowrap text-sm font-semibold">
+                                                    {{ entry.item.code }}
                                                 </span>
                                                 <span
-                                                    v-if="
-                                                        getSuggestionTags(
-                                                            entry.item
-                                                        ).length > 0
-                                                    "
-                                                    class="flex flex-wrap gap-1.5">
+                                                    class="flex min-w-0 flex-col gap-1.5">
                                                     <span
-                                                        v-for="tag in getSuggestionTags(
-                                                            entry.item
-                                                        )"
-                                                        :key="tag"
-                                                        class="inline-flex items-center rounded-full bg-blue-600/8 px-2 py-0.5 text-[11px] font-medium leading-none text-blue-600">
-                                                        {{ tag }}
+                                                        v-if="
+                                                            getSuggestionSubtitle(
+                                                                entry.item
+                                                            )
+                                                        "
+                                                        class="min-w-0 truncate text-xs text-slate-500">
+                                                        {{
+                                                            getSuggestionSubtitle(
+                                                                entry.item
+                                                            )
+                                                        }}
+                                                    </span>
+                                                    <span
+                                                        v-if="
+                                                            getSuggestionTags(
+                                                                entry.item
+                                                            ).length > 0
+                                                        "
+                                                        class="flex flex-wrap gap-1.5">
+                                                        <span
+                                                            v-for="tag in getSuggestionTags(
+                                                                entry.item
+                                                            )"
+                                                            :key="tag"
+                                                            class="inline-flex items-center rounded-full bg-blue-600/8 px-2 py-0.5 text-[11px] font-medium leading-none text-blue-600">
+                                                            {{ tag }}
+                                                        </span>
                                                     </span>
                                                 </span>
-                                            </span>
 
-                                            <svg
-                                                v-if="entry.isFavorite"
-                                                aria-hidden="true"
-                                                viewBox="0 0 20 20"
-                                                class="h-4 w-4 shrink-0 self-center fill-current text-amber-500">
-                                                <path
-                                                    d="M10 2.4L12.28 7.03L17.39 7.78L13.7 11.38L14.57 16.46L10 14.06L5.43 16.46L6.3 11.38L2.61 7.78L7.72 7.03L10 2.4Z" />
-                                            </svg>
-                                        </button>
+                                                <svg
+                                                    v-if="
+                                                        !entry.canRemoveRecent &&
+                                                        entry.isFavorite
+                                                    "
+                                                    aria-hidden="true"
+                                                    viewBox="0 0 20 20"
+                                                    class="h-4 w-4 shrink-0 self-center fill-current text-amber-500">
+                                                    <path
+                                                        d="M10 2.4L12.28 7.03L17.39 7.78L13.7 11.38L14.57 16.46L10 14.06L5.43 16.46L6.3 11.38L2.61 7.78L7.72 7.03L10 2.4Z" />
+                                                </svg>
+                                            </button>
+
+                                            <button
+                                                v-if="entry.canRemoveRecent"
+                                                type="button"
+                                                class="mt-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-slate-400 transition hover:bg-white/80 hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-crh-blue/20"
+                                                :aria-label="
+                                                    getRemoveRecentSearchLabel(
+                                                        entry
+                                                    )
+                                                "
+                                                @mousedown.prevent
+                                                @click.stop="
+                                                    void removeRecentMenuEntry(
+                                                        entry
+                                                    )
+                                                ">
+                                                <svg
+                                                    aria-hidden="true"
+                                                    viewBox="0 0 20 20"
+                                                    class="h-4 w-4 stroke-current"
+                                                    fill="none">
+                                                    <path
+                                                        d="M5.75 6.5V14.25C5.75 15.2165 6.5335 16 7.5 16H12.5C13.4665 16 14.25 15.2165 14.25 14.25V6.5"
+                                                        stroke-linecap="round"
+                                                        stroke-linejoin="round"
+                                                        stroke-width="1.5" />
+                                                    <path
+                                                        d="M4.5 5H15.5"
+                                                        stroke-linecap="round"
+                                                        stroke-width="1.5" />
+                                                    <path
+                                                        d="M8 5V4.25C8 3.55964 8.55964 3 9.25 3H10.75C11.4404 3 12 3.55964 12 4.25V5"
+                                                        stroke-linecap="round"
+                                                        stroke-linejoin="round"
+                                                        stroke-width="1.5" />
+                                                    <path
+                                                        d="M8.5 8.5V13"
+                                                        stroke-linecap="round"
+                                                        stroke-width="1.5" />
+                                                    <path
+                                                        d="M11.5 8.5V13"
+                                                        stroke-linecap="round"
+                                                        stroke-width="1.5" />
+                                                </svg>
+                                            </button>
+                                        </div>
                                     </template>
                                 </div>
                             </div>
@@ -283,52 +339,97 @@
                         {{ section.title }}
                     </div>
 
-                    <button
+                    <div
                         v-for="entry in section.entries"
                         :key="`${section.id}:${entry.key}`"
-                        type="button"
                         :data-suggestion-index="entry.index"
                         :class="[
-                            'grid w-full grid-cols-[var(--lookup-code-column-width,max-content)_minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1 px-4 py-3 text-left transition',
+                            'flex items-start gap-1 rounded-xl px-2 py-1 transition',
                             activeIndex === entry.index
                                 ? 'bg-blue-50 text-crh-blue'
                                 : 'text-crh-grey-dark hover:bg-slate-50'
                         ]"
-                        @mousedown.prevent
-                        @mouseenter="activeIndex = entry.index"
-                        @click="selectSuggestion(entry.item)">
-                        <span
-                            data-suggestion-code
-                            class="block min-w-0 whitespace-nowrap text-sm font-semibold">
-                            {{ entry.item.code }}
-                        </span>
-                        <span class="flex min-w-0 flex-col gap-1.5">
+                        @mouseenter="activeIndex = entry.index">
+                        <button
+                            type="button"
+                            :class="[
+                                'min-w-0 flex-1 items-start gap-x-3 gap-y-1 rounded-[inherit] px-2 py-2 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-crh-blue/20',
+                                entry.canRemoveRecent
+                                    ? 'grid grid-cols-[var(--lookup-code-column-width,max-content)_minmax(0,1fr)]'
+                                    : 'grid grid-cols-[var(--lookup-code-column-width,max-content)_minmax(0,1fr)_auto]'
+                            ]"
+                            @mousedown.prevent
+                            @click="selectSuggestion(entry.item)">
                             <span
-                                v-if="getSuggestionSubtitle(entry.item)"
-                                class="min-w-0 truncate text-xs text-slate-500">
-                                {{ getSuggestionSubtitle(entry.item) }}
+                                data-suggestion-code
+                                class="block min-w-0 whitespace-nowrap text-sm font-semibold">
+                                {{ entry.item.code }}
                             </span>
-                            <span
-                                v-if="getSuggestionTags(entry.item).length > 0"
-                                class="flex flex-wrap gap-1.5">
+                            <span class="flex min-w-0 flex-col gap-1.5">
                                 <span
-                                    v-for="tag in getSuggestionTags(entry.item)"
-                                    :key="tag"
-                                    class="inline-flex items-center rounded-full bg-blue-600/8 px-2 py-0.5 text-[11px] font-medium leading-none text-blue-600">
-                                    {{ tag }}
+                                    v-if="getSuggestionSubtitle(entry.item)"
+                                    class="min-w-0 truncate text-xs text-slate-500">
+                                    {{ getSuggestionSubtitle(entry.item) }}
+                                </span>
+                                <span
+                                    v-if="getSuggestionTags(entry.item).length > 0"
+                                    class="flex flex-wrap gap-1.5">
+                                    <span
+                                        v-for="tag in getSuggestionTags(entry.item)"
+                                        :key="tag"
+                                        class="inline-flex items-center rounded-full bg-blue-600/8 px-2 py-0.5 text-[11px] font-medium leading-none text-blue-600">
+                                        {{ tag }}
+                                    </span>
                                 </span>
                             </span>
-                        </span>
 
-                        <svg
-                            v-if="entry.isFavorite"
-                            aria-hidden="true"
-                            viewBox="0 0 20 20"
-                            class="h-4 w-4 shrink-0 self-center fill-current text-amber-500">
-                            <path
-                                d="M10 2.4L12.28 7.03L17.39 7.78L13.7 11.38L14.57 16.46L10 14.06L5.43 16.46L6.3 11.38L2.61 7.78L7.72 7.03L10 2.4Z" />
-                        </svg>
-                    </button>
+                            <svg
+                                v-if="!entry.canRemoveRecent && entry.isFavorite"
+                                aria-hidden="true"
+                                viewBox="0 0 20 20"
+                                class="h-4 w-4 shrink-0 self-center fill-current text-amber-500">
+                                <path
+                                    d="M10 2.4L12.28 7.03L17.39 7.78L13.7 11.38L14.57 16.46L10 14.06L5.43 16.46L6.3 11.38L2.61 7.78L7.72 7.03L10 2.4Z" />
+                            </svg>
+                        </button>
+
+                        <button
+                            v-if="entry.canRemoveRecent"
+                            type="button"
+                            class="mt-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-slate-400 transition hover:bg-white/80 hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-crh-blue/20"
+                            :aria-label="getRemoveRecentSearchLabel(entry)"
+                            @mousedown.prevent
+                            @click.stop="void removeRecentMenuEntry(entry)">
+                            <svg
+                                aria-hidden="true"
+                                viewBox="0 0 20 20"
+                                class="h-4 w-4 stroke-current"
+                                fill="none">
+                                <path
+                                    d="M5.75 6.5V14.25C5.75 15.2165 6.5335 16 7.5 16H12.5C13.4665 16 14.25 15.2165 14.25 14.25V6.5"
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    stroke-width="1.5" />
+                                <path
+                                    d="M4.5 5H15.5"
+                                    stroke-linecap="round"
+                                    stroke-width="1.5" />
+                                <path
+                                    d="M8 5V4.25C8 3.55964 8.55964 3 9.25 3H10.75C11.4404 3 12 3.55964 12 4.25V5"
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    stroke-width="1.5" />
+                                <path
+                                    d="M8.5 8.5V13"
+                                    stroke-linecap="round"
+                                    stroke-width="1.5" />
+                                <path
+                                    d="M11.5 8.5V13"
+                                    stroke-linecap="round"
+                                    stroke-width="1.5" />
+                            </svg>
+                        </button>
+                    </div>
                 </template>
             </div>
         </div>
@@ -448,7 +549,7 @@ const {
     errorMessage: suggestionsErrorMessage,
     mode: suggestionMode
 } = useLookupSuggestions(() => props.modelValue);
-const { addRecentSearch } = useRecentLookupSearches();
+const { addRecentSearch, removeRecentSearch } = useRecentLookupSearches();
 const { items: favoriteItems, favoriteKeySet } = useFavoriteLookups();
 
 const recentMenuItems = computed(() => {
@@ -461,23 +562,28 @@ const recentMenuItems = computed(() => {
     );
 });
 
+type LookupMenuSectionId = 'favorites' | 'recent' | 'suggestions';
 type LookupMenuItem = LookupSuggestItem | FavoriteLookupItem;
+type LookupMenuEntry = {
+    sectionId: LookupMenuSectionId;
+    item: LookupMenuItem;
+    index: number;
+    key: string;
+    isFavorite: boolean;
+    canRemoveRecent: boolean;
+};
+type LookupMenuSection = {
+    id: LookupMenuSectionId;
+    title: string;
+    entries: LookupMenuEntry[];
+};
 
 const menuSections = computed(() => {
-    const sections: Array<{
-        id: 'favorites' | 'recent' | 'suggestions';
-        title: string;
-        entries: Array<{
-            item: LookupMenuItem;
-            index: number;
-            key: string;
-            isFavorite: boolean;
-        }>;
-    }> = [];
+    const sections: LookupMenuSection[] = [];
     let currentIndex = 0;
 
     function pushSection(
-        id: 'favorites' | 'recent' | 'suggestions',
+        id: LookupMenuSectionId,
         title: string,
         items: LookupMenuItem[]
     ) {
@@ -490,12 +596,14 @@ const menuSections = computed(() => {
             title,
             entries: items.map((item) => {
                 const entry = {
+                    sectionId: id,
                     item,
                     index: currentIndex,
                     key: buildLookupItemKeyFromItem(item),
                     isFavorite: favoriteKeySet.value.has(
                         buildLookupItemKeyFromItem(item)
-                    )
+                    ),
+                    canRemoveRecent: id === 'recent'
                 };
 
                 currentIndex += 1;
@@ -519,7 +627,10 @@ const menuEntries = computed(() =>
 );
 const menuEntrySignature = computed(() =>
     menuEntries.value
-        .map((entry) => `${entry.key}:${entry.isFavorite ? '1' : '0'}`)
+        .map(
+            (entry) =>
+                `${entry.sectionId}:${entry.key}:${entry.isFavorite ? '1' : '0'}`
+        )
         .join('|')
 );
 
@@ -662,6 +773,42 @@ function selectSuggestion(item: LookupMenuItem) {
     addRecentSearch(toRecentLookupSearchItem(item));
     closeMenu();
     emit('submit', item.code);
+}
+
+function getRemoveRecentSearchLabel(entry: LookupMenuEntry) {
+    return `删除最近搜索 ${entry.item.code}`;
+}
+
+async function removeRecentMenuEntry(entry: LookupMenuEntry) {
+    if (!entry.canRemoveRecent) {
+        return;
+    }
+
+    const previousActiveIndex = activeIndex.value;
+    removeRecentSearch(entry.item);
+    await nextTick();
+
+    const nextLength = menuEntries.value.length;
+    if (nextLength === 0) {
+        activeIndex.value = -1;
+        return;
+    }
+
+    if (previousActiveIndex < 0) {
+        return;
+    }
+
+    if (entry.index < previousActiveIndex) {
+        activeIndex.value = previousActiveIndex - 1;
+        return;
+    }
+
+    if (previousActiveIndex >= nextLength) {
+        activeIndex.value = nextLength - 1;
+        return;
+    }
+
+    activeIndex.value = previousActiveIndex;
 }
 
 function getSingleSuggestion() {

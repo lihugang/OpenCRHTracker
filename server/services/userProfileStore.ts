@@ -52,6 +52,11 @@ interface UserProfileDataRaw extends Record<string, unknown> {
     version?: unknown;
     favorites?: unknown;
     subscriptions?: unknown;
+    userPreference?: unknown;
+}
+
+interface UserProfilePreferenceValue extends Record<string, unknown> {
+    saveSearchHistory?: unknown;
 }
 
 export interface UserProfileSubscriptionItem {
@@ -88,6 +93,11 @@ export interface UserProfileData {
     version: 1;
     favorites: FavoriteLookupItem[];
     subscriptions: UserProfileSubscriptionItem[];
+    userPreference: UserProfilePreference;
+}
+
+export interface UserProfilePreference {
+    saveSearchHistory: boolean;
 }
 
 type UserProfileSqlKey = 'selectUserProfileByUserId' | 'upsertUserProfile';
@@ -112,7 +122,27 @@ function createDefaultUserProfileData(): UserProfileData {
     return {
         version: 1,
         favorites: [],
-        subscriptions: []
+        subscriptions: [],
+        userPreference: {
+            saveSearchHistory: true
+        }
+    };
+}
+
+function toUserProfilePreference(value: unknown): UserProfilePreference {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+        return {
+            saveSearchHistory: true
+        };
+    }
+
+    const raw = value as UserProfilePreferenceValue;
+
+    return {
+        saveSearchHistory:
+            typeof raw.saveSearchHistory === 'boolean'
+                ? raw.saveSearchHistory
+                : true
     };
 }
 
@@ -239,11 +269,13 @@ function normalizeUserProfileData(value: unknown): UserProfileData {
               )
               .sort((left, right) => right.updatedAt - left.updatedAt)
         : [];
+    const userPreference = toUserProfilePreference(raw.userPreference);
 
     return {
         version: 1,
         favorites,
-        subscriptions
+        subscriptions,
+        userPreference
     };
 }
 
@@ -303,6 +335,10 @@ export function listUserSubscriptions(userId: string) {
     return getCurrentUserProfileData(userId).subscriptions;
 }
 
+export function getUserPreference(userId: string) {
+    return getCurrentUserProfileData(userId).userPreference;
+}
+
 export function upsertUserFavoriteLookup(
     userId: string,
     item: FavoriteLookupInput
@@ -349,7 +385,8 @@ export function upsertUserFavoriteLookup(
         const nextProfile: UserProfileData = {
             version: 1,
             favorites: nextFavorites,
-            subscriptions: profile.subscriptions
+            subscriptions: profile.subscriptions,
+            userPreference: profile.userPreference
         };
 
         writeUserProfileData(userId, nextProfile, now);
@@ -400,7 +437,8 @@ export function removeUserFavoriteLookup(
         const nextProfile: UserProfileData = {
             version: 1,
             favorites: nextFavorites,
-            subscriptions: profile.subscriptions
+            subscriptions: profile.subscriptions,
+            userPreference: profile.userPreference
         };
 
         writeUserProfileData(userId, nextProfile, now);
@@ -457,7 +495,8 @@ export function upsertUserSubscription(
         const nextProfile: UserProfileData = {
             version: 1,
             favorites: profile.favorites,
-            subscriptions: nextSubscriptions
+            subscriptions: nextSubscriptions,
+            userPreference: profile.userPreference
         };
 
         writeUserProfileData(userId, nextProfile, now);
@@ -509,7 +548,8 @@ export function renameUserSubscription(
         const nextProfile: UserProfileData = {
             version: 1,
             favorites: profile.favorites,
-            subscriptions: nextSubscriptions
+            subscriptions: nextSubscriptions,
+            userPreference: profile.userPreference
         };
 
         writeUserProfileData(userId, nextProfile, now);
@@ -542,7 +582,8 @@ export function removeUserSubscription(userId: string, subscriptionId: string) {
         const nextProfile: UserProfileData = {
             version: 1,
             favorites: profile.favorites,
-            subscriptions: nextSubscriptions
+            subscriptions: nextSubscriptions,
+            userPreference: profile.userPreference
         };
 
         writeUserProfileData(userId, nextProfile, now);
@@ -586,11 +627,41 @@ export function removeUserSubscriptionsByEndpoints(
         const nextProfile: UserProfileData = {
             version: 1,
             favorites: profile.favorites,
-            subscriptions: nextSubscriptions
+            subscriptions: nextSubscriptions,
+            userPreference: profile.userPreference
         };
 
         writeUserProfileData(userId, nextProfile, now);
         return nextProfile.subscriptions;
+    });
+
+    return transaction();
+}
+
+export function updateUserPreference(
+    userId: string,
+    nextPreference: Partial<UserProfilePreference>
+) {
+    const now = getNowSeconds();
+
+    const transaction = useUsersDatabase().transaction(() => {
+        const row = getStoredUserProfileRow(userId);
+        const profile = row
+            ? parseUserProfileData(row.data_json)
+            : createDefaultUserProfileData();
+        const userPreference: UserProfilePreference = {
+            ...profile.userPreference,
+            ...nextPreference
+        };
+        const nextProfile: UserProfileData = {
+            version: 1,
+            favorites: profile.favorites,
+            subscriptions: profile.subscriptions,
+            userPreference
+        };
+
+        writeUserProfileData(userId, nextProfile, now);
+        return nextProfile.userPreference;
     });
 
     return transaction();

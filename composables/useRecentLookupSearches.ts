@@ -1,5 +1,6 @@
-import { computed } from 'vue';
+import { computed, watch } from 'vue';
 import type { RecentLookupSearchItem } from '~/types/lookup';
+import { useUserSettings } from '~/composables/useUserSettings';
 import {
     isLookupTargetType,
     normalizeLookupSuggestItem
@@ -81,6 +82,18 @@ function persistRecentLookupItems(items: RecentLookupSearchItem[]) {
     }
 }
 
+function clearPersistedRecentLookupItems() {
+    if (!import.meta.client) {
+        return;
+    }
+
+    try {
+        window.localStorage.removeItem(STORAGE_KEY);
+    } catch {
+        // Ignore storage cleanup failures and keep in-memory state consistent.
+    }
+}
+
 function isSameRecentLookupItem(
     left: RecentLookupSearchItem,
     right: RecentLookupSearchItem
@@ -94,9 +107,30 @@ export function useRecentLookupSearches() {
         () => []
     );
     const hydrated = useState('recent-lookup-searches-hydrated', () => false);
+    const initialized = useState('recent-lookup-searches-initialized', () => false);
+    const { userPreference, isReady } = useUserSettings();
 
-    function ensureHydrated() {
-        if (!import.meta.client || hydrated.value) {
+    const canPersistRecentSearches = computed(
+        () => userPreference.value.saveSearchHistory
+    );
+
+    function clearRecentSearches() {
+        recentSearches.value = [];
+        hydrated.value = true;
+        clearPersistedRecentLookupItems();
+    }
+
+    function syncRecentSearchHydration() {
+        if (!import.meta.client || !isReady.value) {
+            return;
+        }
+
+        if (!canPersistRecentSearches.value) {
+            clearRecentSearches();
+            return;
+        }
+
+        if (hydrated.value) {
             return;
         }
 
@@ -104,8 +138,44 @@ export function useRecentLookupSearches() {
         hydrated.value = true;
     }
 
+    function ensureInitialized() {
+        if (!import.meta.client || initialized.value) {
+            return;
+        }
+
+        initialized.value = true;
+
+        watch(
+            () => [isReady.value, canPersistRecentSearches.value] as const,
+            ([nextReady]) => {
+                if (!nextReady) {
+                    return;
+                }
+
+                syncRecentSearchHydration();
+            },
+            {
+                immediate: true
+            }
+        );
+    }
+
+    function ensureHydrated() {
+        ensureInitialized();
+
+        if (!import.meta.client || hydrated.value || !isReady.value) {
+            return;
+        }
+
+        syncRecentSearchHydration();
+    }
+
     function addRecentSearch(item: RecentLookupSearchItem) {
         ensureHydrated();
+
+        if (!isReady.value || !canPersistRecentSearches.value) {
+            return;
+        }
 
         const normalizedItem = normalizeRecentLookupItem(item);
         if (!normalizedItem) {
@@ -124,10 +194,38 @@ export function useRecentLookupSearches() {
         persistRecentLookupItems(nextItems);
     }
 
+    function removeRecentSearch(
+        target: Pick<RecentLookupSearchItem, 'type' | 'code'>
+    ) {
+        ensureHydrated();
+
+        if (!isReady.value || !canPersistRecentSearches.value) {
+            return;
+        }
+
+        const nextItems = recentSearches.value.filter(
+            (recentItem) =>
+                !(
+                    recentItem.type === target.type &&
+                    recentItem.code === target.code
+                )
+        );
+
+        if (nextItems.length === recentSearches.value.length) {
+            return;
+        }
+
+        recentSearches.value = nextItems;
+        persistRecentLookupItems(nextItems);
+    }
+
+    ensureInitialized();
     ensureHydrated();
 
     return {
         recentSearches: computed(() => recentSearches.value),
-        addRecentSearch
+        addRecentSearch,
+        removeRecentSearch,
+        clearRecentSearches
     };
 }
