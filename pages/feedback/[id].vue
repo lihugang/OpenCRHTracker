@@ -300,10 +300,6 @@
                                                 )
                                             "
                                             tone="neutral" />
-                                        <UiStatusBadge
-                                            v-if="topic.titleMode === 'custom'"
-                                            label="管理员自定义标题"
-                                            tone="warning" />
                                     </div>
 
                                     <div class="space-y-2">
