@@ -56,10 +56,7 @@ function parseDetectedAt(value: unknown): string[] {
             `detectedAt[${index}] must be a string`
         );
         const normalized = item.trim();
-        assert(
-            normalized.length > 0,
-            `detectedAt[${index}] must be non-empty`
-        );
+        assert(normalized.length > 0, `detectedAt[${index}] must be non-empty`);
         try {
             parseDailyTimeHHmm(normalized);
         } catch (error) {

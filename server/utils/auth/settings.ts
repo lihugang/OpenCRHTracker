@@ -1,6 +1,4 @@
-import type {
-    UserProfilePreference
-} from '~/server/services/userProfileStore';
+import type { UserProfilePreference } from '~/server/services/userProfileStore';
 import type { AuthSettingsResponse } from '~/types/auth';
 
 export function createAuthSettingsResponse(

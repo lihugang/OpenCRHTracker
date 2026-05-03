@@ -372,10 +372,14 @@
                                     {{ getSuggestionSubtitle(entry.item) }}
                                 </span>
                                 <span
-                                    v-if="getSuggestionTags(entry.item).length > 0"
+                                    v-if="
+                                        getSuggestionTags(entry.item).length > 0
+                                    "
                                     class="flex flex-wrap gap-1.5">
                                     <span
-                                        v-for="tag in getSuggestionTags(entry.item)"
+                                        v-for="tag in getSuggestionTags(
+                                            entry.item
+                                        )"
                                         :key="tag"
                                         class="inline-flex items-center rounded-full bg-blue-600/8 px-2 py-0.5 text-[11px] font-medium leading-none text-blue-600">
                                         {{ tag }}
@@ -384,7 +388,9 @@
                             </span>
 
                             <svg
-                                v-if="!entry.canRemoveRecent && entry.isFavorite"
+                                v-if="
+                                    !entry.canRemoveRecent && entry.isFavorite
+                                "
                                 aria-hidden="true"
                                 viewBox="0 0 20 20"
                                 class="h-4 w-4 shrink-0 self-center fill-current text-amber-500">

@@ -36,9 +36,7 @@
                         class="text-xs font-medium uppercase tracking-[0.26em] text-crh-blue/80">
                         Preferences
                     </p>
-                    <h3 class="text-xl font-semibold text-slate-900">
-                        偏好
-                    </h3>
+                    <h3 class="text-xl font-semibold text-slate-900">偏好</h3>
                 </div>
 
                 <div class="motion-divider opacity-70" />
@@ -80,7 +78,8 @@
                         </svg>
                     </span>
                     <span class="min-w-0">
-                        <span class="block text-sm font-semibold text-slate-900">
+                        <span
+                            class="block text-sm font-semibold text-slate-900">
                             保存搜索记录
                         </span>
                     </span>

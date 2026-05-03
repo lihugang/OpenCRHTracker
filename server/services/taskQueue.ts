@@ -277,35 +277,36 @@ function getRemovePendingTasksByExecutorAndArgsTransaction(): RemovePendingTasks
         'selectPendingTasksByExecutor'
     );
 
-    removePendingTasksByExecutorAndArgsTransaction = useTaskDatabase().transaction(
-        (
-            executor: string,
-            argumentsJson: string
-        ): RemovePendingTasksByExecutorAndArgsResult => {
-            const normalizedExecutor = executor.trim();
-            if (normalizedExecutor.length === 0) {
-                throw new Error('executor must be non-empty');
-            }
-
-            const existingTasks = selectPendingTasksByExecutorStatement.all(
-                normalizedExecutor
-            ) as TaskRecord[];
-            const removedTaskIds: number[] = [];
-
-            for (const existingTask of existingTasks) {
-                if (existingTask.arguments !== argumentsJson) {
-                    continue;
+    removePendingTasksByExecutorAndArgsTransaction =
+        useTaskDatabase().transaction(
+            (
+                executor: string,
+                argumentsJson: string
+            ): RemovePendingTasksByExecutorAndArgsResult => {
+                const normalizedExecutor = executor.trim();
+                if (normalizedExecutor.length === 0) {
+                    throw new Error('executor must be non-empty');
                 }
 
-                completeTaskStatement.run(existingTask.id);
-                removedTaskIds.push(existingTask.id);
-            }
+                const existingTasks = selectPendingTasksByExecutorStatement.all(
+                    normalizedExecutor
+                ) as TaskRecord[];
+                const removedTaskIds: number[] = [];
 
-            return {
-                removedTaskIds
-            };
-        }
-    );
+                for (const existingTask of existingTasks) {
+                    if (existingTask.arguments !== argumentsJson) {
+                        continue;
+                    }
+
+                    completeTaskStatement.run(existingTask.id);
+                    removedTaskIds.push(existingTask.id);
+                }
+
+                return {
+                    removedTaskIds
+                };
+            }
+        );
 
     return removePendingTasksByExecutorAndArgsTransaction;
 }

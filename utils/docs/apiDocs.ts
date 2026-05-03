@@ -582,10 +582,10 @@ function overrideJsonResponseContent(
         content: response.content.map((content) =>
             content.contentType === 'application/json'
                 ? {
-                    ...content,
-                    schema,
-                    example
-                }
+                      ...content,
+                      schema,
+                      example
+                  }
                 : content
         )
     };
@@ -600,10 +600,10 @@ function normalizeEndpoint(endpoint: DocsApiEndpoint): DocsApiEndpoint {
                 responses: endpoint.responses.map((response) =>
                     response.statusCode === '200'
                         ? overrideJsonResponseContent(
-                            response,
-                            DAILY_RECORDS_RESPONSE_SCHEMA,
-                            RECORDS_DAILY_RESPONSE_EXAMPLE
-                        )
+                              response,
+                              DAILY_RECORDS_RESPONSE_SCHEMA,
+                              RECORDS_DAILY_RESPONSE_EXAMPLE
+                          )
                         : response
                 )
             };
@@ -614,10 +614,10 @@ function normalizeEndpoint(endpoint: DocsApiEndpoint): DocsApiEndpoint {
                 responses: endpoint.responses.map((response) =>
                     response.statusCode === '200'
                         ? overrideJsonResponseContent(
-                            response,
-                            TRAIN_HISTORY_RESPONSE_SCHEMA,
-                            HISTORY_TRAIN_RESPONSE_EXAMPLE
-                        )
+                              response,
+                              TRAIN_HISTORY_RESPONSE_SCHEMA,
+                              HISTORY_TRAIN_RESPONSE_EXAMPLE
+                          )
                         : response
                 )
             };
@@ -628,10 +628,10 @@ function normalizeEndpoint(endpoint: DocsApiEndpoint): DocsApiEndpoint {
                 responses: endpoint.responses.map((response) =>
                     response.statusCode === '200'
                         ? overrideJsonResponseContent(
-                            response,
-                            EMU_HISTORY_RESPONSE_SCHEMA,
-                            HISTORY_EMU_RESPONSE_EXAMPLE
-                        )
+                              response,
+                              EMU_HISTORY_RESPONSE_SCHEMA,
+                              HISTORY_EMU_RESPONSE_EXAMPLE
+                          )
                         : response
                 )
             };

@@ -1126,7 +1126,9 @@ const resolvedUserPreferenceMessage = computed(() => {
         return userPreferenceMessage.value;
     }
 
-    return userSettingsState.value === 'error' ? userSettingsErrorMessage.value : '';
+    return userSettingsState.value === 'error'
+        ? userSettingsErrorMessage.value
+        : '';
 });
 const resolvedUserPreferenceTone = computed<'success' | 'error'>(() =>
     userPreferenceMessage.value

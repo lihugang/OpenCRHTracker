@@ -19,9 +19,7 @@ import {
     recordCurrentTrainProvenanceEvent,
     recordCurrentTrainProvenanceEventsForTrainCodes
 } from '~/server/services/trainProvenanceRecorder';
-import {
-    loadQrcodeDetectionConfig
-} from '~/server/services/qrcodeDetectionConfigStore';
+import { loadQrcodeDetectionConfig } from '~/server/services/qrcodeDetectionConfigStore';
 import {
     getTodayScheduleProbeGroupByTrainCode,
     getTodayScheduleProbeGroupByTrainInternalCode
@@ -30,9 +28,7 @@ import fetchEMUInfoBySeatCode from '~/server/utils/12306/network/fetchEMUInfoByS
 import normalizeCode from '~/server/utils/12306/normalizeCode';
 import parseEmuCode from '~/server/utils/12306/parseEmuCode';
 import uniqueNormalizedCodes from '~/server/utils/12306/uniqueNormalizedCodes';
-import {
-    formatShanghaiDateString
-} from '~/server/utils/date/getCurrentDateString';
+import { formatShanghaiDateString } from '~/server/utils/date/getCurrentDateString';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
 import { ProbeStatusValue } from '~/server/services/probeStatusStore';
 
@@ -102,7 +98,9 @@ async function executeProbeQrcodeDetectionEmuTask(rawArgs: unknown) {
         (!args.manualNow && !config.detectedAt.includes(args.detectedAt)) ||
         !config.emu.includes(args.emuCode)
     ) {
-        markCurrentTrainProvenanceTaskSkipped('qrcode_detection_target_removed');
+        markCurrentTrainProvenanceTaskSkipped(
+            'qrcode_detection_target_removed'
+        );
         logger.info(
             `skip_target_removed detectedAt=${args.detectedAt} emuCode=${args.emuCode}`
         );
@@ -170,23 +168,25 @@ async function executeProbeQrcodeDetectionEmuTask(rawArgs: unknown) {
     const matchedScheduleGroup =
         getTodayScheduleProbeGroupByTrainInternalCode(
             seatCodeResult.route.internalCode
-        ) ??
-        getTodayScheduleProbeGroupByTrainCode(seatCodeResult.route.code);
+        ) ?? getTodayScheduleProbeGroupByTrainCode(seatCodeResult.route.code);
     const allTrainCodes = matchedScheduleGroup
         ? uniqueNormalizedCodes([
               matchedScheduleGroup.trainCode,
               ...matchedScheduleGroup.allCodes
           ])
         : [normalizeCode(seatCodeResult.route.code)];
-    const routeTrainCode = matchedScheduleGroup?.trainCode ??
+    const routeTrainCode =
+        matchedScheduleGroup?.trainCode ??
         normalizeCode(seatCodeResult.route.code);
     const routeTrainInternalCode =
         matchedScheduleGroup?.trainInternalCode ??
         normalizeCode(seatCodeResult.route.internalCode);
     const routeStartAt =
         matchedScheduleGroup?.startAt ?? seatCodeResult.route.startAt;
-    const routeEndAt = matchedScheduleGroup?.endAt ?? seatCodeResult.route.endAt;
-    const trainKey = matchedScheduleGroup?.trainKey ??
+    const routeEndAt =
+        matchedScheduleGroup?.endAt ?? seatCodeResult.route.endAt;
+    const trainKey =
+        matchedScheduleGroup?.trainKey ??
         buildTrainKey(routeTrainCode, routeTrainInternalCode, routeStartAt);
     const startStation = matchedScheduleGroup?.startStation ?? '';
     const endStation = matchedScheduleGroup?.endStation ?? '';

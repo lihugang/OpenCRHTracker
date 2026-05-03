@@ -19,7 +19,10 @@ export default function useAuthState() {
     const session = useState<AuthSession | null>('auth-session', () => null);
     const hydrated = useState('auth-session-hydrated', () => false);
     const initialized = useState('auth-session-initialized', () => false);
-    const refreshPendingCount = useState('auth-session-refresh-pending', () => 0);
+    const refreshPendingCount = useState(
+        'auth-session-refresh-pending',
+        () => 0
+    );
 
     function setSession(nextSession: AuthSession) {
         session.value = nextSession;

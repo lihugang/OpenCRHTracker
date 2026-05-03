@@ -107,7 +107,10 @@ export function useRecentLookupSearches() {
         () => []
     );
     const hydrated = useState('recent-lookup-searches-hydrated', () => false);
-    const initialized = useState('recent-lookup-searches-initialized', () => false);
+    const initialized = useState(
+        'recent-lookup-searches-initialized',
+        () => false
+    );
     const { userPreference, isReady } = useUserSettings();
 
     const canPersistRecentSearches = computed(

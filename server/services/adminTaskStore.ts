@@ -9,9 +9,7 @@ import {
     type EnqueueTaskInput
 } from '~/server/services/taskQueue';
 import { DETECT_COUPLED_EMU_GROUP_TASK_EXECUTOR } from '~/server/services/taskExecutors/detectCoupledEmuGroupTaskExecutor';
-import {
-    enqueueQrcodeDetectionProbeTasksForDetectedAt
-} from '~/server/services/taskExecutors/dispatchQrcodeDetectionTasksExecutor';
+import { enqueueQrcodeDetectionProbeTasksForDetectedAt } from '~/server/services/taskExecutors/dispatchQrcodeDetectionTasksExecutor';
 import { EXPORT_DAILY_RECORDS_MANUAL_TASK_EXECUTOR } from '~/server/services/taskExecutors/exportDailyRecordsTaskExecutor';
 import { loadProbeAssets } from '~/server/services/probeAssetStore';
 import { PROBE_QRCODE_DETECTION_EMU_TASK_EXECUTOR } from '~/server/services/taskExecutors/probeQrcodeDetectionEmuTaskExecutor';
@@ -149,18 +147,8 @@ async function normalizeCouplingScanTarget(
 ): Promise<NormalizedCouplingScanTarget> {
     const normalizedBureau = bureau.trim();
     const normalizedModel = normalizeCode(model);
-    ensure(
-        normalizedBureau.length > 0,
-        400,
-        'invalid_param',
-        '路局不能为空'
-    );
-    ensure(
-        normalizedModel.length > 0,
-        400,
-        'invalid_param',
-        '车型不能为空'
-    );
+    ensure(normalizedBureau.length > 0, 400, 'invalid_param', '路局不能为空');
+    ensure(normalizedModel.length > 0, 400, 'invalid_param', '车型不能为空');
 
     const assets = await loadProbeAssets();
     const groupKey = buildBureauAndModelKey(normalizedBureau, normalizedModel);

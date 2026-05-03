@@ -37,13 +37,15 @@ function normalizeUserPreference(
 }
 
 export function useUserSettings() {
-    const { session, hydrated, isAuthenticated, isRefreshing } =
-        useAuthState();
+    const { session, hydrated, isAuthenticated, isRefreshing } = useAuthState();
     const userPreference = useState<AuthUserPreference>(
         'user-settings-preference',
         createDefaultUserPreference
     );
-    const state = useState<UserSettingsState>('user-settings-state', () => 'idle');
+    const state = useState<UserSettingsState>(
+        'user-settings-state',
+        () => 'idle'
+    );
     const errorMessage = useState('user-settings-error', () => '');
     const loadedUserId = useState('user-settings-user-id', () => '');
     const initialized = useState('user-settings-initialized', () => false);
@@ -116,7 +118,9 @@ export function useUserSettings() {
         errorMessage.value = '';
 
         try {
-            const requestFetch = import.meta.server ? useRequestFetch() : $fetch;
+            const requestFetch = import.meta.server
+                ? useRequestFetch()
+                : $fetch;
             const response = await requestFetch<
                 TrackerApiResponse<AuthSettingsResponse>
             >('/api/v1/auth/settings', {
@@ -139,10 +143,7 @@ export function useUserSettings() {
             userPreference.value = createDefaultUserPreference();
             loadedUserId.value = session.value.userId;
             state.value = 'error';
-            errorMessage.value = getApiErrorMessage(
-                error,
-                '加载设置失败。'
-            );
+            errorMessage.value = getApiErrorMessage(error, '加载设置失败。');
         }
 
         return userPreference.value;
@@ -199,10 +200,7 @@ export function useUserSettings() {
         } catch (error) {
             loadedUserId.value = session.value.userId;
             state.value = 'error';
-            errorMessage.value = getApiErrorMessage(
-                error,
-                '保存设置失败。'
-            );
+            errorMessage.value = getApiErrorMessage(error, '保存设置失败。');
             return false;
         }
     }

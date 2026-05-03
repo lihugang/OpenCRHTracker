@@ -33,8 +33,10 @@ interface ApplyResolvedProbeResultInput {
     nowSeconds: number;
 }
 
-interface ApplyPendingCouplingProbeResultInput
-    extends Omit<ApplyResolvedProbeResultInput, 'status'> {}
+interface ApplyPendingCouplingProbeResultInput extends Omit<
+    ApplyResolvedProbeResultInput,
+    'status'
+> {}
 
 function persistDailyRoutes(
     trainCodes: string[],

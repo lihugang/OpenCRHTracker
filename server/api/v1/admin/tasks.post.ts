@@ -28,7 +28,12 @@ function parseRequestBody(body: CreateAdminTaskBody): AdminCreateTaskRequest {
         case 'regenerate_daily_export': {
             const date =
                 typeof payload.date === 'string' ? payload.date.trim() : '';
-            ensure(/^[0-9]{8}$/.test(date), 400, 'invalid_param', 'date 必须为 YYYYMMDD 格式');
+            ensure(
+                /^[0-9]{8}$/.test(date),
+                400,
+                'invalid_param',
+                'date 必须为 YYYYMMDD 格式'
+            );
 
             return {
                 type,

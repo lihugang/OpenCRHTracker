@@ -9,9 +9,7 @@ import {
     type TaskRecord
 } from '~/server/services/taskQueue';
 import { registerTaskExecutor } from '~/server/services/taskExecutorRegistry';
-import {
-    loadQrcodeDetectionConfig
-} from '~/server/services/qrcodeDetectionConfigStore';
+import { loadQrcodeDetectionConfig } from '~/server/services/qrcodeDetectionConfigStore';
 import {
     getNextDayExecutionTimeInShanghaiSeconds,
     getNextExecutionTimeInShanghaiSeconds,
@@ -19,9 +17,7 @@ import {
 } from '~/server/utils/date/shanghaiDateTime';
 import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
-import {
-    PROBE_QRCODE_DETECTION_EMU_TASK_EXECUTOR
-} from '~/server/services/taskExecutors/probeQrcodeDetectionEmuTaskExecutor';
+import { PROBE_QRCODE_DETECTION_EMU_TASK_EXECUTOR } from '~/server/services/taskExecutors/probeQrcodeDetectionEmuTaskExecutor';
 import {
     markCurrentTrainProvenanceTaskSkipped,
     recordCurrentTrainProvenanceEvent
@@ -135,8 +131,9 @@ async function executeDispatchQrcodeDetectionTasks(rawArgs: unknown) {
         return;
     }
 
-    const createdTaskIds =
-        await enqueueQrcodeDetectionProbeTasksForDetectedAt(args.detectedAt);
+    const createdTaskIds = await enqueueQrcodeDetectionProbeTasksForDetectedAt(
+        args.detectedAt
+    );
     const nextExecutionTime = getNextDayExecutionTimeInShanghaiSeconds(
         Date.now(),
         args.detectedAt

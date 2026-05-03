@@ -19,9 +19,7 @@ import {
     reloadQrcodeDetectionConfig,
     validateQrcodeDetectionConfigText
 } from '~/server/services/qrcodeDetectionConfigStore';
-import {
-    synchronizeQrcodeDetectionDispatchTasks
-} from '~/server/services/taskExecutors/dispatchQrcodeDetectionTasksExecutor';
+import { synchronizeQrcodeDetectionDispatchTasks } from '~/server/services/taskExecutors/dispatchQrcodeDetectionTasksExecutor';
 import { invalidateTodayScheduleCache } from '~/server/services/todayScheduleCache';
 import ensure from '~/server/utils/api/executor/ensure';
 import {
@@ -70,7 +68,9 @@ function getFileStatus(filePath: string): {
     }
 }
 
-function buildConfigFileItem(target: AdminConfigFileTarget): AdminConfigFileItem {
+function buildConfigFileItem(
+    target: AdminConfigFileTarget
+): AdminConfigFileItem {
     if (target === 'config') {
         const filePath = getResolvedConfigPath();
         const status = getFileStatus(filePath);
@@ -78,8 +78,7 @@ function buildConfigFileItem(target: AdminConfigFileTarget): AdminConfigFileItem
         return {
             target,
             title: '运行配置',
-            description:
-                '重载当前服务使用的运行配置文件。',
+            description: '重载当前服务使用的运行配置文件。',
             filePath: path.resolve(filePath),
             provider: null,
             exists: status.exists,

@@ -18,37 +18,49 @@
         <div class="space-y-6">
             <UiCard :show-accent-bar="false">
                 <div class="space-y-6">
-                    <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div
+                        class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                         <div class="space-y-2">
-                            <p class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                            <p
+                                class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
                                 概览
                             </p>
                             <h2 class="text-2xl font-semibold text-slate-900">
                                 剩余任务概览
                             </h2>
                             <p class="text-sm leading-6 text-slate-600">
-                                统计当前任务队列中的待执行任务，10 分钟、30 分钟和 1 小时均为累计口径，并包含已超时但仍未执行的任务。
+                                统计当前任务队列中的待执行任务，10 分钟、30
+                                分钟和 1
+                                小时均为累计口径，并包含已超时但仍未执行的任务。
                             </p>
                         </div>
 
-                        <div class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-5 py-4 lg:w-[16rem]">
-                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                        <div
+                            class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-5 py-4 lg:w-[16rem]">
+                            <p
+                                class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
                                 统计时间
                             </p>
-                            <p class="mt-2 text-lg font-semibold text-slate-900">
-                                {{ formatTimestamp(taskOverviewData?.asOf ?? 0) }}
+                            <p
+                                class="mt-2 text-lg font-semibold text-slate-900">
+                                {{
+                                    formatTimestamp(taskOverviewData?.asOf ?? 0)
+                                }}
                             </p>
                             <p class="mt-2 text-sm leading-6 text-slate-500">
                                 当前统计截止时间
                             </p>
                             <div class="mt-4 border-t border-slate-200 pt-4">
-                                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                                <p
+                                    class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
                                     下一任务
                                 </p>
-                                <p class="mt-2 text-lg font-semibold text-slate-900">
+                                <p
+                                    class="mt-2 text-lg font-semibold text-slate-900">
                                     {{ nextTaskIdText }}
                                 </p>
-                                <p class="mt-2 text-sm leading-6 text-slate-500">
+                                <p
+                                    class="mt-2 text-sm leading-6 text-slate-500">
                                     当前队列中最早待执行任务的任务 ID。
                                 </p>
                             </div>
@@ -62,7 +74,10 @@
                     </div>
 
                     <div
-                        v-else-if="taskOverviewStatus === 'pending' && !taskOverviewData"
+                        v-else-if="
+                            taskOverviewStatus === 'pending' &&
+                            !taskOverviewData
+                        "
                         class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                         <div
                             v-for="index in 4"
@@ -70,15 +85,19 @@
                             class="h-28 animate-pulse rounded-[1rem] bg-slate-100/90" />
                     </div>
 
-                    <div v-else class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                    <div
+                        v-else
+                        class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                         <div
                             v-for="metric in overviewMetrics"
                             :key="metric.label"
                             class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-5 py-4">
-                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                            <p
+                                class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
                                 {{ metric.eyebrow }}
                             </p>
-                            <p class="mt-2 text-3xl font-semibold text-slate-900">
+                            <p
+                                class="mt-2 text-3xl font-semibold text-slate-900">
                                 {{ formatNumber(metric.value) }}
                             </p>
                             <p class="mt-2 text-sm leading-6 text-slate-500">
@@ -92,7 +111,8 @@
             <UiCard :show-accent-bar="false">
                 <div class="space-y-6">
                     <div class="space-y-2">
-                        <p class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                        <p
+                            class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
                             操作
                         </p>
                         <h2 class="text-2xl font-semibold text-slate-900">
@@ -104,38 +124,54 @@
                     </div>
 
                     <div class="grid gap-6 xl:grid-cols-2">
-                        <div class="rounded-[1rem] border border-slate-200 bg-white/90 px-5 py-5">
+                        <div
+                            class="rounded-[1rem] border border-slate-200 bg-white/90 px-5 py-5">
                             <div class="space-y-6">
                                 <div class="space-y-2">
-                                    <p class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                                    <p
+                                        class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
                                         畅行码
                                     </p>
-                                    <h3 class="text-xl font-semibold text-slate-900">
+                                    <h3
+                                        class="text-xl font-semibold text-slate-900">
                                         立即执行固定车组畅行码检测
                                     </h3>
                                     <p class="text-sm leading-6 text-slate-600">
-                                        立即按当前时间创建 `qrcode_detection.json` 中全部配置车组的畅行码检测任务，不再手动选择 `detectedAt`。
+                                        立即按当前时间创建
+                                        `qrcode_detection.json`
+                                        中全部配置车组的畅行码检测任务，不再手动选择
+                                        `detectedAt`。
                                     </p>
                                 </div>
 
-                                <div class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-4 py-4">
-                                    <p class="text-xs uppercase tracking-[0.18em] text-slate-400">
+                                <div
+                                    class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-4 py-4">
+                                    <p
+                                        class="text-xs uppercase tracking-[0.18em] text-slate-400">
                                         执行方式
                                     </p>
-                                    <p class="mt-2 text-sm leading-6 text-slate-700">
+                                    <p
+                                        class="mt-2 text-sm leading-6 text-slate-700">
                                         点击后将直接使用当前北京时间作为本次检测时间，并对配置文件中的全部目标车组立即发起检测。
                                     </p>
                                 </div>
 
                                 <StatusPanel
-                                    :error-message="qrcodeDetectionTaskErrorMessage"
+                                    :error-message="
+                                        qrcodeDetectionTaskErrorMessage
+                                    "
                                     :response="qrcodeDetectionTaskResponse"
-                                    :format-execution-time="formatExecutionTime" />
+                                    :format-execution-time="
+                                        formatExecutionTime
+                                    " />
 
                                 <div class="flex justify-end">
                                     <UiButton
                                         type="button"
-                                        :loading="qrcodeDetectionTaskStatus === 'pending'"
+                                        :loading="
+                                            qrcodeDetectionTaskStatus ===
+                                            'pending'
+                                        "
                                         @click="createQrcodeDetectionTask">
                                         创建固定车组畅行码检测任务
                                     </UiButton>

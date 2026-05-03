@@ -1153,19 +1153,13 @@
                                         </div>
                                         <h3
                                             class="text-lg font-semibold text-slate-900">
-                                            {{
-                                                item.bureau || '--'
-                                            }}
+                                            {{ item.bureau || '--' }}
                                             /
-                                            {{
-                                                item.model || '--'
-                                            }}
+                                            {{ item.model || '--' }}
                                         </h3>
                                         <p
                                             class="text-sm leading-6 text-slate-600">
-                                            扫描任务 #{{
-                                                item.schedulerTaskId
-                                            }}
+                                            扫描任务 #{{ item.schedulerTaskId }}
                                         </p>
                                     </div>
 
@@ -1173,9 +1167,7 @@
                                         class="text-sm leading-6 text-slate-500 lg:text-right">
                                         <p>
                                             开始：{{
-                                                formatTimestamp(
-                                                    item.startedAt
-                                                )
+                                                formatTimestamp(item.startedAt)
                                             }}
                                         </p>
                                         <p>
@@ -1185,9 +1177,7 @@
                                                 )
                                             }}
                                         </p>
-                                        <p>
-                                            Task Run #{{ item.taskRunId }}
-                                        </p>
+                                        <p>Task Run #{{ item.taskRunId }}</p>
                                     </div>
                                 </div>
 

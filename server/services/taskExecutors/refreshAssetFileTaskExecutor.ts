@@ -12,9 +12,7 @@ import {
     validateQrcodeDetectionConfigText
 } from '~/server/services/qrcodeDetectionConfigStore';
 import { registerTaskExecutor } from '~/server/services/taskExecutorRegistry';
-import {
-    synchronizeQrcodeDetectionDispatchTasks
-} from '~/server/services/taskExecutors/dispatchQrcodeDetectionTasksExecutor';
+import { synchronizeQrcodeDetectionDispatchTasks } from '~/server/services/taskExecutors/dispatchQrcodeDetectionTasksExecutor';
 import { enqueueTask } from '~/server/services/taskQueue';
 import {
     formatShanghaiDateTime,
@@ -114,7 +112,9 @@ async function executeRefreshAssetTask(
                         : definition.key === 'QRCode'
                           ? validateDownloadedQrCodeAssetText
                           : async (content) => {
-                                await validateQrcodeDetectionConfigText(content);
+                                await validateQrcodeDetectionConfigText(
+                                    content
+                                );
                             }
             }
         );

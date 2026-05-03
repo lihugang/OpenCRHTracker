@@ -936,19 +936,22 @@ export const deployDocsSections: DocsContentSection[] = [
                         path: '$schema',
                         valueType: 'string',
                         required: false,
-                        description: '可选的 schema 引用，建议填写 ../assets/json/qrcodeDetectionScheme.json。'
+                        description:
+                            '可选的 schema 引用，建议填写 ../assets/json/qrcodeDetectionScheme.json。'
                     },
                     {
                         path: 'detectedAt',
                         valueType: 'array<string(HHmm)>',
                         required: true,
-                        description: '每日派发时间列表。每个 HHmm 都会保持一条未来待执行的派发任务。'
+                        description:
+                            '每日派发时间列表。每个 HHmm 都会保持一条未来待执行的派发任务。'
                     },
                     {
                         path: 'emu',
                         valueType: 'array<string>',
                         required: true,
-                        description: '每个检测时间都要执行的车组编号列表。加载时会校验这些车组是否存在于 EMUList 中，并检查畅行码映射是否缺失。'
+                        description:
+                            '每个检测时间都要执行的车组编号列表。加载时会校验这些车组是否存在于 EMUList 中，并检查畅行码映射是否缺失。'
                     }
                 ]
             },

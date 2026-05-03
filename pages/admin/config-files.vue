@@ -19,8 +19,10 @@
         <div class="space-y-6">
             <UiCard :show-accent-bar="false">
                 <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                    <div class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-5 py-4">
-                        <p class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                    <div
+                        class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-5 py-4">
+                        <p
+                            class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
                             文件
                         </p>
                         <p class="mt-2 text-3xl font-semibold text-slate-900">
@@ -31,8 +33,10 @@
                         </p>
                     </div>
 
-                    <div class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-5 py-4">
-                        <p class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                    <div
+                        class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-5 py-4">
+                        <p
+                            class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
                             本地
                         </p>
                         <p class="mt-2 text-3xl font-semibold text-slate-900">
@@ -43,8 +47,10 @@
                         </p>
                     </div>
 
-                    <div class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-5 py-4">
-                        <p class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                    <div
+                        class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-5 py-4">
+                        <p
+                            class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
                             远程
                         </p>
                         <p class="mt-2 text-3xl font-semibold text-slate-900">
@@ -55,8 +61,10 @@
                         </p>
                     </div>
 
-                    <div class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-5 py-4">
-                        <p class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                    <div
+                        class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-5 py-4">
+                        <p
+                            class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
                             统计时间
                         </p>
                         <p class="mt-2 text-2xl font-semibold text-slate-900">
@@ -92,14 +100,17 @@
                     class="h-80 animate-pulse rounded-[1.25rem] bg-slate-100/90" />
             </div>
 
-            <div v-else class="grid gap-6 xl:grid-cols-3">
+            <div
+                v-else
+                class="grid gap-6 xl:grid-cols-3">
                 <UiCard
                     v-for="item in configFileItems"
                     :key="item.target"
                     :show-accent-bar="false">
                     <div class="space-y-6">
                         <div class="space-y-2">
-                            <p class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                            <p
+                                class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
                                 {{ getItemEyebrow(item.target) }}
                             </p>
                             <h2 class="text-2xl font-semibold text-slate-900">
@@ -113,38 +124,62 @@
                         <div class="flex flex-wrap gap-2">
                             <span
                                 class="inline-flex items-center rounded-full px-3 py-1.5 text-xs font-semibold"
-                                :class="item.exists ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'">
-                                {{ item.exists ? '本地文件已存在' : '本地文件不存在' }}
+                                :class="
+                                    item.exists
+                                        ? 'bg-emerald-50 text-emerald-700'
+                                        : 'bg-rose-50 text-rose-700'
+                                ">
+                                {{
+                                    item.exists
+                                        ? '本地文件已存在'
+                                        : '本地文件不存在'
+                                }}
                             </span>
-                            <span class="inline-flex items-center rounded-full bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white">
-                                {{ item.supportedActions.includes('refresh_remote') ? '支持远程刷新' : '仅支持本地重载' }}
+                            <span
+                                class="inline-flex items-center rounded-full bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white">
+                                {{
+                                    item.supportedActions.includes(
+                                        'refresh_remote'
+                                    )
+                                        ? '支持远程刷新'
+                                        : '仅支持本地重载'
+                                }}
                             </span>
                         </div>
 
                         <div class="space-y-3">
-                            <div class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-4 py-4">
-                                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                            <div
+                                class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-4 py-4">
+                                <p
+                                    class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
                                     文件路径
                                 </p>
-                                <p class="mt-2 break-all font-mono text-xs leading-6 text-slate-700">
+                                <p
+                                    class="mt-2 break-all font-mono text-xs leading-6 text-slate-700">
                                     {{ item.filePath }}
                                 </p>
                             </div>
 
-                            <div class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-4 py-4">
-                                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                            <div
+                                class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-4 py-4">
+                                <p
+                                    class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
                                     数据源
                                 </p>
-                                <p class="mt-2 break-all font-mono text-xs leading-6 text-slate-700">
+                                <p
+                                    class="mt-2 break-all font-mono text-xs leading-6 text-slate-700">
                                     {{ item.provider ?? '未配置远程地址' }}
                                 </p>
                             </div>
 
-                            <div class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-4 py-4">
-                                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                            <div
+                                class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-4 py-4">
+                                <p
+                                    class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
                                     最后修改
                                 </p>
-                                <p class="mt-2 text-sm font-semibold text-slate-900">
+                                <p
+                                    class="mt-2 text-sm font-semibold text-slate-900">
                                     {{ formatTimestamp(item.modifiedAt) }}
                                 </p>
                             </div>
@@ -153,7 +188,11 @@
                         <div
                             v-if="actionMessages[item.target]"
                             class="rounded-[1rem] border px-4 py-4 text-sm leading-6"
-                            :class="actionMessages[item.target]?.tone === 'success' ? 'border-emerald-200 bg-emerald-50/80 text-emerald-800' : 'border-rose-200 bg-rose-50/80 text-rose-700'">
+                            :class="
+                                actionMessages[item.target]?.tone === 'success'
+                                    ? 'border-emerald-200 bg-emerald-50/80 text-emerald-800'
+                                    : 'border-rose-200 bg-rose-50/80 text-rose-700'
+                            ">
                             {{ actionMessages[item.target]?.text }}
                         </div>
 
@@ -161,16 +200,31 @@
                             <UiButton
                                 type="button"
                                 variant="secondary"
-                                :loading="activeActionKey === buildActionKey(item.target, 'reload_local')"
+                                :loading="
+                                    activeActionKey ===
+                                    buildActionKey(item.target, 'reload_local')
+                                "
                                 @click="runAction(item.target, 'reload_local')">
                                 从本地重载
                             </UiButton>
 
                             <UiButton
-                                v-if="item.supportedActions.includes('refresh_remote')"
+                                v-if="
+                                    item.supportedActions.includes(
+                                        'refresh_remote'
+                                    )
+                                "
                                 type="button"
-                                :loading="activeActionKey === buildActionKey(item.target, 'refresh_remote')"
-                                @click="runAction(item.target, 'refresh_remote')">
+                                :loading="
+                                    activeActionKey ===
+                                    buildActionKey(
+                                        item.target,
+                                        'refresh_remote'
+                                    )
+                                "
+                                @click="
+                                    runAction(item.target, 'refresh_remote')
+                                ">
                                 从远程刷新
                             </UiButton>
                         </div>
@@ -358,7 +412,8 @@ async function runAction(
 
 useSiteSeo({
     title: '配置文件 | Open CRH Tracker',
-    description: '管理员配置文件页面，用于从本地重载 config.json、动车组配属清单、畅行码映射和固定车组畅行码检测计划，或从远程服务器刷新资源文件。',
+    description:
+        '管理员配置文件页面，用于从本地重载 config.json、动车组配属清单、畅行码映射和固定车组畅行码检测计划，或从远程服务器刷新资源文件。',
     path: '/admin/config-files',
     noindex: true
 });
