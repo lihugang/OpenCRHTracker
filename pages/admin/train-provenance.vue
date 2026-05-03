@@ -1842,7 +1842,7 @@ function getRequestTypeLabel(type: AdminTrainDataRequestType) {
         case 'search_train_code':
             return '车次检索';
         case 'fetch_route_info':
-            return '交路查询';
+            return '时刻表查询';
         case 'fetch_emu_by_route':
             return '按车次取车组';
         case 'fetch_emu_by_seat_code':

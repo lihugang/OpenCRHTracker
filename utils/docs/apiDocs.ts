@@ -17,6 +17,389 @@ import type {
     OpenApiSchema
 } from '~/types/docs';
 
+const DAILY_RECORD_ITEM_SCHEMA: OpenApiSchema = {
+    type: 'object',
+    required: ['id', 'serviceDate', 'timetableId', 'emuCode', 'trainCode'],
+    properties: {
+        id: {
+            type: 'string',
+            example: '681107'
+        },
+        serviceDate: {
+            type: 'string',
+            pattern: '^\\d{8}$',
+            example: '20260503'
+        },
+        timetableId: {
+            type: 'integer',
+            nullable: true,
+            example: 5096
+        },
+        emuCode: {
+            type: 'string',
+            example: 'CRH380A-2844'
+        },
+        trainCode: {
+            type: 'string',
+            example: 'C9607'
+        }
+    }
+};
+
+const DAILY_RECORDS_RESPONSE_SCHEMA: OpenApiSchema = {
+    type: 'object',
+    required: ['ok', 'data', 'error'],
+    properties: {
+        ok: {
+            type: 'boolean',
+            example: true
+        },
+        data: {
+            type: 'object',
+            required: ['date', 'cursor', 'limit', 'nextCursor', 'items'],
+            properties: {
+                date: {
+                    type: 'string',
+                    example: '20260503'
+                },
+                cursor: {
+                    type: 'string',
+                    example: ''
+                },
+                limit: {
+                    type: 'integer',
+                    example: 2
+                },
+                nextCursor: {
+                    type: 'string',
+                    example: '20260503:681106'
+                },
+                items: {
+                    type: 'array',
+                    items: DAILY_RECORD_ITEM_SCHEMA
+                }
+            }
+        },
+        error: {
+            type: 'string',
+            example: ''
+        }
+    }
+};
+
+const TRAIN_HISTORY_ITEM_SCHEMA: OpenApiSchema = {
+    type: 'object',
+    required: ['id', 'serviceDate', 'timetableId', 'emuCode'],
+    properties: {
+        id: {
+            type: 'string',
+            example: '674559'
+        },
+        serviceDate: {
+            type: 'string',
+            pattern: '^\\d{8}$',
+            example: '20260503'
+        },
+        timetableId: {
+            type: 'integer',
+            nullable: true,
+            example: 2524
+        },
+        emuCode: {
+            type: 'string',
+            example: 'CRH1A-1156'
+        }
+    }
+};
+
+const TRAIN_HISTORY_RESPONSE_SCHEMA: OpenApiSchema = {
+    type: 'object',
+    required: ['ok', 'data', 'error'],
+    properties: {
+        ok: {
+            type: 'boolean',
+            example: true
+        },
+        data: {
+            type: 'object',
+            required: ['trainCode', 'cursor', 'limit', 'nextCursor', 'items'],
+            properties: {
+                trainCode: {
+                    type: 'string',
+                    example: 'D3319'
+                },
+                start: {
+                    type: 'integer',
+                    nullable: true,
+                    example: null
+                },
+                end: {
+                    type: 'integer',
+                    nullable: true,
+                    example: null
+                },
+                cursor: {
+                    type: 'string',
+                    example: ''
+                },
+                limit: {
+                    type: 'integer',
+                    example: 2
+                },
+                nextCursor: {
+                    type: 'string',
+                    example: '20260503:674558'
+                },
+                items: {
+                    type: 'array',
+                    items: TRAIN_HISTORY_ITEM_SCHEMA
+                }
+            }
+        },
+        error: {
+            type: 'string',
+            example: ''
+        }
+    }
+};
+
+const EMU_HISTORY_ITEM_SCHEMA: OpenApiSchema = {
+    type: 'object',
+    required: ['id', 'serviceDate', 'timetableId', 'trainCode'],
+    properties: {
+        id: {
+            type: 'string',
+            example: '680922'
+        },
+        serviceDate: {
+            type: 'string',
+            pattern: '^\\d{8}$',
+            example: '20260503'
+        },
+        timetableId: {
+            type: 'integer',
+            nullable: true,
+            example: 10196
+        },
+        trainCode: {
+            type: 'string',
+            example: 'C2233'
+        }
+    }
+};
+
+const EMU_HISTORY_RESPONSE_SCHEMA: OpenApiSchema = {
+    type: 'object',
+    required: ['ok', 'data', 'error'],
+    properties: {
+        ok: {
+            type: 'boolean',
+            example: true
+        },
+        data: {
+            type: 'object',
+            required: ['emuCode', 'cursor', 'limit', 'nextCursor', 'items'],
+            properties: {
+                emuCode: {
+                    type: 'string',
+                    example: 'CR400BF-5028'
+                },
+                start: {
+                    type: 'integer',
+                    nullable: true,
+                    example: null
+                },
+                end: {
+                    type: 'integer',
+                    nullable: true,
+                    example: null
+                },
+                cursor: {
+                    type: 'string',
+                    example: ''
+                },
+                limit: {
+                    type: 'integer',
+                    example: 2
+                },
+                nextCursor: {
+                    type: 'string',
+                    example: '20260503:680009'
+                },
+                items: {
+                    type: 'array',
+                    items: EMU_HISTORY_ITEM_SCHEMA
+                }
+            }
+        },
+        error: {
+            type: 'string',
+            example: ''
+        }
+    }
+};
+
+const RECORDS_DAILY_EXAMPLES = [
+    {
+        id: 'daily-first-page',
+        label: '第一页',
+        summary: '不额外携带身份信息，直接读取某一天的第一页数据。',
+        authMode: 'anonymous',
+        query: {
+            date: '20260503',
+            limit: '2'
+        }
+    },
+    {
+        id: 'daily-next-page',
+        label: '下一页',
+        summary: '复用服务端返回的 cursor，继续读取下一页每日记录。',
+        authMode: 'anonymous',
+        query: {
+            date: '20260503',
+            limit: '2',
+            cursor: '20260503:681106'
+        }
+    }
+] as const;
+
+const HISTORY_TRAIN_EXAMPLES = [
+    {
+        id: 'train-first-page',
+        label: '第一页',
+        summary: '读取单个车次最新的历史担当记录。',
+        authMode: 'anonymous',
+        pathParams: {
+            trainCode: 'D3319'
+        },
+        query: {
+            limit: '2'
+        }
+    },
+    {
+        id: 'train-cursor',
+        label: '游标翻页',
+        summary: '使用 cursor 继续读取同一车次的后续历史记录。',
+        authMode: 'anonymous',
+        pathParams: {
+            trainCode: 'D3319'
+        },
+        query: {
+            limit: '2',
+            cursor: '20260503:674558'
+        }
+    }
+] as const;
+
+const HISTORY_EMU_EXAMPLES = [
+    {
+        id: 'emu-first-page',
+        label: '第一页',
+        summary: '读取单个车组最新的历史担当记录。',
+        authMode: 'anonymous',
+        pathParams: {
+            emuCode: 'CR400BF-5028'
+        },
+        query: {
+            limit: '2'
+        }
+    },
+    {
+        id: 'emu-cursor',
+        label: '游标翻页',
+        summary: '使用 cursor 继续读取同一车组的后续历史记录。',
+        authMode: 'anonymous',
+        pathParams: {
+            emuCode: 'CR400BF-5028'
+        },
+        query: {
+            limit: '2',
+            cursor: '20260503:680009'
+        }
+    }
+] as const;
+
+const RECORDS_DAILY_RESPONSE_EXAMPLE = {
+    ok: true,
+    data: {
+        date: '20260503',
+        cursor: '',
+        limit: 2,
+        nextCursor: '20260503:681106',
+        items: [
+            {
+                id: '681107',
+                serviceDate: '20260503',
+                timetableId: 5096,
+                emuCode: 'CRH380A-2844',
+                trainCode: 'C9607'
+            },
+            {
+                id: '681106',
+                serviceDate: '20260503',
+                timetableId: 5096,
+                emuCode: 'CRH380A-2844',
+                trainCode: 'C9606'
+            }
+        ]
+    },
+    error: ''
+} as const;
+
+const HISTORY_TRAIN_RESPONSE_EXAMPLE = {
+    ok: true,
+    data: {
+        trainCode: 'D3319',
+        start: null,
+        end: null,
+        cursor: '',
+        limit: 2,
+        nextCursor: '20260503:674558',
+        items: [
+            {
+                id: '674559',
+                serviceDate: '20260503',
+                timetableId: 2524,
+                emuCode: 'CRH1A-1156'
+            },
+            {
+                id: '674558',
+                serviceDate: '20260503',
+                timetableId: 2524,
+                emuCode: 'CRH1A-1151'
+            }
+        ]
+    },
+    error: ''
+} as const;
+
+const HISTORY_EMU_RESPONSE_EXAMPLE = {
+    ok: true,
+    data: {
+        emuCode: 'CR400BF-5028',
+        start: null,
+        end: null,
+        cursor: '',
+        limit: 2,
+        nextCursor: '20260503:680009',
+        items: [
+            {
+                id: '680922',
+                serviceDate: '20260503',
+                timetableId: 10196,
+                trainCode: 'C2233'
+            },
+            {
+                id: '680009',
+                serviceDate: '20260503',
+                timetableId: 10191,
+                trainCode: 'C2228'
+            }
+        ]
+    },
+    error: ''
+} as const;
+
 export const DEFAULT_DOCS_API_RUNTIME_CONFIG: DocsApiRuntimeConfig = {
     versionPrefix: '/api/v1',
     apiKeyHeader: 'authorization',
@@ -189,12 +572,80 @@ function resolveResponse(
     };
 }
 
+function overrideJsonResponseContent(
+    response: DocsResolvedResponse,
+    schema: OpenApiSchema,
+    example: unknown
+): DocsResolvedResponse {
+    return {
+        ...response,
+        content: response.content.map((content) =>
+            content.contentType === 'application/json'
+                ? {
+                    ...content,
+                    schema,
+                    example
+                }
+                : content
+        )
+    };
+}
+
+function normalizeEndpoint(endpoint: DocsApiEndpoint): DocsApiEndpoint {
+    switch (endpoint.slug) {
+        case 'records-daily':
+            return {
+                ...endpoint,
+                examples: [...RECORDS_DAILY_EXAMPLES],
+                responses: endpoint.responses.map((response) =>
+                    response.statusCode === '200'
+                        ? overrideJsonResponseContent(
+                            response,
+                            DAILY_RECORDS_RESPONSE_SCHEMA,
+                            RECORDS_DAILY_RESPONSE_EXAMPLE
+                        )
+                        : response
+                )
+            };
+        case 'history-train':
+            return {
+                ...endpoint,
+                examples: [...HISTORY_TRAIN_EXAMPLES],
+                responses: endpoint.responses.map((response) =>
+                    response.statusCode === '200'
+                        ? overrideJsonResponseContent(
+                            response,
+                            TRAIN_HISTORY_RESPONSE_SCHEMA,
+                            HISTORY_TRAIN_RESPONSE_EXAMPLE
+                        )
+                        : response
+                )
+            };
+        case 'history-emu':
+            return {
+                ...endpoint,
+                examples: [...HISTORY_EMU_EXAMPLES],
+                responses: endpoint.responses.map((response) =>
+                    response.statusCode === '200'
+                        ? overrideJsonResponseContent(
+                            response,
+                            EMU_HISTORY_RESPONSE_SCHEMA,
+                            HISTORY_EMU_RESPONSE_EXAMPLE
+                        )
+                        : response
+                )
+            };
+        default:
+            return endpoint;
+    }
+}
+
 function createEndpoint(
     method: OpenApiHttpMethod,
     path: string,
     operation: OpenApiOperation
 ): DocsApiEndpoint {
-    return {
+    return normalizeEndpoint({
         slug: operation['x-slug'],
         method,
         operationId: operation.operationId,
@@ -216,7 +667,7 @@ function createEndpoint(
                     Number(left.statusCode) - Number(right.statusCode)
             ),
         examples: operation['x-examples']
-    };
+    });
 }
 
 function readOperation(pathItem: OpenApiPathItem, method: OpenApiHttpMethod) {

@@ -63,8 +63,7 @@ export default defineEventHandler(async (event) => {
                     id: String(row.id),
                     serviceDate: row.service_date,
                     timetableId: row.timetable_id,
-                    emuCode: row.emu_code,
-                    line: []
+                    emuCode: row.emu_code
                 }))
             };
         }
