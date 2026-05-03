@@ -233,10 +233,10 @@
                                     <div
                                         v-for="bucket in requestHourBuckets"
                                         :key="`request-hour:${bucket.hour}`"
-                                        class="flex min-w-0 items-end"
+                                        class="flex h-full min-w-0 items-end"
                                         :title="getRequestBucketTitle(bucket)">
                                         <div
-                                            class="flex w-full flex-col justify-end overflow-hidden rounded-[0.9rem] bg-slate-200/75"
+                                            class="flex w-full flex-col justify-end overflow-hidden bg-slate-200/75"
                                             :style="{
                                                 height: `${getRequestHourBarHeight(bucket.total, requestPeakTotal)}%`
                                             }">
@@ -396,7 +396,7 @@
                                                 <div
                                                     v-for="bucket in requestHourBuckets"
                                                     :key="`${summary.type}:${bucket.hour}`"
-                                                    class="flex min-w-0 items-end"
+                                                    class="flex h-full min-w-0 items-end"
                                                     :title="
                                                         getRequestTypeBucketTitle(
                                                             bucket,
@@ -404,7 +404,7 @@
                                                         )
                                                     ">
                                                     <div
-                                                        class="flex w-full flex-col justify-end overflow-hidden rounded-[0.85rem] bg-slate-200/75"
+                                                        class="flex w-full flex-col justify-end overflow-hidden bg-slate-200/75"
                                                         :style="{
                                                             height: `${getRequestHourBarHeight(getRequestTypeBucket(bucket, summary.type).total, getRequestTypePeakTotal(summary.type))}%`
                                                         }">
