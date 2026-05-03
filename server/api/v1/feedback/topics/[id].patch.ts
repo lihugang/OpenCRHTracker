@@ -24,6 +24,10 @@ import type {
     FeedbackTitleMode,
     UpdateFeedbackTopicResponse
 } from '~/types/feedback';
+import {
+    getFeedbackCategoryLabel,
+    getFeedbackStatusLabel
+} from '~/utils/feedback/catalog';
 import { buildFeedbackAutoTitle } from '~/utils/feedback/topic';
 
 interface UpdateFeedbackTopicBody {
@@ -92,7 +96,7 @@ export default defineEventHandler(async (event) => {
             if (nextTitle !== topic.row.title) {
                 title = nextTitle;
                 titleMode = 'custom';
-                changes.push('管理员已修改标题。');
+                changes.push(`管理员已将标题修改为 ${nextTitle}。`);
             }
         }
 
@@ -101,7 +105,7 @@ export default defineEventHandler(async (event) => {
             topic.row.secondary_type !== secondaryType
         ) {
             changes.push(
-                `管理员已调整分类为 ${primaryType}.${secondaryType || 'general'}。`
+                `分类已被设为 ${getFeedbackCategoryLabel(primaryType, secondaryType)}。`
             );
 
             if (titleMode === 'auto') {
@@ -110,7 +114,7 @@ export default defineEventHandler(async (event) => {
         }
 
         if (topic.row.status !== status) {
-            changes.push(`管理员已更新状态为 ${status}。`);
+            changes.push(`状态已被设置为 ${getFeedbackStatusLabel(status)}。`);
         }
 
         if (changes.length === 0) {

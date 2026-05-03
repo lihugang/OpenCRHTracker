@@ -6,7 +6,13 @@ import { ensureTrainProvenanceDatabaseSchema } from '~/server/libs/database/trai
 import { estimateIdleTaskDurationMs } from '~/server/services/idleTaskEstimator';
 import { listDailyRecordsAll } from '~/server/services/emuRoutesStore';
 import { clearProbeStatus } from '~/server/services/probeStatusStore';
-import { rehydrateProbeRuntimeState } from '~/server/services/probeRuntimeState';
+import {
+    rehydrateProbeRuntimeState
+} from '~/server/services/probeRuntimeState';
+import {
+    formatQrcodeDetectionMissingMappingsWarning,
+    reloadQrcodeDetectionConfig
+} from '~/server/services/qrcodeDetectionConfigStore';
 import { startTaskScheduler } from '~/server/services/taskScheduler';
 import {
     removePendingTasksByExecutor,
@@ -15,8 +21,12 @@ import {
     type ReconcileSingletonTaskResult
 } from '~/server/services/taskQueue';
 import { loadProbeAssets } from '~/server/services/probeAssetStore';
-import { warmHistoricalRecentTrainEmuIndex } from '~/server/services/historicalRecentTrainEmuIndexStore';
-import { cleanupExpiredTrainProvenance } from '~/server/services/trainProvenanceStore';
+import {
+    warmHistoricalRecentTrainEmuIndex
+} from '~/server/services/historicalRecentTrainEmuIndexStore';
+import {
+    cleanupExpiredTrainProvenance
+} from '~/server/services/trainProvenanceStore';
 import {
     BUILD_SCHEDULE_TASK_EXECUTOR,
     registerBuildScheduleTaskExecutor
@@ -25,9 +35,22 @@ import {
     GENERATE_ROUTE_REFRESH_TASKS_EXECUTOR,
     registerGenerateRouteRefreshTasksExecutor
 } from '~/server/services/taskExecutors/generateRouteRefreshTasksExecutor';
-import { registerRefreshRouteBatchTaskExecutor } from '~/server/services/taskExecutors/refreshRouteBatchTaskExecutor';
-import { registerDispatchDailyProbeTasksExecutor } from '~/server/services/taskExecutors/dispatchDailyProbeTasksExecutor';
-import { registerProbeTrainDepartureTaskExecutor } from '~/server/services/taskExecutors/probeTrainDepartureTaskExecutor';
+import {
+    registerRefreshRouteBatchTaskExecutor
+} from '~/server/services/taskExecutors/refreshRouteBatchTaskExecutor';
+import {
+    registerDispatchDailyProbeTasksExecutor
+} from '~/server/services/taskExecutors/dispatchDailyProbeTasksExecutor';
+import {
+    registerDispatchQrcodeDetectionTasksExecutor,
+    synchronizeQrcodeDetectionDispatchTasks
+} from '~/server/services/taskExecutors/dispatchQrcodeDetectionTasksExecutor';
+import {
+    registerProbeTrainDepartureTaskExecutor
+} from '~/server/services/taskExecutors/probeTrainDepartureTaskExecutor';
+import {
+    registerProbeQrcodeDetectionEmuTaskExecutor
+} from '~/server/services/taskExecutors/probeQrcodeDetectionEmuTaskExecutor';
 import {
     CLEAR_DAILY_PROBE_STATUS_TASK_EXECUTOR,
     registerClearDailyProbeStatusTaskExecutor
@@ -48,7 +71,9 @@ import {
     REBUILD_TRAIN_CIRCULATION_INDEX_TASK_EXECUTOR,
     registerRebuildTrainCirculationIndexTaskExecutor
 } from '~/server/services/taskExecutors/rebuildTrainCirculationIndexTaskExecutor';
-import { registerDetectCoupledEmuGroupTaskExecutor } from '~/server/services/taskExecutors/detectCoupledEmuGroupTaskExecutor';
+import {
+    registerDetectCoupledEmuGroupTaskExecutor
+} from '~/server/services/taskExecutors/detectCoupledEmuGroupTaskExecutor';
 import {
     REFRESH_ASSET_TASK_DEFINITIONS,
     registerRefreshAssetFileTaskExecutors
@@ -140,7 +165,6 @@ function reconcileRefreshAssetTasks(): string[] {
 }
 
 function rehydrateProbeRuntimeCache(): void {
-    const config = useConfig();
     const currentDate = getCurrentDateString();
     const dayStart = getShanghaiDayStartUnixSeconds(currentDate);
     const nextDayStart = dayStart + 24 * 60 * 60;
@@ -181,6 +205,14 @@ export default defineNitroPlugin(async () => {
         ensureTrainProvenanceDatabaseSchema();
         cleanupExpiredTrainProvenance();
         await loadProbeAssets();
+        const qrcodeDetectionConfigResult = await reloadQrcodeDetectionConfig();
+        const qrcodeDetectionWarning =
+            formatQrcodeDetectionMissingMappingsWarning(
+                qrcodeDetectionConfigResult.missingQrcodeMappings
+            );
+        if (qrcodeDetectionWarning.length > 0) {
+            logger.warn(`qrcode_detection_config_warning ${qrcodeDetectionWarning}`);
+        }
         try {
             warmHistoricalRecentTrainEmuIndex();
         } catch (error) {
@@ -197,7 +229,9 @@ export default defineNitroPlugin(async () => {
         registerRefreshRouteBatchTaskExecutor();
         registerGenerateRouteRefreshTasksExecutor();
         registerDispatchDailyProbeTasksExecutor();
+        registerDispatchQrcodeDetectionTasksExecutor();
         registerProbeTrainDepartureTaskExecutor();
+        registerProbeQrcodeDetectionEmuTaskExecutor();
         registerClearDailyProbeStatusTaskExecutor();
         registerCleanupRevokedApiKeysTaskExecutor();
         registerExportDailyRecordsTaskExecutor();
@@ -205,6 +239,7 @@ export default defineNitroPlugin(async () => {
         registerRebuildTrainCirculationIndexTaskExecutor();
         registerDetectCoupledEmuGroupTaskExecutor();
         registerRefreshAssetFileTaskExecutors();
+        await synchronizeQrcodeDetectionDispatchTasks();
 
         try {
             rehydrateProbeRuntimeCache();

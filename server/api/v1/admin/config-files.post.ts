@@ -25,16 +25,19 @@ function parseRequestBody(
     const action = typeof body.action === 'string' ? body.action.trim() : '';
 
     ensure(
-        target === 'config' || target === 'EMUList' || target === 'QRCode',
+        target === 'config' ||
+            target === 'EMUList' ||
+            target === 'QRCode' ||
+            target === 'qrcodeDetection',
         400,
         'invalid_param',
-        'target 必须是 config、EMUList 或 QRCode'
+        '不支持的配置文件目标'
     );
     ensure(
         action === 'reload_local' || action === 'refresh_remote',
         400,
         'invalid_param',
-        'action 必须是 reload_local 或 refresh_remote'
+        'action 必须为 reload_local 或 refresh_remote'
     );
 
     return {

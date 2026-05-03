@@ -79,6 +79,14 @@
             "schedule": {
                 "file": "data/schedule.json",
                 "provider": "https://storage.lihugang.top/open_crh_tracker/initialized_data/schedule.json"
+            },
+            "qrcodeDetection": {
+                "file": "data/qrcode_detection.json",
+                "provider": "https://storage.lihugang.top/open_crh_tracker/initialized_data/qrcode_detection.json",
+                "refresh": {
+                    "enabled": true,
+                    "refreshAt": "0000"
+                }
             }
         },
         "databases": {
@@ -279,13 +287,20 @@
             "windowDays": 14,
             "batchSize": 1000,
             "threshold": 0.3,
-            "dailyTimesHHmm": ["0300", "0900", "1500", "2100"]
+            "dailyTimesHHmm": [
+                "0300",
+                "0900",
+                "1500",
+                "2100"
+            ]
         },
         "circulation": {
             "windowDays": 14,
             "batchSize": 2000,
             "threshold": 0.8,
-            "dailyTimesHHmm": ["0200"]
+            "dailyTimesHHmm": [
+                "0200"
+            ]
         },
         "scheduler": {
             "pollIntervalMs": 180000,

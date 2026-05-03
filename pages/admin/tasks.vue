@@ -4,7 +4,7 @@
         :today-date-input-value="todayDateInputValue"
         :session="session"
         title="任务"
-        description="查看当前剩余任务规模，并手动创建后台任务，用于补跑导出文件或立即刷新指定车次的 route info。">
+        description="查看当前剩余任务规模，并手动创建后台任务，用于补跑导出、立即刷新指定车次线路信息、发起重联扫描或立即执行固定车组畅行码检测。">
         <template #toolbar>
             <UiButton
                 type="button"
@@ -18,38 +18,40 @@
         <div class="space-y-6">
             <UiCard :show-accent-bar="false">
                 <div class="space-y-6">
-                    <div
-                        class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                         <div class="space-y-2">
-                            <p
-                                class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
-                                Overview
+                            <p class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                                概览
                             </p>
                             <h2 class="text-2xl font-semibold text-slate-900">
                                 剩余任务概览
                             </h2>
                             <p class="text-sm leading-6 text-slate-600">
-                                统计当前任务队列中的未完成任务，10 分钟、30
-                                分钟和 1
-                                小时均为累计口径，并包含已超时但仍未执行的任务。
+                                统计当前任务队列中的待执行任务，10 分钟、30 分钟和 1 小时均为累计口径，并包含已超时但仍未执行的任务。
                             </p>
                         </div>
 
-                        <div
-                            class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-5 py-4 lg:w-[16rem]">
-                            <p
-                                class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-                                As Of
+                        <div class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-5 py-4 lg:w-[16rem]">
+                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                                统计时间
                             </p>
-                            <p
-                                class="mt-2 text-lg font-semibold text-slate-900">
-                                {{
-                                    formatTimestamp(taskOverviewData?.asOf ?? 0)
-                                }}
+                            <p class="mt-2 text-lg font-semibold text-slate-900">
+                                {{ formatTimestamp(taskOverviewData?.asOf ?? 0) }}
                             </p>
                             <p class="mt-2 text-sm leading-6 text-slate-500">
                                 当前统计截止时间
                             </p>
+                            <div class="mt-4 border-t border-slate-200 pt-4">
+                                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                                    下一任务
+                                </p>
+                                <p class="mt-2 text-lg font-semibold text-slate-900">
+                                    {{ nextTaskIdText }}
+                                </p>
+                                <p class="mt-2 text-sm leading-6 text-slate-500">
+                                    当前队列中最早待执行任务的任务 ID。
+                                </p>
+                            </div>
                         </div>
                     </div>
 
@@ -60,10 +62,7 @@
                     </div>
 
                     <div
-                        v-else-if="
-                            taskOverviewStatus === 'pending' &&
-                            !taskOverviewData
-                        "
+                        v-else-if="taskOverviewStatus === 'pending' && !taskOverviewData"
                         class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                         <div
                             v-for="index in 4"
@@ -71,19 +70,15 @@
                             class="h-28 animate-pulse rounded-[1rem] bg-slate-100/90" />
                     </div>
 
-                    <div
-                        v-else
-                        class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                    <div v-else class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                         <div
                             v-for="metric in overviewMetrics"
                             :key="metric.label"
                             class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-5 py-4">
-                            <p
-                                class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
                                 {{ metric.eyebrow }}
                             </p>
-                            <p
-                                class="mt-2 text-3xl font-semibold text-slate-900">
+                            <p class="mt-2 text-3xl font-semibold text-slate-900">
                                 {{ formatNumber(metric.value) }}
                             </p>
                             <p class="mt-2 text-sm leading-6 text-slate-500">
@@ -97,303 +92,52 @@
             <UiCard :show-accent-bar="false">
                 <div class="space-y-6">
                     <div class="space-y-2">
-                        <p
-                            class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
-                            Templates
+                        <p class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                            操作
                         </p>
                         <h2 class="text-2xl font-semibold text-slate-900">
                             手动创建任务
                         </h2>
                         <p class="text-sm leading-6 text-slate-600">
-                            按需补跑导出文件，或立即追加指定车次的 route info
-                            刷新任务。
+                            按任务模板立即补派后台任务，适用于导出补跑、线路刷新、重联扫描和固定车组畅行码检测。
                         </p>
                     </div>
 
-                    <div class="grid gap-6 xl:grid-cols-3">
-                        <div
-                            class="rounded-[1rem] border border-slate-200 bg-white/90 px-5 py-5">
+                    <div class="grid gap-6 xl:grid-cols-2">
+                        <div class="rounded-[1rem] border border-slate-200 bg-white/90 px-5 py-5">
                             <div class="space-y-6">
                                 <div class="space-y-2">
-                                    <p
-                                        class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
-                                        Export
+                                    <p class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                                        畅行码
                                     </p>
-                                    <h3
-                                        class="text-xl font-semibold text-slate-900">
-                                        指定日期重生成导出文件
+                                    <h3 class="text-xl font-semibold text-slate-900">
+                                        立即执行固定车组畅行码检测
                                     </h3>
                                     <p class="text-sm leading-6 text-slate-600">
-                                        为选定日期立即创建一个导出补跑任务，重新生成该日的
-                                        CSV 和 JSONL 导出文件。
+                                        立即按当前时间创建 `qrcode_detection.json` 中全部配置车组的畅行码检测任务，不再手动选择 `detectedAt`。
                                     </p>
                                 </div>
 
-                                <UiField
-                                    label="导出日期"
-                                    help="默认跟随管理员共享日期，可单独调整。">
-                                    <input
-                                        v-model="exportDateInput"
-                                        type="date"
-                                        class="harmony-input w-full px-4 py-3 text-base text-crh-grey-dark"
-                                        :max="todayDateInputValue" />
-                                </UiField>
-
-                                <div
-                                    v-if="exportTaskErrorMessage"
-                                    class="rounded-[1rem] border border-rose-200 bg-rose-50/80 px-4 py-4 text-sm leading-6 text-rose-700">
-                                    {{ exportTaskErrorMessage }}
-                                </div>
-
-                                <div
-                                    v-else-if="exportTaskResponse"
-                                    class="rounded-[1rem] border border-emerald-200 bg-emerald-50/80 px-4 py-4 text-sm leading-6 text-emerald-800">
-                                    <p class="font-semibold">
-                                        {{ exportTaskResponse.summary }}
+                                <div class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-4 py-4">
+                                    <p class="text-xs uppercase tracking-[0.18em] text-slate-400">
+                                        执行方式
                                     </p>
-                                    <div
-                                        class="mt-3 space-y-1 text-emerald-900">
-                                        <p>
-                                            任务 ID：{{
-                                                exportTaskResponse.createdTasks
-                                                    .map((item) => item.taskId)
-                                                    .join('、')
-                                            }}
-                                        </p>
-                                        <p>
-                                            执行时间：{{
-                                                formatExecutionTime(
-                                                    exportTaskResponse
-                                                        .createdTasks[0]
-                                                        ?.executionTime ?? 0
-                                                )
-                                            }}
-                                        </p>
-                                    </div>
+                                    <p class="mt-2 text-sm leading-6 text-slate-700">
+                                        点击后将直接使用当前北京时间作为本次检测时间，并对配置文件中的全部目标车组立即发起检测。
+                                    </p>
                                 </div>
+
+                                <StatusPanel
+                                    :error-message="qrcodeDetectionTaskErrorMessage"
+                                    :response="qrcodeDetectionTaskResponse"
+                                    :format-execution-time="formatExecutionTime" />
 
                                 <div class="flex justify-end">
                                     <UiButton
                                         type="button"
-                                        :loading="
-                                            exportTaskStatus === 'pending'
-                                        "
-                                        @click="createExportTask">
-                                        创建导出补跑任务
-                                    </UiButton>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div
-                            class="rounded-[1rem] border border-slate-200 bg-white/90 px-5 py-5">
-                            <div class="space-y-6">
-                                <div class="space-y-2">
-                                    <p
-                                        class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
-                                        Refresh
-                                    </p>
-                                    <h3
-                                        class="text-xl font-semibold text-slate-900">
-                                        手动添加车次 refresh 信息任务
-                                    </h3>
-                                    <p class="text-sm leading-6 text-slate-600">
-                                        输入多个车次后立即创建 route info
-                                        刷新任务。后端会自动标准化、去重，并按批大小拆分。
-                                    </p>
-                                </div>
-
-                                <UiField
-                                    label="车次列表"
-                                    help="支持换行、空格、英文逗号和中文逗号分隔。">
-                                    <textarea
-                                        v-model="refreshTrainCodesInput"
-                                        rows="8"
-                                        class="harmony-input w-full px-4 py-3 text-base leading-7 text-crh-grey-dark"
-                                        placeholder="例如：&#10;G1&#10;G3 G5&#10;D1234，D5678" />
-                                </UiField>
-
-                                <div
-                                    class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-4 py-4">
-                                    <p
-                                        class="text-xs uppercase tracking-[0.18em] text-slate-400">
-                                        预览
-                                    </p>
-                                    <p
-                                        class="mt-2 text-sm leading-6 text-slate-700">
-                                        已识别
-                                        {{ normalizedTrainCodesPreview.length }}
-                                        个车次
-                                    </p>
-                                    <p
-                                        class="mt-2 break-all text-sm leading-6 text-slate-500">
-                                        {{
-                                            normalizedTrainCodesPreview.length >
-                                            0
-                                                ? normalizedTrainCodesPreview.join(
-                                                      ' / '
-                                                  )
-                                                : '当前还没有可提交的有效车次'
-                                        }}
-                                    </p>
-                                </div>
-
-                                <div
-                                    v-if="refreshTaskErrorMessage"
-                                    class="rounded-[1rem] border border-rose-200 bg-rose-50/80 px-4 py-4 text-sm leading-6 text-rose-700">
-                                    {{ refreshTaskErrorMessage }}
-                                </div>
-
-                                <div
-                                    v-else-if="refreshTaskResponse"
-                                    class="rounded-[1rem] border border-emerald-200 bg-emerald-50/80 px-4 py-4 text-sm leading-6 text-emerald-800">
-                                    <p class="font-semibold">
-                                        {{ refreshTaskResponse.summary }}
-                                    </p>
-                                    <div
-                                        class="mt-3 space-y-1 text-emerald-900">
-                                        <p>
-                                            创建任务数：{{
-                                                refreshTaskResponse.createdCount
-                                            }}
-                                        </p>
-                                        <p>
-                                            任务 ID：{{
-                                                refreshTaskResponse.createdTasks
-                                                    .map((item) => item.taskId)
-                                                    .join('、')
-                                            }}
-                                        </p>
-                                        <p>
-                                            归一化车次：{{
-                                                refreshTaskResponse.normalizedTrainCodes?.join(
-                                                    ' / '
-                                                ) ?? '--'
-                                            }}
-                                        </p>
-                                    </div>
-                                </div>
-
-                                <div class="flex justify-end">
-                                    <UiButton
-                                        type="button"
-                                        :loading="
-                                            refreshTaskStatus === 'pending'
-                                        "
-                                        @click="createRefreshTask">
-                                        创建立即刷新任务
-                                    </UiButton>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div
-                            class="rounded-[1rem] border border-slate-200 bg-white/90 px-5 py-5">
-                            <div class="space-y-6">
-                                <div class="space-y-2">
-                                    <p
-                                        class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
-                                        Coupling
-                                    </p>
-                                    <h3
-                                        class="text-xl font-semibold text-slate-900">
-                                        手动新增重联扫描任务
-                                    </h3>
-                                    <p class="text-sm leading-6 text-slate-600">
-                                        由服务端提供铁路局和车型选项，提交后立即入队一次重联扫描。
-                                    </p>
-                                </div>
-
-                                <UiField
-                                    label="铁路局"
-                                    help="选项来自当前服务端加载的 EMU 资产。">
-                                    <UiSelect
-                                        v-model="selectedCouplingScanBureau"
-                                        :disabled="
-                                            couplingScanBureauOptions.length ===
-                                            0
-                                        "
-                                        placeholder="暂无可用铁路局"
-                                        mobile-sheet-title="选择铁路局"
-                                        mobile-sheet-eyebrow="BUREAU"
-                                        :options="couplingScanBureauOptions" />
-                                </UiField>
-
-                                <UiField
-                                    label="车型"
-                                    help="会根据当前铁路局自动筛选可用车型。">
-                                    <UiSelect
-                                        v-model="selectedCouplingScanModel"
-                                        :disabled="
-                                            currentCouplingScanModelOptions.length ===
-                                            0
-                                        "
-                                        placeholder="暂无可用车型"
-                                        mobile-sheet-title="选择车型"
-                                        mobile-sheet-eyebrow="MODEL"
-                                        :options="
-                                            currentCouplingScanModelOptions
-                                        " />
-                                </UiField>
-
-                                <div
-                                    class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-4 py-4">
-                                    <p
-                                        class="text-xs uppercase tracking-[0.18em] text-slate-400">
-                                        预览
-                                    </p>
-                                    <p
-                                        class="mt-2 text-sm leading-6 text-slate-700">
-                                        {{
-                                            canCreateCouplingScanTask
-                                                ? `${selectedCouplingScanBureau} / ${selectedCouplingScanModel}`
-                                                : '当前没有可提交的重联扫描组合'
-                                        }}
-                                    </p>
-                                </div>
-
-                                <div
-                                    v-if="couplingScanTaskErrorMessage"
-                                    class="rounded-[1rem] border border-rose-200 bg-rose-50/80 px-4 py-4 text-sm leading-6 text-rose-700">
-                                    {{ couplingScanTaskErrorMessage }}
-                                </div>
-
-                                <div
-                                    v-else-if="couplingScanTaskResponse"
-                                    class="rounded-[1rem] border border-emerald-200 bg-emerald-50/80 px-4 py-4 text-sm leading-6 text-emerald-800">
-                                    <p class="font-semibold">
-                                        {{ couplingScanTaskResponse.summary }}
-                                    </p>
-                                    <div
-                                        class="mt-3 space-y-1 text-emerald-900">
-                                        <p>
-                                            任务 ID：{{
-                                                couplingScanTaskResponse.createdTasks
-                                                    .map((item) => item.taskId)
-                                                    .join('、')
-                                            }}
-                                        </p>
-                                        <p>
-                                            执行时间：{{
-                                                formatExecutionTime(
-                                                    couplingScanTaskResponse
-                                                        .createdTasks[0]
-                                                        ?.executionTime ?? 0
-                                                )
-                                            }}
-                                        </p>
-                                    </div>
-                                </div>
-
-                                <div class="flex justify-end">
-                                    <UiButton
-                                        type="button"
-                                        :disabled="!canCreateCouplingScanTask"
-                                        :loading="
-                                            couplingScanTaskStatus === 'pending'
-                                        "
-                                        @click="createCouplingScanTask">
-                                        创建重联扫描任务
+                                        :loading="qrcodeDetectionTaskStatus === 'pending'"
+                                        @click="createQrcodeDetectionTask">
+                                        创建固定车组畅行码检测任务
                                     </UiButton>
                                 </div>
                             </div>
@@ -411,6 +155,7 @@ import type {
     AdminCreateTaskResponse,
     AdminCouplingScanOptionGroup,
     AdminDetectCoupledEmuGroupNowTaskRequest,
+    AdminRunQrcodeDetectionNowTaskRequest,
     AdminTaskOverviewResponse,
     AdminRefreshRouteInfoNowTaskRequest,
     AdminRegenerateDailyExportTaskRequest
@@ -425,6 +170,61 @@ definePageMeta({
 });
 
 type TaskRequestStatus = 'idle' | 'pending';
+
+const StatusPanel = defineComponent({
+    props: {
+        errorMessage: {
+            type: String,
+            required: true
+        },
+        response: {
+            type: Object as PropType<AdminCreateTaskResponse | null>,
+            required: true
+        },
+        formatExecutionTime: {
+            type: Function as PropType<(timestamp: number) => string>,
+            required: true
+        }
+    },
+    setup(props) {
+        return () => {
+            if (props.errorMessage.length > 0) {
+                return h(
+                    'div',
+                    {
+                        class: 'rounded-[1rem] border border-rose-200 bg-rose-50/80 px-4 py-4 text-sm leading-6 text-rose-700'
+                    },
+                    props.errorMessage
+                );
+            }
+
+            if (!props.response) {
+                return null;
+            }
+
+            return h(
+                'div',
+                {
+                    class: 'rounded-[1rem] border border-emerald-200 bg-emerald-50/80 px-4 py-4 text-sm leading-6 text-emerald-800'
+                },
+                [
+                    h('p', { class: 'font-semibold' }, props.response.summary),
+                    h('div', { class: 'mt-3 space-y-1 text-emerald-900' }, [
+                        h('p', `已创建任务：${props.response.createdCount}`),
+                        h(
+                            'p',
+                            `任务 ID：${props.response.createdTasks.map((item) => item.taskId).join(', ') || '--'}`
+                        ),
+                        h(
+                            'p',
+                            `执行时间：${props.formatExecutionTime(props.response.createdTasks[0]?.executionTime ?? 0)}`
+                        )
+                    ])
+                ]
+            );
+        };
+    }
+});
 
 const requestFetch = import.meta.server ? useRequestFetch() : $fetch;
 const { session } = useAuthState();
@@ -446,6 +246,10 @@ const refreshTaskResponse = ref<AdminCreateTaskResponse | null>(null);
 const couplingScanTaskStatus = ref<TaskRequestStatus>('idle');
 const couplingScanTaskErrorMessage = ref('');
 const couplingScanTaskResponse = ref<AdminCreateTaskResponse | null>(null);
+
+const qrcodeDetectionTaskStatus = ref<TaskRequestStatus>('idle');
+const qrcodeDetectionTaskErrorMessage = ref('');
+const qrcodeDetectionTaskResponse = ref<AdminCreateTaskResponse | null>(null);
 
 async function fetchTaskOverview() {
     const response = await requestFetch<
@@ -484,7 +288,7 @@ const normalizedTrainCodesPreview = computed(() =>
     Array.from(
         new Set(
             refreshTrainCodesInput.value
-                .split(/[\s,，、]+/u)
+                .split(/[\s,，]+/u)
                 .map((item) => item.trim().toUpperCase())
                 .filter((item) => item.length > 0)
         )
@@ -524,25 +328,29 @@ const taskOverviewErrorMessage = computed(() =>
         ? getApiErrorMessage(taskOverviewError.value, '加载任务概览失败。')
         : ''
 );
+const nextTaskIdText = computed(() => {
+    const nextTaskId = taskOverviewData.value?.nextTaskId ?? null;
+    return nextTaskId === null ? '--' : `#${nextTaskId}`;
+});
 const overviewMetrics = computed(() => [
     {
-        eyebrow: 'Total',
-        label: '当前剩余任务数',
+        eyebrow: '总量',
+        label: '全部待执行任务',
         value: taskOverviewData.value?.remainingTotal ?? 0
     },
     {
-        eyebrow: '10m',
-        label: '10 分钟内剩余任务数',
+        eyebrow: '10 分钟',
+        label: '10 分钟内待执行任务',
         value: taskOverviewData.value?.remainingWithin10Minutes ?? 0
     },
     {
-        eyebrow: '30m',
-        label: '30 分钟内剩余任务数',
+        eyebrow: '30 分钟',
+        label: '30 分钟内待执行任务',
         value: taskOverviewData.value?.remainingWithin30Minutes ?? 0
     },
     {
-        eyebrow: '1h',
-        label: '1 小时内剩余任务数',
+        eyebrow: '1 小时',
+        label: '1 小时内待执行任务',
         value: taskOverviewData.value?.remainingWithin1Hour ?? 0
     }
 ]);
@@ -609,6 +417,14 @@ async function postAdminTask(body: AdminCreateTaskRequest) {
     return response.data;
 }
 
+async function refreshOverviewSilently() {
+    try {
+        await refreshTaskOverview();
+    } catch {
+        // Preserve success state when overview refresh fails.
+    }
+}
+
 async function createExportTask() {
     exportTaskStatus.value = 'pending';
     exportTaskErrorMessage.value = '';
@@ -623,15 +439,11 @@ async function createExportTask() {
 
     try {
         exportTaskResponse.value = await postAdminTask(body);
-        try {
-            await refreshTaskOverview();
-        } catch {
-            // Keep the creation success state visible even if overview refresh fails.
-        }
+        await refreshOverviewSilently();
     } catch (error) {
         exportTaskErrorMessage.value = getApiErrorMessage(
             error,
-            '创建导出补跑任务失败。'
+            '创建导出任务失败。'
         );
     } finally {
         exportTaskStatus.value = 'idle';
@@ -652,15 +464,11 @@ async function createRefreshTask() {
 
     try {
         refreshTaskResponse.value = await postAdminTask(body);
-        try {
-            await refreshTaskOverview();
-        } catch {
-            // Keep the creation success state visible even if overview refresh fails.
-        }
+        await refreshOverviewSilently();
     } catch (error) {
         refreshTaskErrorMessage.value = getApiErrorMessage(
             error,
-            '创建车次 refresh 任务失败。'
+            '创建线路刷新任务失败。'
         );
     } finally {
         refreshTaskStatus.value = 'idle';
@@ -669,7 +477,7 @@ async function createRefreshTask() {
 
 async function createCouplingScanTask() {
     if (!canCreateCouplingScanTask.value) {
-        couplingScanTaskErrorMessage.value = '当前没有可提交的重联扫描组合。';
+        couplingScanTaskErrorMessage.value = '请先选择有效的路局和车型。';
         return;
     }
 
@@ -687,11 +495,7 @@ async function createCouplingScanTask() {
 
     try {
         couplingScanTaskResponse.value = await postAdminTask(body);
-        try {
-            await refreshTaskOverview();
-        } catch {
-            // Keep the creation success state visible even if overview refresh fails.
-        }
+        await refreshOverviewSilently();
     } catch (error) {
         couplingScanTaskErrorMessage.value = getApiErrorMessage(
             error,
@@ -699,6 +503,29 @@ async function createCouplingScanTask() {
         );
     } finally {
         couplingScanTaskStatus.value = 'idle';
+    }
+}
+
+async function createQrcodeDetectionTask() {
+    qrcodeDetectionTaskStatus.value = 'pending';
+    qrcodeDetectionTaskErrorMessage.value = '';
+    qrcodeDetectionTaskResponse.value = null;
+
+    const body: AdminRunQrcodeDetectionNowTaskRequest = {
+        type: 'run_qrcode_detection_now',
+        payload: {}
+    };
+
+    try {
+        qrcodeDetectionTaskResponse.value = await postAdminTask(body);
+        await refreshOverviewSilently();
+    } catch (error) {
+        qrcodeDetectionTaskErrorMessage.value = getApiErrorMessage(
+            error,
+            '创建固定车组畅行码检测任务失败。'
+        );
+    } finally {
+        qrcodeDetectionTaskStatus.value = 'idle';
     }
 }
 
@@ -725,7 +552,7 @@ function formatNumber(value: number) {
 useSiteSeo({
     title: '任务 | Open CRH Tracker',
     description:
-        '管理员任务页，用于查看剩余任务概览，并手动补跑导出文件、立即刷新车次 route info，以及新增重联扫描任务。',
+        '管理员任务页面，用于查看待执行任务规模，并手动创建导出、线路刷新、重联扫描和固定车组畅行码检测任务。',
     path: '/admin/tasks',
     noindex: true
 });

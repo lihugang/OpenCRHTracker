@@ -44,6 +44,10 @@ export interface RemovePendingTasksByExecutorResult {
     removedTaskIds: number[];
 }
 
+export interface RemovePendingTasksByExecutorAndArgsResult {
+    removedTaskIds: number[];
+}
+
 interface NormalizedTaskInsert {
     executor: string;
     argumentsJson: string;
@@ -64,6 +68,12 @@ let reconcileSingletonTaskTransaction:
 let removePendingTasksByExecutorTransaction:
     | ((executor: string) => RemovePendingTasksByExecutorResult)
     | null = null;
+let removePendingTasksByExecutorAndArgsTransaction:
+    | ((
+          executor: string,
+          argumentsJson: string
+      ) => RemovePendingTasksByExecutorAndArgsResult)
+    | null = null;
 
 type EnqueueTasksTransaction = (
     tasks: readonly NormalizedTaskInsert[]
@@ -75,6 +85,10 @@ type ReconcileSingletonTaskTransaction = (
 type RemovePendingTasksByExecutorTransaction = (
     executor: string
 ) => RemovePendingTasksByExecutorResult;
+type RemovePendingTasksByExecutorAndArgsTransaction = (
+    executor: string,
+    argumentsJson: string
+) => RemovePendingTasksByExecutorAndArgsResult;
 
 function normalizeTaskInsert(
     executor: string,
@@ -253,6 +267,61 @@ function getRemovePendingTasksByExecutorTransaction(): RemovePendingTasksByExecu
     return removePendingTasksByExecutorTransaction;
 }
 
+function getRemovePendingTasksByExecutorAndArgsTransaction(): RemovePendingTasksByExecutorAndArgsTransaction {
+    if (removePendingTasksByExecutorAndArgsTransaction) {
+        return removePendingTasksByExecutorAndArgsTransaction;
+    }
+
+    const completeTaskStatement = taskStatements.getStatement('completeTask');
+    const selectPendingTasksByExecutorStatement = taskStatements.getStatement(
+        'selectPendingTasksByExecutor'
+    );
+
+    removePendingTasksByExecutorAndArgsTransaction = useTaskDatabase().transaction(
+        (
+            executor: string,
+            argumentsJson: string
+        ): RemovePendingTasksByExecutorAndArgsResult => {
+            const normalizedExecutor = executor.trim();
+            if (normalizedExecutor.length === 0) {
+                throw new Error('executor must be non-empty');
+            }
+
+            const existingTasks = selectPendingTasksByExecutorStatement.all(
+                normalizedExecutor
+            ) as TaskRecord[];
+            const removedTaskIds: number[] = [];
+
+            for (const existingTask of existingTasks) {
+                if (existingTask.arguments !== argumentsJson) {
+                    continue;
+                }
+
+                completeTaskStatement.run(existingTask.id);
+                removedTaskIds.push(existingTask.id);
+            }
+
+            return {
+                removedTaskIds
+            };
+        }
+    );
+
+    return removePendingTasksByExecutorAndArgsTransaction;
+}
+
+function getPendingTasksByExecutor(executor: string): TaskRecord[] {
+    const normalizedExecutor = executor.trim();
+    if (normalizedExecutor.length === 0) {
+        throw new Error('executor must be non-empty');
+    }
+
+    return taskStatements.all<TaskRecord>(
+        'selectPendingTasksByExecutor',
+        normalizedExecutor
+    );
+}
+
 export function enqueueTask(
     executor: string,
     args: unknown,
@@ -315,6 +384,92 @@ export function removePendingTasksByExecutor(
     executor: string
 ): RemovePendingTasksByExecutorResult {
     return getRemovePendingTasksByExecutorTransaction()(executor);
+}
+
+export function listPendingTasksByExecutor(executor: string): TaskRecord[] {
+    return getPendingTasksByExecutor(executor);
+}
+
+export function removePendingTasksByExecutorAndArgs(
+    executor: string,
+    args: unknown
+): RemovePendingTasksByExecutorAndArgsResult {
+    const normalizedTask = normalizeTaskInsert(executor, args, 0);
+    return getRemovePendingTasksByExecutorAndArgsTransaction()(
+        normalizedTask.executor,
+        normalizedTask.argumentsJson
+    );
+}
+
+export function reconcileFuturePendingTaskByExecutorAndArgs(
+    executor: string,
+    args: unknown,
+    executionTime: number,
+    options: EnqueueTaskOptions = {}
+): ReconcileSingletonTaskResult {
+    const normalizedTask = normalizeTaskInsert(
+        executor,
+        args,
+        executionTime,
+        options
+    );
+    const nowSeconds = getNowSeconds();
+    const matchingTasks = getPendingTasksByExecutor(normalizedTask.executor)
+        .filter((task) => task.arguments === normalizedTask.argumentsJson)
+        .sort((left, right) => {
+            if (left.executionTime !== right.executionTime) {
+                return left.executionTime - right.executionTime;
+            }
+
+            return left.id - right.id;
+        });
+
+    if (matchingTasks.length === 0) {
+        const taskId = enqueueTask(
+            normalizedTask.executor,
+            args,
+            executionTime,
+            options
+        );
+        return {
+            action: 'created',
+            taskId,
+            removedTaskIds: [],
+            reusedExecutionTime: null
+        };
+    }
+
+    if (matchingTasks[0]!.executionTime <= nowSeconds) {
+        const removed = removePendingTasksByExecutorAndArgs(
+            normalizedTask.executor,
+            args
+        );
+        const taskId = enqueueTask(
+            normalizedTask.executor,
+            args,
+            executionTime,
+            options
+        );
+        return {
+            action: 'replaced_overdue',
+            taskId,
+            removedTaskIds: removed.removedTaskIds,
+            reusedExecutionTime: null
+        };
+    }
+
+    const removedTaskIds: number[] = [];
+    for (const duplicateTask of matchingTasks.slice(1)) {
+        taskStatements.run('completeTask', duplicateTask.id);
+        removedTaskIds.push(duplicateTask.id);
+    }
+
+    return {
+        action: 'reused_future',
+        taskId: matchingTasks[0]!.id,
+        removedTaskIds,
+        reusedExecutionTime: matchingTasks[0]!.executionTime
+    };
 }
 
 export function enqueueTaskAfterDelaySeconds(

@@ -286,9 +286,7 @@ export interface AdminDetectCoupledEmuGroupNowTaskRequest {
 
 export interface AdminRunQrcodeDetectionNowTaskRequest {
     type: 'run_qrcode_detection_now';
-    payload: {
-        detectedAt: string;
-    };
+    payload: Record<string, never>;
 }
 
 export type AdminCreateTaskRequest =
@@ -319,7 +317,6 @@ export interface AdminTaskOverviewResponse {
     remainingWithin30Minutes: number;
     remainingWithin1Hour: number;
     couplingScanOptions: AdminCouplingScanOptionGroup[];
-    qrcodeDetectionTimes: string[];
 }
 export interface AdminRevokeAllWebappTokensResponse {
     issuer: 'webapp';

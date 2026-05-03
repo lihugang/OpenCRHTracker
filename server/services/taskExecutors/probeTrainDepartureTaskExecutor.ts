@@ -44,6 +44,10 @@ import { registerTaskExecutor } from '~/server/services/taskExecutorRegistry';
 import { enqueueTask } from '~/server/services/taskQueue';
 import { DETECT_COUPLED_EMU_GROUP_TASK_EXECUTOR } from '~/server/services/taskExecutors/detectCoupledEmuGroupTaskExecutor';
 import {
+    applyResolvedProbeResult,
+    queueCoupledDetectionTask
+} from '~/server/services/taskExecutors/probeResolutionShared';
+import {
     markCurrentTrainProvenanceTaskSkipped,
     recordCurrentTrainProvenanceEventsForTrainCodes
 } from '~/server/services/trainProvenanceRecorder';
@@ -717,20 +721,6 @@ function requeueCurrentProbeTaskWithOverlapDelay(
     );
 }
 
-function queueCoupledDetectionTask(mainRecord: EmuListRecord): number {
-    const delaySeconds =
-        useConfig().spider.scheduleProbe.coupling.detectDelaySeconds;
-    const taskArgs: CoupledDetectionTaskArgs = {
-        bureau: mainRecord.bureau,
-        model: mainRecord.model
-    };
-    return enqueueTask(
-        DETECT_COUPLED_EMU_GROUP_TASK_EXECUTOR,
-        taskArgs,
-        getNowSeconds() + delaySeconds
-    );
-}
-
 function collectKnownStatusGroup(
     rows: ProbeStatusRow[],
     currentEmuCode: string,
@@ -1367,40 +1357,19 @@ async function applyResolvedResult(
     status: ProbeStatusValue,
     nowSeconds: number
 ): Promise<void> {
-    const notificationCandidates = collectLookupStatusNotificationCandidates(
+    await applyResolvedProbeResult({
+        trainCode: args.trainCode,
+        trainInternalCode: args.trainInternalCode,
         allTrainCodes,
         allEmuCodes,
-        args.startAt,
-        status
-    );
-    const groupKey = buildRunningEmuGroupKey(
-        args.trainCode,
-        args.trainInternalCode,
-        args.startAt
-    );
-    for (const trainCode of allTrainCodes) {
-        for (const emuCode of allEmuCodes) {
-            ensureProbeStatus(trainCode, emuCode, args.startAt, status);
-        }
-    }
-
-    persistDailyRoutes(
-        allTrainCodes,
-        allEmuCodes,
-        args.startStation,
-        args.endStation,
-        args.startAt,
-        args.endAt
-    );
-    markEmuCodesAssignedToday(
-        allEmuCodes,
+        startStation: args.startStation,
+        endStation: args.endStation,
+        startAt: args.startAt,
+        endAt: args.endAt,
         trainKey,
-        groupKey,
-        args.startAt,
+        status,
         nowSeconds
-    );
-    markQueriedTrainKey(trainKey);
-    await notifyLookupStatusChanges(notificationCandidates);
+    });
 }
 
 async function tryReuseHistoricalProbeStatus(

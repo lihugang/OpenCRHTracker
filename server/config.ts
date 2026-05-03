@@ -161,6 +161,7 @@ export interface Config {
         assets: {
             EMUList: RefreshableAssetConfig;
             QRCode: RefreshableAssetConfig;
+            qrcodeDetection: RefreshableAssetConfig;
             schedule: AssetConfig;
         };
         databases: Record<
@@ -964,6 +965,10 @@ function validateConfig(raw: unknown): Config {
                     assets.QRCode,
                     'data.assets.QRCode'
                 ),
+                qrcodeDetection: parseRefreshableAssetConfig(
+                    assets.qrcodeDetection,
+                    'data.assets.qrcodeDetection'
+                ),
                 schedule: parseAssetConfig(
                     assets.schedule,
                     'data.assets.schedule'
@@ -1675,7 +1680,7 @@ function validateConfig(raw: unknown): Config {
             configResult.task.circulation.threshold <= 1,
         'task.circulation.threshold must be > 0 and <= 1'
     );
-    for (const key of ['EMUList', 'QRCode'] as const) {
+    for (const key of ['EMUList', 'QRCode', 'qrcodeDetection'] as const) {
         const asset = configResult.data.assets[key];
         try {
             parseDailyTimeHHmm(asset.refresh.refreshAt);

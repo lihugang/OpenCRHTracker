@@ -11,7 +11,7 @@ export interface EnsureAssetOptions {
     defaultContent: string;
     forceRefresh?: boolean;
     allowProvider?: boolean;
-    validateContent?: (content: string) => void;
+    validateContent?: (content: string) => void | Promise<void>;
 }
 
 export interface EnsureAssetResult {
@@ -28,7 +28,7 @@ export interface RefreshAssetResult {
 }
 
 export interface RefreshAssetOptions {
-    validateContent?: (content: string) => void;
+    validateContent?: (content: string) => void | Promise<void>;
 }
 
 function assertStringContent(
@@ -114,7 +114,7 @@ export async function refreshAssetFileFromProvider(
         const content = await response.text();
         if (options.validateContent) {
             try {
-                options.validateContent(content);
+                await options.validateContent(content);
             } catch (error) {
                 const message =
                     error instanceof Error
@@ -186,7 +186,7 @@ export async function ensureAssetFile(
                 const content = await response.text();
                 if (validateContent) {
                     try {
-                        validateContent(content);
+                        await validateContent(content);
                     } catch (error) {
                         const message =
                             error instanceof Error

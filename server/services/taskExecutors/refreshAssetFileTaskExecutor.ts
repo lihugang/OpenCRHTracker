@@ -2,9 +2,19 @@ import getLogger from '~/server/libs/log4js';
 import useConfig from '~/server/config';
 import {
     invalidateProbeAssetsCache,
-    validateDownloadedEmuListAssetText
+    preloadProbeAssetsFromLocalFiles,
+    validateDownloadedEmuListAssetText,
+    validateDownloadedQrCodeAssetText
 } from '~/server/services/probeAssetStore';
+import {
+    invalidateQrcodeDetectionConfigCache,
+    reloadQrcodeDetectionConfig,
+    validateQrcodeDetectionConfigText
+} from '~/server/services/qrcodeDetectionConfigStore';
 import { registerTaskExecutor } from '~/server/services/taskExecutorRegistry';
+import {
+    synchronizeQrcodeDetectionDispatchTasks
+} from '~/server/services/taskExecutors/dispatchQrcodeDetectionTasksExecutor';
 import { enqueueTask } from '~/server/services/taskQueue';
 import {
     formatShanghaiDateTime,
@@ -15,7 +25,7 @@ import {
     type AssetKey
 } from '~/server/utils/dataAssets/store';
 
-type RefreshableAssetKey = 'EMUList' | 'QRCode';
+type RefreshableAssetKey = 'EMUList' | 'QRCode' | 'qrcodeDetection';
 
 interface RefreshAssetTaskDefinition {
     key: RefreshableAssetKey;
@@ -25,6 +35,8 @@ interface RefreshAssetTaskDefinition {
 
 export const REFRESH_EMU_LIST_ASSET_TASK_EXECUTOR = 'refresh_emu_list_asset';
 export const REFRESH_QR_CODE_ASSET_TASK_EXECUTOR = 'refresh_qrcode_asset';
+export const REFRESH_QRCODE_DETECTION_ASSET_TASK_EXECUTOR =
+    'refresh_qrcode_detection_asset';
 
 export const REFRESH_ASSET_TASK_DEFINITIONS: readonly RefreshAssetTaskDefinition[] =
     [
@@ -37,6 +49,11 @@ export const REFRESH_ASSET_TASK_DEFINITIONS: readonly RefreshAssetTaskDefinition
             key: 'QRCode',
             executor: REFRESH_QR_CODE_ASSET_TASK_EXECUTOR,
             logger: getLogger('task-executor:refresh-asset:QRCode')
+        },
+        {
+            key: 'qrcodeDetection',
+            executor: REFRESH_QRCODE_DETECTION_ASSET_TASK_EXECUTOR,
+            logger: getLogger('task-executor:refresh-asset:qrcodeDetection')
         }
     ] as const;
 
@@ -52,6 +69,20 @@ function getRefreshDefinition(
         throw new Error(`refresh asset task definition not found for ${key}`);
     }
     return definition;
+}
+
+async function reloadQrcodeDependenciesAfterProbeAssetChange(): Promise<void> {
+    invalidateProbeAssetsCache();
+    preloadProbeAssetsFromLocalFiles();
+    invalidateQrcodeDetectionConfigCache();
+    await reloadQrcodeDetectionConfig();
+    await synchronizeQrcodeDetectionDispatchTasks();
+}
+
+async function reloadQrcodeDetectionAssetOnly(): Promise<void> {
+    invalidateQrcodeDetectionConfigCache();
+    await reloadQrcodeDetectionConfig();
+    await synchronizeQrcodeDetectionDispatchTasks();
 }
 
 function enqueueNextRefreshTask(
@@ -76,16 +107,23 @@ async function executeRefreshAssetTask(
     try {
         const result = await refreshAssetFileFromProvider(
             definition.key as AssetKey,
-            definition.key === 'EMUList'
-                ? {
-                      validateContent: (content) => {
-                          validateDownloadedEmuListAssetText(content);
-                      }
-                  }
-                : {}
+            {
+                validateContent:
+                    definition.key === 'EMUList'
+                        ? validateDownloadedEmuListAssetText
+                        : definition.key === 'QRCode'
+                          ? validateDownloadedQrCodeAssetText
+                          : async (content) => {
+                                await validateQrcodeDetectionConfigText(content);
+                            }
+            }
         );
         if (result.refreshed) {
-            invalidateProbeAssetsCache();
+            if (definition.key === 'qrcodeDetection') {
+                await reloadQrcodeDetectionAssetOnly();
+            } else {
+                await reloadQrcodeDependenciesAfterProbeAssetChange();
+            }
             definition.logger.info(
                 `refresh_succeeded asset=${definition.key} file=${result.filePath}`
             );

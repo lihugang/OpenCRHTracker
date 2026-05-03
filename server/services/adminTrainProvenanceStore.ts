@@ -959,6 +959,16 @@ function formatEventSummary(
             return `畅行码校验不一致，已重新排队`;
         case 'seat_verification_mismatch_exhausted':
             return '畅行码校验不一致，重试已耗尽';
+        case 'qrcode_detection_dispatch_completed':
+            return `QR detection dispatch completed${linkedTaskText}`;
+        case 'qrcode_detection_skipped':
+            return `QR detection skipped: ${event.result || 'skipped'}`;
+        case 'qrcode_detection_request_failed':
+            return `QR detection request failed: ${event.result || 'request_failed'}`;
+        case 'qrcode_detection_succeeded':
+            return event.result === 'tracked_route'
+                ? 'QR detection matched a tracked route'
+                : 'QR detection succeeded on an untracked route';
         case 'resolved_single':
             return '已判定为单组';
         case 'resolved_from_status':

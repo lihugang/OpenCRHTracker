@@ -9,8 +9,12 @@ import {
     type EnqueueTaskInput
 } from '~/server/services/taskQueue';
 import { DETECT_COUPLED_EMU_GROUP_TASK_EXECUTOR } from '~/server/services/taskExecutors/detectCoupledEmuGroupTaskExecutor';
+import {
+    enqueueQrcodeDetectionProbeTasksForDetectedAt
+} from '~/server/services/taskExecutors/dispatchQrcodeDetectionTasksExecutor';
 import { EXPORT_DAILY_RECORDS_MANUAL_TASK_EXECUTOR } from '~/server/services/taskExecutors/exportDailyRecordsTaskExecutor';
 import { loadProbeAssets } from '~/server/services/probeAssetStore';
+import { PROBE_QRCODE_DETECTION_EMU_TASK_EXECUTOR } from '~/server/services/taskExecutors/probeQrcodeDetectionEmuTaskExecutor';
 import { REFRESH_ROUTE_BATCH_TASK_EXECUTOR } from '~/server/services/taskExecutors/refreshRouteBatchTaskExecutor';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
 import { loadPublishedScheduleState } from '~/server/utils/12306/scheduleProbe/stateStore';
@@ -90,6 +94,23 @@ function compareByZhCnLocale(left: string, right: string): number {
     return left.localeCompare(right, 'zh-CN');
 }
 
+function getCurrentShanghaiHHmm(): string {
+    const formatter = new Intl.DateTimeFormat('zh-CN', {
+        timeZone: 'Asia/Shanghai',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+    });
+    const parts = formatter.formatToParts(new Date());
+    const hour = parts.find((part) => part.type === 'hour')?.value ?? '';
+    const minute = parts.find((part) => part.type === 'minute')?.value ?? '';
+    const detectedAt = `${hour}${minute}`;
+    if (!/^\d{4}$/.test(detectedAt)) {
+        throw new Error('failed to format current Shanghai HHmm');
+    }
+    return detectedAt;
+}
+
 async function listAdminCouplingScanOptions(): Promise<
     AdminCouplingScanOptionGroup[]
 > {
@@ -132,13 +153,13 @@ async function normalizeCouplingScanTarget(
         normalizedBureau.length > 0,
         400,
         'invalid_param',
-        'bureau 必须是非空字符串'
+        '路局不能为空'
     );
     ensure(
         normalizedModel.length > 0,
         400,
         'invalid_param',
-        'model 必须是非空字符串'
+        '车型不能为空'
     );
 
     const assets = await loadProbeAssets();
@@ -147,7 +168,7 @@ async function normalizeCouplingScanTarget(
         assets.emuListByBureauAndModel.has(groupKey),
         400,
         'invalid_param',
-        'bureau 和 model 组合无效或已过期'
+        '当前资产中不存在该路局和车型组合'
     );
 
     return {
@@ -163,7 +184,7 @@ function assertPublishedScheduleReadyForRefresh(): void {
         state !== null,
         409,
         'schedule_not_ready',
-        '当前没有可用的当日运行图，无法创建车次 refresh 任务'
+        '当日已发布时刻表暂不可用'
     );
 
     const currentDate = getCurrentDateString();
@@ -171,7 +192,7 @@ function assertPublishedScheduleReadyForRefresh(): void {
         state.date === currentDate,
         409,
         'schedule_not_ready',
-        '当前 published schedule 不是今天，无法创建车次 refresh 任务'
+        '当日已发布时刻表尚未更新到今天'
     );
 }
 
@@ -202,7 +223,7 @@ function createRegenerateDailyExportTask(
             EXPORT_DAILY_RECORDS_MANUAL_TASK_EXECUTOR,
             executionTime
         ),
-        summary: `已创建 1 个导出重生成任务，将立即重新生成 ${request.payload.date} 的导出文件。`,
+        summary: `已创建 1 条 ${request.payload.date} 的每日导出重建任务。`,
         date: request.payload.date
     };
 }
@@ -256,8 +277,8 @@ function createRefreshRouteInfoNowTask(
         ),
         summary:
             taskIds.length === 1
-                ? `已创建 1 个 route refresh 任务，将立即刷新 ${normalizedTrainCodes.length} 个车次。`
-                : `已创建 ${taskIds.length} 个 route refresh 任务，将立即分批刷新 ${normalizedTrainCodes.length} 个车次。`,
+                ? `已为 ${normalizedTrainCodes.length} 个车次创建 1 条线路刷新任务。`
+                : `已为 ${normalizedTrainCodes.length} 个车次创建 ${taskIds.length} 条线路刷新任务。`,
         normalizedTrainCodes
     };
 }
@@ -291,7 +312,37 @@ async function createDetectCoupledEmuGroupNowTask(
             DETECT_COUPLED_EMU_GROUP_TASK_EXECUTOR,
             executionTime
         ),
-        summary: `已创建 1 个重联扫描任务，将立即扫描 ${target.bureau} 的 ${target.model} 车组。`
+        summary: `已为 ${target.bureau} / ${target.model} 创建 1 条重联扫描任务。`
+    };
+}
+
+async function createRunQrcodeDetectionNowTask(
+    request: Extract<
+        AdminCreateTaskRequest,
+        { type: 'run_qrcode_detection_now' }
+    >
+): Promise<AdminCreateTaskResponse> {
+    const detectedAt = getCurrentShanghaiHHmm();
+    const executionTime = getNowSeconds();
+    const taskIds = await enqueueQrcodeDetectionProbeTasksForDetectedAt(
+        detectedAt,
+        executionTime,
+        true
+    );
+
+    logger.info(
+        `admin_task_created type=${request.type} executor=${PROBE_QRCODE_DETECTION_EMU_TASK_EXECUTOR} taskIds=${taskIds.join(',')} detectedAt=${detectedAt} manualNow=true`
+    );
+
+    return {
+        type: request.type,
+        createdCount: taskIds.length,
+        createdTasks: toCreatedTaskRecords(
+            taskIds,
+            PROBE_QRCODE_DETECTION_EMU_TASK_EXECUTOR,
+            executionTime
+        ),
+        summary: `已按当前时间 ${detectedAt} 创建 ${taskIds.length} 条固定车组畅行码检测任务。`
     };
 }
 
@@ -304,7 +355,9 @@ export async function createAdminTask(
         case 'refresh_route_info_now':
             return createRefreshRouteInfoNowTask(request);
         case 'detect_coupled_emu_group_now':
-            return createDetectCoupledEmuGroupNowTask(request);
+            return await createDetectCoupledEmuGroupNowTask(request);
+        case 'run_qrcode_detection_now':
+            return await createRunQrcodeDetectionNowTask(request);
         default:
             request satisfies never;
             throw new Error('Unsupported admin task type');
@@ -337,7 +390,6 @@ export async function getAdminTaskOverview(
         remainingWithin10Minutes: counts.remainingWithin10Minutes,
         remainingWithin30Minutes: counts.remainingWithin30Minutes,
         remainingWithin1Hour: counts.remainingWithin1Hour,
-        couplingScanOptions,
-        qrcodeDetectionTimes: []
+        couplingScanOptions
     };
 }

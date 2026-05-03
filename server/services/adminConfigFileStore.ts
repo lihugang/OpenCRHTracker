@@ -5,9 +5,7 @@ import useConfig, {
     reloadConfig
 } from '~/server/config';
 import getLogger from '~/server/libs/log4js';
-import {
-    invalidateLookupIndexCache
-} from '~/server/services/lookupIndexStore';
+import { invalidateLookupIndexCache } from '~/server/services/lookupIndexStore';
 import {
     invalidateProbeAssetsCache,
     preloadProbeAssetsFromLocalFiles,
@@ -15,8 +13,16 @@ import {
     validateDownloadedQrCodeAssetText
 } from '~/server/services/probeAssetStore';
 import {
-    invalidateTodayScheduleCache
-} from '~/server/services/todayScheduleCache';
+    formatQrcodeDetectionMissingMappingsWarning,
+    getQrcodeDetectionConfigPath,
+    invalidateQrcodeDetectionConfigCache,
+    reloadQrcodeDetectionConfig,
+    validateQrcodeDetectionConfigText
+} from '~/server/services/qrcodeDetectionConfigStore';
+import {
+    synchronizeQrcodeDetectionDispatchTasks
+} from '~/server/services/taskExecutors/dispatchQrcodeDetectionTasksExecutor';
+import { invalidateTodayScheduleCache } from '~/server/services/todayScheduleCache';
 import ensure from '~/server/utils/api/executor/ensure';
 import {
     getAssetFilePath,
@@ -34,6 +40,11 @@ import type {
 } from '~/types/admin';
 
 const logger = getLogger('admin-config-file-store');
+
+type AssetTarget = Extract<
+    AdminConfigFileTarget,
+    'EMUList' | 'QRCode' | 'qrcodeDetection'
+>;
 
 function toTimestampSeconds(value: number): number {
     return Math.floor(value / 1000);
@@ -66,13 +77,40 @@ function buildConfigFileItem(target: AdminConfigFileTarget): AdminConfigFileItem
 
         return {
             target,
-            title: '配置文件',
-            description: '重读当前正在使用的 config.json，并刷新相关运行时缓存。',
+            title: '运行配置',
+            description:
+                '重载当前服务使用的运行配置文件。',
             filePath: path.resolve(filePath),
             provider: null,
             exists: status.exists,
             modifiedAt: status.modifiedAt,
             supportedActions: ['reload_local']
+        };
+    }
+
+    if (target === 'qrcodeDetection') {
+        const assetConfig = useConfig().data.assets.qrcodeDetection;
+        const filePath = path.resolve(getQrcodeDetectionConfigPath());
+        const status = getFileStatus(filePath);
+        const supportedActions: AdminConfigFileAction[] = ['reload_local'];
+
+        if (
+            typeof assetConfig.provider === 'string' &&
+            assetConfig.provider.trim().length > 0
+        ) {
+            supportedActions.push('refresh_remote');
+        }
+
+        return {
+            target,
+            title: '固定车组畅行码检测计划',
+            description:
+                '重载或刷新固定车组畅行码检测计划配置，并重新同步未来的派发任务。',
+            filePath,
+            provider: assetConfig.provider ?? null,
+            exists: status.exists,
+            modifiedAt: status.modifiedAt,
+            supportedActions
         };
     }
 
@@ -90,11 +128,11 @@ function buildConfigFileItem(target: AdminConfigFileTarget): AdminConfigFileItem
 
     return {
         target,
-        title: target === 'EMUList' ? '动车组配属清单' : '畅行码',
+        title: target === 'EMUList' ? '动车组配属清单' : '畅行码映射',
         description:
             target === 'EMUList'
-                ? '重载或重新下载动车组配属清单，更新配属解析与管理员配属选项。'
-                : '重载或重新下载畅行码映射，更新车组二维码识别映射。',
+                ? '重载或刷新探测流程与管理流程使用的动车组配属清单。'
+                : '重载或刷新席位码识别使用的畅行码映射数据。',
         filePath,
         provider: assetConfig.provider ?? null,
         exists: status.exists,
@@ -109,6 +147,15 @@ function resetSafeRuntimeCaches(): void {
     invalidateTodayScheduleCache();
 }
 
+async function reloadQrcodeDetectionAfterAssetChange(): Promise<string> {
+    invalidateQrcodeDetectionConfigCache();
+    const result = await reloadQrcodeDetectionConfig();
+    await synchronizeQrcodeDetectionDispatchTasks();
+    return formatQrcodeDetectionMissingMappingsWarning(
+        result.missingQrcodeMappings
+    );
+}
+
 function assertActionSupported(
     target: AdminConfigFileTarget,
     action: AdminConfigFileAction
@@ -118,7 +165,7 @@ function assertActionSupported(
             action === 'reload_local',
             400,
             'invalid_param',
-            '配置文件仅支持从本地重载'
+            `${target} 仅支持 reload_local 操作`
         );
         return;
     }
@@ -127,13 +174,14 @@ function assertActionSupported(
         action === 'reload_local' || action === 'refresh_remote',
         400,
         'invalid_param',
-        '资源文件仅支持从本地重载或从远程服务器重新下载'
+        '资产文件仅支持 reload_local 或 refresh_remote 操作'
     );
 }
 
-function reloadConfigFromLocal(): AdminConfigFileActionResponse {
+async function reloadConfigFromLocal(): Promise<AdminConfigFileActionResponse> {
     reloadConfig();
     resetSafeRuntimeCaches();
+    const qrcodeWarning = await reloadQrcodeDetectionAfterAssetChange();
 
     const item = buildConfigFileItem('config');
     logger.info(`admin_config_reload_local file=${item.filePath}`);
@@ -141,14 +189,46 @@ function reloadConfigFromLocal(): AdminConfigFileActionResponse {
     return {
         target: 'config',
         action: 'reload_local',
-        summary: '已从本地重载配置文件，并清空相关运行时缓存。',
+        summary:
+            qrcodeWarning.length > 0
+                ? `已重载当前运行配置文件，并重新同步固定车组畅行码检测计划。${qrcodeWarning}`
+                : '已重载当前运行配置文件，并重新同步固定车组畅行码检测计划。',
         item
     };
 }
 
-function reloadAssetFromLocal(
-    target: Extract<AdminConfigFileTarget, 'EMUList' | 'QRCode'>
-): AdminConfigFileActionResponse {
+async function reloadQrcodeDetectionFromLocal(): Promise<AdminConfigFileActionResponse> {
+    const filePath = getQrcodeDetectionConfigPath();
+    const text = fs.readFileSync(filePath, 'utf8');
+    const validationResult = await validateQrcodeDetectionConfigText(text);
+    invalidateQrcodeDetectionConfigCache();
+    await reloadQrcodeDetectionConfig();
+    await synchronizeQrcodeDetectionDispatchTasks();
+
+    const item = buildConfigFileItem('qrcodeDetection');
+    logger.info(`admin_qrcode_detection_reload_local file=${filePath}`);
+    const warningSummary = formatQrcodeDetectionMissingMappingsWarning(
+        validationResult.missingQrcodeMappings
+    );
+
+    return {
+        target: 'qrcodeDetection',
+        action: 'reload_local',
+        summary:
+            warningSummary.length > 0
+                ? `已重载固定车组畅行码检测计划配置，并同步未来派发任务。${warningSummary}`
+                : '已重载固定车组畅行码检测计划配置，并同步未来派发任务。',
+        item
+    };
+}
+
+async function reloadAssetFromLocal(
+    target: AssetTarget
+): Promise<AdminConfigFileActionResponse> {
+    if (target === 'qrcodeDetection') {
+        return await reloadQrcodeDetectionFromLocal();
+    }
+
     const filePath = getAssetFilePath(target);
     const text = readAssetText(target);
 
@@ -161,6 +241,7 @@ function reloadAssetFromLocal(
     invalidateProbeAssetsCache();
     preloadProbeAssetsFromLocalFiles();
     invalidateLookupIndexCache();
+    const qrcodeWarning = await reloadQrcodeDetectionAfterAssetChange();
 
     const item = buildConfigFileItem(target);
     logger.info(`admin_asset_reload_local target=${target} file=${filePath}`);
@@ -170,28 +251,32 @@ function reloadAssetFromLocal(
         action: 'reload_local',
         summary:
             target === 'EMUList'
-                ? '已从本地重载动车组配属清单。'
-                : '已从本地重载畅行码文件。',
+                ? `已重载本地动车组配属清单，并刷新固定车组畅行码检测依赖。${qrcodeWarning}`
+                : `已重载本地畅行码映射，并刷新固定车组畅行码检测依赖。${qrcodeWarning}`,
         item
     };
 }
 
 async function refreshAssetFromRemote(
-    target: Extract<AdminConfigFileTarget, 'EMUList' | 'QRCode'>
+    target: AssetTarget
 ): Promise<AdminConfigFileActionResponse> {
     const item = buildConfigFileItem(target);
     ensure(
         item.supportedActions.includes('refresh_remote'),
         409,
         'refresh_failed',
-        '当前资源文件未配置远程下载地址'
+        '所选资产未配置远程数据源'
     );
 
     const result = await refreshAssetFileFromProvider(target, {
         validateContent:
             target === 'EMUList'
                 ? validateDownloadedEmuListAssetText
-                : validateDownloadedQrCodeAssetText
+                : target === 'QRCode'
+                  ? validateDownloadedQrCodeAssetText
+                  : async (content) => {
+                        await validateQrcodeDetectionConfigText(content);
+                    }
     });
 
     ensure(
@@ -199,17 +284,23 @@ async function refreshAssetFromRemote(
         409,
         'refresh_failed',
         result.invalidContent
-            ? `远程内容校验失败：${result.message ?? 'unknown'}`
+            ? `远程内容校验失败：${result.message ?? '未知原因'}`
             : result.message
-              ? `远程下载失败：${result.message}`
+              ? `远程刷新失败：${result.message}`
               : typeof result.status === 'number'
-                ? `远程下载失败，HTTP 状态码 ${result.status}`
-                : '远程下载失败'
+                ? `远程刷新失败，HTTP 状态码 ${result.status}`
+                : '远程刷新失败'
     );
 
-    invalidateProbeAssetsCache();
-    preloadProbeAssetsFromLocalFiles();
-    invalidateLookupIndexCache();
+    let qrcodeWarning = '';
+    if (target === 'qrcodeDetection') {
+        qrcodeWarning = await reloadQrcodeDetectionAfterAssetChange();
+    } else {
+        invalidateProbeAssetsCache();
+        preloadProbeAssetsFromLocalFiles();
+        invalidateLookupIndexCache();
+        qrcodeWarning = await reloadQrcodeDetectionAfterAssetChange();
+    }
 
     const nextItem = buildConfigFileItem(target);
     logger.info(
@@ -221,8 +312,10 @@ async function refreshAssetFromRemote(
         action: 'refresh_remote',
         summary:
             target === 'EMUList'
-                ? '已从远程服务器重新下载动车组配属清单。'
-                : '已从远程服务器重新下载畅行码文件。',
+                ? `已从远程来源刷新动车组配属清单，并同步固定车组畅行码检测任务。${qrcodeWarning}`
+                : target === 'QRCode'
+                  ? `已从远程来源刷新畅行码映射，并同步固定车组畅行码检测任务。${qrcodeWarning}`
+                  : `已从远程来源刷新固定车组畅行码检测计划，并同步未来派发任务。${qrcodeWarning}`,
         item: nextItem
     };
 }
@@ -233,7 +326,8 @@ export function getAdminConfigFiles(): AdminConfigFilesResponse {
         items: [
             buildConfigFileItem('config'),
             buildConfigFileItem('EMUList'),
-            buildConfigFileItem('QRCode')
+            buildConfigFileItem('QRCode'),
+            buildConfigFileItem('qrcodeDetection')
         ]
     };
 }
@@ -245,11 +339,12 @@ export async function runAdminConfigFileAction(
 
     switch (request.target) {
         case 'config':
-            return reloadConfigFromLocal();
+            return await reloadConfigFromLocal();
         case 'EMUList':
         case 'QRCode':
+        case 'qrcodeDetection':
             if (request.action === 'reload_local') {
-                return reloadAssetFromLocal(request.target);
+                return await reloadAssetFromLocal(request.target);
             }
             return await refreshAssetFromRemote(request.target);
         default:

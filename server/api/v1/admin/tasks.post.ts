@@ -28,12 +28,7 @@ function parseRequestBody(body: CreateAdminTaskBody): AdminCreateTaskRequest {
         case 'regenerate_daily_export': {
             const date =
                 typeof payload.date === 'string' ? payload.date.trim() : '';
-            ensure(
-                /^\d{8}$/.test(date),
-                400,
-                'invalid_param',
-                'date 必须是 YYYYMMDD'
-            );
+            ensure(/^[0-9]{8}$/.test(date), 400, 'invalid_param', 'date 必须为 YYYYMMDD 格式');
 
             return {
                 type,
@@ -52,7 +47,7 @@ function parseRequestBody(body: CreateAdminTaskBody): AdminCreateTaskRequest {
                 trainCodes.length > 0,
                 400,
                 'invalid_param',
-                'trainCodes 至少需要包含一个车次'
+                'trainCodes 至少需要包含一个字符串'
             );
 
             return {
@@ -67,18 +62,8 @@ function parseRequestBody(body: CreateAdminTaskBody): AdminCreateTaskRequest {
                 typeof payload.bureau === 'string' ? payload.bureau.trim() : '';
             const model =
                 typeof payload.model === 'string' ? payload.model.trim() : '';
-            ensure(
-                bureau.length > 0,
-                400,
-                'invalid_param',
-                'bureau 必须是非空字符串'
-            );
-            ensure(
-                model.length > 0,
-                400,
-                'invalid_param',
-                'model 必须是非空字符串'
-            );
+            ensure(bureau.length > 0, 400, 'invalid_param', 'bureau 不能为空');
+            ensure(model.length > 0, 400, 'invalid_param', 'model 不能为空');
 
             return {
                 type,
@@ -88,8 +73,14 @@ function parseRequestBody(body: CreateAdminTaskBody): AdminCreateTaskRequest {
                 }
             };
         }
+        case 'run_qrcode_detection_now': {
+            return {
+                type,
+                payload: {}
+            };
+        }
         default:
-            ensure(false, 400, 'invalid_param', 'type 必须是受支持的任务类型');
+            ensure(false, 400, 'invalid_param', '不支持的管理员任务类型');
     }
 }
 
