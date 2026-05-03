@@ -882,8 +882,8 @@ function formatDirectHitEventSummary(
         scannedRoute?.code || event.relatedTrainCode || event.trainCode;
 
     return event.result === 'matched'
-        ? `重联扫描 ${scannedTrainCode}，包含当前车次`
-        : `重联扫描 ${scannedTrainCode}，未包含当前车次`;
+        ? `其他车组重联扫描，包含当前车次`
+        : `其他车组重联扫描，未包含当前车次`;
 }
 
 function formatEventSummary(
@@ -900,7 +900,7 @@ function formatEventSummary(
 
     switch (event.eventType) {
         case 'probe_task_dispatched':
-            return `${linkedTaskText}，已创建发车探测任务，${new Date(event.startAt ?? 0).toLocaleString('zh-CN')}`;
+            return `${linkedTaskText}，已创建发车探测任务，${new Date(1000 * (event.startAt ?? 0)).toLocaleString('zh-CN')}`;
         case 'probe_task_skipped':
             return `发车探测任务已跳过：${event.result || 'skip'}`;
         case 'route_probe_succeeded':

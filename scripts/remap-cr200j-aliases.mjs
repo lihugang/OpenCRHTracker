@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 const DEFAULT_INPUT_PATH = 'data/emu_list.jsonl';
 const DEFAULT_DB_PATH = 'data/emu.db';
+const MAX_CONFLICT_SAMPLES = 20;
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(scriptDir, '..');
@@ -13,6 +14,8 @@ function printHelp() {
     console.log(`Usage: node scripts/remap-cr200j-aliases.mjs [options]
 
 Options:
+    --apply         Apply the remap. Without this flag the script only
+                    analyzes the database and prints a dry-run summary.
     --input=<path>  Alias JSONL input path. Default: ${DEFAULT_INPUT_PATH}
     --db=<path>     SQLite database path. Default: ${DEFAULT_DB_PATH}
     --help          Show this message
@@ -21,11 +24,17 @@ Options:
 
 function parseArgs(argv) {
     const options = {
+        apply: false,
         inputPath: resolve(repoRoot, DEFAULT_INPUT_PATH),
         dbPath: resolve(repoRoot, DEFAULT_DB_PATH)
     };
 
     for (const argument of argv) {
+        if (argument === '--apply') {
+            options.apply = true;
+            continue;
+        }
+
         if (argument.startsWith('--input=')) {
             options.inputPath = resolve(
                 repoRoot,
@@ -50,12 +59,32 @@ function parseArgs(argv) {
     return options;
 }
 
+function readUtf8File(filePath) {
+    let text = readFileSync(filePath, 'utf8');
+    if (text.charCodeAt(0) === 0xfeff) {
+        text = text.slice(1);
+    }
+    return text;
+}
+
+function loadSql(relativePath) {
+    return readUtf8File(resolve(repoRoot, relativePath));
+}
+
 function normalizeText(value) {
     if (typeof value !== 'string') {
         return '';
     }
 
     return value.trim().toUpperCase();
+}
+
+function normalizeServiceDate(value) {
+    if (typeof value !== 'string') {
+        return '';
+    }
+
+    return value.trim();
 }
 
 function normalizeAliases(value) {
@@ -72,17 +101,20 @@ function normalizeAliases(value) {
         );
 }
 
+function normalizeNullableTimetableId(value) {
+    return Number.isInteger(value) && value > 0 ? value : null;
+}
+
+function normalizeStatus(value) {
+    return Number.isInteger(value) ? value : 0;
+}
+
 function readJsonlRows(filePath) {
     if (!existsSync(filePath)) {
         throw new Error(`Input file does not exist: ${filePath}`);
     }
 
-    let text = readFileSync(filePath, 'utf8');
-    if (text.charCodeAt(0) === 0xfeff) {
-        text = text.slice(1);
-    }
-
-    return text
+    return readUtf8File(filePath)
         .split(/\r?\n/u)
         .filter((line) => line.trim().length > 0)
         .map((line, index) => {
@@ -166,209 +198,348 @@ function buildAliasMapping(rows) {
     };
 }
 
-function choosePreferredText(primaryValue, fallbackValue) {
-    const primary = typeof primaryValue === 'string' ? primaryValue.trim() : '';
-    if (primary.length > 0) {
-        return primary;
-    }
-
-    return typeof fallbackValue === 'string' ? fallbackValue.trim() : '';
-}
-
-function toSafeInteger(value) {
-    return Number.isInteger(value) ? value : 0;
-}
-
-function loadTableRows(db) {
-    const dailyRows = db
-        .prepare(
-            [
-                'SELECT id, train_code, emu_code, start_station_name, end_station_name, start_at, end_at',
-                'FROM daily_emu_routes'
-            ].join(' ')
-        )
-        .all();
-
-    const probeRows = db
-        .prepare(
-            'SELECT id, train_code, emu_code, start_at, status FROM probe_status'
-        )
-        .all();
-
+function createTableSummary() {
     return {
-        dailyRows,
-        probeRows
+        scannedRows: 0,
+        matchedAliasRows: 0,
+        impactedGroups: 0,
+        updatedRows: 0,
+        deletedRows: 0,
+        mergedGroups: 0,
+        conflictGroups: 0,
+        conflicts: []
     };
 }
 
-function buildSummarySkeleton(inputPath, dbPath, mapping) {
+function buildSummarySkeleton(inputPath, dbPath, mapping, mode) {
     return {
+        mode,
         inputPath,
         dbPath,
         cr200jRows: mapping.cr200jRowCount,
         aliasRows: mapping.aliasRowCount,
         aliasMappings: mapping.aliasCount,
-        scanned: {
-            dailyRows: 0,
-            probeRows: 0
-        },
-        affected: {
-            dailyRows: 0,
-            probeRows: 0
-        },
-        updated: {
-            dailyRows: 0,
-            probeRows: 0
-        },
-        merged: {
-            dailyRows: 0,
-            probeRows: 0
-        },
-        deletedAliasRows: {
-            dailyRows: 0,
-            probeRows: 0
-        },
         aliasHits: 0,
-        unusedAliases: 0
+        unusedAliases: mapping.aliasCount,
+        tables: {
+            dailyEmuRoutes: createTableSummary(),
+            probeStatus: createTableSummary()
+        }
     };
 }
 
-function remapDatabase(db, aliasToCanonical, summary) {
-    const selectDailyByBusinessKey = db.prepare(
-        [
-            'SELECT id, train_code, emu_code, start_station_name, end_station_name, start_at, end_at',
-            'FROM daily_emu_routes',
-            'WHERE train_code = ? AND emu_code = ? AND start_at = ?',
-            'LIMIT 1'
-        ].join(' ')
-    );
-    const updateDailyEmuCodeById = db.prepare(
-        'UPDATE daily_emu_routes SET emu_code = ? WHERE id = ?'
-    );
-    const updateDailyMergedRowById = db.prepare(
-        [
-            'UPDATE daily_emu_routes',
-            'SET start_station_name = ?, end_station_name = ?, end_at = ?',
-            'WHERE id = ?'
-        ].join(' ')
-    );
-    const deleteDailyRowById = db.prepare(
-        'DELETE FROM daily_emu_routes WHERE id = ?'
-    );
+function buildTargetGroupKey(trainCode, emuCode, serviceDate) {
+    return [trainCode, emuCode, serviceDate].join('|');
+}
 
-    const selectProbeByBusinessKey = db.prepare(
-        [
-            'SELECT id, train_code, emu_code, start_at, status',
-            'FROM probe_status',
-            'WHERE train_code = ? AND emu_code = ? AND start_at = ?',
-            'LIMIT 1'
-        ].join(' ')
-    );
-    const updateProbeEmuCodeById = db.prepare(
-        'UPDATE probe_status SET emu_code = ? WHERE id = ?'
-    );
-    const updateProbeStatusById = db.prepare(
-        'UPDATE probe_status SET status = ? WHERE id = ?'
-    );
-    const deleteProbeRowById = db.prepare(
-        'DELETE FROM probe_status WHERE id = ?'
-    );
-
-    const aliasHits = new Set();
-    const applyChanges = db.transaction(() => {
-        const { dailyRows, probeRows } = loadTableRows(db);
-
-        summary.scanned.dailyRows = dailyRows.length;
-        summary.scanned.probeRows = probeRows.length;
-
-        for (const row of dailyRows) {
-            const currentEmuCode = normalizeText(row.emu_code);
-            const canonicalEmuCode = aliasToCanonical.get(currentEmuCode);
-            if (!canonicalEmuCode) {
-                continue;
-            }
-
-            summary.affected.dailyRows += 1;
-            aliasHits.add(currentEmuCode);
-
-            const existingRow = selectDailyByBusinessKey.get(
-                row.train_code,
-                canonicalEmuCode,
-                row.start_at
-            );
-
-            if (!existingRow) {
-                updateDailyEmuCodeById.run(canonicalEmuCode, row.id);
-                summary.updated.dailyRows += 1;
-                continue;
-            }
-
-            if (existingRow.id === row.id) {
-                continue;
-            }
-
-            updateDailyMergedRowById.run(
-                choosePreferredText(
-                    existingRow.start_station_name,
-                    row.start_station_name
-                ),
-                choosePreferredText(
-                    existingRow.end_station_name,
-                    row.end_station_name
-                ),
-                Math.max(
-                    toSafeInteger(existingRow.end_at),
-                    toSafeInteger(row.end_at)
-                ),
-                existingRow.id
-            );
-            deleteDailyRowById.run(row.id);
-            summary.merged.dailyRows += 1;
-            summary.deletedAliasRows.dailyRows += 1;
+function chooseKeeperRow(rows, canonicalEmuCode) {
+    return [...rows].sort((left, right) => {
+        const leftIsCanonical = left.emu_code === canonicalEmuCode ? 1 : 0;
+        const rightIsCanonical = right.emu_code === canonicalEmuCode ? 1 : 0;
+        if (leftIsCanonical !== rightIsCanonical) {
+            return rightIsCanonical - leftIsCanonical;
         }
 
-        for (const row of probeRows) {
-            const currentEmuCode = normalizeText(row.emu_code);
-            const canonicalEmuCode = aliasToCanonical.get(currentEmuCode);
-            if (!canonicalEmuCode) {
-                continue;
-            }
+        const leftHasTimetable = left.timetable_id === null ? 0 : 1;
+        const rightHasTimetable = right.timetable_id === null ? 0 : 1;
+        if (leftHasTimetable !== rightHasTimetable) {
+            return rightHasTimetable - leftHasTimetable;
+        }
 
-            summary.affected.probeRows += 1;
-            aliasHits.add(currentEmuCode);
+        return left.id - right.id;
+    })[0];
+}
 
-            const existingRow = selectProbeByBusinessKey.get(
+function analyzeTargetGroup(tableName, targetGroup, actions, tableSummary) {
+    const distinctResolvedTimetableIds = [
+        ...new Set(
+            targetGroup.rows
+                .map((row) => row.timetable_id)
+                .filter((value) => value !== null)
+        )
+    ].sort((left, right) => left - right);
+
+    if (distinctResolvedTimetableIds.length > 1) {
+        tableSummary.conflictGroups += 1;
+        if (tableSummary.conflicts.length < MAX_CONFLICT_SAMPLES) {
+            tableSummary.conflicts.push({
+                table: tableName,
+                train_code: targetGroup.train_code,
+                service_date: targetGroup.service_date,
+                canonical_emu_code: targetGroup.canonical_emu_code,
+                timetable_ids: distinctResolvedTimetableIds,
+                row_ids: targetGroup.rows.map((row) => row.id),
+                emu_codes: [...new Set(targetGroup.rows.map((row) => row.emu_code))]
+            });
+        }
+        return;
+    }
+
+    const nextTimetableId = distinctResolvedTimetableIds[0] ?? null;
+    const keeper = chooseKeeperRow(
+        targetGroup.rows,
+        targetGroup.canonical_emu_code
+    );
+    const deleteIds = targetGroup.rows
+        .filter((row) => row.id !== keeper.id)
+        .map((row) => row.id);
+    const nextStatus =
+        tableName === 'probe_status'
+            ? targetGroup.rows.reduce(
+                  (currentMax, row) =>
+                      Math.max(currentMax, normalizeStatus(row.status)),
+                  0
+              )
+            : undefined;
+
+    const needsUpdate =
+        keeper.emu_code !== targetGroup.canonical_emu_code ||
+        keeper.timetable_id !== nextTimetableId ||
+        (tableName === 'probe_status' && keeper.status !== nextStatus);
+
+    if (needsUpdate) {
+        tableSummary.updatedRows += 1;
+    }
+    if (deleteIds.length > 0) {
+        tableSummary.deletedRows += deleteIds.length;
+        tableSummary.mergedGroups += 1;
+    }
+
+    if (needsUpdate || deleteIds.length > 0) {
+        actions.push({
+            keeperId: keeper.id,
+            canonicalEmuCode: targetGroup.canonical_emu_code,
+            timetableId: nextTimetableId,
+            status: nextStatus,
+            deleteIds
+        });
+    }
+}
+
+function analyzeTableRows(tableName, rows, aliasToCanonical) {
+    const tableSummary = createTableSummary();
+    const aliasHitCodes = new Set();
+    const impactedTargetKeys = new Set();
+    const normalizedRows = rows.map((row) => ({
+        ...row,
+        train_code: normalizeText(row.train_code),
+        emu_code: normalizeText(row.emu_code),
+        service_date: normalizeServiceDate(row.service_date),
+        timetable_id: normalizeNullableTimetableId(row.timetable_id)
+    }));
+
+    tableSummary.scannedRows = normalizedRows.length;
+
+    for (const row of normalizedRows) {
+        const canonicalEmuCode = aliasToCanonical.get(row.emu_code);
+        if (!canonicalEmuCode) {
+            continue;
+        }
+
+        tableSummary.matchedAliasRows += 1;
+        aliasHitCodes.add(row.emu_code);
+        impactedTargetKeys.add(
+            buildTargetGroupKey(
                 row.train_code,
                 canonicalEmuCode,
-                row.start_at
+                row.service_date
+            )
+        );
+    }
+
+    const groupedRows = new Map();
+    for (const row of normalizedRows) {
+        const aliasCanonicalEmuCode = aliasToCanonical.get(row.emu_code);
+        if (aliasCanonicalEmuCode) {
+            const targetGroupKey = buildTargetGroupKey(
+                row.train_code,
+                aliasCanonicalEmuCode,
+                row.service_date
             );
+            const targetGroup = groupedRows.get(targetGroupKey) ?? {
+                train_code: row.train_code,
+                service_date: row.service_date,
+                canonical_emu_code: aliasCanonicalEmuCode,
+                rows: []
+            };
+            targetGroup.rows.push(row);
+            groupedRows.set(targetGroupKey, targetGroup);
+            continue;
+        }
 
-            if (!existingRow) {
-                updateProbeEmuCodeById.run(canonicalEmuCode, row.id);
-                summary.updated.probeRows += 1;
-                continue;
+        const currentGroupKey = buildTargetGroupKey(
+            row.train_code,
+            row.emu_code,
+            row.service_date
+        );
+        if (!impactedTargetKeys.has(currentGroupKey)) {
+            continue;
+        }
+
+        const targetGroup = groupedRows.get(currentGroupKey) ?? {
+            train_code: row.train_code,
+            service_date: row.service_date,
+            canonical_emu_code: row.emu_code,
+            rows: []
+        };
+        targetGroup.rows.push(row);
+        groupedRows.set(currentGroupKey, targetGroup);
+    }
+
+    tableSummary.impactedGroups = groupedRows.size;
+    const actions = [];
+    for (const targetGroup of groupedRows.values()) {
+        analyzeTargetGroup(tableName, targetGroup, actions, tableSummary);
+    }
+
+    return {
+        tableSummary,
+        aliasHitCodes,
+        actions
+    };
+}
+
+function validateCurrentSchema(statements) {
+    const dailyColumnNames = new Set(
+        statements.selectDailyColumns.all().map((row) => row.name)
+    );
+    const probeColumnNames = new Set(
+        statements.selectProbeColumns.all().map((row) => row.name)
+    );
+    const requiredDailyColumns = [
+        'id',
+        'train_code',
+        'emu_code',
+        'service_date',
+        'timetable_id'
+    ];
+    const requiredProbeColumns = [
+        'id',
+        'train_code',
+        'emu_code',
+        'service_date',
+        'timetable_id',
+        'status'
+    ];
+
+    const missingDailyColumns = requiredDailyColumns.filter(
+        (name) => !dailyColumnNames.has(name)
+    );
+    if (missingDailyColumns.length > 0) {
+        throw new Error(
+            `Unsupported daily_emu_routes schema: missing ${missingDailyColumns.join(', ')}`
+        );
+    }
+
+    const missingProbeColumns = requiredProbeColumns.filter(
+        (name) => !probeColumnNames.has(name)
+    );
+    if (missingProbeColumns.length > 0) {
+        throw new Error(
+            `Unsupported probe_status schema: missing ${missingProbeColumns.join(', ')}`
+        );
+    }
+}
+
+function createStatements(db) {
+    return {
+        selectDailyColumns: db.prepare(
+            loadSql('assets/sql/emu/migrations/selectDailyEmuRoutesColumns.sql')
+        ),
+        selectProbeColumns: db.prepare(
+            loadSql('assets/sql/emu/migrations/selectProbeStatusColumns.sql')
+        ),
+        selectDailyRows: db.prepare(
+            loadSql(
+                'assets/sql/emu/maintenance/selectAllDailyEmuRoutesForAliasRemap.sql'
+            )
+        ),
+        selectProbeRows: db.prepare(
+            loadSql(
+                'assets/sql/emu/maintenance/selectAllProbeStatusRowsForAliasRemap.sql'
+            )
+        ),
+        updateDailyRowById: db.prepare(
+            loadSql('assets/sql/emu/maintenance/updateDailyEmuRouteAliasById.sql')
+        ),
+        deleteDailyRowById: db.prepare(
+            loadSql('assets/sql/emu/maintenance/deleteDailyEmuRouteById.sql')
+        ),
+        updateProbeRowById: db.prepare(
+            loadSql('assets/sql/emu/maintenance/updateProbeStatusAliasById.sql')
+        ),
+        deleteProbeRowById: db.prepare(
+            loadSql('assets/sql/emu/maintenance/deleteProbeStatusById.sql')
+        )
+    };
+}
+
+function analyzeDatabase(db, aliasToCanonical, summary) {
+    const statements = createStatements(db);
+    validateCurrentSchema(statements);
+
+    const dailyRows = statements.selectDailyRows.all();
+    const probeRows = statements.selectProbeRows.all();
+
+    const dailyAnalysis = analyzeTableRows(
+        'daily_emu_routes',
+        dailyRows,
+        aliasToCanonical
+    );
+    const probeAnalysis = analyzeTableRows(
+        'probe_status',
+        probeRows,
+        aliasToCanonical
+    );
+    const aliasHitCodes = new Set([
+        ...dailyAnalysis.aliasHitCodes,
+        ...probeAnalysis.aliasHitCodes
+    ]);
+
+    summary.tables.dailyEmuRoutes = dailyAnalysis.tableSummary;
+    summary.tables.probeStatus = probeAnalysis.tableSummary;
+    summary.aliasHits = aliasHitCodes.size;
+    summary.unusedAliases = aliasToCanonical.size - aliasHitCodes.size;
+
+    return {
+        statements,
+        dailyActions: dailyAnalysis.actions,
+        probeActions: probeAnalysis.actions,
+        conflictGroups:
+            dailyAnalysis.tableSummary.conflictGroups +
+            probeAnalysis.tableSummary.conflictGroups
+    };
+}
+
+function applyActions(db, statements, dailyActions, probeActions) {
+    const applyChanges = db.transaction(() => {
+        for (const action of dailyActions) {
+            for (const deleteId of action.deleteIds) {
+                statements.deleteDailyRowById.run(deleteId);
             }
 
-            if (existingRow.id === row.id) {
-                continue;
-            }
-
-            const mergedStatus = Math.max(
-                toSafeInteger(existingRow.status),
-                toSafeInteger(row.status)
+            statements.updateDailyRowById.run(
+                action.canonicalEmuCode,
+                action.timetableId,
+                action.keeperId
             );
-            if (mergedStatus !== existingRow.status) {
-                updateProbeStatusById.run(mergedStatus, existingRow.id);
+        }
+
+        for (const action of probeActions) {
+            for (const deleteId of action.deleteIds) {
+                statements.deleteProbeRowById.run(deleteId);
             }
-            deleteProbeRowById.run(row.id);
-            summary.merged.probeRows += 1;
-            summary.deletedAliasRows.probeRows += 1;
+
+            statements.updateProbeRowById.run(
+                action.canonicalEmuCode,
+                action.timetableId,
+                action.status,
+                action.keeperId
+            );
         }
     });
 
     applyChanges();
-    summary.aliasHits = aliasHits.size;
-    summary.unusedAliases = aliasToCanonical.size - aliasHits.size;
 }
 
 function main() {
@@ -378,7 +549,8 @@ function main() {
     const summary = buildSummarySkeleton(
         options.inputPath,
         options.dbPath,
-        mapping
+        mapping,
+        options.apply ? 'apply' : 'dry-run'
     );
 
     if (!existsSync(options.dbPath)) {
@@ -390,7 +562,23 @@ function main() {
     db.pragma('journal_mode = WAL');
 
     try {
-        remapDatabase(db, mapping.aliasToCanonical, summary);
+        const analysis = analyzeDatabase(db, mapping.aliasToCanonical, summary);
+
+        if (options.apply && analysis.conflictGroups > 0) {
+            console.log(JSON.stringify(summary, null, 2));
+            throw new Error(
+                `Refusing to apply remap because ${analysis.conflictGroups} conflict group(s) require manual resolution`
+            );
+        }
+
+        if (options.apply) {
+            applyActions(
+                db,
+                analysis.statements,
+                analysis.dailyActions,
+                analysis.probeActions
+            );
+        }
     } finally {
         db.close();
     }
