@@ -1037,6 +1037,39 @@
 
                     <div
                         v-if="
+                            couplingScanTaskListData &&
+                            couplingScanTaskListData.enabled &&
+                            couplingScanTaskItems.length > 0
+                        "
+                        class="grid gap-4 md:grid-cols-2">
+                        <UiField
+                            label="路局"
+                            help="先选择路局，再按车型筛选任务。">
+                            <UiSelect
+                                v-model="selectedCouplingTaskBureau"
+                                :options="couplingTaskBureauOptions"
+                                placeholder="请选择路局"
+                                mobile-sheet-title="选择路局"
+                                mobile-sheet-eyebrow="BUREAU" />
+                        </UiField>
+
+                        <UiField
+                            label="车型"
+                            help="默认不渲染全部任务，需选定车型后再显示列表。">
+                            <UiSelect
+                                v-model="selectedCouplingTaskModel"
+                                :disabled="
+                                    couplingTaskModelOptions.length === 0
+                                "
+                                :options="couplingTaskModelOptions"
+                                placeholder="请选择车型"
+                                mobile-sheet-title="选择车型"
+                                mobile-sheet-eyebrow="MODEL" />
+                        </UiField>
+                    </div>
+
+                    <div
+                        v-if="
                             couplingScanTaskListStatus === 'pending' &&
                             !couplingScanTaskListData
                         "
@@ -1076,11 +1109,23 @@
                         title="当天没有重联扫描任务"
                         description="当前日期下还没有可展示的重联扫描任务记录。" />
 
+                    <UiEmptyState
+                        v-else-if="!isCouplingTaskFilterReady"
+                        eyebrow="待筛选"
+                        title="请选择路局和车型"
+                        description="为了避免一次渲染全部任务，请先选择一个路局和车型组合。" />
+
+                    <UiEmptyState
+                        v-else-if="filteredCouplingScanTaskItems.length === 0"
+                        eyebrow="无匹配"
+                        title="没有符合筛选条件的任务"
+                        description="当前日期下没有匹配该路局和车型的重联扫描任务。" />
+
                     <div
                         v-else
                         class="space-y-3">
                         <article
-                            v-for="item in couplingScanTaskItems"
+                            v-for="item in filteredCouplingScanTaskItems"
                             :key="item.taskRunId"
                             class="rounded-[1rem] border border-slate-200 bg-white/90 px-4 py-4 shadow-sm">
                             <div class="space-y-4">
@@ -1457,6 +1502,8 @@ const EMPTY_REQUEST_METRICS = {
 const trainCodeInput = ref(readQueryString(route.query.trainCode));
 const isSubmittingSearch = ref(false);
 const isCouplingDetailDialogOpen = ref(false);
+const selectedCouplingTaskBureau = ref('');
+const selectedCouplingTaskModel = ref('');
 const couplingDetailStatus = ref<'idle' | 'pending' | 'success' | 'error'>(
     'idle'
 );
@@ -1668,6 +1715,77 @@ const timelineItems = computed<AdminTrainProvenanceEvent[]>(
 const couplingScanTaskItems = computed<AdminCouplingScanTaskListItem[]>(
     () => couplingScanTaskListData.value?.items ?? []
 );
+const couplingTaskBureauOptions = computed(() =>
+    Array.from(
+        new Set(
+            couplingScanTaskItems.value
+                .map((item) => item.bureau.trim())
+                .filter((bureau) => bureau.length > 0)
+        )
+    )
+        .sort((left, right) => left.localeCompare(right, 'zh-CN'))
+        .map((bureau) => ({
+            value: bureau,
+            label: bureau
+        }))
+);
+const couplingTaskModelOptions = computed(() => {
+    if (!selectedCouplingTaskBureau.value) {
+        return [];
+    }
+
+    return Array.from(
+        new Set(
+            couplingScanTaskItems.value
+                .filter(
+                    (item) => item.bureau === selectedCouplingTaskBureau.value
+                )
+                .map((item) => item.model.trim())
+                .filter((model) => model.length > 0)
+        )
+    )
+        .sort((left, right) => left.localeCompare(right, 'zh-CN'))
+        .map((model) => ({
+            value: model,
+            label: model
+        }));
+});
+const isCouplingTaskFilterReady = computed(
+    () =>
+        selectedCouplingTaskBureau.value.length > 0 &&
+        selectedCouplingTaskModel.value.length > 0
+);
+const filteredCouplingScanTaskItems = computed<AdminCouplingScanTaskListItem[]>(
+    () => {
+        if (!isCouplingTaskFilterReady.value) {
+            return [];
+        }
+
+        return couplingScanTaskItems.value.filter(
+            (item) =>
+                item.bureau === selectedCouplingTaskBureau.value &&
+                item.model === selectedCouplingTaskModel.value
+        );
+    }
+);
+
+watch(couplingTaskBureauOptions, (options) => {
+    const hasSelectedBureau = options.some(
+        (option) => option.value === selectedCouplingTaskBureau.value
+    );
+    if (!hasSelectedBureau) {
+        selectedCouplingTaskBureau.value = '';
+    }
+});
+
+watch(selectedCouplingTaskBureau, () => {
+    const hasSelectedModel = couplingTaskModelOptions.value.some(
+        (option) => option.value === selectedCouplingTaskModel.value
+    );
+    if (!hasSelectedModel) {
+        selectedCouplingTaskModel.value = '';
+    }
+});
 
 useSiteSeo({
     title: '12306 数据 | Open CRH Tracker',

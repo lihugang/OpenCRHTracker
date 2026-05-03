@@ -1536,7 +1536,9 @@ export function getAdminCouplingScanTaskList(
         listTrainProvenanceTaskRunsByDateAndExecutor(
             date,
             COUPLING_SCAN_TASK_EXECUTOR
-        ).map((taskRun) => {
+        )
+            .filter((taskRun) => taskRun.status !== 'skipped')
+            .map((taskRun) => {
             const taskArgs = extractCouplingScanTaskArgs(taskRun.taskArgs);
 
             return {
@@ -1551,7 +1553,7 @@ export function getAdminCouplingScanTaskList(
                 model: taskArgs.model,
                 taskArgs: taskRun.taskArgs
             };
-        });
+            });
 
     return {
         enabled: true,
