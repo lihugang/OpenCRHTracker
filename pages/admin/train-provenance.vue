@@ -1436,7 +1436,8 @@
         <UiCard :show-accent-bar="false">
             <div class="space-y-6">
                 <div class="space-y-2">
-                    <p class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                    <p
+                        class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
                         Fixed Scan Times
                     </p>
                     <h2 class="text-2xl font-semibold text-slate-900">
@@ -1447,12 +1448,19 @@
                     </p>
                 </div>
 
-                <div class="flex flex-col gap-3 rounded-[1rem] border border-slate-200 bg-slate-50/80 px-4 py-4 text-sm leading-6 text-slate-600">
-                    <p>当前选中日期：{{ formatServiceDate(selectedDateYmd) }}</p>
-                    <p v-if="hasLoadedQrcodeScanTaskList">
-                        当前已加载数据日期：{{ formatServiceDate(qrcodeScanLoadedDate) }}
+                <div
+                    class="flex flex-col gap-3 rounded-[1rem] border border-slate-200 bg-slate-50/80 px-4 py-4 text-sm leading-6 text-slate-600">
+                    <p>
+                        当前选中日期：{{ formatServiceDate(selectedDateYmd) }}
                     </p>
-                    <p v-if="isQrcodeScanTaskListStale" class="text-amber-700">
+                    <p v-if="hasLoadedQrcodeScanTaskList">
+                        当前已加载数据日期：{{
+                            formatServiceDate(qrcodeScanLoadedDate)
+                        }}
+                    </p>
+                    <p
+                        v-if="isQrcodeScanTaskListStale"
+                        class="text-amber-700">
                         当前仍显示旧日期数据，点击“刷新固定车组扫描”后才会切换到所选日期。
                     </p>
 
@@ -1474,7 +1482,10 @@
                     description="该面板默认不自动请求数据；点击上方按钮后，加载当前日期的时刻汇总表。" />
 
                 <div
-                    v-else-if="qrcodeScanTaskListStatus === 'pending' && !qrcodeScanTaskListData"
+                    v-else-if="
+                        qrcodeScanTaskListStatus === 'pending' &&
+                        !qrcodeScanTaskListData
+                    "
                     class="space-y-3">
                     <div
                         v-for="index in 4"
@@ -1497,7 +1508,10 @@
                 </UiEmptyState>
 
                 <UiEmptyState
-                    v-else-if="qrcodeScanTaskListData && !qrcodeScanTaskListData.enabled"
+                    v-else-if="
+                        qrcodeScanTaskListData &&
+                        !qrcodeScanTaskListData.enabled
+                    "
                     eyebrow="已关闭"
                     title="固定车组扫描记录当前已关闭"
                     description="可在 config.json 中重新启用 trainProvenance 记录。" />
@@ -1514,12 +1528,30 @@
                     <table class="min-w-full divide-y divide-slate-200">
                         <thead class="bg-slate-50/80">
                             <tr>
-                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">扫描时刻</th>
-                                <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">总任务</th>
-                                <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">成功</th>
-                                <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">失败</th>
-                                <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">跳过</th>
-                                <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">待重联</th>
+                                <th
+                                    class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                    扫描时刻
+                                </th>
+                                <th
+                                    class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                    总任务
+                                </th>
+                                <th
+                                    class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                    成功
+                                </th>
+                                <th
+                                    class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                    失败
+                                </th>
+                                <th
+                                    class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                    跳过
+                                </th>
+                                <th
+                                    class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                    待重联
+                                </th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100">
@@ -1528,12 +1560,32 @@
                                 :key="`qrcode-scan-summary:${item.detectedAt}`"
                                 class="cursor-pointer transition hover:bg-slate-50/70"
                                 @click="openQrcodeScanDetail(item.detectedAt)">
-                                <td class="px-4 py-3 text-sm font-semibold text-slate-900">{{ formatDetectedAt(item.detectedAt) }}</td>
-                                <td class="px-4 py-3 text-right text-sm text-slate-900">{{ formatNumber(item.total) }}</td>
-                                <td class="px-4 py-3 text-right text-sm text-emerald-700">{{ formatNumber(item.successCount) }}</td>
-                                <td class="px-4 py-3 text-right text-sm text-rose-700">{{ formatNumber(item.failedCount) }}</td>
-                                <td class="px-4 py-3 text-right text-sm text-amber-700">{{ formatNumber(item.skippedCount) }}</td>
-                                <td class="px-4 py-3 text-right text-sm text-blue-700">{{ formatNumber(item.pendingCouplingCount) }}</td>
+                                <td
+                                    class="px-4 py-3 text-sm font-semibold text-slate-900">
+                                    {{ formatDetectedAt(item.detectedAt) }}
+                                </td>
+                                <td
+                                    class="px-4 py-3 text-right text-sm text-slate-900">
+                                    {{ formatNumber(item.total) }}
+                                </td>
+                                <td
+                                    class="px-4 py-3 text-right text-sm text-emerald-700">
+                                    {{ formatNumber(item.successCount) }}
+                                </td>
+                                <td
+                                    class="px-4 py-3 text-right text-sm text-rose-700">
+                                    {{ formatNumber(item.failedCount) }}
+                                </td>
+                                <td
+                                    class="px-4 py-3 text-right text-sm text-amber-700">
+                                    {{ formatNumber(item.skippedCount) }}
+                                </td>
+                                <td
+                                    class="px-4 py-3 text-right text-sm text-blue-700">
+                                    {{
+                                        formatNumber(item.pendingCouplingCount)
+                                    }}
+                                </td>
                             </tr>
                         </tbody>
                     </table>
@@ -1566,17 +1618,59 @@
                 </p>
 
                 <UiEmptyState
-                    v-else-if="qrcodeScanDetailData && qrcodeScanDetailData.tasks.length === 0"
+                    v-else-if="
+                        qrcodeScanDetailData &&
+                        qrcodeScanDetailData.tasks.length === 0
+                    "
                     eyebrow="无任务"
                     title="该时刻没有固定车组扫描任务"
                     description="当前时刻下没有可展示的扫描任务详情。" />
 
                 <template v-else-if="qrcodeScanDetailData">
-                    <div class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-4 py-4 text-sm leading-6 text-slate-700">
-                        <p>日期：{{ formatServiceDate(qrcodeScanDetailData.date) }}</p>
-                        <p>扫描时刻：{{ formatDetectedAt(qrcodeScanDetailData.detectedAt) }}</p>
+                    <div
+                        class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-4 py-4 text-sm leading-6 text-slate-700">
+                        <p>
+                            日期：{{
+                                formatServiceDate(qrcodeScanDetailData.date)
+                            }}
+                        </p>
+                        <p>
+                            扫描时刻：{{
+                                formatDetectedAt(
+                                    qrcodeScanDetailData.detectedAt
+                                )
+                            }}
+                        </p>
                         <p v-if="qrcodeScanDetailData.summary">
-                            汇总：总任务 {{ formatNumber(qrcodeScanDetailData.summary.total) }} / 成功 {{ formatNumber(qrcodeScanDetailData.summary.successCount) }} / 失败 {{ formatNumber(qrcodeScanDetailData.summary.failedCount) }} / 跳过 {{ formatNumber(qrcodeScanDetailData.summary.skippedCount) }} / 待重联 {{ formatNumber(qrcodeScanDetailData.summary.pendingCouplingCount) }}
+                            汇总：总任务
+                            {{
+                                formatNumber(qrcodeScanDetailData.summary.total)
+                            }}
+                            / 成功
+                            {{
+                                formatNumber(
+                                    qrcodeScanDetailData.summary.successCount
+                                )
+                            }}
+                            / 失败
+                            {{
+                                formatNumber(
+                                    qrcodeScanDetailData.summary.failedCount
+                                )
+                            }}
+                            / 跳过
+                            {{
+                                formatNumber(
+                                    qrcodeScanDetailData.summary.skippedCount
+                                )
+                            }}
+                            / 待重联
+                            {{
+                                formatNumber(
+                                    qrcodeScanDetailData.summary
+                                        .pendingCouplingCount
+                                )
+                            }}
                         </p>
                     </div>
 
@@ -1586,28 +1680,67 @@
                             :key="`qrcode-detail-task:${item.taskRun.id}`"
                             class="rounded-[1rem] border border-slate-200 bg-white/90 px-4 py-4">
                             <div class="space-y-4">
-                                <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                                <div
+                                    class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                                     <div class="space-y-2">
-                                        <div class="flex flex-wrap items-center gap-2">
-                                            <span :class="getTaskStatusBadgeClass(item.taskRun.status)">
-                                                {{ getTaskStatusLabel(item.taskRun.status) }}
+                                        <div
+                                            class="flex flex-wrap items-center gap-2">
+                                            <span
+                                                :class="
+                                                    getTaskStatusBadgeClass(
+                                                        item.taskRun.status
+                                                    )
+                                                ">
+                                                {{
+                                                    getTaskStatusLabel(
+                                                        item.taskRun.status
+                                                    )
+                                                }}
                                             </span>
-                                            <span class="text-sm font-medium text-slate-500">
-                                                {{ getQrcodeScanSourceLabel(item.taskRun.manualNow) }}
+                                            <span
+                                                class="text-sm font-medium text-slate-500">
+                                                {{
+                                                    getQrcodeScanSourceLabel(
+                                                        item.taskRun.manualNow
+                                                    )
+                                                }}
                                             </span>
                                         </div>
-                                        <h3 class="text-lg font-semibold text-slate-900">
+                                        <h3
+                                            class="text-lg font-semibold text-slate-900">
                                             {{ item.taskRun.emuCode || '--' }}
                                         </h3>
-                                        <p class="text-sm leading-6 text-slate-600">
-                                            扫描任务 #{{ item.taskRun.schedulerTaskId }}
+                                        <p
+                                            class="text-sm leading-6 text-slate-600">
+                                            扫描任务 #{{
+                                                item.taskRun.schedulerTaskId
+                                            }}
                                         </p>
                                     </div>
 
-                                    <div class="text-sm leading-6 text-slate-500 lg:text-right">
-                                        <p>时刻：{{ formatDetectedAt(item.taskRun.detectedAt) }}</p>
-                                        <p>开始：{{ formatTimestamp(item.taskRun.startedAt) }}</p>
-                                        <p>结束：{{ formatTimestamp(item.taskRun.finishedAt ?? 0) }}</p>
+                                    <div
+                                        class="text-sm leading-6 text-slate-500 lg:text-right">
+                                        <p>
+                                            时刻：{{
+                                                formatDetectedAt(
+                                                    item.taskRun.detectedAt
+                                                )
+                                            }}
+                                        </p>
+                                        <p>
+                                            开始：{{
+                                                formatTimestamp(
+                                                    item.taskRun.startedAt
+                                                )
+                                            }}
+                                        </p>
+                                        <p>
+                                            结束：{{
+                                                formatTimestamp(
+                                                    item.taskRun.finishedAt ?? 0
+                                                )
+                                            }}
+                                        </p>
                                     </div>
                                 </div>
 
@@ -1617,48 +1750,114 @@
                                         :key="`qrcode-detail-event:${event.id}`"
                                         class="rounded-[0.875rem] border border-slate-200 bg-slate-50/80 px-4 py-4">
                                         <div class="space-y-4">
-                                            <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                                            <div
+                                                class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                                                 <div class="space-y-2">
-                                                    <div class="flex flex-wrap items-center gap-2">
-                                                        <span :class="getTaskStatusBadgeClass(event.taskStatus)">
-                                                            {{ getTaskStatusLabel(event.taskStatus) }}
+                                                    <div
+                                                        class="flex flex-wrap items-center gap-2">
+                                                        <span
+                                                            :class="
+                                                                getTaskStatusBadgeClass(
+                                                                    event.taskStatus
+                                                                )
+                                                            ">
+                                                            {{
+                                                                getTaskStatusLabel(
+                                                                    event.taskStatus
+                                                                )
+                                                            }}
                                                         </span>
-                                                        <span class="text-sm font-medium text-slate-500">
+                                                        <span
+                                                            class="text-sm font-medium text-slate-500">
                                                             {{ event.executor }}
                                                         </span>
                                                     </div>
-                                                    <h4 class="text-base font-semibold text-slate-900">
+                                                    <h4
+                                                        class="text-base font-semibold text-slate-900">
                                                         {{ event.summary }}
                                                     </h4>
-                                                    <p class="text-sm leading-6 text-slate-600">
-                                                        事件：{{ event.eventType }}
-                                                        <span v-if="event.result" class="text-slate-400">
-                                                            / {{ getEventResultLabel(event.result) }}
+                                                    <p
+                                                        class="text-sm leading-6 text-slate-600">
+                                                        事件：{{
+                                                            event.eventType
+                                                        }}
+                                                        <span
+                                                            v-if="event.result"
+                                                            class="text-slate-400">
+                                                            /
+                                                            {{
+                                                                getEventResultLabel(
+                                                                    event.result
+                                                                )
+                                                            }}
                                                         </span>
                                                     </p>
                                                 </div>
 
-                                                <div class="text-sm leading-6 text-slate-500">
-                                                    <p>{{ formatTimestamp(event.createdAt) }}</p>
-                                                    <p>任务 #{{ event.schedulerTaskId }}</p>
-                                                    <p v-if="event.emuCode">车组：{{ event.emuCode }}</p>
-                                                    <p v-if="event.relatedTrainCode">关联车次：{{ event.relatedTrainCode }}</p>
+                                                <div
+                                                    class="text-sm leading-6 text-slate-500">
+                                                    <p>
+                                                        {{
+                                                            formatTimestamp(
+                                                                event.createdAt
+                                                            )
+                                                        }}
+                                                    </p>
+                                                    <p>
+                                                        任务 #{{
+                                                            event.schedulerTaskId
+                                                        }}
+                                                    </p>
+                                                    <p v-if="event.emuCode">
+                                                        车组：{{
+                                                            event.emuCode
+                                                        }}
+                                                    </p>
+                                                    <p
+                                                        v-if="
+                                                            event.relatedTrainCode
+                                                        ">
+                                                        关联车次：{{
+                                                            event.relatedTrainCode
+                                                        }}
+                                                    </p>
                                                 </div>
                                             </div>
 
-                                            <div class="flex flex-wrap items-center gap-3">
+                                            <div
+                                                class="flex flex-wrap items-center gap-3">
                                                 <UiButton
-                                                    v-if="getCouplingScanActionTaskRunId(event) !== null"
+                                                    v-if="
+                                                        getCouplingScanActionTaskRunId(
+                                                            event
+                                                        ) !== null
+                                                    "
                                                     type="button"
                                                     variant="secondary"
                                                     size="sm"
-                                                    @click="openCouplingScanDetailForEvent(event)">
-                                                    {{ getCouplingScanActionLabel(event) }}
+                                                    @click="
+                                                        openCouplingScanDetailForEvent(
+                                                            event
+                                                        )
+                                                    ">
+                                                    {{
+                                                        getCouplingScanActionLabel(
+                                                            event
+                                                        )
+                                                    }}
                                                 </UiButton>
                                                 <span
-                                                    v-if="getLinkedTaskHintText(event)"
+                                                    v-if="
+                                                        getLinkedTaskHintText(
+                                                            event
+                                                        )
+                                                    "
                                                     class="inline-flex items-center rounded-full bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-600">
-                                                    {{ getLinkedTaskHintText(event) }}
+                                                    {{
+                                                        getLinkedTaskHintText(
+                                                            event
+                                                        )
+                                                    }}
                                                 </span>
                                             </div>
                                         </div>
@@ -2691,7 +2890,9 @@ function getEventResultLabel(result: string) {
         case 'asset_missing':
             return '资产缺失';
         case 'network_error':
-            return getEventResultLabel('seat_code_request_failed_network_error');
+            return getEventResultLabel(
+                'seat_code_request_failed_network_error'
+            );
         case 'seat_code_not_enabled':
             return getEventResultLabel('seat_code_request_failed_not_enabled');
         case 'other_error':

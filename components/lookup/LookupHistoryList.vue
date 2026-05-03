@@ -503,7 +503,9 @@
                                                     item.startTimeText
                                                 }}</span>
                                                 <span
-                                                    v-if="item.startDayOffsetText"
+                                                    v-if="
+                                                        item.startDayOffsetText
+                                                    "
                                                     class="ml-1 inline-block align-baseline text-[11px] text-slate-400">
                                                     {{
                                                         item.startDayOffsetText

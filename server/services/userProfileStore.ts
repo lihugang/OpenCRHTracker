@@ -345,11 +345,7 @@ export function upsertUserFavoriteLookup(
 ): FavoriteLookupItem[] {
     const normalizedItem = normalizeFavoriteLookupInput(item);
     if (!normalizedItem) {
-        throw new ApiRequestError(
-            400,
-            'invalid_param',
-            '收藏项无效'
-        );
+        throw new ApiRequestError(400, 'invalid_param', '收藏项无效');
     }
 
     const maxEntries = useConfig().user.favorites.maxEntries;
@@ -407,11 +403,7 @@ export function removeUserFavoriteLookup(
     });
 
     if (!normalizedTarget) {
-        throw new ApiRequestError(
-            400,
-            'invalid_param',
-            '收藏项无效'
-        );
+        throw new ApiRequestError(400, 'invalid_param', '收藏项无效');
     }
 
     const targetKey = buildLookupItemKeyFromItem(normalizedTarget);
@@ -427,11 +419,7 @@ export function removeUserFavoriteLookup(
         );
 
         if (nextFavorites.length === profile.favorites.length) {
-            throw new ApiRequestError(
-                404,
-                'not_found',
-                '未找到对应的收藏项'
-            );
+            throw new ApiRequestError(404, 'not_found', '未找到对应的收藏项');
         }
 
         const nextProfile: UserProfileData = {
@@ -527,11 +515,7 @@ export function renameUserSubscription(
         );
 
         if (!matched) {
-            throw new ApiRequestError(
-                404,
-                'not_found',
-                '未找到对应的订阅设备'
-            );
+            throw new ApiRequestError(404, 'not_found', '未找到对应的订阅设备');
         }
 
         const nextSubscriptions = profile.subscriptions
@@ -572,11 +556,7 @@ export function removeUserSubscription(userId: string, subscriptionId: string) {
         );
 
         if (nextSubscriptions.length === profile.subscriptions.length) {
-            throw new ApiRequestError(
-                404,
-                'not_found',
-                '未找到对应的订阅设备'
-            );
+            throw new ApiRequestError(404, 'not_found', '未找到对应的订阅设备');
         }
 
         const nextProfile: UserProfileData = {

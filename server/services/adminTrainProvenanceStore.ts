@@ -480,7 +480,9 @@ function toQrcodeScanTaskRunSummary(
 function hasPendingCouplingDetectionEvent(
     events: TrainProvenanceEventRecord[]
 ): boolean {
-    return events.some((event) => event.eventType === 'pending_coupling_detection');
+    return events.some(
+        (event) => event.eventType === 'pending_coupling_detection'
+    );
 }
 
 function buildQrcodeScanTimeSummaryItem(
@@ -507,7 +509,11 @@ function buildQrcodeScanTimeSummaryItem(
                 break;
         }
 
-        if (hasPendingCouplingDetectionEvent(listTrainProvenanceEventsByTaskRunId(taskRun.id))) {
+        if (
+            hasPendingCouplingDetectionEvent(
+                listTrainProvenanceEventsByTaskRunId(taskRun.id)
+            )
+        ) {
             pendingCouplingCount += 1;
         }
     }
@@ -666,10 +672,10 @@ function resolveDirectHitEventRoute(
                 trainCodes.length > 0
                     ? trainCodes
                     : [
-                        routePayload?.code ||
-                        event.relatedTrainCode ||
-                        event.trainCode
-                    ].filter((trainCode) => trainCode.length > 0),
+                          routePayload?.code ||
+                              event.relatedTrainCode ||
+                              event.trainCode
+                      ].filter((trainCode) => trainCode.length > 0),
             internalCode: routePayload?.internalCode ?? '',
             startAt: event.startAt ?? routePayload?.startAt ?? null,
             endAt: routePayload?.endAt ?? null,
@@ -725,8 +731,8 @@ function resolveOccupiedRoutes(
     const hintedTrainCodes = getStringArray(detailPayload?.trainCodes);
     const hintedStartAts = Array.isArray(detailPayload?.startAts)
         ? detailPayload.startAts
-            .map((startAt) => getOptionalInteger(startAt))
-            .filter((startAt): startAt is number => startAt !== null)
+              .map((startAt) => getOptionalInteger(startAt))
+              .filter((startAt): startAt is number => startAt !== null)
         : [];
 
     if (hintedTrainCodes.length === 0 && hintedStartAts.length === 0) {
@@ -831,11 +837,11 @@ function extractConflictDetail(
     const currentGroup = toConflictCurrentGroup(payload.currentGroup);
     const conflictGroups = Array.isArray(payload.conflictGroups)
         ? payload.conflictGroups
-            .map((item) => toConflictGroup(item))
-            .filter(
-                (item): item is AdminTrainProvenanceConflictGroup =>
-                    item !== null
-            )
+              .map((item) => toConflictGroup(item))
+              .filter(
+                  (item): item is AdminTrainProvenanceConflictGroup =>
+                      item !== null
+              )
         : [];
 
     if (!currentGroup && conflictGroups.length === 0) {
@@ -893,9 +899,7 @@ function formatSeatCodeFailureRouteText(detail: unknown): string {
     }
 
     if (route.startStation.length > 0 || route.endStation.length > 0) {
-        parts.push(
-            `${route.startStation || '--'}-${route.endStation || '--'}`
-        );
+        parts.push(`${route.startStation || '--'}-${route.endStation || '--'}`);
     }
 
     const timeText = formatConflictTimeRange(route.startAt, route.endAt);
@@ -1151,23 +1155,23 @@ function toTimelineEvent(
     const couplingScan =
         event.eventType === 'coupling_scan_candidate_direct_hit'
             ? {
-                state: 'resolved' as const,
-                queuedSchedulerTaskId: null,
-                queuedTaskRunId: null,
-                resultSchedulerTaskId: event.schedulerTaskId,
-                resultTaskRunId: event.taskRunId,
-                canOpenDetail: true
-            }
+                  state: 'resolved' as const,
+                  queuedSchedulerTaskId: null,
+                  queuedTaskRunId: null,
+                  resultSchedulerTaskId: event.schedulerTaskId,
+                  resultTaskRunId: event.taskRunId,
+                  canOpenDetail: true
+              }
             : null;
     const summary =
         event.eventType === 'coupling_scan_candidate_direct_hit'
             ? formatDirectHitEventSummary(event)
             : formatEventSummary(
-                event,
-                conflictDetail,
-                historicalReuse,
-                coupledResolution
-            );
+                  event,
+                  conflictDetail,
+                  historicalReuse,
+                  coupledResolution
+              );
 
     return {
         id: event.id,
@@ -1376,10 +1380,10 @@ export function getAdminTrainRequestStats(
     const runtimeConfig = getTrainProvenanceRuntimeConfig();
     const compareDate = /^\d{8}$/.test(date)
         ? formatShanghaiDateString(
-            (getShanghaiDayStartUnixSeconds(date) -
-                REQUEST_STAT_DAY_SECONDS) *
-            1000
-        )
+              (getShanghaiDayStartUnixSeconds(date) -
+                  REQUEST_STAT_DAY_SECONDS) *
+                  1000
+          )
         : '';
 
     if (!isTrainProvenanceEnabled()) {
@@ -1574,16 +1578,16 @@ export function getAdminTrainProvenance(
         startAt !== null && departureStartAts.includes(startAt)
             ? startAt
             : departures.length === 1
-                ? departures[0]!.startAt
-                : null;
+              ? departures[0]!.startAt
+              : null;
     const timeline =
         selectedStartAt === null
             ? []
             : enrichCouplingScanTimeline(
-                allTimelineRecords
-                    .filter((event) => event.startAt === selectedStartAt)
-                    .map(toTimelineEvent)
-            );
+                  allTimelineRecords
+                      .filter((event) => event.startAt === selectedStartAt)
+                      .map(toTimelineEvent)
+              );
 
     return {
         enabled: true,
@@ -1612,15 +1616,15 @@ export function getAdminCouplingScanDetail(
 
     const taskRunSummary: AdminCouplingScanTaskRunSummary | null = taskRun
         ? {
-            id: taskRun.id,
-            schedulerTaskId: taskRun.schedulerTaskId,
-            executor: taskRun.executor,
-            status: taskRun.status,
-            startedAt: taskRun.startedAt,
-            finishedAt: taskRun.finishedAt,
-            serviceDate: taskRun.serviceDate,
-            taskArgs: taskRun.taskArgs
-        }
+              id: taskRun.id,
+              schedulerTaskId: taskRun.schedulerTaskId,
+              executor: taskRun.executor,
+              status: taskRun.status,
+              startedAt: taskRun.startedAt,
+              finishedAt: taskRun.finishedAt,
+              serviceDate: taskRun.serviceDate,
+              taskArgs: taskRun.taskArgs
+          }
         : null;
 
     const candidateItems: AdminCouplingScanCandidate[] = candidates.map(
@@ -1813,9 +1817,7 @@ export function getAdminQrcodeScanDetail(
             };
         })
         .filter(
-            (
-                item
-            ): item is AdminQrcodeScanTimeDetailTaskItem => item !== null
+            (item): item is AdminQrcodeScanTimeDetailTaskItem => item !== null
         );
 
     return {

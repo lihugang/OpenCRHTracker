@@ -159,10 +159,7 @@ export function useFavoriteLookups() {
             state.value = 'success';
         } catch (error) {
             state.value = 'error';
-            errorMessage.value = getApiErrorMessage(
-                error,
-                '加载收藏失败。'
-            );
+            errorMessage.value = getApiErrorMessage(error, '加载收藏失败。');
         }
 
         return items.value;
@@ -219,10 +216,7 @@ export function useFavoriteLookups() {
         } catch (error) {
             items.value = previousItems;
             state.value = 'error';
-            errorMessage.value = getApiErrorMessage(
-                error,
-                '更新收藏失败。'
-            );
+            errorMessage.value = getApiErrorMessage(error, '更新收藏失败。');
             return false;
         } finally {
             setPending(favoriteKey, false);
@@ -268,10 +262,7 @@ export function useFavoriteLookups() {
         } catch (error) {
             items.value = previousItems;
             state.value = 'error';
-            errorMessage.value = getApiErrorMessage(
-                error,
-                '取消收藏失败。'
-            );
+            errorMessage.value = getApiErrorMessage(error, '取消收藏失败。');
             return false;
         } finally {
             setPending(favoriteKey, false);

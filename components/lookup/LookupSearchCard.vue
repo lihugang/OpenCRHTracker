@@ -484,8 +484,7 @@ const loadingMessage = '正在加载补全...';
 const suggestionLoadErrorFallback = '补全加载失败';
 const favoriteSectionTitle = '收藏';
 const recentSectionTitle = '最近搜索';
-const emptyRecentStateMessage =
-    '暂无收藏或最近搜索';
+const emptyRecentStateMessage = '暂无收藏或最近搜索';
 const emptySuggestionStateMessage = '未找到匹配项';
 
 type OverlayFallbackProfile = 'none' | 'detail-sticky';
