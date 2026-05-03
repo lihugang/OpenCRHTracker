@@ -148,10 +148,10 @@ export function formatQrcodeDetectionMissingMappingsWarning(
         return '';
     }
 
-    const samples = missingQrcodeMappings.slice(0, 3).join('?');
+    const samples = missingQrcodeMappings.slice(0, 3).join(', ');
     const sampleSuffix =
-        missingQrcodeMappings.length > 3 ? `${samples}??` : samples;
-    return `?? ${missingQrcodeMappings.length} ??????????${sampleSuffix}??????????`;
+        missingQrcodeMappings.length > 3 ? `${samples} etc. ` : samples;
+    return `${missingQrcodeMappings.length} train qrcode missing. Samples: ${sampleSuffix}`;
 }
 
 export function getQrcodeDetectionConfigPath(): string {

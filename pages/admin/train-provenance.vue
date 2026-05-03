@@ -1433,6 +1433,243 @@
                 </template>
             </div>
         </component>
+        <UiCard :show-accent-bar="false">
+            <div class="space-y-6">
+                <div class="space-y-2">
+                    <p class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                        Fixed Scan Times
+                    </p>
+                    <h2 class="text-2xl font-semibold text-slate-900">
+                        固定车组扫描情况
+                    </h2>
+                    <p class="text-sm leading-6 text-slate-600">
+                        按扫描时刻汇总展示当天固定车组扫描任务的执行情况，点击表格行可查看该时刻的全部任务详情。
+                    </p>
+                </div>
+
+                <div class="flex flex-col gap-3 rounded-[1rem] border border-slate-200 bg-slate-50/80 px-4 py-4 text-sm leading-6 text-slate-600">
+                    <p>当前选中日期：{{ formatServiceDate(selectedDateYmd) }}</p>
+                    <p v-if="hasLoadedQrcodeScanTaskList">
+                        当前已加载数据日期：{{ formatServiceDate(qrcodeScanLoadedDate) }}
+                    </p>
+                    <p v-if="isQrcodeScanTaskListStale" class="text-amber-700">
+                        当前仍显示旧日期数据，点击“刷新固定车组扫描”后才会切换到所选日期。
+                    </p>
+
+                    <div class="flex flex-wrap items-center gap-3">
+                        <UiButton
+                            type="button"
+                            variant="secondary"
+                            :loading="qrcodeScanTaskListStatus === 'pending'"
+                            @click="refreshQrcodeScanTaskList()">
+                            刷新固定车组扫描
+                        </UiButton>
+                    </div>
+                </div>
+
+                <UiEmptyState
+                    v-if="!hasLoadedQrcodeScanTaskList"
+                    eyebrow="Not Loaded"
+                    title="尚未加载固定车组扫描数据"
+                    description="该面板默认不自动请求数据；点击上方按钮后，加载当前日期的时刻汇总表。" />
+
+                <div
+                    v-else-if="qrcodeScanTaskListStatus === 'pending' && !qrcodeScanTaskListData"
+                    class="space-y-3">
+                    <div
+                        v-for="index in 4"
+                        :key="`qrcode-scan-task-list-loading:${index}`"
+                        class="h-16 animate-pulse rounded-[1rem] bg-slate-100/90" />
+                </div>
+
+                <UiEmptyState
+                    v-else-if="qrcodeScanTaskListErrorMessage"
+                    eyebrow="加载失败"
+                    title="固定车组扫描任务加载失败"
+                    :description="qrcodeScanTaskListErrorMessage"
+                    tone="danger">
+                    <UiButton
+                        type="button"
+                        variant="secondary"
+                        @click="refreshQrcodeScanTaskList()">
+                        重试
+                    </UiButton>
+                </UiEmptyState>
+
+                <UiEmptyState
+                    v-else-if="qrcodeScanTaskListData && !qrcodeScanTaskListData.enabled"
+                    eyebrow="已关闭"
+                    title="固定车组扫描记录当前已关闭"
+                    description="可在 config.json 中重新启用 trainProvenance 记录。" />
+
+                <UiEmptyState
+                    v-else-if="qrcodeScanSummaryItems.length === 0"
+                    eyebrow="无任务"
+                    title="当天没有固定车组扫描任务"
+                    description="当前日期下还没有可展示的固定车组扫描任务记录。" />
+
+                <div
+                    v-else
+                    class="overflow-x-auto rounded-[1rem] border border-slate-200 bg-white/90">
+                    <table class="min-w-full divide-y divide-slate-200">
+                        <thead class="bg-slate-50/80">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">扫描时刻</th>
+                                <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">总任务</th>
+                                <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">成功</th>
+                                <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">失败</th>
+                                <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">跳过</th>
+                                <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">待重联</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            <tr
+                                v-for="item in qrcodeScanSummaryItems"
+                                :key="`qrcode-scan-summary:${item.detectedAt}`"
+                                class="cursor-pointer transition hover:bg-slate-50/70"
+                                @click="openQrcodeScanDetail(item.detectedAt)">
+                                <td class="px-4 py-3 text-sm font-semibold text-slate-900">{{ formatDetectedAt(item.detectedAt) }}</td>
+                                <td class="px-4 py-3 text-right text-sm text-slate-900">{{ formatNumber(item.total) }}</td>
+                                <td class="px-4 py-3 text-right text-sm text-emerald-700">{{ formatNumber(item.successCount) }}</td>
+                                <td class="px-4 py-3 text-right text-sm text-rose-700">{{ formatNumber(item.failedCount) }}</td>
+                                <td class="px-4 py-3 text-right text-sm text-amber-700">{{ formatNumber(item.skippedCount) }}</td>
+                                <td class="px-4 py-3 text-right text-sm text-blue-700">{{ formatNumber(item.pendingCouplingCount) }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </UiCard>
+        <component
+            :is="isMobileActionSheet ? UiBottomSheet : UiModal"
+            :model-value="isQrcodeScanDetailDialogOpen"
+            eyebrow="固定车组扫描"
+            title="扫描详情"
+            description="查看该扫描时刻下全部固定车组任务的执行详情。"
+            size="lg"
+            :close-on-backdrop="qrcodeScanDetailStatus !== 'pending'"
+            @update:model-value="handleQrcodeScanDetailDialogVisibilityChange">
+            <div class="space-y-4">
+                <div
+                    v-if="qrcodeScanDetailStatus === 'pending'"
+                    class="space-y-3">
+                    <div
+                        v-for="index in 3"
+                        :key="`qrcode-detail-loading:${index}`"
+                        class="h-20 animate-pulse rounded-[1rem] bg-slate-100/90" />
+                </div>
+
+                <p
+                    v-else-if="qrcodeScanDetailErrorMessage"
+                    class="rounded-[1rem] border border-rose-200 bg-rose-50/80 px-4 py-4 text-sm leading-6 text-rose-700">
+                    {{ qrcodeScanDetailErrorMessage }}
+                </p>
+
+                <UiEmptyState
+                    v-else-if="qrcodeScanDetailData && qrcodeScanDetailData.tasks.length === 0"
+                    eyebrow="无任务"
+                    title="该时刻没有固定车组扫描任务"
+                    description="当前时刻下没有可展示的扫描任务详情。" />
+
+                <template v-else-if="qrcodeScanDetailData">
+                    <div class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-4 py-4 text-sm leading-6 text-slate-700">
+                        <p>日期：{{ formatServiceDate(qrcodeScanDetailData.date) }}</p>
+                        <p>扫描时刻：{{ formatDetectedAt(qrcodeScanDetailData.detectedAt) }}</p>
+                        <p v-if="qrcodeScanDetailData.summary">
+                            汇总：总任务 {{ formatNumber(qrcodeScanDetailData.summary.total) }} / 成功 {{ formatNumber(qrcodeScanDetailData.summary.successCount) }} / 失败 {{ formatNumber(qrcodeScanDetailData.summary.failedCount) }} / 跳过 {{ formatNumber(qrcodeScanDetailData.summary.skippedCount) }} / 待重联 {{ formatNumber(qrcodeScanDetailData.summary.pendingCouplingCount) }}
+                        </p>
+                    </div>
+
+                    <div class="space-y-3">
+                        <article
+                            v-for="item in qrcodeScanDetailData.tasks"
+                            :key="`qrcode-detail-task:${item.taskRun.id}`"
+                            class="rounded-[1rem] border border-slate-200 bg-white/90 px-4 py-4">
+                            <div class="space-y-4">
+                                <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                                    <div class="space-y-2">
+                                        <div class="flex flex-wrap items-center gap-2">
+                                            <span :class="getTaskStatusBadgeClass(item.taskRun.status)">
+                                                {{ getTaskStatusLabel(item.taskRun.status) }}
+                                            </span>
+                                            <span class="text-sm font-medium text-slate-500">
+                                                {{ getQrcodeScanSourceLabel(item.taskRun.manualNow) }}
+                                            </span>
+                                        </div>
+                                        <h3 class="text-lg font-semibold text-slate-900">
+                                            {{ item.taskRun.emuCode || '--' }}
+                                        </h3>
+                                        <p class="text-sm leading-6 text-slate-600">
+                                            扫描任务 #{{ item.taskRun.schedulerTaskId }}
+                                        </p>
+                                    </div>
+
+                                    <div class="text-sm leading-6 text-slate-500 lg:text-right">
+                                        <p>时刻：{{ formatDetectedAt(item.taskRun.detectedAt) }}</p>
+                                        <p>开始：{{ formatTimestamp(item.taskRun.startedAt) }}</p>
+                                        <p>结束：{{ formatTimestamp(item.taskRun.finishedAt ?? 0) }}</p>
+                                    </div>
+                                </div>
+
+                                <div class="space-y-3">
+                                    <article
+                                        v-for="event in item.timeline"
+                                        :key="`qrcode-detail-event:${event.id}`"
+                                        class="rounded-[0.875rem] border border-slate-200 bg-slate-50/80 px-4 py-4">
+                                        <div class="space-y-4">
+                                            <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                                                <div class="space-y-2">
+                                                    <div class="flex flex-wrap items-center gap-2">
+                                                        <span :class="getTaskStatusBadgeClass(event.taskStatus)">
+                                                            {{ getTaskStatusLabel(event.taskStatus) }}
+                                                        </span>
+                                                        <span class="text-sm font-medium text-slate-500">
+                                                            {{ event.executor }}
+                                                        </span>
+                                                    </div>
+                                                    <h4 class="text-base font-semibold text-slate-900">
+                                                        {{ event.summary }}
+                                                    </h4>
+                                                    <p class="text-sm leading-6 text-slate-600">
+                                                        事件：{{ event.eventType }}
+                                                        <span v-if="event.result" class="text-slate-400">
+                                                            / {{ getEventResultLabel(event.result) }}
+                                                        </span>
+                                                    </p>
+                                                </div>
+
+                                                <div class="text-sm leading-6 text-slate-500">
+                                                    <p>{{ formatTimestamp(event.createdAt) }}</p>
+                                                    <p>任务 #{{ event.schedulerTaskId }}</p>
+                                                    <p v-if="event.emuCode">车组：{{ event.emuCode }}</p>
+                                                    <p v-if="event.relatedTrainCode">关联车次：{{ event.relatedTrainCode }}</p>
+                                                </div>
+                                            </div>
+
+                                            <div class="flex flex-wrap items-center gap-3">
+                                                <UiButton
+                                                    v-if="getCouplingScanActionTaskRunId(event) !== null"
+                                                    type="button"
+                                                    variant="secondary"
+                                                    size="sm"
+                                                    @click="openCouplingScanDetailForEvent(event)">
+                                                    {{ getCouplingScanActionLabel(event) }}
+                                                </UiButton>
+                                                <span
+                                                    v-if="getLinkedTaskHintText(event)"
+                                                    class="inline-flex items-center rounded-full bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-600">
+                                                    {{ getLinkedTaskHintText(event) }}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </article>
+                                </div>
+                            </div>
+                        </article>
+                    </div>
+                </template>
+            </div>
+        </component>
     </AdminShell>
 </template>
 
@@ -1444,6 +1681,9 @@ import type {
     AdminCouplingScanDetailResponse,
     AdminCouplingScanTaskListItem,
     AdminCouplingScanTaskListResponse,
+    AdminQrcodeScanDetailResponse,
+    AdminQrcodeScanTaskListResponse,
+    AdminQrcodeScanTimeSummaryItem,
     AdminTrainDataRequestHourBucket,
     AdminTrainDataRequestStatsResponse,
     AdminTrainDataRequestType,
@@ -1492,6 +1732,7 @@ const EMPTY_REQUEST_METRICS = {
 const trainCodeInput = ref(readQueryString(route.query.trainCode));
 const isSubmittingSearch = ref(false);
 const isCouplingDetailDialogOpen = ref(false);
+const isQrcodeScanDetailDialogOpen = ref(false);
 const selectedCouplingTaskBureau = ref('');
 const selectedCouplingTaskModel = ref('');
 const couplingDetailStatus = ref<'idle' | 'pending' | 'success' | 'error'>(
@@ -1499,6 +1740,19 @@ const couplingDetailStatus = ref<'idle' | 'pending' | 'success' | 'error'>(
 );
 const couplingDetailData = ref<AdminCouplingScanDetailResponse | null>(null);
 const couplingDetailErrorMessage = ref('');
+const qrcodeScanTaskListStatus = ref<'idle' | 'pending' | 'success' | 'error'>(
+    'idle'
+);
+const qrcodeScanTaskListData = ref<AdminQrcodeScanTaskListResponse | null>(
+    null
+);
+const qrcodeScanTaskListErrorMessage = ref('');
+const qrcodeScanLoadedDate = ref('');
+const qrcodeScanDetailStatus = ref<'idle' | 'pending' | 'success' | 'error'>(
+    'idle'
+);
+const qrcodeScanDetailData = ref<AdminQrcodeScanDetailResponse | null>(null);
+const qrcodeScanDetailErrorMessage = ref('');
 const isMobileActionSheet = ref(false);
 const dialogMediaQuery = ref<MediaQueryList | null>(null);
 
@@ -1610,6 +1864,25 @@ async function fetchCouplingScanTaskList() {
     return response.data;
 }
 
+async function fetchQrcodeScanTaskList(date: string) {
+    const response = await requestFetch<
+        TrackerApiResponse<AdminQrcodeScanTaskListResponse>
+    >('/api/v1/admin/train-provenance/qrcode-scan-tasks', {
+        retry: 0,
+        query: {
+            date
+        }
+    });
+
+    if (!response.ok) {
+        throw {
+            data: response
+        };
+    }
+
+    return response.data;
+}
+
 const {
     data: requestStatsData,
     status: requestStatsStatus,
@@ -1678,7 +1951,8 @@ const isRefreshingPage = computed(
     () =>
         requestStatsStatus.value === 'pending' ||
         provenanceStatus.value === 'pending' ||
-        couplingScanTaskListStatus.value === 'pending'
+        couplingScanTaskListStatus.value === 'pending' ||
+        qrcodeScanTaskListStatus.value === 'pending'
 );
 const provenanceErrorMessage = computed(() =>
     provenanceError.value
@@ -1701,6 +1975,17 @@ const activeStartAt = computed(
 );
 const timelineItems = computed<AdminTrainProvenanceEvent[]>(
     () => provenanceData.value?.timeline ?? []
+);
+const qrcodeScanSummaryItems = computed<AdminQrcodeScanTimeSummaryItem[]>(
+    () => qrcodeScanTaskListData.value?.items ?? []
+);
+const hasLoadedQrcodeScanTaskList = computed(
+    () => qrcodeScanLoadedDate.value.length > 0
+);
+const isQrcodeScanTaskListStale = computed(
+    () =>
+        hasLoadedQrcodeScanTaskList.value &&
+        qrcodeScanLoadedDate.value !== selectedDateYmd.value
 );
 const couplingScanTaskItems = computed<AdminCouplingScanTaskListItem[]>(
     () => couplingScanTaskListData.value?.items ?? []
@@ -1812,11 +2097,35 @@ onBeforeUnmount(() => {
 });
 
 async function refreshAll() {
-    await Promise.all([
+    const refreshTasks = [
         refreshRequestStats(),
         refreshProvenance(),
         refreshCouplingScanTaskList()
-    ]);
+    ];
+
+    if (hasLoadedQrcodeScanTaskList.value) {
+        refreshTasks.push(refreshQrcodeScanTaskList());
+    }
+
+    await Promise.all(refreshTasks);
+}
+
+async function refreshQrcodeScanTaskList() {
+    qrcodeScanTaskListStatus.value = 'pending';
+    qrcodeScanTaskListErrorMessage.value = '';
+
+    try {
+        const data = await fetchQrcodeScanTaskList(selectedDateYmd.value);
+        qrcodeScanTaskListData.value = data;
+        qrcodeScanLoadedDate.value = selectedDateYmd.value;
+        qrcodeScanTaskListStatus.value = 'success';
+    } catch (error) {
+        qrcodeScanTaskListErrorMessage.value = getApiErrorMessage(
+            error,
+            '固定车组扫描任务加载失败。'
+        );
+        qrcodeScanTaskListStatus.value = 'error';
+    }
 }
 
 async function submitSearch() {
@@ -1879,6 +2188,24 @@ function handleCouplingDetailDialogVisibilityChange(nextValue: boolean) {
     closeCouplingDetailDialog();
 }
 
+function closeQrcodeScanDetailDialog() {
+    if (qrcodeScanDetailStatus.value === 'pending') {
+        return;
+    }
+
+    isQrcodeScanDetailDialogOpen.value = false;
+    qrcodeScanDetailErrorMessage.value = '';
+}
+
+function handleQrcodeScanDetailDialogVisibilityChange(nextValue: boolean) {
+    if (nextValue) {
+        isQrcodeScanDetailDialogOpen.value = true;
+        return;
+    }
+
+    closeQrcodeScanDetailDialog();
+}
+
 async function openCouplingScanDetail(taskRunId: number) {
     isCouplingDetailDialogOpen.value = true;
     couplingDetailStatus.value = 'pending';
@@ -1909,6 +2236,45 @@ async function openCouplingScanDetail(taskRunId: number) {
             '重联扫描结果加载失败。'
         );
         couplingDetailStatus.value = 'error';
+    }
+}
+
+async function openQrcodeScanDetail(detectedAt: string) {
+    const loadedDate = qrcodeScanLoadedDate.value;
+    if (!/^\d{8}$/.test(loadedDate) || !/^\d{4}$/.test(detectedAt)) {
+        return;
+    }
+
+    isQrcodeScanDetailDialogOpen.value = true;
+    qrcodeScanDetailStatus.value = 'pending';
+    qrcodeScanDetailErrorMessage.value = '';
+    qrcodeScanDetailData.value = null;
+
+    try {
+        const response = await requestFetch<
+            TrackerApiResponse<AdminQrcodeScanDetailResponse>
+        >('/api/v1/admin/train-provenance/qrcode-scan', {
+            retry: 0,
+            query: {
+                date: loadedDate,
+                detectedAt
+            }
+        });
+
+        if (!response.ok) {
+            throw {
+                data: response
+            };
+        }
+
+        qrcodeScanDetailData.value = response.data;
+        qrcodeScanDetailStatus.value = 'success';
+    } catch (error) {
+        qrcodeScanDetailErrorMessage.value = getApiErrorMessage(
+            error,
+            '固定车组扫描详情加载失败。'
+        );
+        qrcodeScanDetailStatus.value = 'error';
     }
 }
 
@@ -2141,6 +2507,16 @@ function formatServiceDate(serviceDate: string) {
     return `${serviceDate.slice(0, 4)}-${serviceDate.slice(4, 6)}-${serviceDate.slice(6, 8)}`;
 }
 
+function formatDetectedAt(detectedAt: string) {
+    return /^\d{4}$/.test(detectedAt)
+        ? `${detectedAt.slice(0, 2)}:${detectedAt.slice(2, 4)}`
+        : '--';
+}
+
+function getQrcodeScanSourceLabel(manualNow: boolean) {
+    return manualNow ? '手动立即执行' : '计划派发';
+}
+
 function formatEmuCodeList(emuCodes: string[]) {
     return emuCodes.length > 0 ? emuCodes.join(' / ') : '--';
 }
@@ -2314,6 +2690,12 @@ function getEventResultLabel(result: string) {
             return '已变化';
         case 'asset_missing':
             return '资产缺失';
+        case 'network_error':
+            return getEventResultLabel('seat_code_request_failed_network_error');
+        case 'seat_code_not_enabled':
+            return getEventResultLabel('seat_code_request_failed_not_enabled');
+        case 'other_error':
+            return getEventResultLabel('seat_code_request_failed_other');
         case 'seat_code_request_failed_network_error':
             return '畅行码查询失败：网络错误';
         case 'seat_code_request_failed_not_enabled':

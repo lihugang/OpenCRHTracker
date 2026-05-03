@@ -15,6 +15,7 @@ import {
     isTrainProvenanceEnabled,
     list12306RequestHourlyStatsInRange,
     listCouplingScanCandidatesByTaskRunId,
+    listTrainProvenanceEventsByTaskRunId,
     listTrainProvenanceTaskRunsByDateAndExecutor,
     listTrainProvenanceDepartureStartAts,
     listTrainProvenanceEventsByDateAndTrainCode,
@@ -36,6 +37,11 @@ import type {
     AdminCouplingScanTaskListItem,
     AdminCouplingScanTaskListResponse,
     AdminCouplingScanTaskRunSummary,
+    AdminQrcodeScanDetailResponse,
+    AdminQrcodeScanTaskListResponse,
+    AdminQrcodeScanTaskRunSummary,
+    AdminQrcodeScanTimeDetailTaskItem,
+    AdminQrcodeScanTimeSummaryItem,
     AdminTrainDataRequestHourBucket,
     AdminTrainDataRequestStatsResponse,
     AdminTrainDataRequestSummary,
@@ -56,6 +62,7 @@ import type {
 } from '~/types/admin';
 
 const COUPLING_SCAN_TASK_EXECUTOR = 'detect_coupled_emu_group';
+const QRCODE_SCAN_TASK_EXECUTOR = 'probe_qrcode_detection_emu';
 
 function toLatestStatus(
     rows: ProbeStatusRow[]
@@ -432,6 +439,89 @@ function extractCouplingScanTaskArgs(taskArgs: unknown): {
     };
 }
 
+function extractQrcodeScanTaskArgs(taskArgs: unknown): {
+    detectedAt: string;
+    emuCode: string;
+    manualNow: boolean;
+} {
+    const payload = getPayloadObject(taskArgs);
+
+    return {
+        detectedAt: (getOptionalString(payload?.detectedAt) ?? '').trim(),
+        emuCode: normalizeCode(getOptionalString(payload?.emuCode) ?? ''),
+        manualNow: payload?.manualNow === true
+    };
+}
+
+function toQrcodeScanTaskRunSummary(
+    taskRun: ReturnType<typeof getTrainProvenanceTaskRunById>
+): AdminQrcodeScanTaskRunSummary | null {
+    if (!taskRun) {
+        return null;
+    }
+
+    const taskArgs = extractQrcodeScanTaskArgs(taskRun.taskArgs);
+
+    return {
+        id: taskRun.id,
+        schedulerTaskId: taskRun.schedulerTaskId,
+        executor: taskRun.executor,
+        status: taskRun.status,
+        startedAt: taskRun.startedAt,
+        finishedAt: taskRun.finishedAt,
+        serviceDate: taskRun.serviceDate,
+        detectedAt: taskArgs.detectedAt,
+        emuCode: taskArgs.emuCode,
+        manualNow: taskArgs.manualNow,
+        taskArgs: taskRun.taskArgs
+    };
+}
+
+function hasPendingCouplingDetectionEvent(
+    events: TrainProvenanceEventRecord[]
+): boolean {
+    return events.some((event) => event.eventType === 'pending_coupling_detection');
+}
+
+function buildQrcodeScanTimeSummaryItem(
+    detectedAt: string,
+    taskRuns: ReturnType<typeof listTrainProvenanceTaskRunsByDateAndExecutor>
+): AdminQrcodeScanTimeSummaryItem {
+    let successCount = 0;
+    let failedCount = 0;
+    let skippedCount = 0;
+    let pendingCouplingCount = 0;
+
+    for (const taskRun of taskRuns) {
+        switch (taskRun.status) {
+            case 'success':
+                successCount += 1;
+                break;
+            case 'failed':
+                failedCount += 1;
+                break;
+            case 'skipped':
+                skippedCount += 1;
+                break;
+            default:
+                break;
+        }
+
+        if (hasPendingCouplingDetectionEvent(listTrainProvenanceEventsByTaskRunId(taskRun.id))) {
+            pendingCouplingCount += 1;
+        }
+    }
+
+    return {
+        detectedAt,
+        total: taskRuns.length,
+        successCount,
+        failedCount,
+        skippedCount,
+        pendingCouplingCount
+    };
+}
+
 function extractHistoricalReuseDetail(
     event: TrainProvenanceEventRecord
 ): AdminTrainProvenanceHistoricalReuseDetail | null {
@@ -576,10 +666,10 @@ function resolveDirectHitEventRoute(
                 trainCodes.length > 0
                     ? trainCodes
                     : [
-                          routePayload?.code ||
-                              event.relatedTrainCode ||
-                              event.trainCode
-                      ].filter((trainCode) => trainCode.length > 0),
+                        routePayload?.code ||
+                        event.relatedTrainCode ||
+                        event.trainCode
+                    ].filter((trainCode) => trainCode.length > 0),
             internalCode: routePayload?.internalCode ?? '',
             startAt: event.startAt ?? routePayload?.startAt ?? null,
             endAt: routePayload?.endAt ?? null,
@@ -635,8 +725,8 @@ function resolveOccupiedRoutes(
     const hintedTrainCodes = getStringArray(detailPayload?.trainCodes);
     const hintedStartAts = Array.isArray(detailPayload?.startAts)
         ? detailPayload.startAts
-              .map((startAt) => getOptionalInteger(startAt))
-              .filter((startAt): startAt is number => startAt !== null)
+            .map((startAt) => getOptionalInteger(startAt))
+            .filter((startAt): startAt is number => startAt !== null)
         : [];
 
     if (hintedTrainCodes.length === 0 && hintedStartAts.length === 0) {
@@ -741,11 +831,11 @@ function extractConflictDetail(
     const currentGroup = toConflictCurrentGroup(payload.currentGroup);
     const conflictGroups = Array.isArray(payload.conflictGroups)
         ? payload.conflictGroups
-              .map((item) => toConflictGroup(item))
-              .filter(
-                  (item): item is AdminTrainProvenanceConflictGroup =>
-                      item !== null
-              )
+            .map((item) => toConflictGroup(item))
+            .filter(
+                (item): item is AdminTrainProvenanceConflictGroup =>
+                    item !== null
+            )
         : [];
 
     if (!currentGroup && conflictGroups.length === 0) {
@@ -774,6 +864,47 @@ function formatConflictTrainCodes(trainCodes: string[]): string {
     return trainCodes.length > 0 ? trainCodes.join(' / ') : '--';
 }
 
+function formatSeatCodeFailureRouteText(detail: unknown): string {
+    const payload = getPayloadObject(detail);
+    const routePayload = toSeatCodeRoutePayload(payload?.route);
+    const route =
+        fillRouteStationsFromTodayCache(
+            buildTrainRouteSnapshot({
+                serviceDate: routePayload?.startDay ?? '',
+                trainCodes: [routePayload?.code ?? ''].filter(
+                    (trainCode) => trainCode.length > 0
+                ),
+                internalCode: routePayload?.internalCode ?? '',
+                startAt: routePayload?.startAt ?? null,
+                endAt: routePayload?.endAt ?? null,
+                startStation: '',
+                endStation: ''
+            })
+        ) ?? null;
+
+    if (!route) {
+        return '';
+    }
+
+    const parts: string[] = [];
+    const trainText = formatRouteTrainCodes(route);
+    if (trainText !== '--') {
+        parts.push(`\u626b\u63cf\u5230 ${trainText}`);
+    }
+
+    if (route.startStation.length > 0 || route.endStation.length > 0) {
+        parts.push(
+            `${route.startStation || '--'}-${route.endStation || '--'}`
+        );
+    }
+
+    const timeText = formatConflictTimeRange(route.startAt, route.endAt);
+    if (timeText !== '--') {
+        parts.push(timeText);
+    }
+
+    return parts.join('\uff0c');
+}
 function formatConflictSummary(
     conflictGroups: AdminTrainProvenanceConflictGroup[]
 ): string {
@@ -824,7 +955,10 @@ function formatSeatCodeFailureReasonText(detail: unknown): string {
     }
 
     if (extraDetail === 'seat route startDay is not current day') {
-        return '列车发车时间不是当前日期';
+        const routeText = formatSeatCodeFailureRouteText(detail);
+        return routeText.length > 0
+            ? `\u5217\u8f66\u53d1\u8f66\u65e5\u671f\u4e0d\u662f\u5f53\u524d\u65e5\u671f\uff1a${routeText}`
+            : '\u5217\u8f66\u53d1\u8f66\u65e5\u671f\u4e0d\u662f\u5f53\u524d\u65e5\u671f';
     }
 
     const parts = [errorCode, errorMsg, extraDetail].filter(
@@ -960,15 +1094,17 @@ function formatEventSummary(
         case 'seat_verification_mismatch_exhausted':
             return '畅行码校验不一致，重试已耗尽';
         case 'qrcode_detection_dispatch_completed':
-            return `QR detection dispatch completed${linkedTaskText}`;
+            return `畅行码批量扫描任务生成完毕，{linkedTaskText}`;
         case 'qrcode_detection_skipped':
-            return `QR detection skipped: ${event.result || 'skipped'}`;
-        case 'qrcode_detection_request_failed':
-            return `QR detection request failed: ${event.result || 'request_failed'}`;
+            return `畅行码批量扫描任务被跳过: ${event.result || '已跳过'}`;
+        case 'qrcode_detection_request_failed': {
+            const seatCodeFailure = payload?.seatCodeFailure;
+            return formatSeatCodeFailureReasonText(seatCodeFailure);
+        }
         case 'qrcode_detection_succeeded':
             return event.result === 'tracked_route'
-                ? 'QR detection matched a tracked route'
-                : 'QR detection succeeded on an untracked route';
+                ? '畅行码批量扫描命中已追踪车次'
+                : '畅行码批量扫描命中未追踪车次';
         case 'resolved_single':
             return '已判定为单组';
         case 'resolved_from_status':
@@ -1015,23 +1151,23 @@ function toTimelineEvent(
     const couplingScan =
         event.eventType === 'coupling_scan_candidate_direct_hit'
             ? {
-                  state: 'resolved' as const,
-                  queuedSchedulerTaskId: null,
-                  queuedTaskRunId: null,
-                  resultSchedulerTaskId: event.schedulerTaskId,
-                  resultTaskRunId: event.taskRunId,
-                  canOpenDetail: true
-              }
+                state: 'resolved' as const,
+                queuedSchedulerTaskId: null,
+                queuedTaskRunId: null,
+                resultSchedulerTaskId: event.schedulerTaskId,
+                resultTaskRunId: event.taskRunId,
+                canOpenDetail: true
+            }
             : null;
     const summary =
         event.eventType === 'coupling_scan_candidate_direct_hit'
             ? formatDirectHitEventSummary(event)
             : formatEventSummary(
-                  event,
-                  conflictDetail,
-                  historicalReuse,
-                  coupledResolution
-              );
+                event,
+                conflictDetail,
+                historicalReuse,
+                coupledResolution
+            );
 
     return {
         id: event.id,
@@ -1240,10 +1376,10 @@ export function getAdminTrainRequestStats(
     const runtimeConfig = getTrainProvenanceRuntimeConfig();
     const compareDate = /^\d{8}$/.test(date)
         ? formatShanghaiDateString(
-              (getShanghaiDayStartUnixSeconds(date) -
-                  REQUEST_STAT_DAY_SECONDS) *
-                  1000
-          )
+            (getShanghaiDayStartUnixSeconds(date) -
+                REQUEST_STAT_DAY_SECONDS) *
+            1000
+        )
         : '';
 
     if (!isTrainProvenanceEnabled()) {
@@ -1438,16 +1574,16 @@ export function getAdminTrainProvenance(
         startAt !== null && departureStartAts.includes(startAt)
             ? startAt
             : departures.length === 1
-              ? departures[0]!.startAt
-              : null;
+                ? departures[0]!.startAt
+                : null;
     const timeline =
         selectedStartAt === null
             ? []
             : enrichCouplingScanTimeline(
-                  allTimelineRecords
-                      .filter((event) => event.startAt === selectedStartAt)
-                      .map(toTimelineEvent)
-              );
+                allTimelineRecords
+                    .filter((event) => event.startAt === selectedStartAt)
+                    .map(toTimelineEvent)
+            );
 
     return {
         enabled: true,
@@ -1476,15 +1612,15 @@ export function getAdminCouplingScanDetail(
 
     const taskRunSummary: AdminCouplingScanTaskRunSummary | null = taskRun
         ? {
-              id: taskRun.id,
-              schedulerTaskId: taskRun.schedulerTaskId,
-              executor: taskRun.executor,
-              status: taskRun.status,
-              startedAt: taskRun.startedAt,
-              finishedAt: taskRun.finishedAt,
-              serviceDate: taskRun.serviceDate,
-              taskArgs: taskRun.taskArgs
-          }
+            id: taskRun.id,
+            schedulerTaskId: taskRun.schedulerTaskId,
+            executor: taskRun.executor,
+            status: taskRun.status,
+            startedAt: taskRun.startedAt,
+            finishedAt: taskRun.finishedAt,
+            serviceDate: taskRun.serviceDate,
+            taskArgs: taskRun.taskArgs
+        }
         : null;
 
     const candidateItems: AdminCouplingScanCandidate[] = candidates.map(
@@ -1570,5 +1706,123 @@ export function getAdminCouplingScanTaskList(
         retentionDays: runtimeConfig.retentionDays,
         date,
         items
+    };
+}
+
+export function getAdminQrcodeScanTaskList(
+    date: string
+): AdminQrcodeScanTaskListResponse {
+    const runtimeConfig = getTrainProvenanceRuntimeConfig();
+
+    if (!isTrainProvenanceEnabled()) {
+        return {
+            enabled: false,
+            retentionDays: runtimeConfig.retentionDays,
+            date,
+            items: []
+        };
+    }
+
+    if (!/^\d{8}$/.test(date)) {
+        return {
+            enabled: true,
+            retentionDays: runtimeConfig.retentionDays,
+            date,
+            items: []
+        };
+    }
+
+    const groupedTaskRuns = new Map<
+        string,
+        ReturnType<typeof listTrainProvenanceTaskRunsByDateAndExecutor>
+    >();
+
+    for (const taskRun of listTrainProvenanceTaskRunsByDateAndExecutor(
+        date,
+        QRCODE_SCAN_TASK_EXECUTOR
+    )) {
+        const taskArgs = extractQrcodeScanTaskArgs(taskRun.taskArgs);
+        const detectedAt = taskArgs.detectedAt;
+        if (!/^\d{4}$/.test(detectedAt)) {
+            continue;
+        }
+
+        const currentGroup = groupedTaskRuns.get(detectedAt) ?? [];
+        currentGroup.push(taskRun);
+        groupedTaskRuns.set(detectedAt, currentGroup);
+    }
+
+    const items: AdminQrcodeScanTimeSummaryItem[] = Array.from(
+        groupedTaskRuns.entries(),
+        ([detectedAt, taskRuns]) =>
+            buildQrcodeScanTimeSummaryItem(detectedAt, taskRuns)
+    ).sort((left, right) => left.detectedAt.localeCompare(right.detectedAt));
+
+    return {
+        enabled: true,
+        retentionDays: runtimeConfig.retentionDays,
+        date,
+        items
+    };
+}
+
+export function getAdminQrcodeScanDetail(
+    date: string,
+    detectedAt: string
+): AdminQrcodeScanDetailResponse {
+    if (!isTrainProvenanceEnabled()) {
+        return {
+            enabled: false,
+            date,
+            detectedAt,
+            summary: null,
+            tasks: []
+        };
+    }
+
+    if (!/^\d{8}$/.test(date) || !/^\d{4}$/.test(detectedAt)) {
+        return {
+            enabled: true,
+            date,
+            detectedAt,
+            summary: null,
+            tasks: []
+        };
+    }
+
+    const matchingTaskRuns = listTrainProvenanceTaskRunsByDateAndExecutor(
+        date,
+        QRCODE_SCAN_TASK_EXECUTOR
+    ).filter((taskRun) => {
+        const taskArgs = extractQrcodeScanTaskArgs(taskRun.taskArgs);
+        return taskArgs.detectedAt === detectedAt;
+    });
+
+    const tasks: AdminQrcodeScanTimeDetailTaskItem[] = matchingTaskRuns
+        .map((taskRun) => {
+            const taskRunSummary = toQrcodeScanTaskRunSummary(taskRun);
+            if (!taskRunSummary) {
+                return null;
+            }
+
+            return {
+                taskRun: taskRunSummary,
+                timeline: listTrainProvenanceEventsByTaskRunId(taskRun.id).map(
+                    toTimelineEvent
+                )
+            };
+        })
+        .filter(
+            (
+                item
+            ): item is AdminQrcodeScanTimeDetailTaskItem => item !== null
+        );
+
+    return {
+        enabled: true,
+        date,
+        detectedAt,
+        summary: buildQrcodeScanTimeSummaryItem(detectedAt, matchingTaskRuns),
+        tasks
     };
 }

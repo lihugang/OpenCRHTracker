@@ -551,3 +551,46 @@ export interface AdminCouplingScanTaskListResponse {
     date: string;
     items: AdminCouplingScanTaskListItem[];
 }
+
+export interface AdminQrcodeScanTaskRunSummary {
+    id: number;
+    schedulerTaskId: number;
+    executor: string;
+    status: AdminTrainProvenanceTaskRunStatus;
+    startedAt: number;
+    finishedAt: number | null;
+    serviceDate: string;
+    detectedAt: string;
+    emuCode: string;
+    manualNow: boolean;
+    taskArgs: unknown;
+}
+
+export interface AdminQrcodeScanTimeSummaryItem {
+    detectedAt: string;
+    total: number;
+    successCount: number;
+    failedCount: number;
+    skippedCount: number;
+    pendingCouplingCount: number;
+}
+
+export interface AdminQrcodeScanTaskListResponse {
+    enabled: boolean;
+    retentionDays: number;
+    date: string;
+    items: AdminQrcodeScanTimeSummaryItem[];
+}
+
+export interface AdminQrcodeScanTimeDetailTaskItem {
+    taskRun: AdminQrcodeScanTaskRunSummary;
+    timeline: AdminTrainProvenanceEvent[];
+}
+
+export interface AdminQrcodeScanDetailResponse {
+    enabled: boolean;
+    date: string;
+    detectedAt: string;
+    summary: AdminQrcodeScanTimeSummaryItem | null;
+    tasks: AdminQrcodeScanTimeDetailTaskItem[];
+}

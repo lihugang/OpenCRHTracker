@@ -204,6 +204,16 @@ export function markCurrentTrainProvenanceTaskSkipped(errorMessage = '') {
     context.errorMessage = errorMessage.trim();
 }
 
+export function markCurrentTrainProvenanceTaskFailed(errorMessage = '') {
+    const context = getCurrentContext();
+    if (!context) {
+        return;
+    }
+
+    context.finalStatus = 'failed';
+    context.errorMessage = errorMessage.trim();
+}
+
 export function recordCurrentTrainProvenanceEvent(
     input: TrainProvenanceEventInput
 ) {

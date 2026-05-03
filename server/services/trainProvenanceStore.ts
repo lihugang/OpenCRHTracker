@@ -30,6 +30,7 @@ type TrainProvenanceSqlKey =
     | 'selectCouplingScanCandidatesByTaskRunId'
     | 'selectDepartureStartAtsByDateAndTrainCode'
     | 'selectEventsByDateAndTrainCode'
+    | 'selectEventsByTaskRunId'
     | 'selectTaskRunById'
     | 'selectTaskRunsByDateAndExecutor'
     | 'selectTaskRunBySchedulerTaskId'
@@ -604,6 +605,17 @@ export function listCouplingScanCandidatesByTaskRunId(taskRunId: number) {
             taskRunId
         )
         .map(toCouplingScanCandidateRecord);
+}
+
+export function listTrainProvenanceEventsByTaskRunId(taskRunId: number) {
+    maybeCleanupExpiredTrainProvenance();
+    if (!Number.isInteger(taskRunId) || taskRunId <= 0) {
+        return [];
+    }
+
+    return trainProvenanceStatements
+        .all<TrainProvenanceEventRow>('selectEventsByTaskRunId', taskRunId)
+        .map(toEventRecord);
 }
 
 export function list12306RequestHourlyStatsInRange(

@@ -15,6 +15,7 @@ import {
     queueCoupledDetectionTask
 } from '~/server/services/taskExecutors/probeResolutionShared';
 import {
+    markCurrentTrainProvenanceTaskFailed,
     markCurrentTrainProvenanceTaskSkipped,
     recordCurrentTrainProvenanceEvent,
     recordCurrentTrainProvenanceEventsForTrainCodes
@@ -142,7 +143,7 @@ async function executeProbeQrcodeDetectionEmuTask(rawArgs: unknown) {
 
     const seatCodeResult = await fetchEMUInfoBySeatCode(seatCode);
     if (seatCodeResult.status !== 'success') {
-        markCurrentTrainProvenanceTaskSkipped(
+        markCurrentTrainProvenanceTaskFailed(
             'qrcode_detection_seat_code_request_failed'
         );
         recordCurrentTrainProvenanceEvent({

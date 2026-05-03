@@ -454,7 +454,7 @@ function collectPendingTrackedGroups(
             if (
                 !trackedGroup ||
                 trackedGroup.finalStatus !==
-                    ProbeStatusValue.PendingCouplingDetection
+                ProbeStatusValue.PendingCouplingDetection
             ) {
                 continue;
             }
@@ -565,26 +565,26 @@ function recordDirectHitTrainProvenanceEvent(input: {
             },
             scheduleGroup: target.scheduleGroup
                 ? {
-                      trainCode: target.scheduleGroup.trainCode,
-                      trainInternalCode: target.scheduleGroup.trainInternalCode,
-                      allCodes: target.scheduleGroup.allCodes,
-                      startAt: target.scheduleGroup.startAt,
-                      endAt: target.scheduleGroup.endAt,
-                      startStation: target.scheduleGroup.startStation,
-                      endStation: target.scheduleGroup.endStation
-                  }
+                    trainCode: target.scheduleGroup.trainCode,
+                    trainInternalCode: target.scheduleGroup.trainInternalCode,
+                    allCodes: target.scheduleGroup.allCodes,
+                    startAt: target.scheduleGroup.startAt,
+                    endAt: target.scheduleGroup.endAt,
+                    startStation: target.scheduleGroup.startStation,
+                    endStation: target.scheduleGroup.endStation
+                }
                 : null,
             trackedGroup: input.trackedGroup
                 ? {
-                      trainCode: input.trackedGroup.group.trainCode,
-                      trainInternalCode:
-                          input.trackedGroup.group.trainInternalCode,
-                      allCodes: input.trackedGroup.group.allCodes,
-                      startAt: input.trackedGroup.group.startAt,
-                      endAt: input.trackedGroup.group.endAt,
-                      startStation: input.trackedGroup.group.startStation,
-                      endStation: input.trackedGroup.group.endStation
-                  }
+                    trainCode: input.trackedGroup.group.trainCode,
+                    trainInternalCode:
+                        input.trackedGroup.group.trainInternalCode,
+                    allCodes: input.trackedGroup.group.allCodes,
+                    startAt: input.trackedGroup.group.startAt,
+                    endAt: input.trackedGroup.group.endAt,
+                    startStation: input.trackedGroup.group.startStation,
+                    endStation: input.trackedGroup.group.endStation
+                }
                 : null
         }
     });
@@ -1049,7 +1049,7 @@ async function persistResolvedTrackedGroup(
     const previousStatus = trackedGroup.finalStatus;
     const finalStatus =
         previousStatus === ProbeStatusValue.CoupledFormationResolved ||
-        emuCodes.length > 1
+            emuCodes.length > 1
             ? ProbeStatusValue.CoupledFormationResolved
             : ProbeStatusValue.SingleFormationResolved;
     const scheduleRoute = resolveScheduleRoute(
