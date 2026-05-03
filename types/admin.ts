@@ -140,7 +140,11 @@ export interface AdminUsersResponse {
     items: AdminUserListItem[];
 }
 
-export type AdminConfigFileTarget = 'config' | 'EMUList' | 'QRCode';
+export type AdminConfigFileTarget =
+    | 'config'
+    | 'EMUList'
+    | 'QRCode'
+    | 'qrcodeDetection';
 
 export type AdminConfigFileAction = 'reload_local' | 'refresh_remote';
 
@@ -249,7 +253,8 @@ export interface AdminServerMetricsResponse {
 export type AdminTaskTemplateType =
     | 'regenerate_daily_export'
     | 'refresh_route_info_now'
-    | 'detect_coupled_emu_group_now';
+    | 'detect_coupled_emu_group_now'
+    | 'run_qrcode_detection_now';
 
 export interface AdminCreatedTask {
     taskId: number;
@@ -279,10 +284,18 @@ export interface AdminDetectCoupledEmuGroupNowTaskRequest {
     };
 }
 
+export interface AdminRunQrcodeDetectionNowTaskRequest {
+    type: 'run_qrcode_detection_now';
+    payload: {
+        detectedAt: string;
+    };
+}
+
 export type AdminCreateTaskRequest =
     | AdminRegenerateDailyExportTaskRequest
     | AdminRefreshRouteInfoNowTaskRequest
-    | AdminDetectCoupledEmuGroupNowTaskRequest;
+    | AdminDetectCoupledEmuGroupNowTaskRequest
+    | AdminRunQrcodeDetectionNowTaskRequest;
 
 export interface AdminCreateTaskResponse {
     type: AdminTaskTemplateType;
@@ -300,13 +313,14 @@ export interface AdminCouplingScanOptionGroup {
 
 export interface AdminTaskOverviewResponse {
     asOf: number;
+    nextTaskId: number | null;
     remainingTotal: number;
     remainingWithin10Minutes: number;
     remainingWithin30Minutes: number;
     remainingWithin1Hour: number;
     couplingScanOptions: AdminCouplingScanOptionGroup[];
+    qrcodeDetectionTimes: string[];
 }
-
 export interface AdminRevokeAllWebappTokensResponse {
     issuer: 'webapp';
     revokedCount: number;

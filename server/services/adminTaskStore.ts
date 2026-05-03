@@ -28,13 +28,17 @@ import type {
 
 const logger = getLogger('admin-task-store');
 
-type AdminTaskSqlKey = 'selectTaskOverviewCounts';
+type AdminTaskSqlKey = 'selectNextPendingTask' | 'selectTaskOverviewCounts';
 
 interface AdminTaskOverviewCountsRow {
     remainingTotal: number;
     remainingWithin10Minutes: number;
     remainingWithin30Minutes: number;
     remainingWithin1Hour: number;
+}
+
+interface NextPendingTaskRow {
+    id: number;
 }
 
 const adminTaskSql = importSqlBatch('tasks/queries') as Record<
@@ -310,6 +314,9 @@ export async function createAdminTask(
 export async function getAdminTaskOverview(
     asOf = getNowSeconds()
 ): Promise<AdminTaskOverviewResponse> {
+    const nextPendingTask = adminTaskStatements.get<NextPendingTaskRow>(
+        'selectNextPendingTask'
+    );
     const counts = adminTaskStatements.get<AdminTaskOverviewCountsRow>(
         'selectTaskOverviewCounts',
         asOf + 10 * 60,
@@ -325,10 +332,12 @@ export async function getAdminTaskOverview(
 
     return {
         asOf,
+        nextTaskId: nextPendingTask?.id ?? null,
         remainingTotal: counts.remainingTotal,
         remainingWithin10Minutes: counts.remainingWithin10Minutes,
         remainingWithin30Minutes: counts.remainingWithin30Minutes,
         remainingWithin1Hour: counts.remainingWithin1Hour,
-        couplingScanOptions
+        couplingScanOptions,
+        qrcodeDetectionTimes: []
     };
 }
