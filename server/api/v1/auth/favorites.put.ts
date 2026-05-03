@@ -33,31 +33,31 @@ export default defineEventHandler(async (event) => {
                     !Array.isArray(body),
                 400,
                 'invalid_param',
-                '\u8bf7\u6c42\u4f53\u5fc5\u987b\u662f JSON \u5bf9\u8c61'
+                '请求体必须是 JSON 对象'
             );
             ensure(
                 body.starredAt === undefined,
                 400,
                 'invalid_param',
-                '\u8bf7\u6c42\u4f53\u5305\u542b\u5ba2\u6237\u7aef\u4e0d\u5141\u8bb8\u4f20\u5165\u7684\u5b57\u6bb5'
+                '请求体包含客户端不允许传入的字段'
             );
             ensure(
                 isLookupTargetType(body.type),
                 400,
                 'invalid_param',
-                'type \u5fc5\u987b\u662f\u6709\u6548\u7684\u6536\u85cf\u7c7b\u578b'
+                'type 必须是有效的收藏类型'
             );
             ensure(
                 typeof body.code === 'string' && body.code.trim().length > 0,
                 400,
                 'invalid_param',
-                'code \u4e0d\u80fd\u4e3a\u7a7a'
+                'code 不能为空'
             );
             ensure(
                 Array.isArray(body.tags),
                 400,
                 'invalid_param',
-                'tags \u5fc5\u987b\u662f\u5b57\u7b26\u4e32\u6570\u7ec4'
+                'tags 必须是字符串数组'
             );
 
             ensurePayloadStringLength(
@@ -71,7 +71,7 @@ export default defineEventHandler(async (event) => {
                     typeof tag === 'string',
                     400,
                     'invalid_param',
-                    `tags[${index}] \u5fc5\u987b\u662f\u5b57\u7b26\u4e32`
+                    `tags[${index}] 必须是字符串`
                 );
                 ensurePayloadStringLength(
                     tag,

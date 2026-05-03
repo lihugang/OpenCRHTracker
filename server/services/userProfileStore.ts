@@ -348,7 +348,7 @@ export function upsertUserFavoriteLookup(
         throw new ApiRequestError(
             400,
             'invalid_param',
-            '\u6536\u85cf\u9879\u65e0\u6548'
+            '收藏项无效'
         );
     }
 
@@ -370,7 +370,7 @@ export function upsertUserFavoriteLookup(
             throw new ApiRequestError(
                 409,
                 'favorites_limit_exceeded',
-                '\u6536\u85cf\u6570\u91cf\u5df2\u8fbe\u4e0a\u9650\uff0c\u8bf7\u5148\u53d6\u6d88\u90e8\u5206\u6536\u85cf'
+                '收藏数量已达上限，请先取消部分收藏'
             );
         }
 
@@ -410,7 +410,7 @@ export function removeUserFavoriteLookup(
         throw new ApiRequestError(
             400,
             'invalid_param',
-            '\u6536\u85cf\u9879\u65e0\u6548'
+            '收藏项无效'
         );
     }
 
@@ -430,7 +430,7 @@ export function removeUserFavoriteLookup(
             throw new ApiRequestError(
                 404,
                 'not_found',
-                '\u672a\u627e\u5230\u5bf9\u5e94\u7684\u6536\u85cf\u9879'
+                '未找到对应的收藏项'
             );
         }
 
@@ -469,7 +469,7 @@ export function upsertUserSubscription(
             throw new ApiRequestError(
                 409,
                 'subscriptions_limit_exceeded',
-                '\u8ba2\u9605\u8bbe\u5907\u6570\u91cf\u5df2\u8fbe\u4e0a\u9650\uff0c\u8bf7\u5148\u5220\u9664\u90e8\u5206\u8bbe\u5907'
+                '订阅设备数量已达上限，请先删除部分设备'
             );
         }
 
@@ -530,7 +530,7 @@ export function renameUserSubscription(
             throw new ApiRequestError(
                 404,
                 'not_found',
-                '\u672a\u627e\u5230\u5bf9\u5e94\u7684\u8ba2\u9605\u8bbe\u5907'
+                '未找到对应的订阅设备'
             );
         }
 
@@ -575,7 +575,7 @@ export function removeUserSubscription(userId: string, subscriptionId: string) {
             throw new ApiRequestError(
                 404,
                 'not_found',
-                '\u672a\u627e\u5230\u5bf9\u5e94\u7684\u8ba2\u9605\u8bbe\u5907'
+                '未找到对应的订阅设备'
             );
         }
 

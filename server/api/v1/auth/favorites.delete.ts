@@ -34,19 +34,19 @@ export default defineEventHandler(async (event) => {
                     !Array.isArray(body),
                 400,
                 'invalid_param',
-                '\u8bf7\u6c42\u4f53\u5fc5\u987b\u662f JSON \u5bf9\u8c61'
+                '请求体必须是 JSON 对象'
             );
             ensure(
                 isLookupTargetType(body.type),
                 400,
                 'invalid_param',
-                'type \u5fc5\u987b\u662f\u6709\u6548\u7684\u6536\u85cf\u7c7b\u578b'
+                'type 必须是有效的收藏类型'
             );
             ensure(
                 typeof body.code === 'string' && body.code.trim().length > 0,
                 400,
                 'invalid_param',
-                'code \u4e0d\u80fd\u4e3a\u7a7a'
+                'code 不能为空'
             );
 
             ensurePayloadStringLength(

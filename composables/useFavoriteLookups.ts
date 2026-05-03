@@ -161,7 +161,7 @@ export function useFavoriteLookups() {
             state.value = 'error';
             errorMessage.value = getApiErrorMessage(
                 error,
-                '\u52a0\u8f7d\u6536\u85cf\u5931\u8d25\u3002'
+                '加载收藏失败。'
             );
         }
 
@@ -221,7 +221,7 @@ export function useFavoriteLookups() {
             state.value = 'error';
             errorMessage.value = getApiErrorMessage(
                 error,
-                '\u66f4\u65b0\u6536\u85cf\u5931\u8d25\u3002'
+                '更新收藏失败。'
             );
             return false;
         } finally {
@@ -270,7 +270,7 @@ export function useFavoriteLookups() {
             state.value = 'error';
             errorMessage.value = getApiErrorMessage(
                 error,
-                '\u53d6\u6d88\u6536\u85cf\u5931\u8d25\u3002'
+                '取消收藏失败。'
             );
             return false;
         } finally {

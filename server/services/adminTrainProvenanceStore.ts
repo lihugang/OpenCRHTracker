@@ -889,7 +889,7 @@ function formatSeatCodeFailureRouteText(detail: unknown): string {
     const parts: string[] = [];
     const trainText = formatRouteTrainCodes(route);
     if (trainText !== '--') {
-        parts.push(`\u626b\u63cf\u5230 ${trainText}`);
+        parts.push(`扫描到 ${trainText}`);
     }
 
     if (route.startStation.length > 0 || route.endStation.length > 0) {
@@ -903,7 +903,7 @@ function formatSeatCodeFailureRouteText(detail: unknown): string {
         parts.push(timeText);
     }
 
-    return parts.join('\uff0c');
+    return parts.join('，');
 }
 function formatConflictSummary(
     conflictGroups: AdminTrainProvenanceConflictGroup[]
@@ -957,8 +957,8 @@ function formatSeatCodeFailureReasonText(detail: unknown): string {
     if (extraDetail === 'seat route startDay is not current day') {
         const routeText = formatSeatCodeFailureRouteText(detail);
         return routeText.length > 0
-            ? `\u5217\u8f66\u53d1\u8f66\u65e5\u671f\u4e0d\u662f\u5f53\u524d\u65e5\u671f\uff1a${routeText}`
-            : '\u5217\u8f66\u53d1\u8f66\u65e5\u671f\u4e0d\u662f\u5f53\u524d\u65e5\u671f';
+            ? `列车发车日期不是当前日期：${routeText}`
+            : '列车发车日期不是当前日期';
     }
 
     const parts = [errorCode, errorMsg, extraDetail].filter(

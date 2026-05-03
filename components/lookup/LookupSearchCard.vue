@@ -479,14 +479,14 @@ const MENU_FALLBACK_GAP_PX = 8;
 const MENU_FALLBACK_VIEWPORT_PADDING_PX = 12;
 const MENU_TOP_ROW_OCCLUDED_THRESHOLD = 2;
 const MENU_TOTAL_OCCLUDED_THRESHOLD = 3;
-const inputLabel = '\u8f66\u6b21\u53f7 / \u8f66\u7ec4\u53f7';
-const loadingMessage = '\u6b63\u5728\u52a0\u8f7d\u8865\u5168...';
-const suggestionLoadErrorFallback = '\u8865\u5168\u52a0\u8f7d\u5931\u8d25';
-const favoriteSectionTitle = '\u6536\u85cf';
-const recentSectionTitle = '\u6700\u8fd1\u641c\u7d22';
+const inputLabel = '车次号 / 车组号';
+const loadingMessage = '正在加载补全...';
+const suggestionLoadErrorFallback = '补全加载失败';
+const favoriteSectionTitle = '收藏';
+const recentSectionTitle = '最近搜索';
 const emptyRecentStateMessage =
-    '\u6682\u65e0\u6536\u85cf\u6216\u6700\u8fd1\u641c\u7d22';
-const emptySuggestionStateMessage = '\u672a\u627e\u5230\u5339\u914d\u9879';
+    '暂无收藏或最近搜索';
+const emptySuggestionStateMessage = '未找到匹配项';
 
 type OverlayFallbackProfile = 'none' | 'detail-sticky';
 type MenuRenderMode = 'inline' | 'teleport';
@@ -519,8 +519,8 @@ const props = withDefaults(
         collapsed: false,
         errorMessage: '',
         detectedType: null,
-        submitLabel: '\u67e5\u8be2',
-        placeholder: 'D2212 \u6216 CR400AF-C-2214',
+        submitLabel: '查询',
+        placeholder: 'D2212 或 CR400AF-C-2214',
         layoutMode: 'responsive',
         overlayFallbackProfile: 'none'
     }
