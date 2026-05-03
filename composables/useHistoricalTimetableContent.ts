@@ -5,6 +5,7 @@ import type {
     LookupHistoryListItem,
     TrainHistoryRecord
 } from '~/types/lookup';
+import getShanghaiDayStartUnixSeconds from '~/utils/time/getShanghaiDayStartUnixSeconds';
 
 type RequestFetch = <T>(
     request: string,
@@ -28,7 +29,6 @@ export interface HydratedTrainHistoryRecord
 export interface HydratedEmuHistoryRecord
     extends EmuHistoryRecord, HydratedHistoryFields {}
 
-const SHANGHAI_OFFSET_MS = 8 * 60 * 60 * 1000;
 const DEFAULT_CONCURRENCY = 6;
 const timetableContentCache = new Map<number, HistoricalTimetableData | null>();
 const timetableContentRequestCache = new Map<
@@ -42,18 +42,6 @@ function normalizeTrainCode(trainCode: string) {
 
 function buildTimetableContentCacheKey(historyId: number) {
     return historyId;
-}
-
-function getShanghaiDayStartUnixSeconds(serviceDate: string) {
-    if (!/^\d{8}$/.test(serviceDate)) {
-        return null;
-    }
-
-    const year = Number.parseInt(serviceDate.slice(0, 4), 10);
-    const month = Number.parseInt(serviceDate.slice(4, 6), 10);
-    const day = Number.parseInt(serviceDate.slice(6, 8), 10);
-    const pseudoUtcMs = Date.UTC(year, month - 1, day, 0, 0, 0, 0);
-    return Math.floor((pseudoUtcMs - SHANGHAI_OFFSET_MS) / 1000);
 }
 
 async function fetchHistoricalTimetableContent(

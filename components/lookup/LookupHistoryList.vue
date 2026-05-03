@@ -269,7 +269,12 @@
                                         :disabled="!canOpenTimetable(item)"
                                         class="inline-flex cursor-pointer items-center rounded-md transition enabled:hover:text-crh-blue enabled:hover:underline disabled:cursor-default"
                                         @click="openTimetable(item)">
-                                        {{ formatTimeLabel(item.startAt) }}
+                                        <span>{{ item.startTimeText }}</span>
+                                        <span
+                                            v-if="item.startDayOffsetText"
+                                            class="ml-1 inline-block align-baseline text-[11px] text-slate-400">
+                                            {{ item.startDayOffsetText }}
+                                        </span>
                                     </button>
                                 </td>
                                 <td
@@ -301,7 +306,12 @@
                                         :disabled="!canOpenTimetable(item)"
                                         class="inline-flex cursor-pointer items-center rounded-md transition enabled:hover:text-crh-blue enabled:hover:underline disabled:cursor-default"
                                         @click="openTimetable(item)">
-                                        {{ formatTimeLabel(item.endAt) }}
+                                        <span>{{ item.endTimeText }}</span>
+                                        <span
+                                            v-if="item.endDayOffsetText"
+                                            class="ml-1 inline-block align-baseline text-[11px] text-slate-400">
+                                            {{ item.endDayOffsetText }}
+                                        </span>
                                     </button>
                                 </td>
                             </tr>
@@ -489,11 +499,16 @@
                                                         true
                                                     )
                                                 ]">
-                                                {{
-                                                    formatTimeLabel(
-                                                        item.startAt
-                                                    )
-                                                }}
+                                                <span>{{
+                                                    item.startTimeText
+                                                }}</span>
+                                                <span
+                                                    v-if="item.startDayOffsetText"
+                                                    class="ml-1 inline-block align-baseline text-[11px] text-slate-400">
+                                                    {{
+                                                        item.startDayOffsetText
+                                                    }}
+                                                </span>
                                             </p>
                                         </button>
 
@@ -535,9 +550,14 @@
                                                         true
                                                     )
                                                 ]">
-                                                {{
-                                                    formatTimeLabel(item.endAt)
-                                                }}
+                                                <span>{{
+                                                    item.endTimeText
+                                                }}</span>
+                                                <span
+                                                    v-if="item.endDayOffsetText"
+                                                    class="ml-1 inline-block align-baseline text-[11px] text-slate-400">
+                                                    {{ item.endDayOffsetText }}
+                                                </span>
                                             </p>
                                         </button>
                                     </div>
@@ -605,6 +625,7 @@ import type {
     LookupTargetType,
     RecentAssignmentsState
 } from '~/types/lookup';
+import { getShanghaiDayOffsetFromServiceDate } from '~/utils/time/getShanghaiDayStartUnixSeconds';
 import isTimestampRangeActive from '~/utils/time/isTimestampRangeActive';
 import formatShanghaiDateString from '~/utils/time/formatShanghaiDateString';
 import { buildLookupPath } from '~/utils/lookup/lookupTarget';
@@ -623,6 +644,10 @@ interface GroupedHistoryListItem {
 interface DisplayHistoryListItem extends GroupedHistoryListItem {
     dateKey: string;
     isTintedDateBand: boolean;
+    startTimeText: string;
+    startDayOffsetText: string;
+    endTimeText: string;
+    endDayOffsetText: string;
 }
 
 const DATE_FORMATTER = new Intl.DateTimeFormat('zh-CN', {
@@ -739,6 +764,14 @@ const groupedItems = computed<DisplayHistoryListItem[]>(() => {
 
     return groupedValues.map((item) => {
         const dateKey = buildDateKey(item.serviceDate, item.startAt);
+        const startTimeDisplay = buildTimeDisplayParts(
+            item.serviceDate,
+            item.startAt
+        );
+        const endTimeDisplay = buildTimeDisplayParts(
+            item.serviceDate,
+            item.endAt
+        );
 
         if (dateKey !== currentDateKey) {
             currentDateKey = dateKey;
@@ -749,7 +782,11 @@ const groupedItems = computed<DisplayHistoryListItem[]>(() => {
             ...item,
             codes: normalizeDisplayCodes(item.codes),
             dateKey,
-            isTintedDateBand: dateBandIndex % 2 === 1
+            isTintedDateBand: dateBandIndex % 2 === 1,
+            startTimeText: startTimeDisplay.timeText,
+            startDayOffsetText: startTimeDisplay.dayOffsetText,
+            endTimeText: endTimeDisplay.timeText,
+            endDayOffsetText: endTimeDisplay.dayOffsetText
         };
     });
 });
@@ -920,6 +957,30 @@ function formatTimeLabel(timestamp: number | null) {
     }
 
     return TIME_FORMATTER.format(new Date((timestamp ?? 0) * 1000));
+}
+
+function formatDayOffsetLabel(serviceDate: string, timestamp: number | null) {
+    if (isMissingTimestamp(timestamp)) {
+        return '';
+    }
+
+    const normalizedTimestamp = timestamp ?? 0;
+    const dayOffset = getShanghaiDayOffsetFromServiceDate(
+        serviceDate,
+        normalizedTimestamp
+    );
+    if (dayOffset === null || dayOffset <= 0) {
+        return '';
+    }
+
+    return `+${dayOffset}`;
+}
+
+function buildTimeDisplayParts(serviceDate: string, timestamp: number | null) {
+    return {
+        timeText: formatTimeLabel(timestamp),
+        dayOffsetText: formatDayOffsetLabel(serviceDate, timestamp)
+    };
 }
 
 function formatCodeText(value: string) {
