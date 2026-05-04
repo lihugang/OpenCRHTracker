@@ -51,7 +51,7 @@ export const crawlDocsSections: DocsContentSection[] = [
                 code: [
                     'taskScheduleBootstrap',
                     '  -> ensure database schema',
-                    '  -> loadProbeAssets / warmHistoricalRecentTrainEmuIndex',
+                    '  -> loadProbeAssets / warmHistoricalRecentTrainEmuIndex (current timetable latest 4 records)',
                     '  -> register executors',
                     '  -> rehydrateProbeRuntimeState',
                     '  -> reconcile build_today_schedule',

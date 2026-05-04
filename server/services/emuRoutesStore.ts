@@ -36,6 +36,7 @@ type EmuRouteSqlKey =
     | 'selectDailyRecordById'
     | 'selectDailyRoutesByEmuCodeInRange'
     | 'selectDailyRoutesByTrainCodeInRange'
+    | 'selectLatestDailyRoutesByTrainCode'
     | 'selectHistoryByEmuPaged'
     | 'selectHistoryByTrainPaged'
     | 'selectDailyRecordsPaged'
@@ -277,6 +278,28 @@ export function listDailyRoutesByTrainCodeInRange(
     )
         .filter((row) => isRowWithinRange(row, startAt, endAtExclusive, true))
         .sort(sortRowsAscendingByStartAt);
+}
+
+export function listLatestDailyRoutesByTrainCode(
+    trainCode: string,
+    limit: number
+): DailyEmuRouteRow[] {
+    const normalizedTrainCode = normalizeCode(trainCode);
+    if (
+        normalizedTrainCode.length === 0 ||
+        !Number.isInteger(limit) ||
+        limit <= 0
+    ) {
+        return [];
+    }
+
+    return hydrateRows(
+        emuRouteStatements.all<RawDailyEmuRouteRow>(
+            'selectLatestDailyRoutesByTrainCode',
+            normalizedTrainCode,
+            limit
+        )
+    );
 }
 
 export function listHistoryByEmuPaged(
