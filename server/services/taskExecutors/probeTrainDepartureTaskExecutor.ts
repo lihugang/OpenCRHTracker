@@ -169,6 +169,16 @@ interface SeatCodeVerificationResult {
     seatCodeFailureDetail?: FetchSeatCodeFailureResult | null;
 }
 
+function shouldRequeueUnavailableSeatVerification(
+    reason: SeatCodeVerificationResult['reason']
+): boolean {
+    return (
+        reason === 'seat_code_request_failed_network_error' ||
+        reason === 'seat_code_request_failed_not_enabled' ||
+        reason === 'seat_code_request_failed_other'
+    );
+}
+
 let registered = false;
 
 function parseTaskArgs(raw: unknown): ProbeTrainDepartureTaskArgs {
@@ -1670,6 +1680,84 @@ async function executeProbeTrainDepartureTaskInternal(
                     `seat_verify_pass trainCode=${args.trainCode} probedTrainCode=${probedTrainCode} mainEmuCode=${mainEmuCode} runningTrainCode=${todayTrainCodesValidation.runningTrainCode} reason=${seatCodeVerification.reason} seatTrainCode=${seatCodeVerification.seatTrainCode} seatInternalCode=${seatCodeVerification.seatInternalCode} seatStartAt=${seatCodeVerification.seatStartAt} historicalRecentMatchedTrainCodes=${historicalRecentMatchingTrainCodes.join(',')}`
                 );
             } else if (seatCodeVerification.state === 'unavailable') {
+                if (
+                    shouldRequeueUnavailableSeatVerification(
+                        seatCodeVerification.reason
+                    )
+                ) {
+                    if (args.retry > 0) {
+                        const nextRetry = args.retry - 1;
+                        const overlapRetryDelaySeconds =
+                            useConfig().spider.scheduleProbe.probe
+                                .overlapRetryDelaySeconds;
+                        const nextTaskId =
+                            requeueCurrentProbeTaskWithOverlapDelay(
+                                args,
+                                nowSeconds,
+                                nextRetry
+                            );
+                        recordCurrentTrainProvenanceEventsForTrainCodes(
+                            allTrainCodes,
+                            {
+                                serviceDate,
+                                startAt: args.startAt,
+                                emuCode: mainEmuCode,
+                                relatedTrainCode:
+                                    todayTrainCodesValidation.runningTrainCode,
+                                eventType:
+                                    'seat_verification_unavailable_requeued',
+                                result: seatCodeVerification.reason,
+                                linkedSchedulerTaskId: nextTaskId,
+                                payload: {
+                                    retry: args.retry,
+                                    nextRetry,
+                                    matchedTrainCodes:
+                                        historicalRecentMatchingTrainCodes,
+                                    seatCodeFailure:
+                                        seatCodeVerification.seatCodeFailureDetail ??
+                                        null
+                                }
+                            }
+                        );
+                        logger.info(
+                            `seat_verify_unavailable_requeue trainCode=${args.trainCode} probedTrainCode=${probedTrainCode} mainEmuCode=${mainEmuCode} runningTrainCode=${todayTrainCodesValidation.runningTrainCode} retry=${args.retry} nextRetry=${nextRetry} nextTaskId=${nextTaskId} delaySeconds=${overlapRetryDelaySeconds} reason=${seatCodeVerification.reason} historicalRecentMatchedTrainCodes=${historicalRecentMatchingTrainCodes.join(',')}`
+                        );
+                        markCurrentTrainProvenanceTaskSkipped(
+                            'seat_verification_unavailable_requeued'
+                        );
+                        return;
+                    }
+
+                    recordCurrentTrainProvenanceEventsForTrainCodes(
+                        allTrainCodes,
+                        {
+                            serviceDate,
+                            startAt: args.startAt,
+                            emuCode: mainEmuCode,
+                            relatedTrainCode:
+                                todayTrainCodesValidation.runningTrainCode,
+                            eventType:
+                                'seat_verification_unavailable_exhausted',
+                            result: seatCodeVerification.reason,
+                            payload: {
+                                retry: args.retry,
+                                matchedTrainCodes:
+                                    historicalRecentMatchingTrainCodes,
+                                seatCodeFailure:
+                                    seatCodeVerification.seatCodeFailureDetail ??
+                                    null
+                            }
+                        }
+                    );
+                    markCurrentTrainProvenanceTaskSkipped(
+                        'seat_verification_unavailable_exhausted'
+                    );
+                    logger.warn(
+                        `seat_verify_unavailable_exhausted trainCode=${args.trainCode} probedTrainCode=${probedTrainCode} mainEmuCode=${mainEmuCode} runningTrainCode=${todayTrainCodesValidation.runningTrainCode} retry=${args.retry} reason=${seatCodeVerification.reason} historicalRecentMatchedTrainCodes=${historicalRecentMatchingTrainCodes.join(',')}`
+                    );
+                    return;
+                }
+
                 recordCurrentTrainProvenanceEventsForTrainCodes(allTrainCodes, {
                     serviceDate,
                     startAt: args.startAt,

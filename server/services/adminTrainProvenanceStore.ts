@@ -1093,6 +1093,10 @@ function formatEventSummary(
             return '畅行码校验通过';
         case 'seat_verification_unavailable':
             return '畅行码校验不可用，继续当前判断';
+        case 'seat_verification_unavailable_requeued':
+            return `畅行码校验不可用，已重新排队`;
+        case 'seat_verification_unavailable_exhausted':
+            return '畅行码校验不可用，重试已耗尽';
         case 'seat_verification_mismatch_requeued':
             return `畅行码校验不一致，已重新排队`;
         case 'seat_verification_mismatch_exhausted':
