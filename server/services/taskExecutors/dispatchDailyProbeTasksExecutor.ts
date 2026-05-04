@@ -12,6 +12,7 @@ import {
 } from '~/server/services/trainProvenanceRecorder';
 import { loadPublishedScheduleState } from '~/server/utils/12306/scheduleProbe/stateStore';
 import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
+import { getShanghaiUnixSecondsFromDateAndTime } from '~/server/utils/date/shanghaiDateTime';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
 import { PROBE_TRAIN_DEPARTURE_TASK_EXECUTOR } from '~/server/services/taskExecutors/probeTrainDepartureTaskExecutor';
 
@@ -19,8 +20,30 @@ export const DISPATCH_DAILY_PROBE_TASKS_EXECUTOR = 'dispatch_daily_probe_tasks';
 
 const logger = getLogger('task-executor:dispatch-daily-probe');
 const MAX_CODES_PER_GROUP = 8;
+const DISABLED_LATEST_EXECUTION_TIME_HHMM = '0000';
 
 let registered = false;
+
+function resolveProbeTaskExecutionTime(
+    startAt: number,
+    now: number,
+    serviceDate: string,
+    latestExecutionTimeHHmm: string
+): number {
+    let plannedExecutionTime = startAt;
+
+    if (latestExecutionTimeHHmm !== DISABLED_LATEST_EXECUTION_TIME_HHMM) {
+        const latestExecutionTime = getShanghaiUnixSecondsFromDateAndTime(
+            serviceDate,
+            latestExecutionTimeHHmm
+        );
+        if (startAt > latestExecutionTime) {
+            plannedExecutionTime = latestExecutionTime;
+        }
+    }
+
+    return plannedExecutionTime > now ? plannedExecutionTime : now;
+}
 
 async function executeDispatchDailyProbeTasks(): Promise<void> {
     const config = useConfig();
@@ -47,6 +70,8 @@ async function executeDispatchDailyProbeTasks(): Promise<void> {
     }
 
     const defaultRetry = config.spider.scheduleProbe.probe.defaultRetry;
+    const latestExecutionTimeHHmm =
+        config.spider.scheduleProbe.probe.latestExecutionTimeHHmm;
     const tasksToEnqueue: EnqueueTaskInput[] = [];
     for (const group of getTodayScheduleProbeGroups().values()) {
         const args = {
@@ -59,7 +84,12 @@ async function executeDispatchDailyProbeTasks(): Promise<void> {
             endAt: group.endAt,
             retry: defaultRetry
         };
-        const executionTime = group.startAt > now ? group.startAt : now;
+        const executionTime = resolveProbeTaskExecutionTime(
+            group.startAt,
+            now,
+            scheduleState.date,
+            latestExecutionTimeHHmm
+        );
         tasksToEnqueue.push({
             executor: PROBE_TRAIN_DEPARTURE_TASK_EXECUTOR,
             args,
@@ -96,7 +126,7 @@ async function executeDispatchDailyProbeTasks(): Promise<void> {
         );
     }
     logger.info(
-        `done date=${scheduleState.date} groups=${getTodayScheduleProbeGroups().size} createdTasks=${tasksToEnqueue.length} defaultRetry=${defaultRetry} firstTaskId=${taskIds[0] ?? 'null'}`
+        `done date=${scheduleState.date} groups=${getTodayScheduleProbeGroups().size} createdTasks=${tasksToEnqueue.length} defaultRetry=${defaultRetry} latestExecutionTimeHHmm=${latestExecutionTimeHHmm} firstTaskId=${taskIds[0] ?? 'null'}`
     );
 }
 

@@ -22,6 +22,7 @@ interface ScheduleProbeRefreshConfig {
 interface ScheduleProbeProbeConfig {
     defaultRetry: number;
     overlapRetryDelaySeconds: number;
+    latestExecutionTimeHHmm: string;
 }
 
 interface ScheduleProbeCouplingConfig {
@@ -896,6 +897,13 @@ function validateConfig(raw: unknown): Config {
                         spiderScheduleProbeProbe.overlapRetryDelaySeconds,
                         'spider.scheduleProbe.probe.overlapRetryDelaySeconds',
                         0
+                    ),
+                    latestExecutionTimeHHmm: asPlainString(
+                        spiderScheduleProbeProbe.latestExecutionTimeHHmm ===
+                            undefined
+                            ? '2350'
+                            : spiderScheduleProbeProbe.latestExecutionTimeHHmm,
+                        'spider.scheduleProbe.probe.latestExecutionTimeHHmm'
                     )
                 },
                 coupling: {
@@ -1642,6 +1650,17 @@ function validateConfig(raw: unknown): Config {
         assert(
             false,
             `spider.scheduleProbe.dailyTimeHHmm is invalid: ${message}`
+        );
+    }
+    try {
+        parseDailyTimeHHmm(
+            configResult.spider.scheduleProbe.probe.latestExecutionTimeHHmm
+        );
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        assert(
+            false,
+            `spider.scheduleProbe.probe.latestExecutionTimeHHmm is invalid: ${message}`
         );
     }
     try {

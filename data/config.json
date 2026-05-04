@@ -27,7 +27,8 @@
             },
             "probe": {
                 "defaultRetry": 5,
-                "overlapRetryDelaySeconds": 3600
+                "overlapRetryDelaySeconds": 3600,
+                "latestExecutionTimeHHmm": "2350"
             },
             "coupling": {
                 "statusResetTimeHHmm": "0000",

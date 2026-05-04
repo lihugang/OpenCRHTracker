@@ -129,11 +129,16 @@
                                 "overlapRetryDelaySeconds": {
                                     "type": "integer",
                                     "minimum": 0
+                                },
+                                "latestExecutionTimeHHmm": {
+                                    "type": "string",
+                                    "pattern": "^\\d{4}$"
                                 }
                             },
                             "required": [
                                 "defaultRetry",
-                                "overlapRetryDelaySeconds"
+                                "overlapRetryDelaySeconds",
+                                "latestExecutionTimeHHmm"
                             ]
                         },
                         "coupling": {
