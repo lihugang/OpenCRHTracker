@@ -1,5 +1,6 @@
 import getLogger from '~/server/libs/log4js';
 import useConfig from '~/server/config';
+import { syncCurrentDayTimetableIdsForTrainCodes } from '~/server/services/currentDayTimetableIdSync';
 import { registerTaskExecutor } from '~/server/services/taskExecutorRegistry';
 import { syncConfirmedTimetableHistoryForPublishedState } from '~/server/services/timetableHistoryStore';
 import {
@@ -337,6 +338,14 @@ async function executeRefreshRouteBatchTaskInternal(rawArgs: unknown) {
                     );
                 logger.info(
                     `history_sync date=${latestState.date} confirmedGroups=${syncResult.confirmedGroups} confirmedTrainCodes=${syncResult.confirmedTrainCodes} skippedGroups=${syncResult.skippedGroups} createdContents=${syncResult.createdContents} insertedCoverages=${syncResult.insertedCoverages} updatedCoverages=${syncResult.updatedCoverages} deletedCoverages=${syncResult.deletedCoverages} noopedCoverages=${syncResult.noopedCoverages}`
+                );
+                const timetableIdSyncResult =
+                    syncCurrentDayTimetableIdsForTrainCodes(
+                        latestState.date,
+                        appliedConfirmedTrainCodes
+                    );
+                logger.info(
+                    `timetable_id_sync date=${latestState.date} scannedTrainCodes=${timetableIdSyncResult.scannedTrainCodes} changedTrainCodes=${timetableIdSyncResult.changedTrainCodes} updatedDailyRows=${timetableIdSyncResult.updatedDailyRows} deletedDailyRows=${timetableIdSyncResult.deletedDailyRows} updatedProbeRows=${timetableIdSyncResult.updatedProbeRows} deletedProbeRows=${timetableIdSyncResult.deletedProbeRows}`
                 );
             }
         }

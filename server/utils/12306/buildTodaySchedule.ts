@@ -1,5 +1,6 @@
 import useConfig from '~/server/config';
 import getLogger from '~/server/libs/log4js';
+import { syncCurrentDayTimetableIdsForTrainCodes } from '~/server/services/currentDayTimetableIdSync';
 import { syncConfirmedTimetableHistoryForPublishedState } from '~/server/services/timetableHistoryStore';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
 import { ensureAssetFile } from '~/server/utils/dataAssets/store';
@@ -84,6 +85,14 @@ function syncBuildConfirmedTimetableHistory(
     );
     logger.info(
         `history_sync date=${promotedState.date} confirmedGroups=${syncResult.confirmedGroups} confirmedTrainCodes=${syncResult.confirmedTrainCodes} skippedGroups=${syncResult.skippedGroups} createdContents=${syncResult.createdContents} insertedCoverages=${syncResult.insertedCoverages} updatedCoverages=${syncResult.updatedCoverages} deletedCoverages=${syncResult.deletedCoverages} noopedCoverages=${syncResult.noopedCoverages}`
+    );
+
+    const timetableIdSyncResult = syncCurrentDayTimetableIdsForTrainCodes(
+        promotedState.date,
+        confirmedTrainCodes
+    );
+    logger.info(
+        `timetable_id_sync date=${promotedState.date} scannedTrainCodes=${timetableIdSyncResult.scannedTrainCodes} changedTrainCodes=${timetableIdSyncResult.changedTrainCodes} updatedDailyRows=${timetableIdSyncResult.updatedDailyRows} deletedDailyRows=${timetableIdSyncResult.deletedDailyRows} updatedProbeRows=${timetableIdSyncResult.updatedProbeRows} deletedProbeRows=${timetableIdSyncResult.deletedProbeRows}`
     );
 }
 
