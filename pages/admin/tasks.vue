@@ -130,6 +130,294 @@
                                 <div class="space-y-2">
                                     <p
                                         class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                                        导出
+                                    </p>
+                                    <h3
+                                        class="text-xl font-semibold text-slate-900">
+                                        指定日期重生成导出文件
+                                    </h3>
+                                    <p class="text-sm leading-6 text-slate-600">
+                                        为选定日期立即创建一个导出补跑任务，重新生成该日的
+                                        CSV 和 JSONL 导出文件。
+                                    </p>
+                                </div>
+
+                                <UiField
+                                    label="导出日期"
+                                    help="默认跟随管理员共享日期，可单独调整。">
+                                    <input
+                                        v-model="exportDateInput"
+                                        type="date"
+                                        class="harmony-input w-full px-4 py-3 text-base text-crh-grey-dark"
+                                        :max="todayDateInputValue" />
+                                </UiField>
+
+                                <div
+                                    v-if="exportTaskErrorMessage"
+                                    class="rounded-[1rem] border border-rose-200 bg-rose-50/80 px-4 py-4 text-sm leading-6 text-rose-700">
+                                    {{ exportTaskErrorMessage }}
+                                </div>
+
+                                <div
+                                    v-else-if="exportTaskResponse"
+                                    class="rounded-[1rem] border border-emerald-200 bg-emerald-50/80 px-4 py-4 text-sm leading-6 text-emerald-800">
+                                    <p class="font-semibold">
+                                        {{ exportTaskResponse.summary }}
+                                    </p>
+                                    <div
+                                        class="mt-3 space-y-1 text-emerald-900">
+                                        <p>
+                                            任务 ID：{{
+                                                exportTaskResponse.createdTasks
+                                                    .map((item) => item.taskId)
+                                                    .join('、')
+                                            }}
+                                        </p>
+                                        <p>
+                                            执行时间：{{
+                                                formatExecutionTime(
+                                                    exportTaskResponse
+                                                        .createdTasks[0]
+                                                        ?.executionTime ?? 0
+                                                )
+                                            }}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div class="flex justify-end">
+                                    <UiButton
+                                        type="button"
+                                        :loading="
+                                            exportTaskStatus === 'pending'
+                                        "
+                                        @click="createExportTask">
+                                        创建导出补跑任务
+                                    </UiButton>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div
+                            class="rounded-[1rem] border border-slate-200 bg-white/90 px-5 py-5">
+                            <div class="space-y-6">
+                                <div class="space-y-2">
+                                    <p
+                                        class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                                        刷新
+                                    </p>
+                                    <h3
+                                        class="text-xl font-semibold text-slate-900">
+                                        手动添加车次刷新任务
+                                    </h3>
+                                    <p class="text-sm leading-6 text-slate-600">
+                                        输入多个车次后立即创建 route info
+                                        刷新任务。后端会自动标准化、去重，并按批大小拆分。
+                                    </p>
+                                </div>
+
+                                <UiField
+                                    label="车次列表"
+                                    help="支持换行、空格、英文逗号、中文逗号和顿号分隔。">
+                                    <textarea
+                                        v-model="refreshTrainCodesInput"
+                                        rows="8"
+                                        class="harmony-input w-full px-4 py-3 text-base leading-7 text-crh-grey-dark"
+                                        placeholder="例如：&#10;G1&#10;G3 G5&#10;D1234，D5678&#10;G7、G9" />
+                                </UiField>
+
+                                <div
+                                    class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-4 py-4">
+                                    <p
+                                        class="text-xs uppercase tracking-[0.18em] text-slate-400">
+                                        预览
+                                    </p>
+                                    <p
+                                        class="mt-2 text-sm leading-6 text-slate-700">
+                                        已识别
+                                        {{ normalizedTrainCodesPreview.length }}
+                                        个车次
+                                    </p>
+                                    <p
+                                        class="mt-2 break-all text-sm leading-6 text-slate-500">
+                                        {{
+                                            normalizedTrainCodesPreview.length >
+                                            0
+                                                ? normalizedTrainCodesPreview.join(
+                                                      ' / '
+                                                  )
+                                                : '当前还没有可提交的有效车次'
+                                        }}
+                                    </p>
+                                </div>
+
+                                <div
+                                    v-if="refreshTaskErrorMessage"
+                                    class="rounded-[1rem] border border-rose-200 bg-rose-50/80 px-4 py-4 text-sm leading-6 text-rose-700">
+                                    {{ refreshTaskErrorMessage }}
+                                </div>
+
+                                <div
+                                    v-else-if="refreshTaskResponse"
+                                    class="rounded-[1rem] border border-emerald-200 bg-emerald-50/80 px-4 py-4 text-sm leading-6 text-emerald-800">
+                                    <p class="font-semibold">
+                                        {{ refreshTaskResponse.summary }}
+                                    </p>
+                                    <div
+                                        class="mt-3 space-y-1 text-emerald-900">
+                                        <p>
+                                            创建任务数：{{
+                                                refreshTaskResponse.createdCount
+                                            }}
+                                        </p>
+                                        <p>
+                                            任务 ID：{{
+                                                refreshTaskResponse.createdTasks
+                                                    .map((item) => item.taskId)
+                                                    .join('、')
+                                            }}
+                                        </p>
+                                        <p>
+                                            归一化车次：{{
+                                                refreshTaskResponse.normalizedTrainCodes?.join(
+                                                    ' / '
+                                                ) ?? '--'
+                                            }}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div class="flex justify-end">
+                                    <UiButton
+                                        type="button"
+                                        :loading="
+                                            refreshTaskStatus === 'pending'
+                                        "
+                                        @click="createRefreshTask">
+                                        创建立即刷新任务
+                                    </UiButton>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div
+                            class="rounded-[1rem] border border-slate-200 bg-white/90 px-5 py-5">
+                            <div class="space-y-6">
+                                <div class="space-y-2">
+                                    <p
+                                        class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                                        重联
+                                    </p>
+                                    <h3
+                                        class="text-xl font-semibold text-slate-900">
+                                        手动新增重联扫描任务
+                                    </h3>
+                                    <p class="text-sm leading-6 text-slate-600">
+                                        由服务端提供铁路局和车型选项，提交后立即入队一次重联扫描。
+                                    </p>
+                                </div>
+
+                                <UiField
+                                    label="铁路局"
+                                    help="选项来自当前服务端加载的 EMU 资产。">
+                                    <UiSelect
+                                        v-model="selectedCouplingScanBureau"
+                                        :disabled="
+                                            couplingScanBureauOptions.length ===
+                                            0
+                                        "
+                                        placeholder="暂无可用铁路局"
+                                        mobile-sheet-title="选择铁路局"
+                                        mobile-sheet-eyebrow="BUREAU"
+                                        :options="couplingScanBureauOptions" />
+                                </UiField>
+
+                                <UiField
+                                    label="车型"
+                                    help="会根据当前铁路局自动筛选可用车型。">
+                                    <UiSelect
+                                        v-model="selectedCouplingScanModel"
+                                        :disabled="
+                                            currentCouplingScanModelOptions.length ===
+                                            0
+                                        "
+                                        placeholder="暂无可用车型"
+                                        mobile-sheet-title="选择车型"
+                                        mobile-sheet-eyebrow="MODEL"
+                                        :options="
+                                            currentCouplingScanModelOptions
+                                        " />
+                                </UiField>
+
+                                <div
+                                    class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-4 py-4">
+                                    <p
+                                        class="text-xs uppercase tracking-[0.18em] text-slate-400">
+                                        预览
+                                    </p>
+                                    <p
+                                        class="mt-2 text-sm leading-6 text-slate-700">
+                                        {{
+                                            canCreateCouplingScanTask
+                                                ? `${selectedCouplingScanBureau} / ${selectedCouplingScanModel}`
+                                                : '当前没有可提交的重联扫描组合'
+                                        }}
+                                    </p>
+                                </div>
+
+                                <div
+                                    v-if="couplingScanTaskErrorMessage"
+                                    class="rounded-[1rem] border border-rose-200 bg-rose-50/80 px-4 py-4 text-sm leading-6 text-rose-700">
+                                    {{ couplingScanTaskErrorMessage }}
+                                </div>
+
+                                <div
+                                    v-else-if="couplingScanTaskResponse"
+                                    class="rounded-[1rem] border border-emerald-200 bg-emerald-50/80 px-4 py-4 text-sm leading-6 text-emerald-800">
+                                    <p class="font-semibold">
+                                        {{ couplingScanTaskResponse.summary }}
+                                    </p>
+                                    <div
+                                        class="mt-3 space-y-1 text-emerald-900">
+                                        <p>
+                                            任务 ID：{{
+                                                couplingScanTaskResponse.createdTasks
+                                                    .map((item) => item.taskId)
+                                                    .join('、')
+                                            }}
+                                        </p>
+                                        <p>
+                                            执行时间：{{
+                                                formatExecutionTime(
+                                                    couplingScanTaskResponse
+                                                        .createdTasks[0]
+                                                        ?.executionTime ?? 0
+                                                )
+                                            }}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div class="flex justify-end">
+                                    <UiButton
+                                        type="button"
+                                        :disabled="!canCreateCouplingScanTask"
+                                        :loading="
+                                            couplingScanTaskStatus === 'pending'
+                                        "
+                                        @click="createCouplingScanTask">
+                                        创建重联扫描任务
+                                    </UiButton>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div
+                            class="rounded-[1rem] border border-slate-200 bg-white/90 px-5 py-5">
+                            <div class="space-y-6">
+                                <div class="space-y-2">
+                                    <p
+                                        class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
                                         畅行码
                                     </p>
                                     <h3
@@ -324,7 +612,7 @@ const normalizedTrainCodesPreview = computed(() =>
     Array.from(
         new Set(
             refreshTrainCodesInput.value
-                .split(/[\s,，]+/u)
+                .split(/[\s,??]+/u)
                 .map((item) => item.trim().toUpperCase())
                 .filter((item) => item.length > 0)
         )
