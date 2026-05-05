@@ -307,38 +307,70 @@ function getEdgeStat(
     return items.find((item) => item.nodeId === toNodeId) ?? null;
 }
 
-function chooseLoopBreakNode(
-    cycleNodeIds: number[],
-    outgoingEdgesByNodeId: Map<number, EdgeStat[]>,
-    nodeMetasByNodeId: CirculationNodeMeta[]
-) {
-    let selectedNodeId = cycleNodeIds[0]!;
-    let selectedDelta = Number.NEGATIVE_INFINITY;
-    let selectedTopWeight = Number.NEGATIVE_INFINITY;
-    let selectedTrainCode = nodeMetasByNodeId[selectedNodeId]?.trainCode ?? '';
+function resolveNodeTiming(nodeMeta: CirculationNodeMeta) {
+    const candidateTrainCodes = uniqueNormalizedCodes([
+        nodeMeta.trainCode,
+        ...nodeMeta.allCodes
+    ]);
 
-    for (const nodeId of cycleNodeIds) {
-        const edges = outgoingEdgesByNodeId.get(nodeId) ?? [];
-        const topWeight = edges[0]?.weight ?? 0;
-        const secondWeight = edges[1]?.weight ?? 0;
-        const delta = topWeight - secondWeight;
-        const trainCode = nodeMetasByNodeId[nodeId]?.trainCode ?? '';
-
-        if (
-            delta > selectedDelta ||
-            (delta === selectedDelta && topWeight > selectedTopWeight) ||
-            (delta === selectedDelta &&
-                topWeight === selectedTopWeight &&
-                trainCode.localeCompare(selectedTrainCode) < 0)
-        ) {
-            selectedNodeId = nodeId;
-            selectedDelta = delta;
-            selectedTopWeight = topWeight;
-            selectedTrainCode = trainCode;
+    for (const trainCode of candidateTrainCodes) {
+        const timetable = getTodayScheduleTimetableByTrainCode(trainCode);
+        if (timetable) {
+            return {
+                startAt: timetable.startAt,
+                endAt: timetable.endAt,
+                trainCode: timetable.trainCode
+            };
         }
     }
 
-    return selectedNodeId;
+    return {
+        startAt: Number.MAX_SAFE_INTEGER,
+        endAt: Number.MAX_SAFE_INTEGER,
+        trainCode: nodeMeta.trainCode
+    };
+}
+
+function rotateRouteNodeIdsByEarliestStartAt(
+    routeNodeIds: number[],
+    nodeMetasByNodeId: CirculationNodeMeta[]
+) {
+    if (routeNodeIds.length <= 1) {
+        return routeNodeIds;
+    }
+
+    let anchorIndex = 0;
+    let anchorStartAt = Number.MAX_SAFE_INTEGER;
+    let anchorEndAt = Number.MAX_SAFE_INTEGER;
+    let anchorTrainCode = '';
+
+    for (const [index, nodeId] of routeNodeIds.entries()) {
+        const nodeMeta = nodeMetasByNodeId[nodeId]!;
+        const timing = resolveNodeTiming(nodeMeta);
+
+        if (
+            timing.startAt < anchorStartAt ||
+            (timing.startAt === anchorStartAt &&
+                timing.endAt < anchorEndAt) ||
+            (timing.startAt === anchorStartAt &&
+                timing.endAt === anchorEndAt &&
+                timing.trainCode.localeCompare(anchorTrainCode) < 0)
+        ) {
+            anchorIndex = index;
+            anchorStartAt = timing.startAt;
+            anchorEndAt = timing.endAt;
+            anchorTrainCode = timing.trainCode;
+        }
+    }
+
+    if (anchorIndex === 0) {
+        return routeNodeIds;
+    }
+
+    return [
+        ...routeNodeIds.slice(anchorIndex),
+        ...routeNodeIds.slice(0, anchorIndex)
+    ];
 }
 
 function buildRouteId(nodeKeys: string[]) {
@@ -532,34 +564,40 @@ function buildCirculationsFromGraph(
         while (true) {
             routeNodeIds.push(currentNodeId);
             visitedInRoute.set(currentNodeId, routeNodeIds.length - 1);
-            const outgoingEdge = getTopEdge(
-                outgoingEdgesByNodeId,
-                currentNodeId
-            );
 
-            if (
-                !outgoingEdge ||
-                outgoingEdge.weight < threshold ||
-                !unassignedNodeIds.has(outgoingEdge.nodeId)
-            ) {
+            const outgoingEdges = outgoingEdgesByNodeId.get(currentNodeId) ?? [];
+            let nextEdge: EdgeStat | null = null;
+            let closingEdge: EdgeStat | null = null;
+
+            for (const outgoingEdge of outgoingEdges) {
+                if (outgoingEdge.weight < threshold) {
+                    break;
+                }
+
+                if (!unassignedNodeIds.has(outgoingEdge.nodeId)) {
+                    continue;
+                }
+
+                if (visitedInRoute.has(outgoingEdge.nodeId)) {
+                    if (!closingEdge) {
+                        closingEdge = outgoingEdge;
+                    }
+                    continue;
+                }
+
+                nextEdge = outgoingEdge;
                 break;
             }
 
-            const loopStartIndex = visitedInRoute.get(outgoingEdge.nodeId);
-            if (loopStartIndex !== undefined) {
-                const cycleNodeIds = routeNodeIds.slice(loopStartIndex);
-                const terminalNodeId = chooseLoopBreakNode(
-                    cycleNodeIds,
-                    outgoingEdgesByNodeId,
-                    nodeMetasByNodeId
-                );
-                const terminalNodeIndex = routeNodeIds.indexOf(terminalNodeId);
-                routeNodeIds.splice(terminalNodeIndex + 1);
+            if (nextEdge) {
+                currentNodeId = nextEdge.nodeId;
+                continue;
+            }
+
+            if (closingEdge) {
                 containsLoopBreak = true;
-                break;
             }
-
-            currentNodeId = outgoingEdge.nodeId;
+            break;
         }
 
         for (const nodeId of routeNodeIds) {

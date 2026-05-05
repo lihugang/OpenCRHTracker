@@ -703,6 +703,20 @@
                                         <div
                                             class="flex flex-wrap items-center gap-3">
                                             <UiButton
+                                                v-if="hasScannedRoute(item.scannedRoute)"
+                                                type="button"
+                                                variant="secondary"
+                                                size="sm"
+                                                @click="toggleScannedRouteExpanded(item.id)">
+                                                {{
+                                                    isScannedRouteExpanded(
+                                                        item.id
+                                                    )
+                                                        ? SCANNED_ROUTE_LABELS.hide
+                                                        : SCANNED_ROUTE_LABELS.show
+                                                }}
+                                            </UiButton>
+                                            <UiButton
                                                 v-if="
                                                     getCouplingScanActionTaskRunId(
                                                         item
@@ -741,6 +755,37 @@
                                                     item.linkedSchedulerTaskId
                                                 }}
                                             </span>
+                                        </div>
+
+                                        <div
+                                            v-if="
+                                                hasScannedRoute(item.scannedRoute) &&
+                                                isScannedRouteExpanded(item.id)
+                                            "
+                                            class="rounded-[0.875rem] border border-sky-200 bg-sky-50/70 px-4 py-4">
+                                            <div class="space-y-3">
+                                                <p class="text-sm font-semibold text-slate-900">
+                                                    {{ SCANNED_ROUTE_LABELS.title }}
+                                                </p>
+                                                <dl class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                                                    <div
+                                                        v-for="field in buildScannedRouteFields(item.scannedRoute)"
+                                                        :key="`${item.id}:${field.key}`">
+                                                        <dt class="text-xs uppercase tracking-[0.16em] text-slate-400">
+                                                            {{ field.label }}
+                                                        </dt>
+                                                        <dd class="mt-1 text-sm text-slate-700">
+                                                            {{ field.value }}
+                                                        </dd>
+                                                    </div>
+                                                </dl>
+                                                <p
+                                                    v-if="item.scannedRoute?.cacheNote"
+                                                    class="text-xs leading-5"
+                                                    :class="getRouteSnapshotNoteClass(item.scannedRoute)">
+                                                    {{ item.scannedRoute.cacheNote }}
+                                                </p>
+                                            </div>
                                         </div>
 
                                         <div
@@ -1827,6 +1872,20 @@
                                             <div
                                                 class="flex flex-wrap items-center gap-3">
                                                 <UiButton
+                                                    v-if="hasScannedRoute(event.scannedRoute)"
+                                                    type="button"
+                                                    variant="secondary"
+                                                    size="sm"
+                                                    @click="toggleScannedRouteExpanded(event.id)">
+                                                    {{
+                                                        isScannedRouteExpanded(
+                                                            event.id
+                                                        )
+                                                            ? SCANNED_ROUTE_LABELS.hide
+                                                            : SCANNED_ROUTE_LABELS.show
+                                                    }}
+                                                </UiButton>
+                                                <UiButton
                                                     v-if="
                                                         getCouplingScanActionTaskRunId(
                                                             event
@@ -1859,6 +1918,37 @@
                                                         )
                                                     }}
                                                 </span>
+                                            </div>
+
+                                            <div
+                                                v-if="
+                                                    hasScannedRoute(event.scannedRoute) &&
+                                                    isScannedRouteExpanded(event.id)
+                                                "
+                                                class="rounded-[0.875rem] border border-sky-200 bg-sky-50/70 px-4 py-4">
+                                                <div class="space-y-3">
+                                                    <p class="text-sm font-semibold text-slate-900">
+                                                        {{ SCANNED_ROUTE_LABELS.title }}
+                                                    </p>
+                                                    <dl class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                                                        <div
+                                                            v-for="field in buildScannedRouteFields(event.scannedRoute)"
+                                                            :key="`${event.id}:${field.key}`">
+                                                            <dt class="text-xs uppercase tracking-[0.16em] text-slate-400">
+                                                                {{ field.label }}
+                                                            </dt>
+                                                            <dd class="mt-1 text-sm text-slate-700">
+                                                                {{ field.value }}
+                                                            </dd>
+                                                        </div>
+                                                    </dl>
+                                                    <p
+                                                        v-if="event.scannedRoute?.cacheNote"
+                                                        class="text-xs leading-5"
+                                                        :class="getRouteSnapshotNoteClass(event.scannedRoute)">
+                                                        {{ event.scannedRoute.cacheNote }}
+                                                    </p>
+                                                </div>
                                             </div>
                                         </div>
                                     </article>
@@ -1928,10 +2018,24 @@ const EMPTY_REQUEST_METRICS = {
     failureChangeRatio: null
 } satisfies Omit<AdminTrainDataRequestTypeSummary, 'type'>;
 
+const SCANNED_ROUTE_LABELS = {
+    show: '\u67e5\u770b\u7545\u884c\u7801\u7ed3\u679c',
+    hide: '\u6536\u8d77\u7545\u884c\u7801\u7ed3\u679c',
+    title: '\u7545\u884c\u7801\u626b\u63cf\u7ed3\u679c',
+    trainCode: '\u8f66\u6b21',
+    serviceDate: '\u53d1\u8f66\u65e5\u671f',
+    startTime: '\u59cb\u53d1\u65f6\u95f4',
+    startStation: '\u59cb\u53d1\u7ad9',
+    endTime: '\u7ec8\u5230\u65f6\u95f4',
+    endStation: '\u7ec8\u5230\u7ad9',
+    internalCode: '\u5185\u90e8\u8f66\u6b21\u53f7'
+} as const;
+
 const trainCodeInput = ref(readQueryString(route.query.trainCode));
 const isSubmittingSearch = ref(false);
 const isCouplingDetailDialogOpen = ref(false);
 const isQrcodeScanDetailDialogOpen = ref(false);
+const expandedScannedRouteEventIds = ref<number[]>([]);
 const selectedCouplingTaskBureau = ref('');
 const selectedCouplingTaskModel = ref('');
 const couplingDetailStatus = ref<'idle' | 'pending' | 'success' | 'error'>(
@@ -2775,6 +2879,83 @@ function formatRouteSnapshotStations(route: AdminTrainRouteSnapshot | null) {
     }
 
     return `${route.startStation || '--'} 至 ${route.endStation || '--'}`;
+}
+
+function hasScannedRoute(route: AdminTrainRouteSnapshot | null) {
+    return route !== null;
+}
+
+function isScannedRouteExpanded(eventId: number) {
+    return expandedScannedRouteEventIds.value.includes(eventId);
+}
+
+function toggleScannedRouteExpanded(eventId: number) {
+    if (isScannedRouteExpanded(eventId)) {
+        expandedScannedRouteEventIds.value =
+            expandedScannedRouteEventIds.value.filter((id) => id !== eventId);
+        return;
+    }
+
+    expandedScannedRouteEventIds.value = [
+        ...expandedScannedRouteEventIds.value,
+        eventId
+    ];
+}
+
+function formatRouteSnapshotStartTime(route: AdminTrainRouteSnapshot | null) {
+    if (!route || route.startAt === null || route.startAt <= 0) {
+        return '--';
+    }
+
+    return formatShanghaiTime(route.startAt);
+}
+
+function formatRouteSnapshotEndTime(route: AdminTrainRouteSnapshot | null) {
+    if (!route || route.endAt === null || route.endAt <= 0) {
+        return '--';
+    }
+
+    return formatShanghaiTime(route.endAt);
+}
+
+function buildScannedRouteFields(route: AdminTrainRouteSnapshot | null) {
+    return [
+        {
+            key: 'trainCode',
+            label: SCANNED_ROUTE_LABELS.trainCode,
+            value: formatRouteSnapshotTrainCodes(route)
+        },
+        {
+            key: 'serviceDate',
+            label: SCANNED_ROUTE_LABELS.serviceDate,
+            value: formatServiceDate(route?.serviceDate ?? '')
+        },
+        {
+            key: 'startTime',
+            label: SCANNED_ROUTE_LABELS.startTime,
+            value: formatRouteSnapshotStartTime(route)
+        },
+        {
+            key: 'internalCode',
+            label: SCANNED_ROUTE_LABELS.internalCode,
+            value: route?.internalCode || '--'
+        },
+        {
+            key: 'startStation',
+            label: SCANNED_ROUTE_LABELS.startStation,
+            value: route?.startStation || '--'
+        },
+        {
+            key: 'endTime',
+            label: SCANNED_ROUTE_LABELS.endTime,
+            value: formatRouteSnapshotEndTime(route)
+        },
+        {
+            key: 'endStation',
+            label: SCANNED_ROUTE_LABELS.endStation,
+            value: route?.endStation || '--'
+        }
+    ];
 }
 
 function getRouteSnapshotNoteClass(route: AdminTrainRouteSnapshot | null) {

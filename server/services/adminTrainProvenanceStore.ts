@@ -686,6 +686,71 @@ function resolveDirectHitEventRoute(
     return fillRouteStationsFromTodayCache(snapshot);
 }
 
+function resolveEventScannedRoute(
+    event: TrainProvenanceEventRecord
+): AdminTrainRouteSnapshot | null {
+    if (event.eventType === 'coupling_scan_candidate_direct_hit') {
+        return resolveDirectHitEventRoute(event);
+    }
+
+    if (
+        event.eventType !== 'seat_verification_passed' &&
+        event.eventType !== 'seat_verification_unavailable' &&
+        event.eventType !== 'seat_verification_unavailable_requeued' &&
+        event.eventType !== 'seat_verification_unavailable_exhausted' &&
+        event.eventType !== 'seat_verification_mismatch_requeued' &&
+        event.eventType !== 'seat_verification_mismatch_exhausted' &&
+        event.eventType !== 'qrcode_detection_succeeded' &&
+        event.eventType !== 'qrcode_detection_request_failed'
+    ) {
+        return null;
+    }
+
+    const payload = getPayloadObject(event.payload);
+    const seatCodeFailure = getPayloadObject(payload?.seatCodeFailure);
+    const routePayload =
+        toSeatCodeRoutePayload(payload?.scannedRoute) ??
+        toSeatCodeRoutePayload(payload?.route) ??
+        toSeatCodeRoutePayload(seatCodeFailure?.route);
+    const payloadTrainCodes = getStringArray(payload?.directHitTrainCodes);
+    const fallbackTrainCode =
+        getOptionalString(payload?.seatTrainCode) ??
+        routePayload?.code ??
+        event.relatedTrainCode ??
+        event.trainCode;
+    const fallbackInternalCode =
+        getOptionalString(payload?.seatInternalCode) ??
+        getOptionalString(payload?.trainInternalCode) ??
+        routePayload?.internalCode ??
+        '';
+    const fallbackStartAt =
+        getOptionalInteger(payload?.seatStartAt) ??
+        routePayload?.startAt ??
+        event.startAt;
+    const fallbackEndAt = routePayload?.endAt ?? null;
+
+    const snapshot =
+        buildTrainRouteSnapshot({
+            serviceDate:
+                routePayload?.startDay ??
+                event.serviceDate ??
+                formatServiceDateFromStartAt(fallbackStartAt),
+            trainCodes:
+                payloadTrainCodes.length > 0
+                    ? payloadTrainCodes
+                    : [fallbackTrainCode].filter(
+                          (trainCode) => trainCode.length > 0
+                      ),
+            internalCode: fallbackInternalCode,
+            startAt: fallbackStartAt,
+            endAt: fallbackEndAt,
+            startStation: '',
+            endStation: ''
+        }) ?? null;
+
+    return fillRouteStationsFromTodayCache(snapshot);
+}
+
 function buildDepartureFallback(events: TrainProvenanceEventRecord[]): {
     route: AdminTrainRouteSnapshot | null;
     emuCodes: string[];
@@ -1154,6 +1219,7 @@ function toTimelineEvent(
     event: TrainProvenanceEventRecord
 ): AdminTrainProvenanceEvent {
     const conflictDetail = extractConflictDetail(event);
+    const scannedRoute = resolveEventScannedRoute(event);
     const historicalReuse = extractHistoricalReuseDetail(event);
     const coupledResolution = extractCoupledResolutionDetail(event);
     const couplingScan =
@@ -1196,6 +1262,7 @@ function toTimelineEvent(
         linkedTaskRunId: event.linkedTaskRunId,
         conflictDetail,
         couplingScan,
+        scannedRoute,
         historicalReuse,
         coupledResolution,
         payload: event.payload

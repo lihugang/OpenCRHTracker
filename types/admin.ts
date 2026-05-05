@@ -430,6 +430,7 @@ export interface AdminTrainProvenanceEvent {
     linkedTaskRunId: number | null;
     conflictDetail: AdminTrainProvenanceConflictDetail | null;
     couplingScan: AdminTrainProvenanceCouplingScanDetail | null;
+    scannedRoute: AdminTrainRouteSnapshot | null;
     historicalReuse: AdminTrainProvenanceHistoricalReuseDetail | null;
     coupledResolution: AdminTrainProvenanceCoupledResolutionDetail | null;
     payload: unknown;
