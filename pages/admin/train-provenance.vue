@@ -3093,6 +3093,8 @@ function getEventResultLabel(result: string) {
 
 function getCandidateStatusLabel(status: string) {
     switch (status) {
+        case 'pending':
+            return '待确认';
         case 'matched':
             return '已匹配';
         case 'skipped':

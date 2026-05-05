@@ -3,6 +3,7 @@ import useConfig from '~/server/config';
 import { clearRecentCoupledGroupDetection } from '~/server/services/probeDetectionState';
 import {
     buildProbeAssetKey,
+    getProbeEmuMultipleStateFromRecord,
     loadProbeAssets,
     type EmuListRecord
 } from '~/server/services/probeAssetStore';
@@ -1887,7 +1888,7 @@ async function executeProbeTrainDepartureTaskInternal(
         return;
     }
 
-    if (!mainRecord.multiple) {
+    if (getProbeEmuMultipleStateFromRecord(mainRecord) === 'non_multiple') {
         await applyResolvedResult(
             args,
             trainKey,

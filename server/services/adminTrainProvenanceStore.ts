@@ -1056,6 +1056,10 @@ function formatCouplingScanCandidateReason(
             return formatSeatCodeFailureReasonText(detail);
         case 'route_not_tracked':
             return '扫描到的车次未发车';
+        case 'route_not_tracked_single_pending':
+            return '扫描到未追踪车次，当前保持待重联确认';
+        case 'route_not_tracked_single_non_multiple_resolved':
+            return '扫描到未追踪车次，且车型不可重联，已直接确认为单组';
         case 'tracked_group_matched':
             return '已匹配到当前车次';
         default:
@@ -1181,10 +1185,23 @@ function formatEventSummary(
         case 'resolved_single':
             return '已判定为单组';
         case 'resolved_from_status':
+            if (
+                event.result === 'single' &&
+                payload?.source === 'coupling_scan_untracked' &&
+                payload?.nonMultiple === true
+            ) {
+                return '重联扫描命中未追踪车次，且车型不可重联，已直接确认为单组';
+            }
             return event.result === 'coupled'
                 ? '复用了当日已有重联状态'
                 : '复用了当日已有单组状态';
         case 'pending_coupling_detection':
+            if (
+                event.result === 'untracked_single' &&
+                payload?.source === 'coupling_scan_untracked'
+            ) {
+                return '重联扫描命中未追踪车次，当前保持待重联确认';
+            }
             return `已进入重联扫描${linkedTaskText}`;
         case 'coupling_group_resolved_single':
             return '重联扫描结束，判定为单组';

@@ -15,6 +15,7 @@ import {
 } from '~/server/services/probeRuntimeState';
 import {
     buildProbeAssetKey,
+    getProbeEmuMultipleStateFromCode,
     loadProbeAssets,
     type EmuListRecord
 } from '~/server/services/probeAssetStore';
@@ -832,13 +833,14 @@ function collectResolvedEmuCodes(
     return filteredEmuCodes.length > 0 ? filteredEmuCodes : originalEmuCodes;
 }
 
-function persistResolvedUntrackedGroups(
+async function persistResolvedUntrackedGroups(
     groups: Map<string, UntrackedResolvedGroup>,
     nowSeconds: number
-): PersistedUntrackedGroupSummary {
+): Promise<PersistedUntrackedGroupSummary> {
     let groupCount = 0;
     let singleCount = 0;
     let coupledCount = 0;
+    const probeAssets = await loadProbeAssets();
 
     for (const group of groups.values()) {
         const emuCodes = uniqueNormalizedCodes(
@@ -848,10 +850,19 @@ function persistResolvedUntrackedGroups(
             continue;
         }
 
+        const multipleState =
+            emuCodes.length === 1
+                ? getProbeEmuMultipleStateFromCode(
+                      probeAssets,
+                      emuCodes[0] ?? ''
+                  )
+                : 'multiple';
         const finalStatus =
             emuCodes.length > 1
                 ? ProbeStatusValue.CoupledFormationResolved
-                : ProbeStatusValue.SingleFormationResolved;
+                : multipleState === 'non_multiple'
+                  ? ProbeStatusValue.SingleFormationResolved
+                  : ProbeStatusValue.PendingCouplingDetection;
         const trainKey = buildTrainKey(
             group.trainCode,
             group.trainInternalCode,
@@ -899,11 +910,17 @@ function persistResolvedUntrackedGroups(
                 candidateOrder: candidate.candidateOrder,
                 serviceDate: formatShanghaiDateString(group.startAt * 1000),
                 candidateEmuCode: candidate.candidateEmuCode,
-                status: 'resolved',
+                status:
+                    finalStatus === ProbeStatusValue.CoupledFormationResolved
+                        ? 'resolved'
+                        : 'pending',
                 reason:
                     finalStatus === ProbeStatusValue.CoupledFormationResolved
                         ? 'route_not_tracked_coupled_persisted'
-                        : 'route_not_tracked_single_persisted',
+                        : finalStatus ===
+                            ProbeStatusValue.SingleFormationResolved
+                          ? 'route_not_tracked_single_non_multiple_resolved'
+                          : 'route_not_tracked_single_pending',
                 scannedTrainCode: group.trainCode,
                 scannedInternalCode: group.trainInternalCode,
                 scannedStartAt: group.startAt,
@@ -921,14 +938,21 @@ function persistResolvedUntrackedGroups(
             serviceDate: formatShanghaiDateString(group.startAt * 1000),
             startAt: group.startAt,
             emuCode: emuCodes[0] ?? '',
-            eventType: 'resolved_from_status',
+            eventType:
+                finalStatus === ProbeStatusValue.PendingCouplingDetection
+                    ? 'pending_coupling_detection'
+                    : 'resolved_from_status',
             result:
                 finalStatus === ProbeStatusValue.CoupledFormationResolved
                     ? 'coupled'
-                    : 'single',
+                    : finalStatus ===
+                        ProbeStatusValue.SingleFormationResolved
+                      ? 'single'
+                      : 'untracked_single',
             payload: {
                 source: 'coupling_scan_untracked',
-                emuCodes
+                emuCodes,
+                nonMultiple: multipleState === 'non_multiple'
             }
         });
         logger.info(
@@ -1247,7 +1271,7 @@ async function executeDetectCoupledEmuGroupTaskInternal(
         );
     }
 
-    const persistedUntrackedGroups = persistResolvedUntrackedGroups(
+    const persistedUntrackedGroups = await persistResolvedUntrackedGroups(
         untrackedGroups,
         nowSeconds
     );

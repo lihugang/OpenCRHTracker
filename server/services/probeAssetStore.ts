@@ -31,6 +31,8 @@ export interface EmuListRecord {
     alias: string[];
 }
 
+export type ProbeEmuMultipleState = 'multiple' | 'non_multiple' | 'unknown';
+
 export interface ProbeAssets {
     emuList: EmuListRecord[];
     emuByModelAndTrainSetNo: Map<string, EmuListRecord>;
@@ -314,6 +316,37 @@ export function preloadProbeAssetsFromLocalFiles(): ProbeAssets {
 
 export function buildProbeAssetKey(model: string, trainSetNo: string): string {
     return buildModelAndTrainSetNoKey(model, trainSetNo);
+}
+
+export function getProbeEmuMultipleStateFromRecord(
+    record: EmuListRecord | null | undefined
+): ProbeEmuMultipleState {
+    if (!record) {
+        return 'unknown';
+    }
+
+    return record.multiple ? 'multiple' : 'non_multiple';
+}
+
+export function getProbeEmuMultipleStateFromCode(
+    assets: ProbeAssets,
+    emuCode: string
+): ProbeEmuMultipleState {
+    const normalizedEmuCode = normalizeCode(emuCode);
+    if (normalizedEmuCode.length === 0) {
+        return 'unknown';
+    }
+
+    const [model, trainSetNo] = normalizedEmuCode.split('-', 2);
+    if (!model || !trainSetNo) {
+        return 'unknown';
+    }
+
+    return getProbeEmuMultipleStateFromRecord(
+        assets.emuByModelAndTrainSetNo.get(
+            buildModelAndTrainSetNoKey(model, trainSetNo)
+        )
+    );
 }
 
 export async function resolveCanonicalEmuCode(

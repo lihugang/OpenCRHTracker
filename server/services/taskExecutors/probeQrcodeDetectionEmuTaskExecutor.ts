@@ -1,6 +1,7 @@
 import getLogger from '~/server/libs/log4js';
 import {
     buildProbeAssetKey,
+    getProbeEmuMultipleStateFromRecord,
     loadProbeAssets,
     type EmuListRecord
 } from '~/server/services/probeAssetStore';
@@ -210,7 +211,7 @@ async function executeProbeQrcodeDetectionEmuTask(rawArgs: unknown) {
         }
     });
 
-    if (!resolvedRecord.multiple) {
+    if (getProbeEmuMultipleStateFromRecord(resolvedRecord) === 'non_multiple') {
         await applyResolvedProbeResult({
             trainCode: routeTrainCode,
             trainInternalCode: routeTrainInternalCode,
