@@ -1,9 +1,14 @@
+import useTrackedRequestFetch, {
+    type TrackedRequestFetch
+} from '~/composables/useTrackedRequestFetch';
 import type { AboutExposedConfigData } from '~/types/about';
 import type { TrackerApiResponse } from '~/types/homepage';
 import { DEFAULT_DOCS_API_RUNTIME_CONFIG } from '~/utils/docs/apiDocs';
 
 export default function useDocsApiRuntimeConfig() {
-    const requestFetch = import.meta.server ? useRequestFetch() : $fetch;
+    const requestFetch: TrackedRequestFetch = import.meta.server
+        ? useTrackedRequestFetch()
+        : ($fetch as TrackedRequestFetch);
 
     return useAsyncData(
         'docs-api-runtime-config',

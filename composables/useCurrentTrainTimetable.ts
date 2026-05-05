@@ -1,4 +1,7 @@
 import { computed, ref, toValue, watch, type MaybeRefOrGetter } from 'vue';
+import useTrackedRequestFetch, {
+    type TrackedRequestFetch
+} from '~/composables/useTrackedRequestFetch';
 import type { TrackerApiResponse } from '~/types/homepage';
 import type {
     CurrentTrainTimetableData,
@@ -12,7 +15,9 @@ export default function useCurrentTrainTimetable(
     trainCodeSource: MaybeRefOrGetter<string>,
     activeSource: MaybeRefOrGetter<boolean>
 ) {
-    const requestFetch = import.meta.server ? useRequestFetch() : $fetch;
+    const requestFetch: TrackedRequestFetch = import.meta.server
+        ? useTrackedRequestFetch()
+        : ($fetch as TrackedRequestFetch);
     const state = ref<RecentAssignmentsState>('idle');
     const timetable = ref<CurrentTrainTimetableData | null>(null);
     const errorMessage = ref('');

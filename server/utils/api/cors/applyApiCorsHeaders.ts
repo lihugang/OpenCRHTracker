@@ -33,7 +33,8 @@ export default function applyApiCorsHeaders(event: H3Event) {
         [
             config.api.headers.remain,
             config.api.headers.cost,
-            config.api.headers.retryAfter
+            config.api.headers.retryAfter,
+            'Server-Timing'
         ].join(', ')
     );
 }

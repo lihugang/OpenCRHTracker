@@ -189,6 +189,9 @@
 
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue';
+import useTrackedRequestFetch, {
+    type TrackedRequestFetch
+} from '~/composables/useTrackedRequestFetch';
 import type {
     DailyExportFormat,
     DailyExportIndexResponse
@@ -202,7 +205,9 @@ definePageMeta({
 
 const route = useRoute();
 const router = useRouter();
-const requestFetch = import.meta.server ? useRequestFetch() : $fetch;
+const requestFetch: TrackedRequestFetch = import.meta.server
+    ? useTrackedRequestFetch()
+    : ($fetch as TrackedRequestFetch);
 const exportListRef = ref<HTMLElement | null>(null);
 const lastScrolledTargetDate = ref('');
 

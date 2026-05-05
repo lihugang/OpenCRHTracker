@@ -50,6 +50,9 @@ export default defineNuxtConfig({
     },
     nitro: {
         sourceMap: false,
+        experimental: {
+            asyncContext: true
+        },
         esbuild: {
             options: {
                 target: 'esnext'

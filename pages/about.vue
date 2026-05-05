@@ -165,6 +165,9 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import AboutFontLicenseModal from '~/components/about/AboutFontLicenseModal.vue';
+import useTrackedRequestFetch, {
+    type TrackedRequestFetch
+} from '~/composables/useTrackedRequestFetch';
 import type {
     AboutExposedConfigData,
     AboutFontLicenseName,
@@ -181,7 +184,7 @@ const MOBILE_QUERY = '(max-width: 767px)';
 const { isOfficialInstance, isDevelopment } = useOfficialInstance();
 const authorSponsorUrl = 'https://ifdian.net/a/lihugang';
 
-const requestFetch = useRequestFetch();
+const requestFetch: TrackedRequestFetch = useTrackedRequestFetch();
 const activeFontLicenseName = ref<AboutFontLicenseName | null>(null);
 const isMobileLayout = ref(false);
 let mediaQueryList: MediaQueryList | null = null;

@@ -1965,6 +1965,9 @@
 <script setup lang="ts">
 import UiBottomSheet from '~/components/ui/UiBottomSheet.vue';
 import UiModal from '~/components/ui/UiModal.vue';
+import useTrackedRequestFetch, {
+    type TrackedRequestFetch
+} from '~/composables/useTrackedRequestFetch';
 import { useAdminDateQuery } from '~/composables/useAdminDateQuery';
 import type {
     AdminCouplingScanDetailResponse,
@@ -1996,7 +1999,9 @@ definePageMeta({
 });
 
 const MOBILE_QUERY = '(max-width: 767px)';
-const requestFetch = import.meta.server ? useRequestFetch() : $fetch;
+const requestFetch: TrackedRequestFetch = import.meta.server
+    ? useTrackedRequestFetch()
+    : ($fetch as TrackedRequestFetch);
 const route = useRoute();
 const router = useRouter();
 const { session } = useAuthState();

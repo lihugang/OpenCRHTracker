@@ -1,4 +1,7 @@
 import { computed, ref, toValue, watch, type MaybeRefOrGetter } from 'vue';
+import useTrackedRequestFetch, {
+    type TrackedRequestFetch
+} from '~/composables/useTrackedRequestFetch';
 import {
     hydrateEmuHistoryRecords,
     hydrateTrainHistoryRecords,
@@ -1025,7 +1028,9 @@ export default function useFutureAssignmentPrediction(
     anchorTrainCodeSource: MaybeRefOrGetter<string>,
     activeSource: MaybeRefOrGetter<boolean>
 ) {
-    const requestFetch = import.meta.server ? useRequestFetch() : $fetch;
+    const requestFetch: TrackedRequestFetch = import.meta.server
+        ? useTrackedRequestFetch()
+        : ($fetch as TrackedRequestFetch);
     const localState = ref<RecentAssignmentsState>('idle');
     const predictionState = ref<FutureAssignmentPredictionStatus>('idle');
     const predictedNodes = ref<FutureAssignmentPredictionNode[]>([]);

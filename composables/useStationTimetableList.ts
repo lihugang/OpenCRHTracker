@@ -1,4 +1,7 @@
 import { computed, ref, toValue, watch, type MaybeRefOrGetter } from 'vue';
+import useTrackedRequestFetch, {
+    type TrackedRequestFetch
+} from '~/composables/useTrackedRequestFetch';
 import type { TrackerApiResponse } from '~/types/homepage';
 import type {
     LookupTarget,
@@ -61,7 +64,9 @@ function isResponseForTarget(
 export function useStationTimetableList(
     targetSource: MaybeRefOrGetter<LookupTarget | null>
 ) {
-    const requestFetch = import.meta.server ? useRequestFetch() : $fetch;
+    const requestFetch: TrackedRequestFetch = import.meta.server
+        ? useTrackedRequestFetch()
+        : ($fetch as TrackedRequestFetch);
     const extraItems = ref<StationTimetableRecord[]>([]);
     const manualNextCursor = ref<string | null>(null);
     const isLoadingMore = ref(false);

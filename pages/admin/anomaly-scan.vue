@@ -337,6 +337,9 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import UiBottomSheet from '~/components/ui/UiBottomSheet.vue';
 import UiModal from '~/components/ui/UiModal.vue';
+import useTrackedRequestFetch, {
+    type TrackedRequestFetch
+} from '~/composables/useTrackedRequestFetch';
 import {
     fromAdminDateInputValue,
     useAdminDateQuery
@@ -363,7 +366,9 @@ interface PendingDeleteRouteContext {
     route: AdminAnomalyRouteRecord;
 }
 
-const requestFetch = import.meta.server ? useRequestFetch() : $fetch;
+const requestFetch: TrackedRequestFetch = import.meta.server
+    ? useTrackedRequestFetch()
+    : ($fetch as TrackedRequestFetch);
 const { session } = useAuthState();
 const { selectedDateInput, selectedDateYmd, todayDateInputValue } =
     await useAdminDateQuery();

@@ -1,4 +1,7 @@
 import { computed, onMounted } from 'vue';
+import useTrackedRequestFetch, {
+    type TrackedRequestFetch
+} from '~/composables/useTrackedRequestFetch';
 import type { AuthMeResponse, AuthSession } from '~/types/auth';
 import type { TrackerApiResponse } from '~/types/homepage';
 
@@ -33,7 +36,9 @@ export default function useAuthState() {
     }
 
     async function refreshSession() {
-        const requestFetch = import.meta.server ? useRequestFetch() : $fetch;
+        const requestFetch: TrackedRequestFetch = import.meta.server
+            ? useTrackedRequestFetch()
+            : ($fetch as TrackedRequestFetch);
 
         refreshPendingCount.value += 1;
 

@@ -1,4 +1,7 @@
 import { computed, ref, toValue, watch, type MaybeRefOrGetter } from 'vue';
+import useTrackedRequestFetch, {
+    type TrackedRequestFetch
+} from '~/composables/useTrackedRequestFetch';
 import {
     hydrateEmuHistoryRecords,
     hydrateTrainHistoryRecords,
@@ -122,7 +125,9 @@ function isResponseForTarget(
 export function useRecentHistoryList(
     targetSource: MaybeRefOrGetter<LookupTarget | null>
 ) {
-    const requestFetch = import.meta.server ? useRequestFetch() : $fetch;
+    const requestFetch: TrackedRequestFetch = import.meta.server
+        ? useTrackedRequestFetch()
+        : ($fetch as TrackedRequestFetch);
     const extraItems = ref<LookupHistoryListItem[]>([]);
     const manualNextCursor = ref<string | null>(null);
     const isLoadingMore = ref(false);

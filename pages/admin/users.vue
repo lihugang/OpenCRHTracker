@@ -151,6 +151,9 @@
 </template>
 
 <script setup lang="ts">
+import useTrackedRequestFetch, {
+    type TrackedRequestFetch
+} from '~/composables/useTrackedRequestFetch';
 import { useAdminDateQuery } from '~/composables/useAdminDateQuery';
 import type { AdminUsersResponse } from '~/types/admin';
 import type { TrackerApiResponse } from '~/types/homepage';
@@ -161,7 +164,9 @@ definePageMeta({
     middleware: 'admin-required'
 });
 
-const requestFetch = import.meta.server ? useRequestFetch() : $fetch;
+const requestFetch: TrackedRequestFetch = import.meta.server
+    ? useTrackedRequestFetch()
+    : ($fetch as TrackedRequestFetch);
 const { session } = useAuthState();
 const { selectedDateInput, todayDateInputValue } = await useAdminDateQuery();
 

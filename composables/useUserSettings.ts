@@ -1,4 +1,7 @@
 import { computed, watch } from 'vue';
+import useTrackedRequestFetch, {
+    type TrackedRequestFetch
+} from '~/composables/useTrackedRequestFetch';
 import type {
     AuthSession,
     AuthSettingsResponse,
@@ -118,9 +121,9 @@ export function useUserSettings() {
         errorMessage.value = '';
 
         try {
-            const requestFetch = import.meta.server
-                ? useRequestFetch()
-                : $fetch;
+            const requestFetch: TrackedRequestFetch = import.meta.server
+                ? useTrackedRequestFetch()
+                : ($fetch as TrackedRequestFetch);
             const response = await requestFetch<
                 TrackerApiResponse<AuthSettingsResponse>
             >('/api/v1/auth/settings', {

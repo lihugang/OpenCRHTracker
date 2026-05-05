@@ -290,6 +290,9 @@
 </template>
 
 <script setup lang="ts">
+import useTrackedRequestFetch, {
+    type TrackedRequestFetch
+} from '~/composables/useTrackedRequestFetch';
 import type {
     AdminPassiveAlertLevel,
     AdminPassiveAlertsResponse
@@ -306,7 +309,9 @@ definePageMeta({
     middleware: 'admin-required'
 });
 
-const requestFetch = import.meta.server ? useRequestFetch() : $fetch;
+const requestFetch: TrackedRequestFetch = import.meta.server
+    ? useTrackedRequestFetch()
+    : ($fetch as TrackedRequestFetch);
 const { session } = useAuthState();
 const { selectedDateInput, selectedDateYmd, todayDateInputValue } =
     await useAdminDateQuery();

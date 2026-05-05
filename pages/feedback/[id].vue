@@ -565,6 +565,9 @@ import {
     ref,
     watch
 } from 'vue';
+import useTrackedRequestFetch, {
+    type TrackedRequestFetch
+} from '~/composables/useTrackedRequestFetch';
 import type { NotificationTarget } from '~/types/notifications';
 import type {
     DeleteFeedbackTopicResponse,
@@ -595,7 +598,9 @@ import formatTrackerTimestamp from '~/utils/time/formatTrackerTimestamp';
 import type { TrackerApiResponse } from '~/types/homepage';
 
 const route = useRoute();
-const requestFetch = import.meta.server ? useRequestFetch() : $fetch;
+const requestFetch: TrackedRequestFetch = import.meta.server
+    ? useTrackedRequestFetch()
+    : ($fetch as TrackedRequestFetch);
 const {
     errorMessage: eventSubscriptionErrorMessage,
     isSubscribed,

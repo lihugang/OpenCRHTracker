@@ -16,6 +16,7 @@ import apiFailure from '~/server/utils/api/response/apiFailure';
 import apiSuccess from '~/server/utils/api/response/apiSuccess';
 import setCommonHeaders from '~/server/utils/api/response/setCommonHeaders';
 import assertRequiredScopes from '~/server/utils/api/scopes/assertRequiredScopes';
+import { measureServerTimingPhase } from '~/server/utils/timing/serverTiming';
 
 export default async function executeApi<TData>(
     event: H3Event,
@@ -55,8 +56,11 @@ export default async function executeApi<TData>(
     };
 
     try {
-        identity = resolveIdentity(event);
-        assertRequiredScopes(identity, options.requiredScopes);
+        identity = await measureServerTimingPhase('auth', async () => {
+            const resolvedIdentity = resolveIdentity(event);
+            assertRequiredScopes(resolvedIdentity, options.requiredScopes);
+            return resolvedIdentity;
+        });
 
         const resolvedIdentity = identity;
         remain = getRemainTokens(resolvedIdentity);
