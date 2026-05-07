@@ -5,6 +5,19 @@ export type TrackedRequestFetch = <T>(
     options?: TrackedFetchOptions
 ) => Promise<T>;
 
+type FetchHookContext = Record<string, unknown> & {
+    response?: unknown;
+};
+
+type FetchHook =
+    | ((context: FetchHookContext) => void | Promise<void>)
+    | Array<(context: FetchHookContext) => void | Promise<void>>;
+
+interface HookableFetchOptions extends Record<string, unknown> {
+    onResponse?: FetchHook;
+    onResponseError?: FetchHook;
+}
+
 function isInternalApiPath(pathname: string) {
     return pathname === '/api' || pathname.startsWith('/api/');
 }
@@ -42,16 +55,59 @@ function getResponseServerTimingHeader(response: unknown) {
     return headers?.get('server-timing') ?? null;
 }
 
+function getErrorResponse(error: unknown) {
+    if (
+        typeof error !== 'object' ||
+        error === null ||
+        !('response' in error)
+    ) {
+        return null;
+    }
+
+    return (error as { response?: unknown }).response ?? null;
+}
+
+async function runFetchHooks(hooks: FetchHook | undefined, context: FetchHookContext) {
+    if (!hooks) {
+        return;
+    }
+
+    if (Array.isArray(hooks)) {
+        for (const hook of hooks) {
+            await hook(context);
+        }
+
+        return;
+    }
+
+    await hooks(context);
+}
+
+function withTimingHooks(
+    options: TrackedFetchOptions,
+    recordTiming: (response: unknown) => void
+) {
+    const resolvedOptions = (options ?? {}) as HookableFetchOptions;
+
+    return {
+        ...resolvedOptions,
+        async onResponse(context: FetchHookContext) {
+            recordTiming(context.response ?? null);
+            await runFetchHooks(resolvedOptions.onResponse, context);
+        },
+        async onResponseError(context: FetchHookContext) {
+            recordTiming(context.response ?? null);
+            await runFetchHooks(resolvedOptions.onResponseError, context);
+        }
+    } satisfies HookableFetchOptions;
+}
+
 export default function useTrackedRequestFetch() {
     if (import.meta.client) {
         return $fetch as TrackedRequestFetch;
     }
 
     const requestFetch = useRequestFetch() as TrackedRequestFetch;
-    const rawRequestFetch = $fetch.raw;
-    if (!rawRequestFetch) {
-        return requestFetch;
-    }
 
     const trackedRequestFetch: TrackedRequestFetch = async <T>(
         request: TrackedFetchRequest,
@@ -71,29 +127,30 @@ export default function useTrackedRequestFetch() {
 
         const startedAtMs = Date.now();
         const pausedStore = pauseServerTiming();
+        let timingRecorded = false;
+
+        const recordTiming = (response: unknown) => {
+            if (timingRecorded) {
+                return;
+            }
+
+            timingRecorded = true;
+            recordSsrInternalApiTiming(
+                pathname,
+                getResponseServerTimingHeader(response),
+                Math.max(0, Date.now() - startedAtMs)
+            );
+        };
+
         try {
-            const response = await rawRequestFetch<T>(
-                request as string,
-                options
+            const response = await requestFetch<T>(
+                request,
+                withTimingHooks(options, recordTiming)
             );
-            recordSsrInternalApiTiming(
-                pathname,
-                getResponseServerTimingHeader(response),
-                Math.max(0, Date.now() - startedAtMs)
-            );
-            return response._data as T;
+            recordTiming(null);
+            return response;
         } catch (error) {
-            const response =
-                typeof error === 'object' &&
-                error !== null &&
-                'response' in error
-                    ? (error as { response?: unknown }).response
-                    : null;
-            recordSsrInternalApiTiming(
-                pathname,
-                getResponseServerTimingHeader(response),
-                Math.max(0, Date.now() - startedAtMs)
-            );
+            recordTiming(getErrorResponse(error));
             throw error;
         } finally {
             resumeServerTiming(pausedStore);
