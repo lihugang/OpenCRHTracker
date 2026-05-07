@@ -5,7 +5,6 @@ import {
     setHeader,
     type H3Event
 } from 'h3';
-import { useEvent } from 'nitropack/runtime';
 import useConfig from '~/server/config';
 import { adminServerMetricsRouteTemplates } from '~/server/utils/meta/routeTemplates';
 

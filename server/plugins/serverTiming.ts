@@ -1,4 +1,3 @@
-import { defineNitroPlugin } from 'nitropack/runtime';
 import {
     appendServerTimingHeaders,
     finalizeSsrRenderTiming,
