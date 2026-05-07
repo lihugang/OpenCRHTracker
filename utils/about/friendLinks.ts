@@ -6,6 +6,10 @@ export const aboutFriendLinks: AboutFriendLinkDefinition[] = [
         url: 'https://emu.passearch.info'
     },
     {
+        name: '现代化的专业铁路信息查询客户端',
+        url: 'https://railgo.dev'
+    },
+    {
         name: '列车运行可视化',
         url: 'https://trainvisual.top'
     },
