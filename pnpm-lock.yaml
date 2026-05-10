@@ -14,6 +14,9 @@ importers:
       date-fns:
         specifier: ^4.1.0
         version: 4.1.0
+      highs:
+        specifier: ^1.8.0
+        version: 1.8.0
       jsqr:
         specifier: ^1.4.0
         version: 1.4.0
@@ -2810,6 +2813,9 @@ packages:
   hasown@2.0.2:
     resolution: {integrity: sha512-0hJU9SCPvmMzIBdZFqNPXWa6dqh7WdH0cII9y+CyS8rG3nL48Bclra9HmKhVVUHyPWNH5Y7xDwAB7bfgSjkUMQ==}
     engines: {node: '>= 0.4'}
+
+  highs@1.8.0:
+    resolution: {integrity: sha512-0QFXXjU/mxU1y3Ec44QpESq6STkPauNDfIPf0welcUGjilpVYnfH9RepBvr0t9YDQPUniIcZTX9xyxqxF668ag==}
 
   hookable@5.5.3:
     resolution: {integrity: sha512-Yc+BQe8SvoXH1643Qez1zqLRmbA5rCL+sSmk6TVos0LWVfNIB7PGncdlId77WzLGSIB5KaWgTaNTs2lNVEI6VQ==}
@@ -7746,6 +7752,8 @@ snapshots:
   hasown@2.0.2:
     dependencies:
       function-bind: 1.1.2
+
+  highs@1.8.0: {}
 
   hookable@5.5.3: {}
 
