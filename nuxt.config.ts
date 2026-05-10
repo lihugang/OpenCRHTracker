@@ -1,4 +1,10 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import tailwindcss from '@tailwindcss/vite';
+
+const externalizeNativeDeps =
+    process.env.NUXT_EXTERNALIZE_NATIVE_DEPS === '1';
+const externalizedNativePackages = ['better-sqlite3'];
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
     compatibilityDate: '2025-05-15',
@@ -53,6 +59,32 @@ export default defineNuxtConfig({
         experimental: {
             asyncContext: true
         },
+        // When enabled, native runtime modules stay external and must be
+        // provided by the deployment host instead of being copied into .output.
+        externals: externalizeNativeDeps
+            ? {
+                  external: externalizedNativePackages
+              }
+            : undefined,
+        hooks: externalizeNativeDeps
+            ? {
+                  compiled(nitro) {
+                      for (const packageName of externalizedNativePackages) {
+                          const packageOutputPath = path.join(
+                              nitro.options.output.serverDir,
+                              'node_modules',
+                              packageName
+                          );
+                          if (fs.existsSync(packageOutputPath)) {
+                              fs.rmSync(packageOutputPath, {
+                                  recursive: true,
+                                  force: true
+                              });
+                          }
+                      }
+                  }
+              }
+            : undefined,
         esbuild: {
             options: {
                 target: 'esnext'

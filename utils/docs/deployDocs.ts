@@ -95,6 +95,19 @@ export const deployDocsSections: DocsContentSection[] = [
             {
                 type: 'paragraph',
                 text: '以生成构建。'
+            },
+            {
+                type: 'paragraph',
+                text: '默认情况下，构建产物会按当前运行时依赖关系携带需要的二进制依赖。如果你准备在一台机器上构建、再上传到另一台 Node 或 libc 环境可能不同的服务器，可以改用下面这个可选命令，让这些二进制依赖不再被复制进 .output/server/node_modules。'
+            },
+            {
+                type: 'code',
+                language: 'bash',
+                code: 'NUXT_EXTERNALIZE_NATIVE_DEPS=1 pnpm build'
+            },
+            {
+                type: 'paragraph',
+                text: '启用这个环境变量后，目标服务器在启动前需要先在项目根目录安装依赖，例如执行 pnpm install --frozen-lockfile，以便在服务器本地安装适配当前环境的二进制依赖。'
             }
         ]
     },
@@ -907,6 +920,10 @@ export const deployDocsSections: DocsContentSection[] = [
                 type: 'code',
                 language: 'bash',
                 code: 'export NITRO_PORT=<port>'
+            },
+            {
+                type: 'paragraph',
+                text: '如果你是通过 NUXT_EXTERNALIZE_NATIVE_DEPS=1 生成构建产物，请先在目标机器的项目根目录执行 pnpm install --frozen-lockfile，再启动服务。默认 pnpm build 构建不需要额外增加这一步。'
             },
             {
                 type: 'paragraph',
