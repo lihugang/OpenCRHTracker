@@ -16,8 +16,9 @@ import {
 import murmurHash32 from '~/server/utils/hash/murmurHash32';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
 import type {
-    InferredCirculation,
-    InferredCirculationNode
+    TrainCirculation,
+    TrainCirculationMetadata,
+    TrainCirculationNode
 } from '~/types/lookup';
 
 interface CursorPoint {
@@ -93,6 +94,7 @@ interface InternalInferredCirculation {
 }
 
 const logger = getLogger('train-circulation-index');
+const DAY_SECONDS = 24 * 60 * 60;
 const SHANGHAI_OFFSET_SECONDS = SHANGHAI_OFFSET_MS / 1000;
 
 let cached: TrainCirculationIndexCache | null = null;
@@ -200,6 +202,19 @@ function buildNodeIdStore() {
 
 function getShanghaiDayBucket(timestampSeconds: number) {
     return Math.floor((timestampSeconds + SHANGHAI_OFFSET_SECONDS) / 86400);
+}
+
+function getShanghaiDayStartUnixSecondsByBucket(dayBucket: number) {
+    return dayBucket * DAY_SECONDS - SHANGHAI_OFFSET_SECONDS;
+}
+
+function getShanghaiDayOffsetSeconds(timestampSeconds: number) {
+    return (
+        timestampSeconds -
+        getShanghaiDayStartUnixSecondsByBucket(
+            getShanghaiDayBucket(timestampSeconds)
+        )
+    );
 }
 
 function buildRunKey(row: DailyEmuRouteRow) {
@@ -403,18 +418,28 @@ function buildCirculation(
     threshold: number,
     containsLoopBreak: boolean
 ): InternalInferredCirculation {
-    const nodeKeys = routeNodeIds.map(
+    const normalizedRouteNodeIds = rotateRouteNodeIdsByEarliestStartAt(
+        routeNodeIds,
+        nodeMetasByNodeId
+    );
+    const nodeKeys = normalizedRouteNodeIds.map(
         (nodeId) => nodeMetasByNodeId[nodeId]!.nodeKey
     );
-    const trainCodes = buildRouteTrainCodes(routeNodeIds, nodeMetasByNodeId);
+    const trainCodes = buildRouteTrainCodes(
+        normalizedRouteNodeIds,
+        nodeMetasByNodeId
+    );
     const nodes: InternalInferredCirculationNode[] = [];
     let lowestLinkWeight: number | null = null;
     let lowestLinkSupportCount: number | null = null;
 
-    for (const [index, nodeId] of routeNodeIds.entries()) {
-        const previousNodeId = index > 0 ? routeNodeIds[index - 1]! : null;
+    for (const [index, nodeId] of normalizedRouteNodeIds.entries()) {
+        const previousNodeId =
+            index > 0 ? normalizedRouteNodeIds[index - 1]! : null;
         const nextNodeId =
-            index + 1 < routeNodeIds.length ? routeNodeIds[index + 1]! : null;
+            index + 1 < normalizedRouteNodeIds.length
+                ? normalizedRouteNodeIds[index + 1]!
+                : null;
         const incomingEdge =
             previousNodeId === null
                 ? null
@@ -518,6 +543,118 @@ function resolvePublicNodeTimetable(node: InternalInferredCirculationNode) {
     }
 
     return null;
+}
+
+function buildPublicNodeInternalCode(
+    node: InternalInferredCirculationNode,
+    timetableTrainCode: string
+) {
+    const normalizedInternalCode = normalizeCode(node.internalCode ?? '');
+    if (normalizedInternalCode.length > 0) {
+        return normalizedInternalCode;
+    }
+
+    const publicTrainCode = uniqueNormalizedCodes([
+        ...node.allCodes,
+        node.trainCode,
+        timetableTrainCode
+    ])[0];
+    return publicTrainCode ?? timetableTrainCode;
+}
+
+function buildPublicCirculationNodes(
+    circulation: InternalInferredCirculation
+): TrainCirculationNode[] | null {
+    const nodes: TrainCirculationNode[] = [];
+    let currentRouteDayOffset = 0;
+
+    for (const [index, node] of circulation.nodes.entries()) {
+        const timetable = resolvePublicNodeTimetable(node);
+        if (!timetable) {
+            return null;
+        }
+
+        const previousNode = circulation.nodes[index - 1] ?? null;
+        const previousTimetable =
+            previousNode === null ? null : resolvePublicNodeTimetable(previousNode);
+        if (previousNode && !previousTimetable) {
+            return null;
+        }
+
+        if (previousTimetable) {
+            const previousReference =
+                getShanghaiDayOffsetSeconds(previousTimetable.endAt) ??
+                getShanghaiDayOffsetSeconds(previousTimetable.startAt);
+            const currentReference = getShanghaiDayOffsetSeconds(
+                timetable.startAt
+            );
+
+            if (currentReference < previousReference) {
+                currentRouteDayOffset += 1;
+            }
+        }
+
+        const startDayOffsetSeconds = getShanghaiDayOffsetSeconds(
+            timetable.startAt
+        );
+        const endDayOffsetSeconds = getShanghaiDayOffsetSeconds(timetable.endAt);
+        const endDayShift =
+            getShanghaiDayBucket(timetable.endAt) -
+            getShanghaiDayBucket(timetable.startAt);
+        const allCodes = uniqueNormalizedCodes([
+            ...node.allCodes,
+            node.trainCode,
+            timetable.trainCode
+        ]);
+        if (allCodes.length === 0) {
+            return null;
+        }
+
+        nodes.push({
+            internalCode: buildPublicNodeInternalCode(
+                node,
+                timetable.trainCode
+            ),
+            allCodes,
+            startStation: timetable.startStation,
+            endStation: timetable.endStation,
+            startAt:
+                currentRouteDayOffset * DAY_SECONDS + startDayOffsetSeconds,
+            endAt:
+                currentRouteDayOffset * DAY_SECONDS +
+                Math.max(endDayShift, 0) * DAY_SECONDS +
+                endDayOffsetSeconds
+        });
+    }
+
+    return nodes;
+}
+
+function toPublicTrainCirculation(
+    circulation: InternalInferredCirculation,
+    refreshAt: number | null
+): TrainCirculation | null {
+    const nodes = buildPublicCirculationNodes(circulation);
+    if (!nodes || nodes.length === 0) {
+        return null;
+    }
+
+    const metadata: TrainCirculationMetadata = {
+        routeId: circulation.routeId,
+        windowStart: circulation.windowStart,
+        windowEnd: circulation.windowEnd,
+        threshold: circulation.threshold,
+        lowestLinkWeight: circulation.lowestLinkWeight,
+        lowestLinkSupportCount: circulation.lowestLinkSupportCount,
+        containsLoopBreak: circulation.containsLoopBreak
+    };
+
+    return {
+        source: 'inferred',
+        refreshAt,
+        nodes,
+        metadata
+    };
 }
 
 function buildCirculationsFromGraph(
@@ -642,38 +779,6 @@ function buildCirculationsFromGraph(
     });
 
     return circulations;
-}
-
-function toPublicInferredCirculation(
-    circulation: InternalInferredCirculation
-): InferredCirculation {
-    const nodes: InferredCirculationNode[] = circulation.nodes.map((node) => {
-        const timetable = resolvePublicNodeTimetable(node);
-
-        return {
-            internalCode: node.internalCode,
-            allCodes: [...node.allCodes],
-            startStation: timetable?.startStation ?? '',
-            endStation: timetable?.endStation ?? '',
-            startAt: timetable?.startAt ?? null,
-            endAt: timetable?.endAt ?? null,
-            incomingWeight: node.incomingWeight,
-            incomingSupportCount: node.incomingSupportCount,
-            outgoingWeight: node.outgoingWeight,
-            outgoingSupportCount: node.outgoingSupportCount
-        };
-    });
-
-    return {
-        routeId: circulation.routeId,
-        windowStart: circulation.windowStart,
-        windowEnd: circulation.windowEnd,
-        threshold: circulation.threshold,
-        lowestLinkWeight: circulation.lowestLinkWeight,
-        lowestLinkSupportCount: circulation.lowestLinkSupportCount,
-        containsLoopBreak: circulation.containsLoopBreak,
-        nodes
-    };
 }
 
 function consumeRow(
@@ -873,12 +978,15 @@ function getInternalInferredCirculationsByTrainCodes(
     );
 }
 
-export function getInferredCirculationByTrainCodes(
+export function getTrainCirculationByTrainCodes(
     trainCodes: string[]
-): InferredCirculation | null {
+): TrainCirculation | null {
+    const activeCache = getActiveCache();
     const circulation =
         getInternalInferredCirculationsByTrainCodes(trainCodes)[0];
-    return circulation ? toPublicInferredCirculation(circulation) : null;
+    return circulation
+        ? toPublicTrainCirculation(circulation, activeCache.stats.rebuiltAt)
+        : null;
 }
 
 export function invalidateTrainCirculationIndexCache() {

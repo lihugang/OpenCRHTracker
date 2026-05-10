@@ -530,13 +530,13 @@
                                                 <p
                                                     class="mt-1 font-mono text-sm text-slate-500">
                                                     {{
-                                                        formatNullableTime(
+                                                        formatCirculationOffsetTime(
                                                             node.startAt
                                                         )
                                                     }}
                                                     <span class="mx-1">-></span>
                                                     {{
-                                                        formatNullableTime(
+                                                        formatCirculationOffsetTime(
                                                             node.endAt
                                                         )
                                                     }}
@@ -695,7 +695,7 @@
                                                         <p
                                                             class="mt-1 font-mono text-sm text-slate-500">
                                                             {{
-                                                                formatNullableTime(
+                                                                formatCirculationOffsetTime(
                                                                     node.startAt
                                                                 )
                                                             }}
@@ -711,7 +711,7 @@
                                                         <p
                                                             class="mt-1 font-mono text-sm text-slate-500">
                                                             {{
-                                                                formatNullableTime(
+                                                                formatCirculationOffsetTime(
                                                                     node.endAt
                                                                 )
                                                             }}
@@ -729,7 +729,7 @@
                     <div
                         v-if="circulationNodes.length === 0"
                         class="rounded-[1rem] border border-dashed border-slate-200 bg-white/70 px-4 py-4 text-sm leading-6 text-slate-500">
-                        无交路表推断结果。
+                        无交路结果。
                     </div>
                 </div>
             </UiCard>
@@ -745,6 +745,7 @@ import type { CurrentTrainTimetableStop } from '~/types/lookup';
 import { buildLookupPath } from '~/utils/lookup/lookupTarget';
 import formatShanghaiDateString from '~/utils/time/formatShanghaiDateString';
 
+const DAY_SECONDS = 24 * 60 * 60;
 const TIME_FORMATTER = new Intl.DateTimeFormat('zh-CN', {
     timeZone: 'Asia/Shanghai',
     hour: '2-digit',
@@ -773,8 +774,8 @@ interface DisplayCirculationNode {
     allCodes: string[];
     startStation: string;
     endStation: string;
-    startAt: number | null;
-    endAt: number | null;
+    startAt: number;
+    endAt: number;
     isCurrent: boolean;
 }
 
@@ -833,9 +834,7 @@ const timetableFocusTrainCodes = computed(() => {
     ]);
 });
 
-const inferredCirculation = computed(
-    () => timetable.value?.inferredCirculation ?? null
-);
+const circulation = computed(() => timetable.value?.circulation ?? null);
 
 const currentCirculationTrainCodeSet = computed(() => {
     return new Set(
@@ -849,8 +848,8 @@ const currentCirculationTrainCodeSet = computed(() => {
 });
 
 const currentCirculationNodeIndex = computed(() => {
-    const circulation = inferredCirculation.value;
-    if (!circulation) {
+    const currentCirculation = circulation.value;
+    if (!currentCirculation) {
         return -1;
     }
 
@@ -858,7 +857,7 @@ const currentCirculationNodeIndex = computed(() => {
         timetable.value?.internalCode
     );
     if (normalizedInternalCode.length > 0) {
-        const nodeIndex = circulation.nodes.findIndex(
+        const nodeIndex = currentCirculation.nodes.findIndex(
             (node) =>
                 normalizeComparableCode(node.internalCode) ===
                 normalizedInternalCode
@@ -868,7 +867,7 @@ const currentCirculationNodeIndex = computed(() => {
         }
     }
 
-    return circulation.nodes.findIndex((node) =>
+    return currentCirculation.nodes.findIndex((node) =>
         node.allCodes.some((code) =>
             currentCirculationTrainCodeSet.value.has(
                 normalizeComparableCode(code)
@@ -878,16 +877,13 @@ const currentCirculationNodeIndex = computed(() => {
 });
 
 const circulationNodes = computed<DisplayCirculationNode[]>(() => {
-    const circulation = inferredCirculation.value;
-    if (!circulation) {
+    const currentCirculation = circulation.value;
+    if (!currentCirculation) {
         return [];
     }
 
-    return circulation.nodes.map((node, index) => ({
-        key:
-            normalizeComparableCode(node.internalCode) ||
-            node.allCodes.join('/') ||
-            `node:${index}`,
+    return currentCirculation.nodes.map((node, index) => ({
+        key: normalizeComparableCode(node.internalCode) || `node:${index}`,
         allCodes: [...node.allCodes],
         startStation: node.startStation,
         endStation: node.endStation,
@@ -1045,6 +1041,23 @@ function formatNullableTime(timestamp: number | null) {
 
 function formatTime(timestamp: number) {
     return TIME_FORMATTER.format(new Date(timestamp * 1000));
+}
+
+function formatCirculationOffsetTime(offsetSeconds: number) {
+    if (!Number.isFinite(offsetSeconds) || offsetSeconds < 0) {
+        return '--';
+    }
+
+    const normalizedOffset = Math.floor(offsetSeconds);
+    const secondsOfDay = normalizedOffset % DAY_SECONDS;
+    const hours = Math.floor(secondsOfDay / 3600)
+        .toString()
+        .padStart(2, '0');
+    const minutes = Math.floor((secondsOfDay % 3600) / 60)
+        .toString()
+        .padStart(2, '0');
+
+    return `${hours}:${minutes}`;
 }
 
 function getUpdatedDateLabel(updatedAt: number | null) {

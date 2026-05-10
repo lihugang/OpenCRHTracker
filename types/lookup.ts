@@ -135,20 +135,16 @@ export interface HistoricalTimetableData {
     stops: HistoricalTimetableStop[];
 }
 
-export interface InferredCirculationNode {
-    internalCode: string | null;
+export interface TrainCirculationNode {
+    internalCode: string;
     allCodes: string[];
     startStation: string;
     endStation: string;
-    startAt: number | null;
-    endAt: number | null;
-    incomingWeight: number | null;
-    incomingSupportCount: number | null;
-    outgoingWeight: number | null;
-    outgoingSupportCount: number | null;
+    startAt: number;
+    endAt: number;
 }
 
-export interface InferredCirculation {
+export interface TrainCirculationMetadata {
     routeId: string;
     windowStart: number;
     windowEnd: number;
@@ -156,7 +152,13 @@ export interface InferredCirculation {
     lowestLinkWeight: number | null;
     lowestLinkSupportCount: number | null;
     containsLoopBreak: boolean;
-    nodes: InferredCirculationNode[];
+}
+
+export interface TrainCirculation {
+    source: 'official' | 'inferred';
+    refreshAt: number | null;
+    nodes: TrainCirculationNode[];
+    metadata?: TrainCirculationMetadata;
 }
 
 export interface CurrentTrainTimetableData {
@@ -174,7 +176,7 @@ export interface CurrentTrainTimetableData {
     endStation: string;
     startAt: number;
     endAt: number;
-    inferredCirculation: InferredCirculation | null;
+    circulation: TrainCirculation | null;
     stops: CurrentTrainTimetableStop[];
 }
 

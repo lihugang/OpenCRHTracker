@@ -18,9 +18,9 @@ import type {
     FutureAssignmentPredictionSourceType,
     FutureAssignmentPredictionStatus,
     FutureAssignmentProgress,
-    InferredCirculation,
-    InferredCirculationNode,
     RecentAssignmentsState,
+    TrainCirculation,
+    TrainCirculationNode,
     TrainHistoryResponse
 } from '~/types/lookup';
 import getApiErrorMessage from '~/utils/api/getApiErrorMessage';
@@ -40,7 +40,7 @@ interface RouteNodeSegment {
     key: string;
     routeNodeIndex: number;
     routeDayOffset: number;
-    node: InferredCirculationNode;
+    node: TrainCirculationNode;
     primaryTrainCode: string;
 }
 
@@ -67,8 +67,8 @@ interface TrainCurrentCycleAnchorCandidate {
     firstNodeHistoryDayBucket: number;
     firstNodeHistoryRun: TrainHistoryRun;
     targetNode: RouteNodeSegment;
-    predictedStartAt: number | null;
-    predictedEndAt: number | null;
+    predictedStartAt: number;
+    predictedEndAt: number;
 }
 
 interface TrainHistoryRun {
@@ -126,15 +126,18 @@ function getShanghaiDayOffsetSeconds(timestamp: number | null) {
     );
 }
 
-function shiftTimestamp(timestamp: number | null, dayOffset: number) {
-    if (timestamp === null || !Number.isFinite(timestamp)) {
-        return null;
-    }
-
-    return timestamp + dayOffset * DAY_SECONDS;
+function getRouteDayOffset(offsetSeconds: number) {
+    return Math.floor(offsetSeconds / DAY_SECONDS);
 }
 
-function buildRouteNodeKey(node: InferredCirculationNode, index: number) {
+function buildAbsoluteTimestampFromRouteBase(
+    routeBaseUnixSeconds: number,
+    routeOffsetSeconds: number
+) {
+    return routeBaseUnixSeconds + routeOffsetSeconds;
+}
+
+function buildRouteNodeKey(node: TrainCirculationNode, index: number) {
     return (
         normalizeComparableCode(node.internalCode) ||
         normalizeCodeList(node.allCodes).join('/') ||
@@ -142,7 +145,7 @@ function buildRouteNodeKey(node: InferredCirculationNode, index: number) {
     );
 }
 
-function getNodePrimaryTrainCode(node: InferredCirculationNode) {
+function getNodePrimaryTrainCode(node: TrainCirculationNode) {
     const publicTrainCodes = normalizeCodeList(node.allCodes);
     if (publicTrainCodes.length > 0) {
         return publicTrainCodes[0] ?? '';
@@ -152,7 +155,7 @@ function getNodePrimaryTrainCode(node: InferredCirculationNode) {
 }
 
 function getRouteNodeReferenceTimestamp(node: RouteNodeSegment) {
-    return node.node.startAt ?? node.node.endAt;
+    return node.node.startAt;
 }
 
 function getPredictedReferenceTimestamp(
@@ -170,29 +173,12 @@ function getRouteDayCount(routeNodes: RouteNodeSegment[]) {
     return Math.max(...routeNodes.map((node) => node.routeDayOffset), 0) + 1;
 }
 
-function buildRouteSegments(circulation: InferredCirculation) {
+function buildRouteSegments(circulation: TrainCirculation) {
     const routeNodes: RouteNodeSegment[] = [];
     const routeDays: RouteDaySegment[] = [];
-    let currentRouteDayOffset = 0;
 
     circulation.nodes.forEach((node, index) => {
-        if (index > 0) {
-            const previousNode = circulation.nodes[index - 1] ?? null;
-            const previousReference =
-                getShanghaiDayOffsetSeconds(previousNode?.endAt ?? null) ??
-                getShanghaiDayOffsetSeconds(previousNode?.startAt ?? null);
-            const currentReference =
-                getShanghaiDayOffsetSeconds(node.startAt) ??
-                getShanghaiDayOffsetSeconds(node.endAt);
-
-            if (
-                previousReference !== null &&
-                currentReference !== null &&
-                currentReference < previousReference
-            ) {
-                currentRouteDayOffset += 1;
-            }
-        }
+        const currentRouteDayOffset = getRouteDayOffset(node.startAt);
 
         const routeNode: RouteNodeSegment = {
             key: buildRouteNodeKey(node, index),
@@ -224,12 +210,9 @@ function buildRouteSegments(circulation: InferredCirculation) {
         routeDay.representativeNode =
             routeDay.nodes
                 .filter((node) => node.primaryTrainCode.length > 0)
-                .filter((node) => node.node.startAt !== null)
                 .sort((left, right) => {
-                    const leftStartAt =
-                        left.node.startAt ?? Number.MAX_SAFE_INTEGER;
-                    const rightStartAt =
-                        right.node.startAt ?? Number.MAX_SAFE_INTEGER;
+                    const leftStartAt = left.node.startAt;
+                    const rightStartAt = right.node.startAt;
 
                     if (leftStartAt !== rightStartAt) {
                         return leftStartAt - rightStartAt;
@@ -341,8 +324,7 @@ async function fetchEmuHistoryRecords(
 
 function matchEmuRecordToRouteNode(
     record: HydratedEmuHistoryRecord,
-    routeNodes: RouteNodeSegment[],
-    todayDayBucket: number
+    routeNodes: RouteNodeSegment[]
 ): EmuNodeHistoryHit | null {
     if (record.startAt === null) {
         return null;
@@ -370,24 +352,14 @@ function matchEmuRecordToRouteNode(
         return null;
     }
 
-    const recordDayOffsetFromToday =
-        getShanghaiDayBucket(record.startAt) - todayDayBucket;
-
     const matchedCandidates: EmuNodeHistoryCandidate[] = [];
+    const recordDayStartAt = getShanghaiDayStartUnixSecondsByBucket(
+        getShanghaiDayBucket(record.startAt)
+    );
 
     for (const node of candidateNodes) {
-        const templateStartAt = node.node.startAt ?? node.node.endAt;
-        if (templateStartAt === null) {
-            continue;
-        }
-
-        const predictedStartAt = shiftTimestamp(
-            templateStartAt,
-            recordDayOffsetFromToday
-        );
-        if (predictedStartAt === null) {
-            continue;
-        }
+        const predictedStartAt =
+            recordDayStartAt + (node.node.startAt % DAY_SECONDS);
 
         matchedCandidates.push({
             node,
@@ -453,14 +425,7 @@ function getAlignedTemplateDayShift(anchor: RouteAnchor) {
     const matchedNodeReferenceTimestamp = getRouteNodeReferenceTimestamp(
         anchor.matchedNode
     );
-    if (matchedNodeReferenceTimestamp === null) {
-        return null;
-    }
-
-    return (
-        getShanghaiDayBucket(anchor.matchedRecordStartAt) -
-        getShanghaiDayBucket(matchedNodeReferenceTimestamp)
-    );
+    return anchor.matchedRecordStartAt - matchedNodeReferenceTimestamp;
 }
 
 function buildEmuPredictedNodes(
@@ -468,25 +433,20 @@ function buildEmuPredictedNodes(
     anchor: RouteAnchor,
     nowUnixSeconds: number
 ) {
-    const templateDayShift = getAlignedTemplateDayShift(anchor);
-    if (templateDayShift === null) {
-        return [];
-    }
+    const routeBaseUnixSeconds = getAlignedTemplateDayShift(anchor);
 
     return routeNodes
         .filter(
             (node) => node.routeNodeIndex > anchor.progress.currentNodeIndex
         )
         .map((node) => {
-            const templateRouteDayOffset =
-                node.routeDayOffset - anchor.progress.currentRouteDayOffset;
-            const predictedStartAt = shiftTimestamp(
-                node.node.startAt,
-                templateDayShift + templateRouteDayOffset
+            const predictedStartAt = buildAbsoluteTimestampFromRouteBase(
+                routeBaseUnixSeconds,
+                node.node.startAt
             );
-            const predictedEndAt = shiftTimestamp(
-                node.node.endAt,
-                templateDayShift + templateRouteDayOffset
+            const predictedEndAt = buildAbsoluteTimestampFromRouteBase(
+                routeBaseUnixSeconds,
+                node.node.endAt
             );
             return buildPredictionNode(
                 node,
@@ -629,28 +589,20 @@ function buildHistoryByDayBucket(runs: TrainHistoryRun[]) {
 function buildTrainAlignedTimestamps(
     firstRouteNode: RouteNodeSegment,
     node: RouteNodeSegment,
-    firstNodeHistoryDayBucket: number
+    firstNodeHistoryStartAt: number
 ) {
-    const firstRouteNodeReferenceTimestamp =
-        getRouteNodeReferenceTimestamp(firstRouteNode);
-    if (firstRouteNodeReferenceTimestamp === null) {
-        return {
-            predictedStartAt: null,
-            predictedEndAt: null
-        };
-    }
-
-    const firstRouteNodeTemplateDayBucket = getShanghaiDayBucket(
-        firstRouteNodeReferenceTimestamp
-    );
-    const alignedDayOffset =
-        firstNodeHistoryDayBucket -
-        firstRouteNodeTemplateDayBucket +
-        (node.routeDayOffset - firstRouteNode.routeDayOffset);
+    const routeBaseUnixSeconds =
+        firstNodeHistoryStartAt - firstRouteNode.node.startAt;
 
     return {
-        predictedStartAt: shiftTimestamp(node.node.startAt, alignedDayOffset),
-        predictedEndAt: shiftTimestamp(node.node.endAt, alignedDayOffset)
+        predictedStartAt: buildAbsoluteTimestampFromRouteBase(
+            routeBaseUnixSeconds,
+            node.node.startAt
+        ),
+        predictedEndAt: buildAbsoluteTimestampFromRouteBase(
+            routeBaseUnixSeconds,
+            node.node.endAt
+        )
     };
 }
 
@@ -667,7 +619,7 @@ function findTrainCurrentCycleAnchorCandidate(
                     buildTrainAlignedTimestamps(
                         firstRouteNode,
                         targetNode,
-                        firstNodeHistoryDayBucket
+                        firstNodeHistoryRun.startAt
                     );
                 const predictedReferenceTimestamp =
                     getPredictedReferenceTimestamp(
@@ -815,13 +767,13 @@ function buildTrainPredictedEmus(
         todayDayBucket + anchor.currentRouteDayNumber - 1;
 
     return [...anchor.historyByDayBucket.entries()]
-        .flatMap(([anchorDayBucket, historyRun]) =>
+        .flatMap(([, historyRun]) =>
             targetNodes.map((node) => {
                 const { predictedStartAt, predictedEndAt } =
                     buildTrainAlignedTimestamps(
                         anchor.firstRouteNode,
                         node,
-                        anchorDayBucket
+                        historyRun.startAt
                     );
                 const predictedReferenceTimestamp =
                     getPredictedReferenceTimestamp(
@@ -970,9 +922,7 @@ async function resolveEmuAnchor(
     );
 
     const matchedHistoryHits = historyRecords
-        .map((record) =>
-            matchEmuRecordToRouteNode(record, routeNodes, todayDayBucket)
-        )
+        .map((record) => matchEmuRecordToRouteNode(record, routeNodes))
         .filter((hit): hit is EmuNodeHistoryHit => hit !== null)
         .sort((left, right) => {
             const leftStartAt = left.record.startAt ?? Number.MIN_SAFE_INTEGER;
@@ -1060,7 +1010,7 @@ export default function useFutureAssignmentPrediction(
                 normalizedSourceCode.value,
                 normalizedAnchorTrainCode.value,
                 timetableState.value,
-                timetable.value?.inferredCirculation?.routeId ?? ''
+                timetable.value?.circulation?.metadata?.routeId ?? ''
             ] as const,
         async ([
             isActive,
@@ -1107,7 +1057,7 @@ export default function useFutureAssignmentPrediction(
                 return;
             }
 
-            const circulation = timetable.value.inferredCirculation;
+            const circulation = timetable.value.circulation;
             if (!circulation || circulation.nodes.length === 0) {
                 localState.value = 'success';
                 predictionState.value = 'no_circulation';
@@ -1222,12 +1172,12 @@ export default function useFutureAssignmentPrediction(
     );
 
     const displayAnchorNode = computed(() => {
-        if (!timetable.value?.inferredCirculation || !displayAnchor.value) {
+        if (!timetable.value?.circulation || !displayAnchor.value) {
             return null;
         }
 
         return (
-            timetable.value.inferredCirculation.nodes[
+            timetable.value.circulation.nodes[
                 displayAnchor.value.routeNodeIndex
             ] ?? null
         );
