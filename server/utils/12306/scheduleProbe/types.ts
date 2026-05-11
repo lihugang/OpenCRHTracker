@@ -1,3 +1,5 @@
+import type { TrainCirculationNode } from '~/types/lookup';
+
 export interface ScheduleProbePrefixRule {
     prefix: string;
     minNo: number;
@@ -82,9 +84,24 @@ export interface ScheduleState {
     generatedAt: number;
 }
 
+export interface ScheduleRouteRefreshQueueEntry {
+    trainCode: string;
+    serviceDate: string;
+    enqueuedAt: number;
+}
+
+export interface ScheduleCirculationEntry {
+    refreshedAt: number;
+    nodes: TrainCirculationNode[];
+}
+
+export type ScheduleCirculationMap = Record<string, ScheduleCirculationEntry>;
+
 export interface ScheduleDocument {
     $schema: string;
-    version: 4;
+    version: 5;
+    circulation: ScheduleCirculationMap;
+    routeRefreshQueue: ScheduleRouteRefreshQueueEntry[];
     published: ScheduleState | null;
     building: ScheduleState | null;
 }

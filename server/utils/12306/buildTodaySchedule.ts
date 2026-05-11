@@ -7,6 +7,7 @@ import { ensureAssetFile } from '~/server/utils/dataAssets/store';
 import runScheduleProbe from './scheduleProbe/runner';
 import { getGroupKey } from './scheduleProbe/taskHelpers';
 import {
+    appendRouteRefreshQueueTrainCodes,
     createInitialScheduleDocument,
     loadOrInitBuildingScheduleState,
     loadPublishedScheduleState,
@@ -75,6 +76,7 @@ function listConfirmedTrainCodesFromBuildState(state: ScheduleState) {
 
 function syncBuildConfirmedTimetableHistory(
     logger: ReturnType<typeof getLogger>,
+    scheduleFilePath: string,
     promotedState: ScheduleState,
     confirmedTrainCodes: string[]
 ) {
@@ -85,6 +87,15 @@ function syncBuildConfirmedTimetableHistory(
     );
     logger.info(
         `history_sync date=${promotedState.date} confirmedGroups=${syncResult.confirmedGroups} confirmedTrainCodes=${syncResult.confirmedTrainCodes} skippedGroups=${syncResult.skippedGroups} createdContents=${syncResult.createdContents} insertedCoverages=${syncResult.insertedCoverages} updatedCoverages=${syncResult.updatedCoverages} deletedCoverages=${syncResult.deletedCoverages} noopedCoverages=${syncResult.noopedCoverages}`
+    );
+    const appendedQueueEntries = appendRouteRefreshQueueTrainCodes(
+        scheduleFilePath,
+        promotedState.date,
+        syncResult.routeRefreshTrainCodes,
+        promotedState.generatedAt
+    );
+    logger.info(
+        `route_refresh_queue_sync date=${promotedState.date} candidates=${syncResult.routeRefreshTrainCodes.length} appended=${appendedQueueEntries.length}`
     );
 
     const timetableIdSyncResult = syncCurrentDayTimetableIdsForTrainCodes(
@@ -150,6 +161,7 @@ export default async function buildTodaySchedule(): Promise<BuildScheduleResult>
         );
         syncBuildConfirmedTimetableHistory(
             logger,
+            scheduleFilePath,
             promotedState,
             confirmedTrainCodes
         );
@@ -184,6 +196,7 @@ export default async function buildTodaySchedule(): Promise<BuildScheduleResult>
     const promotedState = promoteBuildingScheduleState(scheduleFilePath, state);
     syncBuildConfirmedTimetableHistory(
         logger,
+        scheduleFilePath,
         promotedState,
         confirmedTrainCodes
     );

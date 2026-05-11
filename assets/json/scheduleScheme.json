@@ -10,7 +10,19 @@
         },
         "version": {
             "type": "integer",
-            "const": 4
+            "const": 5
+        },
+        "circulation": {
+            "type": "object",
+            "additionalProperties": {
+                "$ref": "#/definitions/circulationEntry"
+            }
+        },
+        "routeRefreshQueue": {
+            "type": "array",
+            "items": {
+                "$ref": "#/definitions/routeRefreshQueueEntry"
+            }
         },
         "published": {
             "anyOf": [
@@ -228,6 +240,90 @@
                 "durationMs"
             ]
         },
+        "routeRefreshQueueEntry": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "trainCode": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "serviceDate": {
+                    "type": "string",
+                    "pattern": "^[0-9]{8}$"
+                },
+                "enqueuedAt": {
+                    "type": "integer",
+                    "minimum": 0
+                }
+            },
+            "required": [
+                "trainCode",
+                "serviceDate",
+                "enqueuedAt"
+            ]
+        },
+        "circulationNode": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "internalCode": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "allCodes": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "minLength": 1
+                    }
+                },
+                "startStation": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "endStation": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "startAt": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "endAt": {
+                    "type": "integer",
+                    "minimum": 0
+                }
+            },
+            "required": [
+                "internalCode",
+                "allCodes",
+                "startStation",
+                "endStation",
+                "startAt",
+                "endAt"
+            ]
+        },
+        "circulationEntry": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "refreshedAt": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "nodes": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/circulationNode"
+                    }
+                }
+            },
+            "required": [
+                "refreshedAt",
+                "nodes"
+            ]
+        },
         "scheduleState": {
             "type": "object",
             "additionalProperties": false,
@@ -383,6 +479,8 @@
     "required": [
         "$schema",
         "version",
+        "circulation",
+        "routeRefreshQueue",
         "published",
         "building"
     ]

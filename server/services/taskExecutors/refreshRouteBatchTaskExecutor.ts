@@ -17,6 +17,7 @@ import {
 } from '~/server/utils/12306/scheduleProbe/taskHelpers';
 import { toScheduleStops } from '~/server/utils/12306/scheduleProbe/mapRouteStops';
 import {
+    appendRouteRefreshQueueTrainCodes,
     loadPublishedScheduleState,
     savePublishedScheduleState
 } from '~/server/utils/12306/scheduleProbe/stateStore';
@@ -338,6 +339,15 @@ async function executeRefreshRouteBatchTaskInternal(rawArgs: unknown) {
                     );
                 logger.info(
                     `history_sync date=${latestState.date} confirmedGroups=${syncResult.confirmedGroups} confirmedTrainCodes=${syncResult.confirmedTrainCodes} skippedGroups=${syncResult.skippedGroups} createdContents=${syncResult.createdContents} insertedCoverages=${syncResult.insertedCoverages} updatedCoverages=${syncResult.updatedCoverages} deletedCoverages=${syncResult.deletedCoverages} noopedCoverages=${syncResult.noopedCoverages}`
+                );
+                const appendedQueueEntries = appendRouteRefreshQueueTrainCodes(
+                    scheduleFilePath,
+                    latestState.date,
+                    syncResult.routeRefreshTrainCodes,
+                    getNowSeconds()
+                );
+                logger.info(
+                    `route_refresh_queue_sync date=${latestState.date} candidates=${syncResult.routeRefreshTrainCodes.length} appended=${appendedQueueEntries.length}`
                 );
                 const timetableIdSyncResult =
                     syncCurrentDayTimetableIdsForTrainCodes(

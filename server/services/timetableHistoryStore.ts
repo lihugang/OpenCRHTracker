@@ -75,6 +75,7 @@ export interface TimetableHistorySyncResult {
     updatedCoverages: number;
     deletedCoverages: number;
     noopedCoverages: number;
+    routeRefreshTrainCodes: string[];
 }
 
 interface SyncCoverageStats {
@@ -413,7 +414,7 @@ function syncCoverageForTrainCode(
     contentId: number,
     nowSeconds: number,
     stats: SyncCoverageStats
-) {
+): boolean {
     const currentRow =
         timetableHistoryStatements.get<TimetableHistoryCoverageRow>(
             'selectLatestCoverageByTrainCodeAtOrBeforeDate',
@@ -431,7 +432,7 @@ function syncCoverageForTrainCode(
             stats
         );
         normalizeAdjacentCoverages(trainCode, nowSeconds, stats);
-        return;
+        return true;
     }
 
     if (
@@ -440,13 +441,13 @@ function syncCoverageForTrainCode(
     ) {
         if (currentRow.content_id === contentId) {
             stats.noopedCoverages += 1;
-            return;
+            return false;
         }
 
         if (currentRow.service_date_start === serviceDate) {
             updateCoverageContent(currentRow.id, contentId, nowSeconds, stats);
             normalizeAdjacentCoverages(trainCode, nowSeconds, stats);
-            return;
+            return true;
         }
 
         updateCoverageEnd(currentRow.id, serviceDate, nowSeconds, stats);
@@ -459,7 +460,7 @@ function syncCoverageForTrainCode(
             stats
         );
         normalizeAdjacentCoverages(trainCode, nowSeconds, stats);
-        return;
+        return true;
     }
 
     if (
@@ -468,7 +469,7 @@ function syncCoverageForTrainCode(
     ) {
         updateCoverageEnd(currentRow.id, nextServiceDate, nowSeconds, stats);
         normalizeAdjacentCoverages(trainCode, nowSeconds, stats);
-        return;
+        return false;
     }
 
     insertCoverage(
@@ -480,6 +481,7 @@ function syncCoverageForTrainCode(
         stats
     );
     normalizeAdjacentCoverages(trainCode, nowSeconds, stats);
+    return true;
 }
 
 export function syncConfirmedTimetableHistoryForPublishedState(
@@ -497,7 +499,8 @@ export function syncConfirmedTimetableHistoryForPublishedState(
         insertedCoverages: 0,
         updatedCoverages: 0,
         deletedCoverages: 0,
-        noopedCoverages: 0
+        noopedCoverages: 0,
+        routeRefreshTrainCodes: []
     };
 
     if (normalizedConfirmedTrainCodes.length === 0) {
@@ -564,6 +567,7 @@ export function syncConfirmedTimetableHistoryForPublishedState(
                 nowSeconds,
                 result
             );
+            let groupContentChanged = false;
 
             for (const aliasCode of aliasCodes) {
                 const normalizedAliasCode = normalizeCode(aliasCode);
@@ -571,16 +575,25 @@ export function syncConfirmedTimetableHistoryForPublishedState(
                     continue;
                 }
 
-                syncCoverageForTrainCode(
-                    normalizedAliasCode,
-                    serviceDate,
-                    nextServiceDate,
-                    contentRow.id,
-                    nowSeconds,
-                    result
-                );
+                if (
+                    syncCoverageForTrainCode(
+                        normalizedAliasCode,
+                        serviceDate,
+                        nextServiceDate,
+                        contentRow.id,
+                        nowSeconds,
+                        result
+                    )
+                ) {
+                    groupContentChanged = true;
+                }
             }
 
+            if (groupContentChanged) {
+                result.routeRefreshTrainCodes.push(
+                    normalizeCode(representativeItem.code)
+                );
+            }
             result.confirmedGroups += 1;
         }
     });

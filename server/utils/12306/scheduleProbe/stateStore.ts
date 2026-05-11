@@ -5,8 +5,11 @@ import normalizeCode from '../normalizeCode';
 import uniqueNormalizedCodes from '../uniqueNormalizedCodes';
 import { getInitialKeywords } from './prefixTree';
 import type {
+    ScheduleCirculationEntry,
+    ScheduleCirculationMap,
     ScheduleDocument,
     ScheduleItem,
+    ScheduleRouteRefreshQueueEntry,
     ScheduleStop,
     ScheduleState,
     ScheduleProbeRuntimeConfig
@@ -28,16 +31,248 @@ interface LoadedBuildingScheduleState {
 }
 
 const SCHEDULE_SCHEMA_RELATIVE_PATH = '../assets/json/scheduleScheme.json';
-const CURRENT_SCHEDULE_DOCUMENT_VERSION = 4;
+const CURRENT_SCHEDULE_DOCUMENT_VERSION = 5;
 
 function cloneScheduleState(state: ScheduleState): ScheduleState {
     return JSON.parse(JSON.stringify(state)) as ScheduleState;
+}
+
+function cloneRouteRefreshQueue(
+    queue: ScheduleRouteRefreshQueueEntry[]
+): ScheduleRouteRefreshQueueEntry[] {
+    return JSON.parse(JSON.stringify(queue)) as ScheduleRouteRefreshQueueEntry[];
+}
+
+function cloneScheduleCirculationEntry(
+    entry: ScheduleCirculationEntry
+): ScheduleCirculationEntry {
+    return JSON.parse(JSON.stringify(entry)) as ScheduleCirculationEntry;
+}
+
+function cloneScheduleCirculationMap(
+    circulation: ScheduleCirculationMap
+): ScheduleCirculationMap {
+    return JSON.parse(JSON.stringify(circulation)) as ScheduleCirculationMap;
 }
 
 function compareRefreshTime(left: number | null, right: number | null): number {
     const normalizedLeft = left ?? -1;
     const normalizedRight = right ?? -1;
     return normalizedLeft - normalizedRight;
+}
+
+function normalizeRouteRefreshQueueEntry(
+    value: unknown
+): ScheduleRouteRefreshQueueEntry | null {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+        return null;
+    }
+
+    const row = value as Partial<ScheduleRouteRefreshQueueEntry>;
+    const trainCode = normalizeCode(String(row.trainCode ?? ''));
+    const serviceDate =
+        typeof row.serviceDate === 'string' ? row.serviceDate.trim() : '';
+    const enqueuedAt = row.enqueuedAt;
+
+    if (
+        trainCode.length === 0 ||
+        !/^\d{8}$/.test(serviceDate) ||
+        typeof enqueuedAt !== 'number' ||
+        !Number.isInteger(enqueuedAt) ||
+        enqueuedAt < 0
+    ) {
+        return null;
+    }
+
+    return {
+        trainCode,
+        serviceDate,
+        enqueuedAt
+    };
+}
+
+function normalizeRouteRefreshQueue(
+    value: unknown
+): {
+    queue: ScheduleRouteRefreshQueueEntry[];
+    migrated: boolean;
+} {
+    if (!Array.isArray(value)) {
+        return {
+            queue: [],
+            migrated: true
+        };
+    }
+
+    let migrated = false;
+    const deduplication = new Set<string>();
+    const queue: ScheduleRouteRefreshQueueEntry[] = [];
+
+    for (const item of value) {
+        const normalized = normalizeRouteRefreshQueueEntry(item);
+        if (!normalized) {
+            migrated = true;
+            continue;
+        }
+
+        const dedupeKey = `${normalized.serviceDate}:${normalized.trainCode}`;
+        if (deduplication.has(dedupeKey)) {
+            migrated = true;
+            continue;
+        }
+
+        deduplication.add(dedupeKey);
+        queue.push(normalized);
+    }
+
+    return {
+        queue,
+        migrated
+    };
+}
+
+function normalizeScheduleCirculationNode(value: unknown) {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+        return null;
+    }
+
+    const row = value as {
+        internalCode?: unknown;
+        allCodes?: unknown;
+        startStation?: unknown;
+        endStation?: unknown;
+        startAt?: unknown;
+        endAt?: unknown;
+    };
+    const internalCode = normalizeCode(String(row.internalCode ?? ''));
+    const startStation =
+        typeof row.startStation === 'string' ? row.startStation.trim() : '';
+    const endStation =
+        typeof row.endStation === 'string' ? row.endStation.trim() : '';
+    const startAt = row.startAt;
+    const endAt = row.endAt;
+
+    if (
+        internalCode.length === 0 ||
+        startStation.length === 0 ||
+        endStation.length === 0 ||
+        typeof startAt !== 'number' ||
+        !Number.isInteger(startAt) ||
+        startAt < 0 ||
+        typeof endAt !== 'number' ||
+        !Number.isInteger(endAt) ||
+        endAt < 0
+    ) {
+        return null;
+    }
+
+    const allCodes = uniqueNormalizedCodes(
+        Array.isArray(row.allCodes)
+            ? [
+                  ...row.allCodes.filter(
+                      (code): code is string => typeof code === 'string'
+                  )
+              ]
+            : []
+    );
+    if (allCodes.length === 0) {
+        return null;
+    }
+
+    return {
+        internalCode,
+        allCodes,
+        startStation,
+        endStation,
+        startAt,
+        endAt
+    };
+}
+
+function getScheduleCirculationKeyFromEntry(
+    entry: Pick<ScheduleCirculationEntry, 'nodes'>
+): string {
+    return normalizeCode(entry.nodes[0]?.internalCode ?? '');
+}
+
+function normalizeScheduleCirculationEntry(
+    key: string,
+    value: unknown
+): ScheduleCirculationEntry | null {
+    const normalizedKey = normalizeCode(key);
+    if (
+        normalizedKey.length === 0 ||
+        typeof value !== 'object' ||
+        value === null ||
+        Array.isArray(value)
+    ) {
+        return null;
+    }
+
+    const row = value as Partial<ScheduleCirculationEntry>;
+    const refreshedAt = row.refreshedAt;
+    if (
+        typeof refreshedAt !== 'number' ||
+        !Number.isInteger(refreshedAt) ||
+        refreshedAt < 0 ||
+        !Array.isArray(row.nodes)
+    ) {
+        return null;
+    }
+
+    const nodes = row.nodes
+        .map((node) => normalizeScheduleCirculationNode(node))
+        .filter((node): node is ScheduleCirculationEntry['nodes'][number] =>
+            node !== null
+        );
+    if (nodes.length !== row.nodes.length || nodes.length === 0) {
+        return null;
+    }
+
+    if (getScheduleCirculationKeyFromEntry({ nodes }) !== normalizedKey) {
+        return null;
+    }
+
+    return {
+        refreshedAt,
+        nodes
+    };
+}
+
+function normalizeScheduleCirculation(
+    value: unknown
+): {
+    circulation: ScheduleCirculationMap;
+    migrated: boolean;
+} {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+        return {
+            circulation: {},
+            migrated: true
+        };
+    }
+
+    let migrated = false;
+    const circulation: ScheduleCirculationMap = {};
+    for (const [key, entry] of Object.entries(value)) {
+        const normalizedEntry = normalizeScheduleCirculationEntry(key, entry);
+        if (!normalizedEntry) {
+            migrated = true;
+            continue;
+        }
+
+        const normalizedKey =
+            getScheduleCirculationKeyFromEntry(normalizedEntry);
+        if (normalizedKey !== key) {
+            migrated = true;
+        }
+        circulation[normalizedKey] = normalizedEntry;
+    }
+
+    return {
+        circulation,
+        migrated
+    };
 }
 
 function ensureScheduleItem(
@@ -320,12 +555,22 @@ function parseScheduleDocument(value: unknown): {
     const document = value as Record<string, unknown>;
     const version =
         typeof document.version === 'number' ? document.version : undefined;
-    if (version !== 3 && version !== CURRENT_SCHEDULE_DOCUMENT_VERSION) {
+    if (
+        version !== 3 &&
+        version !== 4 &&
+        version !== CURRENT_SCHEDULE_DOCUMENT_VERSION
+    ) {
         return {
             document: null,
             migrated: false
         };
     }
+    const normalizedQueue = normalizeRouteRefreshQueue(
+        document.routeRefreshQueue
+    );
+    const normalizedCirculation = normalizeScheduleCirculation(
+        document.circulation
+    );
     const publishedNeedsMigration =
         document.published !== null &&
         typeof document.published !== 'undefined' &&
@@ -336,6 +581,8 @@ function parseScheduleDocument(value: unknown): {
         scheduleStateNeedsRouteMetadataMigration(document.building);
     const migrated =
         version !== CURRENT_SCHEDULE_DOCUMENT_VERSION ||
+        normalizedCirculation.migrated ||
+        normalizedQueue.migrated ||
         publishedNeedsMigration ||
         buildingNeedsMigration;
 
@@ -371,6 +618,8 @@ function parseScheduleDocument(value: unknown): {
         document: {
             $schema: SCHEDULE_SCHEMA_RELATIVE_PATH,
             version: CURRENT_SCHEDULE_DOCUMENT_VERSION,
+            circulation: normalizedCirculation.circulation,
+            routeRefreshQueue: normalizedQueue.queue,
             published,
             building
         },
@@ -513,9 +762,64 @@ export function createInitialScheduleDocument(): ScheduleDocument {
     return {
         $schema: SCHEDULE_SCHEMA_RELATIVE_PATH,
         version: CURRENT_SCHEDULE_DOCUMENT_VERSION,
+        circulation: {},
+        routeRefreshQueue: [],
         published: null,
         building: null
     };
+}
+
+export function appendRouteRefreshQueueTrainCodes(
+    scheduleFilePath: string,
+    serviceDate: string,
+    trainCodes: readonly string[],
+    enqueuedAt: number
+): ScheduleRouteRefreshQueueEntry[] {
+    if (
+        !/^\d{8}$/.test(serviceDate) ||
+        !Number.isInteger(enqueuedAt) ||
+        enqueuedAt < 0
+    ) {
+        return [];
+    }
+
+    const normalizedTrainCodes = uniqueNormalizedCodes([...trainCodes]);
+    if (normalizedTrainCodes.length === 0) {
+        return [];
+    }
+
+    const document =
+        loadScheduleDocument(scheduleFilePath) ??
+        createInitialScheduleDocument();
+    const existingQueue = cloneRouteRefreshQueue(document.routeRefreshQueue);
+    const existingKeys = new Set(
+        existingQueue.map((item) => `${item.serviceDate}:${item.trainCode}`)
+    );
+    const appendedEntries: ScheduleRouteRefreshQueueEntry[] = [];
+
+    for (const trainCode of normalizedTrainCodes) {
+        const dedupeKey = `${serviceDate}:${trainCode}`;
+        if (existingKeys.has(dedupeKey)) {
+            continue;
+        }
+
+        const entry: ScheduleRouteRefreshQueueEntry = {
+            trainCode,
+            serviceDate,
+            enqueuedAt
+        };
+        existingQueue.push(entry);
+        existingKeys.add(dedupeKey);
+        appendedEntries.push(entry);
+    }
+
+    if (appendedEntries.length === 0) {
+        return [];
+    }
+
+    document.routeRefreshQueue = existingQueue;
+    saveScheduleDocument(scheduleFilePath, document);
+    return appendedEntries;
 }
 
 export function loadScheduleDocument(
@@ -549,6 +853,7 @@ export function saveScheduleDocument(
 ): void {
     document.$schema = SCHEDULE_SCHEMA_RELATIVE_PATH;
     document.version = CURRENT_SCHEDULE_DOCUMENT_VERSION;
+    document.circulation = cloneScheduleCirculationMap(document.circulation);
     const absolutePath = path.resolve(scheduleFilePath);
     const directory = path.dirname(absolutePath);
     fs.mkdirSync(directory, { recursive: true });
@@ -564,6 +869,53 @@ export function loadPublishedScheduleState(
 ): ScheduleState | null {
     const document = loadScheduleDocument(scheduleFilePath);
     return document?.published ? cloneScheduleState(document.published) : null;
+}
+
+export function loadScheduleCirculationMap(
+    scheduleFilePath: string
+): ScheduleCirculationMap {
+    const document = loadScheduleDocument(scheduleFilePath);
+    return document ? cloneScheduleCirculationMap(document.circulation) : {};
+}
+
+export function loadScheduleCirculationEntry(
+    scheduleFilePath: string,
+    internalCode: string
+): ScheduleCirculationEntry | null {
+    const normalizedInternalCode = normalizeCode(internalCode);
+    if (normalizedInternalCode.length === 0) {
+        return null;
+    }
+
+    const document = loadScheduleDocument(scheduleFilePath);
+    const entry = document?.circulation[normalizedInternalCode];
+    return entry ? cloneScheduleCirculationEntry(entry) : null;
+}
+
+export function saveScheduleCirculationEntry(
+    scheduleFilePath: string,
+    entry: ScheduleCirculationEntry
+): string | null {
+    const normalizedEntry = normalizeScheduleCirculationEntry(
+        getScheduleCirculationKeyFromEntry(entry),
+        entry
+    );
+    if (!normalizedEntry) {
+        return null;
+    }
+
+    const normalizedKey = getScheduleCirculationKeyFromEntry(normalizedEntry);
+    if (normalizedKey.length === 0) {
+        return null;
+    }
+
+    const document =
+        loadScheduleDocument(scheduleFilePath) ??
+        createInitialScheduleDocument();
+    document.circulation[normalizedKey] =
+        cloneScheduleCirculationEntry(normalizedEntry);
+    saveScheduleDocument(scheduleFilePath, document);
+    return normalizedKey;
 }
 
 export function loadActiveScheduleState(
