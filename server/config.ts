@@ -76,6 +76,10 @@ interface CirculationTaskConfig {
     batchSize: number;
     threshold: number;
     dailyTimesHHmm: string[];
+    stationBoard: {
+        maxAttempts: number;
+        retryDelaySeconds: number;
+    };
 }
 
 interface LoggingConfig {
@@ -787,6 +791,12 @@ function validateConfig(raw: unknown): Config {
         'task.referenceModel'
     );
     const taskCirculation = asObject(task.circulation, 'task.circulation');
+    const taskCirculationStationBoard = asObject(
+        taskCirculation.stationBoard === undefined
+            ? {}
+            : taskCirculation.stationBoard,
+        'task.circulation.stationBoard'
+    );
     const taskScheduler = asObject(task.scheduler, 'task.scheduler');
     const taskSchedulerIdle = asObject(
         taskScheduler.idle,
@@ -1417,7 +1427,24 @@ function validateConfig(raw: unknown): Config {
                 dailyTimesHHmm: parseDailyTimesHHmm(
                     taskCirculation.dailyTimesHHmm,
                     'task.circulation.dailyTimesHHmm'
-                )
+                ),
+                stationBoard: {
+                    maxAttempts: asInteger(
+                        taskCirculationStationBoard.maxAttempts === undefined
+                            ? 5
+                            : taskCirculationStationBoard.maxAttempts,
+                        'task.circulation.stationBoard.maxAttempts',
+                        1
+                    ),
+                    retryDelaySeconds: asInteger(
+                        taskCirculationStationBoard.retryDelaySeconds ===
+                            undefined
+                            ? 30 * 60
+                            : taskCirculationStationBoard.retryDelaySeconds,
+                        'task.circulation.stationBoard.retryDelaySeconds',
+                        0
+                    )
+                }
             },
             scheduler: {
                 pollIntervalMs: asInteger(
@@ -1698,6 +1725,10 @@ function validateConfig(raw: unknown): Config {
         configResult.task.circulation.threshold > 0 &&
             configResult.task.circulation.threshold <= 1,
         'task.circulation.threshold must be > 0 and <= 1'
+    );
+    assert(
+        configResult.task.circulation.stationBoard.maxAttempts >= 1,
+        'task.circulation.stationBoard.maxAttempts must be >= 1'
     );
     for (const key of ['EMUList', 'QRCode', 'qrcodeDetection'] as const) {
         const asset = configResult.data.assets[key];

@@ -8,6 +8,7 @@ import {
     getNextDayExecutionTimeInShanghaiSeconds
 } from '~/server/utils/date/shanghaiDateTime';
 import { DISPATCH_DAILY_PROBE_TASKS_EXECUTOR } from '~/server/services/taskExecutors/dispatchDailyProbeTasksExecutor';
+import { DISPATCH_STATION_BOARD_TASKS_EXECUTOR } from '~/server/services/taskExecutors/dispatchStationBoardTasksExecutor';
 
 export const BUILD_SCHEDULE_TASK_EXECUTOR = 'build_today_schedule';
 
@@ -54,6 +55,14 @@ async function executeBuildScheduleTask() {
                 );
                 logger.info(
                     `enqueued_dispatch_daily_probe_task id=${dispatchTaskId} executor=${DISPATCH_DAILY_PROBE_TASKS_EXECUTOR}`
+                );
+                const stationBoardTaskId = enqueueTask(
+                    DISPATCH_STATION_BOARD_TASKS_EXECUTOR,
+                    {},
+                    Math.floor(Date.now() / 1000)
+                );
+                logger.info(
+                    `enqueued_dispatch_station_board_task id=${stationBoardTaskId} executor=${DISPATCH_STATION_BOARD_TASKS_EXECUTOR}`
                 );
             }
             enqueueNextDailyBuildTask();

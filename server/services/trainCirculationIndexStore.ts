@@ -8,6 +8,7 @@ import {
     getTodayScheduleProbeGroups,
     getTodayScheduleTimetableByTrainCode
 } from '~/server/services/todayScheduleCache';
+import { loadScheduleCirculationEntry } from '~/server/utils/12306/scheduleProbe/stateStore';
 import { getRelativeDateString } from '~/server/utils/date/getCurrentDateString';
 import {
     getShanghaiDayStartUnixSeconds,
@@ -365,8 +366,7 @@ function rotateRouteNodeIdsByEarliestStartAt(
 
         if (
             timing.startAt < anchorStartAt ||
-            (timing.startAt === anchorStartAt &&
-                timing.endAt < anchorEndAt) ||
+            (timing.startAt === anchorStartAt && timing.endAt < anchorEndAt) ||
             (timing.startAt === anchorStartAt &&
                 timing.endAt === anchorEndAt &&
                 timing.trainCode.localeCompare(anchorTrainCode) < 0)
@@ -576,7 +576,9 @@ function buildPublicCirculationNodes(
 
         const previousNode = circulation.nodes[index - 1] ?? null;
         const previousTimetable =
-            previousNode === null ? null : resolvePublicNodeTimetable(previousNode);
+            previousNode === null
+                ? null
+                : resolvePublicNodeTimetable(previousNode);
         if (previousNode && !previousTimetable) {
             return null;
         }
@@ -597,7 +599,9 @@ function buildPublicCirculationNodes(
         const startDayOffsetSeconds = getShanghaiDayOffsetSeconds(
             timetable.startAt
         );
-        const endDayOffsetSeconds = getShanghaiDayOffsetSeconds(timetable.endAt);
+        const endDayOffsetSeconds = getShanghaiDayOffsetSeconds(
+            timetable.endAt
+        );
         const endDayShift =
             getShanghaiDayBucket(timetable.endAt) -
             getShanghaiDayBucket(timetable.startAt);
@@ -702,7 +706,8 @@ function buildCirculationsFromGraph(
             routeNodeIds.push(currentNodeId);
             visitedInRoute.set(currentNodeId, routeNodeIds.length - 1);
 
-            const outgoingEdges = outgoingEdgesByNodeId.get(currentNodeId) ?? [];
+            const outgoingEdges =
+                outgoingEdgesByNodeId.get(currentNodeId) ?? [];
             let nextEdge: EdgeStat | null = null;
             let closingEdge: EdgeStat | null = null;
 
@@ -987,6 +992,50 @@ export function getTrainCirculationByTrainCodes(
     return circulation
         ? toPublicTrainCirculation(circulation, activeCache.stats.rebuiltAt)
         : null;
+}
+
+function toPublicOfficialTrainCirculation(
+    trainInternalCode: string
+): TrainCirculation | null {
+    const normalizedInternalCode = normalizeCode(trainInternalCode);
+    if (normalizedInternalCode.length === 0) {
+        return null;
+    }
+
+    const entry = loadScheduleCirculationEntry(
+        useConfig().data.assets.schedule.file,
+        normalizedInternalCode
+    );
+    if (!entry) {
+        return null;
+    }
+
+    return {
+        source: 'official',
+        refreshAt: entry.refreshedAt,
+        nodes: entry.nodes.map((node) => ({
+            internalCode: node.internalCode,
+            allCodes: [...node.allCodes],
+            startStation: node.startStation,
+            endStation: node.endStation,
+            startAt: node.startAt,
+            endAt: node.endAt
+        }))
+    };
+}
+
+export function getPreferredTrainCirculation(input: {
+    trainInternalCode: string;
+    allCodes: string[];
+}): TrainCirculation | null {
+    const officialCirculation = toPublicOfficialTrainCirculation(
+        input.trainInternalCode
+    );
+    if (officialCirculation) {
+        return officialCirculation;
+    }
+
+    return getTrainCirculationByTrainCodes(input.allCodes);
 }
 
 export function invalidateTrainCirculationIndexCache() {

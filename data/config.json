@@ -301,7 +301,11 @@
             "threshold": 0.8,
             "dailyTimesHHmm": [
                 "0200"
-            ]
+            ],
+            "stationBoard": {
+                "maxAttempts": 5,
+                "retryDelaySeconds": 1800
+            }
         },
         "scheduler": {
             "pollIntervalMs": 180000,

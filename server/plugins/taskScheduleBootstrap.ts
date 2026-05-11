@@ -31,10 +31,12 @@ import {
 } from '~/server/services/taskExecutors/generateRouteRefreshTasksExecutor';
 import { registerRefreshRouteBatchTaskExecutor } from '~/server/services/taskExecutors/refreshRouteBatchTaskExecutor';
 import { registerDispatchDailyProbeTasksExecutor } from '~/server/services/taskExecutors/dispatchDailyProbeTasksExecutor';
+import { registerDispatchStationBoardTasksExecutor } from '~/server/services/taskExecutors/dispatchStationBoardTasksExecutor';
 import {
     registerDispatchQrcodeDetectionTasksExecutor,
     synchronizeQrcodeDetectionDispatchTasks
 } from '~/server/services/taskExecutors/dispatchQrcodeDetectionTasksExecutor';
+import { registerFetchStationBoardTaskExecutor } from '~/server/services/taskExecutors/fetchStationBoardTaskExecutor';
 import { registerProbeTrainDepartureTaskExecutor } from '~/server/services/taskExecutors/probeTrainDepartureTaskExecutor';
 import { registerProbeQrcodeDetectionEmuTaskExecutor } from '~/server/services/taskExecutors/probeQrcodeDetectionEmuTaskExecutor';
 import {
@@ -215,7 +217,9 @@ export default defineNitroPlugin(async () => {
         registerRefreshRouteBatchTaskExecutor();
         registerGenerateRouteRefreshTasksExecutor();
         registerDispatchDailyProbeTasksExecutor();
+        registerDispatchStationBoardTasksExecutor();
         registerDispatchQrcodeDetectionTasksExecutor();
+        registerFetchStationBoardTaskExecutor();
         registerProbeTrainDepartureTaskExecutor();
         registerProbeQrcodeDetectionEmuTaskExecutor();
         registerClearDailyProbeStatusTaskExecutor();
