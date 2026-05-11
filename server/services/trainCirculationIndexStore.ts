@@ -8,7 +8,10 @@ import {
     getTodayScheduleProbeGroups,
     getTodayScheduleTimetableByTrainCode
 } from '~/server/services/todayScheduleCache';
-import { loadScheduleCirculationEntry } from '~/server/utils/12306/scheduleProbe/stateStore';
+import {
+    loadScheduleCirculationEntry,
+    loadScheduleCirculationMap
+} from '~/server/utils/12306/scheduleProbe/stateStore';
 import { getRelativeDateString } from '~/server/utils/date/getCurrentDateString';
 import {
     getShanghaiDayStartUnixSeconds,
@@ -35,8 +38,10 @@ interface RunBucket {
 }
 
 interface EmuScanState {
-    currentRun: RunBucket;
+    pendingRun: RunBucket;
+    currentRun: RunBucket | null;
     nextRun: RunBucket | null;
+    gapPending: boolean;
 }
 
 interface EdgeStat {
@@ -138,8 +143,18 @@ function buildFallbackNodeMeta(trainCode: string): CirculationNodeMeta {
     };
 }
 
-function buildTrainCodeNodeMetaMap() {
+function loadOfficialCirculationInternalCodes() {
+    const scheduleFilePath = useConfig().data.assets.schedule.file;
+    return new Set(
+        Object.keys(loadScheduleCirculationMap(scheduleFilePath))
+            .map((internalCode) => normalizeCode(internalCode))
+            .filter((internalCode) => internalCode.length > 0)
+    );
+}
+
+function buildTrainCodeNodeMetaMap(officialInternalCodes: ReadonlySet<string>) {
     const nodeMetaByTrainCode = new Map<string, CirculationNodeMeta>();
+    const excludedTrainCodes = new Set<string>();
 
     for (const group of getTodayScheduleProbeGroups().values()) {
         const allCodes = uniqueNormalizedCodes(group.allCodes);
@@ -148,6 +163,13 @@ function buildTrainCodeNodeMetaMap() {
         }
 
         const normalizedInternalCode = normalizeCode(group.trainInternalCode);
+        if (officialInternalCodes.has(normalizedInternalCode)) {
+            for (const trainCode of allCodes) {
+                excludedTrainCodes.add(trainCode);
+            }
+            continue;
+        }
+
         if (normalizedInternalCode.length === 0) {
             for (const trainCode of allCodes) {
                 nodeMetaByTrainCode.set(
@@ -172,6 +194,9 @@ function buildTrainCodeNodeMetaMap() {
 
     return {
         resolve(trainCode: string) {
+            if (excludedTrainCodes.has(trainCode)) {
+                return null;
+            }
             return (
                 nodeMetaByTrainCode.get(trainCode) ??
                 buildFallbackNodeMeta(trainCode)
@@ -228,6 +253,15 @@ function createRunBucket(row: DailyEmuRouteRow, nodeId: number): RunBucket {
         startAt: row.start_at,
         endAt: row.end_at,
         nodeIds: new Set<number>([nodeId])
+    };
+}
+
+function createEmptyRunBucket(row: DailyEmuRouteRow): RunBucket {
+    return {
+        runKey: buildRunKey(row),
+        startAt: row.start_at,
+        endAt: row.end_at,
+        nodeIds: new Set<number>()
     };
 }
 
@@ -786,6 +820,55 @@ function buildCirculationsFromGraph(
     return circulations;
 }
 
+function commitClosedRun(
+    closedRun: RunBucket,
+    state: EmuScanState,
+    outgoingCounts: Map<number, Map<number, number>>,
+    incomingCounts: Map<number, Map<number, number>>
+) {
+    if (closedRun.nodeIds.size === 0) {
+        state.gapPending = true;
+        return false;
+    }
+
+    if (!state.currentRun) {
+        state.currentRun = closedRun;
+        state.nextRun = null;
+        state.gapPending = false;
+        return true;
+    }
+
+    if (state.gapPending) {
+        if (state.nextRun) {
+            finalizeRunTransition(
+                state.currentRun,
+                state.nextRun,
+                outgoingCounts,
+                incomingCounts
+            );
+        }
+
+        state.currentRun = closedRun;
+        state.nextRun = null;
+        state.gapPending = false;
+        return true;
+    }
+
+    if (state.nextRun) {
+        finalizeRunTransition(
+            state.currentRun,
+            state.nextRun,
+            outgoingCounts,
+            incomingCounts
+        );
+    }
+
+    state.nextRun = state.currentRun;
+    state.currentRun = closedRun;
+    state.gapPending = false;
+    return true;
+}
+
 function consumeRow(
     row: DailyEmuRouteRow,
     nodeIds: ReturnType<typeof buildNodeIdStore>,
@@ -800,34 +883,42 @@ function consumeRow(
         return false;
     }
 
-    const nodeId = nodeIds.getNodeId(trainCodeNodeMetaMap.resolve(trainCode));
+    const nodeMeta = trainCodeNodeMetaMap.resolve(trainCode);
     const state = scanStatesByEmuCode.get(emuCode);
-    if (!state) {
-        scanStatesByEmuCode.set(emuCode, {
-            currentRun: createRunBucket(row, nodeId),
-            nextRun: null
-        });
-        return true;
-    }
-
     const runKey = buildRunKey(row);
-    if (state.currentRun.runKey === runKey) {
-        state.currentRun.nodeIds.add(nodeId);
+    if (!state) {
+        const pendingRun = nodeMeta
+            ? createRunBucket(row, nodeIds.getNodeId(nodeMeta))
+            : createEmptyRunBucket(row);
+        scanStatesByEmuCode.set(emuCode, {
+            pendingRun,
+            currentRun: null,
+            nextRun: null,
+            gapPending: false
+        });
+        return nodeMeta !== null;
+    }
+
+    if (state.pendingRun.runKey === runKey) {
+        if (!nodeMeta) {
+            return false;
+        }
+
+        state.pendingRun.nodeIds.add(nodeIds.getNodeId(nodeMeta));
         return true;
     }
 
-    if (state.nextRun) {
-        finalizeRunTransition(
-            state.currentRun,
-            state.nextRun,
-            outgoingCounts,
-            incomingCounts
-        );
-    }
+    commitClosedRun(
+        state.pendingRun,
+        state,
+        outgoingCounts,
+        incomingCounts
+    );
+    state.pendingRun = nodeMeta
+        ? createRunBucket(row, nodeIds.getNodeId(nodeMeta))
+        : createEmptyRunBucket(row);
 
-    state.nextRun = state.currentRun;
-    state.currentRun = createRunBucket(row, nodeId);
-    return true;
+    return nodeMeta !== null;
 }
 
 export function rebuildTrainCirculationIndex(): TrainCirculationIndexCache {
@@ -835,7 +926,9 @@ export function rebuildTrainCirculationIndex(): TrainCirculationIndexCache {
     const config = getWindowConfig();
     const { startAt, endAt } = getWindowRange(currentDate, config.windowDays);
     const nodeIds = buildNodeIdStore();
-    const trainCodeNodeMetaMap = buildTrainCodeNodeMetaMap();
+    const officialInternalCodes = loadOfficialCirculationInternalCodes();
+    const trainCodeNodeMetaMap =
+        buildTrainCodeNodeMetaMap(officialInternalCodes);
     const scanStatesByEmuCode = new Map<string, EmuScanState>();
     const outgoingCounts = new Map<number, Map<number, number>>();
     const incomingCounts = new Map<number, Map<number, number>>();
@@ -881,7 +974,14 @@ export function rebuildTrainCirculationIndex(): TrainCirculationIndexCache {
     }
 
     for (const state of scanStatesByEmuCode.values()) {
-        if (state.nextRun) {
+        commitClosedRun(
+            state.pendingRun,
+            state,
+            outgoingCounts,
+            incomingCounts
+        );
+
+        if (state.currentRun && state.nextRun) {
             finalizeRunTransition(
                 state.currentRun,
                 state.nextRun,
