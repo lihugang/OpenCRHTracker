@@ -146,7 +146,7 @@ export interface Config {
             routeProbeCarCode: string;
         };
         rateLimit: Record<
-            'search' | 'query',
+            'search' | 'query' | 'stationBoard',
             {
                 minIntervalMs: number;
             }
@@ -554,6 +554,10 @@ function validateConfig(raw: unknown): Config {
         spiderRateLimit.search,
         'spider.rateLimit.search'
     );
+    const spiderRateLimitStationBoard = asObject(
+        spiderRateLimit.stationBoard,
+        'spider.rateLimit.stationBoard'
+    );
     const spiderScheduleProbe = asObject(
         spider.scheduleProbe,
         'spider.scheduleProbe'
@@ -856,6 +860,13 @@ function validateConfig(raw: unknown): Config {
                     minIntervalMs: asNumber(
                         spiderRateLimitSearch.minIntervalMs,
                         'spider.rateLimit.search.minIntervalMs',
+                        0
+                    )
+                },
+                stationBoard: {
+                    minIntervalMs: asNumber(
+                        spiderRateLimitStationBoard.minIntervalMs,
+                        'spider.rateLimit.stationBoard.minIntervalMs',
                         0
                     )
                 }

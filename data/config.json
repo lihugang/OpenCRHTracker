@@ -13,6 +13,9 @@
             },
             "search": {
                 "minIntervalMs": 8000
+            },
+            "stationBoard": {
+                "minIntervalMs": 8000
             }
         },
         "scheduleProbe": {

@@ -30,7 +30,7 @@ export default async function fetchAllStations(): Promise<AllStationRow[]> {
     let failureLogged = false;
 
     try {
-        await waitFor12306RequestSlot('query');
+        await waitFor12306RequestSlot('stationBoard');
         const response = await fetch(url, {
             headers: {
                 'user-agent': config.spider.userAgent

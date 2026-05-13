@@ -78,7 +78,7 @@ export default async function fetchStationBoardByStation(
     let failureLogged = false;
 
     try {
-        await waitFor12306RequestSlot('query');
+        await waitFor12306RequestSlot('stationBoard');
         const response = await fetch(url, {
             method: 'POST',
             headers: {

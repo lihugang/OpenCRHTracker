@@ -68,11 +68,25 @@
                             "required": [
                                 "minIntervalMs"
                             ]
+                        },
+                        "stationBoard": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "minIntervalMs": {
+                                    "type": "integer",
+                                    "minimum": 0
+                                }
+                            },
+                            "required": [
+                                "minIntervalMs"
+                            ]
                         }
                     },
                     "required": [
                         "query",
-                        "search"
+                        "search",
+                        "stationBoard"
                     ]
                 },
                 "scheduleProbe": {
