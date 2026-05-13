@@ -1485,7 +1485,9 @@ const ADMIN_TRAIN_DATA_REQUEST_TYPES: AdminTrainDataRequestType[] = [
     'search_train_code',
     'fetch_route_info',
     'fetch_emu_by_route',
-    'fetch_emu_by_seat_code'
+    'fetch_emu_by_seat_code',
+    'fetch_all_stations',
+    'fetch_station_board'
 ];
 
 interface RequestMetricAccumulator {

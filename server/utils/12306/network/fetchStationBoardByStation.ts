@@ -1,5 +1,6 @@
 import useConfig from '~/server/config';
 import getLogger from '~/server/libs/log4js';
+import { record12306RequestHourlyStat } from '~/server/services/trainProvenanceStore';
 import waitFor12306RequestSlot from '../requestLimiter';
 import log12306RequestFailure from './log12306RequestFailure';
 
@@ -73,6 +74,8 @@ export default async function fetchStationBoardByStation(
     const url =
         'https://mobile.12306.cn/wxxcx/wechat/bigScreen/queryTrainByStation' +
         `?train_start_date=${normalizedServiceDate}&train_station_code=${normalizedStationTelecode}`;
+    let requestStatRecorded = false;
+    let failureLogged = false;
 
     try {
         await waitFor12306RequestSlot('query');
@@ -85,6 +88,11 @@ export default async function fetchStationBoardByStation(
             body: ''
         });
         if (!response.ok) {
+            requestStatRecorded = true;
+            record12306RequestHourlyStat({
+                requestType: 'fetch_station_board',
+                isSuccess: false
+            });
             log12306RequestFailure({
                 logger,
                 operation: 'http_failed',
@@ -96,6 +104,7 @@ export default async function fetchStationBoardByStation(
                 responseStatus: response.status,
                 responseOk: response.ok
             });
+            failureLogged = true;
             throw new Error(
                 `fetch_station_board_http_failed status=${response.status}`
             );
@@ -103,6 +112,11 @@ export default async function fetchStationBoardByStation(
 
         const json = (await response.json()) as StationBoardResponse;
         if (json.status !== true) {
+            requestStatRecorded = true;
+            record12306RequestHourlyStat({
+                requestType: 'fetch_station_board',
+                isSuccess: false
+            });
             log12306RequestFailure({
                 logger,
                 operation: 'business_failed',
@@ -117,12 +131,18 @@ export default async function fetchStationBoardByStation(
                 errorCode: json.errorCode,
                 errorMsg: json.errorMsg
             });
+            failureLogged = true;
             throw new Error(
                 `fetch_station_board_business_failed errorCode=${String(json.errorCode ?? '')} errorMsg=${String(json.errorMsg ?? '')}`
             );
         }
 
         if (!Array.isArray(json.data)) {
+            requestStatRecorded = true;
+            record12306RequestHourlyStat({
+                requestType: 'fetch_station_board',
+                isSuccess: false
+            });
             log12306RequestFailure({
                 logger,
                 operation: 'invalid_response',
@@ -136,16 +156,30 @@ export default async function fetchStationBoardByStation(
                 businessStatus: json.status,
                 detail: 'data is not an array'
             });
+            failureLogged = true;
             throw new Error(
                 'fetch_station_board_invalid_response data_not_array'
             );
         }
 
-        return json.data
+        const rows = json.data
             .map((row) => normalizeStationBoardRow(row))
             .filter((row): row is StationBoardTrainRow => row !== null);
+        requestStatRecorded = true;
+        record12306RequestHourlyStat({
+            requestType: 'fetch_station_board',
+            isSuccess: true
+        });
+
+        return rows;
     } catch (error) {
-        if (error instanceof Error) {
+        if (!requestStatRecorded) {
+            record12306RequestHourlyStat({
+                requestType: 'fetch_station_board',
+                isSuccess: false
+            });
+        }
+        if (error instanceof Error && !failureLogged) {
             log12306RequestFailure({
                 logger,
                 operation: 'request_failed',

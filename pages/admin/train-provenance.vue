@@ -3319,6 +3319,10 @@ function getRequestTypeLabel(type: AdminTrainDataRequestType) {
             return '按车次取车组';
         case 'fetch_emu_by_seat_code':
             return '畅行码查车组';
+        case 'fetch_all_stations':
+            return '下载车站清单';
+        case 'fetch_station_board':
+            return '获取车站大屏';
         default:
             return type;
     }
@@ -3334,6 +3338,10 @@ function getRequestTypeEyebrow(type: AdminTrainDataRequestType) {
             return 'Route EMU';
         case 'fetch_emu_by_seat_code':
             return 'Seat Code';
+        case 'fetch_all_stations':
+            return 'Stations';
+        case 'fetch_station_board':
+            return 'Station Board';
         default:
             return 'Type';
     }
@@ -3349,6 +3357,10 @@ function getRequestTypeAccentClass(type: AdminTrainDataRequestType) {
             return 'text-amber-700';
         case 'fetch_emu_by_seat_code':
             return 'text-emerald-700';
+        case 'fetch_all_stations':
+            return 'text-violet-700';
+        case 'fetch_station_board':
+            return 'text-cyan-700';
         default:
             return 'text-slate-700';
     }
