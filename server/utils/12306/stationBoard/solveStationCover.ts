@@ -15,7 +15,16 @@ interface StationCoverSolution {
 }
 
 function normalizeStationName(value: string) {
-    return value.trim();
+    const stationName = value.trim();
+    if (stationName.length === 0) {
+        return '';
+    }
+
+    if (/\s/u.test(stationName)) {
+        return '';
+    }
+
+    return stationName;
 }
 
 function buildNormalizedCandidates(
@@ -163,9 +172,7 @@ export default async function solveStationCover(
         buildLpModel(normalizedCandidates);
     const highs = await highsLoader();
     const solution = highs.solve(lpText, {
-        presolve: 'on',
-        output_flag: false,
-        log_to_console: false
+        presolve: 'on'
     }) as StationCoverSolution;
 
     if (solution.Status !== 'Optimal') {
