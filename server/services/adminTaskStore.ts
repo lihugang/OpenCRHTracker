@@ -14,6 +14,7 @@ import { EXPORT_DAILY_RECORDS_MANUAL_TASK_EXECUTOR } from '~/server/services/tas
 import { loadProbeAssets } from '~/server/services/probeAssetStore';
 import { PROBE_QRCODE_DETECTION_EMU_TASK_EXECUTOR } from '~/server/services/taskExecutors/probeQrcodeDetectionEmuTaskExecutor';
 import { REFRESH_ROUTE_BATCH_TASK_EXECUTOR } from '~/server/services/taskExecutors/refreshRouteBatchTaskExecutor';
+import { DISPATCH_STATION_BOARD_TASKS_EXECUTOR } from '~/server/services/taskExecutors/dispatchStationBoardTasksExecutor';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
 import { loadPublishedScheduleState } from '~/server/utils/12306/scheduleProbe/stateStore';
 import { splitIntoBatches } from '~/server/utils/12306/scheduleProbe/taskHelpers';
@@ -334,6 +335,38 @@ async function createRunQrcodeDetectionNowTask(
     };
 }
 
+function createDispatchStationBoardTasksNowTask(
+    request: Extract<
+        AdminCreateTaskRequest,
+        { type: 'dispatch_station_board_tasks_now' }
+    >
+): AdminCreateTaskResponse {
+    assertPublishedScheduleReadyForRefresh();
+
+    const executionTime = getNowSeconds();
+    const taskId = enqueueTask(
+        DISPATCH_STATION_BOARD_TASKS_EXECUTOR,
+        {},
+        executionTime
+    );
+
+    logger.info(
+        `admin_task_created type=${request.type} executor=${DISPATCH_STATION_BOARD_TASKS_EXECUTOR} taskId=${taskId}`
+    );
+
+    return {
+        type: request.type,
+        createdCount: 1,
+        createdTasks: toCreatedTaskRecords(
+            [taskId],
+            DISPATCH_STATION_BOARD_TASKS_EXECUTOR,
+            executionTime
+        ),
+        summary:
+            '已创建 1 条当日交路数据刷新任务，将基于 highs 选站并继续派发车站板抓取任务。'
+    };
+}
+
 export async function createAdminTask(
     request: AdminCreateTaskRequest
 ): Promise<AdminCreateTaskResponse> {
@@ -346,6 +379,8 @@ export async function createAdminTask(
             return await createDetectCoupledEmuGroupNowTask(request);
         case 'run_qrcode_detection_now':
             return await createRunQrcodeDetectionNowTask(request);
+        case 'dispatch_station_board_tasks_now':
+            return createDispatchStationBoardTasksNowTask(request);
         default:
             request satisfies never;
             throw new Error('Unsupported admin task type');

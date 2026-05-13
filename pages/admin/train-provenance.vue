@@ -1959,6 +1959,535 @@
                 </template>
             </div>
         </component>
+        <UiCard :show-accent-bar="false">
+            <div class="space-y-6">
+                <div class="space-y-2">
+                    <p
+                        class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                        Station Board
+                    </p>
+                    <h2 class="text-2xl font-semibold text-slate-900">
+                        交路数据刷新
+                    </h2>
+                    <p class="text-sm leading-6 text-slate-600">
+                        展示当日交路数据刷新派发任务、highs 选中的车站，以及每个车站抓取任务返回的原始站板数据。
+                    </p>
+                </div>
+
+                <UiEmptyState
+                    v-if="
+                        stationBoardTaskListStatus === 'pending' &&
+                        !stationBoardTaskListData
+                    "
+                    eyebrow="加载中"
+                    title="正在加载交路数据刷新任务"
+                    description="请稍候，正在读取当日交路数据刷新记录。" />
+
+                <UiEmptyState
+                    v-else-if="stationBoardTaskListErrorMessage"
+                    eyebrow="加载失败"
+                    title="交路数据刷新任务加载失败"
+                    :description="stationBoardTaskListErrorMessage"
+                    tone="danger">
+                    <UiButton
+                        type="button"
+                        variant="secondary"
+                        @click="refreshStationBoardTaskList()">
+                        重试
+                    </UiButton>
+                </UiEmptyState>
+
+                <UiEmptyState
+                    v-else-if="
+                        stationBoardTaskListData &&
+                        !stationBoardTaskListData.enabled
+                    "
+                    eyebrow="已关闭"
+                    title="交路数据追踪当前已关闭"
+                    description="可在 config.json 中重新启用 trainProvenance 记录。" />
+
+                <UiEmptyState
+                    v-else-if="stationBoardTaskItems.length === 0"
+                    eyebrow="无任务"
+                    title="当天没有交路数据刷新任务"
+                    description="当前日期下还没有可展示的交路数据刷新派发记录。" />
+
+                <div
+                    v-else
+                    class="space-y-3">
+                    <article
+                        v-for="item in stationBoardTaskItems"
+                        :key="`station-board-task:${item.taskRunId}`"
+                        class="rounded-[1rem] border border-slate-200 bg-white/90 px-4 py-4 shadow-sm">
+                        <div class="space-y-4">
+                            <div
+                                class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                                <div class="space-y-2">
+                                    <div
+                                        class="flex flex-wrap items-center gap-2">
+                                        <span
+                                            :class="
+                                                getTaskStatusBadgeClass(
+                                                    item.status
+                                                )
+                                            ">
+                                            {{
+                                                getTaskStatusLabel(item.status)
+                                            }}
+                                        </span>
+                                        <span
+                                            class="text-sm font-medium text-slate-500">
+                                            {{ item.executor }}
+                                        </span>
+                                    </div>
+                                    <h3
+                                        class="text-lg font-semibold text-slate-900">
+                                        任务 #{{ item.schedulerTaskId }}
+                                    </h3>
+                                    <p
+                                        class="text-sm leading-6 text-slate-600">
+                                        已选车站
+                                        {{
+                                            formatNumber(
+                                                item.selectedStationCount
+                                            )
+                                        }}
+                                        / 候选组
+                                        {{
+                                            formatNumber(
+                                                item.candidateGroupCount
+                                            )
+                                        }}
+                                    </p>
+                                </div>
+
+                                <div
+                                    class="text-sm leading-6 text-slate-500 lg:text-right">
+                                    <p>
+                                        开始：{{
+                                            formatTimestamp(item.startedAt)
+                                        }}
+                                    </p>
+                                    <p>
+                                        结束：{{
+                                            formatTimestamp(
+                                                item.finishedAt ?? 0
+                                            )
+                                        }}
+                                    </p>
+                                    <p>
+                                        日期：{{
+                                            formatServiceDate(item.serviceDate)
+                                        }}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div
+                                class="grid gap-3 rounded-[1rem] border border-slate-200 bg-slate-50/80 px-4 py-4 sm:grid-cols-2 xl:grid-cols-4">
+                                <div>
+                                    <p
+                                        class="text-xs uppercase tracking-[0.18em] text-slate-400">
+                                        新建子任务
+                                    </p>
+                                    <p
+                                        class="mt-2 text-lg font-semibold text-slate-900">
+                                        {{
+                                            formatNumber(item.createdTaskCount)
+                                        }}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p
+                                        class="text-xs uppercase tracking-[0.18em] text-slate-400">
+                                        复用子任务
+                                    </p>
+                                    <p
+                                        class="mt-2 text-lg font-semibold text-slate-900">
+                                        {{
+                                            formatNumber(item.reusedTaskCount)
+                                        }}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p
+                                        class="text-xs uppercase tracking-[0.18em] text-slate-400">
+                                        未找到电报码
+                                    </p>
+                                    <p
+                                        class="mt-2 text-lg font-semibold text-slate-900">
+                                        {{
+                                            formatNumber(
+                                                item.skippedNotFoundCount
+                                            )
+                                        }}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p
+                                        class="text-xs uppercase tracking-[0.18em] text-slate-400">
+                                        电报码冲突
+                                    </p>
+                                    <p
+                                        class="mt-2 text-lg font-semibold text-slate-900">
+                                        {{
+                                            formatNumber(
+                                                item.skippedAmbiguousCount
+                                            )
+                                        }}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div
+                                class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-4 py-4">
+                                <p
+                                    class="text-xs uppercase tracking-[0.18em] text-slate-400">
+                                    highs 选站结果
+                                </p>
+                                <p
+                                    class="mt-2 text-sm leading-6 text-slate-700">
+                                    {{
+                                        item.selectedStations.length > 0
+                                            ? item.selectedStations.join(' / ')
+                                            : '当前还没有可展示的选站结果'
+                                    }}
+                                </p>
+                            </div>
+
+                            <div class="flex justify-end">
+                                <UiButton
+                                    type="button"
+                                    variant="secondary"
+                                    size="sm"
+                                    @click="
+                                        openStationBoardDetail(item.taskRunId)
+                                    ">
+                                    查看详情
+                                </UiButton>
+                            </div>
+                        </div>
+                    </article>
+                </div>
+            </div>
+        </UiCard>
+        <component
+            :is="isMobileActionSheet ? UiBottomSheet : UiModal"
+            :model-value="isStationBoardDetailDialogOpen"
+            eyebrow="交路数据刷新"
+            title="任务详情"
+            description="查看本次 highs 选站结果、任务关联和车站原始返回数据。"
+            size="lg"
+            :close-on-backdrop="stationBoardDetailStatus !== 'pending'"
+            @update:model-value="
+                handleStationBoardDetailDialogVisibilityChange
+            ">
+            <div class="space-y-4">
+                <div
+                    v-if="stationBoardDetailStatus === 'pending'"
+                    class="space-y-3">
+                    <div
+                        v-for="index in 3"
+                        :key="`station-board-detail-loading:${index}`"
+                        class="h-20 animate-pulse rounded-[1rem] bg-slate-100/90" />
+                </div>
+
+                <p
+                    v-else-if="stationBoardDetailErrorMessage"
+                    class="rounded-[1rem] border border-rose-200 bg-rose-50/80 px-4 py-4 text-sm leading-6 text-rose-700">
+                    {{ stationBoardDetailErrorMessage }}
+                </p>
+
+                <UiEmptyState
+                    v-else-if="
+                        stationBoardDetailData &&
+                        stationBoardDetailData.stations.length === 0
+                    "
+                    eyebrow="无明细"
+                    title="当前没有车站任务明细"
+                    description="任务存在，但当前没有可展示的车站结果。" />
+
+                <template v-else-if="stationBoardDetailData">
+                    <div
+                        class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-4 py-4 text-sm leading-6 text-slate-700">
+                        <p>
+                            派发任务 #{{
+                                stationBoardDetailData.schedulerTaskId ?? '--'
+                            }}
+                        </p>
+                        <p>
+                            日期：{{
+                                formatServiceDate(
+                                    stationBoardDetailData.serviceDate
+                                )
+                            }}
+                        </p>
+                        <p>
+                            任务状态：{{
+                                stationBoardDetailData.status
+                                    ? getTaskStatusLabel(
+                                          stationBoardDetailData.status
+                                      )
+                                    : '--'
+                            }}
+                        </p>
+                        <p>
+                            highs 选站：{{
+                                stationBoardDetailData.selectedStations.join(
+                                    ' / '
+                                )
+                            }}
+                        </p>
+                    </div>
+
+                    <div class="space-y-3">
+                        <p
+                            class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                            车站列表
+                        </p>
+                        <div class="flex flex-wrap gap-2">
+                            <button
+                                v-for="item in stationBoardDetailStations"
+                                :key="`station-board-station:${item.stationName}`"
+                                type="button"
+                                class="rounded-full border px-3 py-2 text-sm transition"
+                                :class="
+                                    item.stationName ===
+                                    activeStationBoardStation?.stationName
+                                        ? 'border-sky-500 bg-sky-50 text-sky-700'
+                                        : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
+                                "
+                                @click="
+                                    selectedStationBoardStationName =
+                                        item.stationName
+                                ">
+                                {{ item.stationName }}
+                            </button>
+                        </div>
+                    </div>
+
+                    <article
+                        v-if="activeStationBoardStation"
+                        class="rounded-[1rem] border border-slate-200 bg-white/90 px-4 py-4">
+                        <div class="space-y-4">
+                            <div
+                                class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                                <div class="space-y-2">
+                                    <div
+                                        class="flex flex-wrap items-center gap-2">
+                                        <span
+                                            class="inline-flex items-center rounded-full bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700">
+                                            {{
+                                                getStationBoardActionLabel(
+                                                    activeStationBoardStation
+                                                )
+                                            }}
+                                        </span>
+                                        <span
+                                            v-if="
+                                                activeStationBoardStation
+                                                    .taskStatus
+                                            "
+                                            :class="
+                                                getTaskStatusBadgeClass(
+                                                    activeStationBoardStation
+                                                        .taskStatus
+                                                )
+                                            ">
+                                            {{
+                                                getTaskStatusLabel(
+                                                    activeStationBoardStation
+                                                        .taskStatus
+                                                )
+                                            }}
+                                        </span>
+                                    </div>
+                                    <h3
+                                        class="text-lg font-semibold text-slate-900">
+                                        {{
+                                            activeStationBoardStation.stationName
+                                        }}
+                                        <span
+                                            class="text-slate-400">
+                                            /
+                                            {{
+                                                activeStationBoardStation.stationTelecode ||
+                                                '--'
+                                            }}
+                                        </span>
+                                    </h3>
+                                    <p
+                                        class="text-sm leading-6 text-slate-600">
+                                        子任务 #{{ activeStationBoardStation.schedulerTaskId ?? '--' }}
+                                        / 结果：{{
+                                            getStationBoardResultLabel(
+                                                activeStationBoardStation.resultStatus
+                                            )
+                                        }}
+                                    </p>
+                                </div>
+
+                                <div
+                                    class="text-sm leading-6 text-slate-500 lg:text-right">
+                                    <p>
+                                        开始：{{
+                                            formatTimestamp(
+                                                activeStationBoardStation.startedAt ??
+                                                    0
+                                            )
+                                        }}
+                                    </p>
+                                    <p>
+                                        结束：{{
+                                            formatTimestamp(
+                                                activeStationBoardStation.finishedAt ??
+                                                    0
+                                            )
+                                        }}
+                                    </p>
+                                    <p>
+                                        返回行数：{{
+                                            formatNumber(
+                                                activeStationBoardStation.rowCount
+                                            )
+                                        }}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div
+                                v-if="
+                                    activeStationBoardStation.ambiguousTelecodes
+                                        .length > 0
+                                "
+                                class="rounded-[0.875rem] border border-amber-200 bg-amber-50/80 px-4 py-4 text-sm leading-6 text-amber-800">
+                                候选电报码：{{
+                                    activeStationBoardStation.ambiguousTelecodes.join(
+                                        ' / '
+                                    )
+                                }}
+                            </div>
+
+                            <div
+                                class="grid gap-3 rounded-[1rem] border border-slate-200 bg-slate-50/80 px-4 py-4 sm:grid-cols-3">
+                                <div>
+                                    <p
+                                        class="text-xs uppercase tracking-[0.18em] text-slate-400">
+                                        解析成功
+                                    </p>
+                                    <p
+                                        class="mt-2 text-lg font-semibold text-slate-900">
+                                        {{
+                                            formatNumber(
+                                                activeStationBoardStation.parsedEntryCount
+                                            )
+                                        }}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p
+                                        class="text-xs uppercase tracking-[0.18em] text-slate-400">
+                                        保存交路
+                                    </p>
+                                    <p
+                                        class="mt-2 text-lg font-semibold text-slate-900">
+                                        {{
+                                            formatNumber(
+                                                activeStationBoardStation.savedEntryCount
+                                            )
+                                        }}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p
+                                        class="text-xs uppercase tracking-[0.18em] text-slate-400">
+                                        消费队列
+                                    </p>
+                                    <p
+                                        class="mt-2 text-lg font-semibold text-slate-900">
+                                        {{
+                                            formatNumber(
+                                                activeStationBoardStation.consumedQueueEntryCount
+                                            )
+                                        }}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <UiEmptyState
+                                v-if="
+                                    activeStationBoardStation.rows.length === 0
+                                "
+                                eyebrow="无返回"
+                                title="当前车站没有返回行数据"
+                                description="可能任务尚未执行、请求失败重排，或者当前站没有可展示的站板记录。" />
+
+                            <div
+                                v-else
+                                class="overflow-x-auto rounded-[1rem] border border-slate-200 bg-white">
+                                <table
+                                    class="min-w-full divide-y divide-slate-200">
+                                    <thead class="bg-slate-50/80">
+                                        <tr>
+                                            <th
+                                                class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                                车次
+                                            </th>
+                                            <th
+                                                class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                                始发站
+                                            </th>
+                                            <th
+                                                class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                                终到站
+                                            </th>
+                                            <th
+                                                class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                                原始交路串
+                                            </th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-100">
+                                        <tr
+                                            v-for="(
+                                                row, rowIndex
+                                            ) in activeStationBoardStation.rows"
+                                            :key="`station-board-row:${rowIndex}`">
+                                            <td
+                                                class="px-4 py-3 text-sm font-semibold text-slate-900">
+                                                {{
+                                                    row.stationTrainCode ||
+                                                    row.trainNo ||
+                                                    '--'
+                                                }}
+                                            </td>
+                                            <td
+                                                class="px-4 py-3 text-sm text-slate-700">
+                                                {{
+                                                    row.startStationName || '--'
+                                                }}
+                                            </td>
+                                            <td
+                                                class="px-4 py-3 text-sm text-slate-700">
+                                                {{
+                                                    row.endStationName || '--'
+                                                }}
+                                            </td>
+                                            <td
+                                                class="px-4 py-3 text-sm text-slate-600">
+                                                <code class="break-all">{{
+                                                    row.jiaoluTrain || '--'
+                                                }}</code>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </article>
+                </template>
+            </div>
+        </component>
     </AdminShell>
 </template>
 
@@ -1976,6 +2505,10 @@ import type {
     AdminQrcodeScanDetailResponse,
     AdminQrcodeScanTaskListResponse,
     AdminQrcodeScanTimeSummaryItem,
+    AdminStationBoardDispatchDetailResponse,
+    AdminStationBoardDispatchTaskListItem,
+    AdminStationBoardStationTaskItem,
+    AdminStationBoardTaskListResponse,
     AdminTrainDataRequestHourBucket,
     AdminTrainDataRequestStatsResponse,
     AdminTrainDataRequestType,
@@ -2040,9 +2573,11 @@ const trainCodeInput = ref(readQueryString(route.query.trainCode));
 const isSubmittingSearch = ref(false);
 const isCouplingDetailDialogOpen = ref(false);
 const isQrcodeScanDetailDialogOpen = ref(false);
+const isStationBoardDetailDialogOpen = ref(false);
 const expandedScannedRouteEventIds = ref<number[]>([]);
 const selectedCouplingTaskBureau = ref('');
 const selectedCouplingTaskModel = ref('');
+const selectedStationBoardStationName = ref('');
 const couplingDetailStatus = ref<'idle' | 'pending' | 'success' | 'error'>(
     'idle'
 );
@@ -2061,6 +2596,13 @@ const qrcodeScanDetailStatus = ref<'idle' | 'pending' | 'success' | 'error'>(
 );
 const qrcodeScanDetailData = ref<AdminQrcodeScanDetailResponse | null>(null);
 const qrcodeScanDetailErrorMessage = ref('');
+const stationBoardDetailStatus = ref<
+    'idle' | 'pending' | 'success' | 'error'
+>('idle');
+const stationBoardDetailData = ref<AdminStationBoardDispatchDetailResponse | null>(
+    null
+);
+const stationBoardDetailErrorMessage = ref('');
 const isMobileActionSheet = ref(false);
 const dialogMediaQuery = ref<MediaQueryList | null>(null);
 
@@ -2191,6 +2733,25 @@ async function fetchQrcodeScanTaskList(date: string) {
     return response.data;
 }
 
+async function fetchStationBoardTaskList() {
+    const response = await requestFetch<
+        TrackerApiResponse<AdminStationBoardTaskListResponse>
+    >('/api/v1/admin/train-provenance/station-board-tasks', {
+        retry: 0,
+        query: {
+            date: selectedDateYmd.value
+        }
+    });
+
+    if (!response.ok) {
+        throw {
+            data: response
+        };
+    }
+
+    return response.data;
+}
+
 const {
     data: requestStatsData,
     status: requestStatsStatus,
@@ -2221,6 +2782,19 @@ const {
 } = await useAsyncData(
     'admin-train-provenance-coupling-scan-tasks',
     fetchCouplingScanTaskList,
+    {
+        watch: [selectedDateYmd]
+    }
+);
+
+const {
+    data: stationBoardTaskListData,
+    status: stationBoardTaskListStatus,
+    error: stationBoardTaskListError,
+    refresh: refreshStationBoardTaskList
+} = await useAsyncData(
+    'admin-train-provenance-station-board-tasks',
+    fetchStationBoardTaskList,
     {
         watch: [selectedDateYmd]
     }
@@ -2260,6 +2834,7 @@ const isRefreshingPage = computed(
         requestStatsStatus.value === 'pending' ||
         provenanceStatus.value === 'pending' ||
         couplingScanTaskListStatus.value === 'pending' ||
+        stationBoardTaskListStatus.value === 'pending' ||
         qrcodeScanTaskListStatus.value === 'pending'
 );
 const provenanceErrorMessage = computed(() =>
@@ -2275,6 +2850,14 @@ const couplingScanTaskListErrorMessage = computed(() =>
           )
         : ''
 );
+const stationBoardTaskListErrorMessage = computed(() =>
+    stationBoardTaskListError.value
+        ? getApiErrorMessage(
+              stationBoardTaskListError.value,
+              '交路数据刷新任务加载失败。'
+          )
+        : ''
+);
 const departureItems = computed<AdminTrainProvenanceDeparture[]>(
     () => provenanceData.value?.departures ?? []
 );
@@ -2286,6 +2869,9 @@ const timelineItems = computed<AdminTrainProvenanceEvent[]>(
 );
 const qrcodeScanSummaryItems = computed<AdminQrcodeScanTimeSummaryItem[]>(
     () => qrcodeScanTaskListData.value?.items ?? []
+);
+const stationBoardTaskItems = computed<AdminStationBoardDispatchTaskListItem[]>(
+    () => stationBoardTaskListData.value?.items ?? []
 );
 const hasLoadedQrcodeScanTaskList = computed(
     () => qrcodeScanLoadedDate.value.length > 0
@@ -2351,6 +2937,17 @@ const filteredCouplingScanTaskItems = computed<AdminCouplingScanTaskListItem[]>(
         );
     }
 );
+const stationBoardDetailStations = computed<AdminStationBoardStationTaskItem[]>(
+    () => stationBoardDetailData.value?.stations ?? []
+);
+const activeStationBoardStation = computed(
+    () =>
+        stationBoardDetailStations.value.find(
+            (item) => item.stationName === selectedStationBoardStationName.value
+        ) ??
+        stationBoardDetailStations.value[0] ??
+        null
+);
 
 watch(couplingTaskBureauOptions, (options) => {
     const hasSelectedBureau = options.some(
@@ -2368,6 +2965,16 @@ watch(selectedCouplingTaskBureau, () => {
     if (!hasSelectedModel) {
         selectedCouplingTaskModel.value = '';
     }
+});
+
+watch(stationBoardDetailStations, (items) => {
+    if (
+        items.some((item) => item.stationName === selectedStationBoardStationName.value)
+    ) {
+        return;
+    }
+
+    selectedStationBoardStationName.value = items[0]?.stationName ?? '';
 });
 
 useSiteSeo({
@@ -2408,7 +3015,8 @@ async function refreshAll() {
     const refreshTasks = [
         refreshRequestStats(),
         refreshProvenance(),
-        refreshCouplingScanTaskList()
+        refreshCouplingScanTaskList(),
+        refreshStationBoardTaskList()
     ];
 
     if (hasLoadedQrcodeScanTaskList.value) {
@@ -2514,6 +3122,24 @@ function handleQrcodeScanDetailDialogVisibilityChange(nextValue: boolean) {
     closeQrcodeScanDetailDialog();
 }
 
+function closeStationBoardDetailDialog() {
+    if (stationBoardDetailStatus.value === 'pending') {
+        return;
+    }
+
+    isStationBoardDetailDialogOpen.value = false;
+    stationBoardDetailErrorMessage.value = '';
+}
+
+function handleStationBoardDetailDialogVisibilityChange(nextValue: boolean) {
+    if (nextValue) {
+        isStationBoardDetailDialogOpen.value = true;
+        return;
+    }
+
+    closeStationBoardDetailDialog();
+}
+
 async function openCouplingScanDetail(taskRunId: number) {
     isCouplingDetailDialogOpen.value = true;
     couplingDetailStatus.value = 'pending';
@@ -2583,6 +3209,70 @@ async function openQrcodeScanDetail(detectedAt: string) {
             '固定车组扫描详情加载失败。'
         );
         qrcodeScanDetailStatus.value = 'error';
+    }
+}
+
+async function openStationBoardDetail(taskRunId: number) {
+    isStationBoardDetailDialogOpen.value = true;
+    stationBoardDetailStatus.value = 'pending';
+    stationBoardDetailErrorMessage.value = '';
+    stationBoardDetailData.value = null;
+    selectedStationBoardStationName.value = '';
+
+    try {
+        const response = await requestFetch<
+            TrackerApiResponse<AdminStationBoardDispatchDetailResponse>
+        >('/api/v1/admin/train-provenance/station-board', {
+            retry: 0,
+            query: {
+                taskRunId
+            }
+        });
+
+        if (!response.ok) {
+            throw {
+                data: response
+            };
+        }
+
+        stationBoardDetailData.value = response.data;
+        selectedStationBoardStationName.value =
+            response.data.stations[0]?.stationName ?? '';
+        stationBoardDetailStatus.value = 'success';
+    } catch (error) {
+        stationBoardDetailErrorMessage.value = getApiErrorMessage(
+            error,
+            '交路数据刷新详情加载失败。'
+        );
+        stationBoardDetailStatus.value = 'error';
+    }
+}
+
+function getStationBoardActionLabel(item: AdminStationBoardStationTaskItem) {
+    switch (item.action) {
+        case 'created':
+            return '已创建';
+        case 'reused':
+            return '复用已有任务';
+        case 'station_telecode_not_found':
+            return '未找到电报码';
+        case 'station_telecode_ambiguous':
+            return '电报码冲突';
+        default:
+            return item.action;
+    }
+}
+
+function getStationBoardResultLabel(
+    resultStatus: AdminStationBoardStationTaskItem['resultStatus']
+) {
+    switch (resultStatus) {
+        case 'saved_entries':
+            return '已保存交路';
+        case 'no_official_entries':
+            return '无可保存交路';
+        default:
+            return '--';
     }
 }
 

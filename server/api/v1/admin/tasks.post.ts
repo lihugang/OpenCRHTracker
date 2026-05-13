@@ -84,6 +84,12 @@ function parseRequestBody(body: CreateAdminTaskBody): AdminCreateTaskRequest {
                 payload: {}
             };
         }
+        case 'dispatch_station_board_tasks_now': {
+            return {
+                type,
+                payload: {}
+            };
+        }
         default:
             ensure(false, 400, 'invalid_param', '不支持的管理员任务类型');
     }

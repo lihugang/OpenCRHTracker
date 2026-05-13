@@ -26,11 +26,17 @@ type TrainProvenanceSqlKey =
     | 'incrementRequestHourlyStat'
     | 'insertCouplingScanCandidate'
     | 'insertProvenanceEvent'
+    | 'insertStationBoardDispatchResult'
+    | 'insertStationBoardFetchResult'
     | 'selectRequestHourlyStatsInRange'
     | 'selectCouplingScanCandidatesByTaskRunId'
     | 'selectDepartureStartAtsByDateAndTrainCode'
     | 'selectEventsByDateAndTrainCode'
     | 'selectEventsByTaskRunId'
+    | 'selectStationBoardDispatchResultByTaskRunId'
+    | 'selectStationBoardDispatchResultsByDate'
+    | 'selectStationBoardFetchResultByTaskRunId'
+    | 'selectStationBoardFetchResultsByParentSchedulerTaskId'
     | 'selectTaskRunById'
     | 'selectTaskRunsByDateAndExecutor'
     | 'selectTaskRunBySchedulerTaskId'
@@ -102,6 +108,35 @@ interface RequestHourlyStatRow {
     updated_at: number;
 }
 
+interface StationBoardDispatchResultRow {
+    task_run_id: number;
+    service_date: string;
+    candidate_group_count: number;
+    selected_station_count: number;
+    selected_stations_json: string;
+    created_task_count: number;
+    reused_task_count: number;
+    skipped_not_found_count: number;
+    skipped_ambiguous_count: number;
+    detail_json: string;
+    created_at: number;
+}
+
+interface StationBoardFetchResultRow {
+    task_run_id: number;
+    service_date: string;
+    parent_scheduler_task_id: number | null;
+    station_name: string;
+    station_telecode: string;
+    result_status: string;
+    row_count: number;
+    parsed_entry_count: number;
+    saved_entry_count: number;
+    consumed_queue_entry_count: number;
+    rows_json: string;
+    created_at: number;
+}
+
 export interface TrainProvenanceTaskRunRecord {
     id: number;
     schedulerTaskId: number;
@@ -167,6 +202,35 @@ export interface TrainProvenanceRequestHourlyStatRecord {
     updatedAt: number;
 }
 
+export interface StationBoardDispatchResultRecord {
+    taskRunId: number;
+    serviceDate: string;
+    candidateGroupCount: number;
+    selectedStationCount: number;
+    selectedStations: unknown;
+    createdTaskCount: number;
+    reusedTaskCount: number;
+    skippedNotFoundCount: number;
+    skippedAmbiguousCount: number;
+    detail: unknown;
+    createdAt: number;
+}
+
+export interface StationBoardFetchResultRecord {
+    taskRunId: number;
+    serviceDate: string;
+    parentSchedulerTaskId: number | null;
+    stationName: string;
+    stationTelecode: string;
+    resultStatus: string;
+    rowCount: number;
+    parsedEntryCount: number;
+    savedEntryCount: number;
+    consumedQueueEntryCount: number;
+    rows: unknown;
+    createdAt: number;
+}
+
 export interface StartTrainProvenanceTaskRunInput {
     schedulerTaskId: number;
     executor: string;
@@ -218,6 +282,34 @@ export interface Record12306RequestHourlyStatInput {
     requestType: TrainProvenanceRequestStatType;
     isSuccess: boolean;
     timestamp?: number;
+}
+
+export interface RecordStationBoardDispatchResultInput {
+    taskRunId: number;
+    serviceDate: string;
+    candidateGroupCount: number;
+    selectedStations: unknown;
+    createdTaskCount: number;
+    reusedTaskCount: number;
+    skippedNotFoundCount: number;
+    skippedAmbiguousCount: number;
+    detail: unknown;
+    createdAt?: number;
+}
+
+export interface RecordStationBoardFetchResultInput {
+    taskRunId: number;
+    serviceDate: string;
+    parentSchedulerTaskId?: number | null;
+    stationName: string;
+    stationTelecode: string;
+    resultStatus: string;
+    rowCount: number;
+    parsedEntryCount: number;
+    savedEntryCount: number;
+    consumedQueueEntryCount: number;
+    rows: unknown;
+    createdAt?: number;
 }
 
 const CLEANUP_INTERVAL_SECONDS = 60 * 60;
@@ -363,6 +455,43 @@ function toRequestHourlyStatRecord(
 
 function toHourlyBucketStart(timestamp: number): number {
     return timestamp - (timestamp % REQUEST_STAT_BUCKET_SECONDS);
+}
+
+function toStationBoardDispatchResultRecord(
+    row: StationBoardDispatchResultRow
+): StationBoardDispatchResultRecord {
+    return {
+        taskRunId: row.task_run_id,
+        serviceDate: row.service_date,
+        candidateGroupCount: row.candidate_group_count,
+        selectedStationCount: row.selected_station_count,
+        selectedStations: parseJson(row.selected_stations_json),
+        createdTaskCount: row.created_task_count,
+        reusedTaskCount: row.reused_task_count,
+        skippedNotFoundCount: row.skipped_not_found_count,
+        skippedAmbiguousCount: row.skipped_ambiguous_count,
+        detail: parseJson(row.detail_json),
+        createdAt: row.created_at
+    };
+}
+
+function toStationBoardFetchResultRecord(
+    row: StationBoardFetchResultRow
+): StationBoardFetchResultRecord {
+    return {
+        taskRunId: row.task_run_id,
+        serviceDate: row.service_date,
+        parentSchedulerTaskId: row.parent_scheduler_task_id,
+        stationName: row.station_name,
+        stationTelecode: row.station_telecode,
+        resultStatus: row.result_status,
+        rowCount: row.row_count,
+        parsedEntryCount: row.parsed_entry_count,
+        savedEntryCount: row.saved_entry_count,
+        consumedQueueEntryCount: row.consumed_queue_entry_count,
+        rows: parseJson(row.rows_json),
+        createdAt: row.created_at
+    };
 }
 
 export function getTrainProvenanceRuntimeConfig() {
@@ -519,6 +648,51 @@ export function record12306RequestHourlyStat(
     );
 }
 
+export function recordStationBoardDispatchResult(
+    input: RecordStationBoardDispatchResultInput
+) {
+    const createdAt = input.createdAt ?? getNowSeconds();
+    maybeCleanupExpiredTrainProvenance(createdAt);
+
+    trainProvenanceStatements.run(
+        'insertStationBoardDispatchResult',
+        input.taskRunId,
+        normalizeServiceDate(input.serviceDate),
+        input.candidateGroupCount,
+        Array.isArray(input.selectedStations) ? input.selectedStations.length : 0,
+        stringifyJson(input.selectedStations),
+        input.createdTaskCount,
+        input.reusedTaskCount,
+        input.skippedNotFoundCount,
+        input.skippedAmbiguousCount,
+        stringifyJson(input.detail),
+        createdAt
+    );
+}
+
+export function recordStationBoardFetchResult(
+    input: RecordStationBoardFetchResultInput
+) {
+    const createdAt = input.createdAt ?? getNowSeconds();
+    maybeCleanupExpiredTrainProvenance(createdAt);
+
+    trainProvenanceStatements.run(
+        'insertStationBoardFetchResult',
+        input.taskRunId,
+        normalizeServiceDate(input.serviceDate),
+        normalizeOptionalInteger(input.parentSchedulerTaskId),
+        input.stationName.trim(),
+        normalizeCode(input.stationTelecode),
+        input.resultStatus.trim(),
+        input.rowCount,
+        input.parsedEntryCount,
+        input.savedEntryCount,
+        input.consumedQueueEntryCount,
+        stringifyJson(input.rows),
+        createdAt
+    );
+}
+
 export function getTrainProvenanceTaskRunById(taskRunId: number) {
     maybeCleanupExpiredTrainProvenance();
     if (!Number.isInteger(taskRunId) || taskRunId <= 0) {
@@ -549,6 +723,68 @@ export function listTrainProvenanceTaskRunsByDateAndExecutor(
             normalizedExecutor
         )
         .map(toTaskRunRecord);
+}
+
+export function getStationBoardDispatchResultByTaskRunId(taskRunId: number) {
+    maybeCleanupExpiredTrainProvenance();
+    if (!Number.isInteger(taskRunId) || taskRunId <= 0) {
+        return null;
+    }
+
+    const row =
+        trainProvenanceStatements.get<StationBoardDispatchResultRow>(
+            'selectStationBoardDispatchResultByTaskRunId',
+            taskRunId
+        );
+    return row ? toStationBoardDispatchResultRecord(row) : null;
+}
+
+export function listStationBoardDispatchResultsByDate(date: string) {
+    maybeCleanupExpiredTrainProvenance();
+    if (!/^\d{8}$/.test(date)) {
+        return [];
+    }
+
+    return trainProvenanceStatements
+        .all<StationBoardDispatchResultRow>(
+            'selectStationBoardDispatchResultsByDate',
+            date
+        )
+        .map(toStationBoardDispatchResultRecord);
+}
+
+export function listStationBoardFetchResultsByParentSchedulerTaskId(
+    date: string,
+    parentSchedulerTaskId: number
+) {
+    maybeCleanupExpiredTrainProvenance();
+    if (!/^\d{8}$/.test(date)) {
+        return [];
+    }
+    if (!Number.isInteger(parentSchedulerTaskId) || parentSchedulerTaskId <= 0) {
+        return [];
+    }
+
+    return trainProvenanceStatements
+        .all<StationBoardFetchResultRow>(
+            'selectStationBoardFetchResultsByParentSchedulerTaskId',
+            date,
+            parentSchedulerTaskId
+        )
+        .map(toStationBoardFetchResultRecord);
+}
+
+export function getStationBoardFetchResultByTaskRunId(taskRunId: number) {
+    maybeCleanupExpiredTrainProvenance();
+    if (!Number.isInteger(taskRunId) || taskRunId <= 0) {
+        return null;
+    }
+
+    const row = trainProvenanceStatements.get<StationBoardFetchResultRow>(
+        'selectStationBoardFetchResultByTaskRunId',
+        taskRunId
+    );
+    return row ? toStationBoardFetchResultRecord(row) : null;
 }
 
 export function listTrainProvenanceDepartureStartAts(

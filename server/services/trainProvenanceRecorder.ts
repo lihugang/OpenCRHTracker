@@ -116,6 +116,10 @@ function getCurrentContext() {
     return trainProvenanceContext.getStore() ?? null;
 }
 
+export function getCurrentTrainProvenanceTaskRunId() {
+    return getCurrentContext()?.taskRunId ?? null;
+}
+
 export async function runWithTrainProvenanceTaskContext<T>(
     executionContext: TaskExecutionContextValue,
     taskArgs: unknown,

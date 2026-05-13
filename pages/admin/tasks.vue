@@ -4,7 +4,7 @@
         :today-date-input-value="todayDateInputValue"
         :session="session"
         title="任务"
-        description="查看当前剩余任务规模，并手动创建后台任务，用于补跑导出、立即刷新指定车次线路信息、发起重联扫描或立即执行固定车组畅行码检测。">
+        description="查看当前剩余任务规模，并手动创建后台任务，用于补跑导出、立即刷新指定车次线路信息、创建交路数据刷新任务、发起重联扫描或立即执行固定车组畅行码检测。">
         <template #toolbar>
             <UiButton
                 type="button"
@@ -193,6 +193,63 @@
                                         "
                                         @click="createExportTask">
                                         创建导出补跑任务
+                                    </UiButton>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div
+                            class="rounded-[1rem] border border-slate-200 bg-white/90 px-5 py-5">
+                            <div class="space-y-6">
+                                <div class="space-y-2">
+                                    <p
+                                        class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                                        交路
+                                    </p>
+                                    <h3
+                                        class="text-xl font-semibold text-slate-900">
+                                        创建交路数据刷新任务
+                                    </h3>
+                                    <p class="text-sm leading-6 text-slate-600">
+                                        立即执行当日交路数据刷新派发：先用
+                                        highs 计算最小车站覆盖，再按选中车站继续派发车站板抓取任务。
+                                    </p>
+                                </div>
+
+                                <div
+                                    class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-4 py-4">
+                                    <p
+                                        class="text-xs uppercase tracking-[0.18em] text-slate-400">
+                                        执行范围
+                                    </p>
+                                    <p
+                                        class="mt-2 text-sm leading-6 text-slate-700">
+                                        仅支持当前已发布且等于今天的时刻表；创建后可到“12306 数据”面板查看选中的车站与后续子任务结果。
+                                    </p>
+                                </div>
+
+                                <StatusPanel
+                                    :error-message="
+                                        stationBoardDispatchTaskErrorMessage
+                                    "
+                                    :response="
+                                        stationBoardDispatchTaskResponse
+                                    "
+                                    :format-execution-time="
+                                        formatExecutionTime
+                                    " />
+
+                                <div class="flex justify-end">
+                                    <UiButton
+                                        type="button"
+                                        :loading="
+                                            stationBoardDispatchTaskStatus ===
+                                            'pending'
+                                        "
+                                        @click="
+                                            createStationBoardDispatchTask
+                                        ">
+                                        创建交路数据刷新任务
                                     </UiButton>
                                 </div>
                             </div>
@@ -482,6 +539,7 @@ import type {
     AdminCreateTaskResponse,
     AdminCouplingScanOptionGroup,
     AdminDetectCoupledEmuGroupNowTaskRequest,
+    AdminDispatchStationBoardTasksNowTaskRequest,
     AdminRunQrcodeDetectionNowTaskRequest,
     AdminTaskOverviewResponse,
     AdminRefreshRouteInfoNowTaskRequest,
@@ -575,6 +633,12 @@ const refreshTaskResponse = ref<AdminCreateTaskResponse | null>(null);
 const couplingScanTaskStatus = ref<TaskRequestStatus>('idle');
 const couplingScanTaskErrorMessage = ref('');
 const couplingScanTaskResponse = ref<AdminCreateTaskResponse | null>(null);
+
+const stationBoardDispatchTaskStatus = ref<TaskRequestStatus>('idle');
+const stationBoardDispatchTaskErrorMessage = ref('');
+const stationBoardDispatchTaskResponse = ref<AdminCreateTaskResponse | null>(
+    null
+);
 
 const qrcodeDetectionTaskStatus = ref<TaskRequestStatus>('idle');
 const qrcodeDetectionTaskErrorMessage = ref('');
@@ -835,6 +899,29 @@ async function createCouplingScanTask() {
     }
 }
 
+async function createStationBoardDispatchTask() {
+    stationBoardDispatchTaskStatus.value = 'pending';
+    stationBoardDispatchTaskErrorMessage.value = '';
+    stationBoardDispatchTaskResponse.value = null;
+
+    const body: AdminDispatchStationBoardTasksNowTaskRequest = {
+        type: 'dispatch_station_board_tasks_now',
+        payload: {}
+    };
+
+    try {
+        stationBoardDispatchTaskResponse.value = await postAdminTask(body);
+        await refreshOverviewSilently();
+    } catch (error) {
+        stationBoardDispatchTaskErrorMessage.value = getApiErrorMessage(
+            error,
+            '创建交路数据刷新任务失败。'
+        );
+    } finally {
+        stationBoardDispatchTaskStatus.value = 'idle';
+    }
+}
+
 async function createQrcodeDetectionTask() {
     qrcodeDetectionTaskStatus.value = 'pending';
     qrcodeDetectionTaskErrorMessage.value = '';
@@ -881,7 +968,7 @@ function formatNumber(value: number) {
 useSiteSeo({
     title: '任务 | Open CRH Tracker',
     description:
-        '管理员任务页面，用于查看待执行任务规模，并手动创建导出、线路刷新、重联扫描和固定车组畅行码检测任务。',
+        '管理员任务页面，用于查看待执行任务规模，并手动创建导出、线路刷新、交路数据刷新、重联扫描和固定车组畅行码检测任务。',
     path: '/admin/tasks',
     noindex: true
 });

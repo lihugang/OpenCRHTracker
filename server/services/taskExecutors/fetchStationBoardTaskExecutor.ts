@@ -15,7 +15,9 @@ import type {
     ScheduleCirculationEntry,
     ScheduleRouteRefreshQueueEntry
 } from '~/server/utils/12306/scheduleProbe/types';
-import fetchStationBoardByStation from '~/server/utils/12306/network/fetchStationBoardByStation';
+import fetchStationBoardByStation, {
+    type StationBoardTrainRow
+} from '~/server/utils/12306/network/fetchStationBoardByStation';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
 import uniqueNormalizedCodes from '~/server/utils/12306/uniqueNormalizedCodes';
 import {
@@ -26,6 +28,11 @@ import {
 import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
 import { SHANGHAI_OFFSET_MS } from '~/server/utils/date/shanghaiDateTime';
+import {
+    getCurrentTrainProvenanceTaskRunId,
+    recordCurrentTrainProvenanceEvent
+} from '~/server/services/trainProvenanceRecorder';
+import { recordStationBoardFetchResult } from '~/server/services/trainProvenanceStore';
 
 export const FETCH_STATION_BOARD_TASK_EXECUTOR = 'fetch_station_board';
 
@@ -38,6 +45,7 @@ export interface FetchStationBoardTaskArgs {
     stationName: string;
     stationTelecode: string;
     retryRemaining: number;
+    parentSchedulerTaskId: number | null;
 }
 
 interface ParsedJiaoluNode {
@@ -67,6 +75,7 @@ export function parseFetchStationBoardTaskArgs(
         stationName?: unknown;
         stationTelecode?: unknown;
         retryRemaining?: unknown;
+        parentSchedulerTaskId?: unknown;
     };
     const serviceDate =
         typeof body.serviceDate === 'string' ? body.serviceDate.trim() : '';
@@ -82,6 +91,12 @@ export function parseFetchStationBoardTaskArgs(
         body.retryRemaining >= 0
             ? body.retryRemaining
             : defaultRetryRemaining;
+    const parentSchedulerTaskId =
+        typeof body.parentSchedulerTaskId === 'number' &&
+        Number.isInteger(body.parentSchedulerTaskId) &&
+        body.parentSchedulerTaskId > 0
+            ? body.parentSchedulerTaskId
+            : null;
 
     if (!/^\d{8}$/.test(serviceDate)) {
         throw new Error(
@@ -103,8 +118,41 @@ export function parseFetchStationBoardTaskArgs(
         serviceDate,
         stationName,
         stationTelecode,
-        retryRemaining
+        retryRemaining,
+        parentSchedulerTaskId
     };
+}
+
+function maybeRecordFetchResult(input: {
+    serviceDate: string;
+    parentSchedulerTaskId: number | null;
+    stationName: string;
+    stationTelecode: string;
+    resultStatus: 'saved_entries' | 'no_official_entries';
+    rowCount: number;
+    parsedEntryCount: number;
+    savedEntryCount: number;
+    consumedQueueEntryCount: number;
+    rows: StationBoardTrainRow[];
+}) {
+    const taskRunId = getCurrentTrainProvenanceTaskRunId();
+    if (taskRunId === null) {
+        return;
+    }
+
+    recordStationBoardFetchResult({
+        taskRunId,
+        serviceDate: input.serviceDate,
+        parentSchedulerTaskId: input.parentSchedulerTaskId,
+        stationName: input.stationName,
+        stationTelecode: input.stationTelecode,
+        resultStatus: input.resultStatus,
+        rowCount: input.rowCount,
+        parsedEntryCount: input.parsedEntryCount,
+        savedEntryCount: input.savedEntryCount,
+        consumedQueueEntryCount: input.consumedQueueEntryCount,
+        rows: input.rows
+    });
 }
 
 function matchesGroupStations(
@@ -403,6 +451,17 @@ function collectResolvedQueueEntries(
 
 function maybeRequeueTask(args: FetchStationBoardTaskArgs, reason: string) {
     if (args.retryRemaining <= 0) {
+        recordCurrentTrainProvenanceEvent({
+            serviceDate: args.serviceDate,
+            eventType: 'station_board_fetch_exhausted',
+            result: 'exhausted',
+            payload: {
+                stationName: args.stationName,
+                stationTelecode: args.stationTelecode,
+                reason,
+                parentSchedulerTaskId: args.parentSchedulerTaskId
+            }
+        });
         logger.warn(
             `station_board_failed_exhausted serviceDate=${args.serviceDate} stationName=${args.stationName} stationTelecode=${args.stationTelecode} reason=${reason}`
         );
@@ -420,6 +479,21 @@ function maybeRequeueTask(args: FetchStationBoardTaskArgs, reason: string) {
         },
         getNowSeconds() + retryDelaySeconds
     );
+    recordCurrentTrainProvenanceEvent({
+        serviceDate: args.serviceDate,
+        eventType: 'station_board_fetch_requeued',
+        result: 'requeued',
+        linkedSchedulerTaskId: nextTaskId,
+        payload: {
+            stationName: args.stationName,
+            stationTelecode: args.stationTelecode,
+            reason,
+            retryRemaining: args.retryRemaining,
+            nextRetryRemaining,
+            retryDelaySeconds,
+            parentSchedulerTaskId: args.parentSchedulerTaskId
+        }
+    });
     logger.warn(
         `station_board_failed_requeue serviceDate=${args.serviceDate} stationName=${args.stationName} stationTelecode=${args.stationTelecode} reason=${reason} retryRemaining=${args.retryRemaining} nextRetryRemaining=${nextRetryRemaining} nextTaskId=${nextTaskId} retryDelaySeconds=${retryDelaySeconds}`
     );
@@ -464,6 +538,32 @@ async function executeFetchStationBoardTask(rawArgs: unknown) {
         .filter((entry): entry is ScheduleCirculationEntry => entry !== null);
     const chosenEntries = chooseCirculationEntries(parsedEntries);
     if (chosenEntries.length === 0) {
+        maybeRecordFetchResult({
+            serviceDate: args.serviceDate,
+            parentSchedulerTaskId: args.parentSchedulerTaskId,
+            stationName: args.stationName,
+            stationTelecode: args.stationTelecode,
+            resultStatus: 'no_official_entries',
+            rowCount: rows.length,
+            parsedEntryCount: parsedEntries.length,
+            savedEntryCount: 0,
+            consumedQueueEntryCount: 0,
+            rows
+        });
+        recordCurrentTrainProvenanceEvent({
+            serviceDate: args.serviceDate,
+            eventType: 'station_board_fetch_completed',
+            result: 'no_official_entries',
+            payload: {
+                stationName: args.stationName,
+                stationTelecode: args.stationTelecode,
+                rowCount: rows.length,
+                parsedEntryCount: parsedEntries.length,
+                savedEntryCount: 0,
+                consumedQueueEntryCount: 0,
+                parentSchedulerTaskId: args.parentSchedulerTaskId
+            }
+        });
         logger.info(
             `done_no_official_entries serviceDate=${args.serviceDate} stationName=${args.stationName} stationTelecode=${args.stationTelecode} rows=${rows.length}`
         );
@@ -482,6 +582,34 @@ async function executeFetchStationBoardTask(rawArgs: unknown) {
         scheduleFilePath,
         resolvedQueueEntries
     );
+
+    maybeRecordFetchResult({
+        serviceDate: args.serviceDate,
+        parentSchedulerTaskId: args.parentSchedulerTaskId,
+        stationName: args.stationName,
+        stationTelecode: args.stationTelecode,
+        resultStatus: 'saved_entries',
+        rowCount: rows.length,
+        parsedEntryCount: parsedEntries.length,
+        savedEntryCount: chosenEntries.length,
+        consumedQueueEntryCount: removedQueueEntries.length,
+        rows
+    });
+    recordCurrentTrainProvenanceEvent({
+        serviceDate: args.serviceDate,
+        eventType: 'station_board_fetch_completed',
+        result: 'saved_entries',
+        payload: {
+            stationName: args.stationName,
+            stationTelecode: args.stationTelecode,
+            rowCount: rows.length,
+            parsedEntryCount: parsedEntries.length,
+            savedEntryCount: chosenEntries.length,
+            consumedQueueEntryCount: removedQueueEntries.length,
+            savedKeys,
+            parentSchedulerTaskId: args.parentSchedulerTaskId
+        }
+    });
 
     logger.info(
         `done serviceDate=${args.serviceDate} stationName=${args.stationName} stationTelecode=${args.stationTelecode} rows=${rows.length} parsedEntries=${parsedEntries.length} savedEntries=${chosenEntries.length} savedKeys=${savedKeys.length} consumedQueueEntries=${removedQueueEntries.length}`

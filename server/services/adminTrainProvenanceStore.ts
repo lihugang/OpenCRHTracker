@@ -10,16 +10,22 @@ import {
     type ProbeStatusRow
 } from '~/server/services/probeStatusStore';
 import {
+    getStationBoardDispatchResultByTaskRunId,
+    getStationBoardFetchResultByTaskRunId,
     getTrainProvenanceRuntimeConfig,
     getTrainProvenanceTaskRunById,
     isTrainProvenanceEnabled,
     list12306RequestHourlyStatsInRange,
     listCouplingScanCandidatesByTaskRunId,
+    listStationBoardDispatchResultsByDate,
+    listStationBoardFetchResultsByParentSchedulerTaskId,
     listTrainProvenanceEventsByTaskRunId,
     listTrainProvenanceTaskRunsByDateAndExecutor,
     listTrainProvenanceDepartureStartAts,
     listTrainProvenanceEventsByDateAndTrainCode,
     type CouplingScanCandidateRecord,
+    type StationBoardDispatchResultRecord,
+    type StationBoardFetchResultRecord,
     type TrainProvenanceEventRecord
 } from '~/server/services/trainProvenanceStore';
 import {
@@ -42,6 +48,13 @@ import type {
     AdminQrcodeScanTaskRunSummary,
     AdminQrcodeScanTimeDetailTaskItem,
     AdminQrcodeScanTimeSummaryItem,
+    AdminStationBoardDispatchDetailResponse,
+    AdminStationBoardDispatchTaskListItem,
+    AdminStationBoardFetchResultStatus,
+    AdminStationBoardRow,
+    AdminStationBoardStationTaskAction,
+    AdminStationBoardStationTaskItem,
+    AdminStationBoardTaskListResponse,
     AdminTrainDataRequestHourBucket,
     AdminTrainDataRequestStatsResponse,
     AdminTrainDataRequestSummary,
@@ -63,6 +76,8 @@ import type {
 
 const COUPLING_SCAN_TASK_EXECUTOR = 'detect_coupled_emu_group';
 const QRCODE_SCAN_TASK_EXECUTOR = 'probe_qrcode_detection_emu';
+const STATION_BOARD_DISPATCH_TASK_EXECUTOR = 'dispatch_station_board_tasks';
+const STATION_BOARD_FETCH_TASK_EXECUTOR = 'fetch_station_board';
 
 function toLatestStatus(
     rows: ProbeStatusRow[]
@@ -147,6 +162,128 @@ function getStringArray(value: unknown): string[] {
     return Array.isArray(value)
         ? value.filter((item): item is string => typeof item === 'string')
         : [];
+}
+
+interface StationBoardDispatchDetailPayload {
+    stationName: string;
+    stationTelecode: string;
+    action: AdminStationBoardStationTaskAction;
+    schedulerTaskId: number | null;
+    ambiguousTelecodes: string[];
+}
+
+function isStationBoardStationTaskAction(
+    value: unknown
+): value is AdminStationBoardStationTaskAction {
+    return (
+        value === 'created' ||
+        value === 'reused' ||
+        value === 'station_telecode_not_found' ||
+        value === 'station_telecode_ambiguous'
+    );
+}
+
+function isStationBoardFetchResultStatus(
+    value: unknown
+): value is AdminStationBoardFetchResultStatus {
+    return value === 'saved_entries' || value === 'no_official_entries';
+}
+
+function toStationBoardSelectedStations(value: unknown) {
+    return getStringArray(value)
+        .map((item) => item.trim())
+        .filter((item) => item.length > 0);
+}
+
+function toStationBoardDispatchDetailPayloads(
+    value: unknown
+): StationBoardDispatchDetailPayload[] {
+    if (!Array.isArray(value)) {
+        return [];
+    }
+
+    return value
+        .map((item) => {
+            const payload = getPayloadObject(item);
+            if (!payload) {
+                return null;
+            }
+
+            const stationName = (getOptionalString(payload.stationName) ?? '').trim();
+            const stationTelecode = normalizeCode(
+                getOptionalString(payload.stationTelecode) ?? ''
+            );
+            const action = payload.action;
+            const schedulerTaskId = getOptionalInteger(payload.schedulerTaskId);
+            const ambiguousTelecodes = getStringArray(
+                payload.ambiguousTelecodes
+            )
+                .map((telecode) => normalizeCode(telecode))
+                .filter((telecode) => telecode.length > 0);
+
+            if (
+                stationName.length === 0 ||
+                !isStationBoardStationTaskAction(action)
+            ) {
+                return null;
+            }
+
+            return {
+                stationName,
+                stationTelecode,
+                action,
+                schedulerTaskId,
+                ambiguousTelecodes
+            };
+        })
+        .filter(
+            (item): item is StationBoardDispatchDetailPayload => item !== null
+        );
+}
+
+function toStationBoardRows(value: unknown): AdminStationBoardRow[] {
+    if (!Array.isArray(value)) {
+        return [];
+    }
+
+    return value
+        .map((item) => {
+            const payload = getPayloadObject(item);
+            if (!payload) {
+                return null;
+            }
+
+            const trainNo = normalizeCode(getOptionalString(payload.trainNo) ?? '');
+            const stationTrainCode = normalizeCode(
+                getOptionalString(payload.stationTrainCode) ?? ''
+            );
+            const jiaoluTrain = (getOptionalString(payload.jiaoluTrain) ?? '').trim();
+            const startStationName = (
+                getOptionalString(payload.startStationName) ?? ''
+            ).trim();
+            const endStationName = (
+                getOptionalString(payload.endStationName) ?? ''
+            ).trim();
+
+            if (
+                trainNo.length === 0 &&
+                stationTrainCode.length === 0 &&
+                jiaoluTrain.length === 0 &&
+                startStationName.length === 0 &&
+                endStationName.length === 0
+            ) {
+                return null;
+            }
+
+            return {
+                trainNo,
+                stationTrainCode,
+                jiaoluTrain,
+                startStationName,
+                endStationName
+            };
+        })
+        .filter((item): item is AdminStationBoardRow => item !== null);
 }
 
 function normalizeTrainCodeList(trainCodes: string[]): string[] {
@@ -1914,5 +2051,240 @@ export function getAdminQrcodeScanDetail(
         detectedAt,
         summary: buildQrcodeScanTimeSummaryItem(detectedAt, matchingTaskRuns),
         tasks
+    };
+}
+
+function toStationBoardDispatchTaskListItem(
+    taskRun: ReturnType<typeof getTrainProvenanceTaskRunById>,
+    result: StationBoardDispatchResultRecord | null
+): AdminStationBoardDispatchTaskListItem | null {
+    if (!taskRun) {
+        return null;
+    }
+
+    const selectedStations = toStationBoardSelectedStations(
+        result?.selectedStations ?? []
+    );
+
+    return {
+        taskRunId: taskRun.id,
+        schedulerTaskId: taskRun.schedulerTaskId,
+        executor: taskRun.executor,
+        status: taskRun.status,
+        startedAt: taskRun.startedAt,
+        finishedAt: taskRun.finishedAt,
+        serviceDate: taskRun.serviceDate,
+        candidateGroupCount: result?.candidateGroupCount ?? 0,
+        selectedStationCount: result?.selectedStationCount ?? selectedStations.length,
+        createdTaskCount: result?.createdTaskCount ?? 0,
+        reusedTaskCount: result?.reusedTaskCount ?? 0,
+        skippedNotFoundCount: result?.skippedNotFoundCount ?? 0,
+        skippedAmbiguousCount: result?.skippedAmbiguousCount ?? 0,
+        selectedStations,
+        taskArgs: taskRun.taskArgs
+    };
+}
+
+function buildStationBoardStationTaskItem(input: {
+    detail: StationBoardDispatchDetailPayload;
+    fetchTaskRun: ReturnType<typeof getTrainProvenanceTaskRunById>;
+    fetchResult: StationBoardFetchResultRecord | null;
+}): AdminStationBoardStationTaskItem {
+    const fetchTaskRun = input.fetchTaskRun;
+    const fetchResult = input.fetchResult;
+
+    return {
+        stationName: input.detail.stationName,
+        stationTelecode:
+            fetchResult?.stationTelecode ||
+            input.detail.stationTelecode ||
+            '',
+        action: input.detail.action,
+        schedulerTaskId: input.detail.schedulerTaskId,
+        taskRunId: fetchTaskRun?.id ?? null,
+        taskStatus: fetchTaskRun?.status ?? null,
+        startedAt: fetchTaskRun?.startedAt ?? null,
+        finishedAt: fetchTaskRun?.finishedAt ?? null,
+        resultStatus: isStationBoardFetchResultStatus(fetchResult?.resultStatus)
+            ? fetchResult!.resultStatus
+            : null,
+        rowCount: fetchResult?.rowCount ?? 0,
+        parsedEntryCount: fetchResult?.parsedEntryCount ?? 0,
+        savedEntryCount: fetchResult?.savedEntryCount ?? 0,
+        consumedQueueEntryCount: fetchResult?.consumedQueueEntryCount ?? 0,
+        rows: toStationBoardRows(fetchResult?.rows ?? []),
+        ambiguousTelecodes: input.detail.ambiguousTelecodes
+    };
+}
+
+export function getAdminStationBoardTaskList(
+    date: string
+): AdminStationBoardTaskListResponse {
+    const runtimeConfig = getTrainProvenanceRuntimeConfig();
+
+    if (!isTrainProvenanceEnabled()) {
+        return {
+            enabled: false,
+            retentionDays: runtimeConfig.retentionDays,
+            date,
+            items: []
+        };
+    }
+
+    if (!/^\d{8}$/.test(date)) {
+        return {
+            enabled: true,
+            retentionDays: runtimeConfig.retentionDays,
+            date,
+            items: []
+        };
+    }
+
+    const taskRuns = listTrainProvenanceTaskRunsByDateAndExecutor(
+        date,
+        STATION_BOARD_DISPATCH_TASK_EXECUTOR
+    );
+    const resultByTaskRunId = new Map(
+        listStationBoardDispatchResultsByDate(date).map((result) => [
+            result.taskRunId,
+            result
+        ])
+    );
+
+    const items = taskRuns
+        .map((taskRun) =>
+            toStationBoardDispatchTaskListItem(
+                taskRun,
+                resultByTaskRunId.get(taskRun.id) ?? null
+            )
+        )
+        .filter(
+            (item): item is AdminStationBoardDispatchTaskListItem =>
+                item !== null
+        )
+        .sort((left, right) => {
+            if (left.startedAt !== right.startedAt) {
+                return right.startedAt - left.startedAt;
+            }
+
+            return right.taskRunId - left.taskRunId;
+        });
+
+    return {
+        enabled: true,
+        retentionDays: runtimeConfig.retentionDays,
+        date,
+        items
+    };
+}
+
+export function getAdminStationBoardDispatchDetail(
+    taskRunId: number
+): AdminStationBoardDispatchDetailResponse {
+    if (!isTrainProvenanceEnabled()) {
+        return {
+            enabled: false,
+            taskRunId,
+            schedulerTaskId: null,
+            serviceDate: '',
+            status: null,
+            startedAt: null,
+            finishedAt: null,
+            candidateGroupCount: 0,
+            selectedStations: [],
+            createdTaskCount: 0,
+            reusedTaskCount: 0,
+            skippedNotFoundCount: 0,
+            skippedAmbiguousCount: 0,
+            stations: []
+        };
+    }
+
+    const taskRun = getTrainProvenanceTaskRunById(taskRunId);
+    const result = getStationBoardDispatchResultByTaskRunId(taskRunId);
+    const serviceDate = taskRun?.serviceDate ?? result?.serviceDate ?? '';
+    const selectedStations = toStationBoardSelectedStations(
+        result?.selectedStations ?? []
+    );
+    const dispatchDetails = toStationBoardDispatchDetailPayloads(
+        result?.detail ?? []
+    );
+    const fetchTaskRuns = /^\d{8}$/.test(serviceDate)
+        ? listTrainProvenanceTaskRunsByDateAndExecutor(
+              serviceDate,
+              STATION_BOARD_FETCH_TASK_EXECUTOR
+          )
+        : [];
+    const fetchTaskRunBySchedulerTaskId = new Map(
+        fetchTaskRuns.map((fetchTaskRun) => [
+            fetchTaskRun.schedulerTaskId,
+            fetchTaskRun
+        ])
+    );
+    const fetchResultsByParentSchedulerTaskId =
+        taskRun && /^\d{8}$/.test(serviceDate)
+            ? listStationBoardFetchResultsByParentSchedulerTaskId(
+                  serviceDate,
+                  taskRun.schedulerTaskId
+              )
+            : [];
+    const fetchResultByTaskRunId = new Map<number, StationBoardFetchResultRecord>();
+
+    for (const fetchResult of fetchResultsByParentSchedulerTaskId) {
+        fetchResultByTaskRunId.set(fetchResult.taskRunId, fetchResult);
+    }
+
+    for (const detail of dispatchDetails) {
+        const schedulerTaskId = detail.schedulerTaskId;
+        if (schedulerTaskId === null) {
+            continue;
+        }
+
+        const fetchTaskRun =
+            fetchTaskRunBySchedulerTaskId.get(schedulerTaskId) ?? null;
+        if (!fetchTaskRun) {
+            continue;
+        }
+
+        if (!fetchResultByTaskRunId.has(fetchTaskRun.id)) {
+            const fetchResult = getStationBoardFetchResultByTaskRunId(fetchTaskRun.id);
+            if (fetchResult) {
+                fetchResultByTaskRunId.set(fetchTaskRun.id, fetchResult);
+            }
+        }
+    }
+
+    const stations = dispatchDetails.map((detail) => {
+        const fetchTaskRun =
+            detail.schedulerTaskId !== null
+                ? (fetchTaskRunBySchedulerTaskId.get(detail.schedulerTaskId) ?? null)
+                : null;
+        const fetchResult =
+            fetchTaskRun !== null
+                ? (fetchResultByTaskRunId.get(fetchTaskRun.id) ?? null)
+                : null;
+
+        return buildStationBoardStationTaskItem({
+            detail,
+            fetchTaskRun,
+            fetchResult
+        });
+    });
+
+    return {
+        enabled: true,
+        taskRunId,
+        schedulerTaskId: taskRun?.schedulerTaskId ?? null,
+        serviceDate,
+        status: taskRun?.status ?? null,
+        startedAt: taskRun?.startedAt ?? null,
+        finishedAt: taskRun?.finishedAt ?? null,
+        candidateGroupCount: result?.candidateGroupCount ?? 0,
+        selectedStations,
+        createdTaskCount: result?.createdTaskCount ?? 0,
+        reusedTaskCount: result?.reusedTaskCount ?? 0,
+        skippedNotFoundCount: result?.skippedNotFoundCount ?? 0,
+        skippedAmbiguousCount: result?.skippedAmbiguousCount ?? 0,
+        stations
     };
 }

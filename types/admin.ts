@@ -254,7 +254,8 @@ export type AdminTaskTemplateType =
     | 'regenerate_daily_export'
     | 'refresh_route_info_now'
     | 'detect_coupled_emu_group_now'
-    | 'run_qrcode_detection_now';
+    | 'run_qrcode_detection_now'
+    | 'dispatch_station_board_tasks_now';
 
 export interface AdminCreatedTask {
     taskId: number;
@@ -289,11 +290,17 @@ export interface AdminRunQrcodeDetectionNowTaskRequest {
     payload: Record<string, never>;
 }
 
+export interface AdminDispatchStationBoardTasksNowTaskRequest {
+    type: 'dispatch_station_board_tasks_now';
+    payload: Record<string, never>;
+}
+
 export type AdminCreateTaskRequest =
     | AdminRegenerateDailyExportTaskRequest
     | AdminRefreshRouteInfoNowTaskRequest
     | AdminDetectCoupledEmuGroupNowTaskRequest
-    | AdminRunQrcodeDetectionNowTaskRequest;
+    | AdminRunQrcodeDetectionNowTaskRequest
+    | AdminDispatchStationBoardTasksNowTaskRequest;
 
 export interface AdminCreateTaskResponse {
     type: AdminTaskTemplateType;
@@ -594,4 +601,82 @@ export interface AdminQrcodeScanDetailResponse {
     detectedAt: string;
     summary: AdminQrcodeScanTimeSummaryItem | null;
     tasks: AdminQrcodeScanTimeDetailTaskItem[];
+}
+
+export interface AdminStationBoardDispatchTaskListItem {
+    taskRunId: number;
+    schedulerTaskId: number;
+    executor: string;
+    status: AdminTrainProvenanceTaskRunStatus;
+    startedAt: number;
+    finishedAt: number | null;
+    serviceDate: string;
+    candidateGroupCount: number;
+    selectedStationCount: number;
+    createdTaskCount: number;
+    reusedTaskCount: number;
+    skippedNotFoundCount: number;
+    skippedAmbiguousCount: number;
+    selectedStations: string[];
+    taskArgs: unknown;
+}
+
+export interface AdminStationBoardTaskListResponse {
+    enabled: boolean;
+    retentionDays: number;
+    date: string;
+    items: AdminStationBoardDispatchTaskListItem[];
+}
+
+export interface AdminStationBoardRow {
+    trainNo: string;
+    stationTrainCode: string;
+    jiaoluTrain: string;
+    startStationName: string;
+    endStationName: string;
+}
+
+export type AdminStationBoardStationTaskAction =
+    | 'created'
+    | 'reused'
+    | 'station_telecode_not_found'
+    | 'station_telecode_ambiguous';
+
+export type AdminStationBoardFetchResultStatus =
+    | 'saved_entries'
+    | 'no_official_entries';
+
+export interface AdminStationBoardStationTaskItem {
+    stationName: string;
+    stationTelecode: string;
+    action: AdminStationBoardStationTaskAction;
+    schedulerTaskId: number | null;
+    taskRunId: number | null;
+    taskStatus: AdminTrainProvenanceTaskRunStatus | null;
+    startedAt: number | null;
+    finishedAt: number | null;
+    resultStatus: AdminStationBoardFetchResultStatus | null;
+    rowCount: number;
+    parsedEntryCount: number;
+    savedEntryCount: number;
+    consumedQueueEntryCount: number;
+    rows: AdminStationBoardRow[];
+    ambiguousTelecodes: string[];
+}
+
+export interface AdminStationBoardDispatchDetailResponse {
+    enabled: boolean;
+    taskRunId: number;
+    schedulerTaskId: number | null;
+    serviceDate: string;
+    status: AdminTrainProvenanceTaskRunStatus | null;
+    startedAt: number | null;
+    finishedAt: number | null;
+    candidateGroupCount: number;
+    selectedStations: string[];
+    createdTaskCount: number;
+    reusedTaskCount: number;
+    skippedNotFoundCount: number;
+    skippedAmbiguousCount: number;
+    stations: AdminStationBoardStationTaskItem[];
 }
