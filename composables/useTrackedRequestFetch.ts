@@ -56,18 +56,17 @@ function getResponseServerTimingHeader(response: unknown) {
 }
 
 function getErrorResponse(error: unknown) {
-    if (
-        typeof error !== 'object' ||
-        error === null ||
-        !('response' in error)
-    ) {
+    if (typeof error !== 'object' || error === null || !('response' in error)) {
         return null;
     }
 
     return (error as { response?: unknown }).response ?? null;
 }
 
-async function runFetchHooks(hooks: FetchHook | undefined, context: FetchHookContext) {
+async function runFetchHooks(
+    hooks: FetchHook | undefined,
+    context: FetchHookContext
+) {
     if (!hooks) {
         return;
     }
@@ -117,9 +116,7 @@ export default function useTrackedRequestFetch() {
             pauseServerTiming,
             recordSsrInternalApiTiming,
             resumeServerTiming
-        } = await import(
-            '~/server/utils/timing/serverTiming'
-        );
+        } = await import('~/server/utils/timing/serverTiming');
         const pathname = resolveRequestPathname(request as RequestInfo | URL);
         if (!isInternalApiPath(pathname)) {
             return await requestFetch<T>(request, options);

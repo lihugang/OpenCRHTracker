@@ -51,7 +51,9 @@ function nowMs() {
 
 function isApiRequest(pathname: string) {
     const versionPrefix = useConfig().api.versionPrefix;
-    return pathname === versionPrefix || pathname.startsWith(`${versionPrefix}/`);
+    return (
+        pathname === versionPrefix || pathname.startsWith(`${versionPrefix}/`)
+    );
 }
 
 function isDocumentRequest(event: H3Event, pathname: string) {
@@ -183,7 +185,11 @@ function formatServerTiming(metrics: ServerTimingMetric[]) {
         .join(', ');
 }
 
-function appendMetric(metrics: ServerTimingMetric[], name: string, durationMs: number) {
+function appendMetric(
+    metrics: ServerTimingMetric[],
+    name: string,
+    durationMs: number
+) {
     metrics.push({
         name,
         durationMs: Math.max(0, Math.round(durationMs))
@@ -296,7 +302,11 @@ function buildServerTimingMetrics(store: RequestTimingStore) {
     if (store.kind === 'ssr') {
         appendMetric(metrics, 'render', store.phaseDurationsMs.render);
         for (const [index, entry] of store.ssrApiEntries.entries()) {
-            appendMetric(metrics, `${entry.metricName}_${index + 1}`, entry.durationMs);
+            appendMetric(
+                metrics,
+                `${entry.metricName}_${index + 1}`,
+                entry.durationMs
+            );
         }
     }
 
@@ -334,7 +344,8 @@ export function initializeRequestTiming(event: H3Event) {
         headersWritten: false
     };
 
-    (event.context as Record<string, unknown>)[REQUEST_TIMING_CONTEXT_KEY] = store;
+    (event.context as Record<string, unknown>)[REQUEST_TIMING_CONTEXT_KEY] =
+        store;
     return store;
 }
 
@@ -415,7 +426,11 @@ export function appendServerTimingHeaders(event: H3Event) {
     }
 
     pauseActivePhase(store, nowMs());
-    setHeader(event, 'Server-Timing', formatServerTiming(buildServerTimingMetrics(store)));
+    setHeader(
+        event,
+        'Server-Timing',
+        formatServerTiming(buildServerTimingMetrics(store))
+    );
     setHeader(event, 'Timing-Allow-Origin', resolveTimingAllowOrigin(event));
     store.headersWritten = true;
 }

@@ -1079,12 +1079,14 @@ export const developerDocsOpenApi = {
                             },
                             startAt: {
                                 type: 'integer',
-                                description: '当前车次始发时间，Unix 时间戳（秒）。',
+                                description:
+                                    '当前车次始发时间，Unix 时间戳（秒）。',
                                 example: 1774060020
                             },
                             endAt: {
                                 type: 'integer',
-                                description: '当前车次终到时间，Unix 时间戳（秒）。',
+                                description:
+                                    '当前车次终到时间，Unix 时间戳（秒）。',
                                 example: 1774076820
                             },
                             circulation: {

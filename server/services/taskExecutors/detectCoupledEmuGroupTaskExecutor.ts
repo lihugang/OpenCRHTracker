@@ -945,8 +945,7 @@ async function persistResolvedUntrackedGroups(
             result:
                 finalStatus === ProbeStatusValue.CoupledFormationResolved
                     ? 'coupled'
-                    : finalStatus ===
-                        ProbeStatusValue.SingleFormationResolved
+                    : finalStatus === ProbeStatusValue.SingleFormationResolved
                       ? 'single'
                       : 'untracked_single',
             payload: {

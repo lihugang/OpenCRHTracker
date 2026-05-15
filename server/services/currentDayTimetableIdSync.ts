@@ -68,8 +68,10 @@ function chooseKeeperRow<TRow extends DailySyncRow>(
     targetTimetableId: number
 ) {
     return [...rows].sort((left, right) => {
-        const leftMatchesTarget = left.timetable_id === targetTimetableId ? 1 : 0;
-        const rightMatchesTarget = right.timetable_id === targetTimetableId ? 1 : 0;
+        const leftMatchesTarget =
+            left.timetable_id === targetTimetableId ? 1 : 0;
+        const rightMatchesTarget =
+            right.timetable_id === targetTimetableId ? 1 : 0;
         if (leftMatchesTarget !== rightMatchesTarget) {
             return rightMatchesTarget - leftMatchesTarget;
         }
@@ -86,7 +88,9 @@ function buildDailySyncActions(
     const groupedRows = new Map<string, DailySyncRow[]>();
 
     for (const row of rows) {
-        const groupKey = [row.train_code, row.emu_code, row.service_date].join('|');
+        const groupKey = [row.train_code, row.emu_code, row.service_date].join(
+            '|'
+        );
         const existing = groupedRows.get(groupKey);
         if (existing) {
             existing.push(row);
@@ -127,7 +131,9 @@ function buildProbeSyncActions(
     const groupedRows = new Map<string, ProbeSyncRow[]>();
 
     for (const row of rows) {
-        const groupKey = [row.train_code, row.emu_code, row.service_date].join('|');
+        const groupKey = [row.train_code, row.emu_code, row.service_date].join(
+            '|'
+        );
         const existing = groupedRows.get(groupKey);
         if (existing) {
             existing.push(row);
@@ -148,7 +154,8 @@ function buildProbeSyncActions(
             ProbeStatusValue.PendingCouplingDetection
         );
         const needsUpdate =
-            keeper.timetable_id !== targetTimetableId || keeper.status !== nextStatus;
+            keeper.timetable_id !== targetTimetableId ||
+            keeper.status !== nextStatus;
 
         if (!needsUpdate && deleteIds.length === 0) {
             continue;
@@ -189,10 +196,11 @@ export function syncCurrentDayTimetableIdsForTrainCodes(
     const dayEndAtExclusive = dayStartAt + DAY_SECONDS;
     const syncTransaction = useEmuDatabase().transaction(() => {
         for (const trainCode of normalizedTrainCodes) {
-            const targetTimetableId = resolveTimetableIdByTrainCodeAndServiceDate(
-                trainCode,
-                serviceDate
-            );
+            const targetTimetableId =
+                resolveTimetableIdByTrainCodeAndServiceDate(
+                    trainCode,
+                    serviceDate
+                );
             if (targetTimetableId === null) {
                 continue;
             }
@@ -221,8 +229,14 @@ export function syncCurrentDayTimetableIdsForTrainCodes(
                 status: row.status
             }));
 
-            const dailyActions = buildDailySyncActions(dailyRows, targetTimetableId);
-            const probeActions = buildProbeSyncActions(probeRows, targetTimetableId);
+            const dailyActions = buildDailySyncActions(
+                dailyRows,
+                targetTimetableId
+            );
+            const probeActions = buildProbeSyncActions(
+                probeRows,
+                targetTimetableId
+            );
 
             if (dailyActions.length === 0 && probeActions.length === 0) {
                 continue;
@@ -232,7 +246,10 @@ export function syncCurrentDayTimetableIdsForTrainCodes(
 
             for (const action of dailyActions) {
                 for (const deleteId of action.deleteIds) {
-                    maintenanceStatements.run('deleteDailyEmuRouteById', deleteId);
+                    maintenanceStatements.run(
+                        'deleteDailyEmuRouteById',
+                        deleteId
+                    );
                     result.deletedDailyRows += 1;
                 }
 
@@ -249,7 +266,10 @@ export function syncCurrentDayTimetableIdsForTrainCodes(
 
             for (const action of probeActions) {
                 for (const deleteId of action.deleteIds) {
-                    maintenanceStatements.run('deleteProbeStatusById', deleteId);
+                    maintenanceStatements.run(
+                        'deleteProbeStatusById',
+                        deleteId
+                    );
                     result.deletedProbeRows += 1;
                 }
 

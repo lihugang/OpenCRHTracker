@@ -908,12 +908,7 @@ function consumeRow(
         return true;
     }
 
-    commitClosedRun(
-        state.pendingRun,
-        state,
-        outgoingCounts,
-        incomingCounts
-    );
+    commitClosedRun(state.pendingRun, state, outgoingCounts, incomingCounts);
     state.pendingRun = nodeMeta
         ? createRunBucket(row, nodeIds.getNodeId(nodeMeta))
         : createEmptyRunBucket(row);
@@ -927,8 +922,9 @@ export function rebuildTrainCirculationIndex(): TrainCirculationIndexCache {
     const { startAt, endAt } = getWindowRange(currentDate, config.windowDays);
     const nodeIds = buildNodeIdStore();
     const officialInternalCodes = loadOfficialCirculationInternalCodes();
-    const trainCodeNodeMetaMap =
-        buildTrainCodeNodeMetaMap(officialInternalCodes);
+    const trainCodeNodeMetaMap = buildTrainCodeNodeMetaMap(
+        officialInternalCodes
+    );
     const scanStatesByEmuCode = new Map<string, EmuScanState>();
     const outgoingCounts = new Map<number, Map<number, number>>();
     const incomingCounts = new Map<number, Map<number, number>>();

@@ -703,11 +703,19 @@
                                         <div
                                             class="flex flex-wrap items-center gap-3">
                                             <UiButton
-                                                v-if="hasScannedRoute(item.scannedRoute)"
+                                                v-if="
+                                                    hasScannedRoute(
+                                                        item.scannedRoute
+                                                    )
+                                                "
                                                 type="button"
                                                 variant="secondary"
                                                 size="sm"
-                                                @click="toggleScannedRouteExpanded(item.id)">
+                                                @click="
+                                                    toggleScannedRouteExpanded(
+                                                        item.id
+                                                    )
+                                                ">
                                                 {{
                                                     isScannedRouteExpanded(
                                                         item.id
@@ -759,31 +767,51 @@
 
                                         <div
                                             v-if="
-                                                hasScannedRoute(item.scannedRoute) &&
+                                                hasScannedRoute(
+                                                    item.scannedRoute
+                                                ) &&
                                                 isScannedRouteExpanded(item.id)
                                             "
                                             class="rounded-[0.875rem] border border-sky-200 bg-sky-50/70 px-4 py-4">
                                             <div class="space-y-3">
-                                                <p class="text-sm font-semibold text-slate-900">
-                                                    {{ SCANNED_ROUTE_LABELS.title }}
+                                                <p
+                                                    class="text-sm font-semibold text-slate-900">
+                                                    {{
+                                                        SCANNED_ROUTE_LABELS.title
+                                                    }}
                                                 </p>
-                                                <dl class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                                                <dl
+                                                    class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                                                     <div
-                                                        v-for="field in buildScannedRouteFields(item.scannedRoute)"
+                                                        v-for="field in buildScannedRouteFields(
+                                                            item.scannedRoute
+                                                        )"
                                                         :key="`${item.id}:${field.key}`">
-                                                        <dt class="text-xs uppercase tracking-[0.16em] text-slate-400">
+                                                        <dt
+                                                            class="text-xs uppercase tracking-[0.16em] text-slate-400">
                                                             {{ field.label }}
                                                         </dt>
-                                                        <dd class="mt-1 text-sm text-slate-700">
+                                                        <dd
+                                                            class="mt-1 text-sm text-slate-700">
                                                             {{ field.value }}
                                                         </dd>
                                                     </div>
                                                 </dl>
                                                 <p
-                                                    v-if="item.scannedRoute?.cacheNote"
+                                                    v-if="
+                                                        item.scannedRoute
+                                                            ?.cacheNote
+                                                    "
                                                     class="text-xs leading-5"
-                                                    :class="getRouteSnapshotNoteClass(item.scannedRoute)">
-                                                    {{ item.scannedRoute.cacheNote }}
+                                                    :class="
+                                                        getRouteSnapshotNoteClass(
+                                                            item.scannedRoute
+                                                        )
+                                                    ">
+                                                    {{
+                                                        item.scannedRoute
+                                                            .cacheNote
+                                                    }}
                                                 </p>
                                             </div>
                                         </div>
@@ -1872,11 +1900,19 @@
                                             <div
                                                 class="flex flex-wrap items-center gap-3">
                                                 <UiButton
-                                                    v-if="hasScannedRoute(event.scannedRoute)"
+                                                    v-if="
+                                                        hasScannedRoute(
+                                                            event.scannedRoute
+                                                        )
+                                                    "
                                                     type="button"
                                                     variant="secondary"
                                                     size="sm"
-                                                    @click="toggleScannedRouteExpanded(event.id)">
+                                                    @click="
+                                                        toggleScannedRouteExpanded(
+                                                            event.id
+                                                        )
+                                                    ">
                                                     {{
                                                         isScannedRouteExpanded(
                                                             event.id
@@ -1922,31 +1958,57 @@
 
                                             <div
                                                 v-if="
-                                                    hasScannedRoute(event.scannedRoute) &&
-                                                    isScannedRouteExpanded(event.id)
+                                                    hasScannedRoute(
+                                                        event.scannedRoute
+                                                    ) &&
+                                                    isScannedRouteExpanded(
+                                                        event.id
+                                                    )
                                                 "
                                                 class="rounded-[0.875rem] border border-sky-200 bg-sky-50/70 px-4 py-4">
                                                 <div class="space-y-3">
-                                                    <p class="text-sm font-semibold text-slate-900">
-                                                        {{ SCANNED_ROUTE_LABELS.title }}
+                                                    <p
+                                                        class="text-sm font-semibold text-slate-900">
+                                                        {{
+                                                            SCANNED_ROUTE_LABELS.title
+                                                        }}
                                                     </p>
-                                                    <dl class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                                                    <dl
+                                                        class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                                                         <div
-                                                            v-for="field in buildScannedRouteFields(event.scannedRoute)"
+                                                            v-for="field in buildScannedRouteFields(
+                                                                event.scannedRoute
+                                                            )"
                                                             :key="`${event.id}:${field.key}`">
-                                                            <dt class="text-xs uppercase tracking-[0.16em] text-slate-400">
-                                                                {{ field.label }}
+                                                            <dt
+                                                                class="text-xs uppercase tracking-[0.16em] text-slate-400">
+                                                                {{
+                                                                    field.label
+                                                                }}
                                                             </dt>
-                                                            <dd class="mt-1 text-sm text-slate-700">
-                                                                {{ field.value }}
+                                                            <dd
+                                                                class="mt-1 text-sm text-slate-700">
+                                                                {{
+                                                                    field.value
+                                                                }}
                                                             </dd>
                                                         </div>
                                                     </dl>
                                                     <p
-                                                        v-if="event.scannedRoute?.cacheNote"
+                                                        v-if="
+                                                            event.scannedRoute
+                                                                ?.cacheNote
+                                                        "
                                                         class="text-xs leading-5"
-                                                        :class="getRouteSnapshotNoteClass(event.scannedRoute)">
-                                                        {{ event.scannedRoute.cacheNote }}
+                                                        :class="
+                                                            getRouteSnapshotNoteClass(
+                                                                event.scannedRoute
+                                                            )
+                                                        ">
+                                                        {{
+                                                            event.scannedRoute
+                                                                .cacheNote
+                                                        }}
                                                     </p>
                                                 </div>
                                             </div>
@@ -2044,8 +2106,7 @@
                                         class="text-lg font-semibold text-slate-900">
                                         任务 #{{ item.schedulerTaskId }}
                                     </h3>
-                                    <p
-                                        class="text-sm leading-6 text-slate-600">
+                                    <p class="text-sm leading-6 text-slate-600">
                                         已选车站
                                         {{
                                             formatNumber(
@@ -2104,9 +2165,7 @@
                                     </p>
                                     <p
                                         class="mt-2 text-lg font-semibold text-slate-900">
-                                        {{
-                                            formatNumber(item.reusedTaskCount)
-                                        }}
+                                        {{ formatNumber(item.reusedTaskCount) }}
                                     </p>
                                 </div>
                                 <div>
@@ -2285,19 +2344,16 @@
                                         </span>
                                         <span
                                             v-if="
-                                                activeStationBoardStation
-                                                    .taskStatus
+                                                activeStationBoardStation.taskStatus
                                             "
                                             :class="
                                                 getTaskStatusBadgeClass(
-                                                    activeStationBoardStation
-                                                        .taskStatus
+                                                    activeStationBoardStation.taskStatus
                                                 )
                                             ">
                                             {{
                                                 getTaskStatusLabel(
-                                                    activeStationBoardStation
-                                                        .taskStatus
+                                                    activeStationBoardStation.taskStatus
                                                 )
                                             }}
                                         </span>
@@ -2307,8 +2363,7 @@
                                         {{
                                             activeStationBoardStation.stationName
                                         }}
-                                        <span
-                                            class="text-slate-400">
+                                        <span class="text-slate-400">
                                             /
                                             {{
                                                 activeStationBoardStation.stationTelecode ||
@@ -2316,9 +2371,11 @@
                                             }}
                                         </span>
                                     </h3>
-                                    <p
-                                        class="text-sm leading-6 text-slate-600">
-                                        子任务 #{{ activeStationBoardStation.schedulerTaskId ?? '--' }}
+                                    <p class="text-sm leading-6 text-slate-600">
+                                        子任务 #{{
+                                            activeStationBoardStation.schedulerTaskId ??
+                                            '--'
+                                        }}
                                         / 结果：{{
                                             getStationBoardResultLabel(
                                                 activeStationBoardStation.resultStatus
@@ -2469,9 +2526,7 @@
                                             </td>
                                             <td
                                                 class="px-4 py-3 text-sm text-slate-700">
-                                                {{
-                                                    row.endStationName || '--'
-                                                }}
+                                                {{ row.endStationName || '--' }}
                                             </td>
                                             <td
                                                 class="px-4 py-3 text-sm text-slate-600">
@@ -2596,12 +2651,11 @@ const qrcodeScanDetailStatus = ref<'idle' | 'pending' | 'success' | 'error'>(
 );
 const qrcodeScanDetailData = ref<AdminQrcodeScanDetailResponse | null>(null);
 const qrcodeScanDetailErrorMessage = ref('');
-const stationBoardDetailStatus = ref<
-    'idle' | 'pending' | 'success' | 'error'
->('idle');
-const stationBoardDetailData = ref<AdminStationBoardDispatchDetailResponse | null>(
-    null
+const stationBoardDetailStatus = ref<'idle' | 'pending' | 'success' | 'error'>(
+    'idle'
 );
+const stationBoardDetailData =
+    ref<AdminStationBoardDispatchDetailResponse | null>(null);
 const stationBoardDetailErrorMessage = ref('');
 const isMobileActionSheet = ref(false);
 const dialogMediaQuery = ref<MediaQueryList | null>(null);
@@ -2969,7 +3023,9 @@ watch(selectedCouplingTaskBureau, () => {
 
 watch(stationBoardDetailStations, (items) => {
     if (
-        items.some((item) => item.stationName === selectedStationBoardStationName.value)
+        items.some(
+            (item) => item.stationName === selectedStationBoardStationName.value
+        )
     ) {
         return;
     }

@@ -209,7 +209,9 @@ function toStationBoardDispatchDetailPayloads(
                 return null;
             }
 
-            const stationName = (getOptionalString(payload.stationName) ?? '').trim();
+            const stationName = (
+                getOptionalString(payload.stationName) ?? ''
+            ).trim();
             const stationTelecode = normalizeCode(
                 getOptionalString(payload.stationTelecode) ?? ''
             );
@@ -253,11 +255,15 @@ function toStationBoardRows(value: unknown): AdminStationBoardRow[] {
                 return null;
             }
 
-            const trainNo = normalizeCode(getOptionalString(payload.trainNo) ?? '');
+            const trainNo = normalizeCode(
+                getOptionalString(payload.trainNo) ?? ''
+            );
             const stationTrainCode = normalizeCode(
                 getOptionalString(payload.stationTrainCode) ?? ''
             );
-            const jiaoluTrain = (getOptionalString(payload.jiaoluTrain) ?? '').trim();
+            const jiaoluTrain = (
+                getOptionalString(payload.jiaoluTrain) ?? ''
+            ).trim();
             const startStationName = (
                 getOptionalString(payload.startStationName) ?? ''
             ).trim();
@@ -2077,7 +2083,8 @@ function toStationBoardDispatchTaskListItem(
         finishedAt: taskRun.finishedAt,
         serviceDate: taskRun.serviceDate,
         candidateGroupCount: result?.candidateGroupCount ?? 0,
-        selectedStationCount: result?.selectedStationCount ?? selectedStations.length,
+        selectedStationCount:
+            result?.selectedStationCount ?? selectedStations.length,
         createdTaskCount: result?.createdTaskCount ?? 0,
         reusedTaskCount: result?.reusedTaskCount ?? 0,
         skippedNotFoundCount: result?.skippedNotFoundCount ?? 0,
@@ -2098,9 +2105,7 @@ function buildStationBoardStationTaskItem(input: {
     return {
         stationName: input.detail.stationName,
         stationTelecode:
-            fetchResult?.stationTelecode ||
-            input.detail.stationTelecode ||
-            '',
+            fetchResult?.stationTelecode || input.detail.stationTelecode || '',
         action: input.detail.action,
         schedulerTaskId: input.detail.schedulerTaskId,
         taskRunId: fetchTaskRun?.id ?? null,
@@ -2230,7 +2235,10 @@ export function getAdminStationBoardDispatchDetail(
                   taskRun.schedulerTaskId
               )
             : [];
-    const fetchResultByTaskRunId = new Map<number, StationBoardFetchResultRecord>();
+    const fetchResultByTaskRunId = new Map<
+        number,
+        StationBoardFetchResultRecord
+    >();
 
     for (const fetchResult of fetchResultsByParentSchedulerTaskId) {
         fetchResultByTaskRunId.set(fetchResult.taskRunId, fetchResult);
@@ -2249,7 +2257,9 @@ export function getAdminStationBoardDispatchDetail(
         }
 
         if (!fetchResultByTaskRunId.has(fetchTaskRun.id)) {
-            const fetchResult = getStationBoardFetchResultByTaskRunId(fetchTaskRun.id);
+            const fetchResult = getStationBoardFetchResultByTaskRunId(
+                fetchTaskRun.id
+            );
             if (fetchResult) {
                 fetchResultByTaskRunId.set(fetchTaskRun.id, fetchResult);
             }
@@ -2259,7 +2269,8 @@ export function getAdminStationBoardDispatchDetail(
     const stations = dispatchDetails.map((detail) => {
         const fetchTaskRun =
             detail.schedulerTaskId !== null
-                ? (fetchTaskRunBySchedulerTaskId.get(detail.schedulerTaskId) ?? null)
+                ? (fetchTaskRunBySchedulerTaskId.get(detail.schedulerTaskId) ??
+                  null)
                 : null;
         const fetchResult =
             fetchTaskRun !== null

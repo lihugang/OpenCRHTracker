@@ -223,7 +223,8 @@
                                     </p>
                                     <p
                                         class="mt-2 text-sm leading-6 text-slate-700">
-                                        仅支持当前已发布且等于今天的时刻表；创建后可到“12306 数据”面板查看选中的车站与后续子任务结果。
+                                        仅支持当前已发布且等于今天的时刻表；创建后可到“12306
+                                        数据”面板查看选中的车站与后续子任务结果。
                                     </p>
                                 </div>
 
@@ -231,9 +232,7 @@
                                     :error-message="
                                         stationBoardDispatchTaskErrorMessage
                                     "
-                                    :response="
-                                        stationBoardDispatchTaskResponse
-                                    "
+                                    :response="stationBoardDispatchTaskResponse"
                                     :format-execution-time="
                                         formatExecutionTime
                                     " />
@@ -245,9 +244,7 @@
                                             stationBoardDispatchTaskStatus ===
                                             'pending'
                                         "
-                                        @click="
-                                            createStationBoardDispatchTask
-                                        ">
+                                        @click="createStationBoardDispatchTask">
                                         创建交路数据刷新任务
                                     </UiButton>
                                 </div>

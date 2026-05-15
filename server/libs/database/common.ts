@@ -61,7 +61,9 @@ function instrumentStatement<TStatement extends Database.Statement<unknown[]>>(
         const originalMethod = statement[methodName].bind(statement);
         Object.defineProperty(statement, methodName, {
             value: (...args: unknown[]) => {
-                return measureServerTimingPhase('db', () => originalMethod(...args));
+                return measureServerTimingPhase('db', () =>
+                    originalMethod(...args)
+                );
             },
             configurable: true,
             writable: true

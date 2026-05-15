@@ -661,7 +661,9 @@ export function recordStationBoardDispatchResult(
         input.taskRunId,
         normalizeServiceDate(input.serviceDate),
         input.candidateGroupCount,
-        Array.isArray(input.selectedStations) ? input.selectedStations.length : 0,
+        Array.isArray(input.selectedStations)
+            ? input.selectedStations.length
+            : 0,
         stringifyJson(input.selectedStations),
         input.createdTaskCount,
         input.reusedTaskCount,
@@ -733,11 +735,10 @@ export function getStationBoardDispatchResultByTaskRunId(taskRunId: number) {
         return null;
     }
 
-    const row =
-        trainProvenanceStatements.get<StationBoardDispatchResultRow>(
-            'selectStationBoardDispatchResultByTaskRunId',
-            taskRunId
-        );
+    const row = trainProvenanceStatements.get<StationBoardDispatchResultRow>(
+        'selectStationBoardDispatchResultByTaskRunId',
+        taskRunId
+    );
     return row ? toStationBoardDispatchResultRecord(row) : null;
 }
 
@@ -763,7 +764,10 @@ export function listStationBoardFetchResultsByParentSchedulerTaskId(
     if (!/^\d{8}$/.test(date)) {
         return [];
     }
-    if (!Number.isInteger(parentSchedulerTaskId) || parentSchedulerTaskId <= 0) {
+    if (
+        !Number.isInteger(parentSchedulerTaskId) ||
+        parentSchedulerTaskId <= 0
+    ) {
         return [];
     }
 

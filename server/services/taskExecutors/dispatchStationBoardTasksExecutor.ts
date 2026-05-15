@@ -257,7 +257,10 @@ function collectPendingStationBoardTasks() {
                 JSON.parse(task.arguments) as unknown
             );
             pendingTasks.set(
-                buildStationBoardTaskKey(args.serviceDate, args.stationTelecode),
+                buildStationBoardTaskKey(
+                    args.serviceDate,
+                    args.stationTelecode
+                ),
                 {
                     taskId: task.id
                 }
