@@ -379,6 +379,12 @@
                         </button>
                     </div>
 
+                    <p
+                        v-if="circulationNotice && isCirculationExpanded"
+                        class="text-sm leading-6 text-slate-700">
+                        {{ circulationNotice }}
+                    </p>
+
                     <Transition
                         enter-active-class="transition duration-200 ease-out"
                         enter-from-class="translate-y-2 opacity-0 motion-reduce:translate-y-0"
@@ -897,6 +903,11 @@ const timetableSummaryLabel = computed(() => {
 });
 const circulationSummaryLabel = computed(() => {
     return `${circulationNodes.value.length} 段交路`;
+});
+const circulationNotice = computed(() => {
+    return circulation.value?.source === 'inferred'
+        ? '当前交路表结果由计算推测得到，仅供参考'
+        : '';
 });
 
 const responsibilitySummary = computed(() => {
