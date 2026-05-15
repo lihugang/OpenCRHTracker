@@ -201,7 +201,7 @@ const taskFlowCode = [
     '      -> stream daily_emu_routes window',
     '      -> normalize edge weights / break loops',
     '      -> persist inferred circulations',
-    '      -> embed inferredCirculation into timetable responses'
+    '      -> embed circulation into timetable responses'
 ].join('\n');
 
 definePageMeta({

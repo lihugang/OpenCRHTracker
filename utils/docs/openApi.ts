@@ -868,7 +868,7 @@ export const developerDocsOpenApi = {
                     }
                 }
             },
-            InferredCirculationNode: {
+            TrainCirculationNode: {
                 type: 'object',
                 required: [
                     'internalCode',
@@ -876,66 +876,43 @@ export const developerDocsOpenApi = {
                     'startStation',
                     'endStation',
                     'startAt',
-                    'endAt',
-                    'incomingWeight',
-                    'incomingSupportCount',
-                    'outgoingWeight',
-                    'outgoingSupportCount'
+                    'endAt'
                 ],
                 properties: {
                     internalCode: {
                         type: 'string',
-                        nullable: true,
-                        example: '2400000G8388B'
+                        example: '33000G249204'
                     },
                     allCodes: {
                         type: 'array',
                         items: {
                             type: 'string'
                         },
-                        example: ['G8388', 'G8385']
+                        example: ['G2492']
                     },
                     startStation: {
                         type: 'string',
-                        example: '北京南'
+                        example: '包头'
                     },
                     endStation: {
                         type: 'string',
-                        example: '上海虹桥'
+                        example: '北京北'
                     },
                     startAt: {
                         type: 'integer',
-                        nullable: true,
-                        example: 1774060020
+                        description:
+                            '交路内的日内偏移秒数，不是绝对 Unix 时间戳。',
+                        example: 27120
                     },
                     endAt: {
                         type: 'integer',
-                        nullable: true,
-                        example: 1774076820
-                    },
-                    incomingWeight: {
-                        type: 'number',
-                        nullable: true,
-                        example: null
-                    },
-                    incomingSupportCount: {
-                        type: 'integer',
-                        nullable: true,
-                        example: null
-                    },
-                    outgoingWeight: {
-                        type: 'number',
-                        nullable: true,
-                        example: 1
-                    },
-                    outgoingSupportCount: {
-                        type: 'integer',
-                        nullable: true,
-                        example: 3
+                        description:
+                            '交路内的日内偏移秒数，不是绝对 Unix 时间戳。',
+                        example: 39000
                     }
                 }
             },
-            InferredCirculation: {
+            TrainCirculationMetadata: {
                 type: 'object',
                 required: [
                     'routeId',
@@ -981,8 +958,33 @@ export const developerDocsOpenApi = {
                     nodes: {
                         type: 'array',
                         items: {
-                            $ref: '#/components/schemas/InferredCirculationNode'
+                            $ref: '#/components/schemas/TrainCirculationNode'
                         }
+                    }
+                }
+            },
+            TrainCirculation: {
+                type: 'object',
+                required: ['source', 'refreshAt', 'nodes'],
+                properties: {
+                    source: {
+                        type: 'string',
+                        enum: ['official', 'inferred'],
+                        example: 'official'
+                    },
+                    refreshAt: {
+                        type: 'integer',
+                        nullable: true,
+                        example: 1778868346
+                    },
+                    nodes: {
+                        type: 'array',
+                        items: {
+                            $ref: '#/components/schemas/TrainCirculationNode'
+                        }
+                    },
+                    metadata: {
+                        $ref: '#/components/schemas/TrainCirculationMetadata'
                     }
                 }
             },
@@ -1011,7 +1013,7 @@ export const developerDocsOpenApi = {
                             'endStation',
                             'startAt',
                             'endAt',
-                            'inferredCirculation',
+                            'circulation',
                             'stops'
                         ],
                         properties: {
@@ -1077,99 +1079,48 @@ export const developerDocsOpenApi = {
                             },
                             startAt: {
                                 type: 'integer',
+                                description: '当前车次始发时间，Unix 时间戳（秒）。',
                                 example: 1774060020
                             },
                             endAt: {
                                 type: 'integer',
+                                description: '当前车次终到时间，Unix 时间戳（秒）。',
                                 example: 1774076820
                             },
-                            inferredCirculation: {
+                            circulation: {
                                 oneOf: [
                                     {
-                                        $ref: '#/components/schemas/InferredCirculation'
+                                        $ref: '#/components/schemas/TrainCirculation'
                                     }
                                 ],
                                 nullable: true,
                                 example: {
-                                    routeId: 'circulation_ed7147d7',
-                                    windowStart: 1775404800,
-                                    windowEnd: 1776614399,
-                                    threshold: 0.8,
-                                    lowestLinkWeight: 1,
-                                    lowestLinkSupportCount: 13,
-                                    containsLoopBreak: false,
+                                    source: 'official',
+                                    refreshAt: 1778868346,
                                     nodes: [
                                         {
-                                            internalCode: '38000G208500',
-                                            allCodes: ['G2085'],
-                                            startStation: '青岛北',
-                                            endStation: '杭州西',
-                                            startAt: 1776419400,
-                                            endAt: 1776437280,
-                                            incomingWeight: null,
-                                            incomingSupportCount: null,
-                                            outgoingWeight: 1,
-                                            outgoingSupportCount: 14
+                                            internalCode: '33000G249204',
+                                            allCodes: ['G2492'],
+                                            startStation: '包头',
+                                            endStation: '北京北',
+                                            startAt: 27120,
+                                            endAt: 39000
                                         },
                                         {
-                                            internalCode: '390000G5120C',
-                                            allCodes: ['G512'],
-                                            startStation: '杭州西',
-                                            endStation: '武汉',
-                                            startAt: 1776440400,
-                                            endAt: 1776451440,
-                                            incomingWeight: 1,
-                                            incomingSupportCount: 14,
-                                            outgoingWeight: 1,
-                                            outgoingSupportCount: 13
+                                            internalCode: '24000G249307',
+                                            allCodes: ['G2493'],
+                                            startStation: '北京北',
+                                            endStation: '包头',
+                                            startAt: 42840,
+                                            endAt: 56220
                                         },
                                         {
-                                            internalCode: '240000G34910',
-                                            allCodes: ['G349'],
-                                            startStation: '武汉',
-                                            endStation: '北京南',
-                                            startAt: 1776454200,
-                                            endAt: 1776473280,
-                                            incomingWeight: 1,
-                                            incomingSupportCount: 13,
-                                            outgoingWeight: 1,
-                                            outgoingSupportCount: 13
-                                        },
-                                        {
-                                            internalCode: '4E000G228800',
-                                            allCodes: ['G2288', 'G2289'],
-                                            startStation: '北京南',
-                                            endStation: '青岛北',
-                                            startAt: 1776476400,
-                                            endAt: 1776494280,
-                                            incomingWeight: 1,
-                                            incomingSupportCount: 13,
-                                            outgoingWeight: 1,
-                                            outgoingSupportCount: 14
-                                        },
-                                        {
-                                            internalCode: '40000G182401',
-                                            allCodes: ['G1821', 'G1824'],
-                                            startStation: '青岛北',
-                                            endStation: '上海虹桥',
-                                            startAt: 1776498000,
-                                            endAt: 1776517200,
-                                            incomingWeight: 1,
-                                            incomingSupportCount: 14,
-                                            outgoingWeight: 1,
-                                            outgoingSupportCount: 13
-                                        },
-                                        {
-                                            internalCode: '5L00000G8400',
-                                            allCodes: ['G84', 'G85'],
-                                            startStation: '上海虹桥',
-                                            endStation: '北京南',
-                                            startAt: 1776521400,
-                                            endAt: 1776540000,
-                                            incomingWeight: 1,
-                                            incomingSupportCount: 13,
-                                            outgoingWeight: null,
-                                            outgoingSupportCount: null
+                                            internalCode: '33000G249608',
+                                            allCodes: ['G2496'],
+                                            startStation: '包头',
+                                            endStation: '北京北',
+                                            startAt: 58560,
+                                            endAt: 73080
                                         }
                                     ]
                                 }
@@ -2413,7 +2364,7 @@ export const developerDocsOpenApi = {
                 tags: ['Timetable'],
                 summary: '按车次读取当前完整时刻表',
                 description:
-                    '返回该车次的时刻表，包括经停站、当前站车次、检票口信息和参考车型。',
+                    '返回该车次的时刻表，包括经停站、当前站车次、检票口信息、参考车型和交路信息。顶层 startAt/endAt 与 stops 中的时间字段是 Unix 秒；circulation.nodes 中的 startAt/endAt 是交路内日内偏移秒。',
                 parameters: [
                     {
                         $ref: '#/components/parameters/TrainCodeParam'
@@ -2439,142 +2390,121 @@ export const developerDocsOpenApi = {
                                 example: {
                                     ok: true,
                                     data: {
-                                        updatedAt: 1776602294,
-                                        requestTrainCode: 'G512',
-                                        trainCode: 'G512',
-                                        internalCode: '390000G5120C',
-                                        allCodes: ['G512'],
-                                        bureauCode: 'N',
-                                        bureauName: '武汉局集团',
-                                        trainDepartment: '郑州动车段',
-                                        passengerDepartment: '郑州客运段',
+                                        updatedAt: 1778692621,
+                                        requestTrainCode: 'G2492',
+                                        trainCode: 'G2492',
+                                        internalCode: '33000G249204',
+                                        allCodes: ['G2492'],
+                                        bureauCode: 'C',
+                                        bureauName: '呼和浩特局集团',
+                                        trainDepartment: '包头车辆段',
+                                        passengerDepartment: '包头客运段',
                                         referenceModels: [
                                             {
-                                                model: 'CR400BF-A',
+                                                model: 'CR400BF-G',
                                                 weightedShare: 1
                                             }
                                         ],
-                                        startStation: '汉口',
-                                        endStation: '北京西',
-                                        startAt: 1777698540,
-                                        endAt: 1777717260,
-                                        inferredCirculation: {
-                                            routeId: 'circulation_a0ee45fa',
-                                            windowStart: 1776528000,
-                                            windowEnd: 1777737599,
-                                            threshold: 0.8,
-                                            lowestLinkWeight: 1,
-                                            lowestLinkSupportCount: 6,
-                                            containsLoopBreak: false,
+                                        startStation: '包头',
+                                        endStation: '北京北',
+                                        startAt: 1778887920,
+                                        endAt: 1778899800,
+                                        circulation: {
+                                            source: 'official',
+                                            refreshAt: 1778868346,
                                             nodes: [
                                                 {
                                                     internalCode:
-                                                        '38000G208500',
-                                                    allCodes: ['G2085'],
-                                                    startStation: '郑州东',
-                                                    endStation: '汉口',
-                                                    startAt: 1777687260,
-                                                    endAt: 1777697340,
-                                                    incomingWeight: null,
-                                                    incomingSupportCount: null,
-                                                    outgoingWeight: 1,
-                                                    outgoingSupportCount: 6
+                                                        '33000G249204',
+                                                    allCodes: ['G2492'],
+                                                    startStation: '包头',
+                                                    endStation: '北京北',
+                                                    startAt: 27120,
+                                                    endAt: 39000
                                                 },
                                                 {
                                                     internalCode:
-                                                        '390000G5120C',
-                                                    allCodes: ['G512'],
-                                                    startStation: '汉口',
-                                                    endStation: '北京西',
-                                                    startAt: 1777698540,
-                                                    endAt: 1777717260,
-                                                    incomingWeight: 1,
-                                                    incomingSupportCount: 6,
-                                                    outgoingWeight: 1,
-                                                    outgoingSupportCount: 6
+                                                        '24000G249307',
+                                                    allCodes: ['G2493'],
+                                                    startStation: '北京北',
+                                                    endStation: '包头',
+                                                    startAt: 42840,
+                                                    endAt: 56220
                                                 },
                                                 {
                                                     internalCode:
-                                                        '240000G34910',
-                                                    allCodes: ['G349'],
-                                                    startStation: '北京西',
-                                                    endStation: '武汉',
-                                                    startAt: 1777719300,
-                                                    endAt: 1777734180,
-                                                    incomingWeight: 1,
-                                                    incomingSupportCount: 6,
-                                                    outgoingWeight: null,
-                                                    outgoingSupportCount: null
+                                                        '33000G249608',
+                                                    allCodes: ['G2496'],
+                                                    startStation: '包头',
+                                                    endStation: '北京北',
+                                                    startAt: 58560,
+                                                    endAt: 73080
+                                                },
+                                                {
+                                                    internalCode:
+                                                        '24000G249108',
+                                                    allCodes: ['G2491'],
+                                                    startStation: '北京北',
+                                                    endStation: '包头',
+                                                    startAt: 117120,
+                                                    endAt: 129960
+                                                },
+                                                {
+                                                    internalCode:
+                                                        '33000G249408',
+                                                    allCodes: ['G2494'],
+                                                    startStation: '包头',
+                                                    endStation: '北京北',
+                                                    startAt: 131640,
+                                                    endAt: 145560
+                                                },
+                                                {
+                                                    internalCode:
+                                                        '24000G249505',
+                                                    allCodes: ['G2495'],
+                                                    startStation: '北京北',
+                                                    endStation: '包头',
+                                                    startAt: 147300,
+                                                    endAt: 159120
+                                                },
+                                                {
+                                                    internalCode:
+                                                        '33000D67580J',
+                                                    allCodes: ['D6758'],
+                                                    startStation: '包头',
+                                                    endStation: '呼和浩特东',
+                                                    startAt: 160680,
+                                                    endAt: 165300
                                                 }
                                             ]
                                         },
                                         stops: [
                                             {
                                                 stationNo: 1,
-                                                stationName: '汉口',
-                                                arriveAt: 1777698540,
-                                                departAt: 1777698540,
-                                                stationTrainCode: 'G512',
-                                                wicket: '二楼11B检票口',
+                                                stationName: '包头',
+                                                arriveAt: 1778887920,
+                                                departAt: 1778887920,
+                                                stationTrainCode: 'G2492',
+                                                wicket: '一层2检票口',
                                                 isStart: true,
                                                 isEnd: false
                                             },
                                             {
                                                 stationNo: 2,
-                                                stationName: '许昌东',
-                                                arriveAt: 1777704240,
-                                                departAt: 1777704960,
-                                                stationTrainCode: 'G512',
-                                                wicket: '一层检票口',
+                                                stationName: '呼和浩特',
+                                                arriveAt: 1778891460,
+                                                departAt: 1778891760,
+                                                stationTrainCode: 'G2492',
+                                                wicket: '4检票口',
                                                 isStart: false,
                                                 isEnd: false
                                             },
                                             {
                                                 stationNo: 3,
-                                                stationName: '郑州东',
-                                                arriveAt: 1777706340,
-                                                departAt: 1777706520,
-                                                stationTrainCode: 'G512',
-                                                wicket: '6A_7A,6B_7B',
-                                                isStart: false,
-                                                isEnd: false
-                                            },
-                                            {
-                                                stationNo: 4,
-                                                stationName: '高邑西',
-                                                arriveAt: 1777711320,
-                                                departAt: 1777711440,
-                                                stationTrainCode: 'G512',
-                                                wicket: '检票口1',
-                                                isStart: false,
-                                                isEnd: false
-                                            },
-                                            {
-                                                stationNo: 5,
-                                                stationName: '石家庄',
-                                                arriveAt: 1777712340,
-                                                departAt: 1777712520,
-                                                stationTrainCode: 'G512',
-                                                wicket: '14B15B',
-                                                isStart: false,
-                                                isEnd: false
-                                            },
-                                            {
-                                                stationNo: 6,
-                                                stationName: '保定东',
-                                                arriveAt: 1777714620,
-                                                departAt: 1777714740,
-                                                stationTrainCode: 'G512',
-                                                wicket: '进站检票口,进站检票口2',
-                                                isStart: false,
-                                                isEnd: false
-                                            },
-                                            {
-                                                stationNo: 7,
-                                                stationName: '北京西',
-                                                arriveAt: 1777717260,
-                                                departAt: 1777717260,
-                                                stationTrainCode: 'G512',
+                                                stationName: '北京北',
+                                                arriveAt: 1778899800,
+                                                departAt: 1778899800,
+                                                stationTrainCode: 'G2492',
                                                 wicket: '',
                                                 isStart: false,
                                                 isEnd: true
@@ -2646,7 +2576,7 @@ export const developerDocsOpenApi = {
                             '读取当天一趟车次的完整经停表，可用于详情页弹窗展示。',
                         authMode: 'anonymous',
                         pathParams: {
-                            trainCode: 'G512'
+                            trainCode: 'G2492'
                         }
                     }
                 ]
