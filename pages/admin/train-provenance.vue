@@ -1970,7 +1970,7 @@
                         交路数据刷新
                     </h2>
                     <p class="text-sm leading-6 text-slate-600">
-                        展示当日交路数据刷新派发任务、highs 选中的车站，以及每个车站抓取任务返回的原始站板数据。
+                        展示当日交路数据刷新派发任务、按始发站去重后的车站，以及每个车站抓取任务返回的原始站板数据。
                     </p>
                 </div>
 
@@ -2143,7 +2143,7 @@
                                 class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-4 py-4">
                                 <p
                                     class="text-xs uppercase tracking-[0.18em] text-slate-400">
-                                    highs 选站结果
+                                    始发站去重结果
                                 </p>
                                 <p
                                     class="mt-2 text-sm leading-6 text-slate-700">
@@ -2176,7 +2176,7 @@
             :model-value="isStationBoardDetailDialogOpen"
             eyebrow="交路数据刷新"
             title="任务详情"
-            description="查看本次 highs 选站结果、任务关联和车站原始返回数据。"
+            description="查看本次始发站去重结果、任务关联和车站原始返回数据。"
             size="lg"
             :close-on-backdrop="stationBoardDetailStatus !== 'pending'"
             @update:model-value="
@@ -2232,7 +2232,7 @@
                             }}
                         </p>
                         <p>
-                            highs 选站：{{
+                            去重车站：{{
                                 stationBoardDetailData.selectedStations.join(
                                     ' / '
                                 )

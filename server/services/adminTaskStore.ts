@@ -363,7 +363,7 @@ function createDispatchStationBoardTasksNowTask(
             executionTime
         ),
         summary:
-            '已创建 1 条当日交路数据刷新任务，将基于 highs 选站并继续派发车站板抓取任务。'
+            '已创建 1 条当日交路数据刷新任务，将按列车始发站去重后继续派发车站板抓取任务。'
     };
 }
 

@@ -15,7 +15,6 @@ import {
 import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
-import solveStationCover from '~/server/utils/12306/stationBoard/solveStationCover';
 import fetchAllStations from '~/server/utils/12306/network/fetchAllStations';
 import {
     enqueueTask,
@@ -37,7 +36,7 @@ export const DISPATCH_STATION_BOARD_TASKS_EXECUTOR =
 
 interface StationBoardCandidateGroup {
     groupKey: string;
-    stationNames: string[];
+    departureStationNames: string[];
 }
 
 interface PendingStationBoardTask {
@@ -71,7 +70,18 @@ function buildStationBoardTaskKey(
     return `${serviceDate}:${normalizeCode(stationTelecode)}`;
 }
 
-function collectGroupStationNames(
+function resolveItemDepartureStationName(item: ScheduleItem) {
+    const startStationName = normalizeStationName(item.startStation);
+    if (startStationName.length > 0) {
+        return startStationName;
+    }
+
+    const explicitStartStop = item.stops.find((stop) => stop.isStart);
+    const fallbackStop = explicitStartStop ?? item.stops[0] ?? null;
+    return normalizeStationName(fallbackStop?.stationName ?? '');
+}
+
+function collectGroupDepartureStationNames(
     state: ScheduleState,
     groupIndexes: readonly number[]
 ) {
@@ -84,15 +94,13 @@ function collectGroupStationNames(
             continue;
         }
 
-        for (const stop of item.stops) {
-            const stationName = normalizeStationName(stop.stationName);
-            if (stationName.length === 0 || seenStations.has(stationName)) {
-                continue;
-            }
-
-            seenStations.add(stationName);
-            stationNames.push(stationName);
+        const stationName = resolveItemDepartureStationName(item);
+        if (stationName.length === 0 || seenStations.has(stationName)) {
+            continue;
         }
+
+        seenStations.add(stationName);
+        stationNames.push(stationName);
     }
 
     return stationNames;
@@ -106,24 +114,45 @@ function getOrCreateCandidateGroup(
     const groupKey = getGroupKey(item);
     const existing = candidatesByGroupKey.get(groupKey);
     if (existing) {
-        const seenStations = new Set(existing.stationNames);
+        const seenStations = new Set(existing.departureStationNames);
         for (const stationName of stationNames) {
             if (seenStations.has(stationName)) {
                 continue;
             }
 
             seenStations.add(stationName);
-            existing.stationNames.push(stationName);
+            existing.departureStationNames.push(stationName);
         }
         return existing;
     }
 
     const candidate: StationBoardCandidateGroup = {
         groupKey,
-        stationNames: [...stationNames]
+        departureStationNames: [...stationNames]
     };
     candidatesByGroupKey.set(groupKey, candidate);
     return candidate;
+}
+
+function collectSelectedStationNames(
+    candidateGroups: readonly StationBoardCandidateGroup[]
+) {
+    const selectedStations = new Set<string>();
+
+    for (const candidateGroup of candidateGroups) {
+        for (const stationName of candidateGroup.departureStationNames) {
+            if (stationName.length > 0) {
+                selectedStations.add(stationName);
+            }
+        }
+    }
+
+    // 12306 only returns circulation data when the queried station is the
+    // train's departure station, so we query every distinct departure station
+    // instead of solving a minimum cover from intermediate stops.
+    return [...selectedStations].sort((left, right) =>
+        left.localeCompare(right, 'zh-Hans-CN')
+    );
 }
 
 function buildStationTelecodeLookup(
@@ -170,7 +199,10 @@ function collectCandidates(
 
         const item = state.items[itemIndex]!;
         const groupIndexes = groupIndex.get(getGroupKey(item)) ?? [itemIndex];
-        const stationNames = collectGroupStationNames(state, groupIndexes);
+        const stationNames = collectGroupDepartureStationNames(
+            state,
+            groupIndexes
+        );
         if (stationNames.length === 0) {
             continue;
         }
@@ -197,7 +229,10 @@ function collectCandidates(
         }
 
         const groupIndexes = groupIndex.get(groupKey) ?? [itemIndex];
-        const stationNames = collectGroupStationNames(state, groupIndexes);
+        const stationNames = collectGroupDepartureStationNames(
+            state,
+            groupIndexes
+        );
         if (stationNames.length === 0) {
             continue;
         }
@@ -288,12 +323,7 @@ async function executeDispatchStationBoardTasks() {
         return;
     }
 
-    const selectedStations = await solveStationCover(
-        candidateGroups.map((candidate) => ({
-            key: candidate.groupKey,
-            stations: candidate.stationNames
-        }))
-    );
+    const selectedStations = collectSelectedStationNames(candidateGroups);
     const telecodesByStationName = buildStationTelecodeLookup(
         await fetchAllStations()
     );
