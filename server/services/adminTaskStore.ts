@@ -15,6 +15,7 @@ import { loadProbeAssets } from '~/server/services/probeAssetStore';
 import { PROBE_QRCODE_DETECTION_EMU_TASK_EXECUTOR } from '~/server/services/taskExecutors/probeQrcodeDetectionEmuTaskExecutor';
 import { REFRESH_ROUTE_BATCH_TASK_EXECUTOR } from '~/server/services/taskExecutors/refreshRouteBatchTaskExecutor';
 import { DISPATCH_STATION_BOARD_TASKS_EXECUTOR } from '~/server/services/taskExecutors/dispatchStationBoardTasksExecutor';
+import { getStationBoardIdleTaskOptions } from '~/server/services/stationBoardTaskScheduling';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
 import { loadPublishedScheduleState } from '~/server/utils/12306/scheduleProbe/stateStore';
 import { splitIntoBatches } from '~/server/utils/12306/scheduleProbe/taskHelpers';
@@ -347,7 +348,8 @@ function createDispatchStationBoardTasksNowTask(
     const taskId = enqueueTask(
         DISPATCH_STATION_BOARD_TASKS_EXECUTOR,
         {},
-        executionTime
+        executionTime,
+        getStationBoardIdleTaskOptions(DISPATCH_STATION_BOARD_TASKS_EXECUTOR)
     );
 
     logger.info(

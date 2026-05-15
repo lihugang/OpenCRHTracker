@@ -20,6 +20,7 @@ import {
     enqueueTask,
     listPendingTasksByExecutor
 } from '~/server/services/taskQueue';
+import { getStationBoardIdleTaskOptions } from '~/server/services/stationBoardTaskScheduling';
 import { getCurrentTaskExecutionContext } from '~/server/services/taskExecutionContext';
 import {
     getCurrentTrainProvenanceTaskRunId,
@@ -407,7 +408,8 @@ async function executeDispatchStationBoardTasks() {
                 parentSchedulerTaskId:
                     getCurrentTaskExecutionContext()?.taskId ?? null
             },
-            executionTime
+            executionTime,
+            getStationBoardIdleTaskOptions(FETCH_STATION_BOARD_TASK_EXECUTOR)
         );
         pendingTasks.set(taskKey, {
             taskId

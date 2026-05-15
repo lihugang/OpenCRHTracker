@@ -33,6 +33,7 @@ import {
     recordCurrentTrainProvenanceEvent
 } from '~/server/services/trainProvenanceRecorder';
 import { recordStationBoardFetchResult } from '~/server/services/trainProvenanceStore';
+import { getStationBoardIdleTaskOptions } from '~/server/services/stationBoardTaskScheduling';
 
 export const FETCH_STATION_BOARD_TASK_EXECUTOR = 'fetch_station_board';
 
@@ -477,7 +478,8 @@ function maybeRequeueTask(args: FetchStationBoardTaskArgs, reason: string) {
             ...args,
             retryRemaining: nextRetryRemaining
         },
-        getNowSeconds() + retryDelaySeconds
+        getNowSeconds() + retryDelaySeconds,
+        getStationBoardIdleTaskOptions(FETCH_STATION_BOARD_TASK_EXECUTOR)
     );
     recordCurrentTrainProvenanceEvent({
         serviceDate: args.serviceDate,
