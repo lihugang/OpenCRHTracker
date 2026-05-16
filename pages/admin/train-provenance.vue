@@ -2036,8 +2036,41 @@
                     </p>
                 </div>
 
+                <div
+                    class="flex flex-col gap-3 rounded-[1rem] border border-slate-200 bg-slate-50/80 px-4 py-4 text-sm leading-6 text-slate-600">
+                    <p>
+                        当前选中日期：{{ formatServiceDate(selectedDateYmd) }}
+                    </p>
+                    <p v-if="hasLoadedStationBoardTaskList">
+                        当前已加载数据日期：{{
+                            formatServiceDate(stationBoardLoadedDate)
+                        }}
+                    </p>
+                    <p
+                        v-if="isStationBoardTaskListStale"
+                        class="text-amber-700">
+                        当前仍显示旧日期数据，点击“刷新交路数据”后才会切换到所选日期。
+                    </p>
+
+                    <div class="flex flex-wrap items-center gap-3">
+                        <UiButton
+                            type="button"
+                            variant="secondary"
+                            :loading="stationBoardTaskListStatus === 'pending'"
+                            @click="refreshStationBoardTaskList()">
+                            刷新交路数据
+                        </UiButton>
+                    </div>
+                </div>
+
                 <UiEmptyState
-                    v-if="
+                    v-if="!hasLoadedStationBoardTaskList"
+                    eyebrow="Not Loaded"
+                    title="尚未加载交路数据刷新任务"
+                    description="该面板默认不自动请求数据；点击上方按钮后，加载当前日期的交路数据刷新记录。" />
+
+                <UiEmptyState
+                    v-else-if="
                         stationBoardTaskListStatus === 'pending' &&
                         !stationBoardTaskListData
                     "
@@ -2646,6 +2679,13 @@ const qrcodeScanTaskListData = ref<AdminQrcodeScanTaskListResponse | null>(
 );
 const qrcodeScanTaskListErrorMessage = ref('');
 const qrcodeScanLoadedDate = ref('');
+const stationBoardTaskListStatus = ref<
+    'idle' | 'pending' | 'success' | 'error'
+>('idle');
+const stationBoardTaskListData =
+    ref<AdminStationBoardTaskListResponse | null>(null);
+const stationBoardTaskListErrorMessage = ref('');
+const stationBoardLoadedDate = ref('');
 const qrcodeScanDetailStatus = ref<'idle' | 'pending' | 'success' | 'error'>(
     'idle'
 );
@@ -2787,13 +2827,13 @@ async function fetchQrcodeScanTaskList(date: string) {
     return response.data;
 }
 
-async function fetchStationBoardTaskList() {
+async function fetchStationBoardTaskList(date: string) {
     const response = await requestFetch<
         TrackerApiResponse<AdminStationBoardTaskListResponse>
     >('/api/v1/admin/train-provenance/station-board-tasks', {
         retry: 0,
         query: {
-            date: selectedDateYmd.value
+            date
         }
     });
 
@@ -2836,19 +2876,6 @@ const {
 } = await useAsyncData(
     'admin-train-provenance-coupling-scan-tasks',
     fetchCouplingScanTaskList,
-    {
-        watch: [selectedDateYmd]
-    }
-);
-
-const {
-    data: stationBoardTaskListData,
-    status: stationBoardTaskListStatus,
-    error: stationBoardTaskListError,
-    refresh: refreshStationBoardTaskList
-} = await useAsyncData(
-    'admin-train-provenance-station-board-tasks',
-    fetchStationBoardTaskList,
     {
         watch: [selectedDateYmd]
     }
@@ -2904,14 +2931,6 @@ const couplingScanTaskListErrorMessage = computed(() =>
           )
         : ''
 );
-const stationBoardTaskListErrorMessage = computed(() =>
-    stationBoardTaskListError.value
-        ? getApiErrorMessage(
-              stationBoardTaskListError.value,
-              '交路数据刷新任务加载失败。'
-          )
-        : ''
-);
 const departureItems = computed<AdminTrainProvenanceDeparture[]>(
     () => provenanceData.value?.departures ?? []
 );
@@ -2934,6 +2953,14 @@ const isQrcodeScanTaskListStale = computed(
     () =>
         hasLoadedQrcodeScanTaskList.value &&
         qrcodeScanLoadedDate.value !== selectedDateYmd.value
+);
+const hasLoadedStationBoardTaskList = computed(
+    () => stationBoardLoadedDate.value.length > 0
+);
+const isStationBoardTaskListStale = computed(
+    () =>
+        hasLoadedStationBoardTaskList.value &&
+        stationBoardLoadedDate.value !== selectedDateYmd.value
 );
 const couplingScanTaskItems = computed<AdminCouplingScanTaskListItem[]>(
     () => couplingScanTaskListData.value?.items ?? []
@@ -3071,12 +3098,15 @@ async function refreshAll() {
     const refreshTasks = [
         refreshRequestStats(),
         refreshProvenance(),
-        refreshCouplingScanTaskList(),
-        refreshStationBoardTaskList()
+        refreshCouplingScanTaskList()
     ];
 
     if (hasLoadedQrcodeScanTaskList.value) {
         refreshTasks.push(refreshQrcodeScanTaskList());
+    }
+
+    if (hasLoadedStationBoardTaskList.value) {
+        refreshTasks.push(refreshStationBoardTaskList());
     }
 
     await Promise.all(refreshTasks);
@@ -3097,6 +3127,24 @@ async function refreshQrcodeScanTaskList() {
             '固定车组扫描任务加载失败。'
         );
         qrcodeScanTaskListStatus.value = 'error';
+    }
+}
+
+async function refreshStationBoardTaskList() {
+    stationBoardTaskListStatus.value = 'pending';
+    stationBoardTaskListErrorMessage.value = '';
+
+    try {
+        const data = await fetchStationBoardTaskList(selectedDateYmd.value);
+        stationBoardTaskListData.value = data;
+        stationBoardLoadedDate.value = selectedDateYmd.value;
+        stationBoardTaskListStatus.value = 'success';
+    } catch (error) {
+        stationBoardTaskListErrorMessage.value = getApiErrorMessage(
+            error,
+            '交路数据刷新任务加载失败。'
+        );
+        stationBoardTaskListStatus.value = 'error';
     }
 }
 
