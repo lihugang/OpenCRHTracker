@@ -636,6 +636,9 @@ export interface AdminStationBoardRow {
     jiaoluTrain: string;
     startStationName: string;
     endStationName: string;
+    saveStatus: 'saved' | 'not_saved' | 'unknown_legacy';
+    saveReasonCode: string;
+    saveReasonText: string;
 }
 
 export type AdminStationBoardStationTaskAction =

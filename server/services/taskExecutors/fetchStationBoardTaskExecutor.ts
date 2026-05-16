@@ -22,7 +22,6 @@ import normalizeCode from '~/server/utils/12306/normalizeCode';
 import uniqueNormalizedCodes from '~/server/utils/12306/uniqueNormalizedCodes';
 import {
     getTodayScheduleProbeGroupByTrainCode,
-    getTodayScheduleProbeGroupByTrainInternalCode,
     type TodayScheduleProbeGroup
 } from '~/server/services/todayScheduleCache';
 import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
@@ -51,6 +50,20 @@ export interface FetchStationBoardTaskArgs {
 
 interface ParsedJiaoluNode {
     group: TodayScheduleProbeGroup;
+}
+
+type StationBoardRowSaveStatus = 'saved' | 'not_saved';
+
+interface StationBoardPersistedRow extends StationBoardTrainRow {
+    saveStatus: StationBoardRowSaveStatus;
+    saveReasonCode: string;
+    saveReasonText: string;
+}
+
+interface ParsedStationBoardRowEntry {
+    row: StationBoardPersistedRow;
+    entry: ScheduleCirculationEntry | null;
+    signature: string;
 }
 
 let registered = false;
@@ -319,9 +332,53 @@ function buildOfficialCirculationEntry(
     };
 }
 
+function getCirculationEntrySignature(entry: ScheduleCirculationEntry): string {
+    return entry.nodes.map((node) => normalizeCode(node.internalCode)).join('|');
+}
+
+function buildStationBoardPersistedRow(
+    row: StationBoardTrainRow,
+    saveStatus: StationBoardRowSaveStatus,
+    saveReasonCode: string,
+    saveReasonText: string
+): StationBoardPersistedRow {
+    return {
+        ...row,
+        saveStatus,
+        saveReasonCode,
+        saveReasonText
+    };
+}
+
+function buildFailedParsedStationBoardRowEntry(
+    row: StationBoardTrainRow,
+    saveReasonCode: string,
+    saveReasonText: string
+): ParsedStationBoardRowEntry {
+    return {
+        row: buildStationBoardPersistedRow(
+            row,
+            'not_saved',
+            saveReasonCode,
+            saveReasonText
+        ),
+        entry: null,
+        signature: ''
+    };
+}
+
 function parseJiaoluTrainToEntry(
-    jiaoluTrain: string
-): ScheduleCirculationEntry | null {
+    row: StationBoardTrainRow
+): ParsedStationBoardRowEntry {
+    const jiaoluTrain = row.jiaoluTrain.trim();
+    if (jiaoluTrain.length === 0) {
+        return buildFailedParsedStationBoardRowEntry(
+            row,
+            'empty_jiaolu_train',
+            ''
+        );
+    }
+
     const parsedNodes: ParsedJiaoluNode[] = [];
 
     for (const segment of jiaoluTrain
@@ -330,7 +387,11 @@ function parseJiaoluTrainToEntry(
         .filter((item) => item.length > 0)) {
         const fields = segment.split('|').map((item) => item.trim());
         if (fields.length !== 5) {
-            return null;
+            return buildFailedParsedStationBoardRowEntry(
+                row,
+                'invalid_jiaolu_format',
+                '交路串格式不合法'
+            );
         }
 
         const [rawCode, startStationName, startTime, endStationName, endTime] =
@@ -342,7 +403,11 @@ function parseJiaoluTrainToEntry(
             !endStationName ||
             !endTime
         ) {
-            return null;
+            return buildFailedParsedStationBoardRowEntry(
+                row,
+                'invalid_jiaolu_segment',
+                '交路串存在缺失字段'
+            );
         }
 
         const group = resolveUniqueGroupForRawCode(
@@ -351,7 +416,19 @@ function parseJiaoluTrainToEntry(
             endStationName
         );
         if (!group) {
-            return null;
+            return buildFailedParsedStationBoardRowEntry(
+                row,
+                'group_not_resolved',
+                '无法映射到唯一的当日时刻表车次'
+            );
+        }
+
+        if (normalizeCode(group.trainInternalCode).length === 0) {
+            return buildFailedParsedStationBoardRowEntry(
+                row,
+                'missing_internal_code',
+                '匹配到车次但内部车次号缺失'
+            );
         }
 
         parsedNodes.push({
@@ -359,33 +436,54 @@ function parseJiaoluTrainToEntry(
         });
     }
 
-    return buildOfficialCirculationEntry(parsedNodes);
+    const entry = buildOfficialCirculationEntry(parsedNodes);
+    if (!entry) {
+        return buildFailedParsedStationBoardRowEntry(
+            row,
+            'invalid_jiaolu_entry',
+            '交路串无法生成有效交路'
+        );
+    }
+
+    return {
+        row: buildStationBoardPersistedRow(row, 'saved', 'saved', ''),
+        signature: getCirculationEntrySignature(entry),
+        entry
+    };
 }
 
 function chooseCirculationEntries(
-    entries: readonly ScheduleCirculationEntry[]
+    parsedRows: readonly ParsedStationBoardRowEntry[]
 ): ScheduleCirculationEntry[] {
-    const entriesBySignature = new Map<string, ScheduleCirculationEntry>();
-    for (const entry of entries) {
-        const signature = entry.nodes
-            .map((node) => normalizeCode(node.internalCode))
-            .join('|');
-        if (!entriesBySignature.has(signature)) {
-            entriesBySignature.set(signature, entry);
+    const entriesBySignature = new Map<string, ParsedStationBoardRowEntry[]>();
+    for (const parsedRow of parsedRows) {
+        if (!parsedRow.entry || parsedRow.signature.length === 0) {
+            continue;
         }
+
+        const existingGroup = entriesBySignature.get(parsedRow.signature);
+        if (existingGroup) {
+            existingGroup.push(parsedRow);
+            continue;
+        }
+
+        entriesBySignature.set(parsedRow.signature, [parsedRow]);
     }
 
     const chosenEntries: ScheduleCirculationEntry[] = [];
     const signatureByInternalCode = new Map<string, string>();
-    for (const [signature, entry] of [...entriesBySignature.entries()].sort(
+    for (const [signature, signatureRows] of [...entriesBySignature.entries()].sort(
         (left, right) => {
-            const lengthDiff = right[1].nodes.length - left[1].nodes.length;
+            const lengthDiff =
+                right[1][0]!.entry!.nodes.length - left[1][0]!.entry!.nodes.length;
             if (lengthDiff !== 0) {
                 return lengthDiff;
             }
             return left[0].localeCompare(right[0], 'zh-Hans-CN');
         }
     )) {
+        const parsedRow = signatureRows[0]!;
+        const entry = parsedRow.entry!;
         const conflictingSignatures = uniqueNormalizedCodes(
             entry.nodes
                 .map(
@@ -397,6 +495,13 @@ function chooseCirculationEntries(
                 .filter((value) => value.length > 0 && value !== signature)
         );
         if (conflictingSignatures.length > 0) {
+            for (const signatureRow of signatureRows) {
+                signatureRow.row.saveStatus = 'not_saved';
+                signatureRow.row.saveReasonCode =
+                    'conflicting_signature_skipped';
+                signatureRow.row.saveReasonText =
+                    '与优先级更高的交路冲突，未保存';
+            }
             logger.warn(
                 `skip_conflicting_official_circulation signature=${signature} conflictingSignatures=${JSON.stringify(conflictingSignatures)}`
             );
@@ -404,6 +509,15 @@ function chooseCirculationEntries(
         }
 
         chosenEntries.push(entry);
+        parsedRow.row.saveStatus = 'saved';
+        parsedRow.row.saveReasonCode = 'saved';
+        parsedRow.row.saveReasonText = '';
+        for (const signatureRow of signatureRows.slice(1)) {
+            signatureRow.row.saveStatus = 'not_saved';
+            signatureRow.row.saveReasonCode = 'duplicate_signature_skipped';
+            signatureRow.row.saveReasonText =
+                '与其他站板行命中相同交路，未重复保存';
+        }
         for (const node of entry.nodes) {
             signatureByInternalCode.set(
                 normalizeCode(node.internalCode),
@@ -536,9 +650,12 @@ async function executeFetchStationBoardTask(rawArgs: unknown) {
     }
 
     const parsedEntries = rows
-        .map((row) => parseJiaoluTrainToEntry(row.jiaoluTrain))
-        .filter((entry): entry is ScheduleCirculationEntry => entry !== null);
+        .map((row) => parseJiaoluTrainToEntry(row));
     const chosenEntries = chooseCirculationEntries(parsedEntries);
+    const persistedRows = parsedEntries.map((item) => item.row);
+    const parsedEntryCount = parsedEntries.filter(
+        (item) => item.entry !== null
+    ).length;
     if (chosenEntries.length === 0) {
         maybeRecordFetchResult({
             serviceDate: args.serviceDate,
@@ -547,10 +664,10 @@ async function executeFetchStationBoardTask(rawArgs: unknown) {
             stationTelecode: args.stationTelecode,
             resultStatus: 'no_official_entries',
             rowCount: rows.length,
-            parsedEntryCount: parsedEntries.length,
+            parsedEntryCount,
             savedEntryCount: 0,
             consumedQueueEntryCount: 0,
-            rows
+            rows: persistedRows
         });
         recordCurrentTrainProvenanceEvent({
             serviceDate: args.serviceDate,
@@ -560,7 +677,7 @@ async function executeFetchStationBoardTask(rawArgs: unknown) {
                 stationName: args.stationName,
                 stationTelecode: args.stationTelecode,
                 rowCount: rows.length,
-                parsedEntryCount: parsedEntries.length,
+                parsedEntryCount,
                 savedEntryCount: 0,
                 consumedQueueEntryCount: 0,
                 parentSchedulerTaskId: args.parentSchedulerTaskId
@@ -592,10 +709,10 @@ async function executeFetchStationBoardTask(rawArgs: unknown) {
         stationTelecode: args.stationTelecode,
         resultStatus: 'saved_entries',
         rowCount: rows.length,
-        parsedEntryCount: parsedEntries.length,
+        parsedEntryCount,
         savedEntryCount: chosenEntries.length,
         consumedQueueEntryCount: removedQueueEntries.length,
-        rows
+        rows: persistedRows
     });
     recordCurrentTrainProvenanceEvent({
         serviceDate: args.serviceDate,
@@ -605,7 +722,7 @@ async function executeFetchStationBoardTask(rawArgs: unknown) {
             stationName: args.stationName,
             stationTelecode: args.stationTelecode,
             rowCount: rows.length,
-            parsedEntryCount: parsedEntries.length,
+            parsedEntryCount,
             savedEntryCount: chosenEntries.length,
             consumedQueueEntryCount: removedQueueEntries.length,
             savedKeys,
@@ -614,7 +731,7 @@ async function executeFetchStationBoardTask(rawArgs: unknown) {
     });
 
     logger.info(
-        `done serviceDate=${args.serviceDate} stationName=${args.stationName} stationTelecode=${args.stationTelecode} rows=${rows.length} parsedEntries=${parsedEntries.length} savedEntries=${chosenEntries.length} savedKeys=${savedKeys.length} consumedQueueEntries=${removedQueueEntries.length}`
+        `done serviceDate=${args.serviceDate} stationName=${args.stationName} stationTelecode=${args.stationTelecode} rows=${rows.length} parsedEntries=${parsedEntryCount} savedEntries=${chosenEntries.length} savedKeys=${savedKeys.length} consumedQueueEntries=${removedQueueEntries.length}`
     );
 }
 

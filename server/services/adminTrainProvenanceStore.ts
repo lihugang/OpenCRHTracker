@@ -270,6 +270,13 @@ function toStationBoardRows(value: unknown): AdminStationBoardRow[] {
             const endStationName = (
                 getOptionalString(payload.endStationName) ?? ''
             ).trim();
+            const saveStatus = getOptionalString(payload.saveStatus) ?? '';
+            const saveReasonCode = (
+                getOptionalString(payload.saveReasonCode) ?? ''
+            ).trim();
+            const saveReasonText = (
+                getOptionalString(payload.saveReasonText) ?? ''
+            ).trim();
 
             if (
                 trainNo.length === 0 &&
@@ -286,7 +293,19 @@ function toStationBoardRows(value: unknown): AdminStationBoardRow[] {
                 stationTrainCode,
                 jiaoluTrain,
                 startStationName,
-                endStationName
+                endStationName,
+                saveStatus:
+                    saveStatus === 'saved' || saveStatus === 'not_saved'
+                        ? saveStatus
+                        : 'unknown_legacy',
+                saveReasonCode:
+                    saveStatus === 'saved' || saveStatus === 'not_saved'
+                        ? saveReasonCode
+                        : 'legacy_unrecorded',
+                saveReasonText:
+                    saveStatus === 'saved' || saveStatus === 'not_saved'
+                        ? saveReasonText
+                        : '旧记录未持久化逐行保存结果'
             };
         })
         .filter((item): item is AdminStationBoardRow => item !== null);

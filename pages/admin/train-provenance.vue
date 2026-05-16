@@ -2231,22 +2231,6 @@
                                 </div>
                             </div>
 
-                            <div
-                                class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-4 py-4">
-                                <p
-                                    class="text-xs uppercase tracking-[0.18em] text-slate-400">
-                                    始发站去重结果
-                                </p>
-                                <p
-                                    class="mt-2 text-sm leading-6 text-slate-700">
-                                    {{
-                                        item.selectedStations.length > 0
-                                            ? item.selectedStations.join(' / ')
-                                            : '当前还没有可展示的选站结果'
-                                    }}
-                                </p>
-                            </div>
-
                             <div class="flex justify-end">
                                 <UiButton
                                     type="button"
@@ -2268,7 +2252,7 @@
             :model-value="isStationBoardDetailDialogOpen"
             eyebrow="交路数据刷新"
             title="任务详情"
-            description="查看本次始发站去重结果、任务关联和车站原始返回数据。"
+            description="查看任务关联、筛选后的车站选项和车站原始返回数据。"
             size="lg"
             :close-on-backdrop="stationBoardDetailStatus !== 'pending'"
             @update:model-value="
@@ -2323,13 +2307,6 @@
                                     : '--'
                             }}
                         </p>
-                        <p>
-                            去重车站：{{
-                                stationBoardDetailData.selectedStations.join(
-                                    ' / '
-                                )
-                            }}
-                        </p>
                     </div>
 
                     <div class="space-y-3">
@@ -2339,19 +2316,35 @@
                                 class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
                                 车站列表
                             </p>
-                            <UiField
-                                label="电报码首字母"
-                                help="默认按 A 筛选，空电报码或异常电报码项不展示。">
-                                <UiSelect
-                                    v-model="
-                                        selectedStationBoardTelecodeInitial
-                                    "
-                                    :options="
-                                        STATION_TELECODE_INITIAL_OPTIONS
-                                    "
-                                    mobile-sheet-title="选择电报码首字母"
-                                    mobile-sheet-eyebrow="TELECODE" />
-                            </UiField>
+                            <div
+                                class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+                                <UiField
+                                    label="电报码首字母"
+                                    help="默认按 A 筛选，空电报码或异常电报码项不展示。">
+                                    <UiSelect
+                                        v-model="
+                                            selectedStationBoardTelecodeInitial
+                                        "
+                                        :options="
+                                            STATION_TELECODE_INITIAL_OPTIONS
+                                        "
+                                        mobile-sheet-title="选择电报码首字母"
+                                        mobile-sheet-eyebrow="TELECODE" />
+                                </UiField>
+
+                                <label
+                                    class="flex items-center gap-3 rounded-[1rem] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 transition hover:border-slate-300">
+                                    <input
+                                        v-model="
+                                            hideEmptyStationBoardJiaoluRows
+                                        "
+                                        type="checkbox"
+                                        class="h-4 w-4 rounded border-slate-300 text-crh-blue focus:ring-crh-blue/30" />
+                                    <span class="font-medium">
+                                        屏蔽空交路串
+                                    </span>
+                                </label>
+                            </div>
                         </div>
 
                         <UiEmptyState
@@ -2531,11 +2524,15 @@
 
                             <UiEmptyState
                                 v-if="
-                                    activeStationBoardStation.rows.length === 0
+                                    activeStationBoardRows.length === 0
                                 "
                                 eyebrow="无返回"
-                                title="当前车站没有返回行数据"
-                                description="可能任务尚未执行、请求失败重排，或者当前站没有可展示的站板记录。" />
+                                title="当前车站没有可展示的行数据"
+                                :description="
+                                    hideEmptyStationBoardJiaoluRows
+                                        ? '可能任务尚未执行、请求失败重排，或者当前筛选已隐藏全部空交路串行。'
+                                        : '可能任务尚未执行、请求失败重排，或者当前站没有可展示的站板记录。'
+                                " />
 
                             <div
                                 v-else
@@ -2560,13 +2557,21 @@
                                                 class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                                                 原始交路串
                                             </th>
+                                            <th
+                                                class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                                保存状态
+                                            </th>
+                                            <th
+                                                class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                                未保存原因
+                                            </th>
                                         </tr>
                                     </thead>
                                     <tbody class="divide-y divide-slate-100">
                                         <tr
                                             v-for="(
                                                 row, rowIndex
-                                            ) in activeStationBoardStation.rows"
+                                            ) in activeStationBoardRows"
                                             :key="`station-board-row:${rowIndex}`">
                                             <td
                                                 class="px-4 py-3 text-sm font-semibold text-slate-900">
@@ -2591,6 +2596,22 @@
                                                 <code class="break-all">{{
                                                     row.jiaoluTrain || '--'
                                                 }}</code>
+                                            </td>
+                                            <td
+                                                class="px-4 py-3 text-sm text-slate-700">
+                                                {{
+                                                    getStationBoardRowSaveStatusLabel(
+                                                        row
+                                                    )
+                                                }}
+                                            </td>
+                                            <td
+                                                class="px-4 py-3 text-sm text-slate-600">
+                                                {{
+                                                    getStationBoardRowSaveReasonText(
+                                                        row
+                                                    )
+                                                }}
                                             </td>
                                         </tr>
                                     </tbody>
@@ -2620,6 +2641,7 @@ import type {
     AdminQrcodeScanTimeSummaryItem,
     AdminStationBoardDispatchDetailResponse,
     AdminStationBoardDispatchTaskListItem,
+    AdminStationBoardRow,
     AdminStationBoardStationTaskItem,
     AdminStationBoardTaskListResponse,
     AdminTrainDataRequestHourBucket,
@@ -2699,6 +2721,7 @@ const selectedCouplingTaskBureau = ref('');
 const selectedCouplingTaskModel = ref('');
 const selectedStationBoardTelecodeInitial = ref('A');
 const selectedStationBoardStationName = ref('');
+const hideEmptyStationBoardJiaoluRows = ref(true);
 const couplingDetailStatus = ref<'idle' | 'pending' | 'success' | 'error'>(
     'idle'
 );
@@ -3076,6 +3099,14 @@ const activeStationBoardStation = computed(
         filteredStationBoardDetailStations.value[0] ??
         null
 );
+const activeStationBoardRows = computed(() => {
+    const rows = activeStationBoardStation.value?.rows ?? [];
+    if (!hideEmptyStationBoardJiaoluRows.value) {
+        return rows;
+    }
+
+    return rows.filter((row) => row.jiaoluTrain.trim().length > 0);
+});
 
 watch(couplingTaskBureauOptions, (options) => {
     const hasSelectedBureau = options.some(
@@ -3282,6 +3313,7 @@ function closeStationBoardDetailDialog() {
     stationBoardDetailErrorMessage.value = '';
     selectedStationBoardTelecodeInitial.value = 'A';
     selectedStationBoardStationName.value = '';
+    hideEmptyStationBoardJiaoluRows.value = true;
 }
 
 function handleStationBoardDetailDialogVisibilityChange(nextValue: boolean) {
@@ -3372,6 +3404,7 @@ async function openStationBoardDetail(taskRunId: number) {
     stationBoardDetailData.value = null;
     selectedStationBoardTelecodeInitial.value = 'A';
     selectedStationBoardStationName.value = '';
+    hideEmptyStationBoardJiaoluRows.value = true;
 
     try {
         const response = await requestFetch<
@@ -3433,6 +3466,34 @@ function getStationBoardResultLabel(
         default:
             return '--';
     }
+}
+
+function getStationBoardRowSaveStatusLabel(row: AdminStationBoardRow) {
+    switch (row.saveStatus) {
+        case 'saved':
+            return '已保存';
+        case 'not_saved':
+            return '未保存';
+        case 'unknown_legacy':
+            return '未记录';
+        default:
+            return '--';
+    }
+}
+
+function getStationBoardRowSaveReasonText(row: AdminStationBoardRow) {
+    if (row.saveStatus === 'saved') {
+        return '--';
+    }
+
+    if (
+        row.saveStatus === 'not_saved' &&
+        row.saveReasonCode === 'empty_jiaolu_train'
+    ) {
+        return '';
+    }
+
+    return row.saveReasonText || '--';
 }
 
 function getCouplingScanActionTaskRunId(item: AdminTrainProvenanceEvent) {
