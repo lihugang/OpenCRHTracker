@@ -2333,13 +2333,38 @@
                     </div>
 
                     <div class="space-y-3">
-                        <p
-                            class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
-                            车站列表
-                        </p>
-                        <div class="flex flex-wrap gap-2">
+                        <div
+                            class="flex flex-col gap-3 rounded-[1rem] border border-slate-200 bg-slate-50/80 px-4 py-4">
+                            <p
+                                class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                                车站列表
+                            </p>
+                            <UiField
+                                label="电报码首字母"
+                                help="默认按 A 筛选，空电报码或异常电报码项不展示。">
+                                <UiSelect
+                                    v-model="
+                                        selectedStationBoardTelecodeInitial
+                                    "
+                                    :options="
+                                        STATION_TELECODE_INITIAL_OPTIONS
+                                    "
+                                    mobile-sheet-title="选择电报码首字母"
+                                    mobile-sheet-eyebrow="TELECODE" />
+                            </UiField>
+                        </div>
+
+                        <UiEmptyState
+                            v-if="filteredStationBoardDetailStations.length === 0"
+                            eyebrow="无匹配"
+                            title="当前没有匹配该首字母的车站"
+                            description="请切换其他电报码首字母查看对应车站任务。" />
+
+                        <div
+                            v-else
+                            class="flex flex-wrap gap-2">
                             <button
-                                v-for="item in stationBoardDetailStations"
+                                v-for="item in filteredStationBoardDetailStations"
                                 :key="`station-board-station:${item.stationName}`"
                                 type="button"
                                 class="rounded-full border px-3 py-2 text-sm transition"
@@ -2643,6 +2668,13 @@ const EMPTY_REQUEST_METRICS = {
     successChangeRatio: null,
     failureChangeRatio: null
 } satisfies Omit<AdminTrainDataRequestTypeSummary, 'type'>;
+const STATION_TELECODE_INITIAL_OPTIONS = Array.from(
+    'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+    (letter) => ({
+        value: letter,
+        label: letter
+    })
+);
 
 const SCANNED_ROUTE_LABELS = {
     show: '\u67e5\u770b\u7545\u884c\u7801\u7ed3\u679c',
@@ -2665,6 +2697,7 @@ const isStationBoardDetailDialogOpen = ref(false);
 const expandedScannedRouteEventIds = ref<number[]>([]);
 const selectedCouplingTaskBureau = ref('');
 const selectedCouplingTaskModel = ref('');
+const selectedStationBoardTelecodeInitial = ref('A');
 const selectedStationBoardStationName = ref('');
 const couplingDetailStatus = ref<'idle' | 'pending' | 'success' | 'error'>(
     'idle'
@@ -3021,12 +3054,26 @@ const filteredCouplingScanTaskItems = computed<AdminCouplingScanTaskListItem[]>(
 const stationBoardDetailStations = computed<AdminStationBoardStationTaskItem[]>(
     () => stationBoardDetailData.value?.stations ?? []
 );
+const filteredStationBoardDetailStations = computed<
+    AdminStationBoardStationTaskItem[]
+>(() =>
+    stationBoardDetailStations.value.filter((item) => {
+        const telecodeInitial = getStationBoardTelecodeInitial(
+            item.stationTelecode
+        );
+
+        return (
+            telecodeInitial.length > 0 &&
+            telecodeInitial === selectedStationBoardTelecodeInitial.value
+        );
+    })
+);
 const activeStationBoardStation = computed(
     () =>
-        stationBoardDetailStations.value.find(
+        filteredStationBoardDetailStations.value.find(
             (item) => item.stationName === selectedStationBoardStationName.value
         ) ??
-        stationBoardDetailStations.value[0] ??
+        filteredStationBoardDetailStations.value[0] ??
         null
 );
 
@@ -3048,7 +3095,7 @@ watch(selectedCouplingTaskBureau, () => {
     }
 });
 
-watch(stationBoardDetailStations, (items) => {
+watch(filteredStationBoardDetailStations, (items) => {
     if (
         items.some(
             (item) => item.stationName === selectedStationBoardStationName.value
@@ -3233,6 +3280,8 @@ function closeStationBoardDetailDialog() {
 
     isStationBoardDetailDialogOpen.value = false;
     stationBoardDetailErrorMessage.value = '';
+    selectedStationBoardTelecodeInitial.value = 'A';
+    selectedStationBoardStationName.value = '';
 }
 
 function handleStationBoardDetailDialogVisibilityChange(nextValue: boolean) {
@@ -3321,6 +3370,7 @@ async function openStationBoardDetail(taskRunId: number) {
     stationBoardDetailStatus.value = 'pending';
     stationBoardDetailErrorMessage.value = '';
     stationBoardDetailData.value = null;
+    selectedStationBoardTelecodeInitial.value = 'A';
     selectedStationBoardStationName.value = '';
 
     try {
@@ -3340,8 +3390,6 @@ async function openStationBoardDetail(taskRunId: number) {
         }
 
         stationBoardDetailData.value = response.data;
-        selectedStationBoardStationName.value =
-            response.data.stations[0]?.stationName ?? '';
         stationBoardDetailStatus.value = 'success';
     } catch (error) {
         stationBoardDetailErrorMessage.value = getApiErrorMessage(
@@ -3365,6 +3413,13 @@ function getStationBoardActionLabel(item: AdminStationBoardStationTaskItem) {
         default:
             return item.action;
     }
+}
+
+function getStationBoardTelecodeInitial(telecode: string): string {
+    const normalizedTelecode = telecode.trim().toUpperCase();
+    const initial = normalizedTelecode.charAt(0);
+
+    return /^[A-Z]$/.test(initial) ? initial : '';
 }
 
 function getStationBoardResultLabel(
