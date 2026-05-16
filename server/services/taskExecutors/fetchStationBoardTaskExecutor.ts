@@ -52,6 +52,13 @@ interface ParsedJiaoluNode {
     group: TodayScheduleProbeGroup;
 }
 
+interface UnresolvedJiaoluSegment {
+    raw: string;
+    rawCode: string;
+    startStationName: string;
+    endStationName: string;
+}
+
 type StationBoardRowSaveStatus = 'saved' | 'not_saved';
 
 interface StationBoardPersistedRow extends StationBoardTrainRow {
@@ -64,6 +71,8 @@ interface ParsedStationBoardRowEntry {
     row: StationBoardPersistedRow;
     entry: ScheduleCirculationEntry | null;
     signature: string;
+    finalSaveReasonCode: string;
+    finalSaveReasonText: string;
 }
 
 let registered = false;
@@ -363,8 +372,43 @@ function buildFailedParsedStationBoardRowEntry(
             saveReasonText
         ),
         entry: null,
-        signature: ''
+        signature: '',
+        finalSaveReasonCode: saveReasonCode,
+        finalSaveReasonText: saveReasonText
     };
+}
+
+function formatUnresolvedJiaoluSegment(
+    segment: Pick<
+        UnresolvedJiaoluSegment,
+        'raw' | 'rawCode' | 'startStationName' | 'endStationName'
+    >
+) {
+    if (segment.raw.length > 0) {
+        return segment.raw;
+    }
+
+    return [
+        segment.rawCode,
+        segment.startStationName,
+        segment.endStationName
+    ].join('|');
+}
+
+function buildSkippedSegmentsReasonText(
+    skippedSegments: readonly UnresolvedJiaoluSegment[]
+) {
+    return `已跳过未命中当天时刻表的交路段：${skippedSegments
+        .map((segment) => formatUnresolvedJiaoluSegment(segment))
+        .join('、')}`;
+}
+
+function buildAllSegmentsNotResolvedReasonText(
+    skippedSegments: readonly UnresolvedJiaoluSegment[]
+) {
+    return `全部交路段均未命中当天时刻表：${skippedSegments
+        .map((segment) => formatUnresolvedJiaoluSegment(segment))
+        .join('、')}`;
 }
 
 function parseJiaoluTrainToEntry(
@@ -380,6 +424,7 @@ function parseJiaoluTrainToEntry(
     }
 
     const parsedNodes: ParsedJiaoluNode[] = [];
+    const skippedSegments: UnresolvedJiaoluSegment[] = [];
 
     for (const segment of jiaoluTrain
         .split('#')
@@ -416,11 +461,13 @@ function parseJiaoluTrainToEntry(
             endStationName
         );
         if (!group) {
-            return buildFailedParsedStationBoardRowEntry(
-                row,
-                'group_not_resolved',
-                '无法映射到唯一的当日时刻表车次'
-            );
+            skippedSegments.push({
+                raw: segment,
+                rawCode,
+                startStationName,
+                endStationName
+            });
+            continue;
         }
 
         if (normalizeCode(group.trainInternalCode).length === 0) {
@@ -436,6 +483,22 @@ function parseJiaoluTrainToEntry(
         });
     }
 
+    if (parsedNodes.length === 0) {
+        if (skippedSegments.length > 0) {
+            return buildFailedParsedStationBoardRowEntry(
+                row,
+                'all_segments_not_resolved',
+                buildAllSegmentsNotResolvedReasonText(skippedSegments)
+            );
+        }
+
+        return buildFailedParsedStationBoardRowEntry(
+            row,
+            'invalid_jiaolu_entry',
+            '交路串无法生成有效交路'
+        );
+    }
+
     const entry = buildOfficialCirculationEntry(parsedNodes);
     if (!entry) {
         return buildFailedParsedStationBoardRowEntry(
@@ -445,10 +508,24 @@ function parseJiaoluTrainToEntry(
         );
     }
 
+    const finalSaveReasonCode =
+        skippedSegments.length > 0 ? 'partial_segments_skipped' : 'saved';
+    const finalSaveReasonText =
+        skippedSegments.length > 0
+            ? buildSkippedSegmentsReasonText(skippedSegments)
+            : '';
+
     return {
-        row: buildStationBoardPersistedRow(row, 'saved', 'saved', ''),
+        row: buildStationBoardPersistedRow(
+            row,
+            'saved',
+            finalSaveReasonCode,
+            finalSaveReasonText
+        ),
         signature: getCirculationEntrySignature(entry),
-        entry
+        entry,
+        finalSaveReasonCode,
+        finalSaveReasonText
     };
 }
 
@@ -510,8 +587,8 @@ function chooseCirculationEntries(
 
         chosenEntries.push(entry);
         parsedRow.row.saveStatus = 'saved';
-        parsedRow.row.saveReasonCode = 'saved';
-        parsedRow.row.saveReasonText = '';
+        parsedRow.row.saveReasonCode = parsedRow.finalSaveReasonCode;
+        parsedRow.row.saveReasonText = parsedRow.finalSaveReasonText;
         for (const signatureRow of signatureRows.slice(1)) {
             signatureRow.row.saveStatus = 'not_saved';
             signatureRow.row.saveReasonCode = 'duplicate_signature_skipped';

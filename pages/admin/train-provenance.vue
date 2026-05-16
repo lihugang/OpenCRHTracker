@@ -3482,7 +3482,7 @@ function getStationBoardRowSaveStatusLabel(row: AdminStationBoardRow) {
 }
 
 function getStationBoardRowSaveReasonText(row: AdminStationBoardRow) {
-    if (row.saveStatus === 'saved') {
+    if (row.saveStatus === 'saved' && !row.saveReasonText) {
         return '--';
     }
 
