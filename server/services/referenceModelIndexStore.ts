@@ -219,14 +219,7 @@ export function rebuildReferenceModelIndex(): ReferenceModelIndexCache {
 }
 
 function getActiveCache() {
-    const currentDate = getRelativeDateString(0);
-    const { windowDays } = getWindowConfig();
-
-    if (
-        cached &&
-        cached.currentDate === currentDate &&
-        cached.windowDays === windowDays
-    ) {
+    if (cached) {
         return cached;
     }
 

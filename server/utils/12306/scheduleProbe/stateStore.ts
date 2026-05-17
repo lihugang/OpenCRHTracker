@@ -30,8 +30,14 @@ interface LoadedBuildingScheduleState {
         | 'reset_invalid_file';
 }
 
+interface ScheduleDocumentCache {
+    document: ScheduleDocument;
+}
+
 const SCHEDULE_SCHEMA_RELATIVE_PATH = '../assets/json/scheduleScheme.json';
 const CURRENT_SCHEDULE_DOCUMENT_VERSION = 5;
+let cachedScheduleDocument: ScheduleDocumentCache | null = null;
+let scheduleStateVersion = 0;
 
 function cloneScheduleState(state: ScheduleState): ScheduleState {
     return JSON.parse(JSON.stringify(state)) as ScheduleState;
@@ -55,6 +61,20 @@ function cloneScheduleCirculationMap(
     circulation: ScheduleCirculationMap
 ): ScheduleCirculationMap {
     return JSON.parse(JSON.stringify(circulation)) as ScheduleCirculationMap;
+}
+
+function cloneScheduleDocument(document: ScheduleDocument): ScheduleDocument {
+    return JSON.parse(JSON.stringify(document)) as ScheduleDocument;
+}
+
+function setCachedScheduleDocument(document: ScheduleDocument) {
+    cachedScheduleDocument = {
+        document: cloneScheduleDocument(document)
+    };
+}
+
+function bumpScheduleStateVersion() {
+    scheduleStateVersion += 1;
 }
 
 function compareRefreshTime(left: number | null, right: number | null): number {
@@ -801,9 +821,9 @@ export function appendRouteRefreshQueueTrainCodes(
         return [];
     }
 
-    const document =
-        loadScheduleDocument(scheduleFilePath) ??
-        createInitialScheduleDocument();
+    const document = cloneScheduleDocument(
+        loadScheduleDocument(scheduleFilePath) ?? createInitialScheduleDocument()
+    );
     const existingQueue = cloneRouteRefreshQueue(document.routeRefreshQueue);
     const existingKeys = new Set(
         existingQueue.map((item) => `${item.serviceDate}:${item.trainCode}`)
@@ -864,10 +884,11 @@ export function consumeRouteRefreshQueueEntries(
         return [];
     }
 
-    const document = loadScheduleDocument(scheduleFilePath);
-    if (!document || document.routeRefreshQueue.length === 0) {
+    const activeDocument = loadScheduleDocument(scheduleFilePath);
+    if (!activeDocument || activeDocument.routeRefreshQueue.length === 0) {
         return [];
     }
+    const document = cloneScheduleDocument(activeDocument);
 
     const existingQueue = cloneRouteRefreshQueue(document.routeRefreshQueue);
     const removedEntries: ScheduleRouteRefreshQueueEntry[] = [];
@@ -895,6 +916,10 @@ export function consumeRouteRefreshQueueEntries(
 export function loadScheduleDocument(
     scheduleFilePath: string
 ): ScheduleDocument | null {
+    if (cachedScheduleDocument) {
+        return cachedScheduleDocument.document;
+    }
+
     const absolutePath = path.resolve(scheduleFilePath);
     if (!fs.existsSync(absolutePath)) {
         return null;
@@ -911,6 +936,7 @@ export function loadScheduleDocument(
             saveScheduleDocument(scheduleFilePath, parsed.document);
         }
 
+        setCachedScheduleDocument(parsed.document);
         return parsed.document;
     } catch {
         return null;
@@ -932,6 +958,7 @@ export function saveScheduleDocument(
         `${JSON.stringify(document, null, 4)}\n`,
         'utf8'
     );
+    setCachedScheduleDocument(document);
 }
 
 export function loadPublishedScheduleState(
@@ -979,9 +1006,9 @@ export function saveScheduleCirculationEntry(
         return null;
     }
 
-    const document =
-        loadScheduleDocument(scheduleFilePath) ??
-        createInitialScheduleDocument();
+    const document = cloneScheduleDocument(
+        loadScheduleDocument(scheduleFilePath) ?? createInitialScheduleDocument()
+    );
     document.circulation[normalizedKey] =
         cloneScheduleCirculationEntry(normalizedEntry);
     saveScheduleDocument(scheduleFilePath, document);
@@ -996,9 +1023,9 @@ export function saveScheduleCirculationEntries(
         return [];
     }
 
-    const document =
-        loadScheduleDocument(scheduleFilePath) ??
-        createInitialScheduleDocument();
+    const document = cloneScheduleDocument(
+        loadScheduleDocument(scheduleFilePath) ?? createInitialScheduleDocument()
+    );
     const savedKeys = new Set<string>();
 
     for (const entry of entries) {
@@ -1065,11 +1092,12 @@ export function savePublishedScheduleState(
     scheduleFilePath: string,
     state: ScheduleState | null
 ): void {
-    const document =
-        loadScheduleDocument(scheduleFilePath) ??
-        createInitialScheduleDocument();
+    const document = cloneScheduleDocument(
+        loadScheduleDocument(scheduleFilePath) ?? createInitialScheduleDocument()
+    );
     document.published = state ? cloneScheduleState(state) : null;
     saveScheduleDocument(scheduleFilePath, document);
+    bumpScheduleStateVersion();
 }
 
 export function loadBuildingScheduleState(
@@ -1083,20 +1111,21 @@ export function saveBuildingScheduleState(
     scheduleFilePath: string,
     state: ScheduleState | null
 ): void {
-    const document =
-        loadScheduleDocument(scheduleFilePath) ??
-        createInitialScheduleDocument();
+    const document = cloneScheduleDocument(
+        loadScheduleDocument(scheduleFilePath) ?? createInitialScheduleDocument()
+    );
     document.building = state ? cloneScheduleState(state) : null;
     saveScheduleDocument(scheduleFilePath, document);
+    bumpScheduleStateVersion();
 }
 
 export function promoteBuildingScheduleState(
     scheduleFilePath: string,
     fallbackState: ScheduleState
 ): ScheduleState {
-    const document =
-        loadScheduleDocument(scheduleFilePath) ??
-        createInitialScheduleDocument();
+    const document = cloneScheduleDocument(
+        loadScheduleDocument(scheduleFilePath) ?? createInitialScheduleDocument()
+    );
     const buildingState = document.building
         ? cloneScheduleState(document.building)
         : cloneScheduleState(fallbackState);
@@ -1107,7 +1136,12 @@ export function promoteBuildingScheduleState(
     document.published = promotedState;
     document.building = null;
     saveScheduleDocument(scheduleFilePath, document);
+    bumpScheduleStateVersion();
     return cloneScheduleState(promotedState);
+}
+
+export function getScheduleStateVersion() {
+    return scheduleStateVersion;
 }
 
 export function loadOrInitBuildingScheduleState(

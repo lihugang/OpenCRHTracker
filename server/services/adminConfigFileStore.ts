@@ -20,7 +20,6 @@ import {
     validateQrcodeDetectionConfigText
 } from '~/server/services/qrcodeDetectionConfigStore';
 import { synchronizeQrcodeDetectionDispatchTasks } from '~/server/services/taskExecutors/dispatchQrcodeDetectionTasksExecutor';
-import { invalidateTodayScheduleCache } from '~/server/services/todayScheduleCache';
 import ensure from '~/server/utils/api/executor/ensure';
 import {
     getAssetFilePath,
@@ -143,7 +142,6 @@ function buildConfigFileItem(
 function resetSafeRuntimeCaches(): void {
     invalidateProbeAssetsCache();
     invalidateLookupIndexCache();
-    invalidateTodayScheduleCache();
 }
 
 async function reloadQrcodeDetectionAfterAssetChange(): Promise<string> {

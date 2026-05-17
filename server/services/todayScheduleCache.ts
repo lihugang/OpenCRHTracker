@@ -1,9 +1,10 @@
-import fs from 'fs';
-import path from 'path';
 import useConfig from '~/server/config';
 import { buildTrainKey } from '~/server/services/probeRuntimeState';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
-import { loadActiveScheduleState } from '~/server/utils/12306/scheduleProbe/stateStore';
+import {
+    getScheduleStateVersion,
+    loadActiveScheduleState
+} from '~/server/utils/12306/scheduleProbe/stateStore';
 import {
     toShanghaiDayOffsetFromUnixSeconds,
     toUnixSecondsFromShanghaiDayOffset
@@ -57,8 +58,7 @@ export interface TodayScheduleStationIndexRow extends TodayScheduleRoute {
 
 interface TodayScheduleCache {
     date: string;
-    scheduleFilePath: string;
-    scheduleMtimeMs: number;
+    scheduleStateVersion: number;
     routesByTrainCode: Map<string, TodayScheduleRoute>;
     timetablesByTrainCode: Map<string, TodayScheduleTimetable>;
     groupsByTrainKey: Map<string, TodayScheduleProbeGroup>;
@@ -69,23 +69,10 @@ interface TodayScheduleCache {
 
 let cached: TodayScheduleCache | null = null;
 
-function resolveAssetPath(filePath: string): string {
-    return path.resolve(filePath);
-}
-
-function getFileMtimeMs(filePath: string): number {
-    try {
-        return fs.statSync(resolveAssetPath(filePath)).mtimeMs;
-    } catch {
-        return -1;
-    }
-}
-
 function rebuildCache(): TodayScheduleCache {
     const config = useConfig();
     const currentDate = getCurrentDateString();
     const scheduleFilePath = config.data.assets.schedule.file;
-    const scheduleMtimeMs = getFileMtimeMs(scheduleFilePath);
     const state = loadActiveScheduleState(scheduleFilePath);
     const routesByTrainCode = new Map<string, TodayScheduleRoute>();
     const timetablesByTrainCode = new Map<string, TodayScheduleTimetable>();
@@ -234,8 +221,7 @@ function rebuildCache(): TodayScheduleCache {
 
     cached = {
         date: currentDate,
-        scheduleFilePath,
-        scheduleMtimeMs,
+        scheduleStateVersion: getScheduleStateVersion(),
         routesByTrainCode,
         timetablesByTrainCode,
         groupsByTrainKey,
@@ -247,16 +233,9 @@ function rebuildCache(): TodayScheduleCache {
 }
 
 export function getTodayScheduleCache(): Map<string, TodayScheduleRoute> {
-    const config = useConfig();
-    const currentDate = getCurrentDateString();
-    const scheduleFilePath = config.data.assets.schedule.file;
-    const scheduleMtimeMs = getFileMtimeMs(scheduleFilePath);
-
     if (
         cached &&
-        cached.date === currentDate &&
-        cached.scheduleFilePath === scheduleFilePath &&
-        cached.scheduleMtimeMs === scheduleMtimeMs
+        cached.scheduleStateVersion === getScheduleStateVersion()
     ) {
         return cached.routesByTrainCode;
     }
@@ -339,16 +318,9 @@ export function invalidateTodayScheduleCache(): void {
 }
 
 function getActiveCache(): TodayScheduleCache {
-    const config = useConfig();
-    const currentDate = getCurrentDateString();
-    const scheduleFilePath = config.data.assets.schedule.file;
-    const scheduleMtimeMs = getFileMtimeMs(scheduleFilePath);
-
     if (
         cached &&
-        cached.date === currentDate &&
-        cached.scheduleFilePath === scheduleFilePath &&
-        cached.scheduleMtimeMs === scheduleMtimeMs
+        cached.scheduleStateVersion === getScheduleStateVersion()
     ) {
         return cached;
     }
