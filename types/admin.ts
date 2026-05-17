@@ -46,6 +46,44 @@ export interface AdminAnomalyDeleteRouteResponse {
     clearedDetectionGroups: number;
 }
 
+export type AdminOfficialCirculationMatchType =
+    | 'internal_code'
+    | 'all_code';
+
+export interface AdminOfficialCirculationNodePreview {
+    internalCode: string;
+    allCodes: string[];
+    startStation: string;
+    endStation: string;
+    startAt: number;
+    endAt: number;
+}
+
+export interface AdminOfficialCirculationSearchItem {
+    entryKey: string;
+    matchedBy: AdminOfficialCirculationMatchType[];
+    matchedCodes: string[];
+    refreshedAt: number;
+    nodeCount: number;
+    nodes: AdminOfficialCirculationNodePreview[];
+}
+
+export interface AdminOfficialCirculationSearchResponse {
+    keyword: string;
+    normalizedKeyword: string;
+    filePath: string;
+    modifiedAt: number | null;
+    total: number;
+    items: AdminOfficialCirculationSearchItem[];
+}
+
+export interface AdminOfficialCirculationDeleteResponse {
+    entryKey: string;
+    deletedKeys: string[];
+    deletedKeyCount: number;
+    modifiedAt: number | null;
+}
+
 export type AdminPassiveAlertLevel = 'WARN' | 'ERROR';
 
 export interface AdminPassiveAlertItem {

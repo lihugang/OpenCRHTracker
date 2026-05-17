@@ -285,6 +285,10 @@ const navItems = [
         path: '/admin/config-files'
     },
     {
+        label: '官方交路表',
+        path: '/admin/official-circulations'
+    },
+    {
         label: 'WebApp Token',
         path: '/admin/webapp-tokens'
     },

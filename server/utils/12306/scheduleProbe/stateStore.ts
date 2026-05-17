@@ -1095,6 +1095,49 @@ export function saveScheduleCirculationEntries(
     return [...savedKeys];
 }
 
+export function deleteScheduleCirculationEntry(
+    scheduleFilePath: string,
+    entryKey: string
+): string[] {
+    const normalizedEntryKey = normalizeCode(entryKey);
+    if (normalizedEntryKey.length === 0) {
+        return [];
+    }
+
+    const activeDocument = loadScheduleDocument(scheduleFilePath);
+    if (!activeDocument) {
+        return [];
+    }
+
+    const targetEntry = activeDocument.circulation[normalizedEntryKey];
+    if (!targetEntry) {
+        return [];
+    }
+
+    const document = cloneScheduleDocument(activeDocument);
+    const deletedKeys: string[] = [];
+    const deletionKeys = uniqueNormalizedCodes([
+        normalizedEntryKey,
+        ...getScheduleCirculationKeysFromEntry(targetEntry)
+    ]);
+
+    for (const key of deletionKeys) {
+        if (!document.circulation[key]) {
+            continue;
+        }
+
+        delete document.circulation[key];
+        deletedKeys.push(key);
+    }
+
+    if (deletedKeys.length === 0) {
+        return [];
+    }
+
+    saveScheduleDocument(scheduleFilePath, document);
+    return deletedKeys;
+}
+
 export function loadActiveScheduleState(
     scheduleFilePath: string
 ): ScheduleState | null {
