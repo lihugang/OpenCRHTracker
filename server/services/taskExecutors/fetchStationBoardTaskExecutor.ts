@@ -411,6 +411,10 @@ function buildAllSegmentsNotResolvedReasonText(
         .join('、')}`;
 }
 
+function buildDuplicateDisplayCodeReasonText(displayCode: string) {
+    return `12306 返回的交路串无效：展示车次 ${displayCode} 在同一交路中重复出现`;
+}
+
 function parseJiaoluTrainToEntry(
     row: StationBoardTrainRow
 ): ParsedStationBoardRowEntry {
@@ -425,6 +429,7 @@ function parseJiaoluTrainToEntry(
 
     const parsedNodes: ParsedJiaoluNode[] = [];
     const skippedSegments: UnresolvedJiaoluSegment[] = [];
+    const seenResolvedDisplayCodes = new Set<string>();
 
     for (const segment of jiaoluTrain
         .split('#')
@@ -476,6 +481,27 @@ function parseJiaoluTrainToEntry(
                 'missing_internal_code',
                 '匹配到车次但内部车次号缺失'
             );
+        }
+
+        const resolvedDisplayCodes = expandCompressedTrainCodes(rawCode);
+        if (resolvedDisplayCodes.length === 0) {
+            return buildFailedParsedStationBoardRowEntry(
+                row,
+                'invalid_jiaolu_segment',
+                '交路串存在无法识别的展示车次'
+            );
+        }
+
+        for (const resolvedDisplayCode of resolvedDisplayCodes) {
+            if (seenResolvedDisplayCodes.has(resolvedDisplayCode)) {
+                return buildFailedParsedStationBoardRowEntry(
+                    row,
+                    'duplicate_display_code_in_jiaolu',
+                    buildDuplicateDisplayCodeReasonText(resolvedDisplayCode)
+                );
+            }
+
+            seenResolvedDisplayCodes.add(resolvedDisplayCode);
         }
 
         parsedNodes.push({
