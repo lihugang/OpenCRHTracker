@@ -270,12 +270,16 @@ function normalizeScheduleCirculation(value: unknown): {
             continue;
         }
 
-        const normalizedKey =
-            getScheduleCirculationKeyFromEntry(normalizedEntry);
-        if (normalizedKey !== key) {
-            migrated = true;
+        const normalizedKeys =
+            getScheduleCirculationKeysFromEntry(normalizedEntry);
+        for (const normalizedKey of normalizedKeys) {
+            if (circulation[normalizedKey]) {
+                continue;
+            }
+            circulation[normalizedKey] = cloneScheduleCirculationEntry(
+                normalizedEntry
+            );
         }
-        circulation[normalizedKey] = normalizedEntry;
     }
 
     return {
