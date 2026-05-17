@@ -1,5 +1,13 @@
 import useConfig from '~/server/config';
 import getLogger from '~/server/libs/log4js';
+import {
+    buildStationBoardTaskKey,
+    buildStationTelecodeLookup,
+    enqueueOrReuseStationBoardFetchTask,
+    listPendingStationBoardTasks,
+    normalizeStationName,
+    resolveStationTelecodeFromLookup
+} from '~/server/services/stationBoardTaskDispatch';
 import { registerTaskExecutor } from '~/server/services/taskExecutorRegistry';
 import { loadScheduleDocument } from '~/server/utils/12306/scheduleProbe/stateStore';
 import type {
@@ -17,20 +25,10 @@ import getNowSeconds from '~/server/utils/time/getNowSeconds';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
 import fetchAllStations from '~/server/utils/12306/network/fetchAllStations';
 import {
-    enqueueTask,
-    listPendingTasksByExecutor
-} from '~/server/services/taskQueue';
-import { getStationBoardIdleTaskOptions } from '~/server/services/stationBoardTaskScheduling';
-import { getCurrentTaskExecutionContext } from '~/server/services/taskExecutionContext';
-import {
     getCurrentTrainProvenanceTaskRunId,
     recordCurrentTrainProvenanceEvent
 } from '~/server/services/trainProvenanceRecorder';
 import { recordStationBoardDispatchResult } from '~/server/services/trainProvenanceStore';
-import {
-    FETCH_STATION_BOARD_TASK_EXECUTOR,
-    parseFetchStationBoardTaskArgs
-} from './fetchStationBoardTaskExecutor';
 
 export const DISPATCH_STATION_BOARD_TASKS_EXECUTOR =
     'dispatch_station_board_tasks';
@@ -38,10 +36,6 @@ export const DISPATCH_STATION_BOARD_TASKS_EXECUTOR =
 interface StationBoardCandidateGroup {
     groupKey: string;
     departureStationNames: string[];
-}
-
-interface PendingStationBoardTask {
-    taskId: number;
 }
 
 interface StationBoardDispatchTaskDetail {
@@ -59,17 +53,6 @@ interface StationBoardDispatchTaskDetail {
 const logger = getLogger('task-executor:dispatch-station-board-tasks');
 
 let registered = false;
-
-function normalizeStationName(value: string) {
-    return value.trim();
-}
-
-function buildStationBoardTaskKey(
-    serviceDate: string,
-    stationTelecode: string
-) {
-    return `${serviceDate}:${normalizeCode(stationTelecode)}`;
-}
 
 function resolveItemDepartureStationName(item: ScheduleItem) {
     const startStationName = normalizeStationName(item.startStation);
@@ -156,30 +139,6 @@ function collectSelectedStationNames(
     );
 }
 
-function buildStationTelecodeLookup(
-    stations: Awaited<ReturnType<typeof fetchAllStations>>
-) {
-    const telecodesByStationName = new Map<string, Set<string>>();
-
-    for (const station of stations) {
-        const stationName = normalizeStationName(station.stationName);
-        const stationTelecode = normalizeCode(station.stationTelecode);
-        if (stationName.length === 0 || stationTelecode.length === 0) {
-            continue;
-        }
-
-        const existing = telecodesByStationName.get(stationName);
-        if (existing) {
-            existing.add(stationTelecode);
-            continue;
-        }
-
-        telecodesByStationName.set(stationName, new Set([stationTelecode]));
-    }
-
-    return telecodesByStationName;
-}
-
 function collectCandidates(
     document: ScheduleDocument,
     state: ScheduleState
@@ -245,34 +204,6 @@ function collectCandidates(
         left.groupKey.localeCompare(right.groupKey, 'zh-Hans-CN')
     );
 }
-
-function collectPendingStationBoardTasks() {
-    const pendingTasks = new Map<string, PendingStationBoardTask>();
-
-    for (const task of listPendingTasksByExecutor(
-        FETCH_STATION_BOARD_TASK_EXECUTOR
-    )) {
-        try {
-            const args = parseFetchStationBoardTaskArgs(
-                JSON.parse(task.arguments) as unknown
-            );
-            pendingTasks.set(
-                buildStationBoardTaskKey(
-                    args.serviceDate,
-                    args.stationTelecode
-                ),
-                {
-                    taskId: task.id
-                }
-            );
-        } catch {
-            continue;
-        }
-    }
-
-    return pendingTasks;
-}
-
 function maybeRecordDispatchResult(input: {
     serviceDate: string;
     candidateGroupCount: number;
@@ -333,7 +264,7 @@ async function executeDispatchStationBoardTasks() {
     );
 
     const executionTime = getNowSeconds();
-    const pendingTasks = collectPendingStationBoardTasks();
+    const pendingTasks = listPendingStationBoardTasks();
     const retryRemaining = Math.max(
         0,
         config.task.circulation.stationBoard.maxAttempts - 1
@@ -355,8 +286,11 @@ async function executeDispatchStationBoardTasks() {
     });
 
     for (const stationName of selectedStations) {
-        const telecodes = telecodesByStationName.get(stationName);
-        if (!telecodes || telecodes.size === 0) {
+        const telecodeResolution = resolveStationTelecodeFromLookup(
+            telecodesByStationName,
+            stationName
+        );
+        if (telecodeResolution.status === 'not_found') {
             skippedNotFound += 1;
             dispatchDetail.push({
                 stationName,
@@ -370,23 +304,22 @@ async function executeDispatchStationBoardTasks() {
             );
             continue;
         }
-        if (telecodes.size !== 1) {
+        if (telecodeResolution.status === 'ambiguous') {
             skippedAmbiguous += 1;
-            const ambiguousTelecodes = Array.from(telecodes).sort();
             dispatchDetail.push({
                 stationName,
                 stationTelecode: '',
                 action: 'station_telecode_ambiguous',
                 schedulerTaskId: null,
-                ambiguousTelecodes
+                ambiguousTelecodes: telecodeResolution.ambiguousTelecodes
             });
             logger.warn(
-                `station_telecode_ambiguous stationName=${stationName} telecodes=${JSON.stringify(ambiguousTelecodes)}`
+                `station_telecode_ambiguous stationName=${stationName} telecodes=${JSON.stringify(telecodeResolution.ambiguousTelecodes)}`
             );
             continue;
         }
 
-        const stationTelecode = Array.from(telecodes)[0]!;
+        const stationTelecode = telecodeResolution.stationTelecode;
         const taskKey = buildStationBoardTaskKey(state.date, stationTelecode);
         const pendingTask = pendingTasks.get(taskKey) ?? null;
         if (pendingTask) {
@@ -401,28 +334,22 @@ async function executeDispatchStationBoardTasks() {
             continue;
         }
 
-        const taskId = enqueueTask(
-            FETCH_STATION_BOARD_TASK_EXECUTOR,
-            {
-                serviceDate: state.date,
-                stationName,
-                stationTelecode,
-                retryRemaining,
-                parentSchedulerTaskId:
-                    getCurrentTaskExecutionContext()?.taskId ?? null
-            },
+        const stationBoardTask = enqueueOrReuseStationBoardFetchTask({
+            serviceDate: state.date,
+            stationName,
+            stationTelecode,
             executionTime,
-            getStationBoardIdleTaskOptions(FETCH_STATION_BOARD_TASK_EXECUTOR)
-        );
+            retryRemaining
+        });
         pendingTasks.set(taskKey, {
-            taskId
+            taskId: stationBoardTask.schedulerTaskId
         });
         createdTasks += 1;
         dispatchDetail.push({
             stationName,
             stationTelecode,
             action: 'created',
-            schedulerTaskId: taskId,
+            schedulerTaskId: stationBoardTask.schedulerTaskId,
             ambiguousTelecodes: []
         });
     }

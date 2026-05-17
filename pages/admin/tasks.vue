@@ -4,7 +4,7 @@
         :today-date-input-value="todayDateInputValue"
         :session="session"
         title="任务"
-        description="查看当前剩余任务规模，并手动创建后台任务，用于补跑导出、立即刷新指定车次线路信息、创建交路数据刷新任务、发起重联扫描或立即执行固定车组畅行码检测。">
+        description="查看当前剩余任务规模，并手动创建后台任务，用于补跑导出、刷新指定车次线路信息、手动刷新单个车次交路表、创建交路数据刷新任务、发起重联扫描或立即执行固定车组畅行码检测。">
         <template #toolbar>
             <UiButton
                 type="button"
@@ -119,7 +119,7 @@
                             手动创建任务
                         </h2>
                         <p class="text-sm leading-6 text-slate-600">
-                            按任务模板立即补派后台任务，适用于导出补跑、线路刷新、重联扫描和固定车组畅行码检测。
+                            按任务模板立即补派后台任务，适用于导出补跑、线路刷新、单车次交路表刷新、重联扫描和固定车组畅行码检测。
                         </p>
                     </div>
 
@@ -261,11 +261,11 @@
                                     </p>
                                     <h3
                                         class="text-xl font-semibold text-slate-900">
-                                        手动添加车次刷新任务
+                                        手动添加线路刷新任务
                                     </h3>
                                     <p class="text-sm leading-6 text-slate-600">
                                         输入多个车次后立即创建 route info
-                                        刷新任务。后端会自动标准化、去重，并按批大小拆分。
+                                        刷新任务。它会更新今日线路信息，但不会直接写入官方交路表；后端会自动标准化、去重，并按批大小拆分。
                                     </p>
                                 </div>
 
@@ -347,7 +347,97 @@
                                             refreshTaskStatus === 'pending'
                                         "
                                         @click="createRefreshTask">
-                                        创建立即刷新任务
+                                        创建线路刷新任务
+                                    </UiButton>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div
+                            class="rounded-[1rem] border border-slate-200 bg-white/90 px-5 py-5">
+                            <div class="space-y-6">
+                                <div class="space-y-2">
+                                    <p
+                                        class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                                        交路表
+                                    </p>
+                                    <h3
+                                        class="text-xl font-semibold text-slate-900">
+                                        手动刷新单个车次交路表
+                                    </h3>
+                                    <p class="text-sm leading-6 text-slate-600">
+                                        为单个车次派发一次官方交路表刷新。系统会按该车次今日始发站派发或复用站板抓取任务；如果该车次尚未完成今日线路信息刷新，需要先执行上面的线路刷新任务。
+                                    </p>
+                                </div>
+
+                                <UiField
+                                    label="车次号"
+                                    help="一次只支持一个车次，且仅支持今天已发布时刻表中的车次。">
+                                    <input
+                                        v-model="
+                                            refreshCirculationTrainCodeInput
+                                        "
+                                        type="text"
+                                        inputmode="text"
+                                        autocomplete="off"
+                                        class="harmony-input w-full px-4 py-3 text-base text-crh-grey-dark"
+                                        placeholder="例如 G1" />
+                                </UiField>
+
+                                <div
+                                    class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-4 py-4">
+                                    <p
+                                        class="text-xs uppercase tracking-[0.18em] text-slate-400">
+                                        执行限制
+                                    </p>
+                                    <p
+                                        class="mt-2 text-sm leading-6 text-slate-700">
+                                        {{
+                                            isSelectedDateToday
+                                                ? '当前选中的管理员日期就是今天，可以提交单车次交路表刷新。'
+                                                : '该功能仅支持今天。请把管理员共享日期切换到今天后再提交。'
+                                        }}
+                                    </p>
+                                    <p
+                                        class="mt-2 break-all text-sm leading-6 text-slate-500">
+                                        {{
+                                            refreshCirculationTrainCodePreview.length >
+                                            0
+                                                ? `归一化车次：${refreshCirculationTrainCodePreview}`
+                                                : '当前还没有可提交的有效车次'
+                                        }}
+                                    </p>
+                                    <p
+                                        v-if="
+                                            refreshCirculationTrainCodeParts.length >
+                                            1
+                                        "
+                                        class="mt-2 text-sm leading-6 text-amber-700">
+                                        该功能一次只支持一个车次，请删除多余输入。
+                                    </p>
+                                </div>
+
+                                <StatusPanel
+                                    :error-message="
+                                        refreshCirculationTaskErrorMessage
+                                    "
+                                    :response="refreshCirculationTaskResponse"
+                                    :format-execution-time="
+                                        formatExecutionTime
+                                    " />
+
+                                <div class="flex justify-end">
+                                    <UiButton
+                                        type="button"
+                                        :disabled="
+                                            !canCreateRefreshCirculationTask
+                                        "
+                                        :loading="
+                                            refreshCirculationTaskStatus ===
+                                            'pending'
+                                        "
+                                        @click="createRefreshCirculationTask">
+                                        创建交路表刷新任务
                                     </UiButton>
                                 </div>
                             </div>
@@ -536,6 +626,7 @@ import type {
     AdminCouplingScanOptionGroup,
     AdminDetectCoupledEmuGroupNowTaskRequest,
     AdminDispatchStationBoardTasksNowTaskRequest,
+    AdminRefreshTrainCirculationNowTaskRequest,
     AdminRunQrcodeDetectionNowTaskRequest,
     AdminTaskOverviewResponse,
     AdminRefreshRouteInfoNowTaskRequest,
@@ -615,6 +706,7 @@ const { selectedDateInput, todayDateInputValue } = await useAdminDateQuery();
 
 const exportDateInput = ref(selectedDateInput.value);
 const refreshTrainCodesInput = ref('');
+const refreshCirculationTrainCodeInput = ref('');
 const selectedCouplingScanBureau = ref('');
 const selectedCouplingScanModel = ref('');
 
@@ -625,6 +717,12 @@ const exportTaskResponse = ref<AdminCreateTaskResponse | null>(null);
 const refreshTaskStatus = ref<TaskRequestStatus>('idle');
 const refreshTaskErrorMessage = ref('');
 const refreshTaskResponse = ref<AdminCreateTaskResponse | null>(null);
+
+const refreshCirculationTaskStatus = ref<TaskRequestStatus>('idle');
+const refreshCirculationTaskErrorMessage = ref('');
+const refreshCirculationTaskResponse = ref<AdminCreateTaskResponse | null>(
+    null
+);
 
 const couplingScanTaskStatus = ref<TaskRequestStatus>('idle');
 const couplingScanTaskErrorMessage = ref('');
@@ -677,11 +775,29 @@ const normalizedTrainCodesPreview = computed(() =>
     Array.from(
         new Set(
             refreshTrainCodesInput.value
-                .split(/[\s,??]+/u)
+                .split(/[\s,，、,]+/u)
                 .map((item) => item.trim().toUpperCase())
                 .filter((item) => item.length > 0)
         )
     )
+);
+const refreshCirculationTrainCodeParts = computed(() =>
+    refreshCirculationTrainCodeInput.value
+        .split(/[\s,，、,]+/u)
+        .map((item) => item.trim().toUpperCase())
+        .filter((item) => item.length > 0)
+);
+const refreshCirculationTrainCodePreview = computed(
+    () => refreshCirculationTrainCodeParts.value[0] ?? ''
+);
+const isSelectedDateToday = computed(
+    () => selectedDateInput.value === todayDateInputValue
+);
+const canCreateRefreshCirculationTask = computed(
+    () =>
+        isSelectedDateToday.value &&
+        refreshCirculationTrainCodeParts.value.length === 1 &&
+        refreshCirculationTrainCodePreview.value.length > 0
 );
 const couplingScanOptions = computed<AdminCouplingScanOptionGroup[]>(
     () => taskOverviewData.value?.couplingScanOptions ?? []
@@ -864,6 +980,43 @@ async function createRefreshTask() {
     }
 }
 
+async function createRefreshCirculationTask() {
+    refreshCirculationTaskErrorMessage.value = '';
+    refreshCirculationTaskResponse.value = null;
+
+    if (!isSelectedDateToday.value) {
+        refreshCirculationTaskErrorMessage.value =
+            '该功能仅支持今天，请先把管理员共享日期切换到今天。';
+        return;
+    }
+
+    if (refreshCirculationTrainCodeParts.value.length !== 1) {
+        refreshCirculationTaskErrorMessage.value = '该功能一次只支持一个车次。';
+        return;
+    }
+
+    refreshCirculationTaskStatus.value = 'pending';
+
+    const body: AdminRefreshTrainCirculationNowTaskRequest = {
+        type: 'refresh_train_circulation_now',
+        payload: {
+            trainCode: refreshCirculationTrainCodePreview.value
+        }
+    };
+
+    try {
+        refreshCirculationTaskResponse.value = await postAdminTask(body);
+        await refreshOverviewSilently();
+    } catch (error) {
+        refreshCirculationTaskErrorMessage.value = getApiErrorMessage(
+            error,
+            '创建交路表刷新任务失败。'
+        );
+    } finally {
+        refreshCirculationTaskStatus.value = 'idle';
+    }
+}
+
 async function createCouplingScanTask() {
     if (!canCreateCouplingScanTask.value) {
         couplingScanTaskErrorMessage.value = '请先选择有效的路局和车型。';
@@ -964,7 +1117,7 @@ function formatNumber(value: number) {
 useSiteSeo({
     title: '任务 | Open CRH Tracker',
     description:
-        '管理员任务页面，用于查看待执行任务规模，并手动创建导出、线路刷新、交路数据刷新、重联扫描和固定车组畅行码检测任务。',
+        '管理员任务页面，用于查看待执行任务规模，并手动创建导出、线路刷新、单车次交路表刷新、交路数据刷新、重联扫描和固定车组畅行码检测任务。',
     path: '/admin/tasks',
     noindex: true
 });

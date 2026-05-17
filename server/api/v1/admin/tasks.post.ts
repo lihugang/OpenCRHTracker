@@ -62,6 +62,25 @@ function parseRequestBody(body: CreateAdminTaskBody): AdminCreateTaskRequest {
                 }
             };
         }
+        case 'refresh_train_circulation_now': {
+            const trainCode =
+                typeof payload.trainCode === 'string'
+                    ? payload.trainCode.trim()
+                    : '';
+            ensure(
+                trainCode.length > 0,
+                400,
+                'invalid_param',
+                'trainCode 必须为非空字符串'
+            );
+
+            return {
+                type,
+                payload: {
+                    trainCode
+                }
+            };
+        }
         case 'detect_coupled_emu_group_now': {
             const bureau =
                 typeof payload.bureau === 'string' ? payload.bureau.trim() : '';

@@ -253,6 +253,7 @@ export interface AdminServerMetricsResponse {
 export type AdminTaskTemplateType =
     | 'regenerate_daily_export'
     | 'refresh_route_info_now'
+    | 'refresh_train_circulation_now'
     | 'detect_coupled_emu_group_now'
     | 'run_qrcode_detection_now'
     | 'dispatch_station_board_tasks_now';
@@ -277,6 +278,13 @@ export interface AdminRefreshRouteInfoNowTaskRequest {
     };
 }
 
+export interface AdminRefreshTrainCirculationNowTaskRequest {
+    type: 'refresh_train_circulation_now';
+    payload: {
+        trainCode: string;
+    };
+}
+
 export interface AdminDetectCoupledEmuGroupNowTaskRequest {
     type: 'detect_coupled_emu_group_now';
     payload: {
@@ -298,6 +306,7 @@ export interface AdminDispatchStationBoardTasksNowTaskRequest {
 export type AdminCreateTaskRequest =
     | AdminRegenerateDailyExportTaskRequest
     | AdminRefreshRouteInfoNowTaskRequest
+    | AdminRefreshTrainCirculationNowTaskRequest
     | AdminDetectCoupledEmuGroupNowTaskRequest
     | AdminRunQrcodeDetectionNowTaskRequest
     | AdminDispatchStationBoardTasksNowTaskRequest;

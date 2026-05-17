@@ -15,6 +15,7 @@ import { loadProbeAssets } from '~/server/services/probeAssetStore';
 import { PROBE_QRCODE_DETECTION_EMU_TASK_EXECUTOR } from '~/server/services/taskExecutors/probeQrcodeDetectionEmuTaskExecutor';
 import { REFRESH_ROUTE_BATCH_TASK_EXECUTOR } from '~/server/services/taskExecutors/refreshRouteBatchTaskExecutor';
 import { DISPATCH_STATION_BOARD_TASKS_EXECUTOR } from '~/server/services/taskExecutors/dispatchStationBoardTasksExecutor';
+import { REFRESH_TRAIN_CIRCULATION_TASK_EXECUTOR } from '~/server/services/taskExecutors/refreshTrainCirculationTaskExecutor';
 import { getStationBoardIdleTaskOptions } from '~/server/services/stationBoardTaskScheduling';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
 import { loadPublishedScheduleState } from '~/server/utils/12306/scheduleProbe/stateStore';
@@ -23,6 +24,7 @@ import uniqueNormalizedCodes from '~/server/utils/12306/uniqueNormalizedCodes';
 import ensure from '~/server/utils/api/executor/ensure';
 import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
+import { getTodayScheduleTimetableByTrainCode } from '~/server/services/todayScheduleCache';
 import type {
     AdminCreateTaskResponse,
     AdminCreateTaskRequest,
@@ -273,6 +275,76 @@ function createRefreshRouteInfoNowTask(
     };
 }
 
+function normalizeRefreshTrainCirculationCode(trainCode: string): string {
+    const normalizedTrainCode = normalizeCode(trainCode);
+    ensure(
+        normalizedTrainCode.length > 0,
+        400,
+        'invalid_param',
+        '至少需要提供一个有效车次'
+    );
+
+    const timetable = getTodayScheduleTimetableByTrainCode(normalizedTrainCode);
+    ensure(
+        timetable !== null,
+        409,
+        'schedule_not_ready',
+        '当前时刻表中不存在该车次，或该车次尚未完成线路信息刷新'
+    );
+
+    const startStationName =
+        timetable.startStation.trim() ||
+        timetable.stops.find((stop) => stop.isStart)?.stationName.trim() ||
+        timetable.stops[0]?.stationName.trim() ||
+        '';
+    ensure(
+        startStationName.length > 0,
+        409,
+        'schedule_not_ready',
+        '该车次当前缺少始发站信息，请先执行线路刷新'
+    );
+
+    return normalizedTrainCode;
+}
+
+function createRefreshTrainCirculationNowTask(
+    request: Extract<
+        AdminCreateTaskRequest,
+        { type: 'refresh_train_circulation_now' }
+    >
+): AdminCreateTaskResponse {
+    assertPublishedScheduleReadyForRefresh();
+
+    const normalizedTrainCode = normalizeRefreshTrainCirculationCode(
+        request.payload.trainCode
+    );
+    const executionTime = getNowSeconds();
+    const taskId = enqueueTask(
+        REFRESH_TRAIN_CIRCULATION_TASK_EXECUTOR,
+        {
+            trainCode: normalizedTrainCode
+        },
+        executionTime,
+        getStationBoardIdleTaskOptions(REFRESH_TRAIN_CIRCULATION_TASK_EXECUTOR)
+    );
+
+    logger.info(
+        `admin_task_created type=${request.type} executor=${REFRESH_TRAIN_CIRCULATION_TASK_EXECUTOR} taskId=${taskId} trainCode=${normalizedTrainCode}`
+    );
+
+    return {
+        type: request.type,
+        createdCount: 1,
+        createdTasks: toCreatedTaskRecords(
+            [taskId],
+            REFRESH_TRAIN_CIRCULATION_TASK_EXECUTOR,
+            executionTime
+        ),
+        summary: `已为车次 ${normalizedTrainCode} 创建 1 条交路表刷新任务。`,
+        normalizedTrainCodes: [normalizedTrainCode]
+    };
+}
+
 async function createDetectCoupledEmuGroupNowTask(
     request: Extract<
         AdminCreateTaskRequest,
@@ -377,6 +449,8 @@ export async function createAdminTask(
             return createRegenerateDailyExportTask(request);
         case 'refresh_route_info_now':
             return createRefreshRouteInfoNowTask(request);
+        case 'refresh_train_circulation_now':
+            return createRefreshTrainCirculationNowTask(request);
         case 'detect_coupled_emu_group_now':
             return await createDetectCoupledEmuGroupNowTask(request);
         case 'run_qrcode_detection_now':
