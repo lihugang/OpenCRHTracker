@@ -2348,7 +2348,9 @@
                         </div>
 
                         <UiEmptyState
-                            v-if="filteredStationBoardDetailStations.length === 0"
+                            v-if="
+                                filteredStationBoardDetailStations.length === 0
+                            "
                             eyebrow="无匹配"
                             title="当前没有匹配该首字母的车站"
                             description="请切换其他电报码首字母查看对应车站任务。" />
@@ -2523,9 +2525,7 @@
                             </div>
 
                             <UiEmptyState
-                                v-if="
-                                    activeStationBoardRows.length === 0
-                                "
+                                v-if="activeStationBoardRows.length === 0"
                                 eyebrow="无返回"
                                 title="当前车站没有可展示的行数据"
                                 :description="
@@ -2562,7 +2562,8 @@
                                                     </p>
                                                 </div>
 
-                                                <div class="space-y-1 text-right">
+                                                <div
+                                                    class="space-y-1 text-right">
                                                     <p
                                                         class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
                                                         保存状态
@@ -2613,8 +2614,7 @@
                                                         原始交路串
                                                     </dt>
                                                     <dd class="text-slate-600">
-                                                        <code
-                                                            class="break-all">
+                                                        <code class="break-all">
                                                             {{
                                                                 row.circulationTrain ||
                                                                 '--'
@@ -2705,7 +2705,8 @@
                                                 <td
                                                     class="px-4 py-3 text-sm text-slate-600">
                                                     <code class="break-all">{{
-                                                        row.circulationTrain || '--'
+                                                        row.circulationTrain ||
+                                                        '--'
                                                     }}</code>
                                                 </td>
                                                 <td
@@ -2850,8 +2851,9 @@ const qrcodeScanLoadedDate = ref('');
 const stationBoardTaskListStatus = ref<
     'idle' | 'pending' | 'success' | 'error'
 >('idle');
-const stationBoardTaskListData =
-    ref<AdminStationBoardTaskListResponse | null>(null);
+const stationBoardTaskListData = ref<AdminStationBoardTaskListResponse | null>(
+    null
+);
 const stationBoardTaskListErrorMessage = ref('');
 const stationBoardLoadedDate = ref('');
 const qrcodeScanDetailStatus = ref<'idle' | 'pending' | 'success' | 'error'>(

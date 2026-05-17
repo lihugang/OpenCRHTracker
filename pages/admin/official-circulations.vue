@@ -17,8 +17,8 @@
                         搜索并删除官方交路表
                     </h2>
                     <p class="text-sm leading-6 text-slate-600">
-                        输入任意车次号或 internalCode，系统会在
-                        `schedule.json` 的 `circulation` 中做精确归一化匹配。
+                        输入任意车次号或 internalCode，系统会在 `schedule.json`
+                        的 `circulation` 中做精确归一化匹配。
                     </p>
                 </div>
 
@@ -59,7 +59,8 @@
 
                 <div
                     class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-4 py-4">
-                    <p class="text-xs uppercase tracking-[0.18em] text-slate-400">
+                    <p
+                        class="text-xs uppercase tracking-[0.18em] text-slate-400">
                         当前输入
                     </p>
                     <p class="mt-2 text-sm leading-6 text-slate-700">
@@ -120,7 +121,8 @@
                                 class="text-xs uppercase tracking-[0.18em] text-slate-400">
                                 命中数量
                             </p>
-                            <p class="mt-2 text-3xl font-semibold text-slate-900">
+                            <p
+                                class="mt-2 text-3xl font-semibold text-slate-900">
                                 {{ formatNumber(searchData.total) }}
                             </p>
                         </div>
@@ -131,7 +133,8 @@
                                 class="text-xs uppercase tracking-[0.18em] text-slate-400">
                                 文件修改时间
                             </p>
-                            <p class="mt-2 text-sm font-semibold text-slate-900">
+                            <p
+                                class="mt-2 text-sm font-semibold text-slate-900">
                                 {{ formatTimestamp(searchData.modifiedAt) }}
                             </p>
                         </div>
@@ -171,22 +174,24 @@
                                                 v-for="matchType in item.matchedBy"
                                                 :key="`${item.entryKey}:${matchType}`"
                                                 class="inline-flex items-center rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-crh-blue">
-                                                {{ getMatchTypeLabel(matchType) }}
+                                                {{
+                                                    getMatchTypeLabel(matchType)
+                                                }}
                                             </span>
                                         </div>
                                         <h3
                                             class="break-all font-mono text-sm font-semibold text-slate-900">
                                             {{ item.entryKey }}
                                         </h3>
-                                        <p class="text-sm leading-6 text-slate-600">
+                                        <p
+                                            class="text-sm leading-6 text-slate-600">
                                             命中代码：{{
                                                 item.matchedCodes.join(' / ')
                                             }}
                                         </p>
-                                        <p class="text-sm leading-6 text-slate-600">
-                                            {{
-                                                getEntrySummary(item)
-                                            }}
+                                        <p
+                                            class="text-sm leading-6 text-slate-600">
+                                            {{ getEntrySummary(item) }}
                                         </p>
                                     </div>
 
@@ -194,10 +199,16 @@
                                         class="text-sm leading-6 text-slate-500">
                                         <p>
                                             刷新时间：{{
-                                                formatTimestamp(item.refreshedAt)
+                                                formatTimestamp(
+                                                    item.refreshedAt
+                                                )
                                             }}
                                         </p>
-                                        <p>节点数：{{ formatNumber(item.nodeCount) }}</p>
+                                        <p>
+                                            节点数：{{
+                                                formatNumber(item.nodeCount)
+                                            }}
+                                        </p>
                                     </div>
                                 </div>
 
@@ -254,7 +265,9 @@
                                     <UiButton
                                         type="button"
                                         variant="secondary"
-                                        :loading="deletingEntryKey === item.entryKey"
+                                        :loading="
+                                            deletingEntryKey === item.entryKey
+                                        "
                                         :disabled="deletingEntryKey.length > 0"
                                         class="border-rose-200 text-rose-700 hover:border-rose-300 hover:bg-rose-50/80 hover:text-rose-800"
                                         @click="openDeleteDialog(item)">

@@ -46,9 +46,7 @@ export interface AdminAnomalyDeleteRouteResponse {
     clearedDetectionGroups: number;
 }
 
-export type AdminOfficialCirculationMatchType =
-    | 'internal_code'
-    | 'all_code';
+export type AdminOfficialCirculationMatchType = 'internal_code' | 'all_code';
 
 export interface AdminOfficialCirculationNodePreview {
     internalCode: string;

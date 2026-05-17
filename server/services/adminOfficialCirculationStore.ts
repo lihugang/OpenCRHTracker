@@ -41,7 +41,9 @@ function getScheduleFileModifiedAt(filePath: string) {
 function createSearchItem(
     entryKey: string,
     normalizedKeyword: string,
-    entry: NonNullable<ReturnType<typeof loadScheduleDocument>>['circulation'][string]
+    entry: NonNullable<
+        ReturnType<typeof loadScheduleDocument>
+    >['circulation'][string]
 ): AdminOfficialCirculationSearchItem | null {
     const matchedBy = new Set<AdminOfficialCirculationMatchType>();
     const matchedCodes = new Set<string>();
@@ -114,11 +116,8 @@ export function searchAdminOfficialCirculations(
             createSearchItem(entryKey, normalizedKeyword, entry)
         )
         .filter(
-            (
-                item
-            ): item is NonNullable<
-                ReturnType<typeof createSearchItem>
-            > => item !== null
+            (item): item is NonNullable<ReturnType<typeof createSearchItem>> =>
+                item !== null
         )
         .sort((left, right) => {
             if (left.refreshedAt !== right.refreshedAt) {

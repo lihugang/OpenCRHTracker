@@ -296,9 +296,8 @@ function normalizeScheduleCirculation(value: unknown): {
             if (circulation[normalizedKey]) {
                 continue;
             }
-            circulation[normalizedKey] = cloneScheduleCirculationEntry(
-                normalizedEntry
-            );
+            circulation[normalizedKey] =
+                cloneScheduleCirculationEntry(normalizedEntry);
         }
     }
 
@@ -865,7 +864,8 @@ export function appendRouteRefreshQueueTrainCodes(
     }
 
     const document = cloneScheduleDocument(
-        loadScheduleDocument(scheduleFilePath) ?? createInitialScheduleDocument()
+        loadScheduleDocument(scheduleFilePath) ??
+            createInitialScheduleDocument()
     );
     const existingQueue = cloneRouteRefreshQueue(document.routeRefreshQueue);
     const existingKeys = new Set(
@@ -1050,7 +1050,8 @@ export function saveScheduleCirculationEntry(
     }
 
     const document = cloneScheduleDocument(
-        loadScheduleDocument(scheduleFilePath) ?? createInitialScheduleDocument()
+        loadScheduleDocument(scheduleFilePath) ??
+            createInitialScheduleDocument()
     );
     persistScheduleCirculationEntry(document.circulation, normalizedEntry);
     saveScheduleDocument(scheduleFilePath, document);
@@ -1066,7 +1067,8 @@ export function saveScheduleCirculationEntries(
     }
 
     const document = cloneScheduleDocument(
-        loadScheduleDocument(scheduleFilePath) ?? createInitialScheduleDocument()
+        loadScheduleDocument(scheduleFilePath) ??
+            createInitialScheduleDocument()
     );
     const savedKeys = new Set<string>();
 
@@ -1177,7 +1179,8 @@ export function savePublishedScheduleState(
     state: ScheduleState | null
 ): void {
     const document = cloneScheduleDocument(
-        loadScheduleDocument(scheduleFilePath) ?? createInitialScheduleDocument()
+        loadScheduleDocument(scheduleFilePath) ??
+            createInitialScheduleDocument()
     );
     document.published = state ? cloneScheduleState(state) : null;
     saveScheduleDocument(scheduleFilePath, document);
@@ -1196,7 +1199,8 @@ export function saveBuildingScheduleState(
     state: ScheduleState | null
 ): void {
     const document = cloneScheduleDocument(
-        loadScheduleDocument(scheduleFilePath) ?? createInitialScheduleDocument()
+        loadScheduleDocument(scheduleFilePath) ??
+            createInitialScheduleDocument()
     );
     document.building = state ? cloneScheduleState(state) : null;
     saveScheduleDocument(scheduleFilePath, document);
@@ -1208,7 +1212,8 @@ export function promoteBuildingScheduleState(
     fallbackState: ScheduleState
 ): ScheduleState {
     const document = cloneScheduleDocument(
-        loadScheduleDocument(scheduleFilePath) ?? createInitialScheduleDocument()
+        loadScheduleDocument(scheduleFilePath) ??
+            createInitialScheduleDocument()
     );
     const buildingState = document.building
         ? cloneScheduleState(document.building)

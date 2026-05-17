@@ -342,7 +342,9 @@ function buildOfficialCirculationEntry(
 }
 
 function getCirculationEntrySignature(entry: ScheduleCirculationEntry): string {
-    return entry.nodes.map((node) => normalizeCode(node.internalCode)).join('|');
+    return entry.nodes
+        .map((node) => normalizeCode(node.internalCode))
+        .join('|');
 }
 
 function buildStationBoardPersistedRow(
@@ -575,16 +577,16 @@ function chooseCirculationEntries(
 
     const chosenEntries: ScheduleCirculationEntry[] = [];
     const signatureByInternalCode = new Map<string, string>();
-    for (const [signature, signatureRows] of [...entriesBySignature.entries()].sort(
-        (left, right) => {
-            const lengthDiff =
-                right[1][0]!.entry!.nodes.length - left[1][0]!.entry!.nodes.length;
-            if (lengthDiff !== 0) {
-                return lengthDiff;
-            }
-            return left[0].localeCompare(right[0], 'zh-Hans-CN');
+    for (const [signature, signatureRows] of [
+        ...entriesBySignature.entries()
+    ].sort((left, right) => {
+        const lengthDiff =
+            right[1][0]!.entry!.nodes.length - left[1][0]!.entry!.nodes.length;
+        if (lengthDiff !== 0) {
+            return lengthDiff;
         }
-    )) {
+        return left[0].localeCompare(right[0], 'zh-Hans-CN');
+    })) {
         const parsedRow = signatureRows[0]!;
         const entry = parsedRow.entry!;
         const conflictingSignatures = uniqueNormalizedCodes(
@@ -752,8 +754,7 @@ async function executeFetchStationBoardTask(rawArgs: unknown) {
         return;
     }
 
-    const parsedEntries = rows
-        .map((row) => parseCirculationTrainToEntry(row));
+    const parsedEntries = rows.map((row) => parseCirculationTrainToEntry(row));
     const chosenEntries = chooseCirculationEntries(parsedEntries);
     const persistedRows = parsedEntries.map((item) => item.row);
     const parsedEntryCount = parsedEntries.filter(

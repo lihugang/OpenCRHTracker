@@ -233,10 +233,7 @@ function rebuildCache(): TodayScheduleCache {
 }
 
 export function getTodayScheduleCache(): Map<string, TodayScheduleRoute> {
-    if (
-        cached &&
-        cached.scheduleStateVersion === getScheduleStateVersion()
-    ) {
+    if (cached && cached.scheduleStateVersion === getScheduleStateVersion()) {
         return cached.routesByTrainCode;
     }
 
@@ -318,10 +315,7 @@ export function invalidateTodayScheduleCache(): void {
 }
 
 function getActiveCache(): TodayScheduleCache {
-    if (
-        cached &&
-        cached.scheduleStateVersion === getScheduleStateVersion()
-    ) {
+    if (cached && cached.scheduleStateVersion === getScheduleStateVersion()) {
         return cached;
     }
 
