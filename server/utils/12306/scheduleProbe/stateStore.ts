@@ -308,6 +308,49 @@ function normalizeScheduleCirculation(value: unknown): {
     };
 }
 
+function collectOverlappingScheduleCirculationKeys(
+    circulation: ScheduleCirculationMap,
+    normalizedEntry: ScheduleCirculationEntry
+) {
+    const staleKeys = new Set<string>();
+
+    for (const key of getScheduleCirculationKeysFromEntry(normalizedEntry)) {
+        const existingEntry = circulation[key];
+        if (!existingEntry) {
+            continue;
+        }
+
+        for (const existingKey of getScheduleCirculationKeysFromEntry(
+            existingEntry
+        )) {
+            if (circulation[existingKey]) {
+                staleKeys.add(existingKey);
+            }
+        }
+    }
+
+    return [...staleKeys];
+}
+
+function persistScheduleCirculationEntry(
+    circulation: ScheduleCirculationMap,
+    normalizedEntry: ScheduleCirculationEntry
+) {
+    for (const staleKey of collectOverlappingScheduleCirculationKeys(
+        circulation,
+        normalizedEntry
+    )) {
+        delete circulation[staleKey];
+    }
+
+    const savedKeys = getScheduleCirculationKeysFromEntry(normalizedEntry);
+    for (const key of savedKeys) {
+        circulation[key] = cloneScheduleCirculationEntry(normalizedEntry);
+    }
+
+    return savedKeys;
+}
+
 function ensureScheduleItem(
     value: unknown
 ): value is Partial<ScheduleItem> & { code: string } {
@@ -1009,8 +1052,7 @@ export function saveScheduleCirculationEntry(
     const document = cloneScheduleDocument(
         loadScheduleDocument(scheduleFilePath) ?? createInitialScheduleDocument()
     );
-    document.circulation[normalizedKey] =
-        cloneScheduleCirculationEntry(normalizedEntry);
+    persistScheduleCirculationEntry(document.circulation, normalizedEntry);
     saveScheduleDocument(scheduleFilePath, document);
     return normalizedKey;
 }
@@ -1037,11 +1079,10 @@ export function saveScheduleCirculationEntries(
             continue;
         }
 
-        for (const key of getScheduleCirculationKeysFromEntry(
+        for (const key of persistScheduleCirculationEntry(
+            document.circulation,
             normalizedEntry
         )) {
-            document.circulation[key] =
-                cloneScheduleCirculationEntry(normalizedEntry);
             savedKeys.add(key);
         }
     }
