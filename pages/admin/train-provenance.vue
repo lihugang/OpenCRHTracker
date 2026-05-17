@@ -2536,86 +2536,198 @@
 
                             <div
                                 v-else
-                                class="overflow-x-auto rounded-[1rem] border border-slate-200 bg-white">
-                                <table
-                                    class="min-w-full divide-y divide-slate-200">
-                                    <thead class="bg-slate-50/80">
-                                        <tr>
-                                            <th
-                                                class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                                                车次
-                                            </th>
-                                            <th
-                                                class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                                                始发站
-                                            </th>
-                                            <th
-                                                class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                                                终到站
-                                            </th>
-                                            <th
-                                                class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                                                原始交路串
-                                            </th>
-                                            <th
-                                                class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                                                保存状态
-                                            </th>
-                                            <th
-                                                class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                                                未保存原因
-                                            </th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="divide-y divide-slate-100">
-                                        <tr
-                                            v-for="(
-                                                row, rowIndex
-                                            ) in activeStationBoardRows"
-                                            :key="`station-board-row:${rowIndex}`">
-                                            <td
-                                                class="px-4 py-3 text-sm font-semibold text-slate-900">
-                                                {{
-                                                    row.stationTrainCode ||
-                                                    row.trainNo ||
-                                                    '--'
-                                                }}
-                                            </td>
-                                            <td
-                                                class="px-4 py-3 text-sm text-slate-700">
-                                                {{
-                                                    row.startStationName || '--'
-                                                }}
-                                            </td>
-                                            <td
-                                                class="px-4 py-3 text-sm text-slate-700">
-                                                {{ row.endStationName || '--' }}
-                                            </td>
-                                            <td
-                                                class="px-4 py-3 text-sm text-slate-600">
-                                                <code class="break-all">{{
-                                                    row.jiaoluTrain || '--'
-                                                }}</code>
-                                            </td>
-                                            <td
-                                                class="px-4 py-3 text-sm text-slate-700">
-                                                {{
-                                                    getStationBoardRowSaveStatusLabel(
-                                                        row
-                                                    )
-                                                }}
-                                            </td>
-                                            <td
-                                                class="px-4 py-3 text-sm text-slate-600">
-                                                {{
-                                                    getStationBoardRowSaveReasonText(
-                                                        row
-                                                    )
-                                                }}
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </table>
+                                class="space-y-3">
+                                <div class="space-y-3 md:hidden">
+                                    <article
+                                        v-for="(
+                                            row, rowIndex
+                                        ) in activeStationBoardRows"
+                                        :key="`station-board-row-card:${rowIndex}`"
+                                        class="rounded-[1rem] border border-slate-200 bg-white px-4 py-4 shadow-sm">
+                                        <div class="space-y-4">
+                                            <div
+                                                class="flex items-start justify-between gap-3">
+                                                <div class="space-y-1">
+                                                    <p
+                                                        class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                                                        车次
+                                                    </p>
+                                                    <p
+                                                        class="text-lg font-semibold text-slate-900">
+                                                        {{
+                                                            row.stationTrainCode ||
+                                                            row.trainNo ||
+                                                            '--'
+                                                        }}
+                                                    </p>
+                                                </div>
+
+                                                <div class="space-y-1 text-right">
+                                                    <p
+                                                        class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                                                        保存状态
+                                                    </p>
+                                                    <p
+                                                        class="text-sm font-medium text-slate-700">
+                                                        {{
+                                                            getStationBoardRowSaveStatusLabel(
+                                                                row
+                                                            )
+                                                        }}
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            <dl
+                                                class="grid gap-3 rounded-[0.875rem] border border-slate-200 bg-slate-50/80 px-4 py-4">
+                                                <div
+                                                    class="space-y-1 text-sm leading-6">
+                                                    <dt
+                                                        class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                                                        始发站
+                                                    </dt>
+                                                    <dd class="text-slate-700">
+                                                        {{
+                                                            row.startStationName ||
+                                                            '--'
+                                                        }}
+                                                    </dd>
+                                                </div>
+                                                <div
+                                                    class="space-y-1 text-sm leading-6">
+                                                    <dt
+                                                        class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                                                        终到站
+                                                    </dt>
+                                                    <dd class="text-slate-700">
+                                                        {{
+                                                            row.endStationName ||
+                                                            '--'
+                                                        }}
+                                                    </dd>
+                                                </div>
+                                                <div
+                                                    class="space-y-1 text-sm leading-6">
+                                                    <dt
+                                                        class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                                                        原始交路串
+                                                    </dt>
+                                                    <dd class="text-slate-600">
+                                                        <code
+                                                            class="break-all">
+                                                            {{
+                                                                row.jiaoluTrain ||
+                                                                '--'
+                                                            }}
+                                                        </code>
+                                                    </dd>
+                                                </div>
+                                                <div
+                                                    class="space-y-1 text-sm leading-6">
+                                                    <dt
+                                                        class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                                                        未保存原因
+                                                    </dt>
+                                                    <dd class="text-slate-600">
+                                                        {{
+                                                            getStationBoardRowSaveReasonText(
+                                                                row
+                                                            )
+                                                        }}
+                                                    </dd>
+                                                </div>
+                                            </dl>
+                                        </div>
+                                    </article>
+                                </div>
+
+                                <div
+                                    class="hidden overflow-x-auto rounded-[1rem] border border-slate-200 bg-white md:block">
+                                    <table
+                                        class="min-w-full divide-y divide-slate-200">
+                                        <thead class="bg-slate-50/80">
+                                            <tr>
+                                                <th
+                                                    class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                                    车次
+                                                </th>
+                                                <th
+                                                    class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                                    始发站
+                                                </th>
+                                                <th
+                                                    class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                                    终到站
+                                                </th>
+                                                <th
+                                                    class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                                    原始交路串
+                                                </th>
+                                                <th
+                                                    class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                                    保存状态
+                                                </th>
+                                                <th
+                                                    class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                                    未保存原因
+                                                </th>
+                                            </tr>
+                                        </thead>
+                                        <tbody
+                                            class="divide-y divide-slate-100">
+                                            <tr
+                                                v-for="(
+                                                    row, rowIndex
+                                                ) in activeStationBoardRows"
+                                                :key="`station-board-row:${rowIndex}`">
+                                                <td
+                                                    class="px-4 py-3 text-sm font-semibold text-slate-900">
+                                                    {{
+                                                        row.stationTrainCode ||
+                                                        row.trainNo ||
+                                                        '--'
+                                                    }}
+                                                </td>
+                                                <td
+                                                    class="px-4 py-3 text-sm text-slate-700">
+                                                    {{
+                                                        row.startStationName ||
+                                                        '--'
+                                                    }}
+                                                </td>
+                                                <td
+                                                    class="px-4 py-3 text-sm text-slate-700">
+                                                    {{
+                                                        row.endStationName ||
+                                                        '--'
+                                                    }}
+                                                </td>
+                                                <td
+                                                    class="px-4 py-3 text-sm text-slate-600">
+                                                    <code class="break-all">{{
+                                                        row.jiaoluTrain || '--'
+                                                    }}</code>
+                                                </td>
+                                                <td
+                                                    class="px-4 py-3 text-sm text-slate-700">
+                                                    {{
+                                                        getStationBoardRowSaveStatusLabel(
+                                                            row
+                                                        )
+                                                    }}
+                                                </td>
+                                                <td
+                                                    class="px-4 py-3 text-sm text-slate-600">
+                                                    {{
+                                                        getStationBoardRowSaveReasonText(
+                                                            row
+                                                        )
+                                                    }}
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         </div>
                     </article>
