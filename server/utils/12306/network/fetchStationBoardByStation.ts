@@ -22,7 +22,7 @@ interface StationBoardResponse {
 export interface StationBoardTrainRow {
     trainNo: string;
     stationTrainCode: string;
-    jiaoluTrain: string;
+    circulationTrain: string;
     startStationName: string;
     endStationName: string;
 }
@@ -44,7 +44,7 @@ function normalizeStationBoardRow(value: unknown): StationBoardTrainRow | null {
             typeof row.station_train_code === 'string'
                 ? row.station_train_code.trim().toUpperCase()
                 : '',
-        jiaoluTrain:
+        circulationTrain:
             typeof row.jiaolu_train === 'string' ? row.jiaolu_train.trim() : '',
         startStationName:
             typeof row.start_station_name === 'string'

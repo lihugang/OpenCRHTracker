@@ -2336,7 +2336,7 @@
                                     class="flex items-center gap-3 rounded-[1rem] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 transition hover:border-slate-300">
                                     <input
                                         v-model="
-                                            hideEmptyStationBoardJiaoluRows
+                                            hideEmptyStationBoardCirculationRows
                                         "
                                         type="checkbox"
                                         class="h-4 w-4 rounded border-slate-300 text-crh-blue focus:ring-crh-blue/30" />
@@ -2529,7 +2529,7 @@
                                 eyebrow="无返回"
                                 title="当前车站没有可展示的行数据"
                                 :description="
-                                    hideEmptyStationBoardJiaoluRows
+                                    hideEmptyStationBoardCirculationRows
                                         ? '可能任务尚未执行、请求失败重排，或者当前筛选已隐藏全部空交路串行。'
                                         : '可能任务尚未执行、请求失败重排，或者当前站没有可展示的站板记录。'
                                 " />
@@ -2616,7 +2616,7 @@
                                                         <code
                                                             class="break-all">
                                                             {{
-                                                                row.jiaoluTrain ||
+                                                                row.circulationTrain ||
                                                                 '--'
                                                             }}
                                                         </code>
@@ -2705,7 +2705,7 @@
                                                 <td
                                                     class="px-4 py-3 text-sm text-slate-600">
                                                     <code class="break-all">{{
-                                                        row.jiaoluTrain || '--'
+                                                        row.circulationTrain || '--'
                                                     }}</code>
                                                 </td>
                                                 <td
@@ -2833,7 +2833,7 @@ const selectedCouplingTaskBureau = ref('');
 const selectedCouplingTaskModel = ref('');
 const selectedStationBoardTelecodeInitial = ref('A');
 const selectedStationBoardStationName = ref('');
-const hideEmptyStationBoardJiaoluRows = ref(true);
+const hideEmptyStationBoardCirculationRows = ref(true);
 const couplingDetailStatus = ref<'idle' | 'pending' | 'success' | 'error'>(
     'idle'
 );
@@ -3213,11 +3213,11 @@ const activeStationBoardStation = computed(
 );
 const activeStationBoardRows = computed(() => {
     const rows = activeStationBoardStation.value?.rows ?? [];
-    if (!hideEmptyStationBoardJiaoluRows.value) {
+    if (!hideEmptyStationBoardCirculationRows.value) {
         return rows;
     }
 
-    return rows.filter((row) => row.jiaoluTrain.trim().length > 0);
+    return rows.filter((row) => row.circulationTrain.trim().length > 0);
 });
 
 watch(couplingTaskBureauOptions, (options) => {
@@ -3425,7 +3425,7 @@ function closeStationBoardDetailDialog() {
     stationBoardDetailErrorMessage.value = '';
     selectedStationBoardTelecodeInitial.value = 'A';
     selectedStationBoardStationName.value = '';
-    hideEmptyStationBoardJiaoluRows.value = true;
+    hideEmptyStationBoardCirculationRows.value = true;
 }
 
 function handleStationBoardDetailDialogVisibilityChange(nextValue: boolean) {
@@ -3516,7 +3516,7 @@ async function openStationBoardDetail(taskRunId: number) {
     stationBoardDetailData.value = null;
     selectedStationBoardTelecodeInitial.value = 'A';
     selectedStationBoardStationName.value = '';
-    hideEmptyStationBoardJiaoluRows.value = true;
+    hideEmptyStationBoardCirculationRows.value = true;
 
     try {
         const response = await requestFetch<
@@ -3600,7 +3600,7 @@ function getStationBoardRowSaveReasonText(row: AdminStationBoardRow) {
 
     if (
         row.saveStatus === 'not_saved' &&
-        row.saveReasonCode === 'empty_jiaolu_train'
+        row.saveReasonCode === 'empty_circulation_train'
     ) {
         return '';
     }

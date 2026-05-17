@@ -48,11 +48,11 @@ export interface FetchStationBoardTaskArgs {
     parentSchedulerTaskId: number | null;
 }
 
-interface ParsedJiaoluNode {
+interface ParsedCirculationNode {
     group: TodayScheduleProbeGroup;
 }
 
-interface UnresolvedJiaoluSegment {
+interface UnresolvedCirculationSegment {
     raw: string;
     rawCode: string;
     startStationName: string;
@@ -278,7 +278,7 @@ function getShanghaiDayOffsetSeconds(timestampSeconds: number) {
 }
 
 function buildOfficialCirculationEntry(
-    nodes: readonly ParsedJiaoluNode[]
+    nodes: readonly ParsedCirculationNode[]
 ): ScheduleCirculationEntry | null {
     if (nodes.length === 0) {
         return null;
@@ -378,9 +378,9 @@ function buildFailedParsedStationBoardRowEntry(
     };
 }
 
-function formatUnresolvedJiaoluSegment(
+function formatUnresolvedCirculationSegment(
     segment: Pick<
-        UnresolvedJiaoluSegment,
+        UnresolvedCirculationSegment,
         'raw' | 'rawCode' | 'startStationName' | 'endStationName'
     >
 ) {
@@ -396,18 +396,18 @@ function formatUnresolvedJiaoluSegment(
 }
 
 function buildSkippedSegmentsReasonText(
-    skippedSegments: readonly UnresolvedJiaoluSegment[]
+    skippedSegments: readonly UnresolvedCirculationSegment[]
 ) {
     return `已跳过未命中当天时刻表的交路段：${skippedSegments
-        .map((segment) => formatUnresolvedJiaoluSegment(segment))
+        .map((segment) => formatUnresolvedCirculationSegment(segment))
         .join('、')}`;
 }
 
 function buildAllSegmentsNotResolvedReasonText(
-    skippedSegments: readonly UnresolvedJiaoluSegment[]
+    skippedSegments: readonly UnresolvedCirculationSegment[]
 ) {
     return `全部交路段均未命中当天时刻表：${skippedSegments
-        .map((segment) => formatUnresolvedJiaoluSegment(segment))
+        .map((segment) => formatUnresolvedCirculationSegment(segment))
         .join('、')}`;
 }
 
@@ -415,23 +415,23 @@ function buildDuplicateDisplayCodeReasonText(displayCode: string) {
     return `12306 返回的交路串无效：展示车次 ${displayCode} 在同一交路中重复出现`;
 }
 
-function parseJiaoluTrainToEntry(
+function parseCirculationTrainToEntry(
     row: StationBoardTrainRow
 ): ParsedStationBoardRowEntry {
-    const jiaoluTrain = row.jiaoluTrain.trim();
-    if (jiaoluTrain.length === 0) {
+    const circulationTrain = row.circulationTrain.trim();
+    if (circulationTrain.length === 0) {
         return buildFailedParsedStationBoardRowEntry(
             row,
-            'empty_jiaolu_train',
+            'empty_circulation_train',
             ''
         );
     }
 
-    const parsedNodes: ParsedJiaoluNode[] = [];
-    const skippedSegments: UnresolvedJiaoluSegment[] = [];
+    const parsedNodes: ParsedCirculationNode[] = [];
+    const skippedSegments: UnresolvedCirculationSegment[] = [];
     const seenResolvedDisplayCodes = new Set<string>();
 
-    for (const segment of jiaoluTrain
+    for (const segment of circulationTrain
         .split('#')
         .map((item) => item.trim())
         .filter((item) => item.length > 0)) {
@@ -439,7 +439,7 @@ function parseJiaoluTrainToEntry(
         if (fields.length !== 5) {
             return buildFailedParsedStationBoardRowEntry(
                 row,
-                'invalid_jiaolu_format',
+                'invalid_circulation_format',
                 '交路串格式不合法'
             );
         }
@@ -455,7 +455,7 @@ function parseJiaoluTrainToEntry(
         ) {
             return buildFailedParsedStationBoardRowEntry(
                 row,
-                'invalid_jiaolu_segment',
+                'invalid_circulation_segment',
                 '交路串存在缺失字段'
             );
         }
@@ -487,7 +487,7 @@ function parseJiaoluTrainToEntry(
         if (resolvedDisplayCodes.length === 0) {
             return buildFailedParsedStationBoardRowEntry(
                 row,
-                'invalid_jiaolu_segment',
+                'invalid_circulation_segment',
                 '交路串存在无法识别的展示车次'
             );
         }
@@ -496,7 +496,7 @@ function parseJiaoluTrainToEntry(
             if (seenResolvedDisplayCodes.has(resolvedDisplayCode)) {
                 return buildFailedParsedStationBoardRowEntry(
                     row,
-                    'duplicate_display_code_in_jiaolu',
+                    'duplicate_display_code_in_circulation',
                     buildDuplicateDisplayCodeReasonText(resolvedDisplayCode)
                 );
             }
@@ -520,7 +520,7 @@ function parseJiaoluTrainToEntry(
 
         return buildFailedParsedStationBoardRowEntry(
             row,
-            'invalid_jiaolu_entry',
+            'invalid_circulation_entry',
             '交路串无法生成有效交路'
         );
     }
@@ -529,7 +529,7 @@ function parseJiaoluTrainToEntry(
     if (!entry) {
         return buildFailedParsedStationBoardRowEntry(
             row,
-            'invalid_jiaolu_entry',
+            'invalid_circulation_entry',
             '交路串无法生成有效交路'
         );
     }
@@ -753,7 +753,7 @@ async function executeFetchStationBoardTask(rawArgs: unknown) {
     }
 
     const parsedEntries = rows
-        .map((row) => parseJiaoluTrainToEntry(row));
+        .map((row) => parseCirculationTrainToEntry(row));
     const chosenEntries = chooseCirculationEntries(parsedEntries);
     const persistedRows = parsedEntries.map((item) => item.row);
     const parsedEntryCount = parsedEntries.filter(

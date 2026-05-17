@@ -261,8 +261,8 @@ function toStationBoardRows(value: unknown): AdminStationBoardRow[] {
             const stationTrainCode = normalizeCode(
                 getOptionalString(payload.stationTrainCode) ?? ''
             );
-            const jiaoluTrain = (
-                getOptionalString(payload.jiaoluTrain) ?? ''
+            const circulationTrain = (
+                getOptionalString(payload.circulationTrain) ?? ''
             ).trim();
             const startStationName = (
                 getOptionalString(payload.startStationName) ?? ''
@@ -281,7 +281,7 @@ function toStationBoardRows(value: unknown): AdminStationBoardRow[] {
             if (
                 trainNo.length === 0 &&
                 stationTrainCode.length === 0 &&
-                jiaoluTrain.length === 0 &&
+                circulationTrain.length === 0 &&
                 startStationName.length === 0 &&
                 endStationName.length === 0
             ) {
@@ -291,7 +291,7 @@ function toStationBoardRows(value: unknown): AdminStationBoardRow[] {
             return {
                 trainNo,
                 stationTrainCode,
-                jiaoluTrain,
+                circulationTrain,
                 startStationName,
                 endStationName,
                 saveStatus:

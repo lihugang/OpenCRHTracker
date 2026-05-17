@@ -633,7 +633,7 @@ export interface AdminStationBoardTaskListResponse {
 export interface AdminStationBoardRow {
     trainNo: string;
     stationTrainCode: string;
-    jiaoluTrain: string;
+    circulationTrain: string;
     startStationName: string;
     endStationName: string;
     saveStatus: 'saved' | 'not_saved' | 'unknown_legacy';
