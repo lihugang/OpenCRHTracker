@@ -392,71 +392,6 @@ function getEdgeStat(
     return items.find((item) => item.nodeId === toNodeId) ?? null;
 }
 
-function resolveNodeTiming(nodeMeta: CirculationNodeMeta) {
-    const candidateTrainCodes = uniqueNormalizedCodes([
-        nodeMeta.trainCode,
-        ...nodeMeta.allCodes
-    ]);
-
-    for (const trainCode of candidateTrainCodes) {
-        const timetable = getTodayScheduleTimetableByTrainCode(trainCode);
-        if (timetable) {
-            return {
-                startAt: timetable.startAt,
-                endAt: timetable.endAt,
-                trainCode: timetable.trainCode
-            };
-        }
-    }
-
-    return {
-        startAt: Number.MAX_SAFE_INTEGER,
-        endAt: Number.MAX_SAFE_INTEGER,
-        trainCode: nodeMeta.trainCode
-    };
-}
-
-function rotateRouteNodeIdsByEarliestStartAt(
-    routeNodeIds: number[],
-    nodeMetasByNodeId: CirculationNodeMeta[]
-) {
-    if (routeNodeIds.length <= 1) {
-        return routeNodeIds;
-    }
-
-    let anchorIndex = 0;
-    let anchorStartAt = Number.MAX_SAFE_INTEGER;
-    let anchorEndAt = Number.MAX_SAFE_INTEGER;
-    let anchorTrainCode = '';
-
-    for (const [index, nodeId] of routeNodeIds.entries()) {
-        const nodeMeta = nodeMetasByNodeId[nodeId]!;
-        const timing = resolveNodeTiming(nodeMeta);
-
-        if (
-            timing.startAt < anchorStartAt ||
-            (timing.startAt === anchorStartAt && timing.endAt < anchorEndAt) ||
-            (timing.startAt === anchorStartAt &&
-                timing.endAt === anchorEndAt &&
-                timing.trainCode.localeCompare(anchorTrainCode) < 0)
-        ) {
-            anchorIndex = index;
-            anchorStartAt = timing.startAt;
-            anchorEndAt = timing.endAt;
-            anchorTrainCode = timing.trainCode;
-        }
-    }
-
-    if (anchorIndex === 0) {
-        return routeNodeIds;
-    }
-
-    return [
-        ...routeNodeIds.slice(anchorIndex),
-        ...routeNodeIds.slice(0, anchorIndex)
-    ];
-}
-
 function buildRouteId(nodeKeys: string[]) {
     const signature = nodeKeys.join('>');
     const hash = murmurHash32(signature).toString(16).padStart(8, '0');
@@ -487,27 +422,19 @@ function buildCirculation(
     threshold: number,
     containsLoopBreak: boolean
 ): InternalInferredCirculation {
-    const normalizedRouteNodeIds = rotateRouteNodeIdsByEarliestStartAt(
-        routeNodeIds,
-        nodeMetasByNodeId
-    );
-    const nodeKeys = normalizedRouteNodeIds.map(
+    const nodeKeys = routeNodeIds.map(
         (nodeId) => nodeMetasByNodeId[nodeId]!.nodeKey
     );
-    const trainCodes = buildRouteTrainCodes(
-        normalizedRouteNodeIds,
-        nodeMetasByNodeId
-    );
+    const trainCodes = buildRouteTrainCodes(routeNodeIds, nodeMetasByNodeId);
     const nodes: InternalInferredCirculationNode[] = [];
     let lowestLinkWeight: number | null = null;
     let lowestLinkSupportCount: number | null = null;
 
-    for (const [index, nodeId] of normalizedRouteNodeIds.entries()) {
-        const previousNodeId =
-            index > 0 ? normalizedRouteNodeIds[index - 1]! : null;
+    for (const [index, nodeId] of routeNodeIds.entries()) {
+        const previousNodeId = index > 0 ? routeNodeIds[index - 1]! : null;
         const nextNodeId =
-            index + 1 < normalizedRouteNodeIds.length
-                ? normalizedRouteNodeIds[index + 1]!
+            index + 1 < routeNodeIds.length
+                ? routeNodeIds[index + 1]!
                 : null;
         const incomingEdge =
             previousNodeId === null
