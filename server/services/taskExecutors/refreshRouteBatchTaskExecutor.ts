@@ -15,7 +15,10 @@ import {
     buildGroupIndex,
     getGroupKey
 } from '~/server/utils/12306/scheduleProbe/taskHelpers';
-import { toScheduleStops } from '~/server/utils/12306/scheduleProbe/mapRouteStops';
+import {
+    toScheduleStationMap,
+    toScheduleStops
+} from '~/server/utils/12306/scheduleProbe/mapRouteStops';
 import {
     appendRouteRefreshQueueTrainCodes,
     loadPublishedScheduleState,
@@ -27,7 +30,10 @@ import {
     toShanghaiDayOffsetFromUnixSeconds,
     toUnixSecondsFromShanghaiDayOffset
 } from '~/server/utils/date/shanghaiDateTime';
-import type { ScheduleState } from '~/server/utils/12306/scheduleProbe/types';
+import type {
+    ScheduleState,
+    ScheduleStationMap
+} from '~/server/utils/12306/scheduleProbe/types';
 
 export const REFRESH_ROUTE_BATCH_TASK_EXECUTOR = 'refresh_route_batch';
 
@@ -158,6 +164,7 @@ async function executeRefreshRouteBatchTaskInternal(rawArgs: unknown) {
     let changed = 0;
     let totalAttempts = 0;
     let mutated = false;
+    let stationUpdates: ScheduleStationMap = {};
 
     for (const code of args.codes) {
         const itemIndex = codeIndex.get(code);
@@ -234,6 +241,10 @@ async function executeRefreshRouteBatchTaskInternal(rawArgs: unknown) {
             state.date,
             routeResult.data.route.stops
         );
+        stationUpdates = {
+            ...stationUpdates,
+            ...toScheduleStationMap(routeResult.data.route.stops)
+        };
         let groupChanged = false;
         for (const index of groupItemIndexes) {
             const groupItem = state.items[index]!;
@@ -330,7 +341,11 @@ async function executeRefreshRouteBatchTaskInternal(rawArgs: unknown) {
                 }
             }
             if (appliedGroups > 0) {
-                savePublishedScheduleState(scheduleFilePath, latestState);
+                savePublishedScheduleState(
+                    scheduleFilePath,
+                    latestState,
+                    stationUpdates
+                );
                 const syncResult =
                     syncConfirmedTimetableHistoryForPublishedState(
                         latestState,

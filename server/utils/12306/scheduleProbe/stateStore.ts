@@ -10,6 +10,8 @@ import type {
     ScheduleDocument,
     ScheduleItem,
     ScheduleRouteRefreshQueueEntry,
+    ScheduleStationEntry,
+    ScheduleStationMap,
     ScheduleStop,
     ScheduleState,
     ScheduleProbeRuntimeConfig
@@ -35,7 +37,7 @@ interface ScheduleDocumentCache {
 }
 
 const SCHEDULE_SCHEMA_RELATIVE_PATH = '../assets/json/scheduleScheme.json';
-const CURRENT_SCHEDULE_DOCUMENT_VERSION = 5;
+const CURRENT_SCHEDULE_DOCUMENT_VERSION = 6;
 let cachedScheduleDocument: ScheduleDocumentCache | null = null;
 let scheduleStateVersion = 0;
 
@@ -63,6 +65,12 @@ function cloneScheduleCirculationMap(
     return JSON.parse(JSON.stringify(circulation)) as ScheduleCirculationMap;
 }
 
+function cloneScheduleStationMap(
+    stations: ScheduleStationMap
+): ScheduleStationMap {
+    return JSON.parse(JSON.stringify(stations)) as ScheduleStationMap;
+}
+
 function cloneScheduleDocument(document: ScheduleDocument): ScheduleDocument {
     return JSON.parse(JSON.stringify(document)) as ScheduleDocument;
 }
@@ -81,6 +89,97 @@ function compareRefreshTime(left: number | null, right: number | null): number {
     const normalizedLeft = left ?? -1;
     const normalizedRight = right ?? -1;
     return normalizedLeft - normalizedRight;
+}
+
+function normalizeScheduleStationEntry(
+    key: string,
+    value: unknown
+): ScheduleStationEntry | null {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+        return null;
+    }
+
+    const row = value as Partial<ScheduleStationEntry>;
+    const stationTelecode = normalizeCode(
+        typeof row.stationTelecode === 'string' ? row.stationTelecode : key
+    );
+    const stationName =
+        typeof row.stationName === 'string' ? row.stationName.trim() : '';
+    const lat = row.lat;
+    const lon = row.lon;
+
+    if (
+        stationTelecode.length === 0 ||
+        stationName.length === 0 ||
+        typeof lat !== 'number' ||
+        !Number.isFinite(lat) ||
+        typeof lon !== 'number' ||
+        !Number.isFinite(lon)
+    ) {
+        return null;
+    }
+
+    return {
+        stationTelecode,
+        stationName,
+        lat,
+        lon
+    };
+}
+
+function normalizeScheduleStations(value: unknown): {
+    stations: ScheduleStationMap;
+    migrated: boolean;
+} {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+        return {
+            stations: {},
+            migrated: true
+        };
+    }
+
+    let migrated = false;
+    const stations: ScheduleStationMap = {};
+
+    for (const [key, entry] of Object.entries(value)) {
+        const normalizedEntry = normalizeScheduleStationEntry(key, entry);
+        if (!normalizedEntry) {
+            migrated = true;
+            continue;
+        }
+
+        const normalizedKey = normalizedEntry.stationTelecode;
+        if (stations[normalizedKey]) {
+            migrated = true;
+        }
+        stations[normalizedKey] = normalizedEntry;
+    }
+
+    return {
+        stations,
+        migrated
+    };
+}
+
+function mergeScheduleStationMaps(
+    base: ScheduleStationMap,
+    updates: ScheduleStationMap | null | undefined
+): ScheduleStationMap {
+    const merged = cloneScheduleStationMap(base);
+    if (!updates) {
+        return merged;
+    }
+
+    for (const [key, entry] of Object.entries(updates)) {
+        const normalizedEntry = normalizeScheduleStationEntry(key, entry);
+        if (!normalizedEntry) {
+            continue;
+        }
+
+        merged[normalizedEntry.stationTelecode] = normalizedEntry;
+    }
+
+    return merged;
 }
 
 function normalizeRouteRefreshQueueEntry(
@@ -399,6 +498,10 @@ function normalizeScheduleStop(
     return {
         stationNo,
         stationName,
+        stationTelecode:
+            typeof stop.stationTelecode === 'string'
+                ? normalizeCode(stop.stationTelecode)
+                : '',
         arriveAt,
         departAt,
         stationTrainCode:
@@ -616,6 +719,37 @@ function scheduleStateNeedsRouteMetadataMigration(value: unknown): boolean {
     });
 }
 
+function scheduleStateNeedsStopTelecodeMigration(value: unknown): boolean {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+        return false;
+    }
+
+    const items = (value as { items?: unknown }).items;
+    if (!Array.isArray(items)) {
+        return false;
+    }
+
+    return items.some((item) => {
+        if (typeof item !== 'object' || item === null || Array.isArray(item)) {
+            return false;
+        }
+
+        const stops = (item as { stops?: unknown }).stops;
+        if (!Array.isArray(stops)) {
+            return false;
+        }
+
+        return stops.some(
+            (stop) =>
+                typeof stop !== 'object' ||
+                stop === null ||
+                Array.isArray(stop) ||
+                typeof (stop as { stationTelecode?: unknown }).stationTelecode !==
+                    'string'
+        );
+    });
+}
+
 function parseScheduleDocument(value: unknown): {
     document: ScheduleDocument | null;
     migrated: boolean;
@@ -633,6 +767,7 @@ function parseScheduleDocument(value: unknown): {
     if (
         version !== 3 &&
         version !== 4 &&
+        version !== 5 &&
         version !== CURRENT_SCHEDULE_DOCUMENT_VERSION
     ) {
         return {
@@ -640,6 +775,7 @@ function parseScheduleDocument(value: unknown): {
             migrated: false
         };
     }
+    const normalizedStations = normalizeScheduleStations(document.stations);
     const normalizedQueue = normalizeRouteRefreshQueue(
         document.routeRefreshQueue
     );
@@ -649,13 +785,16 @@ function parseScheduleDocument(value: unknown): {
     const publishedNeedsMigration =
         document.published !== null &&
         typeof document.published !== 'undefined' &&
-        scheduleStateNeedsRouteMetadataMigration(document.published);
+        (scheduleStateNeedsRouteMetadataMigration(document.published) ||
+            scheduleStateNeedsStopTelecodeMigration(document.published));
     const buildingNeedsMigration =
         document.building !== null &&
         typeof document.building !== 'undefined' &&
-        scheduleStateNeedsRouteMetadataMigration(document.building);
+        (scheduleStateNeedsRouteMetadataMigration(document.building) ||
+            scheduleStateNeedsStopTelecodeMigration(document.building));
     const migrated =
         version !== CURRENT_SCHEDULE_DOCUMENT_VERSION ||
+        normalizedStations.migrated ||
         normalizedCirculation.migrated ||
         normalizedQueue.migrated ||
         publishedNeedsMigration ||
@@ -693,6 +832,7 @@ function parseScheduleDocument(value: unknown): {
         document: {
             $schema: SCHEDULE_SCHEMA_RELATIVE_PATH,
             version: CURRENT_SCHEDULE_DOCUMENT_VERSION,
+            stations: normalizedStations.stations,
             circulation: normalizedCirculation.circulation,
             routeRefreshQueue: normalizedQueue.queue,
             published,
@@ -837,6 +977,7 @@ export function createInitialScheduleDocument(): ScheduleDocument {
     return {
         $schema: SCHEDULE_SCHEMA_RELATIVE_PATH,
         version: CURRENT_SCHEDULE_DOCUMENT_VERSION,
+        stations: {},
         circulation: {},
         routeRefreshQueue: [],
         published: null,
@@ -992,6 +1133,7 @@ export function saveScheduleDocument(
 ): void {
     document.$schema = SCHEDULE_SCHEMA_RELATIVE_PATH;
     document.version = CURRENT_SCHEDULE_DOCUMENT_VERSION;
+    document.stations = cloneScheduleStationMap(document.stations);
     document.circulation = cloneScheduleCirculationMap(document.circulation);
     const absolutePath = path.resolve(scheduleFilePath);
     const directory = path.dirname(absolutePath);
@@ -1176,13 +1318,15 @@ export function loadActiveScheduleState(
 
 export function savePublishedScheduleState(
     scheduleFilePath: string,
-    state: ScheduleState | null
+    state: ScheduleState | null,
+    stations?: ScheduleStationMap
 ): void {
     const document = cloneScheduleDocument(
         loadScheduleDocument(scheduleFilePath) ??
             createInitialScheduleDocument()
     );
     document.published = state ? cloneScheduleState(state) : null;
+    document.stations = mergeScheduleStationMaps(document.stations, stations);
     saveScheduleDocument(scheduleFilePath, document);
     bumpScheduleStateVersion();
 }
@@ -1196,13 +1340,15 @@ export function loadBuildingScheduleState(
 
 export function saveBuildingScheduleState(
     scheduleFilePath: string,
-    state: ScheduleState | null
+    state: ScheduleState | null,
+    stations?: ScheduleStationMap
 ): void {
     const document = cloneScheduleDocument(
         loadScheduleDocument(scheduleFilePath) ??
             createInitialScheduleDocument()
     );
     document.building = state ? cloneScheduleState(state) : null;
+    document.stations = mergeScheduleStationMaps(document.stations, stations);
     saveScheduleDocument(scheduleFilePath, document);
     bumpScheduleStateVersion();
 }

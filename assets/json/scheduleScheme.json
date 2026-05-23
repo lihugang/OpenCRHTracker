@@ -10,7 +10,13 @@
         },
         "version": {
             "type": "integer",
-            "const": 5
+            "const": 6
+        },
+        "stations": {
+            "type": "object",
+            "additionalProperties": {
+                "$ref": "#/definitions/stationEntry"
+            }
         },
         "circulation": {
             "type": "object",
@@ -99,6 +105,9 @@
                     "type": "string",
                     "minLength": 1
                 },
+                "stationTelecode": {
+                    "type": "string"
+                },
                 "arriveAt": {
                     "description": "Second offset from schedule.date 00:00:00 Asia/Shanghai",
                     "type": [
@@ -131,12 +140,39 @@
             "required": [
                 "stationNo",
                 "stationName",
+                "stationTelecode",
                 "arriveAt",
                 "departAt",
                 "stationTrainCode",
                 "wicket",
                 "isStart",
                 "isEnd"
+            ]
+        },
+        "stationEntry": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "stationTelecode": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "stationName": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "lat": {
+                    "type": "number"
+                },
+                "lon": {
+                    "type": "number"
+                }
+            },
+            "required": [
+                "stationTelecode",
+                "stationName",
+                "lat",
+                "lon"
             ]
         },
         "scheduleItem": {
@@ -479,6 +515,7 @@
     "required": [
         "$schema",
         "version",
+        "stations",
         "circulation",
         "routeRefreshQueue",
         "published",

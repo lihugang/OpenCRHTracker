@@ -101,9 +101,12 @@ export interface RouteInfoData {
 export interface RouteStopData {
     stationNo: number;
     stationName: string;
+    stationTelecode: string;
     arriveAt: number | null;
     departAt: number | null;
     stationTrainCode: string;
+    lat: number | null;
+    lon: number | null;
     wicket: string;
     isStart: boolean;
     isEnd: boolean;
@@ -210,11 +213,14 @@ export default async function fetchRouteInfo(
                         ? stationNo
                         : index + 1,
                     stationName: stop.stationName.trim(),
+                    stationTelecode: stop.stationTelecode.trim().toUpperCase(),
                     arriveAt,
                     departAt,
                     stationTrainCode: stop.stationTrainCode
                         .trim()
                         .toUpperCase(),
+                    lat: parseOptionalCoordinate(stop.lat),
+                    lon: parseOptionalCoordinate(stop.lon),
                     wicket: normalizeOptionalField(stop.wicket),
                     isStart: index === 0,
                     isEnd: index === rawStops.length - 1
@@ -347,6 +353,20 @@ function normalizeOptionalField(value: string | undefined): string {
     }
 
     return normalized;
+}
+
+function parseOptionalCoordinate(value: string | undefined): number | null {
+    if (typeof value !== 'string') {
+        return null;
+    }
+
+    const normalized = value.trim();
+    if (normalized.length === 0) {
+        return null;
+    }
+
+    const parsed = Number.parseFloat(normalized);
+    return Number.isFinite(parsed) ? parsed : null;
 }
 
 function resolveRouteMetadata(

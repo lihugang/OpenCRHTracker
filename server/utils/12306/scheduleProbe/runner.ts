@@ -7,12 +7,13 @@ import { normalizeTrainCodeItems, sortScheduleItems } from './filterAndSort';
 import queryWithRetry from './queryWithRetry';
 import { saveBuildingScheduleState } from './stateStore';
 import { buildGroupIndex, getGroupKey } from './taskHelpers';
-import { toScheduleStops } from './mapRouteStops';
+import { toScheduleStationMap, toScheduleStops } from './mapRouteStops';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
 import { toShanghaiDayOffsetFromUnixSeconds } from '~/server/utils/date/shanghaiDateTime';
 import type {
     ScheduleState,
     ScheduleItem,
+    ScheduleStationMap,
     ScheduleProbeRuntimeConfig
 } from './types';
 
@@ -90,6 +91,7 @@ async function runScheduleProbeInternal(
     let newlyAddedCount = 0;
     let enrichedCount = 0;
     let reusedRouteInfoCount = 0;
+    let stationUpdates: ScheduleStationMap = {};
     logger.info(
         `run runId=${runId} phase=${state.progress.phase} existingItems=${state.items.length} discoverQueue=${state.progress.discoverQueue.length} discoverProcessed=${state.progress.discoverProcessed.length} enrichCursor=${state.progress.enrichCursor}`
     );
@@ -168,7 +170,11 @@ async function runScheduleProbeInternal(
 
             if (processedSinceFlush >= config.checkpointFlushEvery) {
                 updateItemsFromMap(state, itemsByCode, config);
-                saveBuildingScheduleState(scheduleFilePath, state);
+                saveBuildingScheduleState(
+                    scheduleFilePath,
+                    state,
+                    stationUpdates
+                );
                 logger.info(
                     `discover checkpoint runId=${runId} processed=${state.progress.discoverProcessed.length} pending=${state.progress.discoverQueue.length} rawItems=${state.stats.rawItems} uniqueItems=${state.stats.uniqueItems} newlyAdded=${newlyAddedCount} reusedRouteInfo=${reusedRouteInfoCount} apiCalls=${state.progress.counters.apiCalls} apiRetries=${state.progress.counters.apiRetries}`
                 );
@@ -183,7 +189,7 @@ async function runScheduleProbeInternal(
             Math.max(0, state.progress.enrichCursor),
             state.items.length
         );
-        saveBuildingScheduleState(scheduleFilePath, state);
+        saveBuildingScheduleState(scheduleFilePath, state, stationUpdates);
         logger.info(
             `discover finish runId=${runId} processed=${state.progress.discoverProcessed.length} failedKeywords=${state.progress.failedKeywords.length} uniqueItems=${state.stats.uniqueItems} newlyAdded=${newlyAddedCount} reusedRouteInfo=${reusedRouteInfoCount}`
         );
@@ -267,6 +273,10 @@ async function runScheduleProbeInternal(
                     state.date,
                     routeResult.data.route.stops
                 );
+                stationUpdates = {
+                    ...stationUpdates,
+                    ...toScheduleStationMap(routeResult.data.route.stops)
+                };
                 for (const groupItem of groupItems) {
                     groupItem.bureauCode = routeResult.data.route.bureauCode;
                     groupItem.trainDepartment =
@@ -303,7 +313,11 @@ async function runScheduleProbeInternal(
             processedSinceFlush += 1;
 
             if (processedSinceFlush >= config.checkpointFlushEvery) {
-                saveBuildingScheduleState(scheduleFilePath, state);
+                saveBuildingScheduleState(
+                    scheduleFilePath,
+                    state,
+                    stationUpdates
+                );
                 logger.info(
                     `enrich checkpoint runId=${runId} cursor=${state.progress.enrichCursor} totalItems=${state.items.length} failedEnrichCodes=${state.progress.failedEnrichCodes.length} enriched=${enrichedCount} apiCalls=${state.progress.counters.apiCalls} apiRetries=${state.progress.counters.apiRetries}`
                 );
@@ -327,7 +341,7 @@ async function runScheduleProbeInternal(
             ? 'partial_failed'
             : 'done';
 
-    saveBuildingScheduleState(scheduleFilePath, state);
+    saveBuildingScheduleState(scheduleFilePath, state, stationUpdates);
     logger.info(
         `done runId=${runId} status=${state.status} durationMs=${state.stats.durationMs} rawItems=${state.stats.rawItems} uniqueItems=${state.stats.uniqueItems} newlyAdded=${newlyAddedCount} reusedRouteInfo=${reusedRouteInfoCount} enriched=${enrichedCount} failedKeywords=${state.progress.failedKeywords.length} failedEnrichCodes=${state.progress.failedEnrichCodes.length} apiCalls=${state.progress.counters.apiCalls} apiRetries=${state.progress.counters.apiRetries}`
     );

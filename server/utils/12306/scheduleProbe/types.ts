@@ -16,6 +16,7 @@ export interface ScheduleProbeRuntimeConfig {
 export interface ScheduleStop {
     stationNo: number;
     stationName: string;
+    stationTelecode: string;
     arriveAt: number | null;
     departAt: number | null;
     stationTrainCode: string;
@@ -23,6 +24,15 @@ export interface ScheduleStop {
     isStart: boolean;
     isEnd: boolean;
 }
+
+export interface ScheduleStationEntry {
+    stationTelecode: string;
+    stationName: string;
+    lat: number;
+    lon: number;
+}
+
+export type ScheduleStationMap = Record<string, ScheduleStationEntry>;
 
 export interface ScheduleItem {
     code: string;
@@ -99,7 +109,8 @@ export type ScheduleCirculationMap = Record<string, ScheduleCirculationEntry>;
 
 export interface ScheduleDocument {
     $schema: string;
-    version: 5;
+    version: 6;
+    stations: ScheduleStationMap;
     circulation: ScheduleCirculationMap;
     routeRefreshQueue: ScheduleRouteRefreshQueueEntry[];
     published: ScheduleState | null;
