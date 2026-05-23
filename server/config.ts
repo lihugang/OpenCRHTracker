@@ -86,6 +86,11 @@ interface LoggingConfig {
     retentionDays: number;
 }
 
+interface SimpleLatexContainerServiceConfig {
+    baseUrl: string;
+    apiKey: string;
+}
+
 const DEFAULT_PUSH_SUBSCRIPTION_SYNC_TIMEOUT_SECONDS = 30;
 const DEFAULT_CLIENT_IP_HEADERS = [
     'cf-connecting-ip',
@@ -271,6 +276,9 @@ export interface Config {
         };
         permissions: ApiPermissionConfig;
     };
+    services: {
+        simpleLatexContainer: SimpleLatexContainerServiceConfig;
+    };
     task: {
         startup: {
             disabledExecutors: StartupTaskExecutor[];
@@ -313,6 +321,7 @@ export interface Config {
             authDeleteSubscription: number;
             searchIndex: number;
             timetableTrainCurrent: number;
+            trainCirculationImage: number;
             timetableTrainHistory: number;
             exportDailyIndex: number;
             exportDaily: number;
@@ -773,6 +782,35 @@ function validateConfig(raw: unknown): Config {
     const apiPagination = asObject(api.pagination, 'api.pagination');
     const apiDebug = asObject(api.debug, 'api.debug');
     const apiPermissions = asObject(api.permissions, 'api.permissions');
+    const services = asObject(root.services, 'services');
+    const simpleLatexContainer = asObject(
+        services.simpleLatexContainer,
+        'services.simpleLatexContainer'
+    );
+    const envSimpleLatexContainerApiKey =
+        process.env.OCRH_SIMPLE_LATEX_CONTAINER_API_KEY?.trim();
+    const configSimpleLatexContainerApiKey =
+        simpleLatexContainer.apiKey === undefined
+            ? ''
+            : asString(
+                  simpleLatexContainer.apiKey,
+                  'services.simpleLatexContainer.apiKey'
+              ).trim();
+    const simpleLatexContainerApiKey =
+        envSimpleLatexContainerApiKey &&
+        envSimpleLatexContainerApiKey.length > 0
+            ? envSimpleLatexContainerApiKey
+            : configSimpleLatexContainerApiKey;
+    if (
+        !import.meta.dev &&
+        (!envSimpleLatexContainerApiKey ||
+            envSimpleLatexContainerApiKey.length === 0) &&
+        configSimpleLatexContainerApiKey.length > 0
+    ) {
+        console.warn(
+            '[config] WARNING: simple-latex-container API key was loaded from config instead of process.env.OCRH_SIMPLE_LATEX_CONTAINER_API_KEY'
+        );
+    }
     const task = asObject(root.task, 'task');
     const taskStartup =
         task.startup === undefined
@@ -1365,6 +1403,17 @@ function validateConfig(raw: unknown): Config {
                 )
             }
         },
+        services: {
+            simpleLatexContainer: {
+                baseUrl: asString(
+                    simpleLatexContainer.baseUrl,
+                    'services.simpleLatexContainer.baseUrl'
+                )
+                    .trim()
+                    .replace(/\/+$/, ''),
+                apiKey: simpleLatexContainerApiKey
+            }
+        },
         task: {
             startup: {
                 disabledExecutors: taskStartupDisabledExecutors.map(
@@ -1574,6 +1623,11 @@ function validateConfig(raw: unknown): Config {
                 timetableTrainCurrent: asNumber(
                     costFixed.timetableTrainCurrent,
                     'cost.fixed.timetableTrainCurrent',
+                    0
+                ),
+                trainCirculationImage: asNumber(
+                    costFixed.trainCirculationImage,
+                    'cost.fixed.trainCirculationImage',
                     0
                 ),
                 timetableTrainHistory: asNumber(
@@ -1796,6 +1850,18 @@ function validateConfig(raw: unknown): Config {
         configResult.user.apiKeyTtlSeconds <=
             configResult.user.apiKeyMaxLifetimeSeconds,
         'user.apiKeyTtlSeconds must be <= user.apiKeyMaxLifetimeSeconds'
+    );
+    assert(
+        configResult.services.simpleLatexContainer.baseUrl.length > 0,
+        'services.simpleLatexContainer.baseUrl must be configured'
+    );
+    assert(
+        /^https?:\/\//.test(configResult.services.simpleLatexContainer.baseUrl),
+        'services.simpleLatexContainer.baseUrl must start with http:// or https://'
+    );
+    assert(
+        configResult.services.simpleLatexContainer.apiKey.length > 0,
+        'services.simpleLatexContainer.apiKey must be configured'
     );
     const disabledStartupExecutors = new Set<string>();
     for (const executor of configResult.task.startup.disabledExecutors) {

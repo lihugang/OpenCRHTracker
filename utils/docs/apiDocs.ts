@@ -419,6 +419,7 @@ export const DEFAULT_DOCS_API_RUNTIME_CONFIG: DocsApiRuntimeConfig = {
         fixed: {
             authMe: 1,
             timetableTrainCurrent: 1,
+            trainCirculationImage: 20,
             timetableTrainHistory: 1,
             exportDailyIndex: 2,
             exportDaily: 50
@@ -452,6 +453,7 @@ const PUBLIC_DOCS_API_SLUGS = new Set<string>([
     'auth-me',
     'records-daily',
     'timetable-train-current',
+    'timetable-train-circulation-image',
     'timetable-train-history',
     'timetable-train-history-detail',
     'timetable-station',
@@ -719,6 +721,7 @@ const tagDescriptionMap = new Map(
 const FIXED_COST_ENDPOINT_KEYS = {
     'auth-me': 'authMe',
     'timetable-train-current': 'timetableTrainCurrent',
+    'timetable-train-circulation-image': 'trainCirculationImage',
     'timetable-train-history-detail': 'timetableTrainHistory',
     'exports-daily-index': 'exportDailyIndex',
     'exports-daily-date': 'exportDaily'

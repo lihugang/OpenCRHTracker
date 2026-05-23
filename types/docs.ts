@@ -190,6 +190,7 @@ export interface DocsApiCostRuntimeConfig {
     fixed: {
         authMe: number;
         timetableTrainCurrent: number;
+        trainCirculationImage: number;
         timetableTrainHistory: number;
         exportDailyIndex: number;
         exportDaily: number;

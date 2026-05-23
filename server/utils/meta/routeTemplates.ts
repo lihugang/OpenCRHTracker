@@ -13,6 +13,7 @@ export const adminServerMetricsRouteTemplates = {
         { template: '/train/:code', segments: ['train', ':code'] },
     ],
     api: [
+        { template: '/api/v1/timetable/train/:trainCode/circulation/image', segments: ['api', 'v1', 'timetable', 'train', ':trainCode', 'circulation', 'image'] },
         { template: '/api/v1/timetable/train/:trainCode/history/:historyId', segments: ['api', 'v1', 'timetable', 'train', ':trainCode', 'history', ':historyId'] },
         { template: '/api/v1/feedback/topics/:id/messages', segments: ['api', 'v1', 'feedback', 'topics', ':id', 'messages'] },
         { template: '/api/v1/timetable/train/:trainCode/current', segments: ['api', 'v1', 'timetable', 'train', ':trainCode', 'current'] },

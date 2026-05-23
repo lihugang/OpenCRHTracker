@@ -926,6 +926,33 @@
                 "permissions"
             ]
         },
+        "services": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "simpleLatexContainer": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "baseUrl": {
+                            "type": "string",
+                            "minLength": 1
+                        },
+                        "apiKey": {
+                            "type": "string",
+                            "minLength": 1
+                        }
+                    },
+                    "required": [
+                        "baseUrl",
+                        "apiKey"
+                    ]
+                }
+            },
+            "required": [
+                "simpleLatexContainer"
+            ]
+        },
         "task": {
             "type": "object",
             "additionalProperties": false,
@@ -1224,6 +1251,10 @@
                             "type": "integer",
                             "minimum": 0
                         },
+                        "trainCirculationImage": {
+                            "type": "integer",
+                            "minimum": 0
+                        },
                         "timetableTrainHistory": {
                             "type": "integer",
                             "minimum": 0
@@ -1256,6 +1287,7 @@
                         "authDeleteSubscription",
                         "searchIndex",
                         "timetableTrainCurrent",
+                        "trainCirculationImage",
                         "timetableTrainHistory",
                         "exportDailyIndex",
                         "exportDaily"
@@ -1341,6 +1373,7 @@
         "data",
         "user",
         "api",
+        "services",
         "task",
         "logging",
         "quota",

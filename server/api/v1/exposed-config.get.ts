@@ -50,6 +50,8 @@ export default defineEventHandler(async (event) => {
                             authMe: config.cost.fixed.authMe,
                             timetableTrainCurrent:
                                 config.cost.fixed.timetableTrainCurrent,
+                            trainCirculationImage:
+                                config.cost.fixed.trainCirculationImage,
                             timetableTrainHistory:
                                 config.cost.fixed.timetableTrainHistory,
                             exportDailyIndex:

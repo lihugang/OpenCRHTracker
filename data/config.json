@@ -276,6 +276,12 @@
             ]
         }
     },
+    "services": {
+        "simpleLatexContainer": {
+            "baseUrl": "http://127.0.0.1:8080",
+            "apiKey": "change-me"
+        }
+    },
     "task": {
         "startup": {
             "disabledExecutors": []
@@ -345,6 +351,7 @@
             "authDeleteSubscription": 1,
             "searchIndex": 1,
             "timetableTrainCurrent": 1,
+            "trainCirculationImage": 20,
             "timetableTrainHistory": 1,
             "exportDailyIndex": 2,
             "exportDaily": 50,

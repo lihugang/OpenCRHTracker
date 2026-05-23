@@ -189,6 +189,18 @@ export const developerDocsOpenApi = {
                     default: 'false'
                 },
                 example: 'false'
+            },
+            BinaryQuery: {
+                name: 'binary',
+                in: 'query',
+                description:
+                    '当值为 true 时，接口直接返回原始二进制内容；否则返回 JSON 包裹结构。',
+                schema: {
+                    type: 'string',
+                    enum: ['true', 'false'],
+                    default: 'false'
+                },
+                example: 'false'
             }
         },
         headers: {
@@ -936,6 +948,49 @@ export const developerDocsOpenApi = {
                         type: 'object',
                         additionalProperties: true,
                         description: '附加调试信息'
+                    }
+                }
+            },
+            TrainCirculationImageResponse: {
+                type: 'object',
+                required: ['ok', 'data', 'error'],
+                properties: {
+                    ok: {
+                        type: 'boolean',
+                        example: true
+                    },
+                    data: {
+                        type: 'object',
+                        required: [
+                            'requestTrainCode',
+                            'trainCode',
+                            'documentId',
+                            'imageUrl'
+                        ],
+                        properties: {
+                            requestTrainCode: {
+                                type: 'string',
+                                example: 'G2492'
+                            },
+                            trainCode: {
+                                type: 'string',
+                                example: 'G2492'
+                            },
+                            documentId: {
+                                type: 'string',
+                                example:
+                                    '8d2fca6e88c2a1e3c2106a4f28f0d5e7b3147427ec8d1b4af75a4b6b485b92ce'
+                            },
+                            imageUrl: {
+                                type: 'string',
+                                example:
+                                    'http://127.0.0.1:8080/8d2fca6e88c2a1e3c2106a4f28f0d5e7b3147427ec8d1b4af75a4b6b485b92ce/png/1'
+                            }
+                        }
+                    },
+                    error: {
+                        type: 'string',
+                        example: ''
                     }
                 }
             },
@@ -2535,6 +2590,186 @@ export const developerDocsOpenApi = {
                 ]
             }
         },
+        '/timetable/train/{trainCode}/circulation/image': {
+            get: {
+                operationId: 'trainCirculationImage',
+                tags: ['Timetable'],
+                summary: '获取交路运行图图片',
+                description:
+                    '根据交路表和首末站坐标生成交路运行图；启用 binary 模式时直接返回 png ，否则返回图片链接',
+                parameters: [
+                    {
+                        $ref: '#/components/parameters/TrainCodeParam'
+                    },
+                    {
+                        $ref: '#/components/parameters/BinaryQuery'
+                    }
+                ],
+                security: [{}, { bearerAuth: [] }, { cookieAuth: [] }],
+                responses: {
+                    '200': {
+                        description: '运行图生成成功。',
+                        headers: {
+                            'x-api-remain': {
+                                $ref: '#/components/headers/ApiRemain'
+                            },
+                            'x-api-cost': {
+                                $ref: '#/components/headers/ApiCost'
+                            }
+                        },
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    $ref: '#/components/schemas/TrainCirculationImageResponse'
+                                },
+                                example: {
+                                    ok: true,
+                                    data: {
+                                        requestTrainCode: 'G2492',
+                                        trainCode: 'G2492',
+                                        documentId:
+                                            '8d2fca6e88c2a1e3c2106a4f28f0d5e7b3147427ec8d1b4af75a4b6b485b92ce',
+                                        imageUrl:
+                                            'http://127.0.0.1:8080/8d2fca6e88c2a1e3c2106a4f28f0d5e7b3147427ec8d1b4af75a4b6b485b92ce/png/1'
+                                    },
+                                    error: ''
+                                }
+                            },
+                            'image/png': {
+                                schema: {
+                                    type: 'string',
+                                    format: 'binary'
+                                }
+                            }
+                        }
+                    },
+                    '400': {
+                        description: '路径参数或 binary 查询参数无效。',
+                        headers: {
+                            'x-api-remain': {
+                                $ref: '#/components/headers/ApiRemain'
+                            },
+                            'x-api-cost': {
+                                $ref: '#/components/headers/ApiCost'
+                            }
+                        },
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    $ref: '#/components/schemas/ApiFailureResponse'
+                                },
+                                example: {
+                                    ok: false,
+                                    data: 'binary 必须是 true/false',
+                                    error: 'invalid_param'
+                                }
+                            }
+                        }
+                    },
+                    '404': {
+                        description: '当前时刻表或交路数据不可用。',
+                        headers: {
+                            'x-api-remain': {
+                                $ref: '#/components/headers/ApiRemain'
+                            },
+                            'x-api-cost': {
+                                $ref: '#/components/headers/ApiCost'
+                            }
+                        },
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    $ref: '#/components/schemas/ApiFailureResponse'
+                                },
+                                example: {
+                                    ok: false,
+                                    data: '当前暂无交路数据',
+                                    error: 'not_found'
+                                }
+                            }
+                        }
+                    },
+                    '422': {
+                        description: '今日时刻表数据不完整，无法生成运行图。',
+                        headers: {
+                            'x-api-remain': {
+                                $ref: '#/components/headers/ApiRemain'
+                            },
+                            'x-api-cost': {
+                                $ref: '#/components/headers/ApiCost'
+                            }
+                        },
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    $ref: '#/components/schemas/ApiFailureResponse'
+                                },
+                                example: {
+                                    ok: false,
+                                    data: '交路节点 G2492 的首末站缺少经纬度',
+                                    error: 'invalid_schedule_data'
+                                }
+                            }
+                        }
+                    },
+                    '502': {
+                        description: '上游 LaTeX 渲染服务不可用或编译失败。',
+                        headers: {
+                            'x-api-remain': {
+                                $ref: '#/components/headers/ApiRemain'
+                            },
+                            'x-api-cost': {
+                                $ref: '#/components/headers/ApiCost'
+                            }
+                        },
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    $ref: '#/components/schemas/ApiFailureResponse'
+                                },
+                                example: {
+                                    ok: false,
+                                    data: '运行图渲染服务暂时不可用',
+                                    error: 'upstream_unavailable'
+                                }
+                            }
+                        }
+                    }
+                },
+                'x-slug': 'timetable-train-circulation-image',
+                'x-group': '时刻表',
+                'x-sort-order': 26,
+                'x-auth-modes': ['anonymous', 'cookie', 'apiKey'],
+                'x-required-scopes': ['api.timetable.train.current.read'],
+                'x-examples': [
+                    {
+                        id: 'circulation-image-json',
+                        label: '图片地址',
+                        summary:
+                            '返回运行图图片直链，适合在页面中直接展示。',
+                        authMode: 'anonymous',
+                        pathParams: {
+                            trainCode: 'G2492'
+                        },
+                        query: {
+                            binary: 'false'
+                        }
+                    },
+                    {
+                        id: 'circulation-image-binary',
+                        label: '原始 PNG',
+                        summary: '直接返回 PNG 二进制内容，适合下载或转存。',
+                        authMode: 'anonymous',
+                        pathParams: {
+                            trainCode: 'G2492'
+                        },
+                        query: {
+                            binary: 'true'
+                        }
+                    }
+                ]
+            }
+        },
         '/timetable/train/{trainCode}/history': {
             get: {
                 operationId: 'trainTimetableHistory',
@@ -2978,7 +3213,7 @@ export const developerDocsOpenApi = {
                 tags: ['History'],
                 summary: '返回单个车次的历史担当记录',
                 description:
-                    '返回单个车次的历史担当轻量记录，包含 serviceDate、timetableId 和 emuCode。',
+                    '返回单个车次的历史担当记录。',
                 parameters: [
                     {
                         $ref: '#/components/parameters/TrainCodeParam'
@@ -3108,7 +3343,7 @@ export const developerDocsOpenApi = {
                 tags: ['History'],
                 summary: '返回单个车组的历史担当记录',
                 description:
-                    '返回单个车组的历史担当轻量记录，包含 serviceDate、timetableId 和 trainCode。',
+                    '返回单个车组的历史担当记录。',
                 parameters: [
                     {
                         $ref: '#/components/parameters/EmuCodeParam'

@@ -202,6 +202,13 @@ export interface CurrentTrainTimetableData {
     stops: CurrentTrainTimetableStop[];
 }
 
+export interface TrainCirculationImageData {
+    requestTrainCode: string;
+    trainCode: string;
+    documentId: string;
+    imageUrl: string;
+}
+
 export type FutureAssignmentPredictionMatchSource =
     | 'train-history'
     | 'emu-history'
