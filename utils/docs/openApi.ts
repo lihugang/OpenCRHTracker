@@ -912,57 +912,6 @@ export const developerDocsOpenApi = {
                     }
                 }
             },
-            TrainCirculationMetadata: {
-                type: 'object',
-                required: [
-                    'routeId',
-                    'windowStart',
-                    'windowEnd',
-                    'threshold',
-                    'lowestLinkWeight',
-                    'lowestLinkSupportCount',
-                    'containsLoopBreak',
-                    'nodes'
-                ],
-                properties: {
-                    routeId: {
-                        type: 'string',
-                        example: 'circulation_a1b2c3d4'
-                    },
-                    windowStart: {
-                        type: 'integer',
-                        example: 1775347200
-                    },
-                    windowEnd: {
-                        type: 'integer',
-                        example: 1776556799
-                    },
-                    threshold: {
-                        type: 'number',
-                        example: 0.8
-                    },
-                    lowestLinkWeight: {
-                        type: 'number',
-                        nullable: true,
-                        example: 1
-                    },
-                    lowestLinkSupportCount: {
-                        type: 'integer',
-                        nullable: true,
-                        example: 3
-                    },
-                    containsLoopBreak: {
-                        type: 'boolean',
-                        example: false
-                    },
-                    nodes: {
-                        type: 'array',
-                        items: {
-                            $ref: '#/components/schemas/TrainCirculationNode'
-                        }
-                    }
-                }
-            },
             TrainCirculation: {
                 type: 'object',
                 required: ['source', 'refreshAt', 'nodes'],
@@ -984,7 +933,9 @@ export const developerDocsOpenApi = {
                         }
                     },
                     metadata: {
-                        $ref: '#/components/schemas/TrainCirculationMetadata'
+                        type: 'object',
+                        additionalProperties: true,
+                        description: '附加调试信息'
                     }
                 }
             },
@@ -2366,7 +2317,7 @@ export const developerDocsOpenApi = {
                 tags: ['Timetable'],
                 summary: '按车次读取当前完整时刻表',
                 description:
-                    '返回该车次的时刻表，包括经停站、当前站车次、检票口信息、参考车型和交路信息。顶层 startAt/endAt 与 stops 中的时间字段是 Unix 秒；circulation.nodes 中的 startAt/endAt 是交路内日内偏移秒。',
+                    '返回该车次的时刻表，包括经停站、当前站车次、检票口信息、参考车型和交路信息。',
                 parameters: [
                     {
                         $ref: '#/components/parameters/TrainCodeParam'
@@ -3025,7 +2976,7 @@ export const developerDocsOpenApi = {
             get: {
                 operationId: 'historyTrain',
                 tags: ['History'],
-                summary: '按车次查询历史',
+                summary: '返回单个车次的历史担当记录',
                 description:
                     '返回单个车次的历史担当轻量记录，包含 serviceDate、timetableId 和 emuCode。',
                 parameters: [
@@ -3155,7 +3106,7 @@ export const developerDocsOpenApi = {
             get: {
                 operationId: 'historyEmu',
                 tags: ['History'],
-                summary: '按车组查询历史',
+                summary: '返回单个车组的历史担当记录',
                 description:
                     '返回单个车组的历史担当轻量记录，包含 serviceDate、timetableId 和 trainCode。',
                 parameters: [

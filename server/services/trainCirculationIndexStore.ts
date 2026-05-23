@@ -12,6 +12,7 @@ import {
     loadScheduleCirculationEntry,
     loadScheduleCirculationMap
 } from '~/server/utils/12306/scheduleProbe/stateStore';
+import type { ScheduleCirculationEntry } from '~/server/utils/12306/scheduleProbe/types';
 import { getRelativeDateString } from '~/server/utils/date/getCurrentDateString';
 import {
     getShanghaiDayStartUnixSeconds,
@@ -20,6 +21,9 @@ import {
 import murmurHash32 from '~/server/utils/hash/murmurHash32';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
 import type {
+    InferredTrainCirculationMetadata,
+    InferredTrainCirculationReference,
+    OfficialCirculationValidationState,
     TrainCirculation,
     TrainCirculationMetadata,
     TrainCirculationNode
@@ -64,8 +68,33 @@ interface TrainCirculationIndexCache {
     windowStart: number;
     windowEnd: number;
     threshold: number;
-    lookupByTrainCode: Map<string, InternalInferredCirculation[]>;
+    inferredLookupByTrainCode: Map<string, InternalInferredCirculation[]>;
+    validatedOfficialByInternalCode: Map<string, TrainCirculation>;
     stats: CirculationWindowStats;
+}
+
+interface InternalCirculationBuildResult {
+    lookupByTrainCode: Map<string, InternalInferredCirculation[]>;
+    lookupByInternalCode: Map<string, InternalInferredCirculation[]>;
+    circulations: InternalInferredCirculation[];
+    rowsScanned: number;
+    nodeCount: number;
+    edgeCount: number;
+    circulationCount: number;
+}
+
+interface OfficialCirculationSegmentMatch {
+    type: 'exact' | 'split';
+    officialStartIndex: number;
+    officialEndIndex: number;
+    matchedNodeCount: number;
+}
+
+interface OfficialCirculationCandidateEvaluation {
+    circulation: InternalInferredCirculation;
+    publicReference: InferredTrainCirculationReference | null;
+    match: OfficialCirculationSegmentMatch | null;
+    matchedNodeCount: number;
 }
 
 interface CirculationNodeMeta {
@@ -152,7 +181,10 @@ function loadOfficialCirculationInternalCodes() {
     );
 }
 
-function buildTrainCodeNodeMetaMap(officialInternalCodes: ReadonlySet<string>) {
+function buildTrainCodeNodeMetaMap(
+    officialInternalCodes: ReadonlySet<string>,
+    excludeOfficialInternalCodes: boolean
+) {
     const nodeMetaByTrainCode = new Map<string, CirculationNodeMeta>();
     const excludedTrainCodes = new Set<string>();
 
@@ -163,7 +195,10 @@ function buildTrainCodeNodeMetaMap(officialInternalCodes: ReadonlySet<string>) {
         }
 
         const normalizedInternalCode = normalizeCode(group.trainInternalCode);
-        if (officialInternalCodes.has(normalizedInternalCode)) {
+        if (
+            excludeOfficialInternalCodes &&
+            officialInternalCodes.has(normalizedInternalCode)
+        ) {
             for (const trainCode of allCodes) {
                 excludedTrainCodes.add(trainCode);
             }
@@ -550,6 +585,46 @@ function buildLookupByTrainCode(circulations: InternalInferredCirculation[]) {
     return lookupByTrainCode;
 }
 
+function buildLookupByInternalCode(circulations: InternalInferredCirculation[]) {
+    const lookupByInternalCode = new Map<
+        string,
+        InternalInferredCirculation[]
+    >();
+
+    for (const circulation of circulations) {
+        const normalizedInternalCodes = uniqueNormalizedCodes(
+            circulation.nodes
+                .map((node) => normalizeCode(node.internalCode ?? ''))
+                .filter((internalCode) => internalCode.length > 0)
+        );
+        for (const internalCode of normalizedInternalCodes) {
+            const existing = lookupByInternalCode.get(internalCode);
+            if (existing) {
+                existing.push(circulation);
+                continue;
+            }
+
+            lookupByInternalCode.set(internalCode, [circulation]);
+        }
+    }
+
+    return lookupByInternalCode;
+}
+
+function buildInferredMetadata(
+    circulation: InternalInferredCirculation
+): InferredTrainCirculationMetadata {
+    return {
+        routeId: circulation.routeId,
+        windowStart: circulation.windowStart,
+        windowEnd: circulation.windowEnd,
+        threshold: circulation.threshold,
+        lowestLinkWeight: circulation.lowestLinkWeight,
+        lowestLinkSupportCount: circulation.lowestLinkSupportCount,
+        containsLoopBreak: circulation.containsLoopBreak
+    };
+}
+
 function resolvePublicNodeTimetable(node: InternalInferredCirculationNode) {
     const candidateTrainCodes = uniqueNormalizedCodes([
         node.trainCode,
@@ -677,21 +752,31 @@ function toPublicTrainCirculation(
         return null;
     }
 
-    const metadata: TrainCirculationMetadata = {
-        routeId: circulation.routeId,
-        windowStart: circulation.windowStart,
-        windowEnd: circulation.windowEnd,
-        threshold: circulation.threshold,
-        lowestLinkWeight: circulation.lowestLinkWeight,
-        lowestLinkSupportCount: circulation.lowestLinkSupportCount,
-        containsLoopBreak: circulation.containsLoopBreak
-    };
-
     return {
         source: 'inferred',
         refreshAt,
         nodes,
-        metadata
+        metadata: buildInferredMetadata(circulation)
+    };
+}
+
+function toPublicInferredCirculationReference(
+    circulation: InternalInferredCirculation,
+    refreshAt: number | null
+): InferredTrainCirculationReference | null {
+    const publicCirculation = toPublicTrainCirculation(circulation, refreshAt);
+    if (!publicCirculation || !publicCirculation.metadata?.routeId) {
+        return null;
+    }
+
+    return {
+        source: 'inferred',
+        refreshAt: publicCirculation.refreshAt,
+        nodes: publicCirculation.nodes.map((node) => ({
+            ...node,
+            allCodes: [...node.allCodes]
+        })),
+        metadata: buildInferredMetadata(circulation)
     };
 }
 
@@ -820,6 +905,432 @@ function buildCirculationsFromGraph(
     return circulations;
 }
 
+function buildInternalCirculationIndex(
+    startAt: number,
+    endAt: number,
+    threshold: number,
+    batchSize: number,
+    officialInternalCodes: ReadonlySet<string>,
+    excludeOfficialInternalCodes: boolean
+): InternalCirculationBuildResult {
+    const nodeIds = buildNodeIdStore();
+    const trainCodeNodeMetaMap = buildTrainCodeNodeMetaMap(
+        officialInternalCodes,
+        excludeOfficialInternalCodes
+    );
+    const scanStatesByEmuCode = new Map<string, EmuScanState>();
+    const outgoingCounts = new Map<number, Map<number, number>>();
+    const incomingCounts = new Map<number, Map<number, number>>();
+    let rowsScanned = 0;
+    let cursor: CursorPoint | null = null;
+
+    while (true) {
+        const rows = listDailyRecordsPaged(startAt, endAt, cursor, batchSize);
+        if (rows.length === 0) {
+            break;
+        }
+
+        for (const row of rows) {
+            if (
+                consumeRow(
+                    row,
+                    nodeIds,
+                    trainCodeNodeMetaMap,
+                    scanStatesByEmuCode,
+                    outgoingCounts,
+                    incomingCounts
+                )
+            ) {
+                rowsScanned += 1;
+            }
+        }
+
+        if (rows.length < batchSize) {
+            break;
+        }
+
+        const lastRow = rows[rows.length - 1]!;
+        cursor = {
+            serviceDate: lastRow.service_date,
+            id: lastRow.id
+        };
+    }
+
+    for (const state of scanStatesByEmuCode.values()) {
+        commitClosedRun(
+            state.pendingRun,
+            state,
+            outgoingCounts,
+            incomingCounts
+        );
+
+        if (state.currentRun && state.nextRun) {
+            finalizeRunTransition(
+                state.currentRun,
+                state.nextRun,
+                outgoingCounts,
+                incomingCounts
+            );
+        }
+    }
+
+    const outgoingEdgesByNodeId = normalizeEdgeCounts(
+        outgoingCounts,
+        nodeIds.nodeMetasByNodeId
+    );
+    const incomingEdgesByNodeId = normalizeEdgeCounts(
+        incomingCounts,
+        nodeIds.nodeMetasByNodeId
+    );
+    const circulations = buildCirculationsFromGraph(
+        nodeIds.nodeMetasByNodeId,
+        outgoingEdgesByNodeId,
+        incomingEdgesByNodeId,
+        startAt,
+        endAt,
+        threshold
+    );
+
+    return {
+        lookupByTrainCode: buildLookupByTrainCode(circulations),
+        lookupByInternalCode: buildLookupByInternalCode(circulations),
+        circulations,
+        rowsScanned,
+        nodeCount: nodeIds.nodeMetasByNodeId.length,
+        edgeCount: Array.from(outgoingCounts.values()).reduce(
+            (sum, targets) => sum + targets.size,
+            0
+        ),
+        circulationCount: circulations.length
+    };
+}
+
+function buildComparableNodeCodes(node: {
+    internalCode: string | null | undefined;
+    allCodes: string[];
+}) {
+    const normalizedInternalCode = normalizeCode(node.internalCode ?? '');
+    if (normalizedInternalCode.length > 0) {
+        return [normalizedInternalCode];
+    }
+
+    return uniqueNormalizedCodes(node.allCodes);
+}
+
+function nodesShareComparableCode(
+    left: { internalCode: string | null | undefined; allCodes: string[] },
+    right: { internalCode: string | null | undefined; allCodes: string[] }
+) {
+    const leftCodes = buildComparableNodeCodes(left);
+    const rightCodeSet = new Set(buildComparableNodeCodes(right));
+    return leftCodes.some((code) => rightCodeSet.has(code));
+}
+
+function evaluateOfficialCirculationCandidate(
+    entry: ScheduleCirculationEntry,
+    circulation: InternalInferredCirculation,
+    refreshAt: number | null
+): OfficialCirculationCandidateEvaluation {
+    const officialNodes = entry.nodes;
+    const candidateNodes = circulation.nodes;
+    const publicReference = toPublicInferredCirculationReference(
+        circulation,
+        refreshAt
+    );
+
+    if (officialNodes.length === 0 || candidateNodes.length === 0) {
+        return {
+            circulation,
+            publicReference,
+            match: null,
+            matchedNodeCount: 0
+        };
+    }
+
+    let bestMatchedNodeCount = 0;
+
+    for (
+        let officialStartIndex = 0;
+        officialStartIndex < officialNodes.length;
+        officialStartIndex += 1
+    ) {
+        if (
+            !nodesShareComparableCode(
+                officialNodes[officialStartIndex]!,
+                candidateNodes[0]!
+            )
+        ) {
+            continue;
+        }
+
+        let matchedNodeCount = 0;
+        while (
+            matchedNodeCount < candidateNodes.length &&
+            officialStartIndex + matchedNodeCount < officialNodes.length &&
+            nodesShareComparableCode(
+                officialNodes[officialStartIndex + matchedNodeCount]!,
+                candidateNodes[matchedNodeCount]!
+            )
+        ) {
+            matchedNodeCount += 1;
+        }
+
+        bestMatchedNodeCount = Math.max(bestMatchedNodeCount, matchedNodeCount);
+
+        if (matchedNodeCount !== candidateNodes.length) {
+            continue;
+        }
+
+        const officialEndIndex = officialStartIndex + matchedNodeCount - 1;
+        const matchType =
+            matchedNodeCount === officialNodes.length ? 'exact' : 'split';
+        if (matchType === 'split' && matchedNodeCount <= 1) {
+            continue;
+        }
+
+        return {
+            circulation,
+            publicReference,
+            match: {
+                type: matchType,
+                officialStartIndex,
+                officialEndIndex,
+                matchedNodeCount
+            },
+            matchedNodeCount
+        };
+    }
+
+    return {
+        circulation,
+        publicReference,
+        match: null,
+        matchedNodeCount: bestMatchedNodeCount
+    };
+}
+
+function compareOfficialCandidateEvaluations(
+    left: OfficialCirculationCandidateEvaluation,
+    right: OfficialCirculationCandidateEvaluation
+) {
+    if (left.matchedNodeCount !== right.matchedNodeCount) {
+        return right.matchedNodeCount - left.matchedNodeCount;
+    }
+
+    const leftWeight = left.circulation.lowestLinkWeight ?? -1;
+    const rightWeight = right.circulation.lowestLinkWeight ?? -1;
+    if (leftWeight !== rightWeight) {
+        return rightWeight - leftWeight;
+    }
+
+    const leftSupport = left.circulation.lowestLinkSupportCount ?? -1;
+    const rightSupport = right.circulation.lowestLinkSupportCount ?? -1;
+    if (leftSupport !== rightSupport) {
+        return rightSupport - leftSupport;
+    }
+
+    return left.circulation.routeId.localeCompare(right.circulation.routeId);
+}
+
+function buildOfficialCandidateEvaluations(
+    entry: ScheduleCirculationEntry,
+    fullLookupByTrainCode: Map<string, InternalInferredCirculation[]>,
+    fullLookupByInternalCode: Map<string, InternalInferredCirculation[]>,
+    refreshAt: number | null
+) {
+    const candidateMap = new Map<string, InternalInferredCirculation>();
+
+    for (const node of entry.nodes) {
+        const normalizedInternalCode = normalizeCode(node.internalCode);
+        if (normalizedInternalCode.length > 0) {
+            for (const circulation of fullLookupByInternalCode.get(
+                normalizedInternalCode
+            ) ?? []) {
+                candidateMap.set(circulation.routeId, circulation);
+            }
+        }
+
+        for (const trainCode of node.allCodes) {
+            for (const circulation of fullLookupByTrainCode.get(
+                normalizeCode(trainCode)
+            ) ?? []) {
+                candidateMap.set(circulation.routeId, circulation);
+            }
+        }
+    }
+
+    return Array.from(candidateMap.values())
+        .map((circulation) =>
+            evaluateOfficialCirculationCandidate(entry, circulation, refreshAt)
+        )
+        .sort(compareOfficialCandidateEvaluations);
+}
+
+function buildOfficialValidationMetadata(
+    validationState: OfficialCirculationValidationState,
+    entryKey: string,
+    overrides: Partial<TrainCirculationMetadata> = {}
+): TrainCirculationMetadata {
+    return {
+        validationState,
+        originalOfficialEntryKey: entryKey,
+        ...overrides
+    };
+}
+
+function cloneOfficialEntryNodes(nodes: TrainCirculationNode[]) {
+    return nodes.map((node) => ({
+        internalCode: node.internalCode,
+        allCodes: [...node.allCodes],
+        startStation: node.startStation,
+        endStation: node.endStation,
+        startAt: node.startAt,
+        endAt: node.endAt
+    }));
+}
+
+function buildPublicOfficialCirculationFromEntry(
+    entryKey: string,
+    entry: ScheduleCirculationEntry,
+    nodes: TrainCirculationNode[],
+    metadata: TrainCirculationMetadata
+): TrainCirculation {
+    return {
+        source: 'official',
+        refreshAt: entry.refreshedAt,
+        nodes: cloneOfficialEntryNodes(nodes),
+        metadata
+    };
+}
+
+function indexOfficialCirculationByInternalCode(
+    circulation: TrainCirculation,
+    store: Map<string, TrainCirculation>
+) {
+    for (const node of circulation.nodes) {
+        const normalizedInternalCode = normalizeCode(node.internalCode);
+        if (normalizedInternalCode.length === 0) {
+            continue;
+        }
+
+        store.set(normalizedInternalCode, circulation);
+    }
+}
+
+function buildValidatedOfficialCirculationMap(
+    fullBuild: InternalCirculationBuildResult,
+    refreshAt: number | null
+) {
+    const scheduleFilePath = useConfig().data.assets.schedule.file;
+    const officialMap = loadScheduleCirculationMap(scheduleFilePath);
+    const validatedOfficialByInternalCode = new Map<string, TrainCirculation>();
+    let splitCount = 0;
+    let unmatchedCount = 0;
+
+    for (const [entryKey, entry] of Object.entries(officialMap)) {
+        const candidateEvaluations = buildOfficialCandidateEvaluations(
+            entry,
+            fullBuild.lookupByTrainCode,
+            fullBuild.lookupByInternalCode,
+            refreshAt
+        );
+        const bestCandidate = candidateEvaluations[0] ?? null;
+        const splitCandidate =
+            candidateEvaluations.find(
+                (candidate) => candidate.match?.type === 'split'
+            ) ?? null;
+        const exactCandidate =
+            candidateEvaluations.find(
+                (candidate) => candidate.match?.type === 'exact'
+            ) ?? null;
+
+        if (splitCandidate?.match) {
+            const { officialStartIndex, officialEndIndex } = splitCandidate.match;
+            const segmentRanges = [
+                {
+                    startIndex: 0,
+                    endIndex: officialStartIndex - 1
+                },
+                {
+                    startIndex: officialStartIndex,
+                    endIndex: officialEndIndex
+                },
+                {
+                    startIndex: officialEndIndex + 1,
+                    endIndex: entry.nodes.length - 1
+                }
+            ].filter((segment) => segment.startIndex <= segment.endIndex);
+            const splitSegmentCount = segmentRanges.length;
+
+            segmentRanges.forEach((segment, index) => {
+                const segmentNodes = entry.nodes.slice(
+                    segment.startIndex,
+                    segment.endIndex + 1
+                );
+                const metadata = buildOfficialValidationMetadata(
+                    'split_official',
+                    entryKey,
+                    {
+                        splitSegmentIndex: index,
+                        splitSegmentCount,
+                        matchedInferredRouteId: splitCandidate.circulation.routeId
+                    }
+                );
+                const circulation = buildPublicOfficialCirculationFromEntry(
+                    entryKey,
+                    entry,
+                    segmentNodes,
+                    metadata
+                );
+                indexOfficialCirculationByInternalCode(
+                    circulation,
+                    validatedOfficialByInternalCode
+                );
+            });
+            splitCount += 1;
+            continue;
+        }
+
+        if (exactCandidate) {
+            const circulation = buildPublicOfficialCirculationFromEntry(
+                entryKey,
+                entry,
+                entry.nodes,
+                buildOfficialValidationMetadata('raw_official', entryKey, {
+                    matchedInferredRouteId: exactCandidate.circulation.routeId
+                })
+            );
+            indexOfficialCirculationByInternalCode(
+                circulation,
+                validatedOfficialByInternalCode
+            );
+            continue;
+        }
+
+        const circulation = buildPublicOfficialCirculationFromEntry(
+            entryKey,
+            entry,
+            entry.nodes,
+            buildOfficialValidationMetadata('unmatched_official', entryKey, {
+                matchedInferredRouteId: bestCandidate?.circulation.routeId,
+                candidateInferredCirculation:
+                    bestCandidate?.publicReference ?? null
+            })
+        );
+        indexOfficialCirculationByInternalCode(
+            circulation,
+            validatedOfficialByInternalCode
+        );
+        unmatchedCount += 1;
+    }
+
+    logger.info(
+        `official_validation scanned=${Object.keys(officialMap).length} split=${splitCount} unmatched=${unmatchedCount}`
+    );
+
+    return validatedOfficialByInternalCode;
+}
+
 function commitClosedRun(
     closedRun: RunBucket,
     state: EmuScanState,
@@ -920,89 +1431,26 @@ export function rebuildTrainCirculationIndex(): TrainCirculationIndexCache {
     const currentDate = getRelativeDateString(0);
     const config = getWindowConfig();
     const { startAt, endAt } = getWindowRange(currentDate, config.windowDays);
-    const nodeIds = buildNodeIdStore();
     const officialInternalCodes = loadOfficialCirculationInternalCodes();
-    const trainCodeNodeMetaMap = buildTrainCodeNodeMetaMap(
-        officialInternalCodes
-    );
-    const scanStatesByEmuCode = new Map<string, EmuScanState>();
-    const outgoingCounts = new Map<number, Map<number, number>>();
-    const incomingCounts = new Map<number, Map<number, number>>();
     const rebuiltAt = Math.floor(Date.now() / 1000);
-    let rowsScanned = 0;
-    let cursor: CursorPoint | null = null;
-
-    while (true) {
-        const rows = listDailyRecordsPaged(
-            startAt,
-            endAt,
-            cursor,
-            config.batchSize
-        );
-        if (rows.length === 0) {
-            break;
-        }
-
-        for (const row of rows) {
-            if (
-                consumeRow(
-                    row,
-                    nodeIds,
-                    trainCodeNodeMetaMap,
-                    scanStatesByEmuCode,
-                    outgoingCounts,
-                    incomingCounts
-                )
-            ) {
-                rowsScanned += 1;
-            }
-        }
-
-        if (rows.length < config.batchSize) {
-            break;
-        }
-
-        const lastRow = rows[rows.length - 1]!;
-        cursor = {
-            serviceDate: lastRow.service_date,
-            id: lastRow.id
-        };
-    }
-
-    for (const state of scanStatesByEmuCode.values()) {
-        commitClosedRun(
-            state.pendingRun,
-            state,
-            outgoingCounts,
-            incomingCounts
-        );
-
-        if (state.currentRun && state.nextRun) {
-            finalizeRunTransition(
-                state.currentRun,
-                state.nextRun,
-                outgoingCounts,
-                incomingCounts
-            );
-        }
-    }
-
-    const outgoingEdgesByNodeId = normalizeEdgeCounts(
-        outgoingCounts,
-        nodeIds.nodeMetasByNodeId
-    );
-    const incomingEdgesByNodeId = normalizeEdgeCounts(
-        incomingCounts,
-        nodeIds.nodeMetasByNodeId
-    );
-    const circulations = buildCirculationsFromGraph(
-        nodeIds.nodeMetasByNodeId,
-        outgoingEdgesByNodeId,
-        incomingEdgesByNodeId,
+    const inferredBuild = buildInternalCirculationIndex(
         startAt,
         endAt,
-        config.threshold
+        config.threshold,
+        config.batchSize,
+        officialInternalCodes,
+        true
     );
+    const fullBuild = buildInternalCirculationIndex(
+        startAt,
+        endAt,
+        config.threshold,
+        config.batchSize,
+        officialInternalCodes,
+        false
+    );
+    const validatedOfficialByInternalCode =
+        buildValidatedOfficialCirculationMap(fullBuild, rebuiltAt);
 
     cached = {
         currentDate,
@@ -1010,15 +1458,13 @@ export function rebuildTrainCirculationIndex(): TrainCirculationIndexCache {
         windowStart: startAt,
         windowEnd: endAt,
         threshold: config.threshold,
-        lookupByTrainCode: buildLookupByTrainCode(circulations),
+        inferredLookupByTrainCode: inferredBuild.lookupByTrainCode,
+        validatedOfficialByInternalCode,
         stats: {
-            rowsScanned,
-            nodeCount: nodeIds.nodeMetasByNodeId.length,
-            edgeCount: Array.from(outgoingCounts.values()).reduce(
-                (sum, targets) => sum + targets.size,
-                0
-            ),
-            circulationCount: circulations.length,
+            rowsScanned: inferredBuild.rowsScanned,
+            nodeCount: inferredBuild.nodeCount,
+            edgeCount: inferredBuild.edgeCount,
+            circulationCount: inferredBuild.circulationCount,
             rebuiltAt
         }
     };
@@ -1060,7 +1506,7 @@ function getInternalInferredCirculationsByTrainCodes(
     const resultsByRouteId = new Map<string, InternalInferredCirculation>();
 
     for (const trainCode of normalizedTrainCodes) {
-        for (const circulation of activeCache.lookupByTrainCode.get(
+        for (const circulation of activeCache.inferredLookupByTrainCode.get(
             trainCode
         ) ?? []) {
             resultsByRouteId.set(circulation.routeId, circulation);
@@ -1091,6 +1537,13 @@ function toPublicOfficialTrainCirculation(
         return null;
     }
 
+    const cachedOfficialCirculation = getActiveCache().validatedOfficialByInternalCode.get(
+        normalizedInternalCode
+    );
+    if (cachedOfficialCirculation) {
+        return cachedOfficialCirculation;
+    }
+
     const entry = loadScheduleCirculationEntry(
         useConfig().data.assets.schedule.file,
         normalizedInternalCode
@@ -1099,18 +1552,12 @@ function toPublicOfficialTrainCirculation(
         return null;
     }
 
-    return {
-        source: 'official',
-        refreshAt: entry.refreshedAt,
-        nodes: entry.nodes.map((node) => ({
-            internalCode: node.internalCode,
-            allCodes: [...node.allCodes],
-            startStation: node.startStation,
-            endStation: node.endStation,
-            startAt: node.startAt,
-            endAt: node.endAt
-        }))
-    };
+    return buildPublicOfficialCirculationFromEntry(
+        normalizedInternalCode,
+        entry,
+        entry.nodes,
+        buildOfficialValidationMetadata('raw_official', normalizedInternalCode)
+    );
 }
 
 export function getPreferredTrainCirculation(input: {

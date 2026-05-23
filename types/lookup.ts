@@ -144,7 +144,7 @@ export interface TrainCirculationNode {
     endAt: number;
 }
 
-export interface TrainCirculationMetadata {
+export interface InferredTrainCirculationMetadata {
     routeId: string;
     windowStart: number;
     windowEnd: number;
@@ -152,6 +152,28 @@ export interface TrainCirculationMetadata {
     lowestLinkWeight: number | null;
     lowestLinkSupportCount: number | null;
     containsLoopBreak: boolean;
+}
+
+export interface InferredTrainCirculationReference {
+    source: 'inferred';
+    refreshAt: number | null;
+    nodes: TrainCirculationNode[];
+    metadata: InferredTrainCirculationMetadata;
+}
+
+export type OfficialCirculationValidationState =
+    | 'raw_official'
+    | 'split_official'
+    | 'unmatched_official';
+
+export interface TrainCirculationMetadata
+    extends Partial<InferredTrainCirculationMetadata> {
+    validationState?: OfficialCirculationValidationState;
+    originalOfficialEntryKey?: string;
+    splitSegmentIndex?: number;
+    splitSegmentCount?: number;
+    matchedInferredRouteId?: string;
+    candidateInferredCirculation?: InferredTrainCirculationReference | null;
 }
 
 export interface TrainCirculation {
