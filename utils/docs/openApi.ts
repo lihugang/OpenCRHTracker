@@ -190,6 +190,17 @@ export const developerDocsOpenApi = {
                 },
                 example: 'false'
             },
+            TrainCirculationImageFormatQuery: {
+                name: 'format',
+                in: 'query',
+                description: '运行图输出格式；留空时默认使用 png。',
+                schema: {
+                    type: 'string',
+                    enum: ['png', 'pdf'],
+                    default: 'png'
+                },
+                example: 'png'
+            },
             BinaryQuery: {
                 name: 'binary',
                 in: 'query',
@@ -2595,11 +2606,13 @@ export const developerDocsOpenApi = {
                 operationId: 'trainCirculationImage',
                 tags: ['Timetable'],
                 summary: '获取交路运行图图片',
-                description:
-                    '根据交路表和首末站坐标生成交路运行图；启用 binary 模式时直接返回 png ，否则返回图片链接',
+                description: '根据交路表和首末站坐标生成交路运行图',
                 parameters: [
                     {
                         $ref: '#/components/parameters/TrainCodeParam'
+                    },
+                    {
+                        $ref: '#/components/parameters/TrainCirculationImageFormatQuery'
                     },
                     {
                         $ref: '#/components/parameters/BinaryQuery'
@@ -2640,11 +2653,17 @@ export const developerDocsOpenApi = {
                                     type: 'string',
                                     format: 'binary'
                                 }
+                            },
+                            'application/pdf': {
+                                schema: {
+                                    type: 'string',
+                                    format: 'binary'
+                                }
                             }
                         }
                     },
                     '400': {
-                        description: '路径参数或 binary 查询参数无效。',
+                        description: '路径参数、binary 查询参数或 format 查询参数无效。',
                         headers: {
                             'x-api-remain': {
                                 $ref: '#/components/headers/ApiRemain'
@@ -2756,6 +2775,20 @@ export const developerDocsOpenApi = {
                         }
                     },
                     {
+                        id: 'circulation-image-pdf-json',
+                        label: 'PDF 地址',
+                        summary:
+                            '返回运行图 PDF 直链，适合交给下载器或文档预览组件。',
+                        authMode: 'anonymous',
+                        pathParams: {
+                            trainCode: 'G2492'
+                        },
+                        query: {
+                            format: 'pdf',
+                            binary: 'false'
+                        }
+                    },
+                    {
                         id: 'circulation-image-binary',
                         label: '原始 PNG',
                         summary: '直接返回 PNG 二进制内容，适合下载或转存。',
@@ -2764,6 +2797,19 @@ export const developerDocsOpenApi = {
                             trainCode: 'G2492'
                         },
                         query: {
+                            binary: 'true'
+                        }
+                    },
+                    {
+                        id: 'circulation-image-binary-pdf',
+                        label: '原始 PDF',
+                        summary: '直接返回 PDF 二进制内容，适合下载或打印。',
+                        authMode: 'anonymous',
+                        pathParams: {
+                            trainCode: 'G2492'
+                        },
+                        query: {
+                            format: 'pdf',
                             binary: 'true'
                         }
                     }
@@ -3533,8 +3579,7 @@ export const developerDocsOpenApi = {
                 operationId: 'dailyExportByDate',
                 tags: ['Exports'],
                 summary: '读取单日导出文件',
-                description:
-                    '读取某日已生成的车次车底对应关系导出文件；开启 binary 模式时返回原始文本，否则返回 JSON 包裹结构。',
+                description: '读取某日车次车底对应关系导出文件。',
                 parameters: [
                     {
                         $ref: '#/components/parameters/DateParam'

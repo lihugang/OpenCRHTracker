@@ -8,6 +8,7 @@ import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
 import {
     renderTrainCirculationImage,
     toTrainCirculationImageData,
+    type TrainCirculationImageFormat,
     type TrainCirculationImageRenderResult
 } from '~/server/services/trainCirculationImageService';
 
@@ -23,6 +24,17 @@ function parseBinaryFlag(value: unknown): boolean {
     }
 
     throw new Error('binary');
+}
+
+function parseFormat(value: unknown): TrainCirculationImageFormat {
+    if (value === undefined) {
+        return 'png';
+    }
+    if (value === 'png' || value === 'pdf') {
+        return value;
+    }
+
+    throw new Error('format');
 }
 
 export default defineEventHandler(async (event) => {
@@ -48,8 +60,8 @@ export default defineEventHandler(async (event) => {
                     };
                 }
 
-                setHeader(successEvent, 'Content-Type', 'image/png');
-                return data.pngContent;
+                setHeader(successEvent, 'Content-Type', data.binaryContentType);
+                return data.binaryContent;
             },
             successHeaders: (successEvent) =>
                 setCacheControl(successEvent, cacheMaxAge)
@@ -66,13 +78,19 @@ export default defineEventHandler(async (event) => {
             );
 
             let binaryRequested = false;
+            let format: TrainCirculationImageFormat = 'png';
             try {
                 binaryRequested = parseBinaryFlag(query.binary);
             } catch {
                 ensure(false, 400, 'invalid_param', 'binary 必须是 true/false');
             }
+            try {
+                format = parseFormat(query.format);
+            } catch {
+                ensure(false, 400, 'invalid_param', 'format 必须是 png 或 pdf');
+            }
 
-            return renderTrainCirculationImage(trainCode, binaryRequested);
+            return renderTrainCirculationImage(trainCode, binaryRequested, format);
         }
     );
 });
