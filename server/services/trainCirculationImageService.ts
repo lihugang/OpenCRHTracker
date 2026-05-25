@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import useConfig from '~/server/config';
+import { getReferenceModelsByTrainCodes } from '~/server/services/referenceModelIndexStore';
 import { getPreferredTrainCirculation } from '~/server/services/trainCirculationIndexStore';
 import { getTodayScheduleTimetableByTrainCode } from '~/server/services/todayScheduleCache';
 import ApiRequestError from '~/server/utils/api/errors/ApiRequestError';
@@ -20,6 +21,7 @@ import {
     toUnixSecondsFromShanghaiDayOffset
 } from '~/server/utils/date/shanghaiDateTime';
 import type { TrainCirculation, TrainCirculationImageData } from '~/types/lookup';
+import resolveBureauNameByCode from '~/utils/railway/resolveBureauNameByCode';
 
 interface LatexCompileSuccessPayload {
     id?: unknown;
@@ -94,6 +96,7 @@ const TRAIN_LABEL_CANDIDATE_PROGRESS = [0.25, 0.4, 0.55] as const;
 const TRAIN_LABEL_OFFSET_X_CM = 0.32;
 const ENDPOINT_TIME_OFFSET_Y_CM = 0.16;
 const MIDNIGHT_MARKER_OFFSET_Y_CM = 0.2;
+const HEADER_INFO_OFFSET_Y_CM = 0.8;
 const STATION_LABEL_RIGHT_PROTECTION_X_CM = 0.2;
 const SHANGHAI_TIME_FORMATTER = new Intl.DateTimeFormat('zh-CN', {
     timeZone: 'Asia/Shanghai',
@@ -122,6 +125,13 @@ interface TextMetrics {
     heightCm: number;
 }
 
+interface TopRightTextPlacement {
+    x: number;
+    y: number;
+    text: string;
+    box: TextBox;
+}
+
 interface StationAxisLayout {
     chartBodyHeightCm: number;
     projectedDistanceByTelecode: Map<string, number>;
@@ -143,6 +153,10 @@ interface EndpointTimePlacementResult {
     placements: EndpointTimePlacement[];
     requiredChartWidthCm: number;
     hadOverlapFallback: boolean;
+}
+
+interface TrainCirculationHeaderInfo {
+    text: string;
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -634,6 +648,39 @@ function buildStationAxisLayout(
     };
 }
 
+function buildTrainCirculationHeaderInfo(input: {
+    bureauCode: string;
+    trainDepartment: string;
+    passengerDepartment: string;
+    allCodes: string[];
+}): TrainCirculationHeaderInfo | null {
+    const parts: string[] = [];
+    const bureauName = resolveBureauNameByCode(input.bureauCode);
+
+    if (bureauName.length > 0) {
+        parts.push(bureauName);
+    }
+    if (input.trainDepartment.length > 0) {
+        parts.push(input.trainDepartment);
+    }
+    if (input.passengerDepartment.length > 0) {
+        parts.push(input.passengerDepartment);
+    }
+
+    const primaryReferenceModel = getReferenceModelsByTrainCodes(input.allCodes)[0];
+    if (primaryReferenceModel?.model) {
+        parts.push(`${primaryReferenceModel.model} 型动车组`);
+    }
+
+    if (parts.length === 0) {
+        return null;
+    }
+
+    return {
+        text: parts.join(', ')
+    };
+}
+
 function getTextMetricsKindWidthCm(character: string, kind: TextMetricKind) {
     if (character === ' ') {
         return kind === 'time' || kind === 'marker' ? 0.08 : 0.1;
@@ -820,6 +867,27 @@ function createTextPlacement(
             textMetrics.heightCm,
             anchor
         )
+    };
+}
+
+function createTopRightTextPlacement(
+    x: number,
+    y: number,
+    text: string,
+    kind: TextMetricKind
+): TopRightTextPlacement {
+    const textMetrics = getTextMetrics(text, kind);
+
+    return {
+        x,
+        y,
+        text,
+        box: {
+            minX: x - textMetrics.widthCm,
+            maxX: x,
+            minY: y,
+            maxY: y + textMetrics.heightCm
+        }
     };
 }
 
@@ -1083,7 +1151,8 @@ function buildLatexSource(
     _requestTrainCode: string,
     nodes: ResolvedCirculationNode[],
     stationAxisPoints: StationAxisPoint[],
-    _scheduleDate: string
+    _scheduleDate: string,
+    headerInfo: TrainCirculationHeaderInfo | null
 ) {
     const template = fs.readFileSync(TEMPLATE_PATH, 'utf8');
     const stationYByTelecode = new Map<string, number>();
@@ -1133,6 +1202,7 @@ function buildLatexSource(
     const largeCjkFont = '\\fontsize{13.5}{16.5}\\selectfont';
     const trainLabelFont = '\\fontsize{10.8}{13.2}\\selectfont';
     const largeTimeFont = '\\fontsize{10.8}{13.5}\\selectfont';
+    const headerFont = '\\fontsize{9.6}{11.8}\\selectfont';
     const footerFont = '\\fontsize{8.1}{10.1}\\selectfont';
     const stationLabelPlacements = stationAxisPoints.map((stationAxisPoint) => {
         const y = stationYByTelecode.get(stationAxisPoint.stationTelecode) ?? 0;
@@ -1249,6 +1319,18 @@ function buildLatexSource(
         ...endpointTimePlacements.map((placement) => placement.box),
         ...trainLabelPlacements.map((placement) => placement.box)
     ];
+    const headerPlacement =
+        headerInfo === null
+            ? null
+            : createTopRightTextPlacement(
+                  chartWidthCm,
+                  chartBodyHeightCm + HEADER_INFO_OFFSET_Y_CM,
+                  headerInfo.text,
+                  'train'
+              );
+    if (headerPlacement) {
+        allTextBoxes.push(headerPlacement.box);
+    }
     const minTextY = allTextBoxes.reduce(
         (currentMinY, box) => Math.min(currentMinY, box.minY),
         0
@@ -1325,6 +1407,12 @@ function buildLatexSource(
     for (const placement of trainLabelPlacements) {
         contentLines.push(
             `\\node[fill=white,inner sep=2pt,font=${trainLabelFont},anchor=${placement.anchor}] at (${formatCoordinate(placement.x)}, ${formatCoordinate(placement.y + shiftYCm)}) ${quoteTikzText(placement.text)};`
+        );
+    }
+
+    if (headerPlacement) {
+        contentLines.push(
+            `\\node[fill=white,inner sep=2pt,font=${headerFont},anchor=south east,align=right] at (${formatCoordinate(chartWidthCm)}, ${formatCoordinate(headerPlacement.y + shiftYCm)}) ${quoteTikzText(headerPlacement.text)};`
         );
     }
 
@@ -1496,6 +1584,12 @@ export async function renderTrainCirculationImage(
 ): Promise<TrainCirculationImageRenderResult> {
     const { timetable, circulation } = resolveCurrentCirculation(requestTrainCode);
     const publishedScheduleState = resolvePublishedScheduleState();
+    const headerInfo = buildTrainCirculationHeaderInfo({
+        bureauCode: timetable.bureauCode,
+        trainDepartment: timetable.trainDepartment,
+        passengerDepartment: timetable.passengerDepartment,
+        allCodes: timetable.allCodes
+    });
     const resolvedNodes = buildResolvedCirculationNodes(
         publishedScheduleState.date,
         circulation,
@@ -1507,7 +1601,8 @@ export async function renderTrainCirculationImage(
         requestTrainCode,
         resolvedNodes,
         stationAxisPoints,
-        publishedScheduleState.date
+        publishedScheduleState.date,
+        headerInfo
     );
     const compileResult = await compileLatexDocument(latexSource);
     const imageUrl = buildImageUrl(
