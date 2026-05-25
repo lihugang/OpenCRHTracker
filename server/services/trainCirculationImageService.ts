@@ -35,7 +35,8 @@ interface ResolvedScheduleTerminal {
 
 interface ResolvedCirculationNode {
     routeNodeIndex: number;
-    trainCode: string;
+    trainCodes: string[];
+    trainCodeText: string;
     start: ResolvedScheduleTerminal;
     end: ResolvedScheduleTerminal;
 }
@@ -53,21 +54,96 @@ interface LatexCompileResult {
     pageCount: number;
 }
 
+type TextAnchor = 'east' | 'west' | 'north' | 'south';
+type TextMetricKind = 'station' | 'train' | 'time' | 'marker';
+
+interface MergedScheduleItem {
+    representativeItem: ScheduleItem;
+    internalCode: string;
+    allCodes: string[];
+    startStation: string;
+    endStation: string;
+    startAt: number | null;
+    endAt: number | null;
+}
+
+export type TrainCirculationImageFormat = 'png' | 'pdf';
+
 export interface TrainCirculationImageRenderResult {
     requestTrainCode: string;
     trainCode: string;
     documentId: string;
     imageUrl: string;
-    pngContent: Uint8Array | null;
+    binaryContent: Uint8Array | null;
+    binaryContentType: 'image/png' | 'application/pdf';
 }
 
 const TEMPLATE_PATH = path.resolve('assets/latex/train-circulation-image.tex');
+const MIN_STATION_GAP_CM = 1.0;
+const PLOT_TOP_PADDING_CM = 0.9;
+const PLOT_BOTTOM_PADDING_CM = 0.9;
+const ENDPOINT_TIME_MIN_X_GAP_CM = 0.26;
+const ENDPOINT_TIME_HORIZONTAL_STEP_CM = 0.32;
+const ENDPOINT_TIME_MAX_HORIZONTAL_STEPS = 96;
+const ENDPOINT_TIME_LAYOUT_MAX_ITERATIONS = 6;
+const ENDPOINT_TIME_RELAYOUT_GROWTH_CM = 2.4;
+const ENDPOINT_TIME_RIGHT_PADDING_CM = 0.5;
+const TRAIN_LABEL_SAFE_MIN_X_CM = 1.4;
+const TRAIN_LABEL_SAFE_MAX_X_PADDING_CM = 0.4;
+const TRAIN_LABEL_CANDIDATE_PROGRESS = [0.25, 0.4, 0.55] as const;
+const TRAIN_LABEL_OFFSET_X_CM = 0.32;
+const ENDPOINT_TIME_OFFSET_Y_CM = 0.16;
+const MIDNIGHT_MARKER_OFFSET_Y_CM = 0.2;
+const STATION_LABEL_RIGHT_PROTECTION_X_CM = 0.2;
 const SHANGHAI_TIME_FORMATTER = new Intl.DateTimeFormat('zh-CN', {
     timeZone: 'Asia/Shanghai',
     hour: '2-digit',
     minute: '2-digit',
     hour12: false
 });
+
+interface TextBox {
+    minX: number;
+    maxX: number;
+    minY: number;
+    maxY: number;
+}
+
+interface TextPlacement {
+    x: number;
+    y: number;
+    text: string;
+    anchor: TextAnchor;
+    box: TextBox;
+}
+
+interface TextMetrics {
+    widthCm: number;
+    heightCm: number;
+}
+
+interface StationAxisLayout {
+    chartBodyHeightCm: number;
+    projectedDistanceByTelecode: Map<string, number>;
+}
+
+interface EndpointTimePlacement extends TextPlacement {
+    occupiedBox: TextBox;
+}
+
+interface EndpointTimeCandidate {
+    text: string;
+    x: number;
+    y: number;
+    anchor: Extract<TextAnchor, 'north' | 'south'>;
+    direction: 'left' | 'right';
+}
+
+interface EndpointTimePlacementResult {
+    placements: EndpointTimePlacement[];
+    requiredChartWidthCm: number;
+    hadOverlapFallback: boolean;
+}
 
 function asRecord(value: unknown): Record<string, unknown> | null {
     if (typeof value !== 'object' || value === null || Array.isArray(value)) {
@@ -138,9 +214,24 @@ function roundUpToReferenceStep(value: number, reference: number, step: number) 
     return reference + Math.ceil((value - reference) / step) * step;
 }
 
-function buildImageUrl(baseUrl: string, documentId: string, pageNumber: number) {
+function buildImageUrl(
+    baseUrl: string,
+    documentId: string,
+    format: TrainCirculationImageFormat,
+    pageNumber: number
+) {
     const normalizedBaseUrl = baseUrl.replace(/\/+$/, '');
+    if (format === 'pdf') {
+        return `${normalizedBaseUrl}/${documentId}/pdf`;
+    }
+
     return `${normalizedBaseUrl}/${documentId}/png/${pageNumber}`;
+}
+
+function getBinaryContentType(
+    format: TrainCirculationImageFormat
+): 'image/png' | 'application/pdf' {
+    return format === 'pdf' ? 'application/pdf' : 'image/png';
 }
 
 function haversineDistanceKm(
@@ -168,12 +259,52 @@ function haversineDistanceKm(
     return earthRadiusKm * centralAngle;
 }
 
-function buildScheduleIndexes(items: ScheduleItem[]) {
-    const itemsByInternalCode = new Map<string, ScheduleItem[]>();
-    const itemsByTrainCode = new Map<string, ScheduleItem[]>();
+function buildMergedScheduleItemKey(item: ScheduleItem) {
+    return [
+        normalizeCode(item.internalCode),
+        item.startStation.trim(),
+        item.endStation.trim(),
+        item.startAt ?? '',
+        item.endAt ?? ''
+    ].join('|');
+}
+
+function mergeScheduleItems(items: ScheduleItem[]) {
+    const mergedItemsByKey = new Map<string, MergedScheduleItem>();
 
     for (const item of items) {
-        const internalCode = normalizeCode(item.internalCode);
+        const mergedItemKey = buildMergedScheduleItemKey(item);
+        const existingItem = mergedItemsByKey.get(mergedItemKey);
+
+        if (existingItem) {
+            existingItem.allCodes = uniqueNormalizedCodes([
+                ...existingItem.allCodes,
+                item.code,
+                ...item.allCodes
+            ]);
+            continue;
+        }
+
+        mergedItemsByKey.set(mergedItemKey, {
+            representativeItem: item,
+            internalCode: normalizeCode(item.internalCode),
+            allCodes: uniqueNormalizedCodes([item.code, ...item.allCodes]),
+            startStation: item.startStation.trim(),
+            endStation: item.endStation.trim(),
+            startAt: item.startAt,
+            endAt: item.endAt
+        });
+    }
+
+    return [...mergedItemsByKey.values()];
+}
+
+function buildScheduleIndexes(items: MergedScheduleItem[]) {
+    const itemsByInternalCode = new Map<string, MergedScheduleItem[]>();
+    const itemsByTrainCode = new Map<string, MergedScheduleItem[]>();
+
+    for (const item of items) {
+        const internalCode = item.internalCode;
         if (internalCode.length > 0) {
             const internalCodeItems =
                 itemsByInternalCode.get(internalCode) ?? [];
@@ -181,8 +312,7 @@ function buildScheduleIndexes(items: ScheduleItem[]) {
             itemsByInternalCode.set(internalCode, internalCodeItems);
         }
 
-        const allCodes = uniqueNormalizedCodes([item.code, ...item.allCodes]);
-        for (const code of allCodes) {
+        for (const code of item.allCodes) {
             const codeItems = itemsByTrainCode.get(code) ?? [];
             codeItems.push(item);
             itemsByTrainCode.set(code, codeItems);
@@ -196,30 +326,31 @@ function buildScheduleIndexes(items: ScheduleItem[]) {
 }
 
 function getScheduleTerminalStop(
-    item: ScheduleItem,
+    item: MergedScheduleItem,
     type: 'start' | 'end'
 ): ScheduleStop | null {
-    const stop = item.stops.find((currentStop) =>
+    const stops = item.representativeItem.stops;
+    const stop = stops.find((currentStop) =>
         type === 'start' ? currentStop.isStart : currentStop.isEnd
     );
     if (stop) {
         return stop;
     }
 
-    if (item.stops.length === 0) {
+    if (stops.length === 0) {
         return null;
     }
 
-    return type === 'start' ? item.stops[0]! : item.stops[item.stops.length - 1]!;
+    return type === 'start' ? stops[0]! : stops[stops.length - 1]!;
 }
 
 function scoreScheduleItemMatch(
-    item: ScheduleItem,
+    item: MergedScheduleItem,
     node: TrainCirculation['nodes'][number]
 ) {
     let score = 0;
     const normalizedInternalCode = normalizeCode(node.internalCode);
-    const normalizedItemInternalCode = normalizeCode(item.internalCode);
+    const normalizedItemInternalCode = item.internalCode;
 
     if (
         normalizedInternalCode.length > 0 &&
@@ -228,15 +359,15 @@ function scoreScheduleItemMatch(
         score += 8;
     }
 
-    const itemCodes = uniqueNormalizedCodes([item.code, ...item.allCodes]);
+    const itemCodes = item.allCodes;
     const nodeCodes = uniqueNormalizedCodes(node.allCodes);
     const overlapCount = nodeCodes.filter((code) => itemCodes.includes(code)).length;
     score += overlapCount * 4;
 
-    if (item.startStation.trim() === node.startStation.trim()) {
+    if (item.startStation === node.startStation.trim()) {
         score += 2;
     }
-    if (item.endStation.trim() === node.endStation.trim()) {
+    if (item.endStation === node.endStation.trim()) {
         score += 2;
     }
     if (item.startAt === node.startAt) {
@@ -250,7 +381,7 @@ function scoreScheduleItemMatch(
 }
 
 function resolveScheduleItemForNode(
-    items: ScheduleItem[],
+    items: MergedScheduleItem[],
     node: TrainCirculation['nodes'][number]
 ) {
     if (items.length === 0) {
@@ -286,10 +417,14 @@ function resolveScheduleItemForNode(
 function resolveCirculationNode(
     scheduleDate: string,
     stations: Record<string, ScheduleStationEntry>,
-    item: ScheduleItem,
+    item: MergedScheduleItem,
     node: TrainCirculation['nodes'][number],
     routeNodeIndex: number
 ): ResolvedCirculationNode {
+    const resolvedTrainCodes = uniqueNormalizedCodes([
+        ...node.allCodes,
+        ...item.allCodes
+    ]);
     const startStop = getScheduleTerminalStop(item, 'start');
     const endStop = getScheduleTerminalStop(item, 'end');
 
@@ -312,23 +447,16 @@ function resolveCirculationNode(
         );
     }
 
-    if (item.startAt === null || item.endAt === null) {
-        throw new ApiRequestError(
-            422,
-            'invalid_schedule_data',
-            `交路节点 ${node.allCodes[0] ?? node.internalCode} 缺少发到时间`
-        );
-    }
-
     return {
         routeNodeIndex,
-        trainCode: node.allCodes[0] ?? item.code,
+        trainCodes: resolvedTrainCodes,
+        trainCodeText: formatTrainCodeLabel(resolvedTrainCodes),
         start: {
             stationName: startStop.stationName.trim(),
             stationTelecode: normalizeCode(startStop.stationTelecode),
             timestamp: toUnixSecondsFromShanghaiDayOffset(
                 scheduleDate,
-                item.startAt
+                node.startAt
             ),
             station: startStation
         },
@@ -337,7 +465,7 @@ function resolveCirculationNode(
             stationTelecode: normalizeCode(endStop.stationTelecode),
             timestamp: toUnixSecondsFromShanghaiDayOffset(
                 scheduleDate,
-                item.endAt
+                node.endAt
             ),
             station: endStation
         }
@@ -350,12 +478,12 @@ function buildResolvedCirculationNodes(
     items: ScheduleItem[],
     stations: Record<string, ScheduleStationEntry>
 ) {
-    const indexes = buildScheduleIndexes(items);
+    const indexes = buildScheduleIndexes(mergeScheduleItems(items));
     const resolvedNodes: ResolvedCirculationNode[] = [];
 
     circulation.nodes.forEach((node, routeNodeIndex) => {
         const internalCode = normalizeCode(node.internalCode);
-        const candidateMap = new Map<ScheduleItem, ScheduleItem>();
+        const candidateMap = new Map<MergedScheduleItem, MergedScheduleItem>();
 
         if (internalCode.length > 0) {
             for (const item of indexes.itemsByInternalCode.get(internalCode) ?? []) {
@@ -434,6 +562,523 @@ function buildStationAxisPoints(nodes: ResolvedCirculationNode[]) {
     return sortedStations;
 }
 
+function getCommonPrefix(left: string, right: string) {
+    const maxLength = Math.min(left.length, right.length);
+    let index = 0;
+
+    while (index < maxLength && left[index] === right[index]) {
+        index += 1;
+    }
+
+    return left.slice(0, index);
+}
+
+function formatTrainCodeLabel(trainCodes: string[]) {
+    const normalizedCodes = uniqueNormalizedCodes(trainCodes);
+    if (normalizedCodes.length === 0) {
+        return '';
+    }
+
+    if (normalizedCodes.length === 1) {
+        return normalizedCodes[0]!;
+    }
+
+    if (normalizedCodes.length === 2) {
+        const [firstCode, secondCode] = normalizedCodes;
+        const commonPrefix = getCommonPrefix(firstCode!, secondCode!);
+        const secondSuffix = secondCode!.slice(commonPrefix.length);
+
+        if (commonPrefix.length > 0 && secondSuffix.length > 0) {
+            return `${firstCode!}/${secondSuffix}`;
+        }
+    }
+
+    return normalizedCodes.join('/');
+}
+
+function buildStationAxisLayout(
+    stationAxisPoints: StationAxisPoint[]
+): StationAxisLayout {
+    const maxStationDistanceKm =
+        stationAxisPoints[stationAxisPoints.length - 1]?.cumulativeDistanceKm ?? 0;
+    const baseChartBodyHeightCm =
+        Math.max(
+            8,
+            stationAxisPoints.length * 0.9,
+            maxStationDistanceKm / 180
+        ) * 2;
+    const baseYScale =
+        maxStationDistanceKm > 0 ? baseChartBodyHeightCm / maxStationDistanceKm : 0;
+    const projectedDistanceByTelecode = new Map<string, number>();
+    let projectedDistanceCm = 0;
+
+    stationAxisPoints.forEach((stationAxisPoint, index) => {
+        if (index > 0) {
+            const previousStationAxisPoint = stationAxisPoints[index - 1]!;
+            const rawGapKm =
+                stationAxisPoint.cumulativeDistanceKm -
+                previousStationAxisPoint.cumulativeDistanceKm;
+            const rawGapCm = rawGapKm * baseYScale;
+            projectedDistanceCm += Math.max(rawGapCm, MIN_STATION_GAP_CM);
+        }
+
+        projectedDistanceByTelecode.set(
+            stationAxisPoint.stationTelecode,
+            projectedDistanceCm
+        );
+    });
+
+    return {
+        chartBodyHeightCm: Math.max(baseChartBodyHeightCm, projectedDistanceCm),
+        projectedDistanceByTelecode
+    };
+}
+
+function getTextMetricsKindWidthCm(character: string, kind: TextMetricKind) {
+    if (character === ' ') {
+        return kind === 'time' || kind === 'marker' ? 0.08 : 0.1;
+    }
+
+    if (/[\u3400-\u9fff\uf900-\ufaff]/u.test(character)) {
+        switch (kind) {
+            case 'station':
+                return 0.34;
+            case 'train':
+                return 0.27;
+            case 'time':
+            case 'marker':
+                return 0.18;
+            default:
+                return 0.27;
+        }
+    }
+
+    if (/[A-Za-z0-9]/.test(character)) {
+        switch (kind) {
+            case 'station':
+                return 0.18;
+            case 'train':
+                return 0.15;
+            case 'time':
+            case 'marker':
+                return 0.14;
+            default:
+                return 0.15;
+        }
+    }
+
+    switch (kind) {
+        case 'station':
+            return 0.24;
+        case 'train':
+            return 0.1;
+        case 'time':
+        case 'marker':
+            return 0.1;
+        default:
+            return 0.1;
+    }
+}
+
+function getTextMetrics(text: string, kind: TextMetricKind): TextMetrics {
+    const baseHeightCm =
+        kind === 'station' ? 0.52 : kind === 'train' ? 0.44 : 0.34;
+    const paddingCm =
+        kind === 'station' ? 0.06 : kind === 'train' ? 0.08 : 0.04;
+    let textWidthCm = 0;
+
+    for (const character of text) {
+        textWidthCm += getTextMetricsKindWidthCm(character, kind);
+    }
+
+    return {
+        widthCm: textWidthCm + paddingCm * 2,
+        heightCm: baseHeightCm + paddingCm * 2
+    };
+}
+
+function createTextBox(
+    x: number,
+    y: number,
+    widthCm: number,
+    heightCm: number,
+    anchor: TextAnchor
+): TextBox {
+    const halfWidthCm = widthCm / 2;
+    const halfHeightCm = heightCm / 2;
+
+    switch (anchor) {
+        case 'east':
+            return {
+                minX: x - widthCm,
+                maxX: x,
+                minY: y - halfHeightCm,
+                maxY: y + halfHeightCm
+            };
+        case 'west':
+            return {
+                minX: x,
+                maxX: x + widthCm,
+                minY: y - halfHeightCm,
+                maxY: y + halfHeightCm
+            };
+        case 'north':
+            return {
+                minX: x - halfWidthCm,
+                maxX: x + halfWidthCm,
+                minY: y - heightCm,
+                maxY: y
+            };
+        case 'south':
+            return {
+                minX: x - halfWidthCm,
+                maxX: x + halfWidthCm,
+                minY: y,
+                maxY: y + heightCm
+            };
+        default:
+            return {
+                minX: x - halfWidthCm,
+                maxX: x + halfWidthCm,
+                minY: y - halfHeightCm,
+                maxY: y + halfHeightCm
+            };
+    }
+}
+
+function expandTextBox(box: TextBox, deltaXCm: number, deltaYCm: number): TextBox {
+    return {
+        minX: box.minX - deltaXCm,
+        maxX: box.maxX + deltaXCm,
+        minY: box.minY - deltaYCm,
+        maxY: box.maxY + deltaYCm
+    };
+}
+
+function doTextBoxesOverlap(left: TextBox, right: TextBox) {
+    return !(
+        left.maxX <= right.minX ||
+        left.minX >= right.maxX ||
+        left.maxY <= right.minY ||
+        left.minY >= right.maxY
+    );
+}
+
+function getTextBoxOverlapArea(left: TextBox, right: TextBox) {
+    if (!doTextBoxesOverlap(left, right)) {
+        return 0;
+    }
+
+    return (
+        (Math.min(left.maxX, right.maxX) - Math.max(left.minX, right.minX)) *
+        (Math.min(left.maxY, right.maxY) - Math.max(left.minY, right.minY))
+    );
+}
+
+function getTotalTextBoxOverlapArea(box: TextBox, occupiedBoxes: TextBox[]) {
+    return occupiedBoxes.reduce(
+        (totalOverlapArea, occupiedBox) =>
+            totalOverlapArea + getTextBoxOverlapArea(box, occupiedBox),
+        0
+    );
+}
+
+function createProtectedStationLabelBox(x: number, y: number, text: string) {
+    const stationMetrics = getTextMetrics(text, 'station');
+    const stationLabelBox = createTextBox(
+        x,
+        y,
+        stationMetrics.widthCm,
+        stationMetrics.heightCm,
+        'east'
+    );
+
+    return {
+        ...stationLabelBox,
+        maxX: Math.max(stationLabelBox.maxX, STATION_LABEL_RIGHT_PROTECTION_X_CM)
+    };
+}
+
+function createTextPlacement(
+    x: number,
+    y: number,
+    text: string,
+    anchor: TextAnchor,
+    kind: TextMetricKind
+): TextPlacement {
+    const textMetrics = getTextMetrics(text, kind);
+
+    return {
+        x,
+        y,
+        text,
+        anchor,
+        box: createTextBox(
+            x,
+            y,
+            textMetrics.widthCm,
+            textMetrics.heightCm,
+            anchor
+        )
+    };
+}
+
+function buildMidnightMarkerPlacements(input: {
+    axisStartTimestamp: number;
+    axisEndTimestamp: number;
+    firstGridReferenceTimestamp: number;
+    chartBodyHeightCm: number;
+    projectTime: (timestamp: number) => number;
+}): TextPlacement[] {
+    const placements: TextPlacement[] = [];
+    let midnightMarkerIndex = 1;
+
+    for (
+        let timestamp = input.axisStartTimestamp;
+        timestamp <= input.axisEndTimestamp;
+        timestamp += 6 * 60 * 60
+    ) {
+        const isMidnightGridLine =
+            (timestamp - input.firstGridReferenceTimestamp) % (24 * 60 * 60) ===
+            0;
+
+        if (!isMidnightGridLine) {
+            continue;
+        }
+
+        placements.push(
+            createTextPlacement(
+                input.projectTime(timestamp),
+                input.chartBodyHeightCm + MIDNIGHT_MARKER_OFFSET_Y_CM,
+                String(midnightMarkerIndex),
+                'south',
+                'marker'
+            )
+        );
+        midnightMarkerIndex += 1;
+    }
+
+    return placements;
+}
+
+function buildEndpointTimeCandidates(
+    nodes: ResolvedCirculationNode[],
+    stationYByTelecode: Map<string, number>,
+    projectTime: (timestamp: number) => number
+): EndpointTimeCandidate[] {
+    return nodes.flatMap((node) => {
+        const xStart = projectTime(node.start.timestamp);
+        const xEnd = projectTime(node.end.timestamp);
+        const yStart = stationYByTelecode.get(node.start.stationTelecode) ?? 0;
+        const yEnd = stationYByTelecode.get(node.end.stationTelecode) ?? 0;
+        const startTimeAboveLine = yEnd < yStart;
+        const endTimeAboveLine = yEnd >= yStart;
+
+        return [
+            {
+                text: formatShanghaiTimeLabel(node.start.timestamp),
+                x: xStart,
+                y:
+                    yStart +
+                    (startTimeAboveLine
+                        ? ENDPOINT_TIME_OFFSET_Y_CM
+                        : -ENDPOINT_TIME_OFFSET_Y_CM),
+                anchor: startTimeAboveLine ? 'south' : 'north',
+                direction: 'right'
+            },
+            {
+                text: formatShanghaiTimeLabel(node.end.timestamp),
+                x: xEnd,
+                y:
+                    yEnd +
+                    (endTimeAboveLine
+                        ? ENDPOINT_TIME_OFFSET_Y_CM
+                        : -ENDPOINT_TIME_OFFSET_Y_CM),
+                anchor: endTimeAboveLine ? 'south' : 'north',
+                direction: 'left'
+            }
+        ];
+    });
+}
+
+function placeEndpointTimeLabels(
+    candidates: EndpointTimeCandidate[],
+    occupiedBoxes: TextBox[]
+): EndpointTimePlacementResult {
+    const placedLabels: EndpointTimePlacement[] = [];
+    const sortedCandidates = [...candidates].sort((left, right) => {
+        if (left.anchor !== right.anchor) {
+            return left.anchor === 'south' ? -1 : 1;
+        }
+        if (left.anchor === 'south' && left.y !== right.y) {
+            return right.y - left.y;
+        }
+        if (left.anchor === 'north' && left.y !== right.y) {
+            return left.y - right.y;
+        }
+        return left.x - right.x;
+    });
+    let hadOverlapFallback = false;
+    let requiredChartWidthCm = 0;
+
+    for (const candidate of sortedCandidates) {
+        let selectedPlacement: EndpointTimePlacement | null = null;
+        let fallbackPlacement: EndpointTimePlacement | null = null;
+        let fallbackOverlapArea = Number.POSITIVE_INFINITY;
+        let usedFallbackPlacement = false;
+        const textMetrics = getTextMetrics(candidate.text, 'time');
+        const halfWidthCm = textMetrics.widthCm / 2;
+
+        for (let step = 0; step <= ENDPOINT_TIME_MAX_HORIZONTAL_STEPS; step += 1) {
+            const candidateX =
+                candidate.direction === 'right'
+                    ? candidate.x +
+                      ENDPOINT_TIME_MIN_X_GAP_CM +
+                      halfWidthCm +
+                      step * ENDPOINT_TIME_HORIZONTAL_STEP_CM
+                    : candidate.x -
+                      ENDPOINT_TIME_MIN_X_GAP_CM -
+                      halfWidthCm -
+                      step * ENDPOINT_TIME_HORIZONTAL_STEP_CM;
+            const candidatePlacement = createTextPlacement(
+                candidateX,
+                candidate.y,
+                candidate.text,
+                candidate.anchor,
+                'time'
+            );
+            const occupiedBox = expandTextBox(
+                candidatePlacement.box,
+                ENDPOINT_TIME_MIN_X_GAP_CM / 2,
+                0
+            );
+            const overlapArea = getTotalTextBoxOverlapArea(
+                occupiedBox,
+                occupiedBoxes
+            );
+
+            if (overlapArea === 0) {
+                selectedPlacement = {
+                    ...candidatePlacement,
+                    occupiedBox
+                };
+                break;
+            }
+
+            if (overlapArea < fallbackOverlapArea) {
+                fallbackOverlapArea = overlapArea;
+                fallbackPlacement = {
+                    ...candidatePlacement,
+                    occupiedBox
+                };
+            }
+        }
+
+        if (!selectedPlacement) {
+            selectedPlacement = fallbackPlacement;
+            usedFallbackPlacement = selectedPlacement !== null;
+        }
+        if (!selectedPlacement) {
+            continue;
+        }
+
+        if (usedFallbackPlacement && fallbackOverlapArea > 0) {
+            hadOverlapFallback = true;
+        }
+
+        occupiedBoxes.push(selectedPlacement.occupiedBox);
+        placedLabels.push(selectedPlacement);
+        requiredChartWidthCm = Math.max(
+            requiredChartWidthCm,
+            selectedPlacement.occupiedBox.maxX + ENDPOINT_TIME_RIGHT_PADDING_CM
+        );
+    }
+
+    return {
+        placements: placedLabels,
+        requiredChartWidthCm,
+        hadOverlapFallback
+    };
+}
+
+function placeTrainLabels(
+    nodes: ResolvedCirculationNode[],
+    chartWidthCm: number,
+    stationYByTelecode: Map<string, number>,
+    projectTime: (timestamp: number) => number,
+    occupiedBoxes: TextBox[]
+) {
+    const placedLabels: TextPlacement[] = [];
+
+    for (const node of nodes) {
+        const xStart = projectTime(node.start.timestamp);
+        const xEnd = projectTime(node.end.timestamp);
+        const yStart = stationYByTelecode.get(node.start.stationTelecode) ?? 0;
+        const yEnd = stationYByTelecode.get(node.end.stationTelecode) ?? 0;
+        const labelText = `${node.trainCodeText}  ${node.start.stationName} → ${node.end.stationName}`;
+        const defaultDirection = yEnd > yStart ? 1 : -1;
+        let selectedPlacement: TextPlacement | null = null;
+        let fallbackPlacement: TextPlacement | null = null;
+        let fallbackScore = Number.POSITIVE_INFINITY;
+
+        for (const progress of TRAIN_LABEL_CANDIDATE_PROGRESS) {
+            for (const direction of [defaultDirection, -defaultDirection]) {
+                const baseX = xStart + (xEnd - xStart) * progress;
+                const baseY = yStart + (yEnd - yStart) * progress;
+                const placement = createTextPlacement(
+                    baseX + direction * TRAIN_LABEL_OFFSET_X_CM,
+                    baseY,
+                    labelText,
+                    direction > 0 ? 'west' : 'east',
+                    'train'
+                );
+                const boundaryViolationCm =
+                    Math.max(
+                        0,
+                        TRAIN_LABEL_SAFE_MIN_X_CM - placement.box.minX
+                    ) +
+                    Math.max(
+                        0,
+                        placement.box.maxX -
+                            (chartWidthCm - TRAIN_LABEL_SAFE_MAX_X_PADDING_CM)
+                    );
+                const overlapArea = getTotalTextBoxOverlapArea(
+                    placement.box,
+                    occupiedBoxes
+                );
+                const score = overlapArea + boundaryViolationCm * 1000;
+
+                if (
+                    boundaryViolationCm === 0 &&
+                    overlapArea === 0
+                ) {
+                    selectedPlacement = placement;
+                    break;
+                }
+
+                if (score < fallbackScore) {
+                    fallbackScore = score;
+                    fallbackPlacement = placement;
+                }
+            }
+
+            if (selectedPlacement) {
+                break;
+            }
+        }
+
+        const finalPlacement = selectedPlacement ?? fallbackPlacement;
+        if (!finalPlacement) {
+            continue;
+        }
+
+        occupiedBoxes.push(finalPlacement.box);
+        placedLabels.push(finalPlacement);
+    }
+
+    return placedLabels;
+}
+
 function buildLatexSource(
     _requestTrainCode: string,
     nodes: ResolvedCirculationNode[],
@@ -442,20 +1087,16 @@ function buildLatexSource(
 ) {
     const template = fs.readFileSync(TEMPLATE_PATH, 'utf8');
     const stationYByTelecode = new Map<string, number>();
-    const maxStationDistanceKm =
-        stationAxisPoints[stationAxisPoints.length - 1]?.cumulativeDistanceKm ?? 0;
-    const chartHeightCm = Math.max(
-        8,
-        stationAxisPoints.length * 0.9,
-        maxStationDistanceKm / 180
-    ) * 2;
-    const yScale =
-        maxStationDistanceKm > 0 ? chartHeightCm / maxStationDistanceKm : 1;
+    const { chartBodyHeightCm, projectedDistanceByTelecode } =
+        buildStationAxisLayout(stationAxisPoints);
 
     for (const stationAxisPoint of stationAxisPoints) {
         stationYByTelecode.set(
             stationAxisPoint.stationTelecode,
-            chartHeightCm - stationAxisPoint.cumulativeDistanceKm * yScale
+            chartBodyHeightCm -
+                (projectedDistanceByTelecode.get(
+                    stationAxisPoint.stationTelecode
+                ) ?? 0)
         );
     }
 
@@ -482,74 +1123,187 @@ function buildLatexSource(
         timeGridStepSeconds,
         axisEndTimestamp - axisStartTimestamp
     );
-    const chartWidthCm = Math.max(18, axisRangeSeconds / 3600 / 1.2);
+    let chartWidthCm = Math.max(18, axisRangeSeconds / 3600 / 1.2);
 
     const projectTime = (timestamp: number) =>
         ((timestamp - axisStartTimestamp) / axisRangeSeconds) * chartWidthCm;
 
     const contentLines: string[] = [];
     const leftLabelX = -0.4;
-    const trainLabelOffsetX = 0.32;
-    const endpointTimeOffsetX = 0.32;
-    const endpointTimeOffsetY = 0.16;
-    let midnightMarkerIndex = 1;
     const largeCjkFont = '\\fontsize{13.5}{16.5}\\selectfont';
     const trainLabelFont = '\\fontsize{10.8}{13.2}\\selectfont';
     const largeTimeFont = '\\fontsize{10.8}{13.5}\\selectfont';
     const footerFont = '\\fontsize{8.1}{10.1}\\selectfont';
+    const stationLabelPlacements = stationAxisPoints.map((stationAxisPoint) => {
+        const y = stationYByTelecode.get(stationAxisPoint.stationTelecode) ?? 0;
+        const placement = createTextPlacement(
+            leftLabelX,
+            y,
+            stationAxisPoint.stationName,
+            'east',
+            'station'
+        );
+
+        return placement;
+    });
+    const stationLabelOccupiedBoxes = stationLabelPlacements.map((placement) =>
+        createProtectedStationLabelBox(leftLabelX, placement.y, placement.text)
+    );
+    let finalProjectTime = projectTime;
+    let midnightMarkerPlacements: TextPlacement[] = [];
+    let endpointTimePlacements: EndpointTimePlacement[] = [];
+    let occupiedBoxes: TextBox[] = [];
+
+    for (
+        let iteration = 0;
+        iteration < ENDPOINT_TIME_LAYOUT_MAX_ITERATIONS;
+        iteration += 1
+    ) {
+        const iterationProjectTime = (timestamp: number) =>
+            ((timestamp - axisStartTimestamp) / axisRangeSeconds) * chartWidthCm;
+        const iterationOccupiedBoxes = [...stationLabelOccupiedBoxes];
+        const iterationMidnightMarkerPlacements = buildMidnightMarkerPlacements({
+            axisStartTimestamp,
+            axisEndTimestamp,
+            firstGridReferenceTimestamp,
+            chartBodyHeightCm,
+            projectTime: iterationProjectTime
+        });
+        for (const placement of iterationMidnightMarkerPlacements) {
+            iterationOccupiedBoxes.push(placement.box);
+        }
+
+        const endpointTimePlacementResult = placeEndpointTimeLabels(
+            buildEndpointTimeCandidates(
+                nodes,
+                stationYByTelecode,
+                iterationProjectTime
+            ),
+            iterationOccupiedBoxes
+        );
+        const nextChartWidthCm = Math.max(
+            chartWidthCm,
+            endpointTimePlacementResult.requiredChartWidthCm
+        );
+
+        if (nextChartWidthCm > chartWidthCm + 1e-6) {
+            chartWidthCm = nextChartWidthCm;
+            continue;
+        }
+
+        if (
+            endpointTimePlacementResult.hadOverlapFallback &&
+            iteration < ENDPOINT_TIME_LAYOUT_MAX_ITERATIONS - 1
+        ) {
+            chartWidthCm += ENDPOINT_TIME_RELAYOUT_GROWTH_CM;
+            continue;
+        }
+
+        finalProjectTime = iterationProjectTime;
+        midnightMarkerPlacements = iterationMidnightMarkerPlacements;
+        endpointTimePlacements = endpointTimePlacementResult.placements;
+        occupiedBoxes = [
+            ...iterationOccupiedBoxes,
+            ...endpointTimePlacements.map((placement) => placement.occupiedBox)
+        ];
+        break;
+    }
+
+    if (endpointTimePlacements.length === 0 && nodes.length > 0) {
+        finalProjectTime = (timestamp: number) =>
+            ((timestamp - axisStartTimestamp) / axisRangeSeconds) * chartWidthCm;
+        midnightMarkerPlacements = buildMidnightMarkerPlacements({
+            axisStartTimestamp,
+            axisEndTimestamp,
+            firstGridReferenceTimestamp,
+            chartBodyHeightCm,
+            projectTime: finalProjectTime
+        });
+        occupiedBoxes = [
+            ...stationLabelOccupiedBoxes,
+            ...midnightMarkerPlacements.map((placement) => placement.box)
+        ];
+        endpointTimePlacements = placeEndpointTimeLabels(
+            buildEndpointTimeCandidates(
+                nodes,
+                stationYByTelecode,
+                finalProjectTime
+            ),
+            occupiedBoxes
+        ).placements;
+        occupiedBoxes.push(
+            ...endpointTimePlacements.map((placement) => placement.occupiedBox)
+        );
+    }
+
+    const trainLabelPlacements = placeTrainLabels(
+        nodes,
+        chartWidthCm,
+        stationYByTelecode,
+        finalProjectTime,
+        occupiedBoxes
+    );
+    const allTextBoxes = [
+        ...stationLabelPlacements.map((placement) => placement.box),
+        ...midnightMarkerPlacements.map((placement) => placement.box),
+        ...endpointTimePlacements.map((placement) => placement.box),
+        ...trainLabelPlacements.map((placement) => placement.box)
+    ];
+    const minTextY = allTextBoxes.reduce(
+        (currentMinY, box) => Math.min(currentMinY, box.minY),
+        0
+    );
+    const maxTextY = allTextBoxes.reduce(
+        (currentMaxY, box) => Math.max(currentMaxY, box.maxY),
+        chartBodyHeightCm
+    );
+    const shiftYCm = Math.max(0, PLOT_BOTTOM_PADDING_CM - minTextY);
+    const chartBottomY = shiftYCm;
+    const chartTopY = shiftYCm + chartBodyHeightCm;
+    const chartHeightCm = shiftYCm + maxTextY + PLOT_TOP_PADDING_CM;
 
     for (
         let timestamp = axisStartTimestamp;
         timestamp <= axisEndTimestamp;
         timestamp += timeGridStepSeconds
     ) {
-        const x = projectTime(timestamp);
+        const x = finalProjectTime(timestamp);
         const isMidnightGridLine =
             (timestamp - firstGridReferenceTimestamp) % (24 * 60 * 60) === 0;
         contentLines.push(
-            `\\draw[line width=${isMidnightGridLine ? '0.04' : '0.01'}cm, ${isMidnightGridLine ? 'black' : 'gray!15'}] (${formatCoordinate(x)}, ${formatCoordinate(0)}) -- (${formatCoordinate(x)}, ${formatCoordinate(chartHeightCm)});`
+            `\\draw[line width=${isMidnightGridLine ? '0.04' : '0.01'}cm, ${isMidnightGridLine ? 'black' : 'gray!15'}] (${formatCoordinate(x)}, ${formatCoordinate(chartBottomY)}) -- (${formatCoordinate(x)}, ${formatCoordinate(chartTopY)});`
         );
+    }
 
-        if (isMidnightGridLine) {
-            contentLines.push(
-                `\\node[anchor=south,font=${largeTimeFont},text=black] at (${formatCoordinate(x)}, ${formatCoordinate(chartHeightCm + 0.2)}) ${quoteTikzText(String(midnightMarkerIndex))};`
-            );
-            midnightMarkerIndex += 1;
-        }
+    for (const placement of midnightMarkerPlacements) {
+        contentLines.push(
+            `\\node[anchor=${placement.anchor},font=${largeTimeFont},text=black] at (${formatCoordinate(placement.x)}, ${formatCoordinate(placement.y + shiftYCm)}) ${quoteTikzText(placement.text)};`
+        );
     }
 
     for (const stationAxisPoint of stationAxisPoints) {
-        const y = stationYByTelecode.get(stationAxisPoint.stationTelecode) ?? 0;
+        const y =
+            (stationYByTelecode.get(stationAxisPoint.stationTelecode) ?? 0) +
+            shiftYCm;
         contentLines.push(
             `\\draw[line width=0.02cm, black] (${formatCoordinate(0)}, ${formatCoordinate(y)}) -- (${formatCoordinate(chartWidthCm)}, ${formatCoordinate(y)});`
         );
+    }
+
+    for (const placement of stationLabelPlacements) {
         contentLines.push(
-            `\\node[anchor=east,font=${largeCjkFont},align=right] at (${formatCoordinate(leftLabelX)}, ${formatCoordinate(y)}) ${quoteTikzText(stationAxisPoint.stationName)};`
+            `\\node[anchor=east,font=${largeCjkFont},align=right] at (${formatCoordinate(placement.x)}, ${formatCoordinate(placement.y + shiftYCm)}) ${quoteTikzText(placement.text)};`
         );
     }
 
     nodes.forEach((node, index) => {
-        const xStart = projectTime(node.start.timestamp);
-        const xEnd = projectTime(node.end.timestamp);
-        const yStart = stationYByTelecode.get(node.start.stationTelecode) ?? 0;
-        const yEnd = stationYByTelecode.get(node.end.stationTelecode) ?? 0;
-        const labelProgress = 0.25;
-        const labelOnRight = yEnd > yStart;
-        const labelX =
-            xStart +
-            (xEnd - xStart) * labelProgress +
-            (labelOnRight ? trainLabelOffsetX : -trainLabelOffsetX);
-        const labelY = yStart + (yEnd - yStart) * labelProgress;
-        const labelText = `${node.trainCode}  ${node.start.stationName} → ${node.end.stationName}`;
+        const xStart = finalProjectTime(node.start.timestamp);
+        const xEnd = finalProjectTime(node.end.timestamp);
+        const yStart =
+            (stationYByTelecode.get(node.start.stationTelecode) ?? 0) + shiftYCm;
+        const yEnd =
+            (stationYByTelecode.get(node.end.stationTelecode) ?? 0) + shiftYCm;
         const drawColor = index % 2 === 0 ? 'blue!70!black' : 'teal!70!black';
-        const startTimeAboveLine = yEnd < yStart;
-        const endTimeAboveLine = yEnd >= yStart;
-        const startTimeY =
-            yStart + (startTimeAboveLine ? endpointTimeOffsetY : -endpointTimeOffsetY);
-        const endTimeY =
-            yEnd + (endTimeAboveLine ? endpointTimeOffsetY : -endpointTimeOffsetY);
-        const startTimeAnchor = startTimeAboveLine ? 'south' : 'north';
-        const endTimeAnchor = endTimeAboveLine ? 'south' : 'north';
 
         contentLines.push(
             `\\draw[line width=0.08cm, ${drawColor}] (${formatCoordinate(xStart)}, ${formatCoordinate(yStart)}) -- (${formatCoordinate(xEnd)}, ${formatCoordinate(yEnd)});`
@@ -560,16 +1314,19 @@ function buildLatexSource(
         contentLines.push(
             `\\fill[${drawColor}] (${formatCoordinate(xEnd)}, ${formatCoordinate(yEnd)}) circle[radius=0.06cm];`
         );
-        contentLines.push(
-            `\\node[fill=white,inner sep=2pt,font=${trainLabelFont},anchor=${labelOnRight ? 'west' : 'east'}] at (${formatCoordinate(labelX)}, ${formatCoordinate(labelY)}) ${quoteTikzText(labelText)};`
-        );
-        contentLines.push(
-            `\\node[fill=white,inner sep=1.1pt,font=${largeTimeFont},anchor=${startTimeAnchor}] at (${formatCoordinate(xStart + endpointTimeOffsetX)}, ${formatCoordinate(startTimeY)}) ${quoteTikzText(formatShanghaiTimeLabel(node.start.timestamp))};`
-        );
-        contentLines.push(
-            `\\node[fill=white,inner sep=1.1pt,font=${largeTimeFont},anchor=${endTimeAnchor}] at (${formatCoordinate(xEnd - endpointTimeOffsetX)}, ${formatCoordinate(endTimeY)}) ${quoteTikzText(formatShanghaiTimeLabel(node.end.timestamp))};`
-        );
     });
+
+    for (const placement of endpointTimePlacements) {
+        contentLines.push(
+            `\\node[fill=white,inner sep=1.1pt,font=${largeTimeFont},anchor=${placement.anchor}] at (${formatCoordinate(placement.x)}, ${formatCoordinate(placement.y + shiftYCm)}) ${quoteTikzText(placement.text)};`
+        );
+    }
+
+    for (const placement of trainLabelPlacements) {
+        contentLines.push(
+            `\\node[fill=white,inner sep=2pt,font=${trainLabelFont},anchor=${placement.anchor}] at (${formatCoordinate(placement.x)}, ${formatCoordinate(placement.y + shiftYCm)}) ${quoteTikzText(placement.text)};`
+        );
+    }
 
     contentLines.push(
         `\\node[anchor=south east,font=${footerFont},text=black,align=right] at (${formatCoordinate(chartWidthCm)}, ${formatCoordinate(0)}) ${quoteTikzText('算法生成，仅供参考 | Open CRH Tracker')};`
@@ -675,7 +1432,10 @@ async function compileLatexDocument(latexSource: string) {
     return parseLatexCompileEnvelope((await response.json()) as unknown);
 }
 
-async function fetchPngImageContent(imageUrl: string) {
+async function fetchBinaryContent(
+    imageUrl: string,
+    format: TrainCirculationImageFormat
+) {
     const response = await fetchWithTimeout(
         imageUrl,
         {
@@ -688,7 +1448,7 @@ async function fetchPngImageContent(imageUrl: string) {
         throw new ApiRequestError(
             502,
             'upstream_unavailable',
-            '运行图图片暂时不可用'
+            format === 'pdf' ? '运行图 PDF 暂时不可用' : '运行图图片暂时不可用'
         );
     }
 
@@ -731,7 +1491,8 @@ function resolvePublishedScheduleState() {
 
 export async function renderTrainCirculationImage(
     requestTrainCode: string,
-    binaryRequested: boolean
+    binaryRequested: boolean,
+    format: TrainCirculationImageFormat
 ): Promise<TrainCirculationImageRenderResult> {
     const { timetable, circulation } = resolveCurrentCirculation(requestTrainCode);
     const publishedScheduleState = resolvePublishedScheduleState();
@@ -752,10 +1513,11 @@ export async function renderTrainCirculationImage(
     const imageUrl = buildImageUrl(
         useConfig().services.simpleLatexContainer.baseUrl,
         compileResult.id,
+        format,
         1
     );
-    const pngContent = binaryRequested
-        ? await fetchPngImageContent(imageUrl)
+    const binaryContent = binaryRequested
+        ? await fetchBinaryContent(imageUrl, format)
         : null;
 
     return {
@@ -763,7 +1525,8 @@ export async function renderTrainCirculationImage(
         trainCode: timetable.trainCode,
         documentId: compileResult.id,
         imageUrl,
-        pngContent
+        binaryContent,
+        binaryContentType: getBinaryContentType(format)
     };
 }
 
