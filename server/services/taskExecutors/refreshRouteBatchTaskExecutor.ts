@@ -243,7 +243,7 @@ async function executeRefreshRouteBatchTaskInternal(rawArgs: unknown) {
         );
         stationUpdates = {
             ...stationUpdates,
-            ...toScheduleStationMap(routeResult.data.route.stops)
+            ...(await toScheduleStationMap(routeResult.data.route.stops))
         };
         let groupChanged = false;
         for (const index of groupItemIndexes) {

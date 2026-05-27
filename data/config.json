@@ -80,6 +80,14 @@
                     "refreshAt": "0000"
                 }
             },
+            "stationCoord": {
+                "file": "data/stationCoord.jsonl",
+                "provider": "https://storage.lihugang.top/open_crh_tracker/initialized_data/stationCoord.jsonl",
+                "refresh": {
+                    "enabled": true,
+                    "refreshAt": "0000"
+                }
+            },
             "schedule": {
                 "file": "data/schedule.json",
                 "provider": "https://storage.lihugang.top/open_crh_tracker/initialized_data/schedule.json"

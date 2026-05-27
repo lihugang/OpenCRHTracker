@@ -180,6 +180,7 @@ export type AdminConfigFileTarget =
     | 'config'
     | 'EMUList'
     | 'QRCode'
+    | 'stationCoord'
     | 'qrcodeDetection';
 
 export type AdminConfigFileAction = 'reload_local' | 'refresh_remote';

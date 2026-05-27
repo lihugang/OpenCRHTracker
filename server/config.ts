@@ -171,6 +171,7 @@ export interface Config {
         assets: {
             EMUList: RefreshableAssetConfig;
             QRCode: RefreshableAssetConfig;
+            stationCoord: RefreshableAssetConfig;
             qrcodeDetection: RefreshableAssetConfig;
             schedule: AssetConfig;
         };
@@ -1032,6 +1033,10 @@ function validateConfig(raw: unknown): Config {
                     assets.QRCode,
                     'data.assets.QRCode'
                 ),
+                stationCoord: parseRefreshableAssetConfig(
+                    assets.stationCoord,
+                    'data.assets.stationCoord'
+                ),
                 qrcodeDetection: parseRefreshableAssetConfig(
                     assets.qrcodeDetection,
                     'data.assets.qrcodeDetection'
@@ -1795,7 +1800,9 @@ function validateConfig(raw: unknown): Config {
         configResult.task.circulation.stationBoard.maxAttempts >= 1,
         'task.circulation.stationBoard.maxAttempts must be >= 1'
     );
-    for (const key of ['EMUList', 'QRCode', 'qrcodeDetection'] as const) {
+    for (
+        const key of ['EMUList', 'QRCode', 'stationCoord', 'qrcodeDetection'] as const
+    ) {
         const asset = configResult.data.assets[key];
         try {
             parseDailyTimeHHmm(asset.refresh.refreshAt);

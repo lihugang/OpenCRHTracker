@@ -11,6 +11,7 @@ import {
     formatQrcodeDetectionMissingMappingsWarning,
     reloadQrcodeDetectionConfig
 } from '~/server/services/qrcodeDetectionConfigStore';
+import { loadStationCoordAssets } from '~/server/services/stationCoordStore';
 import { startTaskScheduler } from '~/server/services/taskScheduler';
 import {
     removePendingTasksByExecutor,
@@ -192,6 +193,7 @@ export default defineNitroPlugin(async () => {
         ensureTrainProvenanceDatabaseSchema();
         cleanupExpiredTrainProvenance();
         await loadProbeAssets();
+        await loadStationCoordAssets();
         const qrcodeDetectionConfigResult = await reloadQrcodeDetectionConfig();
         const qrcodeDetectionWarning =
             formatQrcodeDetectionMissingMappingsWarning(

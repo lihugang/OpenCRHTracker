@@ -11,6 +11,11 @@ import {
     reloadQrcodeDetectionConfig,
     validateQrcodeDetectionConfigText
 } from '~/server/services/qrcodeDetectionConfigStore';
+import {
+    invalidateStationCoordAssetsCache,
+    preloadStationCoordAssetsFromLocalFile,
+    validateDownloadedStationCoordAssetText
+} from '~/server/services/stationCoordStore';
 import { registerTaskExecutor } from '~/server/services/taskExecutorRegistry';
 import { synchronizeQrcodeDetectionDispatchTasks } from '~/server/services/taskExecutors/dispatchQrcodeDetectionTasksExecutor';
 import { enqueueTask } from '~/server/services/taskQueue';
@@ -23,7 +28,11 @@ import {
     type AssetKey
 } from '~/server/utils/dataAssets/store';
 
-type RefreshableAssetKey = 'EMUList' | 'QRCode' | 'qrcodeDetection';
+type RefreshableAssetKey =
+    | 'EMUList'
+    | 'QRCode'
+    | 'stationCoord'
+    | 'qrcodeDetection';
 
 interface RefreshAssetTaskDefinition {
     key: RefreshableAssetKey;
@@ -33,6 +42,8 @@ interface RefreshAssetTaskDefinition {
 
 export const REFRESH_EMU_LIST_ASSET_TASK_EXECUTOR = 'refresh_emu_list_asset';
 export const REFRESH_QR_CODE_ASSET_TASK_EXECUTOR = 'refresh_qrcode_asset';
+export const REFRESH_STATION_COORD_ASSET_TASK_EXECUTOR =
+    'refresh_station_coord_asset';
 export const REFRESH_QRCODE_DETECTION_ASSET_TASK_EXECUTOR =
     'refresh_qrcode_detection_asset';
 
@@ -47,6 +58,11 @@ export const REFRESH_ASSET_TASK_DEFINITIONS: readonly RefreshAssetTaskDefinition
             key: 'QRCode',
             executor: REFRESH_QR_CODE_ASSET_TASK_EXECUTOR,
             logger: getLogger('task-executor:refresh-asset:QRCode')
+        },
+        {
+            key: 'stationCoord',
+            executor: REFRESH_STATION_COORD_ASSET_TASK_EXECUTOR,
+            logger: getLogger('task-executor:refresh-asset:stationCoord')
         },
         {
             key: 'qrcodeDetection',
@@ -83,6 +99,11 @@ async function reloadQrcodeDetectionAssetOnly(): Promise<void> {
     await synchronizeQrcodeDetectionDispatchTasks();
 }
 
+function reloadStationCoordAssetOnly(): void {
+    invalidateStationCoordAssetsCache();
+    preloadStationCoordAssetsFromLocalFile();
+}
+
 function enqueueNextRefreshTask(
     definition: RefreshAssetTaskDefinition
 ): number {
@@ -111,6 +132,8 @@ async function executeRefreshAssetTask(
                         ? validateDownloadedEmuListAssetText
                         : definition.key === 'QRCode'
                           ? validateDownloadedQrCodeAssetText
+                          : definition.key === 'stationCoord'
+                            ? validateDownloadedStationCoordAssetText
                           : async (content) => {
                                 await validateQrcodeDetectionConfigText(
                                     content
@@ -121,6 +144,8 @@ async function executeRefreshAssetTask(
         if (result.refreshed) {
             if (definition.key === 'qrcodeDetection') {
                 await reloadQrcodeDetectionAssetOnly();
+            } else if (definition.key === 'stationCoord') {
+                reloadStationCoordAssetOnly();
             } else {
                 await reloadQrcodeDependenciesAfterProbeAssetChange();
             }

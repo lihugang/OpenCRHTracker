@@ -19,6 +19,11 @@ import {
     reloadQrcodeDetectionConfig,
     validateQrcodeDetectionConfigText
 } from '~/server/services/qrcodeDetectionConfigStore';
+import {
+    invalidateStationCoordAssetsCache,
+    preloadStationCoordAssetsFromLocalFile,
+    validateDownloadedStationCoordAssetText
+} from '~/server/services/stationCoordStore';
 import { synchronizeQrcodeDetectionDispatchTasks } from '~/server/services/taskExecutors/dispatchQrcodeDetectionTasksExecutor';
 import ensure from '~/server/utils/api/executor/ensure';
 import {
@@ -40,7 +45,7 @@ const logger = getLogger('admin-config-file-store');
 
 type AssetTarget = Extract<
     AdminConfigFileTarget,
-    'EMUList' | 'QRCode' | 'qrcodeDetection'
+    'EMUList' | 'QRCode' | 'stationCoord' | 'qrcodeDetection'
 >;
 
 function toTimestampSeconds(value: number): number {
@@ -126,11 +131,18 @@ function buildConfigFileItem(
 
     return {
         target,
-        title: target === 'EMUList' ? '动车组配属清单' : '畅行码映射',
+        title:
+            target === 'EMUList'
+                ? '动车组配属清单'
+                : target === 'QRCode'
+                  ? '畅行码映射'
+                  : '车站坐标文件',
         description:
             target === 'EMUList'
                 ? '重载或刷新探测流程与管理流程使用的动车组配属清单。'
-                : '重载或刷新席位码识别使用的畅行码映射数据。',
+                : target === 'QRCode'
+                  ? '重载或刷新席位码识别使用的畅行码映射数据。'
+                  : '重载或刷新线路时刻表下载使用的外部车站坐标回退文件。',
         filePath,
         provider: assetConfig.provider ?? null,
         exists: status.exists,
@@ -141,6 +153,7 @@ function buildConfigFileItem(
 
 function resetSafeRuntimeCaches(): void {
     invalidateProbeAssetsCache();
+    invalidateStationCoordAssetsCache();
     invalidateLookupIndexCache();
 }
 
@@ -151,6 +164,11 @@ async function reloadQrcodeDetectionAfterAssetChange(): Promise<string> {
     return formatQrcodeDetectionMissingMappingsWarning(
         result.missingQrcodeMappings
     );
+}
+
+function reloadStationCoordAssetFromLocal(): void {
+    invalidateStationCoordAssetsCache();
+    preloadStationCoordAssetsFromLocalFile();
 }
 
 function assertActionSupported(
@@ -231,14 +249,21 @@ async function reloadAssetFromLocal(
 
     if (target === 'EMUList') {
         validateDownloadedEmuListAssetText(text);
-    } else {
+    } else if (target === 'QRCode') {
         validateDownloadedQrCodeAssetText(text);
+    } else {
+        validateDownloadedStationCoordAssetText(text);
     }
 
-    invalidateProbeAssetsCache();
-    preloadProbeAssetsFromLocalFiles();
-    invalidateLookupIndexCache();
-    const qrcodeWarning = await reloadQrcodeDetectionAfterAssetChange();
+    let qrcodeWarning = '';
+    if (target === 'stationCoord') {
+        reloadStationCoordAssetFromLocal();
+    } else {
+        invalidateProbeAssetsCache();
+        preloadProbeAssetsFromLocalFiles();
+        invalidateLookupIndexCache();
+        qrcodeWarning = await reloadQrcodeDetectionAfterAssetChange();
+    }
 
     const item = buildConfigFileItem(target);
     logger.info(`admin_asset_reload_local target=${target} file=${filePath}`);
@@ -249,7 +274,9 @@ async function reloadAssetFromLocal(
         summary:
             target === 'EMUList'
                 ? `已重载本地动车组配属清单，并刷新固定车组畅行码检测依赖。${qrcodeWarning}`
-                : `已重载本地畅行码映射，并刷新固定车组畅行码检测依赖。${qrcodeWarning}`,
+                : target === 'QRCode'
+                  ? `已重载本地畅行码映射，并刷新固定车组畅行码检测依赖。${qrcodeWarning}`
+                  : '已重载本地车站坐标文件，后续线路时刻表下载任务会使用新的坐标回退规则。',
         item
     };
 }
@@ -271,6 +298,8 @@ async function refreshAssetFromRemote(
                 ? validateDownloadedEmuListAssetText
                 : target === 'QRCode'
                   ? validateDownloadedQrCodeAssetText
+                  : target === 'stationCoord'
+                    ? validateDownloadedStationCoordAssetText
                   : async (content) => {
                         await validateQrcodeDetectionConfigText(content);
                     }
@@ -292,6 +321,8 @@ async function refreshAssetFromRemote(
     let qrcodeWarning = '';
     if (target === 'qrcodeDetection') {
         qrcodeWarning = await reloadQrcodeDetectionAfterAssetChange();
+    } else if (target === 'stationCoord') {
+        reloadStationCoordAssetFromLocal();
     } else {
         invalidateProbeAssetsCache();
         preloadProbeAssetsFromLocalFiles();
@@ -312,6 +343,8 @@ async function refreshAssetFromRemote(
                 ? `已从远程来源刷新动车组配属清单，并同步固定车组畅行码检测任务。${qrcodeWarning}`
                 : target === 'QRCode'
                   ? `已从远程来源刷新畅行码映射，并同步固定车组畅行码检测任务。${qrcodeWarning}`
+                  : target === 'stationCoord'
+                    ? '已从远程来源刷新车站坐标文件，后续线路时刻表下载任务会使用新的坐标回退规则。'
                   : `已从远程来源刷新固定车组畅行码检测计划，并同步未来派发任务。${qrcodeWarning}`,
         item: nextItem
     };
@@ -324,6 +357,7 @@ export function getAdminConfigFiles(): AdminConfigFilesResponse {
             buildConfigFileItem('config'),
             buildConfigFileItem('EMUList'),
             buildConfigFileItem('QRCode'),
+            buildConfigFileItem('stationCoord'),
             buildConfigFileItem('qrcodeDetection')
         ]
     };
@@ -339,6 +373,7 @@ export async function runAdminConfigFileAction(
             return await reloadConfigFromLocal();
         case 'EMUList':
         case 'QRCode':
+        case 'stationCoord':
         case 'qrcodeDetection':
             if (request.action === 'reload_local') {
                 return await reloadAssetFromLocal(request.target);
