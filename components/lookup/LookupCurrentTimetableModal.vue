@@ -540,6 +540,34 @@
                                             class="block h-auto w-full cursor-pointer" />
                                     </div>
                                 </button>
+
+                                <p
+                                    v-if="circulationExportErrorMessage.length > 0"
+                                    class="text-[11px] leading-5 text-rose-600">
+                                    [!] {{ circulationExportErrorMessage }}
+                                </p>
+
+                                <div class="grid gap-2 sm:grid-cols-2">
+                                    <UiButton
+                                        class="border border-slate-200 bg-slate-50 text-slate-700 shadow-none hover:border-slate-300 hover:bg-white hover:text-slate-900"
+                                        variant="ghost"
+                                        :loading="circulationExportState === 'pdf'"
+                                        :disabled="circulationExportState !== null"
+                                        block
+                                        @click="exportCirculationAsset('pdf')">
+                                        {{ circulationExportState === 'pdf' ? '正在准备 PDF' : '保存为 PDF' }}
+                                    </UiButton>
+
+                                    <UiButton
+                                        class="border border-slate-200 bg-slate-50 text-slate-700 shadow-none hover:border-slate-300 hover:bg-white hover:text-slate-900"
+                                        variant="ghost"
+                                        :loading="circulationExportState === 'png'"
+                                        :disabled="circulationExportState !== null"
+                                        block
+                                        @click="exportCirculationAsset('png')">
+                                        {{ circulationExportState === 'png' ? '正在准备图片' : '保存为图片' }}
+                                    </UiButton>
+                                </div>
                             </div>
                         </div>
                     </Transition>
@@ -627,6 +655,7 @@ import type {
 import type {
     CurrentTrainTimetableData,
     HistoricalTimetableData,
+    TrainCirculationImageData,
     TrainTimetableHistoryListResponse
 } from '~/types/lookup';
 import type { TrackerApiResponse } from '~/types/homepage';
@@ -667,6 +696,7 @@ const CIRCULATION_PDF_FULLSCREEN_WHEEL_ZOOM_STEP = 0.2;
 type ViewState = 'loading' | 'error' | 'empty' | 'success';
 type CirculationPdfState = 'idle' | 'loading' | 'ready' | 'error';
 type TimetableSourceKey = 'current' | `history:${number}`;
+type CirculationExportFormat = 'pdf' | 'png';
 type HistoricalTimetableStopItem = HistoricalTimetableData['stops'][number];
 
 interface CirculationPdfRenderTarget {
@@ -765,6 +795,8 @@ const historyContentState = ref<'idle' | 'loading' | 'ready' | 'error'>('idle');
 const historyContentErrorMessage = ref('');
 const circulationPdfState = ref<CirculationPdfState>('idle');
 const circulationPdfFullscreenState = ref<CirculationPdfState>('idle');
+const circulationExportState = ref<CirculationExportFormat | null>(null);
+const circulationExportErrorMessage = ref('');
 const isCirculationPdfPreviewOpen = ref(false);
 const circulationPdfFullscreenZoom = ref(1);
 const circulationPdfFullscreenViewportOffsetX = ref(0);
@@ -1166,6 +1198,185 @@ function buildCirculationCodeLink(code: string) {
         type: 'train',
         code: normalizeComparableCode(code)
     });
+}
+
+function getCirculationExportFileName(format: CirculationExportFormat) {
+    const baseTrainCode =
+        circulationPdfRequestTrainCode.value ||
+        normalizeComparableCode(displayedTimetable.value?.requestTrainCode) ||
+        normalizeComparableCode(props.trainCode) ||
+        'train-circulation';
+
+    return `${baseTrainCode}-circulation.${format}`;
+}
+
+function isUserCancelledShare(error: unknown) {
+    return (
+        error instanceof DOMException &&
+        (error.name === 'AbortError' || error.name === 'NotAllowedError')
+    );
+}
+
+function isMobileDownloadContext() {
+    if (!import.meta.client) {
+        return false;
+    }
+
+    if (window.matchMedia('(max-width: 767px)').matches) {
+        return true;
+    }
+
+    if (window.matchMedia('(pointer: coarse)').matches) {
+        return true;
+    }
+
+    const viewportWidth = Math.max(window.innerWidth || 0, screen.width || 0);
+    if (navigator.maxTouchPoints > 0 && viewportWidth > 0 && viewportWidth <= 1024) {
+        return true;
+    }
+
+    return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+}
+
+async function triggerBrowserDownloadFromBlob(blob: Blob, fileName: string) {
+    const objectUrl = URL.createObjectURL(blob);
+
+    try {
+        const anchor = document.createElement('a');
+        anchor.href = objectUrl;
+        anchor.download = fileName;
+        anchor.rel = 'noopener';
+        anchor.style.display = 'none';
+        document.body.append(anchor);
+        anchor.click();
+        anchor.remove();
+    } finally {
+        window.setTimeout(() => {
+            URL.revokeObjectURL(objectUrl);
+        }, 1000);
+    }
+}
+
+async function triggerBrowserDownloadFromUrl(url: string, fileName: string) {
+    const resolvedUrl = new URL(url, window.location.href);
+    if (resolvedUrl.origin !== window.location.origin) {
+        const blob = await fetchCirculationAssetBlob(resolvedUrl.toString());
+        await triggerBrowserDownloadFromBlob(blob, fileName);
+        return;
+    }
+
+    const anchor = document.createElement('a');
+    anchor.href = resolvedUrl.toString();
+    anchor.download = fileName;
+    anchor.rel = 'noopener';
+    anchor.style.display = 'none';
+    document.body.append(anchor);
+    anchor.click();
+    anchor.remove();
+}
+
+async function fetchCirculationAssetBlob(url: string) {
+    const response = await fetch(url, {
+        credentials: 'same-origin'
+    });
+    if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+    }
+
+    return await response.blob();
+}
+
+async function shareCirculationAssetFile(
+    url: string,
+    format: CirculationExportFormat,
+    fileName: string
+) {
+    if (!import.meta.client || typeof navigator.share !== 'function') {
+        return false;
+    }
+
+    const blob = await fetchCirculationAssetBlob(url);
+    const file = new File([blob], fileName, {
+        type: format === 'pdf' ? 'application/pdf' : 'image/png'
+    });
+    const sharePayload = {
+        files: [file],
+        title: fileName
+    };
+
+    if (typeof navigator.canShare === 'function' && !navigator.canShare(sharePayload)) {
+        return false;
+    }
+
+    await navigator.share(sharePayload);
+    return true;
+}
+
+async function fetchCirculationAssetDownloadUrl(format: CirculationExportFormat) {
+    const requestTrainCode = circulationPdfRequestTrainCode.value;
+    if (requestTrainCode.length === 0) {
+        throw new Error('当前暂无可导出的交路图');
+    }
+
+    const response = await requestFetch<TrackerApiResponse<TrainCirculationImageData>>(
+        `/api/v1/timetable/train/${encodeURIComponent(requestTrainCode)}/circulation/image`,
+        {
+            query: {
+                format,
+                binary: false
+            }
+        }
+    );
+
+    if (!response.ok) {
+        throw new Error(response.data || '运行图导出失败，请稍后重试。');
+    }
+
+    if (typeof response.data.imageUrl !== 'string' || response.data.imageUrl.length === 0) {
+        throw new Error('运行图下载地址无效');
+    }
+
+    return response.data.imageUrl;
+}
+
+async function exportCirculationAsset(format: CirculationExportFormat) {
+    if (!import.meta.client || circulationExportState.value !== null) {
+        return;
+    }
+
+    circulationExportState.value = format;
+    circulationExportErrorMessage.value = '';
+
+    try {
+        const downloadUrl = await fetchCirculationAssetDownloadUrl(format);
+        const fileName = getCirculationExportFileName(format);
+
+        if (!isMobileDownloadContext()) {
+            await triggerBrowserDownloadFromUrl(downloadUrl, fileName);
+            return;
+        }
+
+        try {
+            const shared = await shareCirculationAssetFile(downloadUrl, format, fileName);
+            if (shared) {
+                return;
+            }
+        } catch (error) {
+            if (isUserCancelledShare(error)) {
+                return;
+            }
+        }
+
+        const blob = await fetchCirculationAssetBlob(downloadUrl);
+        await triggerBrowserDownloadFromBlob(blob, fileName);
+    } catch (error) {
+        circulationExportErrorMessage.value = getApiErrorMessage(
+            error,
+            '运行图导出失败，请稍后重试。'
+        );
+    } finally {
+        circulationExportState.value = null;
+    }
 }
 
 function openCirculationPdfPreview() {
@@ -2314,6 +2525,7 @@ function resetHistoryViewState() {
     selectedTimetableSourceKey.value = 'current';
     historyContentState.value = 'idle';
     historyContentErrorMessage.value = '';
+    circulationExportErrorMessage.value = '';
 }
 
 async function fetchHistoricalTimetableList() {
