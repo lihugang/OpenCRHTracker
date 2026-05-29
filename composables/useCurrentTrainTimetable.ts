@@ -11,6 +11,29 @@ import getApiErrorMessage from '~/utils/api/getApiErrorMessage';
 
 const cachedTimetables = new Map<string, CurrentTrainTimetableData>();
 
+function isNotFoundResponse(
+    response: TrackerApiResponse<CurrentTrainTimetableData>
+): response is Extract<TrackerApiResponse<CurrentTrainTimetableData>, { ok: false }> {
+    return !response.ok && response.error === 'not_found';
+}
+
+function isNotFoundError(error: unknown) {
+    if (typeof error !== 'object' || error === null || !('response' in error)) {
+        return false;
+    }
+
+    const response = (error as {
+        response?: {
+            status?: unknown;
+            _data?: unknown;
+        };
+    }).response;
+    const status = typeof response?.status === 'number' ? response.status : 0;
+    const payload = response?._data as Partial<TrackerApiResponse<CurrentTrainTimetableData>> | undefined;
+
+    return status === 404 && payload?.error === 'not_found';
+}
+
 export default function useCurrentTrainTimetable(
     trainCodeSource: MaybeRefOrGetter<string>,
     activeSource: MaybeRefOrGetter<boolean>
@@ -70,6 +93,13 @@ export default function useCurrentTrainTimetable(
                 );
 
                 if (!response.ok) {
+                    if (isNotFoundResponse(response)) {
+                        timetable.value = null;
+                        state.value = 'empty';
+                        errorMessage.value = '';
+                        return;
+                    }
+
                     throw {
                         data: response
                     };
@@ -85,6 +115,13 @@ export default function useCurrentTrainTimetable(
                     response.data.stops.length > 0 ? 'success' : 'empty';
             } catch (error) {
                 if (activeToken !== requestToken) {
+                    return;
+                }
+
+                if (isNotFoundError(error)) {
+                    timetable.value = null;
+                    state.value = 'empty';
+                    errorMessage.value = '';
                     return;
                 }
 
