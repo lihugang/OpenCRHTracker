@@ -433,9 +433,7 @@ function buildCirculation(
     for (const [index, nodeId] of routeNodeIds.entries()) {
         const previousNodeId = index > 0 ? routeNodeIds[index - 1]! : null;
         const nextNodeId =
-            index + 1 < routeNodeIds.length
-                ? routeNodeIds[index + 1]!
-                : null;
+            index + 1 < routeNodeIds.length ? routeNodeIds[index + 1]! : null;
         const incomingEdge =
             previousNodeId === null
                 ? null
@@ -512,7 +510,9 @@ function buildLookupByTrainCode(circulations: InternalInferredCirculation[]) {
     return lookupByTrainCode;
 }
 
-function buildLookupByInternalCode(circulations: InternalInferredCirculation[]) {
+function buildLookupByInternalCode(
+    circulations: InternalInferredCirculation[]
+) {
     const lookupByInternalCode = new Map<
         string,
         InternalInferredCirculation[]
@@ -1172,7 +1172,8 @@ function buildValidatedOfficialCirculationMap(
             ) ?? null;
 
         if (splitCandidate?.match) {
-            const { officialStartIndex, officialEndIndex } = splitCandidate.match;
+            const { officialStartIndex, officialEndIndex } =
+                splitCandidate.match;
             const segmentRanges = [
                 {
                     startIndex: 0,
@@ -1200,7 +1201,8 @@ function buildValidatedOfficialCirculationMap(
                     {
                         splitSegmentIndex: index,
                         splitSegmentCount,
-                        matchedInferredRouteId: splitCandidate.circulation.routeId
+                        matchedInferredRouteId:
+                            splitCandidate.circulation.routeId
                     }
                 );
                 const circulation = buildPublicOfficialCirculationFromEntry(
@@ -1464,9 +1466,10 @@ function toPublicOfficialTrainCirculation(
         return null;
     }
 
-    const cachedOfficialCirculation = getActiveCache().validatedOfficialByInternalCode.get(
-        normalizedInternalCode
-    );
+    const cachedOfficialCirculation =
+        getActiveCache().validatedOfficialByInternalCode.get(
+            normalizedInternalCode
+        );
     if (cachedOfficialCirculation) {
         return cachedOfficialCirculation;
     }

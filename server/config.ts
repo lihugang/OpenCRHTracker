@@ -1817,9 +1817,12 @@ function validateConfig(raw: unknown): Config {
             configResult.cost.fixed.trainCirculationImageCacheHit,
         'cost.fixed.trainCirculationImage must be >= cost.fixed.trainCirculationImageCacheHit'
     );
-    for (
-        const key of ['EMUList', 'QRCode', 'stationCoord', 'qrcodeDetection'] as const
-    ) {
+    for (const key of [
+        'EMUList',
+        'QRCode',
+        'stationCoord',
+        'qrcodeDetection'
+    ] as const) {
         const asset = configResult.data.assets[key];
         try {
             parseDailyTimeHHmm(asset.refresh.refreshAt);

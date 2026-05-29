@@ -275,7 +275,9 @@ async function runScheduleProbeInternal(
                 );
                 stationUpdates = {
                     ...stationUpdates,
-                    ...(await toScheduleStationMap(routeResult.data.route.stops))
+                    ...(await toScheduleStationMap(
+                        routeResult.data.route.stops
+                    ))
                 };
                 for (const groupItem of groupItems) {
                     groupItem.bureauCode = routeResult.data.route.bureauCode;

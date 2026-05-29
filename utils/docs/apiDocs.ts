@@ -781,9 +781,12 @@ export function getDocsApiCostDisplay(
         ];
     if (fixedCostKey) {
         if (endpoint.slug === 'timetable-train-circulation-image') {
-            const cacheHitCost = runtimeConfig.cost.fixed.trainCirculationImageCacheHit;
-            const cacheMissCost = runtimeConfig.cost.fixed.trainCirculationImage;
-            const failureCost = runtimeConfig.cost.fixed.trainCirculationImageFailure;
+            const cacheHitCost =
+                runtimeConfig.cost.fixed.trainCirculationImageCacheHit;
+            const cacheMissCost =
+                runtimeConfig.cost.fixed.trainCirculationImage;
+            const failureCost =
+                runtimeConfig.cost.fixed.trainCirculationImageFailure;
             const ruleText =
                 '缓存命中 ' +
                 formatCostValue(cacheHitCost) +
@@ -798,9 +801,7 @@ export function getDocsApiCostDisplay(
                 ruleText,
                 description: '根据上游 LaTeX 编译是否命中缓存决定扣费档位。',
                 note:
-                    '实际扣费以响应头 ' +
-                    runtimeConfig.headers.cost +
-                    ' 为准。'
+                    '实际扣费以响应头 ' + runtimeConfig.headers.cost + ' 为准。'
             };
         }
         const fixedCost = runtimeConfig.cost.fixed[fixedCostKey];

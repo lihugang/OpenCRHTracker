@@ -2,10 +2,7 @@ import type { RouteStopData } from '~/server/utils/12306/network/fetchRouteInfo'
 import { loadStationCoordAssets } from '~/server/services/stationCoordStore';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
 import { toShanghaiDayOffsetFromUnixSeconds } from '~/server/utils/date/shanghaiDateTime';
-import type {
-    ScheduleStationMap,
-    ScheduleStop
-} from './types';
+import type { ScheduleStationMap, ScheduleStop } from './types';
 
 interface ResolvedRouteStationCoord {
     stationName: string;
@@ -52,7 +49,7 @@ async function resolveRouteStationCoords(
 
         const fallbackStation =
             stop.lat === null || stop.lon === null
-                ? stationCoordAssets.byStationName.get(stationName) ?? null
+                ? (stationCoordAssets.byStationName.get(stationName) ?? null)
                 : null;
         const lat = stop.lat ?? fallbackStation?.lat ?? null;
         const lon = stop.lon ?? fallbackStation?.lon ?? null;

@@ -134,11 +134,11 @@ async function executeRefreshAssetTask(
                           ? validateDownloadedQrCodeAssetText
                           : definition.key === 'stationCoord'
                             ? validateDownloadedStationCoordAssetText
-                          : async (content) => {
-                                await validateQrcodeDetectionConfigText(
-                                    content
-                                );
-                            }
+                            : async (content) => {
+                                  await validateQrcodeDetectionConfigText(
+                                      content
+                                  );
+                              }
             }
         );
         if (result.refreshed) {

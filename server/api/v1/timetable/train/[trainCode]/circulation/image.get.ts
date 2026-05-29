@@ -96,7 +96,11 @@ export default defineEventHandler(async (event) => {
                 ensure(false, 400, 'invalid_param', 'format 必须是 png 或 pdf');
             }
 
-            return renderTrainCirculationImage(trainCode, binaryRequested, format);
+            return renderTrainCirculationImage(
+                trainCode,
+                binaryRequested,
+                format
+            );
         }
     );
 });

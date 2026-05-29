@@ -744,8 +744,8 @@ function scheduleStateNeedsStopTelecodeMigration(value: unknown): boolean {
                 typeof stop !== 'object' ||
                 stop === null ||
                 Array.isArray(stop) ||
-                typeof (stop as { stationTelecode?: unknown }).stationTelecode !==
-                    'string'
+                typeof (stop as { stationTelecode?: unknown })
+                    .stationTelecode !== 'string'
         );
     });
 }

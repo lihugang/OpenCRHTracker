@@ -166,8 +166,7 @@ export type OfficialCirculationValidationState =
     | 'split_official'
     | 'unmatched_official';
 
-export interface TrainCirculationMetadata
-    extends Partial<InferredTrainCirculationMetadata> {
+export interface TrainCirculationMetadata extends Partial<InferredTrainCirculationMetadata> {
     validationState?: OfficialCirculationValidationState;
     originalOfficialEntryKey?: string;
     splitSegmentIndex?: number;

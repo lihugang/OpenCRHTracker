@@ -2663,7 +2663,8 @@ export const developerDocsOpenApi = {
                         }
                     },
                     '400': {
-                        description: '路径参数、binary 查询参数或 format 查询参数无效。',
+                        description:
+                            '路径参数、binary 查询参数或 format 查询参数无效。',
                         headers: {
                             'x-api-remain': {
                                 $ref: '#/components/headers/ApiRemain'
@@ -2766,8 +2767,7 @@ export const developerDocsOpenApi = {
                     {
                         id: 'circulation-image-json',
                         label: '图片地址',
-                        summary:
-                            '返回运行图图片直链，适合在页面中直接展示。',
+                        summary: '返回运行图图片直链，适合在页面中直接展示。',
                         authMode: 'anonymous',
                         pathParams: {
                             trainCode: 'G2492'
@@ -3260,8 +3260,7 @@ export const developerDocsOpenApi = {
                 operationId: 'historyTrain',
                 tags: ['History'],
                 summary: '返回单个车次的历史担当记录',
-                description:
-                    '返回单个车次的历史担当记录。',
+                description: '返回单个车次的历史担当记录。',
                 parameters: [
                     {
                         $ref: '#/components/parameters/TrainCodeParam'
@@ -3390,8 +3389,7 @@ export const developerDocsOpenApi = {
                 operationId: 'historyEmu',
                 tags: ['History'],
                 summary: '返回单个车组的历史担当记录',
-                description:
-                    '返回单个车组的历史担当记录。',
+                description: '返回单个车组的历史担当记录。',
                 parameters: [
                     {
                         $ref: '#/components/parameters/EmuCodeParam'

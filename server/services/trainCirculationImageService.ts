@@ -20,7 +20,10 @@ import {
     getShanghaiDayStartUnixSeconds,
     toUnixSecondsFromShanghaiDayOffset
 } from '~/server/utils/date/shanghaiDateTime';
-import type { TrainCirculation, TrainCirculationImageData } from '~/types/lookup';
+import type {
+    TrainCirculation,
+    TrainCirculationImageData
+} from '~/types/lookup';
 import resolveBureauNameByCode from '~/utils/railway/resolveBureauNameByCode';
 
 interface LatexCompileSuccessPayload {
@@ -227,7 +230,11 @@ function roundDownToReferenceStep(
     return reference + Math.floor((value - reference) / step) * step;
 }
 
-function roundUpToReferenceStep(value: number, reference: number, step: number) {
+function roundUpToReferenceStep(
+    value: number,
+    reference: number,
+    step: number
+) {
     return reference + Math.ceil((value - reference) / step) * step;
 }
 
@@ -378,7 +385,9 @@ function scoreScheduleItemMatch(
 
     const itemCodes = item.allCodes;
     const nodeCodes = uniqueNormalizedCodes(node.allCodes);
-    const overlapCount = nodeCodes.filter((code) => itemCodes.includes(code)).length;
+    const overlapCount = nodeCodes.filter((code) =>
+        itemCodes.includes(code)
+    ).length;
     score += overlapCount * 4;
 
     if (item.startStation === node.startStation.trim()) {
@@ -503,7 +512,8 @@ function buildResolvedCirculationNodes(
         const candidateMap = new Map<MergedScheduleItem, MergedScheduleItem>();
 
         if (internalCode.length > 0) {
-            for (const item of indexes.itemsByInternalCode.get(internalCode) ?? []) {
+            for (const item of indexes.itemsByInternalCode.get(internalCode) ??
+                []) {
                 candidateMap.set(item, item);
             }
         }
@@ -617,7 +627,8 @@ function buildStationAxisLayout(
     stationAxisPoints: StationAxisPoint[]
 ): StationAxisLayout {
     const maxStationDistanceKm =
-        stationAxisPoints[stationAxisPoints.length - 1]?.cumulativeDistanceKm ?? 0;
+        stationAxisPoints[stationAxisPoints.length - 1]?.cumulativeDistanceKm ??
+        0;
     const baseChartBodyHeightCm =
         Math.max(
             8,
@@ -625,7 +636,9 @@ function buildStationAxisLayout(
             maxStationDistanceKm / 180
         ) * 2;
     const baseYScale =
-        maxStationDistanceKm > 0 ? baseChartBodyHeightCm / maxStationDistanceKm : 0;
+        maxStationDistanceKm > 0
+            ? baseChartBodyHeightCm / maxStationDistanceKm
+            : 0;
     const projectedDistanceByTelecode = new Map<string, number>();
     let projectedDistanceCm = 0;
 
@@ -670,7 +683,9 @@ function buildTrainCirculationHeaderInfo(input: {
         parts.push(input.passengerDepartment);
     }
 
-    const primaryReferenceModel = getReferenceModelsByTrainCodes(input.allCodes)[0];
+    const primaryReferenceModel = getReferenceModelsByTrainCodes(
+        input.allCodes
+    )[0];
     if (primaryReferenceModel?.model) {
         parts.push(`${primaryReferenceModel.model} 型动车组`);
     }
@@ -796,7 +811,11 @@ function createTextBox(
     }
 }
 
-function expandTextBox(box: TextBox, deltaXCm: number, deltaYCm: number): TextBox {
+function expandTextBox(
+    box: TextBox,
+    deltaXCm: number,
+    deltaYCm: number
+): TextBox {
     return {
         minX: box.minX - deltaXCm,
         maxX: box.maxX + deltaXCm,
@@ -845,7 +864,10 @@ function createProtectedStationLabelBox(x: number, y: number, text: string) {
 
     return {
         ...stationLabelBox,
-        maxX: Math.max(stationLabelBox.maxX, STATION_LABEL_RIGHT_PROTECTION_X_CM)
+        maxX: Math.max(
+            stationLabelBox.maxX,
+            STATION_LABEL_RIGHT_PROTECTION_X_CM
+        )
     };
 }
 
@@ -1000,7 +1022,11 @@ function placeEndpointTimeLabels(
         const textMetrics = getTextMetrics(candidate.text, 'time');
         const halfWidthCm = textMetrics.widthCm / 2;
 
-        for (let step = 0; step <= ENDPOINT_TIME_MAX_HORIZONTAL_STEPS; step += 1) {
+        for (
+            let step = 0;
+            step <= ENDPOINT_TIME_MAX_HORIZONTAL_STEPS;
+            step += 1
+        ) {
             const candidateX =
                 candidate.direction === 'right'
                     ? candidate.x +
@@ -1119,10 +1145,7 @@ function placeTrainLabels(
                 );
                 const score = overlapArea + boundaryViolationCm * 1000;
 
-                if (
-                    boundaryViolationCm === 0 &&
-                    overlapArea === 0
-                ) {
+                if (boundaryViolationCm === 0 && overlapArea === 0) {
                     selectedPlacement = placement;
                     break;
                 }
@@ -1233,15 +1256,18 @@ function buildLatexSource(
         iteration += 1
     ) {
         const iterationProjectTime = (timestamp: number) =>
-            ((timestamp - axisStartTimestamp) / axisRangeSeconds) * chartWidthCm;
+            ((timestamp - axisStartTimestamp) / axisRangeSeconds) *
+            chartWidthCm;
         const iterationOccupiedBoxes = [...stationLabelOccupiedBoxes];
-        const iterationMidnightMarkerPlacements = buildMidnightMarkerPlacements({
-            axisStartTimestamp,
-            axisEndTimestamp,
-            firstGridReferenceTimestamp,
-            chartBodyHeightCm,
-            projectTime: iterationProjectTime
-        });
+        const iterationMidnightMarkerPlacements = buildMidnightMarkerPlacements(
+            {
+                axisStartTimestamp,
+                axisEndTimestamp,
+                firstGridReferenceTimestamp,
+                chartBodyHeightCm,
+                projectTime: iterationProjectTime
+            }
+        );
         for (const placement of iterationMidnightMarkerPlacements) {
             iterationOccupiedBoxes.push(placement.box);
         }
@@ -1284,7 +1310,8 @@ function buildLatexSource(
 
     if (endpointTimePlacements.length === 0 && nodes.length > 0) {
         finalProjectTime = (timestamp: number) =>
-            ((timestamp - axisStartTimestamp) / axisRangeSeconds) * chartWidthCm;
+            ((timestamp - axisStartTimestamp) / axisRangeSeconds) *
+            chartWidthCm;
         midnightMarkerPlacements = buildMidnightMarkerPlacements({
             axisStartTimestamp,
             axisEndTimestamp,
@@ -1385,7 +1412,8 @@ function buildLatexSource(
         const xStart = finalProjectTime(node.start.timestamp);
         const xEnd = finalProjectTime(node.end.timestamp);
         const yStart =
-            (stationYByTelecode.get(node.start.stationTelecode) ?? 0) + shiftYCm;
+            (stationYByTelecode.get(node.start.stationTelecode) ?? 0) +
+            shiftYCm;
         const yEnd =
             (stationYByTelecode.get(node.end.stationTelecode) ?? 0) + shiftYCm;
         const drawColor = index % 2 === 0 ? 'blue!70!black' : 'teal!70!black';
@@ -1471,7 +1499,9 @@ function parseLatexCompileEnvelope(payload: unknown): LatexCompileResult {
         );
     }
 
-    const compilePayload = asRecord(envelope.data) as LatexCompileSuccessPayload | null;
+    const compilePayload = asRecord(
+        envelope.data
+    ) as LatexCompileSuccessPayload | null;
     const documentId = getNonEmptyString(compilePayload?.id);
     const pageCount = compilePayload?.pageNumber;
 
@@ -1578,7 +1608,10 @@ function resolveCurrentCirculation(trainCode: string) {
 function resolvePublishedScheduleState() {
     const scheduleFilePath = useConfig().data.assets.schedule.file;
     const document = loadScheduleDocument(scheduleFilePath);
-    if (!document?.published || document.published.date !== getCurrentDateString()) {
+    if (
+        !document?.published ||
+        document.published.date !== getCurrentDateString()
+    ) {
         throw new ApiRequestError(404, 'not_found', '当前暂无时刻表');
     }
 
@@ -1594,7 +1627,8 @@ export async function renderTrainCirculationImage(
     binaryRequested: boolean,
     format: TrainCirculationImageFormat
 ): Promise<TrainCirculationImageRenderResult> {
-    const { timetable, circulation } = resolveCurrentCirculation(requestTrainCode);
+    const { timetable, circulation } =
+        resolveCurrentCirculation(requestTrainCode);
     const publishedScheduleState = resolvePublishedScheduleState();
     const headerInfo = buildTrainCirculationHeaderInfo({
         bureauCode: timetable.bureauCode,

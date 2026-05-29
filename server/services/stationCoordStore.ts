@@ -1,6 +1,9 @@
 import fs from 'fs';
 import getLogger from '~/server/libs/log4js';
-import { ensureAssetFile, getAssetFilePath } from '~/server/utils/dataAssets/store';
+import {
+    ensureAssetFile,
+    getAssetFilePath
+} from '~/server/utils/dataAssets/store';
 import parseJsonlToJson from '~/server/utils/json/parseJsonlToJson';
 
 interface RawStationCoordRecord extends Record<string, unknown> {
@@ -148,4 +151,3 @@ export function preloadStationCoordAssetsFromLocalFile(): StationCoordAssets {
 export function invalidateStationCoordAssetsCache(): void {
     cached = null;
 }
-

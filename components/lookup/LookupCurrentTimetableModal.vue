@@ -41,8 +41,12 @@
                     <UiCard
                         :show-accent-bar="false"
                         variant="subtle">
-                        <p class="text-xs uppercase tracking-[0.16em] text-slate-400">车次</p>
-                        <p class="mt-2 font-mono text-sm font-semibold text-crh-blue">
+                        <p
+                            class="text-xs uppercase tracking-[0.16em] text-slate-400">
+                            车次
+                        </p>
+                        <p
+                            class="mt-2 font-mono text-sm font-semibold text-crh-blue">
                             {{ displayedTimetable.allCodes.join(' / ') }}
                         </p>
                     </UiCard>
@@ -50,7 +54,10 @@
                     <UiCard
                         :show-accent-bar="false"
                         variant="subtle">
-                        <p class="text-xs uppercase tracking-[0.16em] text-slate-400">始发 / 终到</p>
+                        <p
+                            class="text-xs uppercase tracking-[0.16em] text-slate-400">
+                            始发 / 终到
+                        </p>
                         <p class="mt-2 text-sm font-medium text-crh-grey-dark">
                             <LookupStationLink
                                 :station-name="displayedTimetable.startStation"
@@ -69,7 +76,10 @@
                         :show-accent-bar="false"
                         variant="subtle"
                         class="sm:col-span-2">
-                        <p class="text-xs uppercase tracking-[0.16em] text-slate-400">担当</p>
+                        <p
+                            class="text-xs uppercase tracking-[0.16em] text-slate-400">
+                            担当
+                        </p>
                         <p class="mt-2 text-sm font-medium text-crh-grey-dark">
                             {{ responsibilitySummary }}
                         </p>
@@ -86,7 +96,10 @@
                 <div class="space-y-4">
                     <div class="flex items-start justify-between gap-3">
                         <div class="min-w-0">
-                            <p class="text-xs uppercase tracking-[0.16em] text-slate-400">时刻表</p>
+                            <p
+                                class="text-xs uppercase tracking-[0.16em] text-slate-400">
+                                时刻表
+                            </p>
                             <p
                                 v-if="!isTimetableExpanded"
                                 class="mt-2 text-sm text-slate-500">
@@ -97,17 +110,29 @@
                         <button
                             type="button"
                             class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:border-slate-300 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-crh-blue/25 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
-                            :class="isTimetableExpanded ? 'border-crh-blue/20 text-crh-blue' : ''"
+                            :class="
+                                isTimetableExpanded
+                                    ? 'border-crh-blue/20 text-crh-blue'
+                                    : ''
+                            "
                             :aria-controls="timetableSectionId"
-                            :aria-expanded="isTimetableExpanded ? 'true' : 'false'"
-                            :aria-label="isTimetableExpanded ? '折叠时刻表' : '展开时刻表'"
+                            :aria-expanded="
+                                isTimetableExpanded ? 'true' : 'false'
+                            "
+                            :aria-label="
+                                isTimetableExpanded
+                                    ? '折叠时刻表'
+                                    : '展开时刻表'
+                            "
                             @click="toggleTimetableExpanded">
                             <svg
                                 aria-hidden="true"
                                 viewBox="0 0 20 20"
                                 fill="none"
                                 class="h-4 w-4 transition-transform duration-200 ease-out"
-                                :class="isTimetableExpanded ? 'rotate-180' : ''">
+                                :class="
+                                    isTimetableExpanded ? 'rotate-180' : ''
+                                ">
                                 <path
                                     d="M5 7.5L10 12.5L15 7.5"
                                     stroke="currentColor"
@@ -148,8 +173,10 @@
                                 {{ timetableNotice }}
                             </p>
 
-                            <div class="hidden overflow-hidden rounded-[1.25rem] border border-slate-200 md:block">
-                                <table class="min-w-full border-separate border-spacing-0 bg-white/90">
+                            <div
+                                class="hidden overflow-hidden rounded-[1.25rem] border border-slate-200 md:block">
+                                <table
+                                    class="min-w-full border-separate border-spacing-0 bg-white/90">
                                     <thead>
                                         <tr class="bg-slate-50/80 text-left">
                                             <th
@@ -165,23 +192,45 @@
                                             v-for="stop in displayedTimetable.stops"
                                             :key="'desktop:' + stop.stationNo"
                                             class="align-top">
-                                            <td class="border-b border-slate-100 px-4 py-3 font-mono text-sm text-slate-500 last:border-b-0">
+                                            <td
+                                                class="border-b border-slate-100 px-4 py-3 font-mono text-sm text-slate-500 last:border-b-0">
                                                 {{ stop.stationNo }}
                                             </td>
-                                            <td class="border-b border-slate-100 px-4 py-3 font-mono text-sm text-slate-500 last:border-b-0">
-                                                {{ stop.stationTrainCode || '--' }}
+                                            <td
+                                                class="border-b border-slate-100 px-4 py-3 font-mono text-sm text-slate-500 last:border-b-0">
+                                                {{
+                                                    stop.stationTrainCode ||
+                                                    '--'
+                                                }}
                                             </td>
-                                            <td class="border-b border-slate-100 px-4 py-3 text-sm font-medium text-crh-grey-dark last:border-b-0">
+                                            <td
+                                                class="border-b border-slate-100 px-4 py-3 text-sm font-medium text-crh-grey-dark last:border-b-0">
                                                 <LookupStationLink
-                                                    :station-name="stop.stationName"
-                                                    :focus-train-codes="resolveStopFocusTrainCodes(stop)"
+                                                    :station-name="
+                                                        stop.stationName
+                                                    "
+                                                    :focus-train-codes="
+                                                        resolveStopFocusTrainCodes(
+                                                            stop
+                                                        )
+                                                    "
                                                     fallback-text="--" />
                                             </td>
-                                            <td class="border-b border-slate-100 px-4 py-3 font-mono text-sm text-slate-500 last:border-b-0">
-                                                {{ formatStopTime(stop.arriveAt) }}
+                                            <td
+                                                class="border-b border-slate-100 px-4 py-3 font-mono text-sm text-slate-500 last:border-b-0">
+                                                {{
+                                                    formatStopTime(
+                                                        stop.arriveAt
+                                                    )
+                                                }}
                                             </td>
-                                            <td class="border-b border-slate-100 px-4 py-3 font-mono text-sm text-slate-500 last:border-b-0">
-                                                {{ formatStopTime(stop.departAt) }}
+                                            <td
+                                                class="border-b border-slate-100 px-4 py-3 font-mono text-sm text-slate-500 last:border-b-0">
+                                                {{
+                                                    formatStopTime(
+                                                        stop.departAt
+                                                    )
+                                                }}
                                             </td>
                                             <td
                                                 v-if="isCurrentView"
@@ -200,45 +249,85 @@
                                     :show-accent-bar="false"
                                     variant="subtle">
                                     <div class="space-y-3">
-                                        <div class="flex items-start justify-between gap-3">
+                                        <div
+                                            class="flex items-start justify-between gap-3">
                                             <div class="min-w-0">
-                                                <p class="text-xs uppercase tracking-[0.16em] text-slate-400">
+                                                <p
+                                                    class="text-xs uppercase tracking-[0.16em] text-slate-400">
                                                     第 {{ stop.stationNo }} 站
                                                 </p>
-                                                <p class="mt-1 text-sm font-semibold text-crh-grey-dark">
+                                                <p
+                                                    class="mt-1 text-sm font-semibold text-crh-grey-dark">
                                                     <LookupStationLink
-                                                        :station-name="stop.stationName"
-                                                        :focus-train-codes="resolveStopFocusTrainCodes(stop)"
+                                                        :station-name="
+                                                            stop.stationName
+                                                        "
+                                                        :focus-train-codes="
+                                                            resolveStopFocusTrainCodes(
+                                                                stop
+                                                            )
+                                                        "
                                                         fallback-text="--" />
                                                 </p>
                                             </div>
-                                            <span class="font-mono text-xs text-slate-400">
-                                                {{ stop.stationTrainCode || '--' }}
+                                            <span
+                                                class="font-mono text-xs text-slate-400">
+                                                {{
+                                                    stop.stationTrainCode ||
+                                                    '--'
+                                                }}
                                             </span>
                                         </div>
 
                                         <div class="grid grid-cols-2 gap-3">
                                             <div>
-                                                <p class="text-[11px] uppercase tracking-[0.16em] text-slate-400">到点</p>
-                                                <p class="mt-1 font-mono text-sm text-slate-500">
-                                                    {{ formatStopTime(stop.arriveAt) }}
+                                                <p
+                                                    class="text-[11px] uppercase tracking-[0.16em] text-slate-400">
+                                                    到点
+                                                </p>
+                                                <p
+                                                    class="mt-1 font-mono text-sm text-slate-500">
+                                                    {{
+                                                        formatStopTime(
+                                                            stop.arriveAt
+                                                        )
+                                                    }}
                                                 </p>
                                             </div>
                                             <div>
-                                                <p class="text-[11px] uppercase tracking-[0.16em] text-slate-400">开点</p>
-                                                <p class="mt-1 font-mono text-sm text-slate-500">
-                                                    {{ formatStopTime(stop.departAt) }}
+                                                <p
+                                                    class="text-[11px] uppercase tracking-[0.16em] text-slate-400">
+                                                    开点
+                                                </p>
+                                                <p
+                                                    class="mt-1 font-mono text-sm text-slate-500">
+                                                    {{
+                                                        formatStopTime(
+                                                            stop.departAt
+                                                        )
+                                                    }}
                                                 </p>
                                             </div>
                                             <div>
-                                                <p class="text-[11px] uppercase tracking-[0.16em] text-slate-400">车次</p>
-                                                <p class="mt-1 font-mono text-sm text-slate-500">
-                                                    {{ stop.stationTrainCode || '--' }}
+                                                <p
+                                                    class="text-[11px] uppercase tracking-[0.16em] text-slate-400">
+                                                    车次
+                                                </p>
+                                                <p
+                                                    class="mt-1 font-mono text-sm text-slate-500">
+                                                    {{
+                                                        stop.stationTrainCode ||
+                                                        '--'
+                                                    }}
                                                 </p>
                                             </div>
                                             <div v-if="isCurrentView">
-                                                <p class="text-[11px] uppercase tracking-[0.16em] text-slate-400">检票口</p>
-                                                <p class="mt-1 text-sm text-slate-500">
+                                                <p
+                                                    class="text-[11px] uppercase tracking-[0.16em] text-slate-400">
+                                                    检票口
+                                                </p>
+                                                <p
+                                                    class="mt-1 text-sm text-slate-500">
                                                     {{ stop.wicket || '--' }}
                                                 </p>
                                             </div>
@@ -259,9 +348,15 @@
                 <div class="space-y-4">
                     <div class="flex items-start justify-between gap-3">
                         <div class="min-w-0">
-                            <p class="text-xs uppercase tracking-[0.16em] text-slate-400">交路表</p>
                             <p
-                                v-if="!isCirculationExpanded && circulationNodes.length > 0"
+                                class="text-xs uppercase tracking-[0.16em] text-slate-400">
+                                交路表
+                            </p>
+                            <p
+                                v-if="
+                                    !isCirculationExpanded &&
+                                    circulationNodes.length > 0
+                                "
                                 class="mt-2 text-sm text-slate-500">
                                 {{ circulationSummaryLabel }}
                             </p>
@@ -271,17 +366,29 @@
                             v-if="circulationNodes.length > 0"
                             type="button"
                             class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:border-slate-300 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-crh-blue/25 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
-                            :class="isCirculationExpanded ? 'border-crh-blue/20 text-crh-blue' : ''"
+                            :class="
+                                isCirculationExpanded
+                                    ? 'border-crh-blue/20 text-crh-blue'
+                                    : ''
+                            "
                             :aria-controls="circulationSectionId"
-                            :aria-expanded="isCirculationExpanded ? 'true' : 'false'"
-                            :aria-label="isCirculationExpanded ? '折叠交路表' : '展开交路表'"
+                            :aria-expanded="
+                                isCirculationExpanded ? 'true' : 'false'
+                            "
+                            :aria-label="
+                                isCirculationExpanded
+                                    ? '折叠交路表'
+                                    : '展开交路表'
+                            "
                             @click="toggleCirculationExpanded">
                             <svg
                                 aria-hidden="true"
                                 viewBox="0 0 20 20"
                                 fill="none"
                                 class="h-4 w-4 transition-transform duration-200 ease-out"
-                                :class="isCirculationExpanded ? 'rotate-180' : ''">
+                                :class="
+                                    isCirculationExpanded ? 'rotate-180' : ''
+                                ">
                                 <path
                                     d="M5 7.5L10 12.5L15 7.5"
                                     stroke="currentColor"
@@ -306,7 +413,10 @@
                         leave-from-class="translate-y-0 opacity-100"
                         leave-to-class="translate-y-1 opacity-0 motion-reduce:translate-y-0">
                         <div
-                            v-if="isCirculationExpanded && circulationNodes.length > 0"
+                            v-if="
+                                isCirculationExpanded &&
+                                circulationNodes.length > 0
+                            "
                             :id="circulationSectionId"
                             class="space-y-3">
                             <div class="hidden space-y-3 md:block">
@@ -314,7 +424,8 @@
                                     v-for="(node, index) in circulationNodes"
                                     :key="`desktop:${node.key}`"
                                     class="flex gap-3">
-                                    <div class="flex w-7 shrink-0 flex-col items-center">
+                                    <div
+                                        class="flex w-7 shrink-0 flex-col items-center">
                                         <span
                                             :class="[
                                                 'inline-flex h-7 w-7 items-center justify-center rounded-full border text-xs font-semibold transition',
@@ -325,10 +436,15 @@
                                             {{ index + 1 }}
                                         </span>
                                         <span
-                                            v-if="index + 1 < circulationNodes.length"
+                                            v-if="
+                                                index + 1 <
+                                                circulationNodes.length
+                                            "
                                             :class="[
                                                 'mt-2 min-h-6 w-px flex-1',
-                                                node.isCurrent ? 'bg-crh-blue/30' : 'bg-slate-200'
+                                                node.isCurrent
+                                                    ? 'bg-crh-blue/30'
+                                                    : 'bg-slate-200'
                                             ]"
                                             aria-hidden="true" />
                                     </div>
@@ -340,19 +456,35 @@
                                                 ? 'border-crh-blue/20 bg-blue-50/80 shadow-[0_14px_30px_-24px_rgba(0,82,155,0.55)]'
                                                 : 'border-slate-200 bg-white/90'
                                         ]">
-                                        <div class="flex flex-wrap items-start justify-between gap-3">
-                                            <div class="min-w-0 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-sm font-semibold">
+                                        <div
+                                            class="flex flex-wrap items-start justify-between gap-3">
+                                            <div
+                                                class="min-w-0 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-sm font-semibold">
                                                 <template
-                                                    v-for="(code, codeIndex) in node.allCodes"
+                                                    v-for="(
+                                                        code, codeIndex
+                                                    ) in node.allCodes"
                                                     :key="`${node.key}:desktop:${code}`">
                                                     <span
-                                                        v-if="isCurrentCirculationCode(code)"
-                                                        :class="node.isCurrent ? 'text-crh-blue' : 'text-crh-grey-dark'">
+                                                        v-if="
+                                                            isCurrentCirculationCode(
+                                                                code
+                                                            )
+                                                        "
+                                                        :class="
+                                                            node.isCurrent
+                                                                ? 'text-crh-blue'
+                                                                : 'text-crh-grey-dark'
+                                                        ">
                                                         {{ code }}
                                                     </span>
                                                     <NuxtLink
                                                         v-else
-                                                        :to="buildCirculationCodeLink(code)"
+                                                        :to="
+                                                            buildCirculationCodeLink(
+                                                                code
+                                                            )
+                                                        "
                                                         :class="[
                                                             'transition hover:underline',
                                                             node.isCurrent
@@ -362,7 +494,12 @@
                                                         {{ code }}
                                                     </NuxtLink>
                                                     <span
-                                                        v-if="codeIndex < node.allCodes.length - 1"
+                                                        v-if="
+                                                            codeIndex <
+                                                            node.allCodes
+                                                                .length -
+                                                                1
+                                                        "
                                                         class="text-slate-400">
                                                         /
                                                     </span>
@@ -376,28 +513,59 @@
                                             </span>
                                         </div>
 
-                                        <div class="mt-3 grid gap-3 sm:grid-cols-2">
-                                            <div class="rounded-[0.9rem] border border-slate-200/80 bg-white/70 px-3 py-3">
-                                                <p class="text-[11px] uppercase tracking-[0.16em] text-slate-400">始发 / 终到</p>
-                                                <p class="mt-1 text-sm font-medium text-crh-grey-dark">
+                                        <div
+                                            class="mt-3 grid gap-3 sm:grid-cols-2">
+                                            <div
+                                                class="rounded-[0.9rem] border border-slate-200/80 bg-white/70 px-3 py-3">
+                                                <p
+                                                    class="text-[11px] uppercase tracking-[0.16em] text-slate-400">
+                                                    始发 / 终到
+                                                </p>
+                                                <p
+                                                    class="mt-1 text-sm font-medium text-crh-grey-dark">
                                                     <LookupStationLink
-                                                        :station-name="node.startStation"
-                                                        :focus-train-codes="resolveCirculationNodeFocusTrainCodes(node)"
+                                                        :station-name="
+                                                            node.startStation
+                                                        "
+                                                        :focus-train-codes="
+                                                            resolveCirculationNodeFocusTrainCodes(
+                                                                node
+                                                            )
+                                                        "
                                                         fallback-text="--" />
                                                     <span class="mx-1">-></span>
                                                     <LookupStationLink
-                                                        :station-name="node.endStation"
-                                                        :focus-train-codes="resolveCirculationNodeFocusTrainCodes(node)"
+                                                        :station-name="
+                                                            node.endStation
+                                                        "
+                                                        :focus-train-codes="
+                                                            resolveCirculationNodeFocusTrainCodes(
+                                                                node
+                                                            )
+                                                        "
                                                         fallback-text="--" />
                                                 </p>
                                             </div>
 
-                                            <div class="rounded-[0.9rem] border border-slate-200/80 bg-white/70 px-3 py-3">
-                                                <p class="text-[11px] uppercase tracking-[0.16em] text-slate-400">始发时间 / 终到时间</p>
-                                                <p class="mt-1 font-mono text-sm text-slate-500">
-                                                    {{ formatCirculationOffsetTime(node.startAt) }}
+                                            <div
+                                                class="rounded-[0.9rem] border border-slate-200/80 bg-white/70 px-3 py-3">
+                                                <p
+                                                    class="text-[11px] uppercase tracking-[0.16em] text-slate-400">
+                                                    始发时间 / 终到时间
+                                                </p>
+                                                <p
+                                                    class="mt-1 font-mono text-sm text-slate-500">
+                                                    {{
+                                                        formatCirculationOffsetTime(
+                                                            node.startAt
+                                                        )
+                                                    }}
                                                     <span class="mx-1">-></span>
-                                                    {{ formatCirculationOffsetTime(node.endAt) }}
+                                                    {{
+                                                        formatCirculationOffsetTime(
+                                                            node.endAt
+                                                        )
+                                                    }}
                                                 </p>
                                             </div>
                                         </div>
@@ -410,7 +578,8 @@
                                     v-for="(node, index) in circulationNodes"
                                     :key="`mobile:${node.key}`"
                                     class="flex gap-3">
-                                    <div class="flex w-7 shrink-0 flex-col items-center">
+                                    <div
+                                        class="flex w-7 shrink-0 flex-col items-center">
                                         <span
                                             :class="[
                                                 'inline-flex h-7 w-7 items-center justify-center rounded-full border text-xs font-semibold transition',
@@ -421,10 +590,15 @@
                                             {{ index + 1 }}
                                         </span>
                                         <span
-                                            v-if="index + 1 < circulationNodes.length"
+                                            v-if="
+                                                index + 1 <
+                                                circulationNodes.length
+                                            "
                                             :class="[
                                                 'mt-2 min-h-6 w-px flex-1',
-                                                node.isCurrent ? 'bg-crh-blue/30' : 'bg-slate-200'
+                                                node.isCurrent
+                                                    ? 'bg-crh-blue/30'
+                                                    : 'bg-slate-200'
                                             ]"
                                             aria-hidden="true" />
                                     </div>
@@ -439,22 +613,40 @@
                                                 : ''
                                         ]">
                                         <div class="space-y-3">
-                                            <div class="flex items-start justify-between gap-3">
-                                                <div class="min-w-0 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-sm font-semibold text-crh-blue">
+                                            <div
+                                                class="flex items-start justify-between gap-3">
+                                                <div
+                                                    class="min-w-0 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-sm font-semibold text-crh-blue">
                                                     <template
-                                                        v-for="(code, codeIndex) in node.allCodes"
+                                                        v-for="(
+                                                            code, codeIndex
+                                                        ) in node.allCodes"
                                                         :key="`${node.key}:${code}`">
-                                                        <span v-if="isCurrentCirculationCode(code)">
+                                                        <span
+                                                            v-if="
+                                                                isCurrentCirculationCode(
+                                                                    code
+                                                                )
+                                                            ">
                                                             {{ code }}
                                                         </span>
                                                         <NuxtLink
                                                             v-else
-                                                            :to="buildCirculationCodeLink(code)"
+                                                            :to="
+                                                                buildCirculationCodeLink(
+                                                                    code
+                                                                )
+                                                            "
                                                             class="transition hover:underline">
                                                             {{ code }}
                                                         </NuxtLink>
                                                         <span
-                                                            v-if="codeIndex < node.allCodes.length - 1"
+                                                            v-if="
+                                                                codeIndex <
+                                                                node.allCodes
+                                                                    .length -
+                                                                    1
+                                                            "
                                                             class="text-slate-400">
                                                             /
                                                         </span>
@@ -475,40 +667,80 @@
                                                         ? 'border-crh-blue/20'
                                                         : 'border-slate-200'
                                                 ]">
-                                                <div class="grid grid-cols-2 gap-3">
+                                                <div
+                                                    class="grid grid-cols-2 gap-3">
                                                     <div class="min-w-0">
-                                                        <p class="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">始发站</p>
-                                                        <p class="mt-1 truncate text-sm font-medium text-crh-grey-dark">
+                                                        <p
+                                                            class="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">
+                                                            始发站
+                                                        </p>
+                                                        <p
+                                                            class="mt-1 truncate text-sm font-medium text-crh-grey-dark">
                                                             <LookupStationLink
-                                                                :station-name="node.startStation"
-                                                                :focus-train-codes="resolveCirculationNodeFocusTrainCodes(node)"
+                                                                :station-name="
+                                                                    node.startStation
+                                                                "
+                                                                :focus-train-codes="
+                                                                    resolveCirculationNodeFocusTrainCodes(
+                                                                        node
+                                                                    )
+                                                                "
                                                                 fallback-text="--" />
                                                         </p>
                                                     </div>
 
-                                                    <div class="min-w-0 text-right">
-                                                        <p class="text-[11px] uppercase tracking-[0.18em] text-slate-400">终到站</p>
-                                                        <p class="mt-1 truncate text-sm font-medium text-crh-grey-dark">
+                                                    <div
+                                                        class="min-w-0 text-right">
+                                                        <p
+                                                            class="text-[11px] uppercase tracking-[0.18em] text-slate-400">
+                                                            终到站
+                                                        </p>
+                                                        <p
+                                                            class="mt-1 truncate text-sm font-medium text-crh-grey-dark">
                                                             <LookupStationLink
-                                                                :station-name="node.endStation"
-                                                                :focus-train-codes="resolveCirculationNodeFocusTrainCodes(node)"
+                                                                :station-name="
+                                                                    node.endStation
+                                                                "
+                                                                :focus-train-codes="
+                                                                    resolveCirculationNodeFocusTrainCodes(
+                                                                        node
+                                                                    )
+                                                                "
                                                                 fallback-text="--" />
                                                         </p>
                                                     </div>
                                                 </div>
 
-                                                <div class="mt-3 grid grid-cols-2 gap-3 border-t border-slate-100 pt-3">
+                                                <div
+                                                    class="mt-3 grid grid-cols-2 gap-3 border-t border-slate-100 pt-3">
                                                     <div class="min-w-0">
-                                                        <p class="text-[11px] uppercase tracking-[0.18em] text-slate-400">始发时间</p>
-                                                        <p class="mt-1 font-mono text-sm text-slate-500">
-                                                            {{ formatCirculationOffsetTime(node.startAt) }}
+                                                        <p
+                                                            class="text-[11px] uppercase tracking-[0.18em] text-slate-400">
+                                                            始发时间
+                                                        </p>
+                                                        <p
+                                                            class="mt-1 font-mono text-sm text-slate-500">
+                                                            {{
+                                                                formatCirculationOffsetTime(
+                                                                    node.startAt
+                                                                )
+                                                            }}
                                                         </p>
                                                     </div>
 
-                                                    <div class="min-w-0 text-right">
-                                                        <p class="text-[11px] uppercase tracking-[0.18em] text-slate-400">终到时间</p>
-                                                        <p class="mt-1 font-mono text-sm text-slate-500">
-                                                            {{ formatCirculationOffsetTime(node.endAt) }}
+                                                    <div
+                                                        class="min-w-0 text-right">
+                                                        <p
+                                                            class="text-[11px] uppercase tracking-[0.18em] text-slate-400">
+                                                            终到时间
+                                                        </p>
+                                                        <p
+                                                            class="mt-1 font-mono text-sm text-slate-500">
+                                                            {{
+                                                                formatCirculationOffsetTime(
+                                                                    node.endAt
+                                                                )
+                                                            }}
                                                         </p>
                                                     </div>
                                                 </div>
@@ -521,10 +753,16 @@
                             <div
                                 v-if="shouldShowCirculationPdfPreview"
                                 class="space-y-3 border-t border-slate-100 pt-4">
-                                <p class="text-xs uppercase tracking-[0.16em] text-slate-400">列车运行图</p>
+                                <p
+                                    class="text-xs uppercase tracking-[0.16em] text-slate-400">
+                                    列车运行图
+                                </p>
 
                                 <div
-                                    v-if="circulationPdfState === 'idle' || circulationPdfState === 'loading'"
+                                    v-if="
+                                        circulationPdfState === 'idle' ||
+                                        circulationPdfState === 'loading'
+                                    "
                                     class="h-64 animate-pulse rounded-[1rem] border border-slate-200 bg-slate-100/80" />
 
                                 <button
@@ -542,7 +780,9 @@
                                 </button>
 
                                 <p
-                                    v-if="circulationExportErrorMessage.length > 0"
+                                    v-if="
+                                        circulationExportErrorMessage.length > 0
+                                    "
                                     class="text-[11px] leading-5 text-rose-600">
                                     [!] {{ circulationExportErrorMessage }}
                                 </p>
@@ -551,27 +791,42 @@
                                     <UiButton
                                         class="border border-slate-200 bg-slate-50 text-slate-700 shadow-none hover:border-slate-300 hover:bg-white hover:text-slate-900"
                                         variant="ghost"
-                                        :loading="circulationExportState === 'pdf'"
-                                        :disabled="circulationExportState !== null"
+                                        :loading="
+                                            circulationExportState === 'pdf'
+                                        "
+                                        :disabled="
+                                            circulationExportState !== null
+                                        "
                                         block
                                         @click="exportCirculationAsset('pdf')">
-                                        {{ circulationExportState === 'pdf' ? '正在准备 PDF' : '保存为 PDF' }}
+                                        {{
+                                            circulationExportState === 'pdf'
+                                                ? '正在准备 PDF'
+                                                : '保存为 PDF'
+                                        }}
                                     </UiButton>
 
                                     <UiButton
                                         class="border border-slate-200 bg-slate-50 text-slate-700 shadow-none hover:border-slate-300 hover:bg-white hover:text-slate-900"
                                         variant="ghost"
-                                        :loading="circulationExportState === 'png'"
-                                        :disabled="circulationExportState !== null"
+                                        :loading="
+                                            circulationExportState === 'png'
+                                        "
+                                        :disabled="
+                                            circulationExportState !== null
+                                        "
                                         block
                                         @click="exportCirculationAsset('png')">
-                                        {{ circulationExportState === 'png' ? '正在准备图片' : '保存为图片' }}
+                                        {{
+                                            circulationExportState === 'png'
+                                                ? '正在准备图片'
+                                                : '保存为图片'
+                                        }}
                                     </UiButton>
                                 </div>
                             </div>
                         </div>
                     </Transition>
-
                 </div>
             </UiCard>
 
@@ -625,12 +880,19 @@
                             :style="circulationPdfFullscreenViewportStyle"
                             @wheel.prevent="handleCirculationPdfFullscreenWheel"
                             @mousedown="handleCirculationPdfFullscreenMouseDown"
-                            @touchstart="handleCirculationPdfFullscreenTouchStart"
+                            @touchstart="
+                                handleCirculationPdfFullscreenTouchStart
+                            "
                             @touchmove="handleCirculationPdfFullscreenTouchMove"
                             @touchend="handleCirculationPdfFullscreenTouchEnd"
-                            @touchcancel="handleCirculationPdfFullscreenTouchEnd">
+                            @touchcancel="
+                                handleCirculationPdfFullscreenTouchEnd
+                            ">
                             <div
-                                v-if="circulationPdfState === 'loading' || circulationPdfFullscreenState === 'loading'"
+                                v-if="
+                                    circulationPdfState === 'loading' ||
+                                    circulationPdfFullscreenState === 'loading'
+                                "
                                 class="absolute inset-0 z-[1] animate-pulse bg-slate-100/80" />
 
                             <canvas
@@ -645,7 +907,15 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
+import {
+    computed,
+    nextTick,
+    onBeforeUnmount,
+    onMounted,
+    ref,
+    shallowRef,
+    watch
+} from 'vue';
 import type {
     PDFDocumentLoadingTask,
     PDFPageProxy,
@@ -761,8 +1031,13 @@ interface DisplayTimetableData {
 
 type PdfJsModule = typeof import('pdfjs-dist/build/pdf.mjs');
 
-const historyContentCache = shallowRef(new Map<number, HistoricalTimetableData | null>());
-const historyContentRequestCache = new Map<number, Promise<HistoricalTimetableData | null>>();
+const historyContentCache = shallowRef(
+    new Map<number, HistoricalTimetableData | null>()
+);
+const historyContentRequestCache = new Map<
+    number,
+    Promise<HistoricalTimetableData | null>
+>();
 
 const props = defineProps<{
     modelValue: boolean;
@@ -778,10 +1053,11 @@ const requestFetch: TrackedRequestFetch = import.meta.server
     ? useTrackedRequestFetch()
     : ($fetch as TrackedRequestFetch);
 
-const { state, timetable, errorMessage, normalizedTrainCode } = useCurrentTrainTimetable(
-    computed(() => props.trainCode),
-    computed(() => props.modelValue)
-);
+const { state, timetable, errorMessage, normalizedTrainCode } =
+    useCurrentTrainTimetable(
+        computed(() => props.trainCode),
+        computed(() => props.modelValue)
+    );
 
 const columns = ['站序', '车次', '站名', '到点', '开点', '检票口'];
 const historyColumns = ['站序', '车次', '站名', '到点', '开点'];
@@ -807,7 +1083,9 @@ const circulationPdfFullscreenViewportWidth = ref(0);
 const circulationPdfFullscreenViewportHeight = ref(0);
 const circulationPdfCanvasContainer = ref<HTMLDivElement | null>(null);
 const circulationPdfCanvas = ref<HTMLCanvasElement | null>(null);
-const circulationPdfFullscreenCanvasContainer = ref<HTMLDivElement | null>(null);
+const circulationPdfFullscreenCanvasContainer = ref<HTMLDivElement | null>(
+    null
+);
 const circulationPdfFullscreenViewport = ref<HTMLDivElement | null>(null);
 const circulationPdfFullscreenCanvas = ref<HTMLCanvasElement | null>(null);
 const circulationPdfObjectUrl = ref<string | null>(null);
@@ -836,15 +1114,17 @@ let circulationPdfFullscreenPanStartY = 0;
 let circulationPdfFullscreenPanStartOffsetX = 0;
 let circulationPdfFullscreenPanStartOffsetY = 0;
 
-const isCurrentView = computed(() => selectedTimetableSourceKey.value === 'current');
+const isCurrentView = computed(
+    () => selectedTimetableSourceKey.value === 'current'
+);
 const isCurrentTimetableAvailable = computed(() => timetable.value !== null);
 const shouldShowCirculationSection = computed(() => {
-    return isCurrentTimetableAvailable.value && circulationNodes.value.length > 0;
+    return (
+        isCurrentTimetableAvailable.value && circulationNodes.value.length > 0
+    );
 });
 
-const latestHistoricalCoverage = computed(
-    () => historyItems.value[0] ?? null
-);
+const latestHistoricalCoverage = computed(() => historyItems.value[0] ?? null);
 
 const selectedHistoricalItem = computed(() => {
     if (isCurrentView.value) {
@@ -852,8 +1132,9 @@ const selectedHistoricalItem = computed(() => {
     }
 
     return (
-        historyItems.value.find((item) => item.sourceKey === selectedTimetableSourceKey.value) ??
-        null
+        historyItems.value.find(
+            (item) => item.sourceKey === selectedTimetableSourceKey.value
+        ) ?? null
     );
 });
 
@@ -880,7 +1161,10 @@ const historyTimetableOptions = computed<TimetableSourceOption[]>(() => {
     const options: TimetableSourceOption[] = [];
 
     if (isCurrentTimetableAvailable.value) {
-        options.push({ value: 'current', label: currentTimetableOptionLabel.value });
+        options.push({
+            value: 'current',
+            label: currentTimetableOptionLabel.value
+        });
     }
 
     const historicalItems = isCurrentTimetableAvailable.value
@@ -888,7 +1172,10 @@ const historyTimetableOptions = computed<TimetableSourceOption[]>(() => {
         : historyItems.value;
 
     for (const item of historicalItems) {
-        options.push({ value: item.sourceKey, label: formatHistoryOptionLabel(item) });
+        options.push({
+            value: item.sourceKey,
+            label: formatHistoryOptionLabel(item)
+        });
     }
 
     return options;
@@ -968,8 +1255,13 @@ const modalTitle = computed(() => {
 });
 
 const timetableNotice = computed(() => {
-    const displayCode = displayedTimetable.value?.allCodes[0] ?? props.displayCodes?.[0] ?? props.trainCode;
-    const updatedDateLabel = getUpdatedDateLabel(displayedTimetable.value?.updatedAt ?? null);
+    const displayCode =
+        displayedTimetable.value?.allCodes[0] ??
+        props.displayCodes?.[0] ??
+        props.trainCode;
+    const updatedDateLabel = getUpdatedDateLabel(
+        displayedTimetable.value?.updatedAt ?? null
+    );
 
     if (updatedDateLabel.length === 0) {
         return `当前展示的是 ${displayCode} 次列车时刻表数据，仅供参考`;
@@ -986,7 +1278,9 @@ const timetableFocusTrainCodes = computed(() => {
     ]);
 });
 
-const circulation = computed(() => (isCurrentView.value ? timetable.value?.circulation ?? null : null));
+const circulation = computed(() =>
+    isCurrentView.value ? (timetable.value?.circulation ?? null) : null
+);
 
 const currentCirculationTrainCodeSet = computed(() => {
     if (!isCurrentView.value) {
@@ -1009,10 +1303,14 @@ const currentCirculationNodeIndex = computed(() => {
         return -1;
     }
 
-    const normalizedInternalCode = normalizeComparableCode(timetable.value?.internalCode);
+    const normalizedInternalCode = normalizeComparableCode(
+        timetable.value?.internalCode
+    );
     if (normalizedInternalCode.length > 0) {
         const nodeIndex = currentCirculation.nodes.findIndex(
-            (node) => normalizeComparableCode(node.internalCode) === normalizedInternalCode
+            (node) =>
+                normalizeComparableCode(node.internalCode) ===
+                normalizedInternalCode
         );
         if (nodeIndex >= 0) {
             return nodeIndex;
@@ -1021,7 +1319,9 @@ const currentCirculationNodeIndex = computed(() => {
 
     return currentCirculation.nodes.findIndex((node) =>
         node.allCodes.some((code) =>
-            currentCirculationTrainCodeSet.value.has(normalizeComparableCode(code))
+            currentCirculationTrainCodeSet.value.has(
+                normalizeComparableCode(code)
+            )
         )
     );
 });
@@ -1067,7 +1367,10 @@ const shouldLoadCirculationPdfPreview = computed(() => {
 });
 
 const shouldShowCirculationPdfPreview = computed(() => {
-    return shouldLoadCirculationPdfPreview.value && circulationPdfState.value !== 'error';
+    return (
+        shouldLoadCirculationPdfPreview.value &&
+        circulationPdfState.value !== 'error'
+    );
 });
 
 const circulationPdfFullscreenViewportStyle = computed(() => {
@@ -1085,7 +1388,9 @@ const circulationPdfFullscreenViewportStyle = computed(() => {
 });
 
 const circulationNotice = computed(() => {
-    return circulation.value?.source === 'inferred' ? '当前交路表结果由计算推测得到，仅供参考' : '';
+    return circulation.value?.source === 'inferred'
+        ? '当前交路表结果由计算推测得到，仅供参考'
+        : '';
 });
 
 const responsibilitySummary = computed(() => {
@@ -1099,7 +1404,8 @@ const responsibilitySummary = computed(() => {
     }
 
     const trainDepartment = timetable.value?.trainDepartment.trim() ?? '';
-    const passengerDepartment = timetable.value?.passengerDepartment.trim() ?? '';
+    const passengerDepartment =
+        timetable.value?.passengerDepartment.trim() ?? '';
     const leadingText = [bureauName, trainDepartment]
         .filter((part) => part.length > 0)
         .join(', ');
@@ -1111,7 +1417,9 @@ const responsibilitySummary = computed(() => {
     return `${leadingText}, ${passengerDepartment}`;
 });
 
-const visibleColumns = computed(() => (isCurrentView.value ? columns : historyColumns));
+const visibleColumns = computed(() =>
+    isCurrentView.value ? columns : historyColumns
+);
 
 const viewState = computed<ViewState>(() => {
     if (displayedTimetable.value) {
@@ -1119,7 +1427,10 @@ const viewState = computed<ViewState>(() => {
     }
 
     if (isCurrentView.value) {
-        if (state.value === 'loading' || historyLoadingState.value === 'loading') {
+        if (
+            state.value === 'loading' ||
+            historyLoadingState.value === 'loading'
+        ) {
             return 'loading';
         }
 
@@ -1127,7 +1438,10 @@ const viewState = computed<ViewState>(() => {
             return 'error';
         }
 
-        if (historyLoadingState.value === 'error' && historyItems.value.length === 0) {
+        if (
+            historyLoadingState.value === 'error' &&
+            historyItems.value.length === 0
+        ) {
             return 'error';
         }
 
@@ -1138,7 +1452,10 @@ const viewState = computed<ViewState>(() => {
         return 'loading';
     }
 
-    if (historyLoadingState.value === 'loading' || historyContentState.value === 'loading') {
+    if (
+        historyLoadingState.value === 'loading' ||
+        historyContentState.value === 'loading'
+    ) {
         return 'loading';
     }
 
@@ -1146,7 +1463,10 @@ const viewState = computed<ViewState>(() => {
         return 'error';
     }
 
-    if (historyLoadingState.value === 'error' && historyItems.value.length === 0) {
+    if (
+        historyLoadingState.value === 'error' &&
+        historyItems.value.length === 0
+    ) {
         return 'error';
     }
 
@@ -1161,10 +1481,16 @@ const viewState = computed<ViewState>(() => {
     return 'loading';
 });
 
-const errorTitle = computed(() => (isCurrentView.value ? '当前时刻表暂时不可用' : '历史时刻表暂时不可用'));
-const emptyTitle = computed(() => (isCurrentView.value ? '当前暂无时刻表' : '当前暂无历史时刻表'));
+const errorTitle = computed(() =>
+    isCurrentView.value ? '当前时刻表暂时不可用' : '历史时刻表暂时不可用'
+);
+const emptyTitle = computed(() =>
+    isCurrentView.value ? '当前暂无时刻表' : '当前暂无历史时刻表'
+);
 const emptyDescription = computed(() =>
-    isCurrentView.value ? '该车次今天没有可用的完整经停表。' : '该车次没有可用的历史时刻表数据。'
+    isCurrentView.value
+        ? '该车次今天没有可用的完整经停表。'
+        : '该车次没有可用的历史时刻表数据。'
 );
 
 function normalizeComparableCode(code: string | null | undefined) {
@@ -1182,15 +1508,23 @@ function normalizeTrainCodes(codes: string[]) {
 }
 
 function resolveStopFocusTrainCodes(stop: DisplayTimetableStop) {
-    return normalizeTrainCodes([stop.stationTrainCode, ...timetableFocusTrainCodes.value]);
+    return normalizeTrainCodes([
+        stop.stationTrainCode,
+        ...timetableFocusTrainCodes.value
+    ]);
 }
 
 function resolveCirculationNodeFocusTrainCodes(node: DisplayCirculationNode) {
-    return normalizeTrainCodes([...node.allCodes, ...timetableFocusTrainCodes.value]);
+    return normalizeTrainCodes([
+        ...node.allCodes,
+        ...timetableFocusTrainCodes.value
+    ]);
 }
 
 function isCurrentCirculationCode(code: string) {
-    return currentCirculationTrainCodeSet.value.has(normalizeComparableCode(code));
+    return currentCirculationTrainCodeSet.value.has(
+        normalizeComparableCode(code)
+    );
 }
 
 function buildCirculationCodeLink(code: string) {
@@ -1231,7 +1565,11 @@ function isMobileDownloadContext() {
     }
 
     const viewportWidth = Math.max(window.innerWidth || 0, screen.width || 0);
-    if (navigator.maxTouchPoints > 0 && viewportWidth > 0 && viewportWidth <= 1024) {
+    if (
+        navigator.maxTouchPoints > 0 &&
+        viewportWidth > 0 &&
+        viewportWidth <= 1024
+    ) {
         return true;
     }
 
@@ -1304,7 +1642,10 @@ async function shareCirculationAssetFile(
         title: fileName
     };
 
-    if (typeof navigator.canShare === 'function' && !navigator.canShare(sharePayload)) {
+    if (
+        typeof navigator.canShare === 'function' &&
+        !navigator.canShare(sharePayload)
+    ) {
         return false;
     }
 
@@ -1312,13 +1653,17 @@ async function shareCirculationAssetFile(
     return true;
 }
 
-async function fetchCirculationAssetDownloadUrl(format: CirculationExportFormat) {
+async function fetchCirculationAssetDownloadUrl(
+    format: CirculationExportFormat
+) {
     const requestTrainCode = circulationPdfRequestTrainCode.value;
     if (requestTrainCode.length === 0) {
         throw new Error('当前暂无可导出的交路图');
     }
 
-    const response = await requestFetch<TrackerApiResponse<TrainCirculationImageData>>(
+    const response = await requestFetch<
+        TrackerApiResponse<TrainCirculationImageData>
+    >(
         `/api/v1/timetable/train/${encodeURIComponent(requestTrainCode)}/circulation/image`,
         {
             query: {
@@ -1332,7 +1677,10 @@ async function fetchCirculationAssetDownloadUrl(format: CirculationExportFormat)
         throw new Error(response.data || '运行图导出失败，请稍后重试。');
     }
 
-    if (typeof response.data.imageUrl !== 'string' || response.data.imageUrl.length === 0) {
+    if (
+        typeof response.data.imageUrl !== 'string' ||
+        response.data.imageUrl.length === 0
+    ) {
         throw new Error('运行图下载地址无效');
     }
 
@@ -1357,7 +1705,11 @@ async function exportCirculationAsset(format: CirculationExportFormat) {
         }
 
         try {
-            const shared = await shareCirculationAssetFile(downloadUrl, format, fileName);
+            const shared = await shareCirculationAssetFile(
+                downloadUrl,
+                format,
+                fileName
+            );
             if (shared) {
                 return;
             }
@@ -1404,14 +1756,12 @@ function clampCirculationPdfFullscreenZoom(nextZoom: number) {
         return 1;
     }
 
-    return Math.min(
-        CIRCULATION_PDF_FULLSCREEN_MAX_ZOOM,
-        Math.max(1, nextZoom)
-    );
+    return Math.min(CIRCULATION_PDF_FULLSCREEN_MAX_ZOOM, Math.max(1, nextZoom));
 }
 
 function setCirculationPdfFullscreenZoom(nextZoom: number) {
-    circulationPdfFullscreenZoom.value = clampCirculationPdfFullscreenZoom(nextZoom);
+    circulationPdfFullscreenZoom.value =
+        clampCirculationPdfFullscreenZoom(nextZoom);
 }
 
 function resetCirculationPdfFullscreenZoom() {
@@ -1515,9 +1865,11 @@ function applyCirculationPdfFullscreenZoomAtPoint(
     const nextContentWidth = currentContentWidth * zoomRatio;
     const nextContentHeight = currentContentHeight * zoomRatio;
     const nextOffsetX =
-        (circulationPdfFullscreenViewportOffsetX.value + anchorX) * zoomRatio - anchorX;
+        (circulationPdfFullscreenViewportOffsetX.value + anchorX) * zoomRatio -
+        anchorX;
     const nextOffsetY =
-        (circulationPdfFullscreenViewportOffsetY.value + anchorY) * zoomRatio - anchorY;
+        (circulationPdfFullscreenViewportOffsetY.value + anchorY) * zoomRatio -
+        anchorY;
 
     circulationPdfFullscreenZoom.value = clampedZoom;
 
@@ -1536,7 +1888,10 @@ function applyCirculationPdfFullscreenZoomAtPoint(
 }
 
 function handleCirculationPdfFullscreenMouseMove(event: MouseEvent) {
-    if (!isCirculationPdfFullscreenPanning || circulationPdfFullscreenState.value !== 'ready') {
+    if (
+        !isCirculationPdfFullscreenPanning ||
+        circulationPdfFullscreenState.value !== 'ready'
+    ) {
         return;
     }
 
@@ -1551,8 +1906,10 @@ function handleCirculationPdfFullscreenMouseMove(event: MouseEvent) {
         viewportHeight,
         circulationPdfFullscreenContentWidth.value,
         circulationPdfFullscreenContentHeight.value,
-        circulationPdfFullscreenPanStartOffsetX - (event.clientX - circulationPdfFullscreenPanStartX),
-        circulationPdfFullscreenPanStartOffsetY - (event.clientY - circulationPdfFullscreenPanStartY)
+        circulationPdfFullscreenPanStartOffsetX -
+            (event.clientX - circulationPdfFullscreenPanStartX),
+        circulationPdfFullscreenPanStartOffsetY -
+            (event.clientY - circulationPdfFullscreenPanStartY)
     );
     circulationPdfFullscreenViewportOffsetX.value = clampedOffset.offsetX;
     circulationPdfFullscreenViewportOffsetY.value = clampedOffset.offsetY;
@@ -1566,8 +1923,14 @@ function handleCirculationPdfFullscreenMouseUp() {
     }
 
     isCirculationPdfFullscreenPanning = false;
-    window.removeEventListener('mousemove', handleCirculationPdfFullscreenMouseMove);
-    window.removeEventListener('mouseup', handleCirculationPdfFullscreenMouseUp);
+    window.removeEventListener(
+        'mousemove',
+        handleCirculationPdfFullscreenMouseMove
+    );
+    window.removeEventListener(
+        'mouseup',
+        handleCirculationPdfFullscreenMouseUp
+    );
 }
 
 function handleCirculationPdfFullscreenMouseDown(event: MouseEvent) {
@@ -1583,9 +1946,14 @@ function handleCirculationPdfFullscreenMouseDown(event: MouseEvent) {
     isCirculationPdfFullscreenPanning = true;
     circulationPdfFullscreenPanStartX = event.clientX;
     circulationPdfFullscreenPanStartY = event.clientY;
-    circulationPdfFullscreenPanStartOffsetX = circulationPdfFullscreenViewportOffsetX.value;
-    circulationPdfFullscreenPanStartOffsetY = circulationPdfFullscreenViewportOffsetY.value;
-    window.addEventListener('mousemove', handleCirculationPdfFullscreenMouseMove);
+    circulationPdfFullscreenPanStartOffsetX =
+        circulationPdfFullscreenViewportOffsetX.value;
+    circulationPdfFullscreenPanStartOffsetY =
+        circulationPdfFullscreenViewportOffsetY.value;
+    window.addEventListener(
+        'mousemove',
+        handleCirculationPdfFullscreenMouseMove
+    );
     window.addEventListener('mouseup', handleCirculationPdfFullscreenMouseUp);
 }
 
@@ -1624,10 +1992,13 @@ function handleCirculationPdfFullscreenTouchStart(event: TouchEvent) {
         isCirculationPdfFullscreenPanning = true;
         circulationPdfFullscreenPanStartX = first.clientX;
         circulationPdfFullscreenPanStartY = first.clientY;
-        circulationPdfFullscreenPanStartOffsetX = circulationPdfFullscreenViewportOffsetX.value;
-        circulationPdfFullscreenPanStartOffsetY = circulationPdfFullscreenViewportOffsetY.value;
+        circulationPdfFullscreenPanStartOffsetX =
+            circulationPdfFullscreenViewportOffsetX.value;
+        circulationPdfFullscreenPanStartOffsetY =
+            circulationPdfFullscreenViewportOffsetY.value;
         circulationPdfFullscreenPinchStartDistance = 0;
-        circulationPdfFullscreenPinchStartZoom = circulationPdfFullscreenZoom.value;
+        circulationPdfFullscreenPinchStartZoom =
+            circulationPdfFullscreenZoom.value;
         return;
     }
 
@@ -1649,7 +2020,9 @@ function handleCirculationPdfFullscreenTouchStart(event: TouchEvent) {
         return;
     }
 
-    circulationPdfFullscreenPinchStartDistance = getTouchDistance(event.touches);
+    circulationPdfFullscreenPinchStartDistance = getTouchDistance(
+        event.touches
+    );
     circulationPdfFullscreenPinchStartZoom = circulationPdfFullscreenZoom.value;
     circulationPdfFullscreenPinchAnchorX = anchorPoint.x;
     circulationPdfFullscreenPinchAnchorY = anchorPoint.y;
@@ -1675,8 +2048,10 @@ function handleCirculationPdfFullscreenTouchMove(event: TouchEvent) {
             viewportHeight,
             circulationPdfFullscreenContentWidth.value,
             circulationPdfFullscreenContentHeight.value,
-            circulationPdfFullscreenPanStartOffsetX - (first.clientX - circulationPdfFullscreenPanStartX),
-            circulationPdfFullscreenPanStartOffsetY - (first.clientY - circulationPdfFullscreenPanStartY)
+            circulationPdfFullscreenPanStartOffsetX -
+                (first.clientX - circulationPdfFullscreenPanStartX),
+            circulationPdfFullscreenPanStartOffsetY -
+                (first.clientY - circulationPdfFullscreenPanStartY)
         );
         circulationPdfFullscreenViewportOffsetX.value = clampedOffset.offsetX;
         circulationPdfFullscreenViewportOffsetY.value = clampedOffset.offsetY;
@@ -1690,8 +2065,11 @@ function handleCirculationPdfFullscreenTouchMove(event: TouchEvent) {
     }
 
     if (circulationPdfFullscreenPinchStartDistance <= 0) {
-        circulationPdfFullscreenPinchStartDistance = getTouchDistance(event.touches);
-        circulationPdfFullscreenPinchStartZoom = circulationPdfFullscreenZoom.value;
+        circulationPdfFullscreenPinchStartDistance = getTouchDistance(
+            event.touches
+        );
+        circulationPdfFullscreenPinchStartZoom =
+            circulationPdfFullscreenZoom.value;
         return;
     }
 
@@ -1729,8 +2107,11 @@ function handleCirculationPdfFullscreenTouchMove(event: TouchEvent) {
 
 function handleCirculationPdfFullscreenTouchEnd(event: TouchEvent) {
     if (event.touches.length >= 2) {
-        circulationPdfFullscreenPinchStartDistance = getTouchDistance(event.touches);
-        circulationPdfFullscreenPinchStartZoom = circulationPdfFullscreenZoom.value;
+        circulationPdfFullscreenPinchStartDistance = getTouchDistance(
+            event.touches
+        );
+        circulationPdfFullscreenPinchStartZoom =
+            circulationPdfFullscreenZoom.value;
         return;
     }
 
@@ -1739,10 +2120,13 @@ function handleCirculationPdfFullscreenTouchEnd(event: TouchEvent) {
         isCirculationPdfFullscreenPanning = true;
         circulationPdfFullscreenPanStartX = first.clientX;
         circulationPdfFullscreenPanStartY = first.clientY;
-        circulationPdfFullscreenPanStartOffsetX = circulationPdfFullscreenViewportOffsetX.value;
-        circulationPdfFullscreenPanStartOffsetY = circulationPdfFullscreenViewportOffsetY.value;
+        circulationPdfFullscreenPanStartOffsetX =
+            circulationPdfFullscreenViewportOffsetX.value;
+        circulationPdfFullscreenPanStartOffsetY =
+            circulationPdfFullscreenViewportOffsetY.value;
         circulationPdfFullscreenPinchStartDistance = 0;
-        circulationPdfFullscreenPinchStartZoom = circulationPdfFullscreenZoom.value;
+        circulationPdfFullscreenPinchStartZoom =
+            circulationPdfFullscreenZoom.value;
         return;
     }
 
@@ -1758,9 +2142,10 @@ async function loadPdfJsModule() {
         pdfJsModulePromise = import('pdfjs-dist/build/pdf.mjs');
     }
     if (!pdfJsWorkerUrlPromise) {
-        pdfJsWorkerUrlPromise = import('pdfjs-dist/build/pdf.worker.mjs?url').then(
-            (module) => module.default
-        );
+        pdfJsWorkerUrlPromise =
+            import('pdfjs-dist/build/pdf.worker.mjs?url').then(
+                (module) => module.default
+            );
     }
 
     const [pdfjs, workerSrc] = await Promise.all([
@@ -1887,7 +2272,10 @@ async function cleanupCirculationPdfPreview(options?: {
     await destroyCirculationPdfDocument();
     await revokeCirculationPdfObjectUrl();
     resetCirculationPdfCanvas(circulationPdfCanvas.value, 'preview');
-    resetCirculationPdfCanvas(circulationPdfFullscreenCanvas.value, 'fullscreen');
+    resetCirculationPdfCanvas(
+        circulationPdfFullscreenCanvas.value,
+        'fullscreen'
+    );
     resetCirculationPdfFullscreenZoom();
     isCirculationPdfPreviewOpen.value = false;
 
@@ -1924,7 +2312,8 @@ function getCirculationPdfPageRenderTarget(mode: 'preview' | 'fullscreen') {
         return {
             container,
             canvas,
-            renderScaleMultiplier: CIRCULATION_PDF_PREVIEW_RENDER_SCALE_MULTIPLIER,
+            renderScaleMultiplier:
+                CIRCULATION_PDF_PREVIEW_RENDER_SCALE_MULTIPLIER,
             maxPixelArea: CIRCULATION_PDF_PREVIEW_MAX_PIXEL_AREA,
             maxDimension: CIRCULATION_PDF_MAX_DIMENSION
         } satisfies CirculationPdfRenderTarget;
@@ -1939,7 +2328,8 @@ function getCirculationPdfPageRenderTarget(mode: 'preview' | 'fullscreen') {
     return {
         container,
         canvas,
-        renderScaleMultiplier: CIRCULATION_PDF_FULLSCREEN_RENDER_SCALE_MULTIPLIER,
+        renderScaleMultiplier:
+            CIRCULATION_PDF_FULLSCREEN_RENDER_SCALE_MULTIPLIER,
         maxPixelArea: CIRCULATION_PDF_FULLSCREEN_MAX_PIXEL_AREA,
         maxDimension: CIRCULATION_PDF_MAX_DIMENSION
     } satisfies CirculationPdfRenderTarget;
@@ -1991,7 +2381,10 @@ function buildCirculationPdfFullscreenRenderKey(input: {
     ].join(':');
 }
 
-function setCirculationPdfRenderTaskRef(mode: 'preview' | 'fullscreen', renderTask: RenderTask | null) {
+function setCirculationPdfRenderTaskRef(
+    mode: 'preview' | 'fullscreen',
+    renderTask: RenderTask | null
+) {
     if (mode === 'preview') {
         circulationPdfRenderTask = renderTask;
         return;
@@ -2015,7 +2408,12 @@ function clampCirculationPdfOutputScale(
 
     return Math.max(
         1,
-        Math.min(desiredOutputScale, maxScaleByArea, maxScaleByWidth, maxScaleByHeight)
+        Math.min(
+            desiredOutputScale,
+            maxScaleByArea,
+            maxScaleByWidth,
+            maxScaleByHeight
+        )
     );
 }
 
@@ -2031,8 +2429,14 @@ async function resolveCirculationPdfFullscreenRenderMetrics(
     viewportDisplayHeight: number;
     renderKey: string;
 } | null> {
-    const containerWidth = Math.max(0, Math.floor(target.container.clientWidth));
-    const containerHeight = Math.max(0, Math.floor(target.container.clientHeight));
+    const containerWidth = Math.max(
+        0,
+        Math.floor(target.container.clientWidth)
+    );
+    const containerHeight = Math.max(
+        0,
+        Math.floor(target.container.clientHeight)
+    );
     const orientation = getCirculationPdfFullscreenOrientation();
     const rotation = orientation === 'portrait' ? 90 : 0;
     const page = await document.getPage(1);
@@ -2084,7 +2488,10 @@ async function requestCirculationPdfFullscreenRender(requestToken: number) {
         return;
     }
 
-    const metrics = await resolveCirculationPdfFullscreenRenderMetrics(document, target);
+    const metrics = await resolveCirculationPdfFullscreenRenderMetrics(
+        document,
+        target
+    );
     if (!metrics || requestToken !== circulationPdfRequestToken) {
         return;
     }
@@ -2105,7 +2512,8 @@ async function requestCirculationPdfFullscreenRender(requestToken: number) {
         });
     } finally {
         if (
-            getCirculationPdfFullscreenPendingRenderKey() === metrics.renderKey &&
+            getCirculationPdfFullscreenPendingRenderKey() ===
+                metrics.renderKey &&
             getCirculationPdfFullscreenLastRenderKey() !== metrics.renderKey
         ) {
             setCirculationPdfFullscreenPendingRenderKey('');
@@ -2140,10 +2548,11 @@ async function renderCirculationPdfPageToTarget(options: {
     let renderKey = `${containerWidth}`;
 
     if (mode === 'fullscreen') {
-        const fullscreenMetrics = await resolveCirculationPdfFullscreenRenderMetrics(
-            document,
-            target
-        );
+        const fullscreenMetrics =
+            await resolveCirculationPdfFullscreenRenderMetrics(
+                document,
+                target
+            );
         if (!fullscreenMetrics) {
             setCirculationPdfFullscreenPendingRenderKey('');
             return;
@@ -2160,7 +2569,10 @@ async function renderCirculationPdfPageToTarget(options: {
 
     if (
         containerWidth <= 0 ||
-        (mode === 'fullscreen' && (containerHeight <= 0 || viewportDisplayWidth <= 0 || viewportDisplayHeight <= 0)) ||
+        (mode === 'fullscreen' &&
+            (containerHeight <= 0 ||
+                viewportDisplayWidth <= 0 ||
+                viewportDisplayHeight <= 0)) ||
         (mode === 'preview'
             ? containerWidth === getCirculationPdfPreviewLastRenderedWidth()
             : renderKey === getCirculationPdfFullscreenLastRenderKey())
@@ -2196,7 +2608,11 @@ async function renderCirculationPdfPageToTarget(options: {
                   )
                 : containerWidth / pageBaseViewport.width;
         const viewport = page.getViewport({
-            scale: fitScale * (mode === 'fullscreen' ? circulationPdfFullscreenZoom.value : 1),
+            scale:
+                fitScale *
+                (mode === 'fullscreen'
+                    ? circulationPdfFullscreenZoom.value
+                    : 1),
             rotation
         });
         const renderSurfaceWidth =
@@ -2217,8 +2633,14 @@ async function renderCirculationPdfPageToTarget(options: {
             return;
         }
 
-        target.canvas.width = Math.max(1, Math.floor(renderSurfaceWidth * outputScale));
-        target.canvas.height = Math.max(1, Math.floor(renderSurfaceHeight * outputScale));
+        target.canvas.width = Math.max(
+            1,
+            Math.floor(renderSurfaceWidth * outputScale)
+        );
+        target.canvas.height = Math.max(
+            1,
+            Math.floor(renderSurfaceHeight * outputScale)
+        );
         target.canvas.style.width = `${Math.floor(renderSurfaceWidth)}px`;
         target.canvas.style.height = `${Math.floor(renderSurfaceHeight)}px`;
 
@@ -2226,7 +2648,8 @@ async function renderCirculationPdfPageToTarget(options: {
             circulationPdfFullscreenContentWidth.value = viewport.width;
             circulationPdfFullscreenContentHeight.value = viewport.height;
             circulationPdfFullscreenViewportWidth.value = viewportDisplayWidth;
-            circulationPdfFullscreenViewportHeight.value = viewportDisplayHeight;
+            circulationPdfFullscreenViewportHeight.value =
+                viewportDisplayHeight;
             const clampedOffset = clampCirculationPdfFullscreenScroll(
                 viewportDisplayWidth,
                 viewportDisplayHeight,
@@ -2235,8 +2658,10 @@ async function renderCirculationPdfPageToTarget(options: {
                 circulationPdfFullscreenViewportOffsetX.value,
                 circulationPdfFullscreenViewportOffsetY.value
             );
-            circulationPdfFullscreenViewportOffsetX.value = clampedOffset.offsetX;
-            circulationPdfFullscreenViewportOffsetY.value = clampedOffset.offsetY;
+            circulationPdfFullscreenViewportOffsetX.value =
+                clampedOffset.offsetX;
+            circulationPdfFullscreenViewportOffsetY.value =
+                clampedOffset.offsetY;
         }
 
         context.setTransform(1, 0, 0, 1, 0, 0);
@@ -2253,14 +2678,18 @@ async function renderCirculationPdfPageToTarget(options: {
                           0,
                           0,
                           outputScale,
-                          -circulationPdfFullscreenViewportOffsetX.value * outputScale,
-                          -circulationPdfFullscreenViewportOffsetY.value * outputScale
+                          -circulationPdfFullscreenViewportOffsetX.value *
+                              outputScale,
+                          -circulationPdfFullscreenViewportOffsetY.value *
+                              outputScale
                       ]
                     : outputScale === 1
                       ? undefined
                       : [outputScale, 0, 0, outputScale, 0, 0],
             background:
-                mode === 'fullscreen' ? 'rgba(255,255,255,0)' : 'rgb(255,255,255)'
+                mode === 'fullscreen'
+                    ? 'rgba(255,255,255,0)'
+                    : 'rgb(255,255,255)'
         });
         setCirculationPdfRenderTaskRef(mode, renderTask);
         await renderTask.promise;
@@ -2286,7 +2715,10 @@ async function renderCirculationPdfPageToTarget(options: {
             setCirculationPdfFullscreenPendingRenderKey('');
         }
 
-        if (requestToken !== circulationPdfRequestToken || isCirculationPdfCancellationError(error)) {
+        if (
+            requestToken !== circulationPdfRequestToken ||
+            isCirculationPdfCancellationError(error)
+        ) {
             return;
         }
 
@@ -2302,7 +2734,10 @@ async function renderCirculationPdfPageToTarget(options: {
         circulationPdfFullscreenState.value = 'error';
         stopCirculationPdfFullscreenResizeObserver();
         cancelCirculationPdfFullscreenRender();
-        resetCirculationPdfCanvas(circulationPdfFullscreenCanvas.value, 'fullscreen');
+        resetCirculationPdfCanvas(
+            circulationPdfFullscreenCanvas.value,
+            'fullscreen'
+        );
     }
 }
 
@@ -2328,7 +2763,9 @@ async function startCirculationPdfResizeObserver(requestToken: number) {
     circulationPdfResizeObserver.observe(container);
 }
 
-async function startCirculationPdfFullscreenResizeObserver(requestToken: number) {
+async function startCirculationPdfFullscreenResizeObserver(
+    requestToken: number
+) {
     await nextTick();
     if (!import.meta.client || requestToken !== circulationPdfRequestToken) {
         return;
@@ -2384,7 +2821,10 @@ async function loadCirculationPdfPreview(requestTrainCode: string) {
         }
 
         const pdfBytes = new Uint8Array(await response.arrayBuffer());
-        if (requestToken !== circulationPdfRequestToken || pdfBytes.byteLength === 0) {
+        if (
+            requestToken !== circulationPdfRequestToken ||
+            pdfBytes.byteLength === 0
+        ) {
             return;
         }
 
@@ -2459,7 +2899,9 @@ function formatCirculationOffsetTime(offsetSeconds: number) {
 }
 
 function formatCalendarDateLabel(timestamp: number) {
-    const parts = DATE_LABEL_FORMATTER.formatToParts(new Date(timestamp * 1000));
+    const parts = DATE_LABEL_FORMATTER.formatToParts(
+        new Date(timestamp * 1000)
+    );
     const year = parts.find((part) => part.type === 'year')?.value ?? '';
     const month = parts.find((part) => part.type === 'month')?.value ?? '';
     const day = parts.find((part) => part.type === 'day')?.value ?? '';
@@ -2486,7 +2928,10 @@ function getUpdatedDateLabel(updatedAt: number | null) {
         return '今日';
     }
 
-    if (updatedDateKey === formatShanghaiDateString(todayTimestamp - 24 * 60 * 60)) {
+    if (
+        updatedDateKey ===
+        formatShanghaiDateString(todayTimestamp - 24 * 60 * 60)
+    ) {
         return '昨日';
     }
 
@@ -2512,7 +2957,10 @@ function formatHistoryOptionLabel(item: HistoricalTimetableOption) {
     return startLabel.length > 0 ? `${startLabel}起` : '';
 }
 
-function setHistoryContentCacheValue(historyId: number, value: HistoricalTimetableData | null) {
+function setHistoryContentCacheValue(
+    historyId: number,
+    value: HistoricalTimetableData | null
+) {
     const nextCache = new Map(historyContentCache.value);
     nextCache.set(historyId, value);
     historyContentCache.value = nextCache;
@@ -2552,7 +3000,9 @@ async function fetchHistoricalTimetableList() {
         let cursor = '';
 
         while (true) {
-            const response = await requestFetch<TrackerApiResponse<TrainTimetableHistoryListResponse>>(
+            const response = await requestFetch<
+                TrackerApiResponse<TrainTimetableHistoryListResponse>
+            >(
                 `/api/v1/timetable/train/${encodeURIComponent(normalizedTrainCode.value)}/history`,
                 {
                     query: {
@@ -2605,7 +3055,10 @@ async function fetchHistoricalTimetableList() {
         }
 
         historyLoadingState.value = 'error';
-        historyErrorMessage.value = getApiErrorMessage(error, '历史时刻表加载失败，请稍后重试。');
+        historyErrorMessage.value = getApiErrorMessage(
+            error,
+            '历史时刻表加载失败，请稍后重试。'
+        );
     }
 }
 
@@ -2641,7 +3094,8 @@ async function fetchHistoricalTimetableContent(historyId: number) {
             if (!response.ok) {
                 setHistoryContentCacheValue(historyId, null);
                 historyContentState.value = 'error';
-                historyContentErrorMessage.value = '历史时刻表加载失败，请稍后重试。';
+                historyContentErrorMessage.value =
+                    '历史时刻表加载失败，请稍后重试。';
                 return null;
             }
 
@@ -2660,7 +3114,8 @@ async function fetchHistoricalTimetableContent(historyId: number) {
 
             setHistoryContentCacheValue(historyId, null);
             historyContentState.value = 'error';
-            historyContentErrorMessage.value = '历史时刻表加载失败，请稍后重试。';
+            historyContentErrorMessage.value =
+                '历史时刻表加载失败，请稍后重试。';
             return null;
         })
         .finally(() => {
@@ -2700,9 +3155,13 @@ function readPersistedSectionState(): PersistedSectionState {
 
         return {
             timetableExpanded:
-                typeof parsed.timetableExpanded === 'boolean' ? parsed.timetableExpanded : true,
+                typeof parsed.timetableExpanded === 'boolean'
+                    ? parsed.timetableExpanded
+                    : true,
             circulationExpanded:
-                typeof parsed.circulationExpanded === 'boolean' ? parsed.circulationExpanded : true
+                typeof parsed.circulationExpanded === 'boolean'
+                    ? parsed.circulationExpanded
+                    : true
         };
     } catch {
         return {
@@ -2772,10 +3231,7 @@ function syncSelectionWithData() {
 }
 
 watch(
-    [
-        () => props.modelValue,
-        () => normalizedTrainCode.value
-    ],
+    [() => props.modelValue, () => normalizedTrainCode.value],
     async ([isOpen, trainCode], [previousOpen, previousTrainCode]) => {
         if (!isOpen) {
             return;
@@ -2795,7 +3251,12 @@ watch(
 );
 
 watch(
-    [() => state.value, () => timetable.value, () => historyItems.value, () => historyLoadingState.value],
+    [
+        () => state.value,
+        () => timetable.value,
+        () => historyItems.value,
+        () => historyLoadingState.value
+    ],
     async () => {
         syncSelectionWithData();
         ensureHistoricalContentLoaded();
@@ -2822,7 +3283,10 @@ watch(
         () => shouldLoadCirculationPdfPreview.value,
         () => circulationPdfRequestTrainCode.value
     ],
-    async ([shouldLoad, requestTrainCode], [previousShouldLoad, previousTrainCode]) => {
+    async (
+        [shouldLoad, requestTrainCode],
+        [previousShouldLoad, previousTrainCode]
+    ) => {
         if (!import.meta.client) {
             return;
         }
@@ -2832,7 +3296,10 @@ watch(
             return;
         }
 
-        if (shouldLoad && (!previousShouldLoad || previousTrainCode !== requestTrainCode)) {
+        if (
+            shouldLoad &&
+            (!previousShouldLoad || previousTrainCode !== requestTrainCode)
+        ) {
             await loadCirculationPdfPreview(requestTrainCode);
         }
     },
@@ -2849,7 +3316,10 @@ watch(
         if (!isOpen) {
             stopCirculationPdfFullscreenResizeObserver();
             cancelCirculationPdfFullscreenRender();
-            resetCirculationPdfCanvas(circulationPdfFullscreenCanvas.value, 'fullscreen');
+            resetCirculationPdfCanvas(
+                circulationPdfFullscreenCanvas.value,
+                'fullscreen'
+            );
             resetCirculationPdfFullscreenZoom();
             circulationPdfFullscreenState.value = 'idle';
             return;
@@ -2860,12 +3330,18 @@ watch(
             return;
         }
 
-        resetCirculationPdfCanvas(circulationPdfFullscreenCanvas.value, 'fullscreen');
+        resetCirculationPdfCanvas(
+            circulationPdfFullscreenCanvas.value,
+            'fullscreen'
+        );
         resetCirculationPdfFullscreenZoom();
-        circulationPdfFullscreenOrientation = getCirculationPdfFullscreenOrientation();
+        circulationPdfFullscreenOrientation =
+            getCirculationPdfFullscreenOrientation();
         circulationPdfFullscreenState.value = 'loading';
         await nextTick();
-        await startCirculationPdfFullscreenResizeObserver(circulationPdfRequestToken);
+        await startCirculationPdfFullscreenResizeObserver(
+            circulationPdfRequestToken
+        );
     }
 );
 

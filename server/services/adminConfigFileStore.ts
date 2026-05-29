@@ -300,9 +300,9 @@ async function refreshAssetFromRemote(
                   ? validateDownloadedQrCodeAssetText
                   : target === 'stationCoord'
                     ? validateDownloadedStationCoordAssetText
-                  : async (content) => {
-                        await validateQrcodeDetectionConfigText(content);
-                    }
+                    : async (content) => {
+                          await validateQrcodeDetectionConfigText(content);
+                      }
     });
 
     ensure(
@@ -345,7 +345,7 @@ async function refreshAssetFromRemote(
                   ? `已从远程来源刷新畅行码映射，并同步固定车组畅行码检测任务。${qrcodeWarning}`
                   : target === 'stationCoord'
                     ? '已从远程来源刷新车站坐标文件，后续线路时刻表下载任务会使用新的坐标回退规则。'
-                  : `已从远程来源刷新固定车组畅行码检测计划，并同步未来派发任务。${qrcodeWarning}`,
+                    : `已从远程来源刷新固定车组畅行码检测计划，并同步未来派发任务。${qrcodeWarning}`,
         item: nextItem
     };
 }

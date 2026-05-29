@@ -13,7 +13,10 @@ const cachedTimetables = new Map<string, CurrentTrainTimetableData>();
 
 function isNotFoundResponse(
     response: TrackerApiResponse<CurrentTrainTimetableData>
-): response is Extract<TrackerApiResponse<CurrentTrainTimetableData>, { ok: false }> {
+): response is Extract<
+    TrackerApiResponse<CurrentTrainTimetableData>,
+    { ok: false }
+> {
     return !response.ok && response.error === 'not_found';
 }
 
@@ -22,14 +25,18 @@ function isNotFoundError(error: unknown) {
         return false;
     }
 
-    const response = (error as {
-        response?: {
-            status?: unknown;
-            _data?: unknown;
-        };
-    }).response;
+    const response = (
+        error as {
+            response?: {
+                status?: unknown;
+                _data?: unknown;
+            };
+        }
+    ).response;
     const status = typeof response?.status === 'number' ? response.status : 0;
-    const payload = response?._data as Partial<TrackerApiResponse<CurrentTrainTimetableData>> | undefined;
+    const payload = response?._data as
+        | Partial<TrackerApiResponse<CurrentTrainTimetableData>>
+        | undefined;
 
     return status === 404 && payload?.error === 'not_found';
 }

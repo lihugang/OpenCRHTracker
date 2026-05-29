@@ -139,8 +139,7 @@ export const deployDocsSections: DocsContentSection[] = [
             },
             {
                 type: 'paragraph',
-                text:
-                    '部署前先确定当前环境实际会读取哪份配置文件，再进行修改。生产环境的配置修改不会主动热更新，修改后请重启 Node 进程或者管理员面板手动重载。'
+                text: '部署前先确定当前环境实际会读取哪份配置文件，再进行修改。生产环境的配置修改不会主动热更新，修改后请重启 Node 进程或者管理员面板手动重载。'
             },
             {
                 type: 'code',
@@ -905,7 +904,8 @@ export const deployDocsSections: DocsContentSection[] = [
                         path: 'cost.fixed.searchIndex / timetableTrainCurrent / trainCirculationImage / trainCirculationImageCacheHit / trainCirculationImageFailure / timetableTrainHistory / exportDailyIndex / exportDaily',
                         valueType: 'integer',
                         required: true,
-                        description: '搜索、当前时刻表、运行图图片与导出接口的固定成本。',
+                        description:
+                            '搜索、当前时刻表、运行图图片与导出接口的固定成本。',
                         notes: [
                             'trainCirculationImageCacheHit 控制运行图图片缓存命中成本，默认 2。',
                             'trainCirculationImageFailure 控制运行图图片失败成本，默认 2。'
@@ -1046,8 +1046,7 @@ export const deployDocsSections: DocsContentSection[] = [
                         path: 'stationName',
                         valueType: 'string',
                         required: true,
-                        description:
-                            '车站名，按线路查询返回的站名字面值匹配。'
+                        description: '车站名，按线路查询返回的站名字面值匹配。'
                     },
                     {
                         path: 'latitude',
@@ -1059,7 +1058,8 @@ export const deployDocsSections: DocsContentSection[] = [
                         path: 'longtitude',
                         valueType: 'number',
                         required: true,
-                        description: '经度。字段名保持为 longtitude 以兼容现有文件。'
+                        description:
+                            '经度。字段名保持为 longtitude 以兼容现有文件。'
                     }
                 ]
             },
