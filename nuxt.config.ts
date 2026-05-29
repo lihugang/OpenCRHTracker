@@ -55,6 +55,14 @@ export default defineNuxtConfig({
     },
     nitro: {
         sourceMap: false,
+        routeRules: {
+            '/_nuxt/**': {
+                headers: {
+                    'Cross-Origin-Embedder-Policy': 'require-corp',
+                    'Cross-Origin-Opener-Policy': 'same-origin'
+                }
+            }
+        },
         experimental: {
             asyncContext: true
         },
@@ -123,6 +131,8 @@ export default defineNuxtConfig({
 
     security: {
         headers: {
+            crossOriginEmbedderPolicy: 'require-corp',
+            crossOriginOpenerPolicy: 'same-origin',
             contentSecurityPolicy: {
                 'default-src': ["'self'"],
                 'script-src': [
