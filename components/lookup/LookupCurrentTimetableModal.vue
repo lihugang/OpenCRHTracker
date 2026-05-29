@@ -925,7 +925,6 @@ import type {
 import type {
     CurrentTrainTimetableData,
     HistoricalTimetableData,
-    TrainCirculationImageData,
     TrainTimetableHistoryListResponse
 } from '~/types/lookup';
 import type { TrackerApiResponse } from '~/types/homepage';
@@ -1653,7 +1652,7 @@ async function shareCirculationAssetFile(
     return true;
 }
 
-async function fetchCirculationAssetDownloadUrl(
+function buildCirculationAssetBinaryUrl(
     format: CirculationExportFormat
 ) {
     const requestTrainCode = circulationPdfRequestTrainCode.value;
@@ -1661,30 +1660,7 @@ async function fetchCirculationAssetDownloadUrl(
         throw new Error('当前暂无可导出的交路图');
     }
 
-    const response = await requestFetch<
-        TrackerApiResponse<TrainCirculationImageData>
-    >(
-        `/api/v1/timetable/train/${encodeURIComponent(requestTrainCode)}/circulation/image`,
-        {
-            query: {
-                format,
-                binary: false
-            }
-        }
-    );
-
-    if (!response.ok) {
-        throw new Error(response.data || '运行图导出失败，请稍后重试。');
-    }
-
-    if (
-        typeof response.data.imageUrl !== 'string' ||
-        response.data.imageUrl.length === 0
-    ) {
-        throw new Error('运行图下载地址无效');
-    }
-
-    return response.data.imageUrl;
+    return `/api/v1/timetable/train/${encodeURIComponent(requestTrainCode)}/circulation/image?format=${encodeURIComponent(format)}&binary=true`;
 }
 
 async function exportCirculationAsset(format: CirculationExportFormat) {
@@ -1696,7 +1672,7 @@ async function exportCirculationAsset(format: CirculationExportFormat) {
     circulationExportErrorMessage.value = '';
 
     try {
-        const downloadUrl = await fetchCirculationAssetDownloadUrl(format);
+        const downloadUrl = buildCirculationAssetBinaryUrl(format);
         const fileName = getCirculationExportFileName(format);
 
         if (!isMobileDownloadContext()) {
