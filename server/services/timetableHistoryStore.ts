@@ -346,6 +346,21 @@ function updateCoverageEnd(
     stats.updatedCoverages += 1;
 }
 
+function extendCoverageEndIfNeeded(
+    coverage: TimetableHistoryCoverageRow,
+    nextServiceDate: number,
+    nowSeconds: number,
+    stats: SyncCoverageStats
+) {
+    if (coverage.service_date_end_exclusive >= nextServiceDate) {
+        stats.noopedCoverages += 1;
+        return false;
+    }
+
+    updateCoverageEnd(coverage.id, nextServiceDate, nowSeconds, stats);
+    return true;
+}
+
 function updateCoverageContent(
     coverageId: number,
     contentId: number,
@@ -382,14 +397,13 @@ function normalizeAdjacentCoverages(
     let previousRow = rows[0]!;
     for (let index = 1; index < rows.length; index += 1) {
         const currentRow = rows[index]!;
-        if (
-            previousRow.content_id === currentRow.content_id &&
-            previousRow.service_date_end_exclusive ===
-                currentRow.service_date_start
-        ) {
+        if (previousRow.content_id === currentRow.content_id) {
             updateCoverageEnd(
                 previousRow.id,
-                currentRow.service_date_end_exclusive,
+                Math.max(
+                    previousRow.service_date_end_exclusive,
+                    currentRow.service_date_end_exclusive
+                ),
                 nowSeconds,
                 stats
             );
@@ -463,11 +477,13 @@ function syncCoverageForTrainCode(
         return true;
     }
 
-    if (
-        currentRow.content_id === contentId &&
-        currentRow.service_date_end_exclusive === serviceDate
-    ) {
-        updateCoverageEnd(currentRow.id, nextServiceDate, nowSeconds, stats);
+    if (currentRow.content_id === contentId) {
+        extendCoverageEndIfNeeded(
+            currentRow,
+            nextServiceDate,
+            nowSeconds,
+            stats
+        );
         normalizeAdjacentCoverages(trainCode, nowSeconds, stats);
         return false;
     }
