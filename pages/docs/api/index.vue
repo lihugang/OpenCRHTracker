@@ -61,6 +61,22 @@
                     </div>
                 </div>
             </UiCard>
+
+            <UiCard :show-accent-bar="false">
+                <div class="space-y-3">
+                    <p
+                        class="text-xs font-medium uppercase tracking-[0.18em] text-crh-blue/80">
+                        访问额度
+                    </p>
+                    <p class="text-sm leading-6 text-slate-600">
+                        游客默认可用额度上限为 25 点，登录用户默认可用额度上限为
+                        1000 点。同一用户下签发的所有 API Key
+                        都共享同一份用户级额度，切换 Key
+                        不会额外增加额度。额度会按配置的恢复周期自动补充，默认每
+                        300 秒恢复 5 点，补充后不会超过当前用户上限。如果默认额度不够，你可以在反馈里说明需求，向管理员申请更多额度。
+                    </p>
+                </div>
+            </UiCard>
         </div>
 
         <UiCard :show-accent-bar="false">
