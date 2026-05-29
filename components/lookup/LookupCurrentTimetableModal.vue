@@ -1050,7 +1050,7 @@ interface DisplayTimetableData {
     isHistorical: boolean;
 }
 
-type PdfJsModule = typeof import('pdfjs-dist/build/pdf.mjs');
+type PdfJsModule = typeof import('pdfjs-dist/legacy/build/pdf.mjs');
 
 const historyContentCache = shallowRef(
     new Map<number, HistoricalTimetableData | null>()
@@ -2178,11 +2178,11 @@ function handleCirculationPdfFullscreenTouchEnd(event: TouchEvent) {
 
 async function loadPdfJsModule() {
     if (!pdfJsModulePromise) {
-        pdfJsModulePromise = import('pdfjs-dist/build/pdf.mjs');
+        pdfJsModulePromise = import('pdfjs-dist/legacy/build/pdf.mjs');
     }
     if (!pdfJsWorkerUrlPromise) {
         pdfJsWorkerUrlPromise =
-            import('pdfjs-dist/build/pdf.worker.mjs?url').then(
+            import('pdfjs-dist/legacy/build/pdf.worker.mjs?url').then(
                 (module) => module.default
             );
     }
