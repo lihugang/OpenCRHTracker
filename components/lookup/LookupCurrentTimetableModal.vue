@@ -779,6 +779,25 @@
                                     </div>
                                 </button>
 
+                                <div
+                                    v-else-if="
+                                        circulationPdfState === 'error' &&
+                                        canInspectCirculationPreviewErrors
+                                    "
+                                    class="rounded-[1rem] border border-rose-200 bg-rose-50/80 p-4 text-rose-900 shadow-[0_18px_42px_-34px_rgba(190,24,93,0.35)]">
+                                    <p
+                                        class="text-xs font-medium uppercase tracking-[0.16em] text-rose-500">
+                                        预览失败
+                                    </p>
+                                    <p class="mt-2 text-sm font-semibold">
+                                        运行图预览加载失败
+                                    </p>
+                                    <p
+                                        class="mt-2 whitespace-pre-wrap break-all font-mono text-xs leading-5 text-rose-700">
+                                        {{ circulationPreviewErrorMessage }}
+                                    </p>
+                                </div>
+
                                 <p
                                     v-if="
                                         circulationExportErrorMessage.length > 0
@@ -932,6 +951,9 @@ import useTrackedRequestFetch, {
     type TrackedRequestFetch
 } from '~/composables/useTrackedRequestFetch';
 import getApiErrorMessage from '~/utils/api/getApiErrorMessage';
+import hasClientScope, {
+    CLIENT_AUTH_SCOPES
+} from '~/utils/auth/hasClientScope';
 import { buildLookupPath } from '~/utils/lookup/lookupTarget';
 import formatShanghaiDateString from '~/utils/time/formatShanghaiDateString';
 
@@ -1051,6 +1073,7 @@ const emit = defineEmits<{
 const requestFetch: TrackedRequestFetch = import.meta.server
     ? useTrackedRequestFetch()
     : ($fetch as TrackedRequestFetch);
+const { session } = useAuthState();
 
 const { state, timetable, errorMessage, normalizedTrainCode } =
     useCurrentTrainTimetable(
@@ -1072,6 +1095,7 @@ const circulationPdfState = ref<CirculationPdfState>('idle');
 const circulationPdfFullscreenState = ref<CirculationPdfState>('idle');
 const circulationExportState = ref<CirculationExportFormat | null>(null);
 const circulationExportErrorMessage = ref('');
+const circulationPreviewErrorMessage = ref('');
 const isCirculationPdfPreviewOpen = ref(false);
 const circulationPdfFullscreenZoom = ref(1);
 const circulationPdfFullscreenViewportOffsetX = ref(0);
@@ -1365,12 +1389,47 @@ const shouldLoadCirculationPdfPreview = computed(() => {
     );
 });
 
+const canInspectCirculationPreviewErrors = computed(() => {
+    return hasClientScope(
+        session.value?.scopes ?? [],
+        CLIENT_AUTH_SCOPES.admin
+    );
+});
+
 const shouldShowCirculationPdfPreview = computed(() => {
     return (
         shouldLoadCirculationPdfPreview.value &&
-        circulationPdfState.value !== 'error'
+        (circulationPdfState.value !== 'error' ||
+            canInspectCirculationPreviewErrors.value)
     );
 });
+
+function resolveCirculationPreviewErrorMessage(
+    error: unknown,
+    fallback: string
+) {
+    return getApiErrorMessage(error, fallback);
+}
+
+async function createCirculationPreviewHttpError(response: Response) {
+    const fallbackMessage = `HTTP ${response.status}`;
+
+    try {
+        const payload = (await response.json()) as Partial<TrackerApiResponse<never>>;
+        if (
+            payload &&
+            payload.ok === false &&
+            typeof payload.data === 'string' &&
+            payload.data.length > 0
+        ) {
+            return new Error(payload.data);
+        }
+    } catch {
+        // Ignore malformed error bodies and keep the HTTP fallback.
+    }
+
+    return new Error(fallbackMessage);
+}
 
 const circulationPdfFullscreenViewportStyle = computed(() => {
     if (
@@ -2699,6 +2758,11 @@ async function renderCirculationPdfPageToTarget(options: {
         }
 
         if (mode === 'preview') {
+            circulationPreviewErrorMessage.value =
+                resolveCirculationPreviewErrorMessage(
+                    error,
+                    '运行图预览渲染失败'
+                );
             circulationPdfState.value = 'error';
             await cleanupCirculationPdfPreview({
                 invalidateRequest: false,
@@ -2776,6 +2840,7 @@ async function loadCirculationPdfPreview(requestTrainCode: string) {
 
     const requestToken = ++circulationPdfRequestToken;
     circulationPdfState.value = 'loading';
+    circulationPreviewErrorMessage.value = '';
     await cleanupCirculationPdfPreview({
         invalidateRequest: false,
         resetState: false
@@ -2793,7 +2858,7 @@ async function loadCirculationPdfPreview(requestTrainCode: string) {
         }
 
         if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
+            throw await createCirculationPreviewHttpError(response);
         }
 
         const pdfBytes = new Uint8Array(await response.arrayBuffer());
@@ -2828,6 +2893,11 @@ async function loadCirculationPdfPreview(requestTrainCode: string) {
             return;
         }
 
+        circulationPreviewErrorMessage.value =
+            resolveCirculationPreviewErrorMessage(
+                error,
+                '运行图预览加载失败，请稍后重试。'
+            );
         circulationPdfState.value = 'error';
         circulationPdfFullscreenState.value = 'error';
         await cleanupCirculationPdfPreview({
