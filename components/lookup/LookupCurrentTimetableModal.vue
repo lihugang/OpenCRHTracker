@@ -155,7 +155,7 @@
                             :id="timetableSectionId"
                             class="space-y-2.5">
                             <div
-                                v-if="historyTimetableOptions.length > 0"
+                                v-if="shouldShowHistoryTimetableSelector"
                                 class="flex justify-end">
                                 <UiSelect
                                     v-model="selectedTimetableSourceKey"
@@ -1203,6 +1203,10 @@ const historyTimetableOptions = computed<TimetableSourceOption[]>(() => {
 
     return options;
 });
+
+const shouldShowHistoryTimetableSelector = computed(
+    () => historyTimetableOptions.value.length > 1
+);
 
 const displayedTimetable = computed<DisplayTimetableData | null>(() => {
     if (isCurrentView.value) {
