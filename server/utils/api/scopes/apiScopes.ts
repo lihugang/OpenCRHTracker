@@ -48,6 +48,11 @@ export const API_SCOPES = {
             current: {
                 read: 'api.timetable.train.current.read'
             },
+            circulation: {
+                image: {
+                    read: 'api.timetable.train.circulation.image.read'
+                }
+            },
             history: {
                 read: 'api.timetable.train.history.read'
             }

@@ -240,6 +240,7 @@
                 "api.history.train.read",
                 "api.history.emu.read",
                 "api.timetable.train.current.read",
+                "api.timetable.train.circulation.image.read",
                 "api.timetable.train.history.read",
                 "api.exports.daily.read",
                 "api.feedback.read",
@@ -253,6 +254,7 @@
                 "api.history.train.read",
                 "api.history.emu.read",
                 "api.timetable.train.current.read",
+                "api.timetable.train.circulation.image.read",
                 "api.timetable.train.history.read",
                 "api.exports.daily.read",
                 "api.feedback.read",
@@ -278,6 +280,7 @@
                 "api.history.train.read",
                 "api.history.emu.read",
                 "api.timetable.train.current.read",
+                "api.timetable.train.circulation.image.read",
                 "api.timetable.train.history.read",
                 "api.exports.daily.read",
                 "api.timetable.station.read"

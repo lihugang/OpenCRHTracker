@@ -44,7 +44,7 @@ export default defineEventHandler(async (event) => {
         event,
         {
             cors: true,
-            requiredScopes: [API_SCOPES.timetable.train.current.read],
+            requiredScopes: [API_SCOPES.timetable.train.circulation.image.read],
             fixedCost: getFixedCost('trainCirculationImage'),
             rawSuccessResponse: (successEvent, data) => {
                 const successQuery = getQuery(successEvent);

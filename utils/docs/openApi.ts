@@ -2759,7 +2759,9 @@ export const developerDocsOpenApi = {
                 'x-group': '时刻表',
                 'x-sort-order': 26,
                 'x-auth-modes': ['anonymous', 'cookie', 'apiKey'],
-                'x-required-scopes': ['api.timetable.train.current.read'],
+                'x-required-scopes': [
+                    'api.timetable.train.circulation.image.read'
+                ],
                 'x-examples': [
                     {
                         id: 'circulation-image-json',
