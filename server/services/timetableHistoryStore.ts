@@ -398,20 +398,20 @@ function normalizeAdjacentCoverages(
     for (let index = 1; index < rows.length; index += 1) {
         const currentRow = rows[index]!;
         if (previousRow.content_id === currentRow.content_id) {
+            const mergedServiceDateEndExclusive = Math.max(
+                previousRow.service_date_end_exclusive,
+                currentRow.service_date_end_exclusive
+            );
             updateCoverageEnd(
                 previousRow.id,
-                Math.max(
-                    previousRow.service_date_end_exclusive,
-                    currentRow.service_date_end_exclusive
-                ),
+                mergedServiceDateEndExclusive,
                 nowSeconds,
                 stats
             );
             deleteCoverage(currentRow.id, stats);
             previousRow = {
                 ...previousRow,
-                service_date_end_exclusive:
-                    currentRow.service_date_end_exclusive,
+                service_date_end_exclusive: mergedServiceDateEndExclusive,
                 updated_at: nowSeconds
             };
             continue;
@@ -478,6 +478,9 @@ function syncCoverageForTrainCode(
     }
 
     if (currentRow.content_id === contentId) {
+        // currentRow is the latest segment at or before serviceDate, so
+        // extending it only bridges uncovered dates and cannot skip over a
+        // later coverage segment with a different content_id.
         extendCoverageEndIfNeeded(
             currentRow,
             nextServiceDate,

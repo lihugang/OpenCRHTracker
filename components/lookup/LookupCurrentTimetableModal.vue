@@ -517,6 +517,30 @@
                                     </UiCard>
                                 </div>
                             </div>
+
+                            <div
+                                v-if="shouldShowCirculationPdfPreview"
+                                class="space-y-3 border-t border-slate-100 pt-4">
+                                <p class="text-xs uppercase tracking-[0.16em] text-slate-400">列车运行图</p>
+
+                                <div
+                                    v-if="circulationPdfState === 'idle' || circulationPdfState === 'loading'"
+                                    class="h-64 animate-pulse rounded-[1rem] border border-slate-200 bg-slate-100/80" />
+
+                                <button
+                                    v-else-if="circulationPdfState === 'ready'"
+                                    type="button"
+                                    class="block w-full cursor-pointer overflow-hidden rounded-[1rem] border border-slate-200 bg-slate-50/80 p-2 text-left shadow-[0_18px_42px_-34px_rgba(15,23,42,0.45)] transition hover:border-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-crh-blue/25 focus-visible:ring-offset-2 focus-visible:ring-offset-white sm:p-3"
+                                    @click="openCirculationPdfPreview">
+                                    <div
+                                        ref="circulationPdfCanvasContainer"
+                                        class="cursor-pointer overflow-hidden rounded-[0.75rem] bg-white">
+                                        <canvas
+                                            ref="circulationPdfCanvas"
+                                            class="block h-auto w-full cursor-pointer" />
+                                    </div>
+                                </button>
+                            </div>
                         </div>
                     </Transition>
 
@@ -528,10 +552,78 @@
                 class="order-3 motion-divider" />
         </div>
     </UiModal>
+
+    <Teleport to="body">
+        <Transition
+            enter-active-class="transition duration-200 ease-out"
+            enter-from-class="opacity-0"
+            enter-to-class="opacity-100"
+            leave-active-class="transition duration-180 ease-out"
+            leave-from-class="opacity-100"
+            leave-to-class="opacity-0">
+            <div
+                v-if="isCirculationPdfPreviewOpen"
+                class="fixed inset-0 z-[100] backdrop-blur-md"
+                @click="closeCirculationPdfPreview" />
+        </Transition>
+
+        <Transition
+            enter-active-class="transition duration-220 ease-out"
+            enter-from-class="translate-y-2 opacity-0 motion-reduce:translate-y-0"
+            enter-to-class="translate-y-0 opacity-100"
+            leave-active-class="transition duration-180 ease-out"
+            leave-from-class="translate-y-0 opacity-100"
+            leave-to-class="translate-y-1 opacity-0 motion-reduce:translate-y-0">
+            <div
+                v-if="isCirculationPdfPreviewOpen"
+                class="fixed inset-0 z-[101]">
+                <button
+                    type="button"
+                    class="absolute right-4 top-4 z-[2] inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-2xl text-white backdrop-blur-sm transition hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35 sm:right-6 sm:top-6"
+                    aria-label="关闭运行图预览"
+                    @click="closeCirculationPdfPreview">
+                    ×
+                </button>
+
+                <div
+                    class="relative h-full w-full p-4 sm:p-6"
+                    @click.self="closeCirculationPdfPreview">
+                    <div
+                        ref="circulationPdfFullscreenCanvasContainer"
+                        class="relative flex h-full w-full items-center justify-center overflow-hidden touch-none">
+                        <div
+                            ref="circulationPdfFullscreenViewport"
+                            class="relative overflow-hidden bg-white shadow-[0_30px_80px_-48px_rgba(15,23,42,0.75)]"
+                            :style="circulationPdfFullscreenViewportStyle"
+                            @wheel.prevent="handleCirculationPdfFullscreenWheel"
+                            @mousedown="handleCirculationPdfFullscreenMouseDown"
+                            @touchstart="handleCirculationPdfFullscreenTouchStart"
+                            @touchmove="handleCirculationPdfFullscreenTouchMove"
+                            @touchend="handleCirculationPdfFullscreenTouchEnd"
+                            @touchcancel="handleCirculationPdfFullscreenTouchEnd">
+                            <div
+                                v-if="circulationPdfState === 'loading' || circulationPdfFullscreenState === 'loading'"
+                                class="absolute inset-0 z-[1] animate-pulse bg-slate-100/80" />
+
+                            <canvas
+                                ref="circulationPdfFullscreenCanvas"
+                                class="absolute inset-0 block" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </Transition>
+    </Teleport>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, shallowRef, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
+import type {
+    PDFDocumentLoadingTask,
+    PDFPageProxy,
+    PDFDocumentProxy,
+    RenderTask
+} from 'pdfjs-dist/types/src/display/api';
 import type {
     CurrentTrainTimetableData,
     HistoricalTimetableData,
@@ -564,10 +656,26 @@ const SECTION_STATE_STORAGE_KEY =
 const timetableSectionId = 'lookup-current-timetable-section';
 const circulationSectionId = 'lookup-current-circulation-section';
 const HISTORY_LIST_LIMIT = 200;
+const CIRCULATION_PDF_PREVIEW_RENDER_SCALE_MULTIPLIER = 2.25;
+const CIRCULATION_PDF_FULLSCREEN_RENDER_SCALE_MULTIPLIER = 2.5;
+const CIRCULATION_PDF_PREVIEW_MAX_PIXEL_AREA = 10_000_000;
+const CIRCULATION_PDF_FULLSCREEN_MAX_PIXEL_AREA = 30_000_000;
+const CIRCULATION_PDF_MAX_DIMENSION = 8192;
+const CIRCULATION_PDF_FULLSCREEN_MAX_ZOOM = 8;
+const CIRCULATION_PDF_FULLSCREEN_WHEEL_ZOOM_STEP = 0.2;
 
 type ViewState = 'loading' | 'error' | 'empty' | 'success';
+type CirculationPdfState = 'idle' | 'loading' | 'ready' | 'error';
 type TimetableSourceKey = 'current' | `history:${number}`;
 type HistoricalTimetableStopItem = HistoricalTimetableData['stops'][number];
+
+interface CirculationPdfRenderTarget {
+    container: HTMLDivElement;
+    canvas: HTMLCanvasElement;
+    renderScaleMultiplier: number;
+    maxPixelArea: number;
+    maxDimension: number;
+}
 
 interface DisplayTimetableStop {
     stationNo: number;
@@ -621,6 +729,8 @@ interface DisplayTimetableData {
     isHistorical: boolean;
 }
 
+type PdfJsModule = typeof import('pdfjs-dist/build/pdf.mjs');
+
 const historyContentCache = shallowRef(new Map<number, HistoricalTimetableData | null>());
 const historyContentRequestCache = new Map<number, Promise<HistoricalTimetableData | null>>();
 
@@ -653,8 +763,46 @@ const historyItems = ref<HistoricalTimetableOption[]>([]);
 const selectedTimetableSourceKey = ref<TimetableSourceKey>('current');
 const historyContentState = ref<'idle' | 'loading' | 'ready' | 'error'>('idle');
 const historyContentErrorMessage = ref('');
+const circulationPdfState = ref<CirculationPdfState>('idle');
+const circulationPdfFullscreenState = ref<CirculationPdfState>('idle');
+const isCirculationPdfPreviewOpen = ref(false);
+const circulationPdfFullscreenZoom = ref(1);
+const circulationPdfFullscreenViewportOffsetX = ref(0);
+const circulationPdfFullscreenViewportOffsetY = ref(0);
+const circulationPdfFullscreenContentWidth = ref(0);
+const circulationPdfFullscreenContentHeight = ref(0);
+const circulationPdfFullscreenViewportWidth = ref(0);
+const circulationPdfFullscreenViewportHeight = ref(0);
+const circulationPdfCanvasContainer = ref<HTMLDivElement | null>(null);
+const circulationPdfCanvas = ref<HTMLCanvasElement | null>(null);
+const circulationPdfFullscreenCanvasContainer = ref<HTMLDivElement | null>(null);
+const circulationPdfFullscreenViewport = ref<HTMLDivElement | null>(null);
+const circulationPdfFullscreenCanvas = ref<HTMLCanvasElement | null>(null);
+const circulationPdfObjectUrl = ref<string | null>(null);
 let historyListRequestToken = 0;
 let historyContentRequestToken = 0;
+let circulationPdfRequestToken = 0;
+let circulationPdfPreviewLastRenderedWidth = 0;
+let circulationPdfFullscreenLastRenderKey = '';
+let circulationPdfFullscreenPendingRenderKey = '';
+let circulationPdfResizeObserver: ResizeObserver | null = null;
+let circulationPdfFullscreenResizeObserver: ResizeObserver | null = null;
+let circulationPdfRenderTask: RenderTask | null = null;
+let circulationPdfFullscreenRenderTask: RenderTask | null = null;
+let circulationPdfLoadingTask: PDFDocumentLoadingTask | null = null;
+let circulationPdfDocument: PDFDocumentProxy | null = null;
+let pdfJsModulePromise: Promise<PdfJsModule> | null = null;
+let pdfJsWorkerUrlPromise: Promise<string> | null = null;
+let circulationPdfFullscreenPinchStartDistance = 0;
+let circulationPdfFullscreenPinchStartZoom = 1;
+let circulationPdfFullscreenOrientation: 'portrait' | 'landscape' = 'landscape';
+let circulationPdfFullscreenPinchAnchorX = 0;
+let circulationPdfFullscreenPinchAnchorY = 0;
+let isCirculationPdfFullscreenPanning = false;
+let circulationPdfFullscreenPanStartX = 0;
+let circulationPdfFullscreenPanStartY = 0;
+let circulationPdfFullscreenPanStartOffsetX = 0;
+let circulationPdfFullscreenPanStartOffsetY = 0;
 
 const isCurrentView = computed(() => selectedTimetableSourceKey.value === 'current');
 const isCurrentTimetableAvailable = computed(() => timetable.value !== null);
@@ -871,6 +1019,39 @@ const circulationSummaryLabel = computed(() => {
     return `${circulationNodes.value.length} 段交路`;
 });
 
+const circulationPdfRequestTrainCode = computed(() => {
+    return normalizeComparableCode(circulation.value?.nodes[0]?.allCodes[0]);
+});
+
+const shouldLoadCirculationPdfPreview = computed(() => {
+    return (
+        import.meta.client &&
+        props.modelValue &&
+        isCurrentView.value &&
+        isCirculationExpanded.value &&
+        shouldShowCirculationSection.value &&
+        circulationPdfRequestTrainCode.value.length > 0
+    );
+});
+
+const shouldShowCirculationPdfPreview = computed(() => {
+    return shouldLoadCirculationPdfPreview.value && circulationPdfState.value !== 'error';
+});
+
+const circulationPdfFullscreenViewportStyle = computed(() => {
+    if (
+        circulationPdfFullscreenViewportWidth.value <= 0 ||
+        circulationPdfFullscreenViewportHeight.value <= 0
+    ) {
+        return {};
+    }
+
+    return {
+        width: `${Math.round(circulationPdfFullscreenViewportWidth.value)}px`,
+        height: `${Math.round(circulationPdfFullscreenViewportHeight.value)}px`
+    };
+});
+
 const circulationNotice = computed(() => {
     return circulation.value?.source === 'inferred' ? '当前交路表结果由计算推测得到，仅供参考' : '';
 });
@@ -985,6 +1166,1048 @@ function buildCirculationCodeLink(code: string) {
         type: 'train',
         code: normalizeComparableCode(code)
     });
+}
+
+function openCirculationPdfPreview() {
+    if (circulationPdfState.value !== 'ready') {
+        return;
+    }
+
+    isCirculationPdfPreviewOpen.value = true;
+}
+
+function closeCirculationPdfPreview() {
+    isCirculationPdfPreviewOpen.value = false;
+}
+
+function getCirculationPdfFullscreenOrientation() {
+    if (!import.meta.client) {
+        return 'landscape' as const;
+    }
+
+    return window.innerHeight > window.innerWidth ? 'portrait' : 'landscape';
+}
+
+function clampCirculationPdfFullscreenZoom(nextZoom: number) {
+    if (!Number.isFinite(nextZoom)) {
+        return 1;
+    }
+
+    return Math.min(
+        CIRCULATION_PDF_FULLSCREEN_MAX_ZOOM,
+        Math.max(1, nextZoom)
+    );
+}
+
+function setCirculationPdfFullscreenZoom(nextZoom: number) {
+    circulationPdfFullscreenZoom.value = clampCirculationPdfFullscreenZoom(nextZoom);
+}
+
+function resetCirculationPdfFullscreenZoom() {
+    circulationPdfFullscreenZoom.value = 1;
+    circulationPdfFullscreenViewportOffsetX.value = 0;
+    circulationPdfFullscreenViewportOffsetY.value = 0;
+    circulationPdfFullscreenPinchStartDistance = 0;
+    circulationPdfFullscreenPinchStartZoom = 1;
+    circulationPdfFullscreenPinchAnchorX = 0;
+    circulationPdfFullscreenPinchAnchorY = 0;
+    isCirculationPdfFullscreenPanning = false;
+}
+
+function getTouchDistance(touches: TouchList) {
+    if (touches.length < 2) {
+        return 0;
+    }
+
+    const first = touches[0]!;
+    const second = touches[1]!;
+    const deltaX = first.clientX - second.clientX;
+    const deltaY = first.clientY - second.clientY;
+    return Math.hypot(deltaX, deltaY);
+}
+
+function getTouchCenter(touches: TouchList) {
+    if (touches.length < 2) {
+        return null;
+    }
+
+    const first = touches[0]!;
+    const second = touches[1]!;
+
+    return {
+        clientX: (first.clientX + second.clientX) / 2,
+        clientY: (first.clientY + second.clientY) / 2
+    };
+}
+
+function getCirculationPdfFullscreenContainerRelativePoint(
+    clientX: number,
+    clientY: number
+) {
+    const viewport = circulationPdfFullscreenViewport.value;
+    if (!viewport) {
+        return null;
+    }
+
+    const rect = viewport.getBoundingClientRect();
+    return {
+        x: clientX - rect.left,
+        y: clientY - rect.top
+    };
+}
+
+function clampCirculationPdfFullscreenScroll(
+    containerWidth: number,
+    containerHeight: number,
+    contentWidth: number,
+    contentHeight: number,
+    nextOffsetX: number,
+    nextOffsetY: number
+) {
+    const maxOffsetX = Math.max(0, contentWidth - containerWidth);
+    const maxOffsetY = Math.max(0, contentHeight - containerHeight);
+
+    return {
+        offsetX: Math.min(maxOffsetX, Math.max(0, nextOffsetX)),
+        offsetY: Math.min(maxOffsetY, Math.max(0, nextOffsetY))
+    };
+}
+
+function applyCirculationPdfFullscreenZoomAtPoint(
+    nextZoom: number,
+    anchorX: number,
+    anchorY: number
+) {
+    const viewportWidth = circulationPdfFullscreenViewportWidth.value;
+    const viewportHeight = circulationPdfFullscreenViewportHeight.value;
+    if (
+        circulationPdfFullscreenState.value !== 'ready' ||
+        viewportWidth <= 0 ||
+        viewportHeight <= 0
+    ) {
+        return;
+    }
+
+    const previousZoom = circulationPdfFullscreenZoom.value;
+    const clampedZoom = clampCirculationPdfFullscreenZoom(nextZoom);
+    if (clampedZoom === previousZoom) {
+        return;
+    }
+
+    const currentContentWidth = circulationPdfFullscreenContentWidth.value;
+    const currentContentHeight = circulationPdfFullscreenContentHeight.value;
+    if (currentContentWidth <= 0 || currentContentHeight <= 0) {
+        return;
+    }
+
+    const zoomRatio = clampedZoom / previousZoom;
+    const nextContentWidth = currentContentWidth * zoomRatio;
+    const nextContentHeight = currentContentHeight * zoomRatio;
+    const nextOffsetX =
+        (circulationPdfFullscreenViewportOffsetX.value + anchorX) * zoomRatio - anchorX;
+    const nextOffsetY =
+        (circulationPdfFullscreenViewportOffsetY.value + anchorY) * zoomRatio - anchorY;
+
+    circulationPdfFullscreenZoom.value = clampedZoom;
+
+    const clampedOffset = clampCirculationPdfFullscreenScroll(
+        viewportWidth,
+        viewportHeight,
+        nextContentWidth,
+        nextContentHeight,
+        nextOffsetX,
+        nextOffsetY
+    );
+    circulationPdfFullscreenViewportOffsetX.value = clampedOffset.offsetX;
+    circulationPdfFullscreenViewportOffsetY.value = clampedOffset.offsetY;
+
+    void requestCirculationPdfFullscreenRender(circulationPdfRequestToken);
+}
+
+function handleCirculationPdfFullscreenMouseMove(event: MouseEvent) {
+    if (!isCirculationPdfFullscreenPanning || circulationPdfFullscreenState.value !== 'ready') {
+        return;
+    }
+
+    const viewportWidth = circulationPdfFullscreenViewportWidth.value;
+    const viewportHeight = circulationPdfFullscreenViewportHeight.value;
+    if (viewportWidth <= 0 || viewportHeight <= 0) {
+        return;
+    }
+
+    const clampedOffset = clampCirculationPdfFullscreenScroll(
+        viewportWidth,
+        viewportHeight,
+        circulationPdfFullscreenContentWidth.value,
+        circulationPdfFullscreenContentHeight.value,
+        circulationPdfFullscreenPanStartOffsetX - (event.clientX - circulationPdfFullscreenPanStartX),
+        circulationPdfFullscreenPanStartOffsetY - (event.clientY - circulationPdfFullscreenPanStartY)
+    );
+    circulationPdfFullscreenViewportOffsetX.value = clampedOffset.offsetX;
+    circulationPdfFullscreenViewportOffsetY.value = clampedOffset.offsetY;
+
+    void requestCirculationPdfFullscreenRender(circulationPdfRequestToken);
+}
+
+function handleCirculationPdfFullscreenMouseUp() {
+    if (!import.meta.client) {
+        return;
+    }
+
+    isCirculationPdfFullscreenPanning = false;
+    window.removeEventListener('mousemove', handleCirculationPdfFullscreenMouseMove);
+    window.removeEventListener('mouseup', handleCirculationPdfFullscreenMouseUp);
+}
+
+function handleCirculationPdfFullscreenMouseDown(event: MouseEvent) {
+    if (circulationPdfFullscreenState.value !== 'ready' || event.button !== 0) {
+        return;
+    }
+
+    if (!import.meta.client) {
+        return;
+    }
+
+    event.preventDefault();
+    isCirculationPdfFullscreenPanning = true;
+    circulationPdfFullscreenPanStartX = event.clientX;
+    circulationPdfFullscreenPanStartY = event.clientY;
+    circulationPdfFullscreenPanStartOffsetX = circulationPdfFullscreenViewportOffsetX.value;
+    circulationPdfFullscreenPanStartOffsetY = circulationPdfFullscreenViewportOffsetY.value;
+    window.addEventListener('mousemove', handleCirculationPdfFullscreenMouseMove);
+    window.addEventListener('mouseup', handleCirculationPdfFullscreenMouseUp);
+}
+
+function handleCirculationPdfFullscreenWheel(event: WheelEvent) {
+    if (circulationPdfFullscreenState.value !== 'ready') {
+        return;
+    }
+
+    event.preventDefault();
+    const anchorPoint = getCirculationPdfFullscreenContainerRelativePoint(
+        event.clientX,
+        event.clientY
+    );
+    if (!anchorPoint) {
+        return;
+    }
+
+    const zoomDelta =
+        event.deltaY < 0
+            ? CIRCULATION_PDF_FULLSCREEN_WHEEL_ZOOM_STEP
+            : -CIRCULATION_PDF_FULLSCREEN_WHEEL_ZOOM_STEP;
+    applyCirculationPdfFullscreenZoomAtPoint(
+        circulationPdfFullscreenZoom.value + zoomDelta,
+        anchorPoint.x,
+        anchorPoint.y
+    );
+}
+
+function handleCirculationPdfFullscreenTouchStart(event: TouchEvent) {
+    if (circulationPdfFullscreenState.value !== 'ready') {
+        return;
+    }
+
+    if (event.touches.length === 1) {
+        const first = event.touches[0]!;
+        isCirculationPdfFullscreenPanning = true;
+        circulationPdfFullscreenPanStartX = first.clientX;
+        circulationPdfFullscreenPanStartY = first.clientY;
+        circulationPdfFullscreenPanStartOffsetX = circulationPdfFullscreenViewportOffsetX.value;
+        circulationPdfFullscreenPanStartOffsetY = circulationPdfFullscreenViewportOffsetY.value;
+        circulationPdfFullscreenPinchStartDistance = 0;
+        circulationPdfFullscreenPinchStartZoom = circulationPdfFullscreenZoom.value;
+        return;
+    }
+
+    if (event.touches.length !== 2) {
+        return;
+    }
+
+    event.preventDefault();
+    const center = getTouchCenter(event.touches);
+    if (!center) {
+        return;
+    }
+
+    const anchorPoint = getCirculationPdfFullscreenContainerRelativePoint(
+        center.clientX,
+        center.clientY
+    );
+    if (!anchorPoint) {
+        return;
+    }
+
+    circulationPdfFullscreenPinchStartDistance = getTouchDistance(event.touches);
+    circulationPdfFullscreenPinchStartZoom = circulationPdfFullscreenZoom.value;
+    circulationPdfFullscreenPinchAnchorX = anchorPoint.x;
+    circulationPdfFullscreenPinchAnchorY = anchorPoint.y;
+    isCirculationPdfFullscreenPanning = false;
+}
+
+function handleCirculationPdfFullscreenTouchMove(event: TouchEvent) {
+    if (circulationPdfFullscreenState.value !== 'ready') {
+        return;
+    }
+
+    if (event.touches.length === 1 && isCirculationPdfFullscreenPanning) {
+        event.preventDefault();
+        const first = event.touches[0]!;
+        const viewportWidth = circulationPdfFullscreenViewportWidth.value;
+        const viewportHeight = circulationPdfFullscreenViewportHeight.value;
+        if (viewportWidth <= 0 || viewportHeight <= 0) {
+            return;
+        }
+
+        const clampedOffset = clampCirculationPdfFullscreenScroll(
+            viewportWidth,
+            viewportHeight,
+            circulationPdfFullscreenContentWidth.value,
+            circulationPdfFullscreenContentHeight.value,
+            circulationPdfFullscreenPanStartOffsetX - (first.clientX - circulationPdfFullscreenPanStartX),
+            circulationPdfFullscreenPanStartOffsetY - (first.clientY - circulationPdfFullscreenPanStartY)
+        );
+        circulationPdfFullscreenViewportOffsetX.value = clampedOffset.offsetX;
+        circulationPdfFullscreenViewportOffsetY.value = clampedOffset.offsetY;
+
+        void requestCirculationPdfFullscreenRender(circulationPdfRequestToken);
+        return;
+    }
+
+    if (event.touches.length !== 2) {
+        return;
+    }
+
+    if (circulationPdfFullscreenPinchStartDistance <= 0) {
+        circulationPdfFullscreenPinchStartDistance = getTouchDistance(event.touches);
+        circulationPdfFullscreenPinchStartZoom = circulationPdfFullscreenZoom.value;
+        return;
+    }
+
+    event.preventDefault();
+    const nextDistance = getTouchDistance(event.touches);
+    if (nextDistance <= 0) {
+        return;
+    }
+
+    const center = getTouchCenter(event.touches);
+    if (!center) {
+        return;
+    }
+
+    const anchorPoint = getCirculationPdfFullscreenContainerRelativePoint(
+        center.clientX,
+        center.clientY
+    );
+    if (!anchorPoint) {
+        return;
+    }
+
+    circulationPdfFullscreenPinchAnchorX = anchorPoint.x;
+    circulationPdfFullscreenPinchAnchorY = anchorPoint.y;
+
+    const nextZoom =
+        circulationPdfFullscreenPinchStartZoom *
+        (nextDistance / circulationPdfFullscreenPinchStartDistance);
+    applyCirculationPdfFullscreenZoomAtPoint(
+        nextZoom,
+        circulationPdfFullscreenPinchAnchorX,
+        circulationPdfFullscreenPinchAnchorY
+    );
+}
+
+function handleCirculationPdfFullscreenTouchEnd(event: TouchEvent) {
+    if (event.touches.length >= 2) {
+        circulationPdfFullscreenPinchStartDistance = getTouchDistance(event.touches);
+        circulationPdfFullscreenPinchStartZoom = circulationPdfFullscreenZoom.value;
+        return;
+    }
+
+    if (event.touches.length === 1) {
+        const first = event.touches[0]!;
+        isCirculationPdfFullscreenPanning = true;
+        circulationPdfFullscreenPanStartX = first.clientX;
+        circulationPdfFullscreenPanStartY = first.clientY;
+        circulationPdfFullscreenPanStartOffsetX = circulationPdfFullscreenViewportOffsetX.value;
+        circulationPdfFullscreenPanStartOffsetY = circulationPdfFullscreenViewportOffsetY.value;
+        circulationPdfFullscreenPinchStartDistance = 0;
+        circulationPdfFullscreenPinchStartZoom = circulationPdfFullscreenZoom.value;
+        return;
+    }
+
+    circulationPdfFullscreenPinchStartDistance = 0;
+    circulationPdfFullscreenPinchStartZoom = circulationPdfFullscreenZoom.value;
+    circulationPdfFullscreenPinchAnchorX = 0;
+    circulationPdfFullscreenPinchAnchorY = 0;
+    isCirculationPdfFullscreenPanning = false;
+}
+
+async function loadPdfJsModule() {
+    if (!pdfJsModulePromise) {
+        pdfJsModulePromise = import('pdfjs-dist/build/pdf.mjs');
+    }
+    if (!pdfJsWorkerUrlPromise) {
+        pdfJsWorkerUrlPromise = import('pdfjs-dist/build/pdf.worker.mjs?url').then(
+            (module) => module.default
+        );
+    }
+
+    const [pdfjs, workerSrc] = await Promise.all([
+        pdfJsModulePromise,
+        pdfJsWorkerUrlPromise
+    ]);
+    pdfjs.GlobalWorkerOptions.workerSrc = workerSrc;
+    return pdfjs;
+}
+
+function resetCirculationPdfCanvas(
+    canvas: HTMLCanvasElement | null,
+    mode: 'preview' | 'fullscreen'
+) {
+    if (!canvas) {
+        if (mode === 'preview') {
+            circulationPdfPreviewLastRenderedWidth = 0;
+        } else {
+            circulationPdfFullscreenLastRenderKey = '';
+            circulationPdfFullscreenPendingRenderKey = '';
+            circulationPdfFullscreenPinchAnchorX = 0;
+            circulationPdfFullscreenPinchAnchorY = 0;
+            circulationPdfFullscreenViewportOffsetX.value = 0;
+            circulationPdfFullscreenViewportOffsetY.value = 0;
+            circulationPdfFullscreenContentWidth.value = 0;
+            circulationPdfFullscreenContentHeight.value = 0;
+            circulationPdfFullscreenViewportWidth.value = 0;
+            circulationPdfFullscreenViewportHeight.value = 0;
+        }
+        return;
+    }
+
+    const context = canvas.getContext('2d');
+    if (context) {
+        context.setTransform(1, 0, 0, 1, 0, 0);
+        context.clearRect(0, 0, canvas.width, canvas.height);
+    }
+
+    canvas.width = 0;
+    canvas.height = 0;
+    canvas.style.width = '';
+    canvas.style.height = '';
+
+    if (mode === 'preview') {
+        circulationPdfPreviewLastRenderedWidth = 0;
+    } else {
+        circulationPdfFullscreenLastRenderKey = '';
+        circulationPdfFullscreenPendingRenderKey = '';
+        circulationPdfFullscreenPinchAnchorX = 0;
+        circulationPdfFullscreenPinchAnchorY = 0;
+        circulationPdfFullscreenViewportOffsetX.value = 0;
+        circulationPdfFullscreenViewportOffsetY.value = 0;
+        circulationPdfFullscreenContentWidth.value = 0;
+        circulationPdfFullscreenContentHeight.value = 0;
+        circulationPdfFullscreenViewportWidth.value = 0;
+        circulationPdfFullscreenViewportHeight.value = 0;
+    }
+}
+
+function stopCirculationPdfResizeObserver() {
+    circulationPdfResizeObserver?.disconnect();
+    circulationPdfResizeObserver = null;
+}
+
+function stopCirculationPdfFullscreenResizeObserver() {
+    circulationPdfFullscreenResizeObserver?.disconnect();
+    circulationPdfFullscreenResizeObserver = null;
+}
+
+function cancelCirculationPdfRender() {
+    circulationPdfRenderTask?.cancel();
+    circulationPdfRenderTask = null;
+}
+
+function cancelCirculationPdfFullscreenRender() {
+    circulationPdfFullscreenRenderTask?.cancel();
+    circulationPdfFullscreenRenderTask = null;
+}
+
+async function revokeCirculationPdfObjectUrl() {
+    const objectUrl = circulationPdfObjectUrl.value;
+    circulationPdfObjectUrl.value = null;
+    if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+    }
+}
+
+async function destroyCirculationPdfDocument() {
+    const loadingTask = circulationPdfLoadingTask;
+    const document = circulationPdfDocument;
+    circulationPdfLoadingTask = null;
+    circulationPdfDocument = null;
+
+    if (loadingTask) {
+        try {
+            await loadingTask.destroy();
+        } catch {
+            // Ignore cleanup failures from abandoned PDF tasks.
+        }
+        return;
+    }
+
+    if (document) {
+        try {
+            await document.destroy();
+        } catch {
+            // Ignore cleanup failures from abandoned PDF documents.
+        }
+    }
+}
+
+async function cleanupCirculationPdfPreview(options?: {
+    invalidateRequest?: boolean;
+    resetState?: boolean;
+}) {
+    if (options?.invalidateRequest !== false) {
+        circulationPdfRequestToken += 1;
+    }
+
+    stopCirculationPdfResizeObserver();
+    stopCirculationPdfFullscreenResizeObserver();
+    cancelCirculationPdfRender();
+    cancelCirculationPdfFullscreenRender();
+    await destroyCirculationPdfDocument();
+    await revokeCirculationPdfObjectUrl();
+    resetCirculationPdfCanvas(circulationPdfCanvas.value, 'preview');
+    resetCirculationPdfCanvas(circulationPdfFullscreenCanvas.value, 'fullscreen');
+    resetCirculationPdfFullscreenZoom();
+    isCirculationPdfPreviewOpen.value = false;
+
+    if (options?.resetState !== false) {
+        circulationPdfState.value = 'idle';
+        circulationPdfFullscreenState.value = 'idle';
+    }
+}
+
+function isCirculationPdfCancellationError(error: unknown) {
+    return (
+        error instanceof Error &&
+        (error.name === 'RenderingCancelledException' ||
+            error.name === 'AbortException' ||
+            /cancel/i.test(error.message))
+    );
+}
+
+async function renderCirculationPdfPage(requestToken: number) {
+    await renderCirculationPdfPageToTarget({
+        requestToken,
+        mode: 'preview'
+    });
+}
+
+function getCirculationPdfPageRenderTarget(mode: 'preview' | 'fullscreen') {
+    if (mode === 'preview') {
+        const container = circulationPdfCanvasContainer.value;
+        const canvas = circulationPdfCanvas.value;
+        if (!container || !canvas) {
+            return null;
+        }
+
+        return {
+            container,
+            canvas,
+            renderScaleMultiplier: CIRCULATION_PDF_PREVIEW_RENDER_SCALE_MULTIPLIER,
+            maxPixelArea: CIRCULATION_PDF_PREVIEW_MAX_PIXEL_AREA,
+            maxDimension: CIRCULATION_PDF_MAX_DIMENSION
+        } satisfies CirculationPdfRenderTarget;
+    }
+
+    const container = circulationPdfFullscreenCanvasContainer.value;
+    const canvas = circulationPdfFullscreenCanvas.value;
+    if (!container || !canvas) {
+        return null;
+    }
+
+    return {
+        container,
+        canvas,
+        renderScaleMultiplier: CIRCULATION_PDF_FULLSCREEN_RENDER_SCALE_MULTIPLIER,
+        maxPixelArea: CIRCULATION_PDF_FULLSCREEN_MAX_PIXEL_AREA,
+        maxDimension: CIRCULATION_PDF_MAX_DIMENSION
+    } satisfies CirculationPdfRenderTarget;
+}
+
+function getCirculationPdfPreviewLastRenderedWidth() {
+    return circulationPdfPreviewLastRenderedWidth;
+}
+
+function setCirculationPdfPreviewLastRenderedWidth(width: number) {
+    circulationPdfPreviewLastRenderedWidth = width;
+}
+
+function getCirculationPdfFullscreenLastRenderKey() {
+    return circulationPdfFullscreenLastRenderKey;
+}
+
+function setCirculationPdfFullscreenLastRenderKey(renderKey: string) {
+    circulationPdfFullscreenLastRenderKey = renderKey;
+}
+
+function getCirculationPdfFullscreenPendingRenderKey() {
+    return circulationPdfFullscreenPendingRenderKey;
+}
+
+function setCirculationPdfFullscreenPendingRenderKey(renderKey: string) {
+    circulationPdfFullscreenPendingRenderKey = renderKey;
+}
+
+function buildCirculationPdfFullscreenRenderKey(input: {
+    containerWidth: number;
+    containerHeight: number;
+    rotation: number;
+    viewportDisplayWidth: number;
+    viewportDisplayHeight: number;
+    zoom: number;
+    offsetX: number;
+    offsetY: number;
+}) {
+    return [
+        input.containerWidth,
+        input.containerHeight,
+        input.rotation,
+        Math.round(input.viewportDisplayWidth),
+        Math.round(input.viewportDisplayHeight),
+        input.zoom.toFixed(3),
+        Math.round(input.offsetX),
+        Math.round(input.offsetY)
+    ].join(':');
+}
+
+function setCirculationPdfRenderTaskRef(mode: 'preview' | 'fullscreen', renderTask: RenderTask | null) {
+    if (mode === 'preview') {
+        circulationPdfRenderTask = renderTask;
+        return;
+    }
+
+    circulationPdfFullscreenRenderTask = renderTask;
+}
+
+function clampCirculationPdfOutputScale(
+    page: PDFPageProxy,
+    viewportWidth: number,
+    viewportHeight: number,
+    desiredOutputScale: number,
+    target: CirculationPdfRenderTarget
+) {
+    const maxScaleByArea = Math.sqrt(
+        target.maxPixelArea / Math.max(1, viewportWidth * viewportHeight)
+    );
+    const maxScaleByWidth = target.maxDimension / Math.max(1, viewportWidth);
+    const maxScaleByHeight = target.maxDimension / Math.max(1, viewportHeight);
+
+    return Math.max(
+        1,
+        Math.min(desiredOutputScale, maxScaleByArea, maxScaleByWidth, maxScaleByHeight)
+    );
+}
+
+async function resolveCirculationPdfFullscreenRenderMetrics(
+    document: PDFDocumentProxy,
+    target: CirculationPdfRenderTarget
+): Promise<{
+    containerWidth: number;
+    containerHeight: number;
+    orientation: 'portrait' | 'landscape';
+    rotation: number;
+    viewportDisplayWidth: number;
+    viewportDisplayHeight: number;
+    renderKey: string;
+} | null> {
+    const containerWidth = Math.max(0, Math.floor(target.container.clientWidth));
+    const containerHeight = Math.max(0, Math.floor(target.container.clientHeight));
+    const orientation = getCirculationPdfFullscreenOrientation();
+    const rotation = orientation === 'portrait' ? 90 : 0;
+    const page = await document.getPage(1);
+    const baseViewport = page.getViewport({ scale: 1, rotation });
+    const viewportDisplayWidth = Math.min(
+        containerWidth,
+        containerHeight * (baseViewport.width / baseViewport.height)
+    );
+    const viewportDisplayHeight =
+        viewportDisplayWidth / (baseViewport.width / baseViewport.height);
+
+    if (
+        containerWidth <= 0 ||
+        containerHeight <= 0 ||
+        viewportDisplayWidth <= 0 ||
+        viewportDisplayHeight <= 0
+    ) {
+        return null;
+    }
+
+    return {
+        containerWidth,
+        containerHeight,
+        orientation,
+        rotation,
+        viewportDisplayWidth,
+        viewportDisplayHeight,
+        renderKey: buildCirculationPdfFullscreenRenderKey({
+            containerWidth,
+            containerHeight,
+            rotation,
+            viewportDisplayWidth,
+            viewportDisplayHeight,
+            zoom: circulationPdfFullscreenZoom.value,
+            offsetX: circulationPdfFullscreenViewportOffsetX.value,
+            offsetY: circulationPdfFullscreenViewportOffsetY.value
+        })
+    };
+}
+
+async function requestCirculationPdfFullscreenRender(requestToken: number) {
+    if (!import.meta.client || requestToken !== circulationPdfRequestToken) {
+        return;
+    }
+
+    const document = circulationPdfDocument;
+    const target = getCirculationPdfPageRenderTarget('fullscreen');
+    if (!document || !target) {
+        return;
+    }
+
+    const metrics = await resolveCirculationPdfFullscreenRenderMetrics(document, target);
+    if (!metrics || requestToken !== circulationPdfRequestToken) {
+        return;
+    }
+
+    if (
+        metrics.renderKey === getCirculationPdfFullscreenLastRenderKey() ||
+        metrics.renderKey === getCirculationPdfFullscreenPendingRenderKey()
+    ) {
+        return;
+    }
+
+    setCirculationPdfFullscreenPendingRenderKey(metrics.renderKey);
+
+    try {
+        await renderCirculationPdfPageToTarget({
+            requestToken,
+            mode: 'fullscreen'
+        });
+    } finally {
+        if (
+            getCirculationPdfFullscreenPendingRenderKey() === metrics.renderKey &&
+            getCirculationPdfFullscreenLastRenderKey() !== metrics.renderKey
+        ) {
+            setCirculationPdfFullscreenPendingRenderKey('');
+        }
+    }
+}
+
+async function renderCirculationPdfPageToTarget(options: {
+    requestToken: number;
+    mode: 'preview' | 'fullscreen';
+}) {
+    const { requestToken, mode } = options;
+    if (!import.meta.client || requestToken !== circulationPdfRequestToken) {
+        return;
+    }
+
+    const document = circulationPdfDocument;
+    const target = getCirculationPdfPageRenderTarget(mode);
+    if (!document || !target) {
+        if (mode === 'fullscreen' && isCirculationPdfPreviewOpen.value) {
+            circulationPdfFullscreenState.value = 'error';
+        }
+        return;
+    }
+
+    let containerWidth = Math.max(0, Math.floor(target.container.clientWidth));
+    let containerHeight = 0;
+    let orientation: 'portrait' | 'landscape' = 'landscape';
+    let rotation = 0;
+    let viewportDisplayWidth = containerWidth;
+    let viewportDisplayHeight = 0;
+    let renderKey = `${containerWidth}`;
+
+    if (mode === 'fullscreen') {
+        const fullscreenMetrics = await resolveCirculationPdfFullscreenRenderMetrics(
+            document,
+            target
+        );
+        if (!fullscreenMetrics) {
+            setCirculationPdfFullscreenPendingRenderKey('');
+            return;
+        }
+
+        containerWidth = fullscreenMetrics.containerWidth;
+        containerHeight = fullscreenMetrics.containerHeight;
+        orientation = fullscreenMetrics.orientation;
+        rotation = fullscreenMetrics.rotation;
+        viewportDisplayWidth = fullscreenMetrics.viewportDisplayWidth;
+        viewportDisplayHeight = fullscreenMetrics.viewportDisplayHeight;
+        renderKey = fullscreenMetrics.renderKey;
+    }
+
+    if (
+        containerWidth <= 0 ||
+        (mode === 'fullscreen' && (containerHeight <= 0 || viewportDisplayWidth <= 0 || viewportDisplayHeight <= 0)) ||
+        (mode === 'preview'
+            ? containerWidth === getCirculationPdfPreviewLastRenderedWidth()
+            : renderKey === getCirculationPdfFullscreenLastRenderKey())
+    ) {
+        return;
+    }
+
+    if (mode === 'preview') {
+        cancelCirculationPdfRender();
+    } else {
+        cancelCirculationPdfFullscreenRender();
+    }
+
+    try {
+        const page = await document.getPage(1);
+        if (requestToken !== circulationPdfRequestToken) {
+            if (mode === 'fullscreen') {
+                setCirculationPdfFullscreenPendingRenderKey('');
+            }
+            return;
+        }
+
+        const pageBaseViewport = page.getViewport({
+            scale: 1,
+            rotation
+        });
+
+        const fitScale =
+            mode === 'fullscreen'
+                ? Math.min(
+                      viewportDisplayWidth / pageBaseViewport.width,
+                      viewportDisplayHeight / pageBaseViewport.height
+                  )
+                : containerWidth / pageBaseViewport.width;
+        const viewport = page.getViewport({
+            scale: fitScale * (mode === 'fullscreen' ? circulationPdfFullscreenZoom.value : 1),
+            rotation
+        });
+        const renderSurfaceWidth =
+            mode === 'fullscreen' ? viewportDisplayWidth : viewport.width;
+        const renderSurfaceHeight =
+            mode === 'fullscreen' ? viewportDisplayHeight : viewport.height;
+        const desiredOutputScale =
+            (window.devicePixelRatio || 1) * target.renderScaleMultiplier;
+        const outputScale = clampCirculationPdfOutputScale(
+            page,
+            renderSurfaceWidth,
+            renderSurfaceHeight,
+            desiredOutputScale,
+            target
+        );
+        const context = target.canvas.getContext('2d');
+        if (!context) {
+            return;
+        }
+
+        target.canvas.width = Math.max(1, Math.floor(renderSurfaceWidth * outputScale));
+        target.canvas.height = Math.max(1, Math.floor(renderSurfaceHeight * outputScale));
+        target.canvas.style.width = `${Math.floor(renderSurfaceWidth)}px`;
+        target.canvas.style.height = `${Math.floor(renderSurfaceHeight)}px`;
+
+        if (mode === 'fullscreen') {
+            circulationPdfFullscreenContentWidth.value = viewport.width;
+            circulationPdfFullscreenContentHeight.value = viewport.height;
+            circulationPdfFullscreenViewportWidth.value = viewportDisplayWidth;
+            circulationPdfFullscreenViewportHeight.value = viewportDisplayHeight;
+            const clampedOffset = clampCirculationPdfFullscreenScroll(
+                viewportDisplayWidth,
+                viewportDisplayHeight,
+                viewport.width,
+                viewport.height,
+                circulationPdfFullscreenViewportOffsetX.value,
+                circulationPdfFullscreenViewportOffsetY.value
+            );
+            circulationPdfFullscreenViewportOffsetX.value = clampedOffset.offsetX;
+            circulationPdfFullscreenViewportOffsetY.value = clampedOffset.offsetY;
+        }
+
+        context.setTransform(1, 0, 0, 1, 0, 0);
+        context.clearRect(0, 0, target.canvas.width, target.canvas.height);
+
+        const renderTask = page.render({
+            canvas: null,
+            canvasContext: context,
+            viewport,
+            transform:
+                mode === 'fullscreen'
+                    ? [
+                          outputScale,
+                          0,
+                          0,
+                          outputScale,
+                          -circulationPdfFullscreenViewportOffsetX.value * outputScale,
+                          -circulationPdfFullscreenViewportOffsetY.value * outputScale
+                      ]
+                    : outputScale === 1
+                      ? undefined
+                      : [outputScale, 0, 0, outputScale, 0, 0],
+            background:
+                mode === 'fullscreen' ? 'rgba(255,255,255,0)' : 'rgb(255,255,255)'
+        });
+        setCirculationPdfRenderTaskRef(mode, renderTask);
+        await renderTask.promise;
+
+        if (requestToken !== circulationPdfRequestToken) {
+            return;
+        }
+
+        if (mode === 'preview') {
+            setCirculationPdfPreviewLastRenderedWidth(containerWidth);
+        } else {
+            setCirculationPdfFullscreenLastRenderKey(renderKey);
+            setCirculationPdfFullscreenPendingRenderKey('');
+        }
+        setCirculationPdfRenderTaskRef(mode, null);
+
+        if (mode === 'fullscreen') {
+            circulationPdfFullscreenOrientation = orientation;
+            circulationPdfFullscreenState.value = 'ready';
+        }
+    } catch (error) {
+        if (mode === 'fullscreen') {
+            setCirculationPdfFullscreenPendingRenderKey('');
+        }
+
+        if (requestToken !== circulationPdfRequestToken || isCirculationPdfCancellationError(error)) {
+            return;
+        }
+
+        if (mode === 'preview') {
+            circulationPdfState.value = 'error';
+            await cleanupCirculationPdfPreview({
+                invalidateRequest: false,
+                resetState: false
+            });
+            return;
+        }
+
+        circulationPdfFullscreenState.value = 'error';
+        stopCirculationPdfFullscreenResizeObserver();
+        cancelCirculationPdfFullscreenRender();
+        resetCirculationPdfCanvas(circulationPdfFullscreenCanvas.value, 'fullscreen');
+    }
+}
+
+async function startCirculationPdfResizeObserver(requestToken: number) {
+    await nextTick();
+    if (!import.meta.client || requestToken !== circulationPdfRequestToken) {
+        return;
+    }
+
+    const container = circulationPdfCanvasContainer.value;
+    if (!container) {
+        return;
+    }
+
+    stopCirculationPdfResizeObserver();
+    circulationPdfResizeObserver = new ResizeObserver(() => {
+        if (requestToken !== circulationPdfRequestToken) {
+            return;
+        }
+
+        void renderCirculationPdfPage(requestToken);
+    });
+    circulationPdfResizeObserver.observe(container);
+}
+
+async function startCirculationPdfFullscreenResizeObserver(requestToken: number) {
+    await nextTick();
+    if (!import.meta.client || requestToken !== circulationPdfRequestToken) {
+        return;
+    }
+
+    const container = circulationPdfFullscreenCanvasContainer.value;
+    if (!container) {
+        return;
+    }
+
+    stopCirculationPdfFullscreenResizeObserver();
+    circulationPdfFullscreenResizeObserver = new ResizeObserver(() => {
+        if (requestToken !== circulationPdfRequestToken) {
+            return;
+        }
+
+        const nextOrientation = getCirculationPdfFullscreenOrientation();
+        if (nextOrientation !== circulationPdfFullscreenOrientation) {
+            resetCirculationPdfFullscreenZoom();
+        }
+
+        void requestCirculationPdfFullscreenRender(requestToken);
+    });
+    circulationPdfFullscreenResizeObserver.observe(container);
+    void requestCirculationPdfFullscreenRender(requestToken);
+}
+
+async function loadCirculationPdfPreview(requestTrainCode: string) {
+    if (!import.meta.client) {
+        return;
+    }
+
+    const requestToken = ++circulationPdfRequestToken;
+    circulationPdfState.value = 'loading';
+    await cleanupCirculationPdfPreview({
+        invalidateRequest: false,
+        resetState: false
+    });
+
+    try {
+        const response = await fetch(
+            `/api/v1/timetable/train/${encodeURIComponent(requestTrainCode)}/circulation/image?format=pdf&binary=true`,
+            {
+                credentials: 'same-origin'
+            }
+        );
+        if (requestToken !== circulationPdfRequestToken) {
+            return;
+        }
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+
+        const pdfBytes = new Uint8Array(await response.arrayBuffer());
+        if (requestToken !== circulationPdfRequestToken || pdfBytes.byteLength === 0) {
+            return;
+        }
+
+        const pdfBlob = new Blob([pdfBytes], { type: 'application/pdf' });
+        circulationPdfObjectUrl.value = URL.createObjectURL(pdfBlob);
+
+        const pdfjs = await loadPdfJsModule();
+        if (requestToken !== circulationPdfRequestToken) {
+            return;
+        }
+
+        const loadingTask = pdfjs.getDocument({ data: pdfBytes });
+        circulationPdfLoadingTask = loadingTask;
+        circulationPdfDocument = await loadingTask.promise;
+        if (requestToken !== circulationPdfRequestToken) {
+            return;
+        }
+
+        circulationPdfState.value = 'ready';
+        circulationPdfFullscreenState.value = 'idle';
+        await startCirculationPdfResizeObserver(requestToken);
+        await renderCirculationPdfPage(requestToken);
+    } catch (error) {
+        if (requestToken !== circulationPdfRequestToken) {
+            return;
+        }
+
+        circulationPdfState.value = 'error';
+        circulationPdfFullscreenState.value = 'error';
+        await cleanupCirculationPdfPreview({
+            invalidateRequest: false,
+            resetState: false
+        });
+    }
 }
 
 function formatNullableTime(timestamp: number | null) {
@@ -1382,6 +2605,58 @@ watch(
     }
 );
 
+watch(
+    [
+        () => shouldLoadCirculationPdfPreview.value,
+        () => circulationPdfRequestTrainCode.value
+    ],
+    async ([shouldLoad, requestTrainCode], [previousShouldLoad, previousTrainCode]) => {
+        if (!import.meta.client) {
+            return;
+        }
+
+        if (!shouldLoad) {
+            await cleanupCirculationPdfPreview();
+            return;
+        }
+
+        if (shouldLoad && (!previousShouldLoad || previousTrainCode !== requestTrainCode)) {
+            await loadCirculationPdfPreview(requestTrainCode);
+        }
+    },
+    { immediate: true }
+);
+
+watch(
+    () => isCirculationPdfPreviewOpen.value,
+    async (isOpen) => {
+        if (!import.meta.client) {
+            return;
+        }
+
+        if (!isOpen) {
+            stopCirculationPdfFullscreenResizeObserver();
+            cancelCirculationPdfFullscreenRender();
+            resetCirculationPdfCanvas(circulationPdfFullscreenCanvas.value, 'fullscreen');
+            resetCirculationPdfFullscreenZoom();
+            circulationPdfFullscreenState.value = 'idle';
+            return;
+        }
+
+        if (circulationPdfState.value !== 'ready' || !circulationPdfDocument) {
+            circulationPdfFullscreenState.value = 'error';
+            return;
+        }
+
+        resetCirculationPdfCanvas(circulationPdfFullscreenCanvas.value, 'fullscreen');
+        resetCirculationPdfFullscreenZoom();
+        circulationPdfFullscreenOrientation = getCirculationPdfFullscreenOrientation();
+        circulationPdfFullscreenState.value = 'loading';
+        await nextTick();
+        await startCirculationPdfFullscreenResizeObserver(circulationPdfRequestToken);
+    }
+);
+
 onMounted(() => {
     const persistedState = readPersistedSectionState();
     isTimetableExpanded.value = persistedState.timetableExpanded;
@@ -1390,5 +2665,10 @@ onMounted(() => {
     if (props.modelValue && normalizedTrainCode.value.length > 0) {
         void fetchHistoricalTimetableList();
     }
+});
+
+onBeforeUnmount(() => {
+    handleCirculationPdfFullscreenMouseUp();
+    void cleanupCirculationPdfPreview();
 });
 </script>

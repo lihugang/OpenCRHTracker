@@ -100,64 +100,75 @@ function loadCoverageRows(db) {
                 created_at,
                 updated_at
             FROM timetable_history_coverages
-            ORDER BY train_code ASC, content_id ASC, service_date_start ASC, id ASC`
+            ORDER BY train_code ASC, service_date_start ASC, id ASC`
         )
         .all();
 }
 
-function groupCoverageRows(rows) {
-    const groups = new Map();
+function appendMergeRun(runs, currentRun) {
+    if (currentRun.rows.length < 2) {
+        return;
+    }
+
+    runs.push(currentRun);
+}
+
+function buildMergeRuns(rows) {
+    const runs = [];
+    let currentRun = null;
 
     for (const row of rows) {
-        const groupKey = `${row.train_code}|${row.content_id}`;
-        const existing = groups.get(groupKey);
-        if (existing) {
-            existing.rows.push(row);
-            existing.serviceDateStart = Math.min(
-                existing.serviceDateStart,
-                row.service_date_start
-            );
-            existing.serviceDateEndExclusive = Math.max(
-                existing.serviceDateEndExclusive,
+        if (
+            currentRun !== null &&
+            currentRun.trainCode === row.train_code &&
+            currentRun.contentId === row.content_id
+        ) {
+            currentRun.rows.push(row);
+            currentRun.serviceDateEndExclusive = Math.max(
+                currentRun.serviceDateEndExclusive,
                 row.service_date_end_exclusive
             );
             continue;
         }
 
-        groups.set(groupKey, {
+        if (currentRun !== null) {
+            appendMergeRun(runs, currentRun);
+        }
+
+        currentRun = {
             trainCode: row.train_code,
             contentId: row.content_id,
             serviceDateStart: row.service_date_start,
             serviceDateEndExclusive: row.service_date_end_exclusive,
             rows: [row]
-        });
+        };
     }
 
-    return [...groups.values()];
+    if (currentRun !== null) {
+        appendMergeRun(runs, currentRun);
+    }
+
+    return runs;
 }
 
-function buildMergePlan(groups) {
+function buildMergePlan(runs) {
     const mergeGroups = [];
     let updatedRows = 0;
     let deletedRows = 0;
 
-    for (const group of groups) {
-        if (group.rows.length < 2) {
-            continue;
-        }
-
-        const keeper = group.rows[0];
+    for (const run of runs) {
+        const keeper = run.rows[0];
         const requiresRangeUpdate =
-            keeper.service_date_start !== group.serviceDateStart ||
-            keeper.service_date_end_exclusive !== group.serviceDateEndExclusive;
+            keeper.service_date_start !== run.serviceDateStart ||
+            keeper.service_date_end_exclusive !== run.serviceDateEndExclusive;
         if (requiresRangeUpdate) {
             updatedRows += 1;
         }
 
-        const removedRows = group.rows.slice(1);
+        const removedRows = run.rows.slice(1);
         deletedRows += removedRows.length;
         mergeGroups.push({
-            ...group,
+            ...run,
             keeperId: keeper.id,
             keeperRangeChanged: requiresRangeUpdate,
             removedIds: removedRows.map((row) => row.id)
@@ -248,13 +259,13 @@ function main() {
 
     try {
         const rows = loadCoverageRows(db);
-        const groups = groupCoverageRows(rows);
-        const mergePlan = buildMergePlan(groups);
+        const mergeRuns = buildMergeRuns(rows);
+        const mergePlan = buildMergePlan(mergeRuns);
         const summary = buildSummary(dbPath, rows, mergePlan);
 
         console.log(JSON.stringify({
             mode: options.apply ? 'apply' : 'dry-run',
-            note: 'Merging same train_code + content_id coverages will make gap dates count as covered by that timetable.',
+            note: 'Merging only adjacent same-content runs keeps gaps uncovered and never merges across intervening coverage rows.',
             ...summary
         }, null, 2));
 

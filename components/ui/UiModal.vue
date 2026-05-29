@@ -92,8 +92,8 @@ const props = withDefaults(
         title: string;
         eyebrow?: string;
         description?: string;
-        size?: 'md' | 'lg';
-        height?: 'default' | 'tall';
+        size?: 'md' | 'lg' | 'screen';
+        height?: 'default' | 'tall' | 'screen';
         closeOnBackdrop?: boolean;
     }>(),
     {
@@ -110,12 +110,18 @@ const emit = defineEmits<{
 }>();
 
 const sizeClass = computed(() =>
-    props.size === 'lg' ? 'max-w-4xl' : 'max-w-2xl'
+    props.size === 'screen'
+        ? 'max-w-[min(96vw,96rem)]'
+        : props.size === 'lg'
+          ? 'max-w-4xl'
+          : 'max-w-2xl'
 );
 const heightClass = computed(() =>
-    props.height === 'tall'
-        ? 'max-h-[min(92vh,64rem)]'
-        : 'max-h-[min(86vh,48rem)]'
+    props.height === 'screen'
+        ? 'max-h-[96vh]'
+        : props.height === 'tall'
+          ? 'max-h-[min(92vh,64rem)]'
+          : 'max-h-[min(86vh,48rem)]'
 );
 const panelClass = computed(() => [sizeClass.value, heightClass.value]);
 const isRendered = ref(props.modelValue);
