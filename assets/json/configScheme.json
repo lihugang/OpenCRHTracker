@@ -1282,7 +1282,15 @@
                             "type": "integer",
                             "minimum": 0
                         },
+                        "trainCirculationImageCacheHit": {
+                            "type": "integer",
+                            "minimum": 0
+                        },
                         "trainCirculationImage": {
+                            "type": "integer",
+                            "minimum": 0
+                        },
+                        "trainCirculationImageFailure": {
                             "type": "integer",
                             "minimum": 0
                         },
@@ -1318,7 +1326,9 @@
                         "authDeleteSubscription",
                         "searchIndex",
                         "timetableTrainCurrent",
+                        "trainCirculationImageCacheHit",
                         "trainCirculationImage",
+                        "trainCirculationImageFailure",
                         "timetableTrainHistory",
                         "exportDailyIndex",
                         "exportDaily"

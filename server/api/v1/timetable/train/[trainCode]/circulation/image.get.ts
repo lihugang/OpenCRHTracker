@@ -1,6 +1,5 @@
 import { defineEventHandler, getQuery, getRouterParam, setHeader } from 'h3';
 import useConfig from '~/server/config';
-import getFixedCost from '~/server/utils/api/cost/getFixedCost';
 import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';
 import setCacheControl from '~/server/utils/api/response/setCacheControl';
@@ -38,14 +37,21 @@ function parseFormat(value: unknown): TrainCirculationImageFormat {
 }
 
 export default defineEventHandler(async (event) => {
-    const cacheMaxAge = useConfig().api.cache.timetableMaxAgeSeconds;
+    const config = useConfig();
+    const cacheMaxAge = config.api.cache.timetableMaxAgeSeconds;
+    const cacheHitCost = config.cost.fixed.trainCirculationImageCacheHit;
+    const cacheMissCost = config.cost.fixed.trainCirculationImage;
+    const failureCost = config.cost.fixed.trainCirculationImageFailure;
 
     return executeApi(
         event,
         {
             cors: true,
             requiredScopes: [API_SCOPES.timetable.train.circulation.image.read],
-            fixedCost: getFixedCost('trainCirculationImage'),
+            fixedCost: cacheHitCost,
+            failureCost,
+            dynamicCostFromData: (data) =>
+                data.cacheHit ? 0 : cacheMissCost - cacheHitCost,
             rawSuccessResponse: (successEvent, data) => {
                 const successQuery = getQuery(successEvent);
                 const binaryRequested =

@@ -419,7 +419,9 @@ export const DEFAULT_DOCS_API_RUNTIME_CONFIG: DocsApiRuntimeConfig = {
         fixed: {
             authMe: 1,
             timetableTrainCurrent: 1,
+            trainCirculationImageCacheHit: 2,
             trainCirculationImage: 20,
+            trainCirculationImageFailure: 2,
             timetableTrainHistory: 1,
             exportDailyIndex: 2,
             exportDaily: 50
@@ -778,6 +780,29 @@ export function getDocsApiCostDisplay(
             endpoint.slug as keyof typeof FIXED_COST_ENDPOINT_KEYS
         ];
     if (fixedCostKey) {
+        if (endpoint.slug === 'timetable-train-circulation-image') {
+            const cacheHitCost = runtimeConfig.cost.fixed.trainCirculationImageCacheHit;
+            const cacheMissCost = runtimeConfig.cost.fixed.trainCirculationImage;
+            const failureCost = runtimeConfig.cost.fixed.trainCirculationImageFailure;
+            const ruleText =
+                '缓存命中 ' +
+                formatCostValue(cacheHitCost) +
+                ' 点/次，缓存未命中 ' +
+                formatCostValue(cacheMissCost) +
+                ' 点/次，失败 ' +
+                formatCostValue(failureCost) +
+                ' 点/次';
+
+            return {
+                summary: '扣费规则：' + ruleText,
+                ruleText,
+                description: '根据上游 LaTeX 编译是否命中缓存决定扣费档位。',
+                note:
+                    '实际扣费以响应头 ' +
+                    runtimeConfig.headers.cost +
+                    ' 为准。'
+            };
+        }
         const fixedCost = runtimeConfig.cost.fixed[fixedCostKey];
         const ruleText = `固定 ${formatCostValue(fixedCost)} 点额度/次`;
 

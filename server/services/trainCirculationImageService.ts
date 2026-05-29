@@ -26,6 +26,7 @@ import resolveBureauNameByCode from '~/utils/railway/resolveBureauNameByCode';
 interface LatexCompileSuccessPayload {
     id?: unknown;
     pageNumber?: unknown;
+    cacheHit?: unknown;
 }
 
 interface ResolvedScheduleTerminal {
@@ -54,6 +55,7 @@ interface StationAxisPoint {
 interface LatexCompileResult {
     id: string;
     pageCount: number;
+    cacheHit: boolean;
 }
 
 type TextAnchor = 'east' | 'west' | 'north' | 'south';
@@ -75,6 +77,7 @@ export interface TrainCirculationImageRenderResult {
     requestTrainCode: string;
     trainCode: string;
     documentId: string;
+    cacheHit: boolean;
     imageUrl: string;
     binaryContent: Uint8Array | null;
     binaryContentType: 'image/png' | 'application/pdf';
@@ -1485,9 +1488,18 @@ function parseLatexCompileEnvelope(payload: unknown): LatexCompileResult {
         );
     }
 
+    if (typeof compilePayload?.cacheHit !== 'boolean') {
+        throw new ApiRequestError(
+            502,
+            'upstream_unavailable',
+            '运行图渲染服务返回了无效响应'
+        );
+    }
+
     return {
         id: documentId,
-        pageCount
+        pageCount,
+        cacheHit: compilePayload.cacheHit
     };
 }
 
@@ -1619,6 +1631,7 @@ export async function renderTrainCirculationImage(
         requestTrainCode,
         trainCode: timetable.trainCode,
         documentId: compileResult.id,
+        cacheHit: compileResult.cacheHit,
         imageUrl,
         binaryContent,
         binaryContentType: getBinaryContentType(format)

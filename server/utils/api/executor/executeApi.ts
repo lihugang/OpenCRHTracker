@@ -27,6 +27,7 @@ export default async function executeApi<TData>(
     const corsEnabled = options.cors ?? false;
     const bypassAnonymousQuota = options.bypassAnonymousQuota ?? false;
     const fixedCost = options.fixedCost ?? 0;
+    const failureCost = options.failureCost ?? minimumRequestCost;
     let identity: ApiIdentity | null = null;
     let remain = 0;
     let costApplied = 0;
@@ -188,13 +189,17 @@ export default async function executeApi<TData>(
             identity = getAnonymousIdentity(event);
         }
 
+        const targetFailureCost = Math.max(
+            minimumRequestCost,
+            Math.floor(failureCost)
+        );
         if (
             !(bypassAnonymousQuota && identity.type === 'anonymous') &&
-            costApplied < minimumRequestCost
+            costApplied < targetFailureCost
         ) {
             const minimumConsume = tryConsumeTokens(
                 identity,
-                minimumRequestCost - costApplied
+                targetFailureCost - costApplied
             );
             if (minimumConsume.ok) {
                 remain = minimumConsume.remain;

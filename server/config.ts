@@ -322,7 +322,9 @@ export interface Config {
             authDeleteSubscription: number;
             searchIndex: number;
             timetableTrainCurrent: number;
+            trainCirculationImageCacheHit: number;
             trainCirculationImage: number;
+            trainCirculationImageFailure: number;
             timetableTrainHistory: number;
             exportDailyIndex: number;
             exportDaily: number;
@@ -1630,9 +1632,19 @@ function validateConfig(raw: unknown): Config {
                     'cost.fixed.timetableTrainCurrent',
                     0
                 ),
+                trainCirculationImageCacheHit: asNumber(
+                    costFixed.trainCirculationImageCacheHit,
+                    'cost.fixed.trainCirculationImageCacheHit',
+                    0
+                ),
                 trainCirculationImage: asNumber(
                     costFixed.trainCirculationImage,
                     'cost.fixed.trainCirculationImage',
+                    0
+                ),
+                trainCirculationImageFailure: asNumber(
+                    costFixed.trainCirculationImageFailure,
+                    'cost.fixed.trainCirculationImageFailure',
                     0
                 ),
                 timetableTrainHistory: asNumber(
@@ -1799,6 +1811,11 @@ function validateConfig(raw: unknown): Config {
     assert(
         configResult.task.circulation.stationBoard.maxAttempts >= 1,
         'task.circulation.stationBoard.maxAttempts must be >= 1'
+    );
+    assert(
+        configResult.cost.fixed.trainCirculationImage >=
+            configResult.cost.fixed.trainCirculationImageCacheHit,
+        'cost.fixed.trainCirculationImage must be >= cost.fixed.trainCirculationImageCacheHit'
     );
     for (
         const key of ['EMUList', 'QRCode', 'stationCoord', 'qrcodeDetection'] as const

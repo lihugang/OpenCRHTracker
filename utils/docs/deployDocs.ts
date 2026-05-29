@@ -139,7 +139,8 @@ export const deployDocsSections: DocsContentSection[] = [
             },
             {
                 type: 'paragraph',
-                text: '部署前先确定当前环境实际会读取哪份配置文件，再进行修改。生产环境的配置修改不会热更新，修改后需要重启 Node 进程。'
+                text:
+                    '部署前先确定当前环境实际会读取哪份配置文件，再进行修改。生产环境的配置修改不会主动热更新，修改后请重启 Node 进程或者管理员面板手动重载。'
             },
             {
                 type: 'code',
@@ -901,10 +902,14 @@ export const deployDocsSections: DocsContentSection[] = [
                         description: 'API Key 管理接口的固定成本。'
                     },
                     {
-                        path: 'cost.fixed.searchIndex / timetableTrainCurrent / trainCirculationImage / timetableTrainHistory / exportDailyIndex / exportDaily',
+                        path: 'cost.fixed.searchIndex / timetableTrainCurrent / trainCirculationImage / trainCirculationImageCacheHit / trainCirculationImageFailure / timetableTrainHistory / exportDailyIndex / exportDaily',
                         valueType: 'integer',
                         required: true,
-                        description: '搜索、当前时刻表、运行图图片与导出接口的固定成本。'
+                        description: '搜索、当前时刻表、运行图图片与导出接口的固定成本。',
+                        notes: [
+                            'trainCirculationImageCacheHit 控制运行图图片缓存命中成本，默认 2。',
+                            'trainCirculationImageFailure 控制运行图图片失败成本，默认 2。'
+                        ]
                     },
                     {
                         path: 'cost.perRecord.historyEmu',

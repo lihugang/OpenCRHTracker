@@ -6,6 +6,7 @@ export interface ExecuteApiOptions<TData> {
     cors?: boolean;
     bypassAnonymousQuota?: boolean;
     fixedCost?: number;
+    failureCost?: number;
     dynamicCostFromData?: (data: TData) => number;
     successHeaders?: (event: H3Event, data: TData) => void;
     rawSuccessResponse?: (
