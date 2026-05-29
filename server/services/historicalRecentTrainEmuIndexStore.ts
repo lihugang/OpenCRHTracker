@@ -12,7 +12,7 @@ interface HistoricalRecentTrainEmuIndexCache {
 }
 
 const logger = getLogger('historical-recent-train-emu-index');
-const LATEST_RECORD_LIMIT = 4;
+const LATEST_RECORD_LIMIT = 2;
 
 let cached: HistoricalRecentTrainEmuIndexCache | null = null;
 
