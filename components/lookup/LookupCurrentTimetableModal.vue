@@ -252,7 +252,7 @@
             </UiCard>
 
             <UiCard
-                v-if="isCurrentTimetableAvailable && circulationNodes.length > 0"
+                v-if="shouldShowCirculationSection"
                 class="order-2"
                 :show-accent-bar="false"
                 variant="subtle">
@@ -523,7 +523,9 @@
                 </div>
             </UiCard>
 
-            <div class="order-3 motion-divider" />
+            <div
+                v-if="shouldShowCirculationSection"
+                class="order-3 motion-divider" />
         </div>
     </UiModal>
 </template>
@@ -656,6 +658,9 @@ let historyContentRequestToken = 0;
 
 const isCurrentView = computed(() => selectedTimetableSourceKey.value === 'current');
 const isCurrentTimetableAvailable = computed(() => timetable.value !== null);
+const shouldShowCirculationSection = computed(() => {
+    return isCurrentTimetableAvailable.value && circulationNodes.value.length > 0;
+});
 
 const latestHistoricalCoverage = computed(
     () => historyItems.value[0] ?? null
