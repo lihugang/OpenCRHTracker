@@ -1,6 +1,7 @@
 import parseTimeAsTimestamp from './parseTimeAsTimestamp';
 
 export const SHANGHAI_OFFSET_MS = 8 * 60 * 60 * 1000;
+export const SHANGHAI_DAY_SECONDS = 24 * 60 * 60;
 
 const shanghaiDateTimeFormatter = new Intl.DateTimeFormat('zh-CN', {
     timeZone: 'Asia/Shanghai',
@@ -72,6 +73,69 @@ export function getShanghaiDayStartUnixSeconds(dateYYYYMMDD: string): number {
     const { year, month, day } = parseDateYYYYMMDD(dateYYYYMMDD);
     const pseudoUtcMs = Date.UTC(year, month - 1, day, 0, 0, 0, 0);
     return Math.floor((pseudoUtcMs - SHANGHAI_OFFSET_MS) / 1000);
+}
+
+export function getShanghaiDayBucket(timestampSeconds: number) {
+    return Math.floor(
+        (timestampSeconds + SHANGHAI_OFFSET_MS / 1000) / SHANGHAI_DAY_SECONDS
+    );
+}
+
+export function getShanghaiDayOffsetSeconds(timestampSeconds: number) {
+    const dayBucket = getShanghaiDayBucket(timestampSeconds);
+    return (
+        timestampSeconds -
+        (dayBucket * SHANGHAI_DAY_SECONDS - SHANGHAI_OFFSET_MS / 1000)
+    );
+}
+
+export function expandSequentialShanghaiDayOffsets<T>(
+    items: readonly T[],
+    getStartAt: (item: T) => number,
+    getEndAt: (item: T) => number
+) {
+    const expandedOffsets: {
+        startAt: number;
+        endAt: number;
+        routeDayOffset: number;
+    }[] = [];
+    let previousEndAt: number | null = null;
+
+    for (const item of items) {
+        const startAt = getStartAt(item);
+        const endAt = getEndAt(item);
+        const startDayOffsetSeconds = getShanghaiDayOffsetSeconds(startAt);
+        const endDayOffsetSeconds = getShanghaiDayOffsetSeconds(endAt);
+        const endDayShift = Math.max(
+            getShanghaiDayBucket(endAt) - getShanghaiDayBucket(startAt),
+            0
+        );
+        let routeDayOffset = 0;
+        let expandedStartAt = startDayOffsetSeconds;
+
+        if (previousEndAt !== null) {
+            while (expandedStartAt < previousEndAt) {
+                routeDayOffset += 1;
+                expandedStartAt =
+                    routeDayOffset * SHANGHAI_DAY_SECONDS +
+                    startDayOffsetSeconds;
+            }
+        }
+
+        const expandedEndAt =
+            routeDayOffset * SHANGHAI_DAY_SECONDS +
+            endDayShift * SHANGHAI_DAY_SECONDS +
+            endDayOffsetSeconds;
+
+        expandedOffsets.push({
+            startAt: expandedStartAt,
+            endAt: expandedEndAt,
+            routeDayOffset
+        });
+        previousEndAt = expandedEndAt;
+    }
+
+    return expandedOffsets;
 }
 
 export function toUnixSecondsFromShanghaiDayOffset(

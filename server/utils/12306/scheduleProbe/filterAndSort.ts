@@ -24,6 +24,7 @@ export function normalizeTrainCodeItems(
             internalCode: item.route.internalCode,
             allCodes: [match.normalizedCode],
             bureauCode: '',
+            trainStyle: '',
             trainDepartment: '',
             passengerDepartment: '',
             startStation: '',

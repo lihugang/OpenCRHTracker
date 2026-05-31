@@ -26,7 +26,7 @@ import {
 } from '~/server/services/todayScheduleCache';
 import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
-import { SHANGHAI_OFFSET_MS } from '~/server/utils/date/shanghaiDateTime';
+import { expandSequentialShanghaiDayOffsets } from '~/server/utils/date/shanghaiDateTime';
 import {
     getCurrentTrainProvenanceTaskRunId,
     recordCurrentTrainProvenanceEvent
@@ -37,8 +37,6 @@ import { getStationBoardIdleTaskOptions } from '~/server/services/stationBoardTa
 export const FETCH_STATION_BOARD_TASK_EXECUTOR = 'fetch_station_board';
 
 const logger = getLogger('task-executor:fetch-station-board');
-const DAY_SECONDS = 24 * 60 * 60;
-const SHANGHAI_OFFSET_SECONDS = SHANGHAI_OFFSET_MS / 1000;
 
 export interface FetchStationBoardTaskArgs {
     serviceDate: string;
@@ -264,19 +262,6 @@ function resolveUniqueGroupForRawCode(
     return normalizeCode(group.trainInternalCode).length > 0 ? group : null;
 }
 
-function getShanghaiDayBucket(timestampSeconds: number) {
-    return Math.floor(
-        (timestampSeconds + SHANGHAI_OFFSET_SECONDS) / DAY_SECONDS
-    );
-}
-
-function getShanghaiDayOffsetSeconds(timestampSeconds: number) {
-    const dayBucket = getShanghaiDayBucket(timestampSeconds);
-    return (
-        timestampSeconds - (dayBucket * DAY_SECONDS - SHANGHAI_OFFSET_SECONDS)
-    );
-}
-
 function buildOfficialCirculationEntry(
     nodes: readonly ParsedCirculationNode[]
 ): ScheduleCirculationEntry | null {
@@ -284,34 +269,16 @@ function buildOfficialCirculationEntry(
         return null;
     }
 
-    let currentRouteDayOffset = 0;
     const circulationNodes: ScheduleCirculationEntry['nodes'] = [];
+    const expandedOffsets = expandSequentialShanghaiDayOffsets(
+        nodes,
+        (node) => node.group.startAt,
+        (node) => node.group.endAt
+    );
 
     for (const [index, node] of nodes.entries()) {
         const currentGroup = node.group;
-        const previousGroup = nodes[index - 1]?.group ?? null;
-
-        if (previousGroup) {
-            const previousReference = getShanghaiDayOffsetSeconds(
-                previousGroup.endAt
-            );
-            const currentReference = getShanghaiDayOffsetSeconds(
-                currentGroup.startAt
-            );
-            if (currentReference < previousReference) {
-                currentRouteDayOffset += 1;
-            }
-        }
-
-        const startDayOffsetSeconds = getShanghaiDayOffsetSeconds(
-            currentGroup.startAt
-        );
-        const endDayOffsetSeconds = getShanghaiDayOffsetSeconds(
-            currentGroup.endAt
-        );
-        const endDayShift =
-            getShanghaiDayBucket(currentGroup.endAt) -
-            getShanghaiDayBucket(currentGroup.startAt);
+        const expandedOffset = expandedOffsets[index]!;
         const allCodes = uniqueNormalizedCodes([
             currentGroup.trainCode,
             ...currentGroup.allCodes
@@ -326,12 +293,8 @@ function buildOfficialCirculationEntry(
             allCodes,
             startStation: normalizeStationName(currentGroup.startStation),
             endStation: normalizeStationName(currentGroup.endStation),
-            startAt:
-                currentRouteDayOffset * DAY_SECONDS + startDayOffsetSeconds,
-            endAt:
-                currentRouteDayOffset * DAY_SECONDS +
-                Math.max(endDayShift, 0) * DAY_SECONDS +
-                endDayOffsetSeconds
+            startAt: expandedOffset.startAt,
+            endAt: expandedOffset.endAt
         });
     }
 

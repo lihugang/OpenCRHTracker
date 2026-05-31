@@ -89,6 +89,7 @@ export interface RouteInfoData {
     allCodes: string[];
     internalCode: string;
     bureauCode: string;
+    trainStyle: string;
     trainDepartment: string;
     passengerDepartment: string;
     startStation: string;
@@ -298,6 +299,7 @@ export default async function fetchRouteInfo(
                 ]),
                 internalCode: json.data.trainNo,
                 bureauCode: routeMetadata.bureauCode,
+                trainStyle: routeMetadata.trainStyle,
                 trainDepartment: routeMetadata.trainDepartment,
                 passengerDepartment: routeMetadata.passengerDepartment,
                 startStation: startStation.stationName,
@@ -373,13 +375,14 @@ function resolveRouteMetadata(
     rawStops: RouteInfoResponse['data']['trainDetail']['stopTime']
 ): Pick<
     RouteInfoData,
-    'bureauCode' | 'trainDepartment' | 'passengerDepartment'
+    'bureauCode' | 'trainStyle' | 'trainDepartment' | 'passengerDepartment'
 > {
     const metadata: Pick<
         RouteInfoData,
-        'bureauCode' | 'trainDepartment' | 'passengerDepartment'
+        'bureauCode' | 'trainStyle' | 'trainDepartment' | 'passengerDepartment'
     > = {
         bureauCode: '',
+        trainStyle: '',
         trainDepartment: '',
         passengerDepartment: ''
     };
@@ -389,6 +392,9 @@ function resolveRouteMetadata(
             metadata.bureauCode = normalizeOptionalField(
                 stop.corporation_code
             ).slice(0, 1);
+        }
+        if (metadata.trainStyle.length === 0) {
+            metadata.trainStyle = normalizeOptionalField(stop.train_style);
         }
         if (metadata.trainDepartment.length === 0) {
             metadata.trainDepartment = normalizeOptionalField(
@@ -402,6 +408,7 @@ function resolveRouteMetadata(
         }
         if (
             metadata.bureauCode.length > 0 &&
+            metadata.trainStyle.length > 0 &&
             metadata.trainDepartment.length > 0 &&
             metadata.passengerDepartment.length > 0
         ) {

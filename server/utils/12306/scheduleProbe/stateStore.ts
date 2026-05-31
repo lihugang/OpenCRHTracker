@@ -37,7 +37,7 @@ interface ScheduleDocumentCache {
 }
 
 const SCHEDULE_SCHEMA_RELATIVE_PATH = '../assets/json/scheduleScheme.json';
-const CURRENT_SCHEDULE_DOCUMENT_VERSION = 6;
+const CURRENT_SCHEDULE_DOCUMENT_VERSION = 7;
 let cachedScheduleDocument: ScheduleDocumentCache | null = null;
 let scheduleStateVersion = 0;
 
@@ -630,6 +630,9 @@ function asScheduleState(value: unknown): ScheduleState | null {
         if (typeof row.bureauCode !== 'string') {
             row.bureauCode = '';
         }
+        if (typeof row.trainStyle !== 'string') {
+            row.trainStyle = '';
+        }
         if (typeof row.trainDepartment !== 'string') {
             row.trainDepartment = '';
         }
@@ -708,11 +711,13 @@ function scheduleStateNeedsRouteMetadataMigration(value: unknown): boolean {
 
         const row = item as {
             bureauCode?: unknown;
+            trainStyle?: unknown;
             trainDepartment?: unknown;
             passengerDepartment?: unknown;
         };
         return (
             typeof row.bureauCode !== 'string' ||
+            typeof row.trainStyle !== 'string' ||
             typeof row.trainDepartment !== 'string' ||
             typeof row.passengerDepartment !== 'string'
         );
@@ -768,6 +773,7 @@ function parseScheduleDocument(value: unknown): {
         version !== 3 &&
         version !== 4 &&
         version !== 5 &&
+        version !== 6 &&
         version !== CURRENT_SCHEDULE_DOCUMENT_VERSION
     ) {
         return {
@@ -904,6 +910,7 @@ function mergePublishedRouteInfo(
         item.startStation = currentItem.startStation;
         item.endStation = currentItem.endStation;
         item.bureauCode = currentItem.bureauCode;
+        item.trainStyle = currentItem.trainStyle;
         item.trainDepartment = currentItem.trainDepartment;
         item.passengerDepartment = currentItem.passengerDepartment;
         item.startAt = currentItem.startAt;

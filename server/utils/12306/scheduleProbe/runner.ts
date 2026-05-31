@@ -56,6 +56,7 @@ function restorePreservedRouteInfo(
     }
 
     item.bureauCode = preservedItem.bureauCode;
+    item.trainStyle = preservedItem.trainStyle;
     item.trainDepartment = preservedItem.trainDepartment;
     item.passengerDepartment = preservedItem.passengerDepartment;
     item.startStation = preservedItem.startStation;
@@ -281,6 +282,7 @@ async function runScheduleProbeInternal(
                 };
                 for (const groupItem of groupItems) {
                     groupItem.bureauCode = routeResult.data.route.bureauCode;
+                    groupItem.trainStyle = routeResult.data.route.trainStyle;
                     groupItem.trainDepartment =
                         routeResult.data.route.trainDepartment;
                     groupItem.passengerDepartment =

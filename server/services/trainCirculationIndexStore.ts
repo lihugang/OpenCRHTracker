@@ -6,7 +6,8 @@ import {
 } from '~/server/services/emuRoutesStore';
 import {
     getTodayScheduleProbeGroups,
-    getTodayScheduleTimetableByTrainCode
+    getTodayScheduleTimetableByTrainCode,
+    type TodayScheduleTimetable
 } from '~/server/services/todayScheduleCache';
 import {
     loadScheduleCirculationEntry,
@@ -15,8 +16,9 @@ import {
 import type { ScheduleCirculationEntry } from '~/server/utils/12306/scheduleProbe/types';
 import { getRelativeDateString } from '~/server/utils/date/getCurrentDateString';
 import {
-    getShanghaiDayStartUnixSeconds,
-    SHANGHAI_OFFSET_MS
+    expandSequentialShanghaiDayOffsets,
+    getShanghaiDayBucket,
+    getShanghaiDayStartUnixSeconds
 } from '~/server/utils/date/shanghaiDateTime';
 import murmurHash32 from '~/server/utils/hash/murmurHash32';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
@@ -130,7 +132,6 @@ interface InternalInferredCirculation {
 
 const logger = getLogger('train-circulation-index');
 const DAY_SECONDS = 24 * 60 * 60;
-const SHANGHAI_OFFSET_SECONDS = SHANGHAI_OFFSET_MS / 1000;
 
 let cached: TrainCirculationIndexCache | null = null;
 
@@ -259,23 +260,6 @@ function buildNodeIdStore() {
             return nextNodeId;
         }
     };
-}
-
-function getShanghaiDayBucket(timestampSeconds: number) {
-    return Math.floor((timestampSeconds + SHANGHAI_OFFSET_SECONDS) / 86400);
-}
-
-function getShanghaiDayStartUnixSecondsByBucket(dayBucket: number) {
-    return dayBucket * DAY_SECONDS - SHANGHAI_OFFSET_SECONDS;
-}
-
-function getShanghaiDayOffsetSeconds(timestampSeconds: number) {
-    return (
-        timestampSeconds -
-        getShanghaiDayStartUnixSecondsByBucket(
-            getShanghaiDayBucket(timestampSeconds)
-        )
-    );
 }
 
 function buildRunKey(row: DailyEmuRouteRow) {
@@ -602,45 +586,25 @@ function buildPublicCirculationNodes(
     circulation: InternalInferredCirculation
 ): TrainCirculationNode[] | null {
     const nodes: TrainCirculationNode[] = [];
-    let currentRouteDayOffset = 0;
+    const resolvedTimetables: TodayScheduleTimetable[] = [];
 
-    for (const [index, node] of circulation.nodes.entries()) {
+    for (const node of circulation.nodes) {
         const timetable = resolvePublicNodeTimetable(node);
         if (!timetable) {
             return null;
         }
+        resolvedTimetables.push(timetable);
+    }
 
-        const previousNode = circulation.nodes[index - 1] ?? null;
-        const previousTimetable =
-            previousNode === null
-                ? null
-                : resolvePublicNodeTimetable(previousNode);
-        if (previousNode && !previousTimetable) {
-            return null;
-        }
+    const expandedOffsets = expandSequentialShanghaiDayOffsets(
+        resolvedTimetables,
+        (timetable) => timetable.startAt,
+        (timetable) => timetable.endAt
+    );
 
-        if (previousTimetable) {
-            const previousReference =
-                getShanghaiDayOffsetSeconds(previousTimetable.endAt) ??
-                getShanghaiDayOffsetSeconds(previousTimetable.startAt);
-            const currentReference = getShanghaiDayOffsetSeconds(
-                timetable.startAt
-            );
-
-            if (currentReference < previousReference) {
-                currentRouteDayOffset += 1;
-            }
-        }
-
-        const startDayOffsetSeconds = getShanghaiDayOffsetSeconds(
-            timetable.startAt
-        );
-        const endDayOffsetSeconds = getShanghaiDayOffsetSeconds(
-            timetable.endAt
-        );
-        const endDayShift =
-            getShanghaiDayBucket(timetable.endAt) -
-            getShanghaiDayBucket(timetable.startAt);
+    for (const [index, node] of circulation.nodes.entries()) {
+        const timetable = resolvedTimetables[index]!;
+        const expandedOffset = expandedOffsets[index]!;
         const allCodes = uniqueNormalizedCodes([
             ...node.allCodes,
             node.trainCode,
@@ -658,12 +622,8 @@ function buildPublicCirculationNodes(
             allCodes,
             startStation: timetable.startStation,
             endStation: timetable.endStation,
-            startAt:
-                currentRouteDayOffset * DAY_SECONDS + startDayOffsetSeconds,
-            endAt:
-                currentRouteDayOffset * DAY_SECONDS +
-                Math.max(endDayShift, 0) * DAY_SECONDS +
-                endDayOffsetSeconds
+            startAt: expandedOffset.startAt,
+            endAt: expandedOffset.endAt
         });
     }
 

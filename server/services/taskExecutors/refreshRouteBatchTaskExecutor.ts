@@ -49,6 +49,7 @@ interface RefreshRouteGroupUpdate {
     codes: string[];
     allCodes: string[];
     bureauCode: string;
+    trainStyle: string;
     trainDepartment: string;
     passengerDepartment: string;
     startStation: string;
@@ -108,6 +109,7 @@ function applyGroupUpdate(
         const item = state.items[itemIndex]!;
         item.allCodes = [...update.allCodes];
         item.bureauCode = update.bureauCode;
+        item.trainStyle = update.trainStyle;
         item.trainDepartment = update.trainDepartment;
         item.passengerDepartment = update.passengerDepartment;
         item.startStation = update.startStation;
@@ -233,6 +235,7 @@ async function executeRefreshRouteBatchTaskInternal(rawArgs: unknown) {
             routeResult.data.route.internalCode.trim();
         const nextAllCodes = [...routeResult.data.route.allCodes];
         const nextBureauCode = routeResult.data.route.bureauCode.trim();
+        const nextTrainStyle = routeResult.data.route.trainStyle.trim();
         const nextTrainDepartment =
             routeResult.data.route.trainDepartment.trim();
         const nextPassengerDepartment =
@@ -251,6 +254,7 @@ async function executeRefreshRouteBatchTaskInternal(rawArgs: unknown) {
             if (
                 groupItem.allCodes.join('/') !== nextAllCodes.join('/') ||
                 groupItem.bureauCode !== nextBureauCode ||
+                groupItem.trainStyle !== nextTrainStyle ||
                 groupItem.trainDepartment !== nextTrainDepartment ||
                 groupItem.passengerDepartment !== nextPassengerDepartment ||
                 groupItem.startStation !== nextStartStation ||
@@ -263,6 +267,7 @@ async function executeRefreshRouteBatchTaskInternal(rawArgs: unknown) {
             }
             groupItem.allCodes = [...nextAllCodes];
             groupItem.bureauCode = nextBureauCode;
+            groupItem.trainStyle = nextTrainStyle;
             groupItem.trainDepartment = nextTrainDepartment;
             groupItem.passengerDepartment = nextPassengerDepartment;
             groupItem.startStation = nextStartStation;
@@ -289,6 +294,7 @@ async function executeRefreshRouteBatchTaskInternal(rawArgs: unknown) {
             ),
             allCodes: nextAllCodes,
             bureauCode: nextBureauCode,
+            trainStyle: nextTrainStyle,
             trainDepartment: nextTrainDepartment,
             passengerDepartment: nextPassengerDepartment,
             startStation: nextStartStation,

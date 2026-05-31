@@ -10,7 +10,7 @@
         },
         "version": {
             "type": "integer",
-            "const": 6
+            "const": 7
         },
         "stations": {
             "type": "object",
@@ -197,6 +197,9 @@
                 "bureauCode": {
                     "type": "string"
                 },
+                "trainStyle": {
+                    "type": "string"
+                },
                 "trainDepartment": {
                     "type": "string"
                 },
@@ -243,6 +246,7 @@
                 "internalCode",
                 "allCodes",
                 "bureauCode",
+                "trainStyle",
                 "trainDepartment",
                 "passengerDepartment",
                 "startStation",

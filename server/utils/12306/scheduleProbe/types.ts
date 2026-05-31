@@ -39,6 +39,7 @@ export interface ScheduleItem {
     internalCode: string;
     allCodes: string[];
     bureauCode: string;
+    trainStyle: string;
     trainDepartment: string;
     passengerDepartment: string;
     startStation: string;
@@ -109,7 +110,7 @@ export type ScheduleCirculationMap = Record<string, ScheduleCirculationEntry>;
 
 export interface ScheduleDocument {
     $schema: string;
-    version: 6;
+    version: 7;
     stations: ScheduleStationMap;
     circulation: ScheduleCirculationMap;
     routeRefreshQueue: ScheduleRouteRefreshQueueEntry[];
