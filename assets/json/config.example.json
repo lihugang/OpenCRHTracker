@@ -81,8 +81,9 @@
                 }
             },
             "stationCoord": {
-                "file": "data/stationCoord.jsonl",
-                "provider": "https://storage.lihugang.top/open_crh_tracker/initialized_data/stationCoord.jsonl",
+                "file": "data/station_coord.jsonl",
+                "provider":
+                "https://storage.lihugang.top/open_crh_tracker/initialized_data/station_coord.jsonl",
                 "refresh": {
                     "enabled": true,
                     "refreshAt": "0000"
