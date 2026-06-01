@@ -1,10 +1,12 @@
 import normalizeCode from '~/server/utils/12306/normalizeCode';
 import parseEmuCode from '~/server/utils/12306/parseEmuCode';
 import useConfig from '~/server/config';
+import getLogger from '~/server/libs/log4js';
 import {
     listDailyRecordsPaged,
     type DailyEmuRouteRow
 } from '~/server/services/emuRoutesStore';
+import { loadTrainStyleMapping } from '~/server/services/trainStyleMappingStore';
 import {
     formatShanghaiDateString,
     getRelativeDateString
@@ -44,6 +46,7 @@ export interface ReferenceModelItem {
 }
 
 let cached: ReferenceModelIndexCache | null = null;
+const logger = getLogger('reference-model-index');
 
 function getWindowConfig() {
     return useConfig().task.referenceModel;
@@ -94,10 +97,11 @@ function roundWeightedShare(value: number) {
     return Number(value.toFixed(4));
 }
 
-function getFallbackReferenceModelFromSchedule(
+async function getFallbackReferenceModelFromSchedule(
     trainCodes: string[]
-): ReferenceModelItem | null {
+): Promise<ReferenceModelItem | null> {
     const scheduleRoutesByTrainCode = getTodayScheduleCache();
+    const trainStyleMappingAssets = await loadTrainStyleMapping();
 
     for (const trainCode of trainCodes) {
         const route = scheduleRoutesByTrainCode.get(trainCode) ?? null;
@@ -106,8 +110,16 @@ function getFallbackReferenceModelFromSchedule(
             continue;
         }
 
+        const mappedModel =
+            trainStyleMappingAssets.mappings.get(trainStyle) ?? trainStyle;
+        if (mappedModel === trainStyle) {
+            logger.warn(
+                `train_style_mapping_miss trainCode=${trainCode} trainStyle=${trainStyle} allCodes=${route?.allCodes.join('/') ?? ''} strategy=keep_raw_train_style`
+            );
+        }
+
         return {
-            model: trainStyle,
+            model: mappedModel,
             weightedShare: 0
         };
     }
@@ -252,9 +264,9 @@ export function invalidateReferenceModelIndexCache() {
     cached = null;
 }
 
-export function getReferenceModelsByTrainCodes(
+export async function getReferenceModelsByTrainCodes(
     trainCodes: string[]
-): ReferenceModelItem[] {
+): Promise<ReferenceModelItem[]> {
     const normalizedTrainCodes = normalizeQueryTrainCodes(trainCodes);
     if (normalizedTrainCodes.length === 0) {
         return [];
@@ -276,7 +288,7 @@ export function getReferenceModelsByTrainCodes(
     }
 
     if (dedupedRuns.size === 0) {
-        const fallbackModel = getFallbackReferenceModelFromSchedule(
+        const fallbackModel = await getFallbackReferenceModelFromSchedule(
             normalizedTrainCodes
         );
         return fallbackModel ? [fallbackModel] : [];

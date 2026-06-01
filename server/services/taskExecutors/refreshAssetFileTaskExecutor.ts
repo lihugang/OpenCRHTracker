@@ -16,6 +16,11 @@ import {
     preloadStationCoordAssetsFromLocalFile,
     validateDownloadedStationCoordAssetText
 } from '~/server/services/stationCoordStore';
+import {
+    invalidateTrainStyleMappingCache,
+    preloadTrainStyleMappingFromLocalFile,
+    validateTrainStyleMappingText
+} from '~/server/services/trainStyleMappingStore';
 import { registerTaskExecutor } from '~/server/services/taskExecutorRegistry';
 import { synchronizeQrcodeDetectionDispatchTasks } from '~/server/services/taskExecutors/dispatchQrcodeDetectionTasksExecutor';
 import { enqueueTask } from '~/server/services/taskQueue';
@@ -32,6 +37,7 @@ type RefreshableAssetKey =
     | 'EMUList'
     | 'QRCode'
     | 'stationCoord'
+    | 'trainStyleMapping'
     | 'qrcodeDetection';
 
 interface RefreshAssetTaskDefinition {
@@ -44,6 +50,8 @@ export const REFRESH_EMU_LIST_ASSET_TASK_EXECUTOR = 'refresh_emu_list_asset';
 export const REFRESH_QR_CODE_ASSET_TASK_EXECUTOR = 'refresh_qrcode_asset';
 export const REFRESH_STATION_COORD_ASSET_TASK_EXECUTOR =
     'refresh_station_coord_asset';
+export const REFRESH_TRAIN_STYLE_MAPPING_ASSET_TASK_EXECUTOR =
+    'refresh_train_style_mapping_asset';
 export const REFRESH_QRCODE_DETECTION_ASSET_TASK_EXECUTOR =
     'refresh_qrcode_detection_asset';
 
@@ -63,6 +71,11 @@ export const REFRESH_ASSET_TASK_DEFINITIONS: readonly RefreshAssetTaskDefinition
             key: 'stationCoord',
             executor: REFRESH_STATION_COORD_ASSET_TASK_EXECUTOR,
             logger: getLogger('task-executor:refresh-asset:stationCoord')
+        },
+        {
+            key: 'trainStyleMapping',
+            executor: REFRESH_TRAIN_STYLE_MAPPING_ASSET_TASK_EXECUTOR,
+            logger: getLogger('task-executor:refresh-asset:trainStyleMapping')
         },
         {
             key: 'qrcodeDetection',
@@ -104,6 +117,11 @@ function reloadStationCoordAssetOnly(): void {
     preloadStationCoordAssetsFromLocalFile();
 }
 
+function reloadTrainStyleMappingAssetOnly(): void {
+    invalidateTrainStyleMappingCache();
+    preloadTrainStyleMappingFromLocalFile();
+}
+
 function enqueueNextRefreshTask(
     definition: RefreshAssetTaskDefinition
 ): number {
@@ -134,6 +152,8 @@ async function executeRefreshAssetTask(
                           ? validateDownloadedQrCodeAssetText
                           : definition.key === 'stationCoord'
                             ? validateDownloadedStationCoordAssetText
+                            : definition.key === 'trainStyleMapping'
+                              ? validateTrainStyleMappingText
                             : async (content) => {
                                   await validateQrcodeDetectionConfigText(
                                       content
@@ -146,6 +166,8 @@ async function executeRefreshAssetTask(
                 await reloadQrcodeDetectionAssetOnly();
             } else if (definition.key === 'stationCoord') {
                 reloadStationCoordAssetOnly();
+            } else if (definition.key === 'trainStyleMapping') {
+                reloadTrainStyleMappingAssetOnly();
             } else {
                 await reloadQrcodeDependenciesAfterProbeAssetChange();
             }

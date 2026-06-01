@@ -664,12 +664,12 @@ function buildStationAxisLayout(
     };
 }
 
-function buildTrainCirculationHeaderInfo(input: {
+async function buildTrainCirculationHeaderInfo(input: {
     bureauCode: string;
     trainDepartment: string;
     passengerDepartment: string;
     allCodes: string[];
-}): TrainCirculationHeaderInfo | null {
+}): Promise<TrainCirculationHeaderInfo | null> {
     const parts: string[] = [];
     const bureauName = resolveBureauNameByCode(input.bureauCode);
 
@@ -683,9 +683,9 @@ function buildTrainCirculationHeaderInfo(input: {
         parts.push(input.passengerDepartment);
     }
 
-    const primaryReferenceModel = getReferenceModelsByTrainCodes(
+    const primaryReferenceModel = (await getReferenceModelsByTrainCodes(
         input.allCodes
-    )[0];
+    ))[0];
     if (primaryReferenceModel?.model) {
         parts.push(`${primaryReferenceModel.model} 型动车组`);
     }
@@ -1630,7 +1630,7 @@ export async function renderTrainCirculationImage(
     const { timetable, circulation } =
         resolveCurrentCirculation(requestTrainCode);
     const publishedScheduleState = resolvePublishedScheduleState();
-    const headerInfo = buildTrainCirculationHeaderInfo({
+    const headerInfo = await buildTrainCirculationHeaderInfo({
         bureauCode: timetable.bureauCode,
         trainDepartment: timetable.trainDepartment,
         passengerDepartment: timetable.passengerDepartment,

@@ -1,0 +1,9 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Train Style Mapping Scheme",
+    "type": "object",
+    "additionalProperties": {
+        "type": "string",
+        "minLength": 1
+    }
+}

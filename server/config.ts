@@ -172,6 +172,7 @@ export interface Config {
             EMUList: RefreshableAssetConfig;
             QRCode: RefreshableAssetConfig;
             stationCoord: RefreshableAssetConfig;
+            trainStyleMapping: RefreshableAssetConfig;
             qrcodeDetection: RefreshableAssetConfig;
             schedule: AssetConfig;
         };
@@ -1039,6 +1040,10 @@ function validateConfig(raw: unknown): Config {
                     assets.stationCoord,
                     'data.assets.stationCoord'
                 ),
+                trainStyleMapping: parseRefreshableAssetConfig(
+                    assets.trainStyleMapping,
+                    'data.assets.trainStyleMapping'
+                ),
                 qrcodeDetection: parseRefreshableAssetConfig(
                     assets.qrcodeDetection,
                     'data.assets.qrcodeDetection'
@@ -1821,6 +1826,7 @@ function validateConfig(raw: unknown): Config {
         'EMUList',
         'QRCode',
         'stationCoord',
+        'trainStyleMapping',
         'qrcodeDetection'
     ] as const) {
         const asset = configResult.data.assets[key];

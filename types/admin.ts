@@ -181,6 +181,7 @@ export type AdminConfigFileTarget =
     | 'EMUList'
     | 'QRCode'
     | 'stationCoord'
+    | 'trainStyleMapping'
     | 'qrcodeDetection';
 
 export type AdminConfigFileAction = 'reload_local' | 'refresh_remote';

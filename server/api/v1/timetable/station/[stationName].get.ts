@@ -63,15 +63,11 @@ export default defineEventHandler(async (event) => {
                     : '';
             const referenceModelsByCodeSet = new Map<
                 string,
-                ReturnType<typeof getReferenceModelsByTrainCodes>
+                Awaited<ReturnType<typeof getReferenceModelsByTrainCodes>>
             >();
 
-            const response: StationTimetableResponse = {
-                stationName,
-                cursor: typeof query.cursor === 'string' ? query.cursor : '',
-                limit,
-                nextCursor,
-                items: pageRows.map((row) => ({
+            const items = await Promise.all(
+                pageRows.map(async (row) => ({
                     trainCode: row.trainCode,
                     allCodes: [...row.allCodes],
                     arriveAt: row.arriveAt,
@@ -79,11 +75,19 @@ export default defineEventHandler(async (event) => {
                     startStation: row.startStation,
                     endStation: row.endStation,
                     updatedAt: row.updatedAt,
-                    referenceModels: getReferenceModelsForRow(
+                    referenceModels: await getReferenceModelsForRow(
                         row,
                         referenceModelsByCodeSet
                     )
                 }))
+            );
+
+            const response: StationTimetableResponse = {
+                stationName,
+                cursor: typeof query.cursor === 'string' ? query.cursor : '',
+                limit,
+                nextCursor,
+                items
             };
 
             return response;
@@ -103,11 +107,11 @@ function decodeStationName(rawStationName: string | undefined) {
     }
 }
 
-function getReferenceModelsForRow(
+async function getReferenceModelsForRow(
     row: TodayScheduleStationIndexRow,
     referenceModelsByCodeSet: Map<
         string,
-        ReturnType<typeof getReferenceModelsByTrainCodes>
+        Awaited<ReturnType<typeof getReferenceModelsByTrainCodes>>
     >
 ) {
     const cacheKey = [...row.allCodes]
@@ -118,7 +122,9 @@ function getReferenceModelsForRow(
         return cachedReferenceModels;
     }
 
-    const referenceModels = getReferenceModelsByTrainCodes(row.allCodes);
+    const referenceModels = await getReferenceModelsByTrainCodes(
+        row.allCodes
+    );
     referenceModelsByCodeSet.set(cacheKey, referenceModels);
     return referenceModels;
 }

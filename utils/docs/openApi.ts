@@ -887,8 +887,7 @@ export const developerDocsOpenApi = {
                     },
                     weightedShare: {
                         type: 'number',
-                        description:
-                            '历史推断命中时为 0 到 1 的权重占比；仅从 schedule trainStyle 回退时为 0。',
+                        description: '历史推断命中时为 0 到 1 的权重占比。',
                         example: 0.625
                     }
                 }

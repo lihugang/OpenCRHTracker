@@ -24,6 +24,11 @@ import {
     preloadStationCoordAssetsFromLocalFile,
     validateDownloadedStationCoordAssetText
 } from '~/server/services/stationCoordStore';
+import {
+    invalidateTrainStyleMappingCache,
+    preloadTrainStyleMappingFromLocalFile,
+    validateTrainStyleMappingText
+} from '~/server/services/trainStyleMappingStore';
 import { synchronizeQrcodeDetectionDispatchTasks } from '~/server/services/taskExecutors/dispatchQrcodeDetectionTasksExecutor';
 import ensure from '~/server/utils/api/executor/ensure';
 import {
@@ -45,7 +50,11 @@ const logger = getLogger('admin-config-file-store');
 
 type AssetTarget = Extract<
     AdminConfigFileTarget,
-    'EMUList' | 'QRCode' | 'stationCoord' | 'qrcodeDetection'
+    | 'EMUList'
+    | 'QRCode'
+    | 'stationCoord'
+    | 'trainStyleMapping'
+    | 'qrcodeDetection'
 >;
 
 function toTimestampSeconds(value: number): number {
@@ -136,12 +145,16 @@ function buildConfigFileItem(
                 ? '动车组配属清单'
                 : target === 'QRCode'
                   ? '畅行码映射'
+                  : target === 'trainStyleMapping'
+                    ? '车型映射表'
                   : '车站坐标文件',
         description:
             target === 'EMUList'
                 ? '重载或刷新探测流程与管理流程使用的动车组配属清单。'
                 : target === 'QRCode'
                   ? '重载或刷新席位码识别使用的畅行码映射数据。'
+                  : target === 'trainStyleMapping'
+                    ? '重载或刷新参考车型回退使用的 trainStyle 到车型名映射表。'
                   : '重载或刷新线路时刻表下载使用的外部车站坐标回退文件。',
         filePath,
         provider: assetConfig.provider ?? null,
@@ -169,6 +182,11 @@ async function reloadQrcodeDetectionAfterAssetChange(): Promise<string> {
 function reloadStationCoordAssetFromLocal(): void {
     invalidateStationCoordAssetsCache();
     preloadStationCoordAssetsFromLocalFile();
+}
+
+function reloadTrainStyleMappingAssetFromLocal(): void {
+    invalidateTrainStyleMappingCache();
+    preloadTrainStyleMappingFromLocalFile();
 }
 
 function assertActionSupported(
@@ -251,6 +269,8 @@ async function reloadAssetFromLocal(
         validateDownloadedEmuListAssetText(text);
     } else if (target === 'QRCode') {
         validateDownloadedQrCodeAssetText(text);
+    } else if (target === 'trainStyleMapping') {
+        validateTrainStyleMappingText(text);
     } else {
         validateDownloadedStationCoordAssetText(text);
     }
@@ -258,6 +278,8 @@ async function reloadAssetFromLocal(
     let qrcodeWarning = '';
     if (target === 'stationCoord') {
         reloadStationCoordAssetFromLocal();
+    } else if (target === 'trainStyleMapping') {
+        reloadTrainStyleMappingAssetFromLocal();
     } else {
         invalidateProbeAssetsCache();
         preloadProbeAssetsFromLocalFiles();
@@ -276,6 +298,8 @@ async function reloadAssetFromLocal(
                 ? `已重载本地动车组配属清单，并刷新固定车组畅行码检测依赖。${qrcodeWarning}`
                 : target === 'QRCode'
                   ? `已重载本地畅行码映射，并刷新固定车组畅行码检测依赖。${qrcodeWarning}`
+                  : target === 'trainStyleMapping'
+                    ? '已重载本地车型映射表，后续参考车型回退会使用新的映射规则。'
                   : '已重载本地车站坐标文件，后续线路时刻表下载任务会使用新的坐标回退规则。',
         item
     };
@@ -300,6 +324,8 @@ async function refreshAssetFromRemote(
                   ? validateDownloadedQrCodeAssetText
                   : target === 'stationCoord'
                     ? validateDownloadedStationCoordAssetText
+                    : target === 'trainStyleMapping'
+                      ? validateTrainStyleMappingText
                     : async (content) => {
                           await validateQrcodeDetectionConfigText(content);
                       }
@@ -323,6 +349,8 @@ async function refreshAssetFromRemote(
         qrcodeWarning = await reloadQrcodeDetectionAfterAssetChange();
     } else if (target === 'stationCoord') {
         reloadStationCoordAssetFromLocal();
+    } else if (target === 'trainStyleMapping') {
+        reloadTrainStyleMappingAssetFromLocal();
     } else {
         invalidateProbeAssetsCache();
         preloadProbeAssetsFromLocalFiles();
@@ -343,6 +371,8 @@ async function refreshAssetFromRemote(
                 ? `已从远程来源刷新动车组配属清单，并同步固定车组畅行码检测任务。${qrcodeWarning}`
                 : target === 'QRCode'
                   ? `已从远程来源刷新畅行码映射，并同步固定车组畅行码检测任务。${qrcodeWarning}`
+                  : target === 'trainStyleMapping'
+                    ? '已从远程来源刷新车型映射表，后续参考车型回退会使用新的映射规则。'
                   : target === 'stationCoord'
                     ? '已从远程来源刷新车站坐标文件，后续线路时刻表下载任务会使用新的坐标回退规则。'
                     : `已从远程来源刷新固定车组畅行码检测计划，并同步未来派发任务。${qrcodeWarning}`,
@@ -358,6 +388,7 @@ export function getAdminConfigFiles(): AdminConfigFilesResponse {
             buildConfigFileItem('EMUList'),
             buildConfigFileItem('QRCode'),
             buildConfigFileItem('stationCoord'),
+            buildConfigFileItem('trainStyleMapping'),
             buildConfigFileItem('qrcodeDetection')
         ]
     };
@@ -374,6 +405,7 @@ export async function runAdminConfigFileAction(
         case 'EMUList':
         case 'QRCode':
         case 'stationCoord':
+        case 'trainStyleMapping':
         case 'qrcodeDetection':
             if (request.action === 'reload_local') {
                 return await reloadAssetFromLocal(request.target);

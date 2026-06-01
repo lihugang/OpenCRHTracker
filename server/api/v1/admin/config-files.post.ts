@@ -29,6 +29,7 @@ function parseRequestBody(
             target === 'EMUList' ||
             target === 'QRCode' ||
             target === 'stationCoord' ||
+            target === 'trainStyleMapping' ||
             target === 'qrcodeDetection',
         400,
         'invalid_param',

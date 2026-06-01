@@ -306,6 +306,19 @@ export const deployDocsSections: DocsContentSection[] = [
                         ]
                     },
                     {
+                        path: 'data.assets.trainStyleMapping',
+                        valueType: 'object',
+                        required: true,
+                        description:
+                            '参考车型回退使用的 trainStyle 映射文件路径、下载地址与刷新时间。',
+                        notes: [
+                            '默认文件建议为 data/train_style_mapping.json。',
+                            'refresh.enabled=true 时 provider 必填。',
+                            'refresh.refreshAt 必须是 HHmm 字符串。',
+                            '管理员页面支持本地重载和远程刷新，刷新后会立即影响 referenceModels 的 schedule 回退映射结果。'
+                        ]
+                    },
+                    {
                         path: 'data.assets.stationCoord',
                         valueType: 'object',
                         required: true,
@@ -768,6 +781,7 @@ export const deployDocsSections: DocsContentSection[] = [
                             'windowDays 用于设置历史窗口天数，当前默认值为 14。',
                             'batchSize 用于设置扫描 daily_emu_routes 时的分页批大小，当前默认值为 1000。',
                             'threshold 是 weightedShare 的阈值，必须大于 0 且小于等于 1。',
+                            '当历史窗口内完全没有命中记录时，系统会回退到 schedule.json 的 trainStyle，并再经过 train_style_mapping.json 映射后返回 weightedShare=0 的参考车型。',
                             'dailyTimesHHmm 用于手动填写多个 HHmm 时刻，控制 rebuild_reference_model_index 在一天内多次重建。'
                         ]
                     },
@@ -1121,6 +1135,50 @@ export const deployDocsSections: DocsContentSection[] = [
                     '管理员页面“配置文件”支持对该文件执行本地重载和远程刷新。',
                     '重载或刷新该文件后，会重新校验内容并同步未来的 dispatch_qrcode_detection_tasks 派发任务。',
                     '重载或刷新 EMUList、QRCode 资产后，也会重新校验本文件并同步这些未来派发任务。'
+                ]
+            }
+        ]
+    },
+    {
+        id: 'train-style-mapping',
+        title: 'train_style_mapping.json',
+        summary: '为 referenceModels 的 schedule 回退提供 trainStyle 到规范车型名的映射。',
+        blocks: [
+            {
+                type: 'paragraph',
+                text: '车型映射文件默认建议放在 data/train_style_mapping.json，实际路径由 data/config.json 中的 data.assets.trainStyleMapping.file 决定。仅当 referenceModels 在历史窗口内完全没有命中任何运行记录、需要从 schedule.json 的 trainStyle 回退时，系统才会读取本文件做映射。'
+            },
+            {
+                type: 'code',
+                language: 'json',
+                code: '{\n    "$schema": "../assets/json/trainStyleMappingScheme.json",\n    "CR400AF_578": "CR400AF",\n    "CR400AF-A": "CR400AF-A",\n    "ZL200J": "LCR200J3-B"\n}'
+            },
+            {
+                type: 'field-cards',
+                cards: [
+                    {
+                        path: '$schema',
+                        valueType: 'string',
+                        required: false,
+                        description:
+                            '可选的 schema 引用，建议填写 ../assets/json/trainStyleMappingScheme.json。'
+                    },
+                    {
+                        path: '<trainStyle>',
+                        valueType: 'string',
+                        required: true,
+                        description:
+                            '键是 schedule.json 中保存的原始 trainStyle，值是期望输出到 referenceModels 的规范车型名。'
+                    }
+                ]
+            },
+            {
+                type: 'list',
+                items: [
+                    '文件格式为单个 JSON 对象，除 $schema 外其余键值都必须是非空字符串。',
+                    '管理员页面“配置文件”支持对该文件执行本地重载和远程刷新。',
+                    '未命中映射时，系统会保留原始 trainStyle，并记录 warning 日志。',
+                    '通过该文件回退得到的 referenceModels 会返回 weightedShare=0，表示它不是历史推断结果。'
                 ]
             }
         ]
