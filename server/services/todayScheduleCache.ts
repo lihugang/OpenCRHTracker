@@ -16,6 +16,7 @@ export interface TodayScheduleRoute {
     trainInternalCode: string;
     allCodes: string[];
     bureauCode: string;
+    trainStyle: string;
     trainDepartment: string;
     passengerDepartment: string;
     startAt: number;
@@ -119,6 +120,7 @@ function rebuildCache(): TodayScheduleCache {
                 trainInternalCode,
                 allCodes,
                 bureauCode: item.bureauCode.trim(),
+                trainStyle: item.trainStyle.trim(),
                 trainDepartment: item.trainDepartment.trim(),
                 passengerDepartment: item.passengerDepartment.trim(),
                 startAt,
@@ -180,6 +182,7 @@ function rebuildCache(): TodayScheduleCache {
                         trainInternalCode,
                         allCodes: timetable.allCodes,
                         bureauCode: timetable.bureauCode,
+                        trainStyle: timetable.trainStyle,
                         trainDepartment: timetable.trainDepartment,
                         passengerDepartment: timetable.passengerDepartment,
                         startAt,
@@ -349,6 +352,7 @@ function upsertProbeGroup(
             trainInternalCode: timetable.trainInternalCode,
             allCodes: [...timetable.allCodes],
             bureauCode: timetable.bureauCode,
+            trainStyle: timetable.trainStyle,
             trainDepartment: timetable.trainDepartment,
             passengerDepartment: timetable.passengerDepartment,
             startAt: timetable.startAt,
@@ -374,6 +378,10 @@ function upsertProbeGroup(
     existingGroup.bureauCode = pickPreferredText(
         existingGroup.bureauCode,
         timetable.bureauCode
+    );
+    existingGroup.trainStyle = pickPreferredText(
+        existingGroup.trainStyle,
+        timetable.trainStyle
     );
     existingGroup.trainDepartment = pickPreferredText(
         existingGroup.trainDepartment,
@@ -441,6 +449,7 @@ function upsertStationRow(
         trainInternalCode: group.trainInternalCode,
         allCodes: [...group.allCodes],
         bureauCode: group.bureauCode,
+        trainStyle: group.trainStyle,
         trainDepartment: group.trainDepartment,
         passengerDepartment: group.passengerDepartment,
         startAt: group.startAt,
@@ -508,6 +517,7 @@ function applyGroupToStationRow(
     );
     row.allCodes = mergeCodeLists(row.allCodes, group.allCodes);
     row.bureauCode = pickPreferredText(row.bureauCode, group.bureauCode);
+    row.trainStyle = pickPreferredText(row.trainStyle, group.trainStyle);
     row.trainDepartment = pickPreferredText(
         row.trainDepartment,
         group.trainDepartment

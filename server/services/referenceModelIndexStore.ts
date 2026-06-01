@@ -10,6 +10,7 @@ import {
     getRelativeDateString
 } from '~/server/utils/date/getCurrentDateString';
 import { getShanghaiDayStartUnixSeconds } from '~/server/utils/date/shanghaiDateTime';
+import { getTodayScheduleCache } from '~/server/services/todayScheduleCache';
 
 interface CursorPoint {
     serviceDate: string;
@@ -91,6 +92,27 @@ function normalizeQueryTrainCodes(trainCodes: string[]) {
 
 function roundWeightedShare(value: number) {
     return Number(value.toFixed(4));
+}
+
+function getFallbackReferenceModelFromSchedule(
+    trainCodes: string[]
+): ReferenceModelItem | null {
+    const scheduleRoutesByTrainCode = getTodayScheduleCache();
+
+    for (const trainCode of trainCodes) {
+        const route = scheduleRoutesByTrainCode.get(trainCode) ?? null;
+        const trainStyle = route?.trainStyle.trim() ?? '';
+        if (trainStyle.length === 0) {
+            continue;
+        }
+
+        return {
+            model: trainStyle,
+            weightedShare: 0
+        };
+    }
+
+    return null;
 }
 
 function buildRunsByTrainCode(
@@ -254,7 +276,10 @@ export function getReferenceModelsByTrainCodes(
     }
 
     if (dedupedRuns.size === 0) {
-        return [];
+        const fallbackModel = getFallbackReferenceModelFromSchedule(
+            normalizedTrainCodes
+        );
+        return fallbackModel ? [fallbackModel] : [];
     }
 
     const modelsByServiceDate = new Map<string, Set<string>>();
