@@ -189,6 +189,7 @@ export interface DocsApiCostRuntimeConfig {
     minimumRequestCost: number;
     fixed: {
         authMe: number;
+        authCreateOauthClient: number;
         timetableTrainCurrent: number;
         trainCirculationImageCacheHit: number;
         trainCirculationImage: number;

@@ -1,6 +1,7 @@
 type RetryAfterMessageKind =
     | 'auth_login'
     | 'auth_register'
+    | 'auth_oauth_authorize'
     | 'auth_oauth_token'
     | 'quota_anonymous'
     | 'quota_user';
@@ -32,6 +33,8 @@ export default function formatRetryAfterMessage(
             return `登录操作过于频繁，请在 ${duration} 后重试`;
         case 'auth_register':
             return `注册操作过于频繁，请在 ${duration} 后重试`;
+        case 'auth_oauth_authorize':
+            return `OAuth 授权操作过于频繁，请在 ${duration} 后重试`;
         case 'auth_oauth_token':
             return `OAuth 令牌交换操作过于频繁，请在 ${duration} 后重试`;
         case 'quota_anonymous':

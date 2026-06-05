@@ -2,6 +2,7 @@ import { defineEventHandler, getRouterParam, readBody } from 'h3';
 import { updateOauthClientByOwner } from '~/server/services/oauthStore';
 import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';
+import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
 import type {
     OAuthClientCreateInput,
     OAuthClientMutationResponse
@@ -19,7 +20,7 @@ export default defineEventHandler(async (event) => {
     return executeApi(
         event,
         {
-            requiredScopes: ['api.auth.api-keys.create']
+            requiredScopes: [API_SCOPES.auth.oauthClients.write]
         },
         async ({ identity }) => {
             const clientId = getRouterParam(event, 'clientId') ?? '';

@@ -6,7 +6,11 @@ import getClientIp from '~/server/utils/api/quota/getClientIp';
 import getAuthRateLimitStore from '~/server/utils/api/authRateLimit/getAuthRateLimitStore';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
 
-export type AuthRateLimitAction = 'login' | 'register' | 'oauthToken';
+export type AuthRateLimitAction =
+    | 'login'
+    | 'register'
+    | 'oauthAuthorize'
+    | 'oauthToken';
 
 function getRateLimitMessageKind(action: AuthRateLimitAction) {
     switch (action) {
@@ -14,6 +18,8 @@ function getRateLimitMessageKind(action: AuthRateLimitAction) {
             return 'auth_login' as const;
         case 'register':
             return 'auth_register' as const;
+        case 'oauthAuthorize':
+            return 'auth_oauth_authorize' as const;
         case 'oauthToken':
             return 'auth_oauth_token' as const;
     }

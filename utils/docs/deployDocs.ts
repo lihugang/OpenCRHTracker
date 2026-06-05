@@ -673,6 +673,7 @@ export const deployDocsSections: DocsContentSection[] = [
                             'JWKS 中发布的当前签名密钥标识，以及 id_token JWT header 里的 kid。',
                         notes: [
                             '不能为空。',
+                            '生产环境建议通过 OCRH_OAUTH_ID_TOKEN_SIGNING_KID 覆盖，而不是把真实运行值直接写进配置文件。',
                             '第三方客户端会用它在 JWKS 中定位对应公钥；后续做密钥轮换时，应保证不同密钥使用不同 kid。'
                         ]
                     },
@@ -684,8 +685,10 @@ export const deployDocsSections: DocsContentSection[] = [
                             '用于签发 OIDC id_token 的 RSA 私钥，PEM 格式保存。',
                         notes: [
                             '配置值必须看起来像 PEM 私钥，启动时会检查是否包含 BEGIN 片段。',
+                            '生产环境建议通过 OCRH_OAUTH_ID_TOKEN_SIGNING_PRIVATE_KEY 覆盖，而不是把真实私钥直接写进配置文件。',
                             '生产环境应使用真实私钥并妥善保密；泄露后，攻击者可伪造看似合法的 id_token。',
-                            '如果写在 JSON 中，多行内容需要按 JSON 字符串格式转义换行，例如使用 \\n。'
+                            '如果写在 JSON 中，多行内容需要按 JSON 字符串格式转义换行，例如使用 \\n。',
+                            '如果通过环境变量提供，可直接传入多行 PEM，也可传入包含 \\n 的单行字符串，服务启动时会自动还原换行。'
                         ]
                     },
                     {
@@ -744,7 +747,18 @@ export const deployDocsSections: DocsContentSection[] = [
                         path: 'api.authRateLimit',
                         valueType: 'object',
                         required: true,
-                        description: '登录、注册与 OAuth 令牌接口的限流配置。'
+                        description: '登录、注册、OAuth 授权流程与 OAuth 令牌接口的限流配置。'
+                    },
+                    {
+                        path: 'api.authRateLimit.oauthAuthorize',
+                        valueType: 'object',
+                        required: true,
+                        description:
+                            'OAuth 授权流程的限流配置，对应 GET /api/v1/oauth/authorize/context 与 POST /oauth/authorize。',
+                        notes: [
+                            '这两个入口共用同一个限流桶，便于限制授权页探测和频繁同意/拒绝操作。',
+                            '当前默认建议值为 20 分钟 20 次。'
+                        ]
                     },
                     {
                         path: 'api.authRateLimit.oauthToken',
@@ -753,7 +767,7 @@ export const deployDocsSections: DocsContentSection[] = [
                         description:
                             'OAuth 令牌交换接口的限流配置，对应 POST /oauth/token。',
                         notes: [
-                            '该接口用于将授权码交换为访问令牌，建议单独设置比登录接口更短的窗口期。',
+                            '该接口用于将授权码交换为访问令牌，当前默认建议值为 20 分钟 20 次。',
                             '限流命中后会直接拒绝请求；来源校验失败、请求体无效或授权码无效时也会计入这一额度。'
                         ]
                     },
@@ -1067,10 +1081,10 @@ export const deployDocsSections: DocsContentSection[] = [
                         description: '健康检查、身份相关和调试接口的固定成本。'
                     },
                     {
-                        path: 'cost.fixed.authChangePassword / authIssueApiKey / authListApiKeys / authRevokeApiKey',
+                        path: 'cost.fixed.authChangePassword / authIssueApiKey / authCreateOauthClient / authListApiKeys / authRevokeApiKey',
                         valueType: 'integer',
                         required: true,
-                        description: 'API Key 管理接口的固定成本。'
+                        description: 'API Key 管理接口与 OAuth 客户端创建接口的固定成本。'
                     },
                     {
                         path: 'cost.fixed.searchIndex / timetableTrainCurrent / trainCirculationImage / trainCirculationImageCacheHit / trainCirculationImageFailure / timetableTrainHistory / exportDailyIndex / exportDaily',
@@ -1121,6 +1135,7 @@ export const deployDocsSections: DocsContentSection[] = [
                     '修改 user.signKey、api.apiKeyHeader、api.authCookieName 等身份相关字段后，应该视为一次完整重启变更并安排验证。',
                     '修改 user.adminUserIds 或 OCRH_ADMIN_USERS 后需要重启 Node 进程，新的登录会话才会按最新名单授予管理员权限。',
                     '修改 user.push 或 OCRH_VAPID_PUBLIC_KEY / OCRH_VAPID_PRIVATE_KEY / OCRH_VAPID_EMAIL 后需要重启 Node 进程，并建议立即用一台 Apple Safari PWA 设备验证推送是否正常。',
+                    '修改 oauth.idTokenSigning 或 OCRH_OAUTH_ID_TOKEN_SIGNING_KID / OCRH_OAUTH_ID_TOKEN_SIGNING_PRIVATE_KEY 后需要重启 Node 进程，并建议立即验证 JWKS 输出与 id_token 签名是否正常。',
                     '提高 api.permissions.anonymousScopes、quota 或 cost 前，先确认你准备公开暴露的接口范围和限额策略。',
                     '修改 spider.scheduleProbe.prefixRules、task.referenceModel.dailyTimesHHmm、task.circulation.dailyTimesHHmm 或 task.scheduler 参数后，重启后应观察首轮任务执行是否符合预期。',
                     '修改 spider.rateLimit.stationBoard 或 task.circulation.stationBoard 后，重启后应关注车站大屏相关抓取、重试与交路推断任务是否按预期工作。'
@@ -1141,6 +1156,15 @@ export const deployDocsSections: DocsContentSection[] = [
                 type: 'code',
                 language: 'bash',
                 code: 'export OCRH_SIGN_KEY=<xxxxxxxx>'
+            },
+            {
+                type: 'paragraph',
+                text: '如果启用了 OAuth/OIDC，请同时设置 id_token 签名所需的 kid 和 RSA 私钥。私钥既可以直接传入多行 PEM，也可以传入包含 \\n 的单行字符串。'
+            },
+            {
+                type: 'code',
+                language: 'bash',
+                code: 'export OCRH_OAUTH_ID_TOKEN_SIGNING_KID=default-rs256\nexport OCRH_OAUTH_ID_TOKEN_SIGNING_PRIVATE_KEY=\"-----BEGIN PRIVATE KEY-----\\n...\\n-----END PRIVATE KEY-----\"'
             },
             {
                 type: 'paragraph',

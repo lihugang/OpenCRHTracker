@@ -25,6 +25,7 @@ export type OAuthAuthorizeDecisionResult =
     | {
           type: 'success';
           location: string;
+          recordRateLimitHit: boolean;
       }
     | {
           type: 'error';
@@ -207,6 +208,7 @@ export function applyAuthorizeDecision(
     if (!validated.ok) {
         return {
             type: 'success',
+            recordRateLimitHit: true,
             location: buildRedirectUrl(input.request.redirectUri, {
                 error: 'invalid_request',
                 state: input.request.state
@@ -218,6 +220,7 @@ export function applyAuthorizeDecision(
     if (!session) {
         return {
             type: 'success',
+            recordRateLimitHit: true,
             location: '/login'
         };
     }
@@ -226,6 +229,7 @@ export function applyAuthorizeDecision(
     if (!authorized) {
         return {
             type: 'success',
+            recordRateLimitHit: true,
             location: buildRedirectUrl(input.request.redirectUri, {
                 error: 'access_denied',
                 state: input.request.state
@@ -236,6 +240,7 @@ export function applyAuthorizeDecision(
     if (input.decision !== 'approve') {
         return {
             type: 'success',
+            recordRateLimitHit: true,
             location: buildRedirectUrl(input.request.redirectUri, {
                 error: 'access_denied',
                 state: input.request.state
@@ -261,6 +266,7 @@ export function applyAuthorizeDecision(
 
     return {
         type: 'success',
+        recordRateLimitHit: false,
         location: buildRedirectUrl(input.request.redirectUri, {
             code,
             state: input.request.state

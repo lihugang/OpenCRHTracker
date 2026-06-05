@@ -116,6 +116,10 @@ interface SimpleLatexContainerServiceConfig {
     apiKey: string;
 }
 
+function normalizeEscapedPem(value: string) {
+    return value.replace(/\\n/g, '\n');
+}
+
 const DEFAULT_PUSH_SUBSCRIPTION_SYNC_TIMEOUT_SECONDS = 30;
 const DEFAULT_CLIENT_IP_HEADERS = [
     'cf-connecting-ip',
@@ -263,6 +267,10 @@ export interface Config {
                 maxRequests: number;
                 windowSeconds: number;
             };
+            oauthAuthorize: {
+                maxRequests: number;
+                windowSeconds: number;
+            };
             oauthToken: {
                 maxRequests: number;
                 windowSeconds: number;
@@ -346,6 +354,7 @@ export interface Config {
             authChangePassword: number;
             debugEchoError: number;
             authIssueApiKey: number;
+            authCreateOauthClient: number;
             authListApiKeys: number;
             authRevokeApiKey: number;
             authListAuthorizations: number;
@@ -670,6 +679,15 @@ function validateConfig(raw: unknown): Config {
     const envAdminUserIdsRaw = process.env.OCRH_ADMIN_USERS?.trim();
     const envAdminUserIds = parseEnvList(envAdminUserIdsRaw);
     const envSignKey = process.env.OCRH_SIGN_KEY?.trim();
+    const envOauthIdTokenSigningKid =
+        process.env.OCRH_OAUTH_ID_TOKEN_SIGNING_KID?.trim();
+    const envOauthIdTokenSigningPrivateKeyRaw =
+        process.env.OCRH_OAUTH_ID_TOKEN_SIGNING_PRIVATE_KEY?.trim();
+    const envOauthIdTokenSigningPrivateKey =
+        envOauthIdTokenSigningPrivateKeyRaw &&
+        envOauthIdTokenSigningPrivateKeyRaw.length > 0
+            ? normalizeEscapedPem(envOauthIdTokenSigningPrivateKeyRaw)
+            : undefined;
     const userPush =
         user.push === undefined ? undefined : asObject(user.push, 'user.push');
     const envVapidPublicKey = process.env.OCRH_VAPID_PUBLIC_KEY?.trim();
@@ -697,6 +715,22 @@ function validateConfig(raw: unknown): Config {
         userPush?.vapidEmail === undefined
             ? ''
             : asPlainString(userPush.vapidEmail, 'user.push.vapidEmail').trim();
+    const oauth = asObject(root.oauth, 'oauth');
+    const oauthIdTokenSigning = asObject(
+        oauth.idTokenSigning,
+        'oauth.idTokenSigning'
+    );
+    const configOauthIdTokenSigningKid =
+        oauthIdTokenSigning.kid === undefined
+            ? ''
+            : asString(oauthIdTokenSigning.kid, 'oauth.idTokenSigning.kid');
+    const configOauthIdTokenSigningPrivateKey =
+        oauthIdTokenSigning.privateKeyPem === undefined
+            ? ''
+            : asPlainString(
+                  oauthIdTokenSigning.privateKeyPem,
+                  'oauth.idTokenSigning.privateKeyPem'
+              ).trim();
     const signKey =
         envSignKey && envSignKey.length > 0 ? envSignKey : configSignKey;
     const vapidPublicKey =
@@ -711,6 +745,15 @@ function validateConfig(raw: unknown): Config {
         envVapidEmail && envVapidEmail.length > 0
             ? envVapidEmail
             : configVapidEmail;
+    const oauthIdTokenSigningKid =
+        envOauthIdTokenSigningKid && envOauthIdTokenSigningKid.length > 0
+            ? envOauthIdTokenSigningKid
+            : configOauthIdTokenSigningKid;
+    const oauthIdTokenSigningPrivateKey =
+        envOauthIdTokenSigningPrivateKey &&
+        envOauthIdTokenSigningPrivateKey.length > 0
+            ? envOauthIdTokenSigningPrivateKey
+            : configOauthIdTokenSigningPrivateKey;
     const adminUserIds =
         envAdminUserIdsRaw && envAdminUserIdsRaw.length > 0
             ? envAdminUserIds
@@ -736,6 +779,25 @@ function validateConfig(raw: unknown): Config {
     if (!import.meta.dev && (!envSignKey || envSignKey.length === 0)) {
         console.warn(
             '[config] WARNING: OCRH signing key was loaded from config instead of process.env.OCRH_SIGN_KEY'
+        );
+    }
+    if (
+        !import.meta.dev &&
+        (!envOauthIdTokenSigningKid || envOauthIdTokenSigningKid.length === 0) &&
+        configOauthIdTokenSigningKid.length > 0
+    ) {
+        console.warn(
+            '[config] WARNING: OAuth id_token signing kid was loaded from config instead of process.env.OCRH_OAUTH_ID_TOKEN_SIGNING_KID'
+        );
+    }
+    if (
+        !import.meta.dev &&
+        (!envOauthIdTokenSigningPrivateKeyRaw ||
+            envOauthIdTokenSigningPrivateKeyRaw.length === 0) &&
+        configOauthIdTokenSigningPrivateKey.length > 0
+    ) {
+        console.warn(
+            '[config] WARNING: OAuth id_token signing private key was loaded from config instead of process.env.OCRH_OAUTH_ID_TOKEN_SIGNING_PRIVATE_KEY'
         );
     }
     if (
@@ -783,6 +845,10 @@ function validateConfig(raw: unknown): Config {
         apiAuthRateLimit.register,
         'api.authRateLimit.register'
     );
+    const apiAuthRateLimitOauthAuthorize = asObject(
+        apiAuthRateLimit.oauthAuthorize,
+        'api.authRateLimit.oauthAuthorize'
+    );
     const apiAuthRateLimitOauthToken = asObject(
         apiAuthRateLimit.oauthToken,
         'api.authRateLimit.oauthToken'
@@ -823,13 +889,8 @@ function validateConfig(raw: unknown): Config {
     const apiPagination = asObject(api.pagination, 'api.pagination');
     const apiDebug = asObject(api.debug, 'api.debug');
     const apiPermissions = asObject(api.permissions, 'api.permissions');
-    const oauth = asObject(root.oauth, 'oauth');
     const oauthPkce = asObject(oauth.pkce, 'oauth.pkce');
     const oauthDiscovery = asObject(oauth.discovery, 'oauth.discovery');
-    const oauthIdTokenSigning = asObject(
-        oauth.idTokenSigning,
-        'oauth.idTokenSigning'
-    );
     const services = asObject(root.services, 'services');
     const simpleLatexContainer = asObject(
         services.simpleLatexContainer,
@@ -1304,6 +1365,18 @@ function validateConfig(raw: unknown): Config {
                         1
                     )
                 },
+                oauthAuthorize: {
+                    maxRequests: asInteger(
+                        apiAuthRateLimitOauthAuthorize.maxRequests,
+                        'api.authRateLimit.oauthAuthorize.maxRequests',
+                        1
+                    ),
+                    windowSeconds: asInteger(
+                        apiAuthRateLimitOauthAuthorize.windowSeconds,
+                        'api.authRateLimit.oauthAuthorize.windowSeconds',
+                        1
+                    )
+                },
                 oauthToken: {
                     maxRequests: asInteger(
                         apiAuthRateLimitOauthToken.maxRequests,
@@ -1530,11 +1603,8 @@ function validateConfig(raw: unknown): Config {
                 ).replace(/\/+$/, '')
             },
             idTokenSigning: {
-                kid: asString(oauthIdTokenSigning.kid, 'oauth.idTokenSigning.kid'),
-                privateKeyPem: asString(
-                    oauthIdTokenSigning.privateKeyPem,
-                    'oauth.idTokenSigning.privateKeyPem'
-                ),
+                kid: oauthIdTokenSigningKid,
+                privateKeyPem: oauthIdTokenSigningPrivateKey,
                 alg: (() => {
                     const alg = asString(
                         oauthIdTokenSigning.alg,
@@ -1728,6 +1798,11 @@ function validateConfig(raw: unknown): Config {
                 authIssueApiKey: asNumber(
                     costFixed.authIssueApiKey,
                     'cost.fixed.authIssueApiKey',
+                    0
+                ),
+                authCreateOauthClient: asNumber(
+                    costFixed.authCreateOauthClient,
+                    'cost.fixed.authCreateOauthClient',
                     0
                 ),
                 authListApiKeys: asNumber(

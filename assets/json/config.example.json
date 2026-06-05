@@ -188,9 +188,13 @@
                 "maxRequests": 3,
                 "windowSeconds": 86400
             },
+            "oauthAuthorize": {
+                "maxRequests": 20,
+                "windowSeconds": 1200
+            },
             "oauthToken": {
-                "maxRequests": 10,
-                "windowSeconds": 600
+                "maxRequests": 20,
+                "windowSeconds": 1200
             }
         },
         "authCache": {
@@ -283,6 +287,7 @@
                 "api.auth.authorizations.revoke",
                 "api.auth.api-keys.read",
                 "api.auth.api-keys.create",
+                "api.auth.oauth-clients.write",
                 "api.auth.api-keys.revoke",
                 "api.auth.favorites.read",
                 "api.auth.favorites.write",
@@ -392,6 +397,7 @@
             "authLogout": 1,
             "debugEchoError": 0,
             "authIssueApiKey": 5,
+            "authCreateOauthClient": 500,
             "authListApiKeys": 1,
             "authRevokeApiKey": 1,
             "authListAuthorizations": 1,

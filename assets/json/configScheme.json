@@ -739,6 +739,24 @@
                                 "windowSeconds"
                             ]
                         },
+                        "oauthAuthorize": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "maxRequests": {
+                                    "type": "integer",
+                                    "minimum": 1
+                                },
+                                "windowSeconds": {
+                                    "type": "integer",
+                                    "minimum": 1
+                                }
+                            },
+                            "required": [
+                                "maxRequests",
+                                "windowSeconds"
+                            ]
+                        },
                         "oauthToken": {
                             "type": "object",
                             "additionalProperties": false,
@@ -761,6 +779,7 @@
                     "required": [
                         "login",
                         "register",
+                        "oauthAuthorize",
                         "oauthToken"
                     ]
                 },
@@ -1097,8 +1116,6 @@
                         }
                     },
                     "required": [
-                        "kid",
-                        "privateKeyPem",
                         "alg"
                     ]
                 }
@@ -1408,6 +1425,10 @@
                             "type": "integer",
                             "minimum": 0
                         },
+                        "authCreateOauthClient": {
+                            "type": "integer",
+                            "minimum": 0
+                        },
                         "authListApiKeys": {
                             "type": "integer",
                             "minimum": 0
@@ -1484,6 +1505,7 @@
                         "authChangePassword",
                         "debugEchoError",
                         "authIssueApiKey",
+                        "authCreateOauthClient",
                         "authListApiKeys",
                         "authRevokeApiKey",
                         "authListAuthorizations",

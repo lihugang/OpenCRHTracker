@@ -22,6 +22,9 @@ export const API_SCOPES = {
             create: 'api.auth.api-keys.create',
             revoke: 'api.auth.api-keys.revoke'
         },
+        oauthClients: {
+            write: 'api.auth.oauth-clients.write'
+        },
         favorites: {
             read: 'api.auth.favorites.read',
             write: 'api.auth.favorites.write'

@@ -424,6 +424,7 @@ export const DEFAULT_DOCS_API_RUNTIME_CONFIG: DocsApiRuntimeConfig = {
         minimumRequestCost: 1,
         fixed: {
             authMe: 1,
+            authCreateOauthClient: 500,
             timetableTrainCurrent: 1,
             trainCirculationImageCacheHit: 2,
             trainCirculationImage: 20,
@@ -728,6 +729,7 @@ const tagDescriptionMap = new Map(
 
 const FIXED_COST_ENDPOINT_KEYS = {
     'auth-me': 'authMe',
+    'oauth-clients-create': 'authCreateOauthClient',
     'timetable-train-current': 'timetableTrainCurrent',
     'timetable-train-circulation-image': 'trainCirculationImage',
     'timetable-train-history-detail': 'timetableTrainHistory',
