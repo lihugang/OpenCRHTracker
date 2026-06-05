@@ -5,9 +5,13 @@ interface IdTokenClaims {
     iss: string;
     sub: string;
     aud: string;
+    azp: string;
     exp: number;
     iat: number;
     auth_time: number;
+    at_hash: string;
+    nonce?: string;
+    preferred_username?: string;
 }
 
 function encodeBase64UrlJson(value: unknown) {

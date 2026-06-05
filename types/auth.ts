@@ -185,6 +185,7 @@ export interface OidcJwksDocument {
 
 export interface OidcUserInfo {
     sub: string;
+    preferred_username?: string;
 }
 
 export interface OAuthTokenResponse {

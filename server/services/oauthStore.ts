@@ -7,6 +7,7 @@ import {
     revokeApiKeysByOauthClientId
 } from '~/server/services/authStore';
 import useConfig from '~/server/config';
+import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
 import hasScope from '~/server/utils/api/scopes/hasScope';
 import buildOidcSubject from '~/server/utils/oauth/subject';
 import { signOidcIdToken } from '~/server/utils/oauth/idToken';
@@ -55,6 +56,7 @@ interface OAuthAuthorizationCodeRow {
     redirect_uri: string;
     code_challenge: string;
     code_challenge_method: string;
+    nonce: string | null;
     approved_scopes_json: string;
     auth_time: number;
     expires_at: number;
@@ -85,6 +87,7 @@ export interface OAuthAuthorizeRequest {
     state: string;
     codeChallenge: string;
     codeChallengeMethod: 'S256';
+    nonce: string;
 }
 
 export interface OAuthContinuationPayload {
@@ -419,6 +422,7 @@ export function createAuthorizationCode(input: {
     approvedScopes: string[];
     codeChallenge: string;
     codeChallengeMethod: 'S256';
+    nonce: string;
     authTime: number;
 }) {
     const code = randomId(24);
@@ -431,6 +435,7 @@ export function createAuthorizationCode(input: {
         input.redirectUri,
         input.codeChallenge,
         input.codeChallengeMethod,
+        input.nonce,
         JSON.stringify(input.approvedScopes),
         input.authTime,
         now + useConfig().oauth.authorizationCodeTtlSeconds
@@ -440,6 +445,11 @@ export function createAuthorizationCode(input: {
 
 function verifyPkce(verifier: string, challenge: string) {
     return sha256Base64Url(verifier) === challenge;
+}
+
+function toOidcTokenHash(value: string) {
+    const digest = crypto.createHash('sha256').update(value).digest();
+    return digest.subarray(0, digest.length / 2).toString('base64url');
 }
 
 export function exchangeAuthorizationCode(input: {
@@ -497,13 +507,20 @@ export function exchangeAuthorizationCode(input: {
         return undefined;
     }
 
+    const canReadProfile = hasScope(approvedScopes, API_SCOPES.auth.me);
+    const nonce = row.nonce?.trim() ? row.nonce : undefined;
+
     const idToken = signOidcIdToken({
         iss: useConfig().oauth.issuer,
         sub: buildOidcSubject(user),
         aud: client.clientId,
+        azp: client.clientId,
         exp: now + useConfig().oauth.idTokenTtlSeconds,
         iat: now,
-        auth_time: row.auth_time
+        auth_time: row.auth_time,
+        at_hash: toOidcTokenHash(accessToken.apiKey),
+        nonce,
+        preferred_username: canReadProfile ? row.user_id : undefined
     });
 
     const response: OAuthTokenResponse = {
@@ -517,15 +534,23 @@ export function exchangeAuthorizationCode(input: {
     return response;
 }
 
-export function buildUserInfo(userId: string): OidcUserInfo | undefined {
+export function buildUserInfo(
+    userId: string,
+    canReadProfile: boolean
+): OidcUserInfo | undefined {
     const user = getUserByUsername(userId);
     if (!user) {
         return undefined;
     }
 
-    return {
-        sub: buildOidcSubject(user)
-    };
+    return canReadProfile
+        ? {
+              sub: buildOidcSubject(user),
+              preferred_username: user.username
+          }
+        : {
+              sub: buildOidcSubject(user)
+          };
 }
 
 export function validateAuthorizeRequest(input: OAuthAuthorizeRequest) {

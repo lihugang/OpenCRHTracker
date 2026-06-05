@@ -38,6 +38,9 @@ export default defineEventHandler((event) => {
         'code_challenge_method',
         payload.authorizeRequest.codeChallengeMethod
     );
+    if (payload.authorizeRequest.nonce) {
+        target.searchParams.set('nonce', payload.authorizeRequest.nonce);
+    }
 
     return sendRedirect(event, target.pathname + target.search);
 });

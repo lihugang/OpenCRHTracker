@@ -36,7 +36,8 @@ function parseAuthorizeRequest(event: Parameters<typeof defineEventHandler>[0] e
         codeChallenge:
             typeof query.code_challenge === 'string' ? query.code_challenge : '',
         codeChallengeMethod:
-            query.code_challenge_method === 'S256' ? 'S256' : ('S256' as const)
+            query.code_challenge_method === 'S256' ? 'S256' : ('S256' as const),
+        nonce: typeof query.nonce === 'string' ? query.nonce : ''
     };
 }
 
@@ -126,7 +127,8 @@ export default defineEventHandler(async (event) => {
             scope: typeof body?.scope === 'string' ? body.scope.split(/\s+/).filter(Boolean) : [],
             state: body?.state ?? '',
             codeChallenge: body?.code_challenge ?? '',
-            codeChallengeMethod: body?.code_challenge_method === 'S256' ? 'S256' : 'S256'
+            codeChallengeMethod: body?.code_challenge_method === 'S256' ? 'S256' : 'S256',
+            nonce: body?.nonce ?? ''
         };
         const validated = validateAuthorizeRequest(request);
         if (!validated) {
@@ -180,6 +182,7 @@ export default defineEventHandler(async (event) => {
             approvedScopes: validated.requestedScopes,
             codeChallenge: request.codeChallenge,
             codeChallengeMethod: request.codeChallengeMethod,
+            nonce: request.nonce,
             authTime: Number(body?.auth_time ?? 0)
         });
 
@@ -228,6 +231,7 @@ export default defineEventHandler(async (event) => {
             approvedScopes: validated.requestedScopes,
             codeChallenge: authorizeRequest.codeChallenge,
             codeChallengeMethod: authorizeRequest.codeChallengeMethod,
+            nonce: authorizeRequest.nonce,
             authTime: session.activeFrom
         });
 
@@ -255,6 +259,7 @@ export default defineEventHandler(async (event) => {
             state: authorizeRequest.state,
             code_challenge: authorizeRequest.codeChallenge,
             code_challenge_method: authorizeRequest.codeChallengeMethod,
+            nonce: authorizeRequest.nonce,
             auth_time: String(session.activeFrom)
         }
     });
