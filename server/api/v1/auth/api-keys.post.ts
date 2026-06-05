@@ -187,7 +187,6 @@ export default defineEventHandler(async (event) => {
                 maskedApiKey: apiKey.maskedApiKey,
                 activeFrom: apiKey.activeFrom,
                 expiresAt: apiKey.expiresAt,
-                dailyTokenLimit: apiKey.dailyTokenLimit,
                 scopes: apiKey.scopes
             };
 

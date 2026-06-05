@@ -10,7 +10,6 @@ export interface SignedApiKeyPayload {
     scopes: string[];
     nbf: number;
     exp: number;
-    limit: number;
 }
 
 export interface ParsedSignedApiKeyPayload extends SignedApiKeyPayload {
@@ -64,8 +63,7 @@ export function createSignedApiKeyToken(
             sub: payload.sub,
             scopes: normalizeScopeList(payload.scopes),
             nbf: payload.nbf,
-            exp: payload.exp,
-            limit: payload.limit
+            exp: payload.exp
         } satisfies SignedApiKeyPayload)
     );
 
@@ -113,8 +111,7 @@ export function parseSignedApiKeyToken(token: string) {
         typeof candidate.sub !== 'string' ||
         !Array.isArray(candidate.scopes) ||
         typeof candidate.nbf !== 'number' ||
-        typeof candidate.exp !== 'number' ||
-        typeof candidate.limit !== 'number'
+        typeof candidate.exp !== 'number'
     ) {
         return null;
     }
@@ -126,8 +123,7 @@ export function parseSignedApiKeyToken(token: string) {
             sub: candidate.sub,
             scopes: normalizeScopeList(candidate.scopes),
             nbf: candidate.nbf,
-            exp: candidate.exp,
-            limit: candidate.limit
+            exp: candidate.exp
         } satisfies ParsedSignedApiKeyPayload;
     } catch {
         return null;

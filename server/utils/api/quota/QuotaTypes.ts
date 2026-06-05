@@ -1,6 +1,8 @@
 export interface QuotaSubject {
     bucketKey: string;
     tokenLimit: number;
+    refillAmount: number;
+    refillIntervalSeconds: number;
 }
 
 export interface QuotaConsumeResult {

@@ -1,4 +1,3 @@
-import useConfig from '~/server/config';
 import getQuotaStore from '~/server/utils/api/quota/getQuotaStore';
 import type {
     QuotaSubject,
@@ -6,7 +5,6 @@ import type {
 } from '~/server/utils/api/quota/QuotaTypes';
 
 export default function hydrateBucket(subject: QuotaSubject, now: number) {
-    const config = useConfig();
     const { buckets } = getQuotaStore();
     let bucket = buckets.get(subject.bucketKey);
 
@@ -19,13 +17,13 @@ export default function hydrateBucket(subject: QuotaSubject, now: number) {
         return bucket;
     }
 
-    const refillStep = config.quota.refillIntervalSeconds;
+    const refillStep = subject.refillIntervalSeconds;
     const elapsed = now - bucket.updatedAt;
     if (elapsed >= refillStep) {
         const refillCount = Math.floor(elapsed / refillStep);
         bucket.tokens = Math.min(
             subject.tokenLimit,
-            bucket.tokens + refillCount * config.quota.refillAmount
+            bucket.tokens + refillCount * subject.refillAmount
         );
         bucket.updatedAt += refillCount * refillStep;
     }

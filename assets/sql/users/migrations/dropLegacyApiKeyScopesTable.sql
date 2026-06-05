@@ -1,0 +1,1 @@
+DROP TABLE IF EXISTS api_key_scopes_legacy_pre_remove_daily_token_limit;

@@ -4,6 +4,7 @@ import { getValidApiKey } from '~/server/services/authStore';
 import ApiRequestError from '~/server/utils/api/errors/ApiRequestError';
 import getAnonymousIdentity from '~/server/utils/api/identity/getAnonymousIdentity';
 import type ApiIdentity from '~/server/utils/api/identity/ApiIdentity';
+import resolveUserQuotaSubject from '~/server/utils/api/quota/resolveUserQuotaSubject';
 import {
     clearAuthCookie,
     readAuthCookie
@@ -93,6 +94,8 @@ export default function resolveIdentity(event: H3Event): ApiIdentity {
         );
     }
 
+    const quotaSubject = resolveUserQuotaSubject(apiKeyRecord.userId);
+
     return {
         type: 'user',
         id: apiKeyRecord.userId,
@@ -100,11 +103,12 @@ export default function resolveIdentity(event: H3Event): ApiIdentity {
         revokeId: apiKeyRecord.revokeId,
         issuer: apiKeyRecord.issuer,
         apiKey: resolvedApiKey.key,
-        bucketKey: `user:${apiKeyRecord.userId}`,
-        tokenLimit: apiKeyRecord.dailyTokenLimit,
+        bucketKey: quotaSubject.bucketKey,
+        tokenLimit: quotaSubject.tokenLimit,
+        refillAmount: quotaSubject.refillAmount,
+        refillIntervalSeconds: quotaSubject.refillIntervalSeconds,
         scopes: apiKeyRecord.scopes,
         activeFrom: apiKeyRecord.activeFrom,
-        expiresAt: apiKeyRecord.expiresAt,
-        dailyTokenLimit: apiKeyRecord.dailyTokenLimit
+        expiresAt: apiKeyRecord.expiresAt
     };
 }

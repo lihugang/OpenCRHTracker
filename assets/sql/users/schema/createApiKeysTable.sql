@@ -7,6 +7,5 @@ CREATE TABLE IF NOT EXISTS api_keys (
     active_from INTEGER NOT NULL,
     revoked_at INTEGER,
     expires_at INTEGER NOT NULL,
-    daily_token_limit INTEGER NOT NULL,
     FOREIGN KEY (user_id) REFERENCES users(username) ON DELETE CASCADE
 );

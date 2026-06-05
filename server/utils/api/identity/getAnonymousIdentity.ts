@@ -11,6 +11,8 @@ export default function getAnonymousIdentity(event: H3Event): ApiIdentity {
         id: ip ?? 'unknown',
         bucketKey: `ip:${ip}`,
         tokenLimit: config.quota.anonymousMaxTokens,
+        refillAmount: config.quota.refillAmount,
+        refillIntervalSeconds: config.quota.refillIntervalSeconds,
         scopes: config.api.permissions.anonymousScopes
     };
 }

@@ -53,10 +53,21 @@ interface UserProfileDataRaw extends Record<string, unknown> {
     favorites?: unknown;
     subscriptions?: unknown;
     userPreference?: unknown;
+    quotaOverride?: unknown;
 }
 
 interface UserProfilePreferenceValue extends Record<string, unknown> {
     saveSearchHistory?: unknown;
+}
+
+interface UserProfileQuotaOverrideValue extends Record<string, unknown> {
+    tokenLimit?: unknown;
+    refillAmount?: unknown;
+}
+
+export interface UserQuotaOverride {
+    tokenLimit: number | null;
+    refillAmount: number | null;
 }
 
 export interface UserProfileSubscriptionItem {
@@ -94,6 +105,7 @@ export interface UserProfileData {
     favorites: FavoriteLookupItem[];
     subscriptions: UserProfileSubscriptionItem[];
     userPreference: UserProfilePreference;
+    quotaOverride: UserQuotaOverride;
 }
 
 export interface UserProfilePreference {
@@ -125,8 +137,21 @@ function createDefaultUserProfileData(): UserProfileData {
         subscriptions: [],
         userPreference: {
             saveSearchHistory: true
+        },
+        quotaOverride: {
+            tokenLimit: null,
+            refillAmount: null
         }
     };
+}
+
+function normalizePositiveInteger(value: unknown) {
+    return typeof value === 'number' &&
+        Number.isInteger(value) &&
+        value > 0 &&
+        Number.isFinite(value)
+        ? value
+        : null;
 }
 
 function toUserProfilePreference(value: unknown): UserProfilePreference {
@@ -143,6 +168,22 @@ function toUserProfilePreference(value: unknown): UserProfilePreference {
             typeof raw.saveSearchHistory === 'boolean'
                 ? raw.saveSearchHistory
                 : true
+    };
+}
+
+function toUserQuotaOverride(value: unknown): UserQuotaOverride {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+        return {
+            tokenLimit: null,
+            refillAmount: null
+        };
+    }
+
+    const raw = value as UserProfileQuotaOverrideValue;
+
+    return {
+        tokenLimit: normalizePositiveInteger(raw.tokenLimit),
+        refillAmount: normalizePositiveInteger(raw.refillAmount)
     };
 }
 
@@ -270,12 +311,14 @@ function normalizeUserProfileData(value: unknown): UserProfileData {
               .sort((left, right) => right.updatedAt - left.updatedAt)
         : [];
     const userPreference = toUserProfilePreference(raw.userPreference);
+    const quotaOverride = toUserQuotaOverride(raw.quotaOverride);
 
     return {
         version: 1,
         favorites,
         subscriptions,
-        userPreference
+        userPreference,
+        quotaOverride
     };
 }
 
@@ -339,6 +382,10 @@ export function getUserPreference(userId: string) {
     return getCurrentUserProfileData(userId).userPreference;
 }
 
+export function getUserQuotaOverride(userId: string) {
+    return getCurrentUserProfileData(userId).quotaOverride;
+}
+
 export function upsertUserFavoriteLookup(
     userId: string,
     item: FavoriteLookupInput
@@ -382,7 +429,8 @@ export function upsertUserFavoriteLookup(
             version: 1,
             favorites: nextFavorites,
             subscriptions: profile.subscriptions,
-            userPreference: profile.userPreference
+            userPreference: profile.userPreference,
+            quotaOverride: profile.quotaOverride
         };
 
         writeUserProfileData(userId, nextProfile, now);
@@ -426,7 +474,8 @@ export function removeUserFavoriteLookup(
             version: 1,
             favorites: nextFavorites,
             subscriptions: profile.subscriptions,
-            userPreference: profile.userPreference
+            userPreference: profile.userPreference,
+            quotaOverride: profile.quotaOverride
         };
 
         writeUserProfileData(userId, nextProfile, now);
@@ -484,7 +533,8 @@ export function upsertUserSubscription(
             version: 1,
             favorites: profile.favorites,
             subscriptions: nextSubscriptions,
-            userPreference: profile.userPreference
+            userPreference: profile.userPreference,
+            quotaOverride: profile.quotaOverride
         };
 
         writeUserProfileData(userId, nextProfile, now);
@@ -533,7 +583,8 @@ export function renameUserSubscription(
             version: 1,
             favorites: profile.favorites,
             subscriptions: nextSubscriptions,
-            userPreference: profile.userPreference
+            userPreference: profile.userPreference,
+            quotaOverride: profile.quotaOverride
         };
 
         writeUserProfileData(userId, nextProfile, now);
@@ -563,7 +614,8 @@ export function removeUserSubscription(userId: string, subscriptionId: string) {
             version: 1,
             favorites: profile.favorites,
             subscriptions: nextSubscriptions,
-            userPreference: profile.userPreference
+            userPreference: profile.userPreference,
+            quotaOverride: profile.quotaOverride
         };
 
         writeUserProfileData(userId, nextProfile, now);
@@ -608,7 +660,8 @@ export function removeUserSubscriptionsByEndpoints(
             version: 1,
             favorites: profile.favorites,
             subscriptions: nextSubscriptions,
-            userPreference: profile.userPreference
+            userPreference: profile.userPreference,
+            quotaOverride: profile.quotaOverride
         };
 
         writeUserProfileData(userId, nextProfile, now);
@@ -637,11 +690,48 @@ export function updateUserPreference(
             version: 1,
             favorites: profile.favorites,
             subscriptions: profile.subscriptions,
-            userPreference
+            userPreference,
+            quotaOverride: profile.quotaOverride
         };
 
         writeUserProfileData(userId, nextProfile, now);
         return nextProfile.userPreference;
+    });
+
+    return transaction();
+}
+
+export function updateUserQuotaOverride(
+    userId: string,
+    nextOverride: Partial<UserQuotaOverride>
+) {
+    const now = getNowSeconds();
+
+    const transaction = useUsersDatabase().transaction(() => {
+        const row = getStoredUserProfileRow(userId);
+        const profile = row
+            ? parseUserProfileData(row.data_json)
+            : createDefaultUserProfileData();
+        const quotaOverride: UserQuotaOverride = {
+            tokenLimit:
+                nextOverride.tokenLimit === undefined
+                    ? profile.quotaOverride.tokenLimit
+                    : nextOverride.tokenLimit,
+            refillAmount:
+                nextOverride.refillAmount === undefined
+                    ? profile.quotaOverride.refillAmount
+                    : nextOverride.refillAmount
+        };
+        const nextProfile: UserProfileData = {
+            version: 1,
+            favorites: profile.favorites,
+            subscriptions: profile.subscriptions,
+            userPreference: profile.userPreference,
+            quotaOverride
+        };
+
+        writeUserProfileData(userId, nextProfile, now);
+        return nextProfile.quotaOverride;
     });
 
     return transaction();

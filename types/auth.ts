@@ -98,7 +98,6 @@ export interface AuthIssueApiKeyResponse {
     maskedApiKey: string;
     activeFrom: number;
     expiresAt: number;
-    dailyTokenLimit: number;
     scopes: string[];
 }
 

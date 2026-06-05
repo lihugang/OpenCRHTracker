@@ -11,5 +11,4 @@ export default interface ApiIdentity extends QuotaSubject {
     scopes: string[];
     activeFrom?: number;
     expiresAt?: number;
-    dailyTokenLimit?: number;
 }

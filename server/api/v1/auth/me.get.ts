@@ -25,8 +25,7 @@ export default defineEventHandler(async (event) => {
                     maskedApiKey: maskApiKey(identity.apiKey ?? ''),
                     activeFrom: identity.activeFrom ?? 0,
                     expiresAt: identity.expiresAt ?? 0,
-                    dailyTokenLimit:
-                        identity.dailyTokenLimit ?? identity.tokenLimit,
+                    dailyTokenLimit: identity.tokenLimit,
                     scopes: identity.scopes
                 },
                 quota: getQuotaSummary(identity)

@@ -168,12 +168,35 @@ export interface AdminUserListItem {
     createdAt: number;
     lastLoginAt: number | null;
     apiRemainCost: number;
+    customTokenLimit: number | null;
+    customRefillAmount: number | null;
 }
 
 export interface AdminUsersResponse {
     totalUsers: number;
     asOf: number;
     items: AdminUserListItem[];
+}
+
+export interface AdminUserQuotaOverride {
+    tokenLimit: number | null;
+    refillAmount: number | null;
+}
+
+export interface AdminUpdateUserQuotaRequest {
+    userId: string;
+    tokenLimit: number | null;
+    refillAmount: number | null;
+}
+
+export interface AdminUpdateUserQuotaResponse {
+    userId: string;
+    quotaOverride: AdminUserQuotaOverride;
+    effectiveQuota: {
+        tokenLimit: number;
+        refillAmount: number;
+        refillIntervalSeconds: number;
+    };
 }
 
 export type AdminConfigFileTarget =

@@ -25,7 +25,6 @@ interface ApiKeyPayload {
     scopes: string[];
     activeFrom: number;
     expiresAt: number;
-    dailyTokenLimit: number;
 }
 
 export interface IssuedAuthSession extends ApiKeyPayload {
@@ -57,7 +56,6 @@ interface StoredApiKeyRecord {
     active_from: number;
     revoked_at: number | null;
     expires_at: number;
-    daily_token_limit: number;
 }
 
 export interface ApiKeyRecord {
@@ -69,7 +67,6 @@ export interface ApiKeyRecord {
     active_from: StoredApiKeyRecord['active_from'];
     revoked_at: StoredApiKeyRecord['revoked_at'];
     expires_at: StoredApiKeyRecord['expires_at'];
-    daily_token_limit: StoredApiKeyRecord['daily_token_limit'];
     scopes: string[];
 }
 
@@ -215,7 +212,6 @@ function buildApiKeySession(
     activeFrom = getNowSeconds(),
     expiresAt = activeFrom + useConfig().user.apiKeyTtlSeconds
 ): IssuedAuthSession {
-    const config = useConfig();
     const normalizedScopes = normalizeScopeList(scopes);
     const resolvedWindow = resolveApiKeyWindow(activeFrom, expiresAt);
     const resolvedName = resolveApiKeyName(
@@ -223,15 +219,13 @@ function buildApiKeySession(
         issuer,
         resolvedWindow.activeFrom
     );
-    const dailyTokenLimit = config.quota.userMaxTokens;
     const apiKey = createSignedApiKeyToken(
         {
             kid: keyId,
             sub: userId,
             scopes: normalizedScopes,
             nbf: resolvedWindow.activeFrom,
-            exp: resolvedWindow.expiresAt,
-            limit: dailyTokenLimit
+            exp: resolvedWindow.expiresAt
         },
         issuer
     );
@@ -246,8 +240,7 @@ function buildApiKeySession(
         maskedApiKey: maskApiKey(apiKey),
         scopes: normalizedScopes,
         activeFrom: resolvedWindow.activeFrom,
-        expiresAt: resolvedWindow.expiresAt,
-        dailyTokenLimit
+        expiresAt: resolvedWindow.expiresAt
     };
 }
 
@@ -275,8 +268,7 @@ function cacheIssuedApiKey(apiKey: IssuedAuthSession) {
         name: apiKey.name,
         active_from: apiKey.activeFrom,
         revoked_at: null,
-        expires_at: apiKey.expiresAt,
-        daily_token_limit: apiKey.dailyTokenLimit
+        expires_at: apiKey.expiresAt
     });
 }
 
@@ -286,8 +278,7 @@ function matchesPayload(record: StoredApiKeyRecord, payload: ApiKeyPayload) {
         record.user_id === payload.userId &&
         record.issuer === payload.issuer &&
         record.active_from === payload.activeFrom &&
-        record.expires_at === payload.expiresAt &&
-        record.daily_token_limit === payload.dailyTokenLimit
+        record.expires_at === payload.expiresAt
     );
 }
 
@@ -318,8 +309,7 @@ function buildAuthSessionFromRecord(
         maskedApiKey: maskApiKey(apiKey),
         scopes,
         activeFrom: record.active_from,
-        expiresAt: record.expires_at,
-        dailyTokenLimit: record.daily_token_limit
+        expiresAt: record.expires_at
     };
 }
 
@@ -418,8 +408,7 @@ export function createApiKey(
             apiKey.issuer,
             apiKey.name,
             apiKey.activeFrom,
-            apiKey.expiresAt,
-            apiKey.dailyTokenLimit
+            apiKey.expiresAt
         );
         insertApiKeyScopes(apiKey.keyId, apiKey.scopes);
     });
@@ -470,8 +459,7 @@ export function createUserWithApiKey(
             apiKey.issuer,
             apiKey.name,
             apiKey.activeFrom,
-            apiKey.expiresAt,
-            apiKey.dailyTokenLimit
+            apiKey.expiresAt
         );
         insertApiKeyScopes(apiKey.keyId, apiKey.scopes);
     });
@@ -534,8 +522,7 @@ export function changeUserPasswordWithApiKey(
             apiKey.issuer,
             apiKey.name,
             apiKey.activeFrom,
-            apiKey.expiresAt,
-            apiKey.dailyTokenLimit
+            apiKey.expiresAt
         );
         insertApiKeyScopes(apiKey.keyId, apiKey.scopes);
     });
@@ -653,8 +640,7 @@ export function getValidApiKey(apiKey: string) {
         issuer: payload.issuer,
         scopes: payload.scopes,
         activeFrom: payload.nbf,
-        expiresAt: payload.exp,
-        dailyTokenLimit: payload.limit
+        expiresAt: payload.exp
     };
 
     if (!matchesPayload(storedRecord, hydratedPayload)) {

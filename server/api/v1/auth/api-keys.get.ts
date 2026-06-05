@@ -53,7 +53,7 @@ export default defineEventHandler(async (event) => {
                     activeFrom: record.active_from,
                     revokedAt: record.revoked_at,
                     expiresAt: record.expires_at,
-                    dailyTokenLimit: record.daily_token_limit,
+                    dailyTokenLimit: identity.tokenLimit,
                     scopes: record.scopes,
                     isCurrent: record.key === identity.keyId,
                     usage: getApiKeyUsageSummary(record.key)

@@ -1,0 +1,1 @@
+ALTER TABLE api_keys RENAME TO api_keys_legacy_pre_remove_daily_token_limit;

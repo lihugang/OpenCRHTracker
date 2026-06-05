@@ -1,4 +1,5 @@
 import { maskApiKey } from '~/server/services/authStore';
+import resolveUserQuotaSubject from '~/server/utils/api/quota/resolveUserQuotaSubject';
 import type { AuthSession } from '~/types/auth';
 
 interface AuthSessionLike {
@@ -9,12 +10,13 @@ interface AuthSessionLike {
     scopes: string[];
     activeFrom: number;
     expiresAt: number;
-    dailyTokenLimit: number;
 }
 
 export default function toPublicAuthSession(
     session: AuthSessionLike
 ): AuthSession {
+    const quotaSubject = resolveUserQuotaSubject(session.userId);
+
     return {
         userId: session.userId,
         revokeId: session.revokeId,
@@ -23,6 +25,6 @@ export default function toPublicAuthSession(
         scopes: session.scopes,
         activeFrom: session.activeFrom,
         expiresAt: session.expiresAt,
-        dailyTokenLimit: session.dailyTokenLimit
+        dailyTokenLimit: quotaSubject.tokenLimit
     };
 }

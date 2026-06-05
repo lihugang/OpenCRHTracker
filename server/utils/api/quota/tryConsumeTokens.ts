@@ -10,12 +10,19 @@ export default function tryConsumeTokens(
     subject: QuotaSubject,
     rawCost: number
 ): QuotaConsumeResult {
-    const config = useConfig();
     const cost = Math.max(0, Math.floor(rawCost));
     const now = getNowSeconds();
     const bucket = hydrateBucket(subject, now);
 
-    if (!config.quota.consumeTokens) {
+    if (!subject.refillIntervalSeconds || subject.refillAmount <= 0) {
+        throw new Error('invalid quota subject refill configuration');
+    }
+
+    if (!subject.tokenLimit || subject.tokenLimit < 0) {
+        throw new Error('invalid quota subject token limit');
+    }
+
+    if (!useRuntimeQuotaConsumeFlag()) {
         return {
             ok: true,
             remain: bucket.tokens,
@@ -50,8 +57,8 @@ export default function tryConsumeTokens(
     }
 
     const deficit = cost - bucket.tokens;
-    const refillPerStep = config.quota.refillAmount;
-    const refillStep = config.quota.refillIntervalSeconds;
+    const refillPerStep = subject.refillAmount;
+    const refillStep = subject.refillIntervalSeconds;
     const refillCount = Math.ceil(deficit / refillPerStep);
     const nextAvailableAt = bucket.updatedAt + refillCount * refillStep;
     const retryAfter = Math.max(1, nextAvailableAt - now);
@@ -62,4 +69,8 @@ export default function tryConsumeTokens(
         cost: 0,
         retryAfter
     };
+}
+
+function useRuntimeQuotaConsumeFlag() {
+    return useConfig().quota.consumeTokens;
 }
