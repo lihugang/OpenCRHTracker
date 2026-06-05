@@ -33,6 +33,25 @@ function ensureUsersSchema(db: Database.Database) {
 
         db.exec(statement);
     }
+
+    const oauthSchemaSql = importSqlBatch('users/oauth');
+    const orderedOauthKeys = [
+        'createOauthClientsTable',
+        'createOauthClientRedirectUrisTable',
+        'createOauthClientScopeRequestsTable',
+        'createOauthAuthorizationCodesTable',
+        'createOauthConsentsTable',
+        'createOauthLoginContinuationsTable'
+    ];
+
+    for (const key of orderedOauthKeys) {
+        const statement = oauthSchemaSql[key];
+        if (!statement) {
+            continue;
+        }
+
+        db.exec(statement);
+    }
 }
 
 registerDatabaseInitializer('users', ensureUsersSchema);
