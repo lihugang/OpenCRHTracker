@@ -683,9 +683,9 @@ async function buildTrainCirculationHeaderInfo(input: {
         parts.push(input.passengerDepartment);
     }
 
-    const primaryReferenceModel = (await getReferenceModelsByTrainCodes(
-        input.allCodes
-    ))[0];
+    const primaryReferenceModel = (
+        await getReferenceModelsByTrainCodes(input.allCodes)
+    )[0];
     if (primaryReferenceModel?.model) {
         parts.push(`${primaryReferenceModel.model} 型动车组`);
     }

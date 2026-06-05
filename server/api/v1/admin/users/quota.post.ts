@@ -53,12 +53,7 @@ export default defineEventHandler(async (event) => {
 
             const userId =
                 typeof body.userId === 'string' ? body.userId.trim() : '';
-            ensure(
-                userId.length > 0,
-                400,
-                'invalid_param',
-                'userId 不能为空'
-            );
+            ensure(userId.length > 0, 400, 'invalid_param', 'userId 不能为空');
 
             const request: AdminUpdateUserQuotaRequest = {
                 userId,

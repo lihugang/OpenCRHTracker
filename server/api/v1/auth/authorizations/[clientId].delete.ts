@@ -24,9 +24,16 @@ export default defineEventHandler(async (event) => {
                 'clientId 不能为空'
             );
 
-            const revoked = revokeOauthAuthorizationByUser(identity.id, clientId);
+            const revoked = revokeOauthAuthorizationByUser(
+                identity.id,
+                clientId
+            );
             if (!revoked) {
-                throw new ApiRequestError(404, 'not_found', '未找到该应用的授权记录');
+                throw new ApiRequestError(
+                    404,
+                    'not_found',
+                    '未找到该应用的授权记录'
+                );
             }
 
             const response: AuthAuthorizationRevokeResponse = {

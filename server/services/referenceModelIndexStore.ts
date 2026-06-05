@@ -288,9 +288,8 @@ export async function getReferenceModelsByTrainCodes(
     }
 
     if (dedupedRuns.size === 0) {
-        const fallbackModel = await getFallbackReferenceModelFromSchedule(
-            normalizedTrainCodes
-        );
+        const fallbackModel =
+            await getFallbackReferenceModelFromSchedule(normalizedTrainCodes);
         return fallbackModel ? [fallbackModel] : [];
     }
 

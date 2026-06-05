@@ -24,11 +24,11 @@ export default defineEventHandler((event) => {
         payload.authorizeRequest.responseType
     );
     target.searchParams.set('client_id', payload.authorizeRequest.clientId);
-    target.searchParams.set('redirect_uri', payload.authorizeRequest.redirectUri);
     target.searchParams.set(
-        'scope',
-        payload.authorizeRequest.scope.join(' ')
+        'redirect_uri',
+        payload.authorizeRequest.redirectUri
     );
+    target.searchParams.set('scope', payload.authorizeRequest.scope.join(' '));
     target.searchParams.set('state', payload.authorizeRequest.state);
     target.searchParams.set(
         'code_challenge',

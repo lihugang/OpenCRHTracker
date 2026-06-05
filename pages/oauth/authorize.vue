@@ -27,7 +27,8 @@
                                     授权 {{ consent.client.name }}
                                 </h1>
                                 <p class="text-sm leading-6 text-slate-600">
-                                    该应用希望访问你的 Open CRH Tracker 账户数据。
+                                    该应用希望访问你的 Open CRH Tracker
+                                    账户数据。
                                 </p>
                             </div>
 
@@ -55,7 +56,8 @@
                                         class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
                                         开发者
                                     </p>
-                                    <p class="mt-1 text-sm font-medium text-slate-700">
+                                    <p
+                                        class="mt-1 text-sm font-medium text-slate-700">
                                         {{ consent.client.ownerUserId }}
                                     </p>
                                 </div>
@@ -93,7 +95,8 @@
                         <div
                             v-if="consent.requiresOwnerBypass"
                             class="rounded-[1rem] border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm leading-6 text-amber-800">
-                            当前授权包含待审核 scope。由于你是该应用开发者，系统允许你绕过审核完成授权。
+                            当前授权包含待审核
+                            scope。由于你是该应用开发者，系统允许你绕过审核完成授权。
                         </div>
 
                         <div class="space-y-2">
@@ -122,7 +125,10 @@
                         <div class="flex flex-wrap gap-3 pt-2">
                             <UiButton
                                 type="button"
-                                :loading="isSubmitting && pendingDecision === 'approve'"
+                                :loading="
+                                    isSubmitting &&
+                                    pendingDecision === 'approve'
+                                "
                                 :disabled="isSubmitting"
                                 @click="submitDecision('approve')">
                                 允许授权
@@ -130,7 +136,9 @@
                             <UiButton
                                 type="button"
                                 variant="secondary"
-                                :loading="isSubmitting && pendingDecision === 'deny'"
+                                :loading="
+                                    isSubmitting && pendingDecision === 'deny'
+                                "
                                 :disabled="isSubmitting"
                                 @click="submitDecision('deny')">
                                 拒绝
@@ -146,7 +154,8 @@
                         class="text-xs font-semibold uppercase tracking-[0.28em] text-crh-blue/80">
                         OAuth Authorize
                     </p>
-                    <h1 class="text-3xl font-semibold tracking-tight text-slate-900">
+                    <h1
+                        class="text-3xl font-semibold tracking-tight text-slate-900">
                         无法处理该授权请求
                     </h1>
                     <p
@@ -201,7 +210,8 @@ const context = await requestFetch<OAuthAuthorizeContextResponse>(
 
 if (context.mode === 'redirect') {
     await navigateTo(context.location, {
-        external: context.location.startsWith('http://') ||
+        external:
+            context.location.startsWith('http://') ||
             context.location.startsWith('https://')
     });
 }
@@ -249,23 +259,20 @@ async function submitDecision(decision: 'approve' | 'deny') {
     try {
         const response = await useNuxtApp().$csrfFetch<
             TrackerApiResponse<OAuthAuthorizeDecisionResponse>
-        >(
-            '/oauth/authorize',
-            {
-                method: 'POST',
-                body: {
-                    decision,
-                    response_type: consent.request.responseType,
-                    client_id: consent.request.clientId,
-                    redirect_uri: consent.request.redirectUri,
-                    scope: consent.request.scope.join(' '),
-                    state: consent.request.state,
-                    code_challenge: consent.request.codeChallenge,
-                    code_challenge_method: consent.request.codeChallengeMethod,
-                    nonce: consent.request.nonce
-                }
+        >('/oauth/authorize', {
+            method: 'POST',
+            body: {
+                decision,
+                response_type: consent.request.responseType,
+                client_id: consent.request.clientId,
+                redirect_uri: consent.request.redirectUri,
+                scope: consent.request.scope.join(' '),
+                state: consent.request.state,
+                code_challenge: consent.request.codeChallenge,
+                code_challenge_method: consent.request.codeChallengeMethod,
+                nonce: consent.request.nonce
             }
-        );
+        });
 
         if (!response.ok) {
             throw {
@@ -274,7 +281,8 @@ async function submitDecision(decision: 'approve' | 'deny') {
         }
 
         await navigateTo(response.data.location, {
-            external: response.data.location.startsWith('http://') ||
+            external:
+                response.data.location.startsWith('http://') ||
                 response.data.location.startsWith('https://')
         });
     } catch (error) {

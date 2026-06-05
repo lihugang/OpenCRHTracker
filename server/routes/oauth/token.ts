@@ -1,9 +1,4 @@
-import {
-    defineEventHandler,
-    readBody,
-    setHeader,
-    setResponseStatus
-} from 'h3';
+import { defineEventHandler, readBody, setHeader, setResponseStatus } from 'h3';
 import { exchangeAuthorizationCode } from '~/server/services/oauthStore';
 import {
     assertAuthRateLimit,

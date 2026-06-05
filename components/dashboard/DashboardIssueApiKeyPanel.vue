@@ -243,7 +243,9 @@
                             :model-value="scopes"
                             :scopes="creatableScopes"
                             :label-map="scopeLabelMap"
-                            @update:model-value="emit('update:scopes', $event)" />
+                            @update:model-value="
+                                emit('update:scopes', $event)
+                            " />
                     </div>
                 </div>
 
@@ -333,10 +335,7 @@ const emit = defineEmits<{
 
 const issueNameInputRef = ref<HTMLInputElement | null>(null);
 
-function updateField(
-    field: 'name' | 'activeFrom' | 'expiresAt',
-    event: Event
-) {
+function updateField(field: 'name' | 'activeFrom' | 'expiresAt', event: Event) {
     const target = event.target as HTMLInputElement;
 
     if (field === 'name') {

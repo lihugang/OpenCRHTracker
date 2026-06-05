@@ -154,11 +154,11 @@ async function executeRefreshAssetTask(
                             ? validateDownloadedStationCoordAssetText
                             : definition.key === 'trainStyleMapping'
                               ? validateTrainStyleMappingText
-                            : async (content) => {
-                                  await validateQrcodeDetectionConfigText(
-                                      content
-                                  );
-                              }
+                              : async (content) => {
+                                    await validateQrcodeDetectionConfigText(
+                                        content
+                                    );
+                                }
             }
         );
         if (result.refreshed) {

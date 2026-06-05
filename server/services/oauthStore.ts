@@ -109,8 +109,7 @@ export type OAuthAuthorizeValidationResult =
           error: InvalidOAuthAuthorizeRequest;
       };
 
-export interface AuthorizedOAuthAuthorizeRequest
-    extends ValidatedOAuthAuthorizeRequest {
+export interface AuthorizedOAuthAuthorizeRequest extends ValidatedOAuthAuthorizeRequest {
     hasPendingScopes: boolean;
     requiresOwnerBypass: boolean;
 }
@@ -167,15 +166,15 @@ function normalizeUrl(value: string) {
 }
 
 function normalizeScopeRequests(scopeRequests: string[]) {
-    return [...new Set(scopeRequests.map((scope) => scope.trim()).filter(Boolean))].sort(
-        (left, right) => left.localeCompare(right)
-    );
+    return [
+        ...new Set(scopeRequests.map((scope) => scope.trim()).filter(Boolean))
+    ].sort((left, right) => left.localeCompare(right));
 }
 
 function normalizeRedirectUris(redirectUris: string[]) {
-    return [...new Set(redirectUris.map((uri) => normalizeUrl(uri)).filter(Boolean))].sort(
-        (left, right) => left.localeCompare(right)
-    );
+    return [
+        ...new Set(redirectUris.map((uri) => normalizeUrl(uri)).filter(Boolean))
+    ].sort((left, right) => left.localeCompare(right));
 }
 
 function toScopeRequestItem(
@@ -191,12 +190,18 @@ function toScopeRequestItem(
 
 function hydrateClient(row: OAuthClientRow): OAuthClient {
     const redirectUris = oauthStatements
-        .all<OAuthClientRedirectUriRow>('selectOauthClientRedirectUris', row.client_id)
+        .all<OAuthClientRedirectUriRow>(
+            'selectOauthClientRedirectUris',
+            row.client_id
+        )
         .map((item) => ({
             value: item.redirect_uri
         }));
     const scopeRequests = oauthStatements
-        .all<OAuthClientScopeRequestRow>('selectOauthClientScopeRequests', row.client_id)
+        .all<OAuthClientScopeRequestRow>(
+            'selectOauthClientScopeRequests',
+            row.client_id
+        )
         .map(toScopeRequestItem);
 
     return {
@@ -258,15 +263,23 @@ export function listOauthClientsByOwner(ownerUserId: string) {
 }
 
 export function listAllOauthClients() {
-    return oauthStatements.all<OAuthClientRow>('selectAllOauthClients').map(hydrateClient);
+    return oauthStatements
+        .all<OAuthClientRow>('selectAllOauthClients')
+        .map(hydrateClient);
 }
 
 export function getOauthClientById(clientId: string) {
-    const row = oauthStatements.get<OAuthClientRow>('selectOauthClientById', clientId);
+    const row = oauthStatements.get<OAuthClientRow>(
+        'selectOauthClientById',
+        clientId
+    );
     return row ? hydrateClient(row) : undefined;
 }
 
-export function getOauthClientByIdAndOwner(clientId: string, ownerUserId: string) {
+export function getOauthClientByIdAndOwner(
+    clientId: string,
+    ownerUserId: string
+) {
     const row = oauthStatements.get<OAuthClientRow>(
         'selectOauthClientByIdAndOwner',
         clientId,
@@ -339,8 +352,15 @@ export function updateOauthClientByOwner(
     return getOauthClientById(clientId);
 }
 
-export function deleteOauthClientByOwner(clientId: string, ownerUserId: string) {
-    const result = oauthStatements.run('deleteOauthClient', clientId, ownerUserId);
+export function deleteOauthClientByOwner(
+    clientId: string,
+    ownerUserId: string
+) {
+    const result = oauthStatements.run(
+        'deleteOauthClient',
+        clientId,
+        ownerUserId
+    );
     return result.changes > 0;
 }
 
@@ -438,7 +458,11 @@ export function getGrantedConsentScopes(userId: string, clientId: string) {
         .map((row) => row.scope);
 }
 
-export function grantOauthConsents(userId: string, clientId: string, scopes: string[]) {
+export function grantOauthConsents(
+    userId: string,
+    clientId: string,
+    scopes: string[]
+) {
     const now = getNowSeconds();
     for (const scope of scopes) {
         oauthStatements.run(
@@ -530,7 +554,10 @@ export function revokeOauthAuthorizationByUser(
         );
         revokedConsentCount = consentResult.changes;
 
-        const tokenResult = revokeApiKeysByUserAndOauthClientId(userId, clientId);
+        const tokenResult = revokeApiKeysByUserAndOauthClientId(
+            userId,
+            clientId
+        );
         revokedAt = tokenResult.revokedAt;
         revokedTokenCount = tokenResult.revokedCount;
     });
@@ -814,7 +841,11 @@ export function canUserAuthorizeScopes(
     return requestedScopes.every((scope) => hasScope(grantedScopes, scope));
 }
 
-export function needsConsent(userId: string, client: OAuthClient, requestedScopes: string[]) {
+export function needsConsent(
+    userId: string,
+    client: OAuthClient,
+    requestedScopes: string[]
+) {
     if (client.isTrusted) {
         return false;
     }

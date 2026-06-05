@@ -43,7 +43,10 @@ export default function ensureAuthRateLimit(
             throw new ApiRequestError(
                 429,
                 'auth_rate_limited',
-                formatRetryAfterMessage(retryAfter, getRateLimitMessageKind(action)),
+                formatRetryAfterMessage(
+                    retryAfter,
+                    getRateLimitMessageKind(action)
+                ),
                 retryAfter
             );
         }

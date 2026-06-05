@@ -1420,7 +1420,9 @@ async function createCirculationPreviewHttpError(response: Response) {
     const fallbackMessage = `HTTP ${response.status}`;
 
     try {
-        const payload = (await response.json()) as Partial<TrackerApiResponse<never>>;
+        const payload = (await response.json()) as Partial<
+            TrackerApiResponse<never>
+        >;
         if (
             payload &&
             payload.ok === false &&
@@ -1716,9 +1718,7 @@ async function shareCirculationAssetFile(
     return true;
 }
 
-function buildCirculationAssetBinaryUrl(
-    format: CirculationExportFormat
-) {
+function buildCirculationAssetBinaryUrl(format: CirculationExportFormat) {
     const requestTrainCode = circulationPdfRequestTrainCode.value;
     if (requestTrainCode.length === 0) {
         throw new Error('当前暂无可导出的交路图');
@@ -2597,7 +2597,10 @@ async function requestCirculationPdfPreviewRender(requestToken: number) {
         return;
     }
 
-    const containerWidth = Math.max(0, Math.floor(target.container.clientWidth));
+    const containerWidth = Math.max(
+        0,
+        Math.floor(target.container.clientWidth)
+    );
     if (containerWidth <= 0) {
         return;
     }
@@ -2807,7 +2810,8 @@ async function renderCirculationPdfPageToTarget(options: {
             await renderTask.promise;
         } finally {
             if (
-                (mode === 'preview' && circulationPdfRenderTask === renderTask) ||
+                (mode === 'preview' &&
+                    circulationPdfRenderTask === renderTask) ||
                 (mode === 'fullscreen' &&
                     circulationPdfFullscreenRenderTask === renderTask)
             ) {

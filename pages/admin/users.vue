@@ -150,29 +150,41 @@
                                     </td>
                                     <td
                                         class="px-4 py-3 text-right text-sm text-slate-700">
-                                        {{ formatOptionalNumber(item.customTokenLimit) }}
+                                        {{
+                                            formatOptionalNumber(
+                                                item.customTokenLimit
+                                            )
+                                        }}
                                     </td>
                                     <td
                                         class="px-4 py-3 text-right text-sm text-slate-700">
-                                        {{ formatOptionalNumber(item.customRefillAmount) }}
+                                        {{
+                                            formatOptionalNumber(
+                                                item.customRefillAmount
+                                            )
+                                        }}
                                     </td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
 
-                    <div class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-5 py-5">
+                    <div
+                        class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-5 py-5">
                         <div class="space-y-6">
                             <div class="space-y-2">
                                 <p
                                     class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
                                     Quota Override
                                 </p>
-                                <h3 class="text-xl font-semibold text-slate-900">
+                                <h3
+                                    class="text-xl font-semibold text-slate-900">
                                     用户配额设置
                                 </h3>
                                 <p class="text-sm leading-6 text-slate-600">
-                                    留空后保存表示清除该用户的自定义设置，恢复为全局默认值。恢复速度单位为每个恢复周期补充的 token 数量，恢复周期秒数继续沿用服务端全局配置。
+                                    留空后保存表示清除该用户的自定义设置，恢复为全局默认值。恢复速度单位为每个恢复周期补充的
+                                    token
+                                    数量，恢复周期秒数继续沿用服务端全局配置。
                                 </p>
                             </div>
 

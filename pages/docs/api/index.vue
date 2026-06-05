@@ -81,8 +81,11 @@
                         游客默认可用额度上限为
                         {{ apiConfig.quota.anonymousMaxTokens }}
                         点，登录用户默认可用额度上限为
-                        {{ apiConfig.quota.userMaxTokens }} 点。同一用户下签发的所有
-                        API Key 都共享同一份用户级额度，切换 Key
+                        {{
+                            apiConfig.quota.userMaxTokens
+                        }}
+                        点。同一用户下签发的所有 API Key
+                        都共享同一份用户级额度，切换 Key
                         不会额外增加额度。额度会按配置的恢复周期自动补充，默认每
                         {{ apiConfig.quota.refillIntervalSeconds }} 秒恢复
                         {{ apiConfig.quota.refillAmount }}

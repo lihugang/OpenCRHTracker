@@ -49,7 +49,9 @@
                 description="请稍候，正在同步你的授权记录。" />
 
             <UiEmptyState
-                v-else-if="canReadAuthorizations && errorMessage && items.length === 0"
+                v-else-if="
+                    canReadAuthorizations && errorMessage && items.length === 0
+                "
                 eyebrow="ERROR"
                 title="授权列表加载失败"
                 :description="errorMessage"
@@ -88,7 +90,12 @@
                                         class="text-base font-semibold text-slate-900">
                                         {{ item.name }}
                                     </h4>
-                                    <span :class="getClientStatusBadgeClass(item.status)">
+                                    <span
+                                        :class="
+                                            getClientStatusBadgeClass(
+                                                item.status
+                                            )
+                                        ">
                                         {{ getClientStatusLabel(item.status) }}
                                     </span>
                                     <span
@@ -114,14 +121,18 @@
                                 type="button"
                                 variant="secondary"
                                 class="shrink-0 border-rose-200 bg-white text-rose-700 hover:border-rose-300 hover:bg-rose-50 hover:text-rose-800"
-                                :disabled="!canRevokeAuthorizations || isPending(item.clientId)"
+                                :disabled="
+                                    !canRevokeAuthorizations ||
+                                    isPending(item.clientId)
+                                "
                                 :loading="isPending(item.clientId)"
                                 @click="emit('revoke', item)">
                                 取消授权
                             </UiButton>
                         </div>
 
-                        <div class="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
+                        <div
+                            class="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
                             <div class="space-y-4">
                                 <div class="space-y-2">
                                     <p
@@ -158,13 +169,15 @@
                                         class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
                                         开发者
                                     </p>
-                                    <p class="text-sm font-medium text-slate-700">
+                                    <p
+                                        class="text-sm font-medium text-slate-700">
                                         {{ item.ownerUserId }}
                                     </p>
                                 </div>
                             </div>
 
-                            <dl class="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+                            <dl
+                                class="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
                                 <div
                                     class="dashboard-soft-surface rounded-[1rem] border px-4 py-3">
                                     <dt
@@ -222,10 +235,7 @@
 </template>
 
 <script setup lang="ts">
-import type {
-    AuthAuthorizationItem,
-    OAuthClientStatus
-} from '~/types/auth';
+import type { AuthAuthorizationItem, OAuthClientStatus } from '~/types/auth';
 
 defineProps<{
     items: AuthAuthorizationItem[];

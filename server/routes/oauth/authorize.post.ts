@@ -1,8 +1,4 @@
-import {
-    createError,
-    defineEventHandler,
-    readBody
-} from 'h3';
+import { createError, defineEventHandler, readBody } from 'h3';
 import {
     assertAuthRateLimit,
     recordAuthRateLimitHit

@@ -580,7 +580,7 @@ export const deployDocsSections: DocsContentSection[] = [
                             'authorization code 的有效期，单位秒；从用户完成授权开始计时，超过时限后 /oauth/token 必须拒绝换取 token。',
                         notes: [
                             '必须为正整数。',
-                            '建议保持较短时长，减少授权码泄露后的可利用窗口。',
+                            '建议保持较短时长，减少授权码泄露后的可利用窗口。'
                         ]
                     },
                     {
@@ -695,8 +695,7 @@ export const deployDocsSections: DocsContentSection[] = [
                         path: 'oauth.idTokenSigning.alg',
                         valueType: '"RS256"',
                         required: true,
-                        description:
-                            'id_token 使用的 JWT 签名算法标识。',
+                        description: 'id_token 使用的 JWT 签名算法标识。',
                         notes: [
                             '当前实现只接受 RS256；配置为其他值会直接阻止服务启动。',
                             '该值应与私钥类型和 JWKS 中暴露的公钥参数保持一致。'
@@ -747,7 +746,8 @@ export const deployDocsSections: DocsContentSection[] = [
                         path: 'api.authRateLimit',
                         valueType: 'object',
                         required: true,
-                        description: '登录、注册、OAuth 授权流程与 OAuth 令牌接口的限流配置。'
+                        description:
+                            '登录、注册、OAuth 授权流程与 OAuth 令牌接口的限流配置。'
                     },
                     {
                         path: 'api.authRateLimit.oauthAuthorize',
@@ -1084,7 +1084,8 @@ export const deployDocsSections: DocsContentSection[] = [
                         path: 'cost.fixed.authChangePassword / authIssueApiKey / authCreateOauthClient / authListApiKeys / authRevokeApiKey',
                         valueType: 'integer',
                         required: true,
-                        description: 'API Key 管理接口与 OAuth 客户端创建接口的固定成本。'
+                        description:
+                            'API Key 管理接口与 OAuth 客户端创建接口的固定成本。'
                     },
                     {
                         path: 'cost.fixed.searchIndex / timetableTrainCurrent / trainCirculationImage / trainCirculationImageCacheHit / trainCirculationImageFailure / timetableTrainHistory / exportDailyIndex / exportDaily',
@@ -1324,7 +1325,8 @@ export const deployDocsSections: DocsContentSection[] = [
     {
         id: 'train-style-mapping',
         title: 'train_style_mapping.json',
-        summary: '为 referenceModels 的 schedule 回退提供 trainStyle 到规范车型名的映射。',
+        summary:
+            '为 referenceModels 的 schedule 回退提供 trainStyle 到规范车型名的映射。',
         blocks: [
             {
                 type: 'paragraph',

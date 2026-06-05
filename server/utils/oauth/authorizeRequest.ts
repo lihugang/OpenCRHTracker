@@ -34,9 +34,7 @@ export type OAuthAuthorizeDecisionResult =
       };
 
 function parseScopeValue(scope: unknown) {
-    return typeof scope === 'string'
-        ? scope.split(/\s+/).filter(Boolean)
-        : [];
+    return typeof scope === 'string' ? scope.split(/\s+/).filter(Boolean) : [];
 }
 
 export function parseAuthorizeRequest(event: H3Event): OAuthAuthorizeRequest {
@@ -51,7 +49,9 @@ export function parseAuthorizeRequest(event: H3Event): OAuthAuthorizeRequest {
         scope: parseScopeValue(query.scope),
         state: typeof query.state === 'string' ? query.state : '',
         codeChallenge:
-            typeof query.code_challenge === 'string' ? query.code_challenge : '',
+            typeof query.code_challenge === 'string'
+                ? query.code_challenge
+                : '',
         codeChallengeMethod:
             query.code_challenge_method === 'S256' ? 'S256' : ('S256' as const),
         nonce: typeof query.nonce === 'string' ? query.nonce : ''

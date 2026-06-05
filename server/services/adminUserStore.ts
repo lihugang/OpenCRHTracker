@@ -36,7 +36,10 @@ const adminUserStatements = createPreparedSqlStore<AdminUserSqlKey>({
     sql: adminUserSql
 });
 
-function toAdminUserListItem(row: AdminUserRow, now: number): AdminUserListItem {
+function toAdminUserListItem(
+    row: AdminUserRow,
+    now: number
+): AdminUserListItem {
     const quotaSubject = resolveUserQuotaSubject(row.username);
     const quotaOverride = getUserQuotaOverride(row.username);
 

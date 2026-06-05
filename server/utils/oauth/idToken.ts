@@ -30,6 +30,9 @@ export function signOidcIdToken(claims: IdTokenClaims) {
     const signer = crypto.createSign('RSA-SHA256');
     signer.update(signingInput);
     signer.end();
-    const signature = signer.sign(config.idTokenSigning.privateKeyPem, 'base64url');
+    const signature = signer.sign(
+        config.idTokenSigning.privateKeyPem,
+        'base64url'
+    );
     return `${signingInput}.${signature}`;
 }

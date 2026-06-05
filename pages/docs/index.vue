@@ -45,7 +45,8 @@
                             OAuth 文档
                         </h2>
                         <p class="text-sm leading-6 text-slate-600">
-                            通过 OAuth 2.0 协议授权第三方 App 获取本网站上的信息。
+                            通过 OAuth 2.0 协议授权第三方 App
+                            获取本网站上的信息。
                         </p>
                     </div>
 

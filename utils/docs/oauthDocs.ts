@@ -88,8 +88,7 @@ export const oauthDocsSections: DocsContentSection[] = [
     {
         id: 'overview',
         title: '这份授权是怎么工作的',
-        summary:
-            '本站当前使用授权码模式完成登录授权，并用 PKCE 保护授权过程。',
+        summary: '本站当前使用授权码模式完成登录授权，并用 PKCE 保护授权过程。',
         blocks: [
             {
                 type: 'list',
@@ -127,7 +126,7 @@ export const oauthDocsSections: DocsContentSection[] = [
                             '用户信息端点。应用拿到 access_token 后可在这里读取 OIDC sub，若 scope 允许还会返回 preferred_username。'
                     }
                 ]
-            },
+            }
         ]
     },
     {
@@ -219,13 +218,15 @@ export const oauthDocsSections: DocsContentSection[] = [
                         path: 'state',
                         valueType: 'string',
                         required: true,
-                        description: '建议填写一个随机字符串。发起授权时先把它保存起来，等回调回来后再对比返回值是否一致，用来确认这次回调确实是你自己刚才发起的那次请求。'
+                        description:
+                            '建议填写一个随机字符串。发起授权时先把它保存起来，等回调回来后再对比返回值是否一致，用来确认这次回调确实是你自己刚才发起的那次请求。'
                     },
                     {
                         path: 'code_challenge',
                         valueType: 'string',
                         required: true,
-                        description: '由 code_verifier 经过 SHA-256 和 Base64URL 计算得到的 PKCE challenge。'
+                        description:
+                            '由 code_verifier 经过 SHA-256 和 Base64URL 计算得到的 PKCE challenge。'
                     },
                     {
                         path: 'code_challenge_method',
@@ -236,7 +237,8 @@ export const oauthDocsSections: DocsContentSection[] = [
                     {
                         path: 'nonce',
                         valueType: 'string',
-                        description: '可选。建议填写一个随机字符串并在本地保存；如果这次登录返回了 id_token，再检查里面带回来的 nonce 是否和你最初保存的一致，用来确认这份身份结果确实对应当前这次请求。'
+                        description:
+                            '可选。建议填写一个随机字符串并在本地保存；如果这次登录返回了 id_token，再检查里面带回来的 nonce 是否和你最初保存的一致，用来确认这份身份结果确实对应当前这次请求。'
                     }
                 ]
             },
@@ -245,7 +247,7 @@ export const oauthDocsSections: DocsContentSection[] = [
                 title: '授权 URL 示例',
                 language: 'text',
                 code: authorizeUrlExample
-            },
+            }
         ]
     },
     {
@@ -303,13 +305,15 @@ export const oauthDocsSections: DocsContentSection[] = [
                         path: 'redirect_uri',
                         valueType: 'string',
                         required: true,
-                        description: '必须与授权阶段提交的 redirect_uri 完全一致。'
+                        description:
+                            '必须与授权阶段提交的 redirect_uri 完全一致。'
                     },
                     {
                         path: 'code_verifier',
                         valueType: 'string',
                         required: true,
-                        description: '这是第三方 App 在发起授权前随机生成并保存在本地的一串字符串。服务端会用它与之前提交的 code_challenge 做校验。'
+                        description:
+                            '这是第三方 App 在发起授权前随机生成并保存在本地的一串字符串。服务端会用它与之前提交的 code_challenge 做校验。'
                     }
                 ]
             },
@@ -324,7 +328,7 @@ export const oauthDocsSections: DocsContentSection[] = [
                 title: '成功响应示例',
                 language: 'json',
                 code: tokenResponseExample
-            },
+            }
         ]
     },
     {

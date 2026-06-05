@@ -23,10 +23,27 @@ export default defineEventHandler(async (event) => {
         },
         async ({ identity }) => {
             const clientId = getRouterParam(event, 'clientId') ?? '';
-            const body = (await readBody<AdminOAuthClientUpdateBody | null>(event)) ?? {};
-            ensure(body.status === 'active' || body.status === 'disabled', 400, 'invalid_param', 'status 必须为 active 或 disabled');
-            ensure(typeof body.isTrusted === 'boolean', 400, 'invalid_param', 'isTrusted 必须为布尔值');
-            ensure(Array.isArray(body.scopeReviews), 400, 'invalid_param', 'scopeReviews 必须为数组');
+            const body =
+                (await readBody<AdminOAuthClientUpdateBody | null>(event)) ??
+                {};
+            ensure(
+                body.status === 'active' || body.status === 'disabled',
+                400,
+                'invalid_param',
+                'status 必须为 active 或 disabled'
+            );
+            ensure(
+                typeof body.isTrusted === 'boolean',
+                400,
+                'invalid_param',
+                'isTrusted 必须为布尔值'
+            );
+            ensure(
+                Array.isArray(body.scopeReviews),
+                400,
+                'invalid_param',
+                'scopeReviews 必须为数组'
+            );
 
             const client = updateOauthClientAdmin(clientId, {
                 status: body.status as OAuthClientStatus,
@@ -44,7 +61,8 @@ export default defineEventHandler(async (event) => {
                     );
                     return {
                         scope: String(row.scope ?? ''),
-                        reviewStatus: reviewStatus as OAuthClientScopeReviewStatus
+                        reviewStatus:
+                            reviewStatus as OAuthClientScopeReviewStatus
                     };
                 }),
                 reviewedBy: identity.id

@@ -122,9 +122,7 @@ async function getReferenceModelsForRow(
         return cachedReferenceModels;
     }
 
-    const referenceModels = await getReferenceModelsByTrainCodes(
-        row.allCodes
-    );
+    const referenceModels = await getReferenceModelsByTrainCodes(row.allCodes);
     referenceModelsByCodeSet.set(cacheKey, referenceModels);
     return referenceModels;
 }

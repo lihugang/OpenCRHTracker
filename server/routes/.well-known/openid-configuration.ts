@@ -2,7 +2,9 @@ import { defineEventHandler, getRequestURL } from 'h3';
 import useConfig from '~/server/config';
 import type { OidcDiscoveryDocument } from '~/types/auth';
 
-function buildBaseUrl(event: Parameters<typeof defineEventHandler>[0] extends never ? never : any) {
+function buildBaseUrl(
+    event: Parameters<typeof defineEventHandler>[0] extends never ? never : any
+) {
     const config = useConfig().oauth;
     return config.discovery.enabled
         ? config.discovery.externalBaseUrl

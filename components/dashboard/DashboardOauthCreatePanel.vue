@@ -87,8 +87,7 @@
                 {{ mutationMessage }}
             </div>
 
-            <div
-                class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            <div class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
                 <UiButton
                     type="button"
                     variant="secondary"
@@ -143,10 +142,7 @@ function emitInput(field: 'name' | 'homepageUrl', event: Event) {
     emit('update:homepageUrl', target.value);
 }
 
-function emitTextarea(
-    field: 'description' | 'redirectUrisText',
-    event: Event
-) {
+function emitTextarea(field: 'description' | 'redirectUrisText', event: Event) {
     const target = event.target as HTMLTextAreaElement;
 
     if (field === 'description') {

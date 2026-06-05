@@ -51,7 +51,8 @@
                                     class="text-xs uppercase tracking-[0.18em] text-slate-400">
                                     用户名
                                 </dt>
-                                <dd class="text-base font-semibold text-slate-900">
+                                <dd
+                                    class="text-base font-semibold text-slate-900">
                                     {{ session?.userId ?? '--' }}
                                 </dd>
                             </div>
@@ -60,7 +61,8 @@
                                     class="text-xs uppercase tracking-[0.18em] text-slate-400">
                                     生效时间
                                 </dt>
-                                <dd class="text-base font-semibold text-slate-900">
+                                <dd
+                                    class="text-base font-semibold text-slate-900">
                                     {{ activeFromLabel }}
                                 </dd>
                             </div>
@@ -69,7 +71,8 @@
                                     class="text-xs uppercase tracking-[0.18em] text-slate-400">
                                     失效时间
                                 </dt>
-                                <dd class="text-base font-semibold text-slate-900">
+                                <dd
+                                    class="text-base font-semibold text-slate-900">
                                     {{ expiresAtLabel }}
                                 </dd>
                             </div>
@@ -78,7 +81,8 @@
                                     class="text-xs uppercase tracking-[0.18em] text-slate-400">
                                     权限数量
                                 </dt>
-                                <dd class="text-base font-semibold text-slate-900">
+                                <dd
+                                    class="text-base font-semibold text-slate-900">
                                     {{ session?.scopes.length ?? 0 }}
                                 </dd>
                             </div>
@@ -110,7 +114,8 @@
                                     class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
                                     当前剩余
                                 </p>
-                                <p class="text-3xl font-semibold text-slate-900">
+                                <p
+                                    class="text-3xl font-semibold text-slate-900">
                                     {{ quotaRemainLabel }}
                                 </p>
                             </div>
@@ -142,9 +147,7 @@
                         class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
                         DEVELOPER MODE
                     </p>
-                    <h3 class="text-lg font-semibold text-slate-900">
-                        选项卡
-                    </h3>
+                    <h3 class="text-lg font-semibold text-slate-900">选项卡</h3>
                 </div>
 
                 <div class="w-full lg:max-w-xs">

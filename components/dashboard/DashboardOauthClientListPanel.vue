@@ -72,19 +72,28 @@
                     v-for="item in items"
                     :key="item.clientId"
                     class="dashboard-glass-card rounded-[1.15rem] border px-5 py-5">
-                    <div
-                        class="space-y-5">
+                    <div class="space-y-5">
                         <div class="space-y-4">
                             <div
                                 class="flex flex-wrap items-start justify-between gap-4">
                                 <div class="min-w-0 space-y-3">
-                                    <div class="flex flex-wrap items-center gap-2">
+                                    <div
+                                        class="flex flex-wrap items-center gap-2">
                                         <h3
                                             class="text-lg font-semibold text-slate-900">
                                             {{ item.name }}
                                         </h3>
-                                        <span :class="getClientStatusBadgeClass(item.status)">
-                                            {{ getClientStatusLabel(item.status) }}
+                                        <span
+                                            :class="
+                                                getClientStatusBadgeClass(
+                                                    item.status
+                                                )
+                                            ">
+                                            {{
+                                                getClientStatusLabel(
+                                                    item.status
+                                                )
+                                            }}
                                         </span>
                                         <span
                                             v-if="item.isTrusted"
@@ -106,14 +115,16 @@
                                 </div>
                             </div>
 
-                            <div class="grid gap-4 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,0.75fr)]">
+                            <div
+                                class="grid gap-4 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,0.75fr)]">
                                 <div class="space-y-4">
                                     <div class="space-y-2">
                                         <p
                                             class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
                                             描述
                                         </p>
-                                        <p class="text-sm leading-6 text-slate-600">
+                                        <p
+                                            class="text-sm leading-6 text-slate-600">
                                             {{ item.description || '无描述' }}
                                         </p>
                                     </div>
@@ -139,7 +150,8 @@
                                     </div>
                                 </div>
 
-                                <dl class="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+                                <dl
+                                    class="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
                                     <div
                                         class="dashboard-soft-surface rounded-[1rem] border px-4 py-3">
                                         <dt
@@ -148,7 +160,9 @@
                                         </dt>
                                         <dd
                                             class="mt-1 text-sm font-semibold text-slate-900">
-                                            {{ formatTimestamp(item.createdAt) }}
+                                            {{
+                                                formatTimestamp(item.createdAt)
+                                            }}
                                         </dd>
                                     </div>
                                     <div
@@ -159,7 +173,9 @@
                                         </dt>
                                         <dd
                                             class="mt-1 text-sm font-semibold text-slate-900">
-                                            {{ formatTimestamp(item.updatedAt) }}
+                                            {{
+                                                formatTimestamp(item.updatedAt)
+                                            }}
                                         </dd>
                                     </div>
                                 </dl>
@@ -207,8 +223,17 @@
                                                 class="break-all font-mono text-sm text-slate-700">
                                                 {{ scopeItem.scope }}
                                             </span>
-                                            <span :class="getScopeReviewBadgeClass(scopeItem.reviewStatus)">
-                                                {{ getScopeReviewLabel(scopeItem.reviewStatus) }}
+                                            <span
+                                                :class="
+                                                    getScopeReviewBadgeClass(
+                                                        scopeItem.reviewStatus
+                                                    )
+                                                ">
+                                                {{
+                                                    getScopeReviewLabel(
+                                                        scopeItem.reviewStatus
+                                                    )
+                                                }}
                                             </span>
                                         </div>
                                     </div>

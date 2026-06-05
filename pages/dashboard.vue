@@ -355,9 +355,7 @@
                                 :name="oauthForm.name"
                                 :description="oauthForm.description"
                                 :homepage-url="oauthForm.homepageUrl"
-                                :redirect-uris-text="
-                                    oauthForm.redirectUrisText
-                                "
+                                :redirect-uris-text="oauthForm.redirectUrisText"
                                 :requested-scopes="oauthForm.requestedScopes"
                                 :allowed-scopes="allowedOauthScopes"
                                 :scope-label-map="scopeLabelMap"
@@ -498,7 +496,9 @@
             :model-value="authorizationRevokeTarget !== null"
             title="取消应用授权"
             :close-on-backdrop="!isRevokingAuthorization"
-            @update:model-value="handleAuthorizationRevokeModalVisibilityChange">
+            @update:model-value="
+                handleAuthorizationRevokeModalVisibilityChange
+            ">
             <div
                 v-if="authorizationRevokeTarget"
                 class="space-y-4">
@@ -1132,10 +1132,7 @@ const oauthClientsErrorMessage = computed(() =>
 );
 const authorizationsErrorMessage = computed(() =>
     authorizationsError.value
-        ? getApiErrorMessage(
-              authorizationsError.value,
-              '加载授权列表失败。'
-          )
+        ? getApiErrorMessage(authorizationsError.value, '加载授权列表失败。')
         : ''
 );
 
@@ -1520,7 +1517,10 @@ function isAuthorizationPending(clientId: string) {
 }
 
 function openAuthorizationRevokeModal(item: AuthAuthorizationItem) {
-    if (!canRevokeAuthorizations.value || isAuthorizationPending(item.clientId)) {
+    if (
+        !canRevokeAuthorizations.value ||
+        isAuthorizationPending(item.clientId)
+    ) {
         return;
     }
 
@@ -1785,9 +1785,12 @@ async function confirmAuthorizationRevoke() {
     revokingAuthorizationClientIds.value = [target.clientId];
 
     try {
-        await executeMutation(`/api/v1/auth/authorizations/${target.clientId}`, {
-            method: 'DELETE'
-        });
+        await executeMutation(
+            `/api/v1/auth/authorizations/${target.clientId}`,
+            {
+                method: 'DELETE'
+            }
+        );
 
         authorizationRevokeTarget.value = null;
         await refreshAuthorizations();
@@ -1922,8 +1925,7 @@ async function createOauthClient() {
         );
 
         oauthMutationTone.value = 'success';
-        oauthMutationMessage.value =
-            '已创建 OAuth 客户端，请等待管理员审核。';
+        oauthMutationMessage.value = '已创建 OAuth 客户端，请等待管理员审核。';
         clearOauthFormFields();
         await refreshOauthClients();
     } catch (error) {

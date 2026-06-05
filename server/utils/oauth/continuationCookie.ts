@@ -1,9 +1,4 @@
-import {
-    deleteCookie,
-    getCookie,
-    setCookie,
-    type H3Event
-} from 'h3';
+import { deleteCookie, getCookie, setCookie, type H3Event } from 'h3';
 import useConfig from '~/server/config';
 
 const COOKIE_NAME = 'oauth_continuation';

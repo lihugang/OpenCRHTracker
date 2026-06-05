@@ -24,27 +24,54 @@ export default defineEventHandler(async (event) => {
         },
         async ({ identity }) => {
             const clientId = getRouterParam(event, 'clientId') ?? '';
-            const body = (await readBody<OAuthClientUpdateBody | null>(event)) ?? {};
+            const body =
+                (await readBody<OAuthClientUpdateBody | null>(event)) ?? {};
 
-            ensure(typeof body.name === 'string' && body.name.trim().length > 0, 400, 'invalid_param', 'name 不能为空');
-            ensure(Array.isArray(body.redirectUris) && body.redirectUris.length > 0, 400, 'invalid_param', 'redirectUris 不能为空');
-            ensure(Array.isArray(body.requestedScopes), 400, 'invalid_param', 'requestedScopes 必须为数组');
+            ensure(
+                typeof body.name === 'string' && body.name.trim().length > 0,
+                400,
+                'invalid_param',
+                'name 不能为空'
+            );
+            ensure(
+                Array.isArray(body.redirectUris) &&
+                    body.redirectUris.length > 0,
+                400,
+                'invalid_param',
+                'redirectUris 不能为空'
+            );
+            ensure(
+                Array.isArray(body.requestedScopes),
+                400,
+                'invalid_param',
+                'requestedScopes 必须为数组'
+            );
 
             const input: OAuthClientCreateInput = {
                 name: body.name.trim(),
                 description:
-                    typeof body.description === 'string' && body.description.trim().length > 0
+                    typeof body.description === 'string' &&
+                    body.description.trim().length > 0
                         ? body.description.trim()
                         : null,
                 homepageUrl:
-                    typeof body.homepageUrl === 'string' && body.homepageUrl.trim().length > 0
+                    typeof body.homepageUrl === 'string' &&
+                    body.homepageUrl.trim().length > 0
                         ? body.homepageUrl.trim()
                         : null,
-                redirectUris: body.redirectUris.map((item) => String(item ?? '').trim()),
-                requestedScopes: body.requestedScopes.map((item) => String(item ?? '').trim())
+                redirectUris: body.redirectUris.map((item) =>
+                    String(item ?? '').trim()
+                ),
+                requestedScopes: body.requestedScopes.map((item) =>
+                    String(item ?? '').trim()
+                )
             };
 
-            const client = updateOauthClientByOwner(clientId, identity.id, input);
+            const client = updateOauthClientByOwner(
+                clientId,
+                identity.id,
+                input
+            );
             ensure(client, 404, 'not_found', 'OAuth 客户端不存在');
 
             const response: OAuthClientMutationResponse = {

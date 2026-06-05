@@ -29,10 +29,7 @@ export function getOidcJwks() {
         use: 'sig',
         kid: useConfig().oauth.idTokenSigning.kid,
         alg: 'RS256',
-        n:
-            typeof jwk.n === 'string'
-                ? jwk.n
-                : toBase64UrlUInt(Buffer.from([])),
+        n: typeof jwk.n === 'string' ? jwk.n : toBase64UrlUInt(Buffer.from([])),
         e:
             typeof jwk.e === 'string'
                 ? jwk.e

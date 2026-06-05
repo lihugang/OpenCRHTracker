@@ -783,7 +783,8 @@ function validateConfig(raw: unknown): Config {
     }
     if (
         !import.meta.dev &&
-        (!envOauthIdTokenSigningKid || envOauthIdTokenSigningKid.length === 0) &&
+        (!envOauthIdTokenSigningKid ||
+            envOauthIdTokenSigningKid.length === 0) &&
         configOauthIdTokenSigningKid.length > 0
     ) {
         console.warn(
@@ -1580,10 +1581,7 @@ function validateConfig(raw: unknown): Config {
                         oauthPkce.allowedMethods,
                         'oauth.pkce.allowedMethods'
                     ).map((method, index) =>
-                        asString(
-                            method,
-                            `oauth.pkce.allowedMethods[${index}]`
-                        )
+                        asString(method, `oauth.pkce.allowedMethods[${index}]`)
                     );
                     assert(
                         methods.length === 1 && methods[0] === 'S256',

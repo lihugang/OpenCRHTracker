@@ -42,13 +42,23 @@
                             <div
                                 class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                                 <div class="min-w-0 space-y-3">
-                                    <div class="flex flex-wrap items-center gap-2">
+                                    <div
+                                        class="flex flex-wrap items-center gap-2">
                                         <h2
                                             class="text-lg font-semibold text-slate-900">
                                             {{ item.name }}
                                         </h2>
-                                        <span :class="getClientStatusBadgeClass(item.status)">
-                                            {{ getClientStatusLabel(item.status) }}
+                                        <span
+                                            :class="
+                                                getClientStatusBadgeClass(
+                                                    item.status
+                                                )
+                                            ">
+                                            {{
+                                                getClientStatusLabel(
+                                                    item.status
+                                                )
+                                            }}
                                         </span>
                                         <span
                                             v-if="item.isTrusted"
@@ -85,7 +95,11 @@
                                         variant="secondary"
                                         class="border-rose-200 bg-white text-rose-700 hover:border-rose-300 hover:bg-rose-50"
                                         @click="toggleStatus(item)">
-                                        {{ item.status === 'active' ? '停用' : '启用' }}
+                                        {{
+                                            item.status === 'active'
+                                                ? '停用'
+                                                : '启用'
+                                        }}
                                     </UiButton>
                                     <UiButton
                                         type="button"
@@ -96,14 +110,16 @@
                                 </div>
                             </div>
 
-                            <div class="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
+                            <div
+                                class="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
                                 <div class="space-y-4">
                                     <div class="space-y-2">
                                         <p
                                             class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
                                             描述
                                         </p>
-                                        <p class="text-sm leading-6 text-slate-600">
+                                        <p
+                                            class="text-sm leading-6 text-slate-600">
                                             {{ item.description || '无描述' }}
                                         </p>
                                     </div>
@@ -149,7 +165,9 @@
                                         </dt>
                                         <dd
                                             class="mt-1 text-sm font-semibold text-slate-900">
-                                            {{ formatTimestamp(item.createdAt) }}
+                                            {{
+                                                formatTimestamp(item.createdAt)
+                                            }}
                                         </dd>
                                     </div>
                                     <div
@@ -160,7 +178,9 @@
                                         </dt>
                                         <dd
                                             class="mt-1 text-sm font-semibold text-slate-900">
-                                            {{ formatTimestamp(item.updatedAt) }}
+                                            {{
+                                                formatTimestamp(item.updatedAt)
+                                            }}
                                         </dd>
                                     </div>
                                 </dl>
@@ -209,17 +229,38 @@
                                                     class="break-all font-mono text-sm text-slate-700">
                                                     {{ scope.scope }}
                                                 </p>
-                                                <span :class="getScopeReviewBadgeClass(scope.reviewStatus)">
-                                                    {{ getScopeReviewLabel(scope.reviewStatus) }}
+                                                <span
+                                                    :class="
+                                                        getScopeReviewBadgeClass(
+                                                            scope.reviewStatus
+                                                        )
+                                                    ">
+                                                    {{
+                                                        getScopeReviewLabel(
+                                                            scope.reviewStatus
+                                                        )
+                                                    }}
                                                 </span>
                                             </div>
                                             <select
                                                 class="harmony-input min-w-[8rem] px-3 py-2 text-sm text-crh-grey-dark"
                                                 :value="scope.reviewStatus"
-                                                @change="updateScopeReview(item, scope.scope, $event)">
-                                                <option value="pending">待审核</option>
-                                                <option value="approved">已通过</option>
-                                                <option value="rejected">已拒绝</option>
+                                                @change="
+                                                    updateScopeReview(
+                                                        item,
+                                                        scope.scope,
+                                                        $event
+                                                    )
+                                                ">
+                                                <option value="pending">
+                                                    待审核
+                                                </option>
+                                                <option value="approved">
+                                                    已通过
+                                                </option>
+                                                <option value="rejected">
+                                                    已拒绝
+                                                </option>
                                             </select>
                                         </label>
                                     </div>
@@ -261,12 +302,11 @@ const requestFetch = useTrackedRequestFetch();
 const { selectedDateInput, todayDateInputValue } = await useAdminDateQuery();
 
 async function fetchClients() {
-    return await requestFetch<TrackerApiResponse<{ items: OAuthClientPublicItem[] }>>(
-        '/api/v1/admin/oauth/clients',
-        {
-            retry: 0
-        }
-    );
+    return await requestFetch<
+        TrackerApiResponse<{ items: OAuthClientPublicItem[] }>
+    >('/api/v1/admin/oauth/clients', {
+        retry: 0
+    });
 }
 
 const { data, status, error, refresh } = await useAsyncData(
@@ -294,26 +334,25 @@ async function patchClient(
         }>;
     }>
 ) {
-    const { data, error } = await useCsrfFetch<TrackerApiResponse<{ client: OAuthClientPublicItem }>>(
-        `/api/v1/admin/oauth/clients/${encodeURIComponent(item.clientId)}`,
-        {
-            method: 'PATCH',
-            body: {
-                status: overrides.status ?? item.status,
-                isTrusted: overrides.isTrusted ?? item.isTrusted,
-                scopeReviews:
-                    overrides.scopeReviews ??
-                    item.scopeRequests.map((scope) => ({
-                        scope: scope.scope,
-                        reviewStatus: scope.reviewStatus
-                    }))
-            },
-            retry: 0,
-            key: `admin:oauth-client:patch:${item.clientId}:${Date.now()}`,
-            watch: false,
-            server: false
-        }
-    );
+    const { data, error } = await useCsrfFetch<
+        TrackerApiResponse<{ client: OAuthClientPublicItem }>
+    >(`/api/v1/admin/oauth/clients/${encodeURIComponent(item.clientId)}`, {
+        method: 'PATCH',
+        body: {
+            status: overrides.status ?? item.status,
+            isTrusted: overrides.isTrusted ?? item.isTrusted,
+            scopeReviews:
+                overrides.scopeReviews ??
+                item.scopeRequests.map((scope) => ({
+                    scope: scope.scope,
+                    reviewStatus: scope.reviewStatus
+                }))
+        },
+        retry: 0,
+        key: `admin:oauth-client:patch:${item.clientId}:${Date.now()}`,
+        watch: false,
+        server: false
+    });
 
     if (error.value) {
         throw error.value;
@@ -380,7 +419,8 @@ async function updateScopeReview(
     scopeName: string,
     event: Event
 ) {
-    const reviewStatus = (event.target as HTMLSelectElement).value as OAuthClientScopeReviewStatus;
+    const reviewStatus = (event.target as HTMLSelectElement)
+        .value as OAuthClientScopeReviewStatus;
     await patchClient(item, {
         scopeReviews: item.scopeRequests.map((scope) => ({
             scope: scope.scope,
