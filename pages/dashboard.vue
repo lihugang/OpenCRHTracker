@@ -1703,25 +1703,19 @@ async function createOauthClient() {
     oauthMutationMessage.value = '';
 
     try {
-        const response = await requestFetch<
-            TrackerApiResponse<OAuthClientMutationResponse>
-        >('/api/v1/oauth/clients', {
-            method: 'POST',
-            body: {
-                name: oauthForm.name,
-                description: oauthForm.description,
-                homepageUrl: oauthForm.homepageUrl,
-                redirectUris: splitLines(oauthForm.redirectUrisText),
-                requestedScopes: oauthForm.requestedScopes
-            },
-            retry: 0
-        });
-
-        if (!response.ok) {
-            throw {
-                data: response
-            };
-        }
+        await executeMutation<OAuthClientMutationResponse>(
+            '/api/v1/oauth/clients',
+            {
+                method: 'POST',
+                body: {
+                    name: oauthForm.name,
+                    description: oauthForm.description,
+                    homepageUrl: oauthForm.homepageUrl,
+                    redirectUris: splitLines(oauthForm.redirectUrisText),
+                    requestedScopes: oauthForm.requestedScopes
+                }
+            }
+        );
 
         oauthMutationTone.value = 'success';
         oauthMutationMessage.value =
