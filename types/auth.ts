@@ -207,6 +207,30 @@ export interface AuthSettingsResponse {
     userPreference: AuthUserPreference;
 }
 
+export interface AuthAuthorizationItem {
+    clientId: string;
+    name: string;
+    description: string | null;
+    homepageUrl: string | null;
+    ownerUserId: string;
+    status: OAuthClientStatus;
+    isTrusted: boolean;
+    grantedScopes: string[];
+    grantedAt: number;
+    updatedAt: number;
+}
+
+export interface AuthAuthorizationListResponse {
+    userId: string;
+    items: AuthAuthorizationItem[];
+}
+
+export interface AuthAuthorizationRevokeResponse {
+    userId: string;
+    clientId: string;
+    revoked: true;
+}
+
 export interface AuthSubscriptionListResponse {
     userId: string;
     maxDevices: number;

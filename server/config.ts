@@ -344,6 +344,8 @@ export interface Config {
             authIssueApiKey: number;
             authListApiKeys: number;
             authRevokeApiKey: number;
+            authListAuthorizations: number;
+            authRevokeAuthorization: number;
             authListSubscriptions: number;
             authUpsertSubscription: number;
             authUpdateSubscription: number;
@@ -1716,6 +1718,16 @@ function validateConfig(raw: unknown): Config {
                 authRevokeApiKey: asNumber(
                     costFixed.authRevokeApiKey,
                     'cost.fixed.authRevokeApiKey',
+                    0
+                ),
+                authListAuthorizations: asNumber(
+                    costFixed.authListAuthorizations,
+                    'cost.fixed.authListAuthorizations',
+                    0
+                ),
+                authRevokeAuthorization: asNumber(
+                    costFixed.authRevokeAuthorization,
+                    'cost.fixed.authRevokeAuthorization',
                     0
                 ),
                 authListSubscriptions: asNumber(

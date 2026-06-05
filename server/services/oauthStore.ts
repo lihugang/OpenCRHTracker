@@ -4,7 +4,8 @@ import { useUsersDatabase } from '~/server/libs/database/users';
 import {
     createApiKey,
     getUserByUsername,
-    revokeApiKeysByOauthClientId
+    revokeApiKeysByOauthClientId,
+    revokeApiKeysByUserAndOauthClientId
 } from '~/server/services/authStore';
 import useConfig from '~/server/config';
 import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
@@ -71,6 +72,8 @@ interface OAuthConsentRow {
     updated_at: number;
 }
 
+interface OAuthAuthorizedClientRow extends OAuthConsentRow {}
+
 interface OAuthLoginContinuationRow {
     continuation_id: string;
     request_json: string;
@@ -106,6 +109,12 @@ export interface AuthorizedOAuthAuthorizeRequest
     requiresOwnerBypass: boolean;
 }
 
+export interface RevokedOauthAuthorizationResult {
+    revokedAt: number;
+    revokedConsentCount: number;
+    revokedTokenCount: number;
+}
+
 type OAuthSqlKey =
     | 'insertOauthClient'
     | 'updateOauthClient'
@@ -126,6 +135,8 @@ type OAuthSqlKey =
     | 'consumeOauthAuthorizationCode'
     | 'upsertOauthConsent'
     | 'selectOauthConsents'
+    | 'selectOauthAuthorizedClientsByUser'
+    | 'deleteOauthConsentsByUserAndClient'
     | 'insertOauthLoginContinuation'
     | 'selectOauthLoginContinuation'
     | 'consumeOauthLoginContinuation';
@@ -433,6 +444,98 @@ export function grantOauthConsents(userId: string, clientId: string, scopes: str
             now
         );
     }
+}
+
+export function listAuthorizedOauthAppsByUser(userId: string) {
+    const rows = oauthStatements.all<OAuthAuthorizedClientRow>(
+        'selectOauthAuthorizedClientsByUser',
+        userId
+    );
+    const rowsByClientId = new Map<string, OAuthAuthorizedClientRow[]>();
+
+    for (const row of rows) {
+        const group = rowsByClientId.get(row.client_id) ?? [];
+        group.push(row);
+        rowsByClientId.set(row.client_id, group);
+    }
+
+    return [...rowsByClientId.entries()]
+        .map(([clientId, consentRows]) => {
+            const client = getOauthClientById(clientId);
+            if (!client) {
+                return null;
+            }
+
+            const grantedScopes = normalizeScopeRequests(
+                consentRows.map((row) => row.scope)
+            );
+            const grantedAt = Math.min(
+                ...consentRows.map((row) => row.granted_at)
+            );
+            const updatedAt = Math.max(
+                ...consentRows.map((row) => row.updated_at)
+            );
+
+            return {
+                clientId: client.clientId,
+                name: client.name,
+                description: client.description,
+                homepageUrl: client.homepageUrl,
+                ownerUserId: client.ownerUserId,
+                status: client.status,
+                isTrusted: client.isTrusted,
+                grantedScopes,
+                grantedAt,
+                updatedAt
+            };
+        })
+        .filter((item) => item !== null)
+        .sort(
+            (left, right) =>
+                right.updatedAt - left.updatedAt ||
+                left.clientId.localeCompare(right.clientId)
+        );
+}
+
+export function revokeOauthAuthorizationByUser(
+    userId: string,
+    clientId: string
+): RevokedOauthAuthorizationResult | undefined {
+    const existingConsentRows = oauthStatements.all<OAuthAuthorizedClientRow>(
+        'selectOauthAuthorizedClientsByUser',
+        userId
+    );
+    const hasAuthorization = existingConsentRows.some(
+        (row) => row.client_id === clientId
+    );
+
+    if (!hasAuthorization) {
+        return undefined;
+    }
+
+    let revokedConsentCount = 0;
+    let revokedTokenCount = 0;
+    let revokedAt = getNowSeconds();
+    const revoke = useUsersDatabase().transaction(() => {
+        const consentResult = oauthStatements.run(
+            'deleteOauthConsentsByUserAndClient',
+            userId,
+            clientId
+        );
+        revokedConsentCount = consentResult.changes;
+
+        const tokenResult = revokeApiKeysByUserAndOauthClientId(userId, clientId);
+        revokedAt = tokenResult.revokedAt;
+        revokedTokenCount = tokenResult.revokedCount;
+    });
+
+    revoke();
+
+    return {
+        revokedAt,
+        revokedConsentCount,
+        revokedTokenCount
+    };
 }
 
 export function createAuthorizationCode(input: {

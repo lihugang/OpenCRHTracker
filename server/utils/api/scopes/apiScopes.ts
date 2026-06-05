@@ -13,6 +13,10 @@ export const API_SCOPES = {
             read: 'api.auth.settings.read',
             write: 'api.auth.settings.write'
         },
+        authorizations: {
+            read: 'api.auth.authorizations.read',
+            revoke: 'api.auth.authorizations.revoke'
+        },
         apiKeys: {
             read: 'api.auth.api-keys.read',
             create: 'api.auth.api-keys.create',

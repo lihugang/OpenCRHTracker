@@ -1397,6 +1397,14 @@
                             "type": "integer",
                             "minimum": 0
                         },
+                        "authListAuthorizations": {
+                            "type": "integer",
+                            "minimum": 0
+                        },
+                        "authRevokeAuthorization": {
+                            "type": "integer",
+                            "minimum": 0
+                        },
                         "authListSubscriptions": {
                             "type": "integer",
                             "minimum": 0
@@ -1459,6 +1467,8 @@
                         "authIssueApiKey",
                         "authListApiKeys",
                         "authRevokeApiKey",
+                        "authListAuthorizations",
+                        "authRevokeAuthorization",
                         "authListSubscriptions",
                         "authUpsertSubscription",
                         "authUpdateSubscription",

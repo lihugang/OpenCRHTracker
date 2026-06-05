@@ -272,6 +272,24 @@
                         </div>
 
                         <div
+                            v-else-if="currentPanelId === 'authorizations'"
+                            key="authorizations"
+                            class="max-w-4xl">
+                            <DashboardAuthorizationListPanel
+                                :items="authorizationItems"
+                                :is-loading="isAuthorizationsLoading"
+                                :error-message="authorizationsErrorMessage"
+                                :can-read-authorizations="canReadAuthorizations"
+                                :can-revoke-authorizations="
+                                    canRevokeAuthorizations
+                                "
+                                :format-timestamp="formatTimestamp"
+                                :is-pending="isAuthorizationPending"
+                                @refresh="refreshAuthorizations()"
+                                @revoke="openAuthorizationRevokeModal" />
+                        </div>
+
+                        <div
                             v-else
                             key="developer"
                             class="space-y-6">
@@ -477,6 +495,70 @@
         </UiModal>
 
         <UiModal
+            :model-value="authorizationRevokeTarget !== null"
+            title="取消应用授权"
+            :close-on-backdrop="!isRevokingAuthorization"
+            @update:model-value="handleAuthorizationRevokeModalVisibilityChange">
+            <div
+                v-if="authorizationRevokeTarget"
+                class="space-y-4">
+                <div
+                    class="dashboard-soft-surface rounded-[1rem] border px-4 py-4">
+                    <div class="space-y-3">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <p class="text-base font-semibold text-slate-900">
+                                {{ authorizationRevokeTarget.name }}
+                            </p>
+                            <span
+                                v-if="authorizationRevokeTarget.isTrusted"
+                                class="inline-flex shrink-0 whitespace-nowrap items-center rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.1em] text-emerald-700">
+                                Trusted
+                            </span>
+                        </div>
+                        <p
+                            class="break-all font-mono text-sm font-semibold text-crh-blue">
+                            {{ authorizationRevokeTarget.clientId }}
+                        </p>
+                        <p class="text-sm leading-6 text-slate-600">
+                            取消授权后，该应用的授权记录会被删除，现有 OAuth
+                            访问令牌会立即失效。之后如需继续使用该应用，需要重新授权。
+                        </p>
+                    </div>
+                </div>
+
+                <p
+                    v-if="authorizationRevokeErrorMessage"
+                    class="flex items-center gap-1.5 pl-1 text-xs leading-5 text-[#E53E3E]">
+                    <span
+                        aria-hidden="true"
+                        class="font-semibold">
+                        [!]
+                    </span>
+                    {{ authorizationRevokeErrorMessage }}
+                </p>
+            </div>
+
+            <template #footer>
+                <div
+                    class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                    <UiButton
+                        type="button"
+                        variant="secondary"
+                        :disabled="isRevokingAuthorization"
+                        @click="closeAuthorizationRevokeModal">
+                        取消
+                    </UiButton>
+                    <UiButton
+                        type="button"
+                        :loading="isRevokingAuthorization"
+                        @click="confirmAuthorizationRevoke">
+                        确认取消授权
+                    </UiButton>
+                </div>
+            </template>
+        </UiModal>
+
+        <UiModal
             :model-value="isApiKeyListModalOpen"
             eyebrow="LIST"
             title="API 密钥列表"
@@ -531,6 +613,8 @@ import useTrackedRequestFetch, {
     type TrackedRequestFetch
 } from '~/composables/useTrackedRequestFetch';
 import type {
+    AuthAuthorizationItem,
+    AuthAuthorizationListResponse,
     AuthApiKeyIssuer,
     AuthApiKeyListItem,
     AuthApiKeyListResponse,
@@ -557,6 +641,8 @@ definePageMeta({
 });
 
 const PASSWORD_SCOPE = 'api.auth.password.update';
+const AUTHORIZATION_READ_SCOPE = 'api.auth.authorizations.read';
+const AUTHORIZATION_REVOKE_SCOPE = 'api.auth.authorizations.revoke';
 const ISSUE_SCOPE = 'api.auth.api-keys.create';
 const REVOKE_SCOPE = 'api.auth.api-keys.revoke';
 const DEFAULT_ISSUE_LIFETIME_SECONDS = 30 * 24 * 60 * 60;
@@ -569,7 +655,7 @@ const dashboardPageCopy = {
     panelSheetEyebrow: 'SWITCH',
     panelSheetTitle: '切换选项卡',
     pageTitle: '设置 | Open CRH Tracker',
-    pageDescription: '管理账户安全、收藏、订阅设备、会话和 API 密钥。'
+    pageDescription: '管理账户安全、收藏、授权应用、订阅设备、会话和 API 密钥。'
 } as const;
 
 const dashboardPanels = [
@@ -593,6 +679,13 @@ const dashboardPanels = [
         headerTitle: '订阅',
         title: '订阅设备',
         description: '查看和管理各设备的订阅。'
+    },
+    {
+        id: 'authorizations',
+        label: '授权',
+        headerTitle: '授权',
+        title: '已授权应用',
+        description: '查看和取消第三方应用授权。'
     },
     {
         id: 'developer',
@@ -628,6 +721,9 @@ const scopeLabelMap: Record<string, string> = {
     'api.auth.settings': '设置',
     'api.auth.settings.read': '读取设置',
     'api.auth.settings.write': '修改设置',
+    'api.auth.authorizations': '应用授权',
+    'api.auth.authorizations.read': '读取授权记录',
+    'api.auth.authorizations.revoke': '取消应用授权',
     'api.auth.api-keys': 'API 密钥',
     'api.auth.api-keys.read': '读取密钥',
     'api.auth.api-keys.create': '签发密钥',
@@ -738,6 +834,10 @@ const isPanelSheetOpen = ref(false);
 const revokeTarget = ref<AuthApiKeyListItem | null>(null);
 const revokeErrorMessage = ref('');
 const isRevoking = ref(false);
+const authorizationRevokeTarget = ref<AuthAuthorizationItem | null>(null);
+const authorizationRevokeErrorMessage = ref('');
+const revokingAuthorizationClientIds = ref<string[]>([]);
+const isRevokingAuthorization = ref(false);
 const developerMode = ref<DeveloperMode>('keys');
 const isApiKeyListModalOpen = ref(false);
 const isOauthClientListModalOpen = ref(false);
@@ -782,6 +882,10 @@ function readPanelQuery(value: unknown) {
 function normalizePanelId(value: string): DashboardPanelId {
     if (value === 'developer') {
         return 'developer';
+    }
+
+    if (value === 'authorizations') {
+        return 'authorizations';
     }
 
     if (value === 'subscriptions') {
@@ -905,6 +1009,22 @@ async function fetchOauthClients() {
     return response.data;
 }
 
+async function fetchAuthorizations() {
+    const response = await requestFetch<
+        TrackerApiResponse<AuthAuthorizationListResponse>
+    >('/api/v1/auth/authorizations', {
+        retry: 0
+    });
+
+    if (!response.ok) {
+        throw {
+            data: response
+        };
+    }
+
+    return response.data;
+}
+
 const {
     data: oauthClientsData,
     status: oauthClientsStatus,
@@ -912,7 +1032,17 @@ const {
     refresh: refreshOauthClients
 } = await useAsyncData('dashboard-oauth-clients', fetchOauthClients);
 
+const {
+    data: authorizationsData,
+    status: authorizationsStatus,
+    error: authorizationsError,
+    refresh: refreshAuthorizations
+} = await useAsyncData('dashboard-authorizations', fetchAuthorizations);
+
 const apiKeyItems = computed(() => apiKeysData.value?.items ?? []);
+const authorizationItems = computed<AuthAuthorizationItem[]>(
+    () => authorizationsData.value?.items ?? []
+);
 const oauthClientItems = computed<OAuthClientPublicItem[]>(
     () => oauthClientsData.value?.items ?? []
 );
@@ -977,6 +1107,9 @@ const isApiKeysLoading = computed(() => apiKeysStatus.value === 'pending');
 const isOauthClientsLoading = computed(
     () => oauthClientsStatus.value === 'pending'
 );
+const isAuthorizationsLoading = computed(
+    () => authorizationsStatus.value === 'pending'
+);
 const isFavoritesLoading = computed(() => favoritesState.value === 'loading');
 const isUpdatingUserPreference = computed(
     () => userSettingsState.value === 'loading'
@@ -994,6 +1127,14 @@ const oauthClientsErrorMessage = computed(() =>
         ? getApiErrorMessage(
               oauthClientsError.value,
               '加载 OAuth 客户端列表失败。'
+          )
+        : ''
+);
+const authorizationsErrorMessage = computed(() =>
+    authorizationsError.value
+        ? getApiErrorMessage(
+              authorizationsError.value,
+              '加载授权列表失败。'
           )
         : ''
 );
@@ -1027,6 +1168,12 @@ const currentKeyName = computed(() => {
 
 const canChangePassword = computed(() =>
     hasClientScope(session.value?.scopes ?? [], PASSWORD_SCOPE)
+);
+const canReadAuthorizations = computed(() =>
+    hasClientScope(session.value?.scopes ?? [], AUTHORIZATION_READ_SCOPE)
+);
+const canRevokeAuthorizations = computed(() =>
+    hasClientScope(session.value?.scopes ?? [], AUTHORIZATION_REVOKE_SCOPE)
 );
 const canIssueApiKeys = computed(() =>
     hasClientScope(session.value?.scopes ?? [], ISSUE_SCOPE)
@@ -1368,6 +1515,34 @@ function openRevokeModal(item: AuthApiKeyListItem) {
     revokeErrorMessage.value = '';
 }
 
+function isAuthorizationPending(clientId: string) {
+    return revokingAuthorizationClientIds.value.includes(clientId);
+}
+
+function openAuthorizationRevokeModal(item: AuthAuthorizationItem) {
+    if (!canRevokeAuthorizations.value || isAuthorizationPending(item.clientId)) {
+        return;
+    }
+
+    authorizationRevokeTarget.value = item;
+    authorizationRevokeErrorMessage.value = '';
+}
+
+function closeAuthorizationRevokeModal() {
+    if (isRevokingAuthorization.value) {
+        return;
+    }
+
+    authorizationRevokeTarget.value = null;
+    authorizationRevokeErrorMessage.value = '';
+}
+
+function handleAuthorizationRevokeModalVisibilityChange(nextValue: boolean) {
+    if (!nextValue) {
+        closeAuthorizationRevokeModal();
+    }
+}
+
 function closeRevokeModal() {
     if (isRevoking.value) {
         return;
@@ -1596,6 +1771,34 @@ async function confirmRevoke() {
         );
     } finally {
         isRevoking.value = false;
+    }
+}
+
+async function confirmAuthorizationRevoke() {
+    if (!authorizationRevokeTarget.value || isRevokingAuthorization.value) {
+        return;
+    }
+
+    const target = authorizationRevokeTarget.value;
+    isRevokingAuthorization.value = true;
+    authorizationRevokeErrorMessage.value = '';
+    revokingAuthorizationClientIds.value = [target.clientId];
+
+    try {
+        await executeMutation(`/api/v1/auth/authorizations/${target.clientId}`, {
+            method: 'DELETE'
+        });
+
+        authorizationRevokeTarget.value = null;
+        await refreshAuthorizations();
+    } catch (error) {
+        authorizationRevokeErrorMessage.value = getApiErrorMessage(
+            error,
+            '取消授权失败，请稍后重试。'
+        );
+    } finally {
+        isRevokingAuthorization.value = false;
+        revokingAuthorizationClientIds.value = [];
     }
 }
 

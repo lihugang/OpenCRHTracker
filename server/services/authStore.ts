@@ -88,6 +88,7 @@ type AuthSqlKey =
     | 'insertApiKey'
     | 'insertApiKeyScope'
     | 'revokeApiKeysByOauthClientId'
+    | 'revokeApiKeysByUserAndOauthClientId'
     | 'revokeApiKeysByIssuer'
     | 'revokeApiKeysByUserAndIssuer'
     | 'revokeApiKeyByUser'
@@ -628,6 +629,28 @@ export function revokeApiKeysByOauthClientId(oauthClientId: string) {
     const result = authStatements.run(
         'revokeApiKeysByOauthClientId',
         now,
+        oauthClientId
+    );
+
+    if (result.changes > 0) {
+        apiKeyRecordCache.clear();
+    }
+
+    return {
+        revokedAt: now,
+        revokedCount: result.changes
+    };
+}
+
+export function revokeApiKeysByUserAndOauthClientId(
+    userId: string,
+    oauthClientId: string
+) {
+    const now = getNowSeconds();
+    const result = authStatements.run(
+        'revokeApiKeysByUserAndOauthClientId',
+        now,
+        userId,
         oauthClientId
     );
 
