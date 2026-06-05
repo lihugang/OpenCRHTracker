@@ -161,6 +161,10 @@ const navItems = [
         to: '/docs/crawl'
     },
     {
+        label: 'OAuth 文档',
+        to: '/docs/oauth'
+    },
+    {
         label: 'API 文档',
         to: '/docs/api'
     }

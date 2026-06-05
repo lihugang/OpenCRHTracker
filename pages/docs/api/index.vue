@@ -40,6 +40,15 @@
                     <p class="font-mono text-xs text-slate-500">
                         API Key 请求头：{{ apiConfig.apiKeyHeader }}
                     </p>
+                    <p class="text-sm leading-6 text-slate-600">
+                        如果你要让第三方应用直接接入用户登录流程，请阅读
+                        <NuxtLink
+                            to="/docs/oauth"
+                            class="font-semibold text-crh-blue transition hover:text-slate-900">
+                            OAuth 文档
+                        </NuxtLink>
+                        。
+                    </p>
                 </div>
             </UiCard>
 

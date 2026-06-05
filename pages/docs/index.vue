@@ -3,7 +3,7 @@
         eyebrow="DOCS"
         title="文档"
         description="">
-        <div class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <div class="grid gap-6 xl:grid-cols-3">
             <UiCard variant="accent">
                 <div class="space-y-5">
                     <div class="space-y-2">
@@ -30,6 +30,27 @@
 
                     <NuxtLink to="/docs/deploy">
                         <UiButton> 查看部署文档 </UiButton>
+                    </NuxtLink>
+                </div>
+            </UiCard>
+
+            <UiCard :show-accent-bar="false">
+                <div class="space-y-5">
+                    <div class="space-y-2">
+                        <p
+                            class="text-xs font-medium uppercase tracking-[0.2em] text-crh-blue/80">
+                            OAUTH
+                        </p>
+                        <h2 class="text-2xl font-semibold text-slate-900">
+                            OAuth 文档
+                        </h2>
+                        <p class="text-sm leading-6 text-slate-600">
+                            通过 OAuth 2.0 协议授权第三方 App 获取本网站上的信息。
+                        </p>
+                    </div>
+
+                    <NuxtLink to="/docs/oauth">
+                        <UiButton> 查看 OAuth 文档 </UiButton>
                     </NuxtLink>
                 </div>
             </UiCard>
