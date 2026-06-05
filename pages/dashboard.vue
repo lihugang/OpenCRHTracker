@@ -274,39 +274,94 @@
                         <div
                             v-else
                             key="developer"
-                            class="grid gap-6 xl:grid-cols-[minmax(18rem,24rem)_minmax(0,1fr)]">
+                            class="space-y-6">
                             <DashboardDeveloperOverview
+                                v-model:mode="developerMode"
                                 :session="session"
                                 :quota="liveQuotaSummary"
                                 :current-key-name="currentKeyName"
                                 :current-masked-key-id="currentMaskedKeyId"
-                                :max-lifetime-seconds="maxLifetimeSeconds"
-                                :creatable-scope-count="creatableScopes.length"
-                                :can-issue-api-keys="canIssueApiKeys"
                                 :format-timestamp="formatTimestamp"
-                                :format-duration="formatDuration"
                                 :format-token-count="formatTokenCount"
                                 :quota-status-label="quotaStatusLabel"
                                 :get-issuer-label="getIssuerLabel"
-                                :get-issuer-badge-class="getIssuerBadgeClass"
-                                @open-issue="openIssueModal" />
+                                :get-issuer-badge-class="getIssuerBadgeClass" />
 
-                            <DashboardKeyListPanel
-                                :groups="issuerGroups"
-                                :is-loading="isApiKeysLoading"
-                                :error-message="apiKeysErrorMessage"
-                                :can-revoke="canRevokeApiKeys"
-                                :format-timestamp="formatTimestamp"
-                                :format-token-count="formatTokenCount"
-                                :get-issuer-label="getIssuerLabel"
-                                :get-issuer-section-title="
-                                    getIssuerSectionTitle
+                            <DashboardIssueApiKeyPanel
+                                v-if="developerMode === 'keys'"
+                                :name="issueForm.name"
+                                :active-from="issueForm.activeFrom"
+                                :expires-at="issueForm.expiresAt"
+                                :scopes="issueForm.scopes"
+                                :issue-name-error="issueNameError"
+                                :issue-error-message="issueErrorMessage"
+                                :issued-key-result="issuedKeyResult"
+                                :is-issuing="isIssuing"
+                                :can-issue-api-keys="canIssueApiKeys"
+                                :can-submit-issue-form="canSubmitIssueForm"
+                                :max-lifetime-seconds="maxLifetimeSeconds"
+                                :creatable-scope-count="creatableScopes.length"
+                                :creatable-scopes="creatableScopes"
+                                :api-key-name-length="apiKeyNameLength"
+                                :issue-active-from-timestamp="
+                                    issueActiveFromTimestamp
                                 "
-                                :get-issuer-badge-class="getIssuerBadgeClass"
-                                :get-status-label="getStatusLabel"
-                                :get-status-badge-class="getStatusBadgeClass"
-                                @refresh="refreshApiKeys()"
-                                @revoke="openRevokeModal" />
+                                :issue-max-expires-at-timestamp="
+                                    issueMaxExpiresAtTimestamp
+                                "
+                                :issue-expires-at-max="issueExpiresAtMax"
+                                :copy-state="copyState"
+                                :copy-message="copyMessage"
+                                :scope-label-map="scopeLabelMap"
+                                :format-duration="formatDuration"
+                                :format-timestamp="formatTimestamp"
+                                :get-issuer-label="getIssuerLabel"
+                                @update:name="issueForm.name = $event"
+                                @update:active-from="
+                                    issueForm.activeFrom = $event
+                                "
+                                @update:expires-at="
+                                    issueForm.expiresAt = $event
+                                "
+                                @update:scopes="issueForm.scopes = $event"
+                                @submit="issueApiKey"
+                                @reset-form="resetIssueForm"
+                                @open-list="openApiKeyListModal"
+                                @copy-issued-key="copyIssuedKey"
+                                @dismiss-issued-result="
+                                    dismissIssuedKeyResult
+                                " />
+
+                            <DashboardOauthCreatePanel
+                                v-else
+                                :name="oauthForm.name"
+                                :description="oauthForm.description"
+                                :homepage-url="oauthForm.homepageUrl"
+                                :redirect-uris-text="
+                                    oauthForm.redirectUrisText
+                                "
+                                :requested-scopes="oauthForm.requestedScopes"
+                                :allowed-scopes="allowedOauthScopes"
+                                :scope-label-map="scopeLabelMap"
+                                :mutation-message="oauthMutationMessage"
+                                :mutation-tone="oauthMutationTone"
+                                :is-submitting="isSubmittingOauthClient"
+                                @update:name="oauthForm.name = $event"
+                                @update:description="
+                                    oauthForm.description = $event
+                                "
+                                @update:homepage-url="
+                                    oauthForm.homepageUrl = $event
+                                "
+                                @update:redirect-uris-text="
+                                    oauthForm.redirectUrisText = $event
+                                "
+                                @update:requested-scopes="
+                                    oauthForm.requestedScopes = $event
+                                "
+                                @submit="createOauthClient"
+                                @reset="resetOauthForm"
+                                @open-list="openOauthClientListModal" />
                         </div>
                     </Transition>
                 </div>
@@ -422,247 +477,40 @@
         </UiModal>
 
         <UiModal
-            :model-value="isIssueModalOpen"
-            eyebrow="OPERATION"
-            title="签发 API 密钥"
-            size="lg"
-            :close-on-backdrop="!isIssuing"
-            @update:model-value="handleIssueModalVisibilityChange">
-            <div
-                v-if="issuedKeyResult"
-                class="space-y-5">
-                <div
-                    class="rounded-[1rem] border border-emerald-200/80 bg-emerald-50/80 px-4 py-4">
-                    <p
-                        class="text-xs font-medium uppercase tracking-[0.18em] text-emerald-700">
-                        一次性明文
-                    </p>
-                    <p
-                        class="mt-3 break-all font-mono text-sm font-semibold text-emerald-800">
-                        {{ issuedKeyResult.apiKey }}
-                    </p>
-                    <p class="mt-2 text-sm leading-6 text-emerald-700/90">
-                        此密钥只会显示一次，请及时复制并保存。
-                    </p>
-                </div>
+            :model-value="isApiKeyListModalOpen"
+            eyebrow="LIST"
+            title="API 密钥列表"
+            size="screen"
+            height="tall"
+            @update:model-value="isApiKeyListModalOpen = $event">
+            <DashboardKeyListPanel
+                :groups="issuerGroups"
+                :is-loading="isApiKeysLoading"
+                :error-message="apiKeysErrorMessage"
+                :can-revoke="canRevokeApiKeys"
+                :format-timestamp="formatTimestamp"
+                :format-token-count="formatTokenCount"
+                :get-issuer-label="getIssuerLabel"
+                :get-issuer-section-title="getIssuerSectionTitle"
+                :get-issuer-badge-class="getIssuerBadgeClass"
+                :get-status-label="getStatusLabel"
+                :get-status-badge-class="getStatusBadgeClass"
+                @refresh="refreshApiKeys()"
+                @revoke="openRevokeModal" />
+        </UiModal>
 
-                <div
-                    class="dashboard-soft-surface grid gap-4 rounded-[1rem] border px-4 py-4 sm:grid-cols-2">
-                    <div class="space-y-1 sm:col-span-2">
-                        <p
-                            class="text-xs uppercase tracking-[0.18em] text-slate-400">
-                            名称
-                        </p>
-                        <p class="font-medium text-slate-900">
-                            {{ issuedKeyResult.name }}
-                        </p>
-                    </div>
-                    <div class="space-y-1">
-                        <p
-                            class="text-xs uppercase tracking-[0.18em] text-slate-400">
-                            类型
-                        </p>
-                        <p class="font-medium text-slate-900">
-                            {{ getIssuerLabel(issuedKeyResult.issuer) }}
-                        </p>
-                    </div>
-                    <div class="space-y-1">
-                        <p
-                            class="text-xs uppercase tracking-[0.18em] text-slate-400">
-                            生效时间
-                        </p>
-                        <p class="font-medium text-slate-900">
-                            {{ formatTimestamp(issuedKeyResult.activeFrom) }}
-                        </p>
-                    </div>
-                    <div class="space-y-1">
-                        <p
-                            class="text-xs uppercase tracking-[0.18em] text-slate-400">
-                            失效时间
-                        </p>
-                        <p class="font-medium text-slate-900">
-                            {{ formatTimestamp(issuedKeyResult.expiresAt) }}
-                        </p>
-                    </div>
-                    <div class="space-y-1">
-                        <p
-                            class="text-xs uppercase tracking-[0.18em] text-slate-400">
-                            权限数量
-                        </p>
-                        <p class="font-medium text-slate-900">
-                            {{ issuedKeyResult.scopes.length }}
-                        </p>
-                    </div>
-                </div>
-
-                <div class="space-y-2">
-                    <p
-                        class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
-                        权限
-                    </p>
-                    <div class="flex flex-wrap gap-2">
-                        <span
-                            v-for="scope in issuedKeyResult.scopes"
-                            :key="`issued:${scope}`"
-                            class="inline-flex items-center rounded-full bg-blue-600/8 px-2.5 py-1 text-[11px] font-medium text-blue-700">
-                            {{ scope }}
-                        </span>
-                    </div>
-                </div>
-
-                <p
-                    v-if="copyMessage"
-                    :class="
-                        copyState === 'error'
-                            ? 'text-sm text-[#E53E3E]'
-                            : 'text-sm text-emerald-700'
-                    ">
-                    {{ copyMessage }}
-                </p>
-            </div>
-
-            <div
-                v-else
-                class="space-y-6">
-                <div class="space-y-2">
-                    <label
-                        for="issue-name"
-                        class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
-                        密钥名称
-                    </label>
-                    <input
-                        id="issue-name"
-                        ref="issueNameInputRef"
-                        v-model.trim="issueForm.name"
-                        type="text"
-                        class="harmony-input w-full px-4 py-3 text-base text-crh-grey-dark"
-                        :maxlength="apiKeyNameLength.maxLength"
-                        placeholder="例如：本地脚本、CI 部署、临时调试" />
-                    <p class="text-xs leading-5 text-slate-500">
-                        名称长度 {{ apiKeyNameLength.minLength }} -
-                        {{ apiKeyNameLength.maxLength }} 个字符。
-                    </p>
-                    <p
-                        v-if="issueNameError"
-                        class="flex items-center gap-1.5 pl-1 text-xs leading-5 text-[#E53E3E]">
-                        <span
-                            aria-hidden="true"
-                            class="font-semibold">
-                            [!]
-                        </span>
-                        {{ issueNameError }}
-                    </p>
-                </div>
-
-                <div class="grid gap-4 md:grid-cols-2">
-                    <div class="space-y-2">
-                        <label
-                            for="issue-active-from"
-                            class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
-                            生效时间
-                        </label>
-                        <input
-                            id="issue-active-from"
-                            v-model="issueForm.activeFrom"
-                            type="datetime-local"
-                            class="harmony-input w-full px-4 py-3 text-base text-crh-grey-dark" />
-                    </div>
-
-                    <div class="space-y-2">
-                        <label
-                            for="issue-expires-at"
-                            class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
-                            失效时间
-                        </label>
-                        <input
-                            id="issue-expires-at"
-                            v-model="issueForm.expiresAt"
-                            type="datetime-local"
-                            :max="issueExpiresAtMax"
-                            class="harmony-input w-full px-4 py-3 text-base text-crh-grey-dark" />
-                    </div>
-                </div>
-
-                <div
-                    class="dashboard-soft-surface rounded-[1rem] border border-dashed px-4 py-4 text-sm leading-6 text-slate-600">
-                    最长存活时间：
-                    <span class="font-semibold text-slate-900">
-                        {{ formatDuration(maxLifetimeSeconds) }}
-                    </span>
-                    <template v-if="issueActiveFromTimestamp !== null">
-                        <br />
-                        最晚失效时间：
-                        <span class="font-semibold text-slate-900">
-                            {{ formatTimestamp(issueMaxExpiresAtTimestamp) }}
-                        </span>
-                    </template>
-                </div>
-
-                <div class="space-y-3">
-                    <div class="space-y-1">
-                        <p
-                            class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
-                            权限树
-                        </p>
-                    </div>
-
-                    <div
-                        class="dashboard-soft-surface rounded-[1.1rem] border px-4 py-4">
-                        <DashboardScopeTree
-                            v-model="issueForm.scopes"
-                            :scopes="creatableScopes"
-                            :label-map="scopeLabelMap" />
-                    </div>
-                </div>
-
-                <p
-                    v-if="issueErrorMessage"
-                    class="flex items-center gap-1.5 pl-1 text-xs leading-5 text-[#E53E3E]">
-                    <span
-                        aria-hidden="true"
-                        class="font-semibold">
-                        [!]
-                    </span>
-                    {{ issueErrorMessage }}
-                </p>
-            </div>
-
-            <template #footer>
-                <div
-                    v-if="issuedKeyResult"
-                    class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-                    <UiButton
-                        type="button"
-                        variant="secondary"
-                        @click="closeIssueModal">
-                        关闭
-                    </UiButton>
-                    <UiButton
-                        type="button"
-                        @click="copyIssuedKey">
-                        复制 API 密钥
-                    </UiButton>
-                </div>
-
-                <div
-                    v-else
-                    class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-                    <UiButton
-                        type="button"
-                        variant="secondary"
-                        :disabled="isIssuing"
-                        @click="closeIssueModal">
-                        取消
-                    </UiButton>
-                    <UiButton
-                        type="button"
-                        :loading="isIssuing"
-                        :disabled="!canSubmitIssueForm"
-                        @click="issueApiKey">
-                        签发密钥
-                    </UiButton>
-                </div>
-            </template>
+        <UiModal
+            :model-value="isOauthClientListModalOpen"
+            eyebrow="LIST"
+            title="OAuth 客户端列表"
+            size="screen"
+            height="tall"
+            @update:model-value="isOauthClientListModalOpen = $event">
+            <DashboardOauthClientListPanel
+                :items="oauthClientItems"
+                :is-loading="isOauthClientsLoading"
+                :error-message="oauthClientsErrorMessage"
+                @refresh="refreshOauthClients()" />
         </UiModal>
 
         <AppFooter />
@@ -688,7 +536,10 @@ import type {
     AuthApiKeyNameLength,
     AuthQuotaSummary,
     AuthIssueApiKeyResponse,
-    AuthSession
+    AuthSession,
+    OAuthClientListResponse,
+    OAuthClientMutationResponse,
+    OAuthClientPublicItem
 } from '~/types/auth';
 import type { TrackerApiResponse } from '~/types/homepage';
 import getApiErrorMessage from '~/utils/api/getApiErrorMessage';
@@ -823,6 +674,8 @@ interface DashboardMutationOptions {
     body?: Record<string, unknown>;
 }
 
+type DeveloperMode = 'keys' | 'oauth';
+
 const route = useRoute();
 const router = useRouter();
 const { session, clearSession, setSession } = useAuthState();
@@ -884,19 +737,30 @@ const isPanelSheetOpen = ref(false);
 const revokeTarget = ref<AuthApiKeyListItem | null>(null);
 const revokeErrorMessage = ref('');
 const isRevoking = ref(false);
-const isIssueModalOpen = ref(false);
+const developerMode = ref<DeveloperMode>('keys');
+const isApiKeyListModalOpen = ref(false);
+const isOauthClientListModalOpen = ref(false);
 const isIssuing = ref(false);
+const isSubmittingOauthClient = ref(false);
 const issueErrorMessage = ref('');
 const issuedKeyResult = ref<AuthIssueApiKeyResponse | null>(null);
 const copyState = ref<'idle' | 'success' | 'error'>('idle');
 const nowSeconds = ref(Math.floor(Date.now() / 1000));
-const issueNameInputRef = ref<HTMLInputElement | null>(null);
+const oauthMutationMessage = ref('');
+const oauthMutationTone = ref<'success' | 'error'>('success');
 
 const issueForm = reactive({
     name: '',
     activeFrom: '',
     expiresAt: '',
     scopes: [] as string[]
+});
+const oauthForm = reactive({
+    name: '',
+    description: '',
+    homepageUrl: '',
+    redirectUrisText: '',
+    requestedScopes: [] as string[]
 });
 const changePasswordForm = reactive({
     currentPassword: '',
@@ -1024,7 +888,36 @@ const {
     refresh: refreshApiKeys
 } = await useAsyncData('dashboard-api-keys', fetchApiKeys);
 
+async function fetchOauthClients() {
+    const response = await requestFetch<
+        TrackerApiResponse<OAuthClientListResponse>
+    >('/api/v1/oauth/clients', {
+        retry: 0
+    });
+
+    if (!response.ok) {
+        throw {
+            data: response
+        };
+    }
+
+    return response.data;
+}
+
+const {
+    data: oauthClientsData,
+    status: oauthClientsStatus,
+    error: oauthClientsError,
+    refresh: refreshOauthClients
+} = await useAsyncData('dashboard-oauth-clients', fetchOauthClients);
+
 const apiKeyItems = computed(() => apiKeysData.value?.items ?? []);
+const oauthClientItems = computed<OAuthClientPublicItem[]>(
+    () => oauthClientsData.value?.items ?? []
+);
+const allowedOauthScopes = computed(
+    () => oauthClientsData.value?.allowedScopes ?? []
+);
 const creatableScopes = computed(
     () => apiKeysData.value?.creatableScopes ?? []
 );
@@ -1080,6 +973,9 @@ const canSubmitIssueForm = computed(
         !isIssuing.value && !issueNameError.value && issueForm.scopes.length > 0
 );
 const isApiKeysLoading = computed(() => apiKeysStatus.value === 'pending');
+const isOauthClientsLoading = computed(
+    () => oauthClientsStatus.value === 'pending'
+);
 const isFavoritesLoading = computed(() => favoritesState.value === 'loading');
 const isUpdatingUserPreference = computed(
     () => userSettingsState.value === 'loading'
@@ -1090,6 +986,14 @@ const isEventSubscriptionsLoading = computed(
 const apiKeysErrorMessage = computed(() =>
     apiKeysError.value
         ? getApiErrorMessage(apiKeysError.value, '加载 API 密钥列表失败。')
+        : ''
+);
+const oauthClientsErrorMessage = computed(() =>
+    oauthClientsError.value
+        ? getApiErrorMessage(
+              oauthClientsError.value,
+              '加载 OAuth 客户端列表失败。'
+          )
         : ''
 );
 
@@ -1242,17 +1146,39 @@ function getPanelSheetOptionClass(panelId: DashboardPanelId) {
 }
 
 function getIssuerLabel(issuer: AuthApiKeyIssuer) {
-    return issuer === 'webapp' ? '网页端' : 'API';
+    if (issuer === 'webapp') {
+        return '网页端';
+    }
+
+    if (issuer === 'oauth') {
+        return 'OAuth';
+    }
+
+    return 'API';
 }
 
 function getIssuerSectionTitle(issuer: AuthApiKeyIssuer) {
-    return issuer === 'webapp' ? '网页端会话' : 'API 密钥';
+    if (issuer === 'webapp') {
+        return '网页端会话';
+    }
+
+    if (issuer === 'oauth') {
+        return 'OAuth 令牌';
+    }
+
+    return 'API 密钥';
 }
 
 function getIssuerBadgeClass(issuer: AuthApiKeyIssuer) {
-    return issuer === 'webapp'
-        ? 'inline-flex shrink-0 whitespace-nowrap items-center rounded-full bg-slate-900 px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.1em] text-white'
-        : 'inline-flex shrink-0 whitespace-nowrap items-center rounded-full bg-crh-blue/10 px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.1em] text-crh-blue';
+    if (issuer === 'webapp') {
+        return 'inline-flex shrink-0 whitespace-nowrap items-center rounded-full bg-slate-900 px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.1em] text-white';
+    }
+
+    if (issuer === 'oauth') {
+        return 'inline-flex shrink-0 whitespace-nowrap items-center rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.1em] text-emerald-700';
+    }
+
+    return 'inline-flex shrink-0 whitespace-nowrap items-center rounded-full bg-crh-blue/10 px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.1em] text-crh-blue';
 }
 
 function formatTimestamp(timestamp: number) {
@@ -1415,32 +1341,21 @@ function resetIssueForm() {
     copyState.value = 'idle';
 }
 
-function openIssueModal() {
-    if (!canIssueApiKeys.value) {
-        return;
-    }
-
+if (!issueForm.activeFrom) {
     resetIssueForm();
-    isIssueModalOpen.value = true;
 }
 
-function closeIssueModal() {
-    if (isIssuing.value) {
-        return;
-    }
-
-    isIssueModalOpen.value = false;
-    issueErrorMessage.value = '';
+function dismissIssuedKeyResult() {
+    issuedKeyResult.value = null;
     copyState.value = 'idle';
 }
 
-function handleIssueModalVisibilityChange(nextValue: boolean) {
-    if (nextValue) {
-        isIssueModalOpen.value = true;
-        return;
-    }
+function openApiKeyListModal() {
+    isApiKeyListModalOpen.value = true;
+}
 
-    closeIssueModal();
+function openOauthClientListModal() {
+    isOauthClientListModalOpen.value = true;
 }
 
 function openRevokeModal(item: AuthApiKeyListItem) {
@@ -1755,6 +1670,72 @@ async function issueApiKey() {
         );
     } finally {
         isIssuing.value = false;
+    }
+}
+
+function splitLines(value: string) {
+    return value
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean);
+}
+
+function clearOauthFormFields() {
+    oauthForm.name = '';
+    oauthForm.description = '';
+    oauthForm.homepageUrl = '';
+    oauthForm.redirectUrisText = '';
+    oauthForm.requestedScopes = [];
+}
+
+function resetOauthForm() {
+    clearOauthFormFields();
+    oauthMutationMessage.value = '';
+    oauthMutationTone.value = 'success';
+}
+
+async function createOauthClient() {
+    if (isSubmittingOauthClient.value) {
+        return;
+    }
+
+    isSubmittingOauthClient.value = true;
+    oauthMutationMessage.value = '';
+
+    try {
+        const response = await requestFetch<
+            TrackerApiResponse<OAuthClientMutationResponse>
+        >('/api/v1/oauth/clients', {
+            method: 'POST',
+            body: {
+                name: oauthForm.name,
+                description: oauthForm.description,
+                homepageUrl: oauthForm.homepageUrl,
+                redirectUris: splitLines(oauthForm.redirectUrisText),
+                requestedScopes: oauthForm.requestedScopes
+            },
+            retry: 0
+        });
+
+        if (!response.ok) {
+            throw {
+                data: response
+            };
+        }
+
+        oauthMutationTone.value = 'success';
+        oauthMutationMessage.value =
+            'OAuth 客户端已创建，scope 默认处于待审核状态。';
+        clearOauthFormFields();
+        await refreshOauthClients();
+    } catch (error) {
+        oauthMutationTone.value = 'error';
+        oauthMutationMessage.value = getApiErrorMessage(
+            error,
+            '创建 OAuth 客户端失败。'
+        );
+    } finally {
+        isSubmittingOauthClient.value = false;
     }
 }
 
