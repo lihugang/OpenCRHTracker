@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import useConfig from '~/server/config';
 import normalizeScopeList from '~/server/utils/api/scopes/normalizeScopeList';
 
-export type ApiKeyIssuer = 'webapp' | 'api';
+export type ApiKeyIssuer = 'webapp' | 'api' | 'oauth';
 
 export interface SignedApiKeyPayload {
     kid: string;

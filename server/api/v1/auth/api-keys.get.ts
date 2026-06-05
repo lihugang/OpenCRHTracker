@@ -50,6 +50,7 @@ export default defineEventHandler(async (event) => {
                     revokeId: record.revoke_id,
                     maskedKeyId: maskApiKey(record.key),
                     issuer: record.issuer,
+                    oauthClientId: record.oauth_client_id,
                     activeFrom: record.active_from,
                     revokedAt: record.revoked_at,
                     expiresAt: record.expires_at,

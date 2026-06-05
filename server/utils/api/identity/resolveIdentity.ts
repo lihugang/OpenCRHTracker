@@ -102,6 +102,7 @@ export default function resolveIdentity(event: H3Event): ApiIdentity {
         keyId: apiKeyRecord.keyId,
         revokeId: apiKeyRecord.revokeId,
         issuer: apiKeyRecord.issuer,
+        oauthClientId: apiKeyRecord.oauthClientId ?? undefined,
         apiKey: resolvedApiKey.key,
         bucketKey: quotaSubject.bucketKey,
         tokenLimit: quotaSubject.tokenLimit,

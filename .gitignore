@@ -19,7 +19,10 @@ logs
 .DS_Store
 .fleet
 .idea
+
+# Vim Files
 *.un~
+*.swp
 
 # Local env files
 .env

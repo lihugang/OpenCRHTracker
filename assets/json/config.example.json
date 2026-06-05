@@ -138,7 +138,8 @@
         "saltLength": 16,
         "apiKeyPrefixes": {
             "webapp": "ocrh_webapp_",
-            "api": "ocrh_api_"
+            "api": "ocrh_api_",
+            "oauth": "ocrh_oauth_"
         },
         "adminUserIds": [],
         "apiKeyBytes": 24,
@@ -294,6 +295,28 @@
                 "api.exports.daily.read",
                 "api.timetable.station.read"
             ]
+        }
+    },
+    "oauth": {
+        "issuer": "https://example.com",
+        "authorizationCodeTtlSeconds": 300,
+        "accessTokenTtlSeconds": 3600,
+        "idTokenTtlSeconds": 3600,
+        "loginContinuationTtlSeconds": 600,
+        "subjectSalt": "change-me-oauth-subject-salt",
+        "pkce": {
+            "allowedMethods": [
+                "S256"
+            ]
+        },
+        "discovery": {
+            "enabled": true,
+            "externalBaseUrl": "https://example.com"
+        },
+        "idTokenSigning": {
+            "kid": "default-rs256",
+            "privateKeyPem": "-----BEGIN PRIVATE KEY-----\\nchange-me\\n-----END PRIVATE KEY-----",
+            "alg": "RS256"
         }
     },
     "services": {

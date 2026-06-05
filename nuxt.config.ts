@@ -61,6 +61,11 @@ export default defineNuxtConfig({
                     'Cross-Origin-Embedder-Policy': 'require-corp',
                     'Cross-Origin-Opener-Policy': 'same-origin'
                 }
+            },
+            '/oauth/token': {
+                security: {
+                    csrf: false
+                }
             }
         },
         experimental: {

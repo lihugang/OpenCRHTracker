@@ -261,6 +261,10 @@ const navItems = [
         path: '/admin/users'
     },
     {
+        label: 'OAuth 客户端',
+        path: '/admin/oauth-clients'
+    },
+    {
         label: '被动告警',
         path: '/admin/passive-alerts'
     },

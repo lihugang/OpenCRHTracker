@@ -1,7 +1,7 @@
 import type { FavoriteLookupItem } from '~/types/lookup';
 import type { NotificationTargetType } from '~/types/notifications';
 
-export type AuthApiKeyIssuer = 'webapp' | 'api';
+export type AuthApiKeyIssuer = 'webapp' | 'api' | 'oauth';
 
 export interface AuthApiKeyNameLength {
     minLength: number;
@@ -70,6 +70,7 @@ export interface AuthApiKeyListItem {
     revokeId: string;
     maskedKeyId: string;
     issuer: AuthApiKeyIssuer;
+    oauthClientId: string | null;
     activeFrom: number;
     revokedAt: number | null;
     expiresAt: number;
@@ -94,11 +95,104 @@ export interface AuthIssueApiKeyResponse {
     name: string;
     revokeId: string;
     issuer: AuthApiKeyIssuer;
+    oauthClientId?: string | null;
     apiKey: string;
     maskedApiKey: string;
     activeFrom: number;
     expiresAt: number;
     scopes: string[];
+}
+
+export type OAuthClientStatus = 'active' | 'disabled';
+export type OAuthClientScopeReviewStatus = 'pending' | 'approved' | 'rejected';
+
+export interface OAuthClientRedirectUriItem {
+    value: string;
+}
+
+export interface OAuthClientScopeRequestItem {
+    scope: string;
+    reviewStatus: OAuthClientScopeReviewStatus;
+    reviewedBy: string | null;
+    reviewedAt: number | null;
+}
+
+export interface OAuthClientPublicItem {
+    clientId: string;
+    ownerUserId: string;
+    name: string;
+    description: string | null;
+    homepageUrl: string | null;
+    status: OAuthClientStatus;
+    isTrusted: boolean;
+    createdAt: number;
+    updatedAt: number;
+    redirectUris: OAuthClientRedirectUriItem[];
+    scopeRequests: OAuthClientScopeRequestItem[];
+}
+
+export interface OAuthClient extends OAuthClientPublicItem {}
+
+export interface OAuthClientCreateInput {
+    name: string;
+    description: string | null;
+    homepageUrl: string | null;
+    redirectUris: string[];
+    requestedScopes: string[];
+}
+
+export interface OAuthClientUpdateInput extends OAuthClientCreateInput {
+    status?: OAuthClientStatus;
+    isTrusted?: boolean;
+}
+
+export interface OAuthClientListResponse {
+    items: OAuthClientPublicItem[];
+    allowedScopes: string[];
+}
+
+export interface OAuthClientMutationResponse {
+    client: OAuthClientPublicItem;
+}
+
+export interface OidcDiscoveryDocument {
+    issuer: string;
+    authorization_endpoint: string;
+    token_endpoint: string;
+    userinfo_endpoint: string;
+    jwks_uri: string;
+    response_types_supported: string[];
+    grant_types_supported: string[];
+    subject_types_supported: string[];
+    id_token_signing_alg_values_supported: string[];
+    code_challenge_methods_supported: string[];
+    token_endpoint_auth_methods_supported: string[];
+    scopes_supported: string[];
+}
+
+export interface OidcJwk {
+    kty: 'RSA';
+    use: 'sig';
+    kid: string;
+    alg: 'RS256';
+    n: string;
+    e: string;
+}
+
+export interface OidcJwksDocument {
+    keys: OidcJwk[];
+}
+
+export interface OidcUserInfo {
+    sub: string;
+}
+
+export interface OAuthTokenResponse {
+    access_token: string;
+    token_type: 'Bearer';
+    expires_in: number;
+    id_token: string;
+    scope: string;
 }
 
 export interface AuthFavoritesResponse {

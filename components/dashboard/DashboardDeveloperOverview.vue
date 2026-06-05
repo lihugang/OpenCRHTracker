@@ -150,6 +150,11 @@
                         最长存活时间：{{ formatDuration(maxLifetimeSeconds) }}
                     </div>
                     <NuxtLink
+                        to="/oauth-clients"
+                        class="inline-flex items-center text-sm font-medium text-crh-blue transition hover:text-slate-900 hover:underline hover:underline-offset-4">
+                        管理 OAuth 客户端
+                    </NuxtLink>
+                    <NuxtLink
                         to="/docs/api"
                         class="inline-flex items-center text-sm font-medium text-crh-blue transition hover:text-slate-900 hover:underline hover:underline-offset-4">
                         查看 API 文档

@@ -449,10 +449,11 @@ export const deployDocsSections: DocsContentSection[] = [
                         path: 'user.apiKeyPrefixes',
                         valueType: 'object',
                         required: true,
-                        description: '分别定义 webapp 和 API Key 的前缀。',
+                        description:
+                            '分别定义站内登录态签名、普通 API Key 和 OAuth access token 的前缀。',
                         notes: [
-                            '新部署请使用 webapp/api 两个前缀。',
-                            '两个前缀不能重复。'
+                            '当前必须同时提供 webapp、api、oauth 三个前缀。',
+                            '三个前缀都不能为空，且彼此不能重复。'
                         ]
                     },
                     {
@@ -551,6 +552,152 @@ export const deployDocsSections: DocsContentSection[] = [
                         required: true,
                         description:
                             '密码派生算法参数，包含 keyLength、cost、blockSize、parallelization。'
+                    }
+                ]
+            },
+            {
+                type: 'field-cards',
+                title: 'oauth：OAuth 2.0 / OpenID Connect 授权服务器配置',
+                text: '这一组决定站点对外暴露的 OAuth 2.0 与 OIDC 行为，包括 issuer、授权码与 token 生命周期、PKCE 策略、discovery 文档地址以及 id_token 签名密钥。',
+                cards: [
+                    {
+                        path: 'oauth.issuer',
+                        valueType: 'string(URL)',
+                        required: true,
+                        description:
+                            'OAuth/OIDC 对外声明的 issuer，用于写入 discovery 文档、id_token 的 iss claim，以及第三方客户端校验授权服务器身份。',
+                        notes: [
+                            '必须以 http:// 或 https:// 开头。',
+                            '生产环境应填写第三方应用实际可访问到的外部地址，而不是容器内部地址或仅本机可见的回环地址。',
+                            '它应与对外公开的授权服务器域名保持稳定；修改后，依赖旧 issuer 的客户端通常需要重新配置。'
+                        ]
+                    },
+                    {
+                        path: 'oauth.authorizationCodeTtlSeconds',
+                        valueType: 'integer(seconds)',
+                        required: true,
+                        description:
+                            'authorization code 的有效期，单位秒；从用户完成授权开始计时，超过时限后 /oauth/token 必须拒绝换取 token。',
+                        notes: [
+                            '必须为正整数。',
+                            '建议保持较短时长，减少授权码泄露后的可利用窗口。',
+                        ]
+                    },
+                    {
+                        path: 'oauth.accessTokenTtlSeconds',
+                        valueType: 'integer(seconds)',
+                        required: true,
+                        description:
+                            'OAuth access token 的有效期，单位秒；会写入复用的签名 API Key 记录，并影响现有 Bearer Token 资源访问链路的过期判断。',
+                        notes: [
+                            '必须为正整数。',
+                            'access token 会直接作为现有 /api/v1/* 接口的 Bearer Token 使用，因此过期时间会影响第三方应用访问所有受 scope 保护资源的可用窗口。',
+                            '暂不支持 refresh token，过期后需要重新走授权流程。'
+                        ]
+                    },
+                    {
+                        path: 'oauth.idTokenTtlSeconds',
+                        valueType: 'integer(seconds)',
+                        required: true,
+                        description:
+                            'OIDC id_token 的有效期，单位秒；用于控制第三方客户端持有身份断言的时间窗口。',
+                        notes: [
+                            '必须为正整数。',
+                            'id_token 与 access token 分离签发，不复用现有 HMAC API Key 格式。',
+                            '时长不宜过长，否则客户端长期缓存旧身份断言时，撤销或策略变更的收敛会更慢。'
+                        ]
+                    },
+                    {
+                        path: 'oauth.loginContinuationTtlSeconds',
+                        valueType: 'integer(seconds)',
+                        required: true,
+                        description:
+                            '未登录用户访问 /oauth/authorize 时，系统为“登录后继续原授权流程”保存上下文的有效期，单位秒。',
+                        notes: [
+                            '必须为正整数。',
+                            '这个值控制的是授权流程恢复窗口，不是 Cookie 登录态本身的生命周期。',
+                            '值过短可能导致用户刚完成站内登录就无法返回原 OAuth 授权确认页。'
+                        ]
+                    },
+                    {
+                        path: 'oauth.subjectSalt',
+                        valueType: 'string',
+                        required: true,
+                        description:
+                            '生成 OIDC subject 标识时使用的服务端盐值，用于把站内用户 ID 稳定映射为对外暴露的 sub。',
+                        notes: [
+                            '不能为空。',
+                            '应使用独立、不可预测的随机字符串，避免直接暴露站内用户主键或让第三方推导真实用户 ID。',
+                            '修改后，同一用户在 OIDC 中看到的 sub 会发生变化，已依赖旧 sub 建立映射关系的客户端可能需要重新关联账号。'
+                        ]
+                    },
+                    {
+                        path: 'oauth.pkce.allowedMethods',
+                        valueType: 'array<"S256">',
+                        required: true,
+                        description:
+                            '允许客户端在授权请求中使用的 PKCE code_challenge_method 列表。',
+                        notes: [
+                            '当前实现要求该数组必须精确为 ["S256"]，不接受 plain，也不接受额外方法。',
+                            '这是对 public client 的强制安全约束，所有客户端都必须带 PKCE。'
+                        ]
+                    },
+                    {
+                        path: 'oauth.discovery.enabled',
+                        valueType: 'boolean',
+                        required: true,
+                        description:
+                            '是否启用标准 OIDC discovery 文档与关联元数据暴露。',
+                        notes: [
+                            '开启后，第三方客户端可通过 /.well-known/openid-configuration 自动发现授权端点、token 端点、userinfo 端点和 JWKS 地址。',
+                            '如果关闭 discovery，协议端点实现仍可存在，但接入方需要手工配置所有地址和签名信息来源。'
+                        ]
+                    },
+                    {
+                        path: 'oauth.discovery.externalBaseUrl',
+                        valueType: 'string(URL)',
+                        required: true,
+                        description:
+                            'discovery 与 JWKS 文档中生成公开 URL 时使用的外部基础地址。',
+                        notes: [
+                            '必须以 http:// 或 https:// 开头；服务启动时会自动去掉末尾多余的 /。',
+                            '通常应与 oauth.issuer 指向同一对外域名；若站点通过网关、反代或单独公开 OAuth 子路径，这里可以明确指定 discovery 文档里应返回的基准地址。',
+                            '如果填写内网地址或错误前缀，标准 OIDC 客户端即使能拿到 discovery 文档，也会因为端点 URL 不可达而接入失败。'
+                        ]
+                    },
+                    {
+                        path: 'oauth.idTokenSigning.kid',
+                        valueType: 'string',
+                        required: true,
+                        description:
+                            'JWKS 中发布的当前签名密钥标识，以及 id_token JWT header 里的 kid。',
+                        notes: [
+                            '不能为空。',
+                            '第三方客户端会用它在 JWKS 中定位对应公钥；后续做密钥轮换时，应保证不同密钥使用不同 kid。'
+                        ]
+                    },
+                    {
+                        path: 'oauth.idTokenSigning.privateKeyPem',
+                        valueType: 'string(PEM private key)',
+                        required: true,
+                        description:
+                            '用于签发 OIDC id_token 的 RSA 私钥，PEM 格式保存。',
+                        notes: [
+                            '配置值必须看起来像 PEM 私钥，启动时会检查是否包含 BEGIN 片段。',
+                            '生产环境应使用真实私钥并妥善保密；泄露后，攻击者可伪造看似合法的 id_token。',
+                            '如果写在 JSON 中，多行内容需要按 JSON 字符串格式转义换行，例如使用 \\n。'
+                        ]
+                    },
+                    {
+                        path: 'oauth.idTokenSigning.alg',
+                        valueType: '"RS256"',
+                        required: true,
+                        description:
+                            'id_token 使用的 JWT 签名算法标识。',
+                        notes: [
+                            '当前实现只接受 RS256；配置为其他值会直接阻止服务启动。',
+                            '该值应与私钥类型和 JWKS 中暴露的公钥参数保持一致。'
+                        ]
                     }
                 ]
             },

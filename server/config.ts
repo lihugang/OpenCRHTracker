@@ -37,6 +37,31 @@ interface ApiPermissionConfig {
     creatableKeyMaxScopes: string[];
 }
 
+interface OAuthDiscoveryConfig {
+    enabled: boolean;
+    externalBaseUrl: string;
+}
+
+interface OAuthIdTokenSigningConfig {
+    kid: string;
+    privateKeyPem: string;
+    alg: 'RS256';
+}
+
+interface OAuthConfig {
+    issuer: string;
+    authorizationCodeTtlSeconds: number;
+    accessTokenTtlSeconds: number;
+    idTokenTtlSeconds: number;
+    loginContinuationTtlSeconds: number;
+    subjectSalt: string;
+    pkce: {
+        allowedMethods: ['S256'];
+    };
+    discovery: OAuthDiscoveryConfig;
+    idTokenSigning: OAuthIdTokenSigningConfig;
+}
+
 interface FeedbackValidationLengthConfig {
     minLength: number;
     maxLength: number;
@@ -196,6 +221,7 @@ export interface Config {
         apiKeyPrefixes: {
             webapp: string;
             api: string;
+            oauth: string;
         };
         adminUserIds: string[];
         favorites: {
@@ -278,6 +304,7 @@ export interface Config {
         };
         permissions: ApiPermissionConfig;
     };
+    oauth: OAuthConfig;
     services: {
         simpleLatexContainer: SimpleLatexContainerServiceConfig;
     };
@@ -786,6 +813,13 @@ function validateConfig(raw: unknown): Config {
     const apiPagination = asObject(api.pagination, 'api.pagination');
     const apiDebug = asObject(api.debug, 'api.debug');
     const apiPermissions = asObject(api.permissions, 'api.permissions');
+    const oauth = asObject(root.oauth, 'oauth');
+    const oauthPkce = asObject(oauth.pkce, 'oauth.pkce');
+    const oauthDiscovery = asObject(oauth.discovery, 'oauth.discovery');
+    const oauthIdTokenSigning = asObject(
+        oauth.idTokenSigning,
+        'oauth.idTokenSigning'
+    );
     const services = asObject(root.services, 'services');
     const simpleLatexContainer = asObject(
         services.simpleLatexContainer,
@@ -1142,6 +1176,13 @@ function validateConfig(raw: unknown): Config {
                         : asString(
                               userApiKeyPrefixes.api,
                               'user.apiKeyPrefixes.api'
+                          ),
+                oauth:
+                    userApiKeyPrefixes === undefined
+                        ? asString(legacyApiKeyPrefix, 'user.apiKeyPrefix')
+                        : asString(
+                              userApiKeyPrefixes.oauth,
+                              'user.apiKeyPrefixes.oauth'
                           )
             },
             adminUserIds,
@@ -1413,6 +1454,76 @@ function validateConfig(raw: unknown): Config {
                     apiPermissions.creatableKeyMaxScopes,
                     'api.permissions.creatableKeyMaxScopes'
                 )
+            }
+        },
+        oauth: {
+            issuer: asString(oauth.issuer, 'oauth.issuer'),
+            authorizationCodeTtlSeconds: asInteger(
+                oauth.authorizationCodeTtlSeconds,
+                'oauth.authorizationCodeTtlSeconds',
+                1
+            ),
+            accessTokenTtlSeconds: asInteger(
+                oauth.accessTokenTtlSeconds,
+                'oauth.accessTokenTtlSeconds',
+                1
+            ),
+            idTokenTtlSeconds: asInteger(
+                oauth.idTokenTtlSeconds,
+                'oauth.idTokenTtlSeconds',
+                1
+            ),
+            loginContinuationTtlSeconds: asInteger(
+                oauth.loginContinuationTtlSeconds,
+                'oauth.loginContinuationTtlSeconds',
+                1
+            ),
+            subjectSalt: asString(oauth.subjectSalt, 'oauth.subjectSalt'),
+            pkce: {
+                allowedMethods: (() => {
+                    const methods = asArray(
+                        oauthPkce.allowedMethods,
+                        'oauth.pkce.allowedMethods'
+                    ).map((method, index) =>
+                        asString(
+                            method,
+                            `oauth.pkce.allowedMethods[${index}]`
+                        )
+                    );
+                    assert(
+                        methods.length === 1 && methods[0] === 'S256',
+                        'oauth.pkce.allowedMethods must be exactly ["S256"]'
+                    );
+                    return ['S256'] as ['S256'];
+                })()
+            },
+            discovery: {
+                enabled: asBoolean(
+                    oauthDiscovery.enabled,
+                    'oauth.discovery.enabled'
+                ),
+                externalBaseUrl: asString(
+                    oauthDiscovery.externalBaseUrl,
+                    'oauth.discovery.externalBaseUrl'
+                ).replace(/\/+$/, '')
+            },
+            idTokenSigning: {
+                kid: asString(oauthIdTokenSigning.kid, 'oauth.idTokenSigning.kid'),
+                privateKeyPem: asString(
+                    oauthIdTokenSigning.privateKeyPem,
+                    'oauth.idTokenSigning.privateKeyPem'
+                ),
+                alg: (() => {
+                    const alg = asString(
+                        oauthIdTokenSigning.alg,
+                        'oauth.idTokenSigning.alg'
+                    );
+                    assert(
+                        alg === 'RS256',
+                        'oauth.idTokenSigning.alg must be "RS256"'
+                    );
+                    return 'RS256' as const;
+                })()
             }
         },
         services: {
@@ -1883,6 +1994,22 @@ function validateConfig(raw: unknown): Config {
         configResult.user.apiKeyTtlSeconds <=
             configResult.user.apiKeyMaxLifetimeSeconds,
         'user.apiKeyTtlSeconds must be <= user.apiKeyMaxLifetimeSeconds'
+    );
+    assert(
+        /^https?:\/\//.test(configResult.oauth.issuer),
+        'oauth.issuer must start with http:// or https://'
+    );
+    assert(
+        /^https?:\/\//.test(configResult.oauth.discovery.externalBaseUrl),
+        'oauth.discovery.externalBaseUrl must start with http:// or https://'
+    );
+    assert(
+        configResult.oauth.subjectSalt.length > 0,
+        'oauth.subjectSalt must be configured'
+    );
+    assert(
+        configResult.oauth.idTokenSigning.privateKeyPem.includes('BEGIN'),
+        'oauth.idTokenSigning.privateKeyPem must be a PEM private key'
     );
     assert(
         configResult.services.simpleLatexContainer.baseUrl.length > 0,

@@ -408,7 +408,12 @@ async function submitAuth() {
                 : '注册成功，系统已自动登录并写入浏览器 Cookie。',
             'success'
         );
-        await navigateTo('/');
+        const hasOauthContinuation = useCookie<string | null>(
+            'oauth_continuation'
+        ).value;
+        await navigateTo(
+            hasOauthContinuation ? '/oauth/authorize/resume' : '/'
+        );
     } catch (error) {
         setStatus(
             getApiErrorMessage(error, '认证请求失败，请稍后重试。'),

@@ -22,6 +22,7 @@ interface ApiKeyPayload {
     userId: string;
     keyId: string;
     issuer: ApiKeyIssuer;
+    oauthClientId: string | null;
     scopes: string[];
     activeFrom: number;
     expiresAt: number;
@@ -52,6 +53,7 @@ interface StoredApiKeyRecord {
     revoke_id: string;
     user_id: string;
     issuer: ApiKeyIssuer;
+    oauth_client_id: string | null;
     name: string;
     active_from: number;
     revoked_at: number | null;
@@ -63,6 +65,7 @@ export interface ApiKeyRecord {
     revoke_id: StoredApiKeyRecord['revoke_id'];
     user_id: StoredApiKeyRecord['user_id'];
     issuer: StoredApiKeyRecord['issuer'];
+    oauth_client_id: StoredApiKeyRecord['oauth_client_id'];
     name: StoredApiKeyRecord['name'];
     active_from: StoredApiKeyRecord['active_from'];
     revoked_at: StoredApiKeyRecord['revoked_at'];
@@ -74,6 +77,7 @@ export interface CreateApiKeyOptions {
     name?: string;
     scopes?: string[];
     issuer?: ApiKeyIssuer;
+    oauthClientId?: string | null;
     activeFrom?: number;
     expiresAt?: number;
 }
@@ -83,6 +87,7 @@ type AuthSqlKey =
     | 'insertUser'
     | 'insertApiKey'
     | 'insertApiKeyScope'
+    | 'revokeApiKeysByOauthClientId'
     | 'revokeApiKeysByIssuer'
     | 'revokeApiKeysByUserAndIssuer'
     | 'revokeApiKeyByUser'
@@ -209,6 +214,7 @@ function buildApiKeySession(
     name: string | undefined,
     scopes: string[],
     issuer: ApiKeyIssuer,
+    oauthClientId: string | null,
     activeFrom = getNowSeconds(),
     expiresAt = activeFrom + useConfig().user.apiKeyTtlSeconds
 ): IssuedAuthSession {
@@ -235,6 +241,7 @@ function buildApiKeySession(
         keyId,
         revokeId,
         issuer,
+        oauthClientId,
         name: resolvedName,
         apiKey,
         maskedApiKey: maskApiKey(apiKey),
@@ -265,6 +272,7 @@ function cacheIssuedApiKey(apiKey: IssuedAuthSession) {
         revoke_id: apiKey.revokeId,
         user_id: apiKey.userId,
         issuer: apiKey.issuer,
+        oauth_client_id: apiKey.oauthClientId,
         name: apiKey.name,
         active_from: apiKey.activeFrom,
         revoked_at: null,
@@ -277,6 +285,7 @@ function matchesPayload(record: StoredApiKeyRecord, payload: ApiKeyPayload) {
         record.key === payload.keyId &&
         record.user_id === payload.userId &&
         record.issuer === payload.issuer &&
+        record.oauth_client_id === payload.oauthClientId &&
         record.active_from === payload.activeFrom &&
         record.expires_at === payload.expiresAt
     );
@@ -304,6 +313,7 @@ function buildAuthSessionFromRecord(
         keyId: record.key,
         revokeId: record.revoke_id,
         issuer: record.issuer,
+        oauthClientId: record.oauth_client_id,
         name: record.name,
         apiKey,
         maskedApiKey: maskApiKey(apiKey),
@@ -387,6 +397,7 @@ export function createApiKey(
     const issuer = options.issuer ?? 'webapp';
     const scopes =
         options.scopes ?? resolveDefaultSessionScopes(userId, issuer);
+    const oauthClientId = options.oauthClientId ?? null;
     const keyId = createKeyId();
     const revokeId = createRevokeId();
     const apiKey = buildApiKeySession(
@@ -396,6 +407,7 @@ export function createApiKey(
         options.name,
         scopes,
         issuer,
+        oauthClientId,
         options.activeFrom,
         options.expiresAt
     );
@@ -406,6 +418,7 @@ export function createApiKey(
             apiKey.revokeId,
             userId,
             apiKey.issuer,
+            apiKey.oauthClientId,
             apiKey.name,
             apiKey.activeFrom,
             apiKey.expiresAt
@@ -432,6 +445,7 @@ export function createUserWithApiKey(
     const issuer = options.issuer ?? 'webapp';
     const scopes =
         options.scopes ?? resolveDefaultSessionScopes(username, issuer);
+    const oauthClientId = options.oauthClientId ?? null;
     const apiKey = buildApiKeySession(
         username,
         keyId,
@@ -439,6 +453,7 @@ export function createUserWithApiKey(
         options.name,
         scopes,
         issuer,
+        oauthClientId,
         options.activeFrom,
         options.expiresAt
     );
@@ -457,6 +472,7 @@ export function createUserWithApiKey(
             apiKey.revokeId,
             username,
             apiKey.issuer,
+            apiKey.oauthClientId,
             apiKey.name,
             apiKey.activeFrom,
             apiKey.expiresAt
@@ -498,7 +514,8 @@ export function changeUserPasswordWithApiKey(
         revokeId,
         undefined,
         scopes,
-        issuer
+        issuer,
+        null
     );
     const now = getNowSeconds();
     const update = useUsersDatabase().transaction(() => {
@@ -520,6 +537,7 @@ export function changeUserPasswordWithApiKey(
             apiKey.revokeId,
             username,
             apiKey.issuer,
+            apiKey.oauthClientId,
             apiKey.name,
             apiKey.activeFrom,
             apiKey.expiresAt
@@ -605,6 +623,24 @@ export function revokeApiKeysByIssuer(issuer: ApiKeyIssuer) {
     };
 }
 
+export function revokeApiKeysByOauthClientId(oauthClientId: string) {
+    const now = getNowSeconds();
+    const result = authStatements.run(
+        'revokeApiKeysByOauthClientId',
+        now,
+        oauthClientId
+    );
+
+    if (result.changes > 0) {
+        apiKeyRecordCache.clear();
+    }
+
+    return {
+        revokedAt: now,
+        revokedCount: result.changes
+    };
+}
+
 export function deleteRevokedApiKeysBefore(cutoffTimestamp: number) {
     const result = authStatements.run(
         'deleteRevokedApiKeysBefore',
@@ -638,6 +674,7 @@ export function getValidApiKey(apiKey: string) {
         userId: payload.sub,
         keyId: payload.kid,
         issuer: payload.issuer,
+        oauthClientId: storedRecord.oauth_client_id,
         scopes: payload.scopes,
         activeFrom: payload.nbf,
         expiresAt: payload.exp

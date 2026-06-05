@@ -8,6 +8,7 @@ export default interface ApiIdentity extends QuotaSubject {
     keyId?: string;
     revokeId?: string;
     issuer?: AuthApiKeyIssuer;
+    oauthClientId?: string;
     scopes: string[];
     activeFrom?: number;
     expiresAt?: number;
