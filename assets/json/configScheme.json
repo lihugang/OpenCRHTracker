@@ -738,11 +738,30 @@
                                 "maxRequests",
                                 "windowSeconds"
                             ]
+                        },
+                        "oauthToken": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "maxRequests": {
+                                    "type": "integer",
+                                    "minimum": 1
+                                },
+                                "windowSeconds": {
+                                    "type": "integer",
+                                    "minimum": 1
+                                }
+                            },
+                            "required": [
+                                "maxRequests",
+                                "windowSeconds"
+                            ]
                         }
                     },
                     "required": [
                         "login",
-                        "register"
+                        "register",
+                        "oauthToken"
                     ]
                 },
                 "authCache": {

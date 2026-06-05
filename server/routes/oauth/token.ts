@@ -5,6 +5,10 @@ import {
     setResponseStatus
 } from 'h3';
 import { exchangeAuthorizationCode } from '~/server/services/oauthStore';
+import {
+    assertAuthRateLimit,
+    recordAuthRateLimitHit
+} from '~/server/utils/api/authRateLimit/ensureAuthRateLimit';
 import { validateOauthTokenOrigin } from '~/server/utils/oauth/origin';
 
 interface OAuthTokenBody {
@@ -16,7 +20,10 @@ interface OAuthTokenBody {
 }
 
 export default defineEventHandler(async (event) => {
+    assertAuthRateLimit(event, 'oauthToken');
+
     if (!(await validateOauthTokenOrigin(event))) {
+        recordAuthRateLimitHit(event, 'oauthToken');
         setResponseStatus(event, 403);
         return {
             error: 'origin_not_allowed'
@@ -33,6 +40,7 @@ export default defineEventHandler(async (event) => {
         typeof parsed.redirect_uri !== 'string' ||
         typeof parsed.code_verifier !== 'string'
     ) {
+        recordAuthRateLimitHit(event, 'oauthToken');
         setResponseStatus(event, 400);
         return {
             error: 'invalid_request'
@@ -46,6 +54,7 @@ export default defineEventHandler(async (event) => {
         codeVerifier: parsed.code_verifier
     });
     if (!token) {
+        recordAuthRateLimitHit(event, 'oauthToken');
         setResponseStatus(event, 400);
         return {
             error: 'invalid_grant'

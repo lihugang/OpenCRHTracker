@@ -187,6 +187,10 @@
             "register": {
                 "maxRequests": 3,
                 "windowSeconds": 86400
+            },
+            "oauthToken": {
+                "maxRequests": 10,
+                "windowSeconds": 600
             }
         },
         "authCache": {

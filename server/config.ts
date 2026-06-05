@@ -263,6 +263,10 @@ export interface Config {
                 maxRequests: number;
                 windowSeconds: number;
             };
+            oauthToken: {
+                maxRequests: number;
+                windowSeconds: number;
+            };
         };
         authCache: {
             userRecord: {
@@ -779,6 +783,10 @@ function validateConfig(raw: unknown): Config {
         apiAuthRateLimit.register,
         'api.authRateLimit.register'
     );
+    const apiAuthRateLimitOauthToken = asObject(
+        apiAuthRateLimit.oauthToken,
+        'api.authRateLimit.oauthToken'
+    );
     const apiAuthCache = asObject(api.authCache, 'api.authCache');
     const apiAuthCacheUserRecord = asObject(
         apiAuthCache.userRecord,
@@ -1293,6 +1301,18 @@ function validateConfig(raw: unknown): Config {
                     windowSeconds: asInteger(
                         apiAuthRateLimitRegister.windowSeconds,
                         'api.authRateLimit.register.windowSeconds',
+                        1
+                    )
+                },
+                oauthToken: {
+                    maxRequests: asInteger(
+                        apiAuthRateLimitOauthToken.maxRequests,
+                        'api.authRateLimit.oauthToken.maxRequests',
+                        1
+                    ),
+                    windowSeconds: asInteger(
+                        apiAuthRateLimitOauthToken.windowSeconds,
+                        'api.authRateLimit.oauthToken.windowSeconds',
                         1
                     )
                 }
