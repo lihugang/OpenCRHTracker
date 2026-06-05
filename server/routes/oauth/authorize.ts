@@ -6,6 +6,7 @@ import {
     setHeader
 } from 'h3';
 import {
+    authorizeValidatedRequestForUser,
     canUserAuthorizeScopes,
     createAuthorizationCode,
     createOauthLoginContinuation,
@@ -50,6 +51,21 @@ function buildRedirectUrl(
         url.searchParams.set(key, value);
     }
     return url.toString();
+}
+
+function canSessionAuthorizeRequest(
+    session: NonNullable<ReturnType<typeof getValidApiKey>>,
+    request: ReturnType<typeof validateAuthorizeRequest>
+) {
+    if (!request) {
+        return null;
+    }
+
+    if (!canUserAuthorizeScopes(session.scopes, request.requestedScopes)) {
+        return null;
+    }
+
+    return authorizeValidatedRequestForUser(request, session.userId);
 }
 
 function renderConsentPage(input: {
@@ -145,12 +161,8 @@ export default defineEventHandler(async (event) => {
             return sendRedirect(event, '/login');
         }
 
-        if (
-            !canUserAuthorizeScopes(
-                session.scopes,
-                validated.requestedScopes
-            )
-        ) {
+        const authorized = canSessionAuthorizeRequest(session, validated);
+        if (!authorized) {
             return sendRedirect(
                 event,
                 buildRedirectUrl(request.redirectUri, {
@@ -172,14 +184,14 @@ export default defineEventHandler(async (event) => {
 
         grantOauthConsents(
             session.userId,
-            validated.client.clientId,
-            validated.requestedScopes
+            authorized.client.clientId,
+            authorized.requestedScopes
         );
         const code = createAuthorizationCode({
-            clientId: validated.client.clientId,
+            clientId: authorized.client.clientId,
             userId: session.userId,
             redirectUri: request.redirectUri,
-            approvedScopes: validated.requestedScopes,
+            approvedScopes: authorized.requestedScopes,
             codeChallenge: request.codeChallenge,
             codeChallengeMethod: request.codeChallengeMethod,
             nonce: request.nonce,
@@ -213,7 +225,8 @@ export default defineEventHandler(async (event) => {
         return sendRedirect(event, '/login');
     }
 
-    if (!canUserAuthorizeScopes(session.scopes, validated.requestedScopes)) {
+    const authorized = canSessionAuthorizeRequest(session, validated);
+    if (!authorized) {
         return sendRedirect(
             event,
             buildRedirectUrl(authorizeRequest.redirectUri, {
@@ -223,12 +236,12 @@ export default defineEventHandler(async (event) => {
         );
     }
 
-    if (!needsConsent(session.userId, validated.client, validated.requestedScopes)) {
+    if (!needsConsent(session.userId, authorized.client, authorized.requestedScopes)) {
         const code = createAuthorizationCode({
-            clientId: validated.client.clientId,
+            clientId: authorized.client.clientId,
             userId: session.userId,
             redirectUri: authorizeRequest.redirectUri,
-            approvedScopes: validated.requestedScopes,
+            approvedScopes: authorized.requestedScopes,
             codeChallenge: authorizeRequest.codeChallenge,
             codeChallengeMethod: authorizeRequest.codeChallengeMethod,
             nonce: authorizeRequest.nonce,
@@ -246,16 +259,16 @@ export default defineEventHandler(async (event) => {
 
     setHeader(event, 'content-type', 'text/html; charset=UTF-8');
     return renderConsentPage({
-        clientName: validated.client.name,
-        ownerUserId: validated.client.ownerUserId,
+        clientName: authorized.client.name,
+        ownerUserId: authorized.client.ownerUserId,
         redirectUri: authorizeRequest.redirectUri,
         state: authorizeRequest.state,
-        scopes: validated.requestedScopes,
+        scopes: authorized.requestedScopes,
         hiddenFields: {
             response_type: authorizeRequest.responseType,
             client_id: authorizeRequest.clientId,
             redirect_uri: authorizeRequest.redirectUri,
-            scope: validated.requestedScopes.join(' '),
+            scope: authorized.requestedScopes.join(' '),
             state: authorizeRequest.state,
             code_challenge: authorizeRequest.codeChallenge,
             code_challenge_method: authorizeRequest.codeChallengeMethod,

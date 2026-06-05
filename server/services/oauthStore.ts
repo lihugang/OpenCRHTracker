@@ -94,6 +94,18 @@ export interface OAuthContinuationPayload {
     authorizeRequest: OAuthAuthorizeRequest;
 }
 
+export interface ValidatedOAuthAuthorizeRequest {
+    client: OAuthClient;
+    requestedScopes: string[];
+    pendingScopes: string[];
+}
+
+export interface AuthorizedOAuthAuthorizeRequest
+    extends ValidatedOAuthAuthorizeRequest {
+    hasPendingScopes: boolean;
+    requiresOwnerBypass: boolean;
+}
+
 type OAuthSqlKey =
     | 'insertOauthClient'
     | 'updateOauthClient'
@@ -208,10 +220,18 @@ function insertScopeRequests(clientId: string, requestedScopes: string[]) {
     }
 }
 
-function getApprovedScopeRequests(client: OAuthClient) {
-    return client.scopeRequests
-        .filter((item) => item.reviewStatus === 'approved')
-        .map((item) => item.scope);
+function getRequestedScopeReviewStatuses(
+    client: OAuthClient,
+    requestedScopes: string[]
+) {
+    const scopeStatusMap = new Map(
+        client.scopeRequests.map((item) => [item.scope, item.reviewStatus])
+    );
+
+    return requestedScopes.map((scope) => ({
+        scope,
+        reviewStatus: scopeStatusMap.get(scope)
+    }));
 }
 
 export function listOauthClientsByOwner(ownerUserId: string) {
@@ -553,7 +573,9 @@ export function buildUserInfo(
           };
 }
 
-export function validateAuthorizeRequest(input: OAuthAuthorizeRequest) {
+export function validateAuthorizeRequest(
+    input: OAuthAuthorizeRequest
+): ValidatedOAuthAuthorizeRequest | null {
     if (input.responseType !== 'code') {
         return null;
     }
@@ -572,19 +594,51 @@ export function validateAuthorizeRequest(input: OAuthAuthorizeRequest) {
         return null;
     }
 
-    const approvedScopes = getApprovedScopeRequests(client);
     const requestedScopes = normalizeScopeRequests(input.scope);
-    const allowedScopes = requestedScopes.filter((scope) =>
-        approvedScopes.includes(scope)
+    const scopeReviews = getRequestedScopeReviewStatuses(
+        client,
+        requestedScopes
     );
+    const hasUnknownScope = scopeReviews.some(
+        (item) => typeof item.reviewStatus !== 'string'
+    );
+    if (hasUnknownScope) {
+        return null;
+    }
 
-    if (allowedScopes.length !== requestedScopes.length) {
+    const hasRejectedScope = scopeReviews.some(
+        (item) => item.reviewStatus === 'rejected'
+    );
+    if (hasRejectedScope) {
+        return null;
+    }
+
+    const pendingScopes = scopeReviews
+        .filter((item) => item.reviewStatus === 'pending')
+        .map((item) => item.scope);
+
+    return {
+        client,
+        requestedScopes,
+        pendingScopes
+    };
+}
+
+export function authorizeValidatedRequestForUser(
+    validated: ValidatedOAuthAuthorizeRequest,
+    userId: string
+): AuthorizedOAuthAuthorizeRequest | null {
+    const hasPendingScopes = validated.pendingScopes.length > 0;
+    const isClientOwner = validated.client.ownerUserId === userId;
+
+    if (hasPendingScopes && !isClientOwner) {
         return null;
     }
 
     return {
-        client,
-        requestedScopes
+        ...validated,
+        hasPendingScopes,
+        requiresOwnerBypass: hasPendingScopes
     };
 }
 
