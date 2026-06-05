@@ -5,6 +5,7 @@ import {
     setResponseStatus
 } from 'h3';
 import { exchangeAuthorizationCode } from '~/server/services/oauthStore';
+import { validateOauthTokenOrigin } from '~/server/utils/oauth/origin';
 
 interface OAuthTokenBody {
     grant_type?: string;
@@ -15,6 +16,13 @@ interface OAuthTokenBody {
 }
 
 export default defineEventHandler(async (event) => {
+    if (!(await validateOauthTokenOrigin(event))) {
+        setResponseStatus(event, 403);
+        return {
+            error: 'origin_not_allowed'
+        };
+    }
+
     const body = await readBody<OAuthTokenBody | null>(event);
     const parsed = body ?? {};
 
