@@ -196,6 +196,61 @@ export interface OAuthTokenResponse {
     scope: string;
 }
 
+export interface OAuthAuthorizeRequest {
+    responseType: string;
+    clientId: string;
+    redirectUri: string;
+    scope: string[];
+    state: string;
+    codeChallenge: string;
+    codeChallengeMethod: 'S256';
+    nonce: string;
+}
+
+export interface OAuthAuthorizeContextClient {
+    clientId: string;
+    name: string;
+    description: string | null;
+    homepageUrl: string | null;
+    ownerUserId: string;
+    isTrusted: boolean;
+}
+
+export interface OAuthAuthorizeContextSession {
+    userId: string;
+    activeFrom: number;
+}
+
+export type OAuthAuthorizeInvalidReason =
+    | 'unsupported_response_type'
+    | 'invalid_client'
+    | 'inactive_client'
+    | 'invalid_redirect_uri'
+    | 'unsupported_code_challenge_method'
+    | 'unknown_scope'
+    | 'rejected_scope';
+
+export type OAuthAuthorizeContextResponse =
+    | {
+          mode: 'redirect';
+          location: string;
+      }
+    | {
+          mode: 'error';
+          error: 'invalid_request';
+          reason: OAuthAuthorizeInvalidReason;
+          message: string;
+      }
+    | {
+          mode: 'consent';
+          client: OAuthAuthorizeContextClient;
+          request: OAuthAuthorizeRequest;
+          session: OAuthAuthorizeContextSession;
+          scopes: string[];
+          hasPendingScopes: boolean;
+          requiresOwnerBypass: boolean;
+      };
+
 export interface AuthFavoritesResponse {
     userId: string;
     maxEntries: number;

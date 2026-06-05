@@ -15,6 +15,8 @@ import { signOidcIdToken } from '~/server/utils/oauth/idToken';
 import importSqlBatch from '~/server/utils/sql/importSqlBatch';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
 import type {
+    OAuthAuthorizeRequest,
+    OAuthAuthorizeInvalidReason,
     OAuthClient,
     OAuthClientCreateInput,
     OAuthClientPublicItem,
@@ -82,17 +84,6 @@ interface OAuthLoginContinuationRow {
     consumed_at: number | null;
 }
 
-export interface OAuthAuthorizeRequest {
-    responseType: string;
-    clientId: string;
-    redirectUri: string;
-    scope: string[];
-    state: string;
-    codeChallenge: string;
-    codeChallengeMethod: 'S256';
-    nonce: string;
-}
-
 export interface OAuthContinuationPayload {
     authorizeRequest: OAuthAuthorizeRequest;
 }
@@ -102,6 +93,21 @@ export interface ValidatedOAuthAuthorizeRequest {
     requestedScopes: string[];
     pendingScopes: string[];
 }
+
+export interface InvalidOAuthAuthorizeRequest {
+    reason: OAuthAuthorizeInvalidReason;
+    message: string;
+}
+
+export type OAuthAuthorizeValidationResult =
+    | {
+          ok: true;
+          data: ValidatedOAuthAuthorizeRequest;
+      }
+    | {
+          ok: false;
+          error: InvalidOAuthAuthorizeRequest;
+      };
 
 export interface AuthorizedOAuthAuthorizeRequest
     extends ValidatedOAuthAuthorizeRequest {
@@ -678,23 +684,58 @@ export function buildUserInfo(
 
 export function validateAuthorizeRequest(
     input: OAuthAuthorizeRequest
-): ValidatedOAuthAuthorizeRequest | null {
+): OAuthAuthorizeValidationResult {
     if (input.responseType !== 'code') {
-        return null;
+        return {
+            ok: false,
+            error: {
+                reason: 'unsupported_response_type',
+                message: `仅支持 response_type=code，当前收到 ${input.responseType || '(empty)'}。`
+            }
+        };
     }
 
     const client = getOauthClientById(input.clientId);
-    if (!client || client.status !== 'active') {
-        return null;
+    if (!client) {
+        return {
+            ok: false,
+            error: {
+                reason: 'invalid_client',
+                message: `未找到 client_id=${input.clientId || '(empty)'} 对应的 OAuth 客户端。`
+            }
+        };
+    }
+
+    if (client.status !== 'active') {
+        return {
+            ok: false,
+            error: {
+                reason: 'inactive_client',
+                message: `OAuth 客户端 ${client.clientId} 当前未启用。`
+            }
+        };
     }
 
     const redirectUris = client.redirectUris.map((item) => item.value);
     if (!redirectUris.includes(input.redirectUri)) {
-        return null;
+        return {
+            ok: false,
+            error: {
+                reason: 'invalid_redirect_uri',
+                message:
+                    '请求中的 redirect_uri 未在该 OAuth 客户端的回调地址列表中登记。'
+            }
+        };
     }
 
     if (input.codeChallengeMethod !== 'S256') {
-        return null;
+        return {
+            ok: false,
+            error: {
+                reason: 'unsupported_code_challenge_method',
+                message: `仅支持 code_challenge_method=S256，当前收到 ${input.codeChallengeMethod || '(empty)'}。`
+            }
+        };
     }
 
     const requestedScopes = normalizeScopeRequests(input.scope);
@@ -706,14 +747,32 @@ export function validateAuthorizeRequest(
         (item) => typeof item.reviewStatus !== 'string'
     );
     if (hasUnknownScope) {
-        return null;
+        const unknownScope = scopeReviews.find(
+            (item) => typeof item.reviewStatus !== 'string'
+        )?.scope;
+        return {
+            ok: false,
+            error: {
+                reason: 'unknown_scope',
+                message: `请求的 scope ${unknownScope || '(unknown)'} 未在该客户端登记。`
+            }
+        };
     }
 
     const hasRejectedScope = scopeReviews.some(
         (item) => item.reviewStatus === 'rejected'
     );
     if (hasRejectedScope) {
-        return null;
+        const rejectedScope = scopeReviews.find(
+            (item) => item.reviewStatus === 'rejected'
+        )?.scope;
+        return {
+            ok: false,
+            error: {
+                reason: 'rejected_scope',
+                message: `请求的 scope ${rejectedScope || '(unknown)'} 已被管理员拒绝。`
+            }
+        };
     }
 
     const pendingScopes = scopeReviews
@@ -721,9 +780,12 @@ export function validateAuthorizeRequest(
         .map((item) => item.scope);
 
     return {
-        client,
-        requestedScopes,
-        pendingScopes
+        ok: true,
+        data: {
+            client,
+            requestedScopes,
+            pendingScopes
+        }
     };
 }
 
