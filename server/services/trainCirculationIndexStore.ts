@@ -1155,6 +1155,9 @@ function buildValidatedOfficialCirculationMap(
                     segment.startIndex,
                     segment.endIndex + 1
                 );
+                const isMatchedSegment =
+                    segment.startIndex === officialStartIndex &&
+                    segment.endIndex === officialEndIndex;
                 const metadata = buildOfficialValidationMetadata(
                     'split_official',
                     entryKey,
@@ -1162,7 +1165,10 @@ function buildValidatedOfficialCirculationMap(
                         splitSegmentIndex: index,
                         splitSegmentCount,
                         matchedInferredRouteId:
-                            splitCandidate.circulation.routeId
+                            splitCandidate.circulation.routeId,
+                        candidateInferredCirculation: isMatchedSegment
+                            ? splitCandidate.publicReference
+                            : null
                     }
                 );
                 const circulation = buildPublicOfficialCirculationFromEntry(

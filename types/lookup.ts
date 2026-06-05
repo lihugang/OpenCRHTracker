@@ -172,6 +172,7 @@ export interface TrainCirculationMetadata extends Partial<InferredTrainCirculati
     splitSegmentIndex?: number;
     splitSegmentCount?: number;
     matchedInferredRouteId?: string;
+    // Filled for unmatched_official and for the matched segment of split_official.
     candidateInferredCirculation?: InferredTrainCirculationReference | null;
 }
 
