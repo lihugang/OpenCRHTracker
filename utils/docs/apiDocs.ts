@@ -414,6 +414,12 @@ export const DEFAULT_DOCS_API_RUNTIME_CONFIG: DocsApiRuntimeConfig = {
         defaultLimit: 20,
         maxLimit: 200
     },
+    quota: {
+        anonymousMaxTokens: 25,
+        userMaxTokens: 1000,
+        refillAmount: 5,
+        refillIntervalSeconds: 300
+    },
     cost: {
         minimumRequestCost: 1,
         fixed: {

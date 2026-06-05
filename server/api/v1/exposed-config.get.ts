@@ -44,6 +44,13 @@ export default defineEventHandler(async (event) => {
                         defaultLimit: config.api.pagination.defaultLimit,
                         maxLimit: config.api.pagination.maxLimit
                     },
+                    quota: {
+                        anonymousMaxTokens: config.quota.anonymousMaxTokens,
+                        userMaxTokens: config.quota.userMaxTokens,
+                        refillAmount: config.quota.refillAmount,
+                        refillIntervalSeconds:
+                            config.quota.refillIntervalSeconds
+                    },
                     cost: {
                         minimumRequestCost: 1,
                         fixed: {

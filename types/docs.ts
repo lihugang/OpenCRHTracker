@@ -227,5 +227,11 @@ export interface DocsApiRuntimeConfig {
         defaultLimit: number;
         maxLimit: number;
     };
+    quota: {
+        anonymousMaxTokens: number;
+        userMaxTokens: number;
+        refillAmount: number;
+        refillIntervalSeconds: number;
+    };
     cost: DocsApiCostRuntimeConfig;
 }
