@@ -61,18 +61,6 @@
                                 </div>
 
                                 <div
-                                    class="rounded-[1rem] border border-white/70 bg-white/80 px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
-                                    <p
-                                        class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
-                                        回调地址
-                                    </p>
-                                    <p
-                                        class="mt-1 break-all font-mono text-sm text-crh-blue">
-                                        {{ consent.request.redirectUri }}
-                                    </p>
-                                </div>
-
-                                <div
                                     v-if="consent.client.homepageUrl"
                                     class="rounded-[1rem] border border-white/70 bg-white/80 px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
                                     <p
@@ -100,9 +88,6 @@
                             <h2 class="text-2xl font-semibold text-slate-900">
                                 该应用将获得以下权限
                             </h2>
-                            <p class="text-sm leading-6 text-slate-600">
-                                请确认这些权限与你的预期一致，再决定是否继续。
-                            </p>
                         </div>
 
                         <div
@@ -191,7 +176,11 @@ import { computed, ref } from 'vue';
 import useTrackedRequestFetch, {
     type TrackedRequestFetch
 } from '~/composables/useTrackedRequestFetch';
-import type { OAuthAuthorizeContextResponse } from '~/types/auth';
+import type {
+    OAuthAuthorizeContextResponse,
+    OAuthAuthorizeDecisionResponse
+} from '~/types/auth';
+import type { TrackerApiResponse } from '~/types/homepage';
 import getApiErrorMessage from '~/utils/api/getApiErrorMessage';
 
 definePageMeta({
@@ -258,7 +247,9 @@ async function submitDecision(decision: 'approve' | 'deny') {
     statusMessage.value = '';
 
     try {
-        const response = await useNuxtApp().$csrfFetch.raw(
+        const response = await useNuxtApp().$csrfFetch<
+            TrackerApiResponse<OAuthAuthorizeDecisionResponse>
+        >(
             '/oauth/authorize',
             {
                 method: 'POST',
@@ -272,19 +263,19 @@ async function submitDecision(decision: 'approve' | 'deny') {
                     code_challenge: consent.request.codeChallenge,
                     code_challenge_method: consent.request.codeChallengeMethod,
                     nonce: consent.request.nonce
-                },
-                redirect: 'manual'
+                }
             }
         );
 
-        const locationHeader = response.headers.get('location');
-        if (!locationHeader) {
-            throw new Error('OAuth authorize redirect missing location header');
+        if (!response.ok) {
+            throw {
+                data: response
+            };
         }
 
-        await navigateTo(locationHeader, {
-            external: locationHeader.startsWith('http://') ||
-                locationHeader.startsWith('https://')
+        await navigateTo(response.data.location, {
+            external: response.data.location.startsWith('http://') ||
+                response.data.location.startsWith('https://')
         });
     } catch (error) {
         statusMessage.value = getApiErrorMessage(

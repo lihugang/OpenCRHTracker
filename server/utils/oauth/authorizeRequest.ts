@@ -23,7 +23,7 @@ export interface OAuthAuthorizeDecisionInput {
 
 export type OAuthAuthorizeDecisionResult =
     | {
-          type: 'redirect';
+          type: 'success';
           location: string;
       }
     | {
@@ -206,7 +206,7 @@ export function applyAuthorizeDecision(
     const validated = validateAuthorizeRequest(input.request);
     if (!validated.ok) {
         return {
-            type: 'redirect',
+            type: 'success',
             location: buildRedirectUrl(input.request.redirectUri, {
                 error: 'invalid_request',
                 state: input.request.state
@@ -217,7 +217,7 @@ export function applyAuthorizeDecision(
     const session = resolveAuthorizeSession(event);
     if (!session) {
         return {
-            type: 'redirect',
+            type: 'success',
             location: '/login'
         };
     }
@@ -225,7 +225,7 @@ export function applyAuthorizeDecision(
     const authorized = canSessionAuthorizeRequest(session, validated);
     if (!authorized) {
         return {
-            type: 'redirect',
+            type: 'success',
             location: buildRedirectUrl(input.request.redirectUri, {
                 error: 'access_denied',
                 state: input.request.state
@@ -235,7 +235,7 @@ export function applyAuthorizeDecision(
 
     if (input.decision !== 'approve') {
         return {
-            type: 'redirect',
+            type: 'success',
             location: buildRedirectUrl(input.request.redirectUri, {
                 error: 'access_denied',
                 state: input.request.state
@@ -260,7 +260,7 @@ export function applyAuthorizeDecision(
     });
 
     return {
-        type: 'redirect',
+        type: 'success',
         location: buildRedirectUrl(input.request.redirectUri, {
             code,
             state: input.request.state

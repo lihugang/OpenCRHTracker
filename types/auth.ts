@@ -251,6 +251,10 @@ export type OAuthAuthorizeContextResponse =
           requiresOwnerBypass: boolean;
       };
 
+export interface OAuthAuthorizeDecisionResponse {
+    location: string;
+}
+
 export interface AuthFavoritesResponse {
     userId: string;
     maxEntries: number;

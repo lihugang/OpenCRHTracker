@@ -744,7 +744,18 @@ export const deployDocsSections: DocsContentSection[] = [
                         path: 'api.authRateLimit',
                         valueType: 'object',
                         required: true,
-                        description: '登录与注册接口的限流配置。'
+                        description: '登录、注册与 OAuth 令牌接口的限流配置。'
+                    },
+                    {
+                        path: 'api.authRateLimit.oauthToken',
+                        valueType: 'object',
+                        required: true,
+                        description:
+                            'OAuth 令牌交换接口的限流配置，对应 POST /oauth/token。',
+                        notes: [
+                            '该接口用于将授权码交换为访问令牌，建议单独设置比登录接口更短的窗口期。',
+                            '限流命中后会直接拒绝请求；来源校验失败、请求体无效或授权码无效时也会计入这一额度。'
+                        ]
                     },
                     {
                         path: 'api.authCache',
