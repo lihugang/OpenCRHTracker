@@ -510,6 +510,7 @@
                 :items="oauthClientItems"
                 :is-loading="isOauthClientsLoading"
                 :error-message="oauthClientsErrorMessage"
+                :format-timestamp="formatTimestamp"
                 @refresh="refreshOauthClients()" />
         </UiModal>
 
@@ -1719,7 +1720,7 @@ async function createOauthClient() {
 
         oauthMutationTone.value = 'success';
         oauthMutationMessage.value =
-            'OAuth 客户端已创建，scope 默认处于待审核状态。';
+            '已创建 OAuth 客户端，请等待管理员审核。';
         clearOauthFormFields();
         await refreshOauthClients();
     } catch (error) {
