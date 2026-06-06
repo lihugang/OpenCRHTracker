@@ -343,7 +343,23 @@ function formatOptionalNumber(value: number | null) {
     return typeof value === 'number' ? formatNumber(value) : '--';
 }
 
-function parseOptionalPositiveInteger(value: string) {
+function parseOptionalPositiveInteger(value: unknown) {
+    if (value === null || value === undefined) {
+        return null;
+    }
+
+    if (typeof value === 'number') {
+        if (!Number.isSafeInteger(value) || value <= 0) {
+            throw new Error('请输入大于 0 的正整数。');
+        }
+
+        return value;
+    }
+
+    if (typeof value !== 'string') {
+        throw new Error('请输入正整数，或留空表示清除自定义设置。');
+    }
+
     const normalizedValue = value.trim();
     if (normalizedValue.length === 0) {
         return null;
