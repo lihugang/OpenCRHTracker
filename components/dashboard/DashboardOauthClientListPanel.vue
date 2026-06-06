@@ -113,6 +113,18 @@
                                         </p>
                                     </div>
                                 </div>
+
+                                <UiButton
+                                    v-if="canDelete"
+                                    type="button"
+                                    variant="secondary"
+                                    size="sm"
+                                    class="!text-rose-700 hover:!border-rose-200 hover:!bg-rose-50"
+                                    :loading="isPending(item.clientId)"
+                                    :disabled="isLoading"
+                                    @click="emit('delete', item)">
+                                    删除
+                                </UiButton>
                             </div>
 
                             <div
@@ -264,11 +276,14 @@ defineProps<{
     items: OAuthClientPublicItem[];
     isLoading: boolean;
     errorMessage: string;
+    canDelete: boolean;
+    isPending: (clientId: string) => boolean;
     formatTimestamp: (timestamp: number) => string;
 }>();
 
 const emit = defineEmits<{
     refresh: [];
+    delete: [item: OAuthClientPublicItem];
 }>();
 
 function getClientStatusLabel(status: OAuthClientStatus) {

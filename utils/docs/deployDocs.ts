@@ -865,7 +865,8 @@ export const deployDocsSections: DocsContentSection[] = [
                             '如需默认允许当前车次时刻表接口，请包含 api.timetable.train.current.read；如需默认允许历史车次时刻表接口，请同时包含 api.timetable.train.history.read。',
                             '如需默认允许列车交路运行图图片接口，请包含 api.timetable.train.circulation.image.read。',
                             '如需默认允许车站时刻表接口，请包含 api.timetable.station.read。',
-                            '如需让 Web 端收藏功能开箱即用，请包含 api.auth.favorites.read 和 api.auth.favorites.write。'
+                            '如需让 Web 端收藏功能开箱即用，请包含 api.auth.favorites.read 和 api.auth.favorites.write。',
+                            '如需让 Web 端用户删除自己创建的 OAuth 客户端，请包含 api.auth.oauth-clients.delete；已有登录会话可能需要重新登录后才会拿到新增 scope。'
                         ]
                     },
                     {
@@ -1081,11 +1082,11 @@ export const deployDocsSections: DocsContentSection[] = [
                         description: '健康检查、身份相关和调试接口的固定成本。'
                     },
                     {
-                        path: 'cost.fixed.authChangePassword / authIssueApiKey / authCreateOauthClient / authListApiKeys / authRevokeApiKey',
+                        path: 'cost.fixed.authChangePassword / authIssueApiKey / authCreateOauthClient / authDeleteOauthClient / authListApiKeys / authRevokeApiKey',
                         valueType: 'integer',
                         required: true,
                         description:
-                            'API Key 管理接口与 OAuth 客户端创建接口的固定成本。'
+                            'API Key 管理接口与 OAuth 客户端创建、删除接口的固定成本。'
                     },
                     {
                         path: 'cost.fixed.searchIndex / timetableTrainCurrent / trainCirculationImage / trainCirculationImageCacheHit / trainCirculationImageFailure / timetableTrainHistory / exportDailyIndex / exportDaily',
@@ -1137,6 +1138,7 @@ export const deployDocsSections: DocsContentSection[] = [
                     '修改 user.adminUserIds 或 OCRH_ADMIN_USERS 后需要重启 Node 进程，新的登录会话才会按最新名单授予管理员权限。',
                     '修改 user.push 或 OCRH_VAPID_PUBLIC_KEY / OCRH_VAPID_PRIVATE_KEY / OCRH_VAPID_EMAIL 后需要重启 Node 进程，并建议立即用一台 Apple Safari PWA 设备验证推送是否正常。',
                     '修改 oauth.idTokenSigning 或 OCRH_OAUTH_ID_TOKEN_SIGNING_KID / OCRH_OAUTH_ID_TOKEN_SIGNING_PRIVATE_KEY 后需要重启 Node 进程，并建议立即验证 JWKS 输出与 id_token 签名是否正常。',
+                    '升级到支持 OAuth 客户端删除的版本后，既有私有部署需要在 cost.fixed 中补充 authDeleteOauthClient，并按需在 api.permissions.issuedKeyDefaultScopes 中补充 api.auth.oauth-clients.delete。',
                     '提高 api.permissions.anonymousScopes、quota 或 cost 前，先确认你准备公开暴露的接口范围和限额策略。',
                     '修改 spider.scheduleProbe.prefixRules、task.referenceModel.dailyTimesHHmm、task.circulation.dailyTimesHHmm 或 task.scheduler 参数后，重启后应观察首轮任务执行是否符合预期。',
                     '修改 spider.rateLimit.stationBoard 或 task.circulation.stationBoard 后，重启后应关注车站大屏相关抓取、重试与交路推断任务是否按预期工作。'

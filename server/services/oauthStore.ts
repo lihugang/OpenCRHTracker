@@ -356,12 +356,24 @@ export function deleteOauthClientByOwner(
     clientId: string,
     ownerUserId: string
 ) {
-    const result = oauthStatements.run(
-        'deleteOauthClient',
-        clientId,
-        ownerUserId
-    );
-    return result.changes > 0;
+    const existing = getOauthClientByIdAndOwner(clientId, ownerUserId);
+    if (!existing) {
+        return false;
+    }
+
+    let deleted = false;
+    const deleteClient = useUsersDatabase().transaction(() => {
+        revokeApiKeysByOauthClientId(clientId);
+        const result = oauthStatements.run(
+            'deleteOauthClient',
+            clientId,
+            ownerUserId
+        );
+        deleted = result.changes > 0;
+    });
+
+    deleteClient();
+    return deleted;
 }
 
 export function updateOauthClientAdmin(

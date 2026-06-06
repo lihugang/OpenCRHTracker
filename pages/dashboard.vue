@@ -592,8 +592,68 @@
                 :items="oauthClientItems"
                 :is-loading="isOauthClientsLoading"
                 :error-message="oauthClientsErrorMessage"
+                :can-delete="canDeleteOauthClients"
+                :is-pending="isOauthClientDeletePending"
                 :format-timestamp="formatTimestamp"
-                @refresh="refreshOauthClients()" />
+                @refresh="refreshOauthClients()"
+                @delete="openOauthClientDeleteModal" />
+        </UiModal>
+
+        <UiModal
+            :model-value="oauthClientDeleteTarget !== null"
+            title="删除 OAuth 客户端"
+            :close-on-backdrop="!isDeletingOauthClient"
+            @update:model-value="handleOauthClientDeleteModalVisibilityChange">
+            <div
+                v-if="oauthClientDeleteTarget"
+                class="space-y-4">
+                <div
+                    class="dashboard-soft-surface rounded-[1rem] border px-4 py-4">
+                    <div class="space-y-3">
+                        <p class="text-base font-semibold text-slate-900">
+                            {{ oauthClientDeleteTarget.name }}
+                        </p>
+                        <p
+                            class="break-all font-mono text-sm font-semibold text-crh-blue">
+                            {{ oauthClientDeleteTarget.clientId }}
+                        </p>
+                        <p class="text-sm leading-6 text-slate-600">
+                            删除后，该 OAuth 客户端的配置、授权记录和现有
+                            OAuth 访问令牌会失效。这个操作不能撤销。
+                        </p>
+                    </div>
+                </div>
+
+                <p
+                    v-if="oauthClientDeleteErrorMessage"
+                    class="flex items-center gap-1.5 pl-1 text-xs leading-5 text-[#E53E3E]">
+                    <span
+                        aria-hidden="true"
+                        class="font-semibold">
+                        [!]
+                    </span>
+                    {{ oauthClientDeleteErrorMessage }}
+                </p>
+            </div>
+
+            <template #footer>
+                <div
+                    class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                    <UiButton
+                        type="button"
+                        variant="secondary"
+                        :disabled="isDeletingOauthClient"
+                        @click="closeOauthClientDeleteModal">
+                        取消
+                    </UiButton>
+                    <UiButton
+                        type="button"
+                        :loading="isDeletingOauthClient"
+                        @click="confirmOauthClientDelete">
+                        确认删除
+                    </UiButton>
+                </div>
+            </template>
         </UiModal>
 
         <AppFooter />
@@ -645,6 +705,7 @@ const AUTHORIZATION_READ_SCOPE = 'api.auth.authorizations.read';
 const AUTHORIZATION_REVOKE_SCOPE = 'api.auth.authorizations.revoke';
 const ISSUE_SCOPE = 'api.auth.api-keys.create';
 const REVOKE_SCOPE = 'api.auth.api-keys.revoke';
+const OAUTH_CLIENT_DELETE_SCOPE = 'api.auth.oauth-clients.delete';
 const DEFAULT_ISSUE_LIFETIME_SECONDS = 30 * 24 * 60 * 60;
 
 const dashboardPageCopy = {
@@ -728,6 +789,9 @@ const scopeLabelMap: Record<string, string> = {
     'api.auth.api-keys.read': '读取密钥',
     'api.auth.api-keys.create': '签发密钥',
     'api.auth.api-keys.revoke': '吊销密钥',
+    'api.auth.oauth-clients': 'OAuth 客户端',
+    'api.auth.oauth-clients.write': '创建 OAuth 客户端',
+    'api.auth.oauth-clients.delete': '删除 OAuth 客户端',
     'api.auth.favorites': '收藏',
     'api.auth.favorites.read': '读取收藏',
     'api.auth.favorites.write': '修改收藏',
@@ -838,6 +902,10 @@ const authorizationRevokeTarget = ref<AuthAuthorizationItem | null>(null);
 const authorizationRevokeErrorMessage = ref('');
 const revokingAuthorizationClientIds = ref<string[]>([]);
 const isRevokingAuthorization = ref(false);
+const oauthClientDeleteTarget = ref<OAuthClientPublicItem | null>(null);
+const oauthClientDeleteErrorMessage = ref('');
+const deletingOauthClientIds = ref<string[]>([]);
+const isDeletingOauthClient = ref(false);
 const developerMode = ref<DeveloperMode>('keys');
 const isApiKeyListModalOpen = ref(false);
 const isOauthClientListModalOpen = ref(false);
@@ -1178,6 +1246,9 @@ const canIssueApiKeys = computed(() =>
 const canRevokeApiKeys = computed(() =>
     hasClientScope(session.value?.scopes ?? [], REVOKE_SCOPE)
 );
+const canDeleteOauthClients = computed(() =>
+    hasClientScope(session.value?.scopes ?? [], OAUTH_CLIENT_DELETE_SCOPE)
+);
 const resolvedUserPreferenceMessage = computed(() => {
     if (userPreferenceMessage.value) {
         return userPreferenceMessage.value;
@@ -1503,6 +1574,10 @@ function openOauthClientListModal() {
     isOauthClientListModalOpen.value = true;
 }
 
+function isOauthClientDeletePending(clientId: string) {
+    return deletingOauthClientIds.value.includes(clientId);
+}
+
 function openRevokeModal(item: AuthApiKeyListItem) {
     if (!canRevokeApiKeys.value || item.revokedAt !== null) {
         return;
@@ -1540,6 +1615,33 @@ function closeAuthorizationRevokeModal() {
 function handleAuthorizationRevokeModalVisibilityChange(nextValue: boolean) {
     if (!nextValue) {
         closeAuthorizationRevokeModal();
+    }
+}
+
+function openOauthClientDeleteModal(item: OAuthClientPublicItem) {
+    if (
+        !canDeleteOauthClients.value ||
+        isOauthClientDeletePending(item.clientId)
+    ) {
+        return;
+    }
+
+    oauthClientDeleteTarget.value = item;
+    oauthClientDeleteErrorMessage.value = '';
+}
+
+function closeOauthClientDeleteModal() {
+    if (isDeletingOauthClient.value) {
+        return;
+    }
+
+    oauthClientDeleteTarget.value = null;
+    oauthClientDeleteErrorMessage.value = '';
+}
+
+function handleOauthClientDeleteModalVisibilityChange(nextValue: boolean) {
+    if (!nextValue) {
+        closeOauthClientDeleteModal();
     }
 }
 
@@ -1802,6 +1904,34 @@ async function confirmAuthorizationRevoke() {
     } finally {
         isRevokingAuthorization.value = false;
         revokingAuthorizationClientIds.value = [];
+    }
+}
+
+async function confirmOauthClientDelete() {
+    if (!oauthClientDeleteTarget.value || isDeletingOauthClient.value) {
+        return;
+    }
+
+    const target = oauthClientDeleteTarget.value;
+    isDeletingOauthClient.value = true;
+    oauthClientDeleteErrorMessage.value = '';
+    deletingOauthClientIds.value = [target.clientId];
+
+    try {
+        await executeMutation(`/api/v1/oauth/clients/${target.clientId}`, {
+            method: 'DELETE'
+        });
+
+        oauthClientDeleteTarget.value = null;
+        await refreshOauthClients();
+    } catch (error) {
+        oauthClientDeleteErrorMessage.value = getApiErrorMessage(
+            error,
+            '删除 OAuth 客户端失败，请稍后重试。'
+        );
+    } finally {
+        isDeletingOauthClient.value = false;
+        deletingOauthClientIds.value = [];
     }
 }
 

@@ -355,6 +355,7 @@ export interface Config {
             debugEchoError: number;
             authIssueApiKey: number;
             authCreateOauthClient: number;
+            authDeleteOauthClient: number;
             authListApiKeys: number;
             authRevokeApiKey: number;
             authListAuthorizations: number;
@@ -1801,6 +1802,11 @@ function validateConfig(raw: unknown): Config {
                 authCreateOauthClient: asNumber(
                     costFixed.authCreateOauthClient,
                     'cost.fixed.authCreateOauthClient',
+                    0
+                ),
+                authDeleteOauthClient: asNumber(
+                    costFixed.authDeleteOauthClient,
+                    'cost.fixed.authDeleteOauthClient',
                     0
                 ),
                 authListApiKeys: asNumber(
