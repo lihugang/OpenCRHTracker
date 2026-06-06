@@ -7,7 +7,7 @@
             class="pointer-events-none absolute inset-x-0 top-24 h-48 bg-[linear-gradient(90deg,_rgba(90,132,162,0.12),_rgba(90,132,162,0))] blur-3xl" />
 
         <div
-            class="relative mx-auto flex min-h-screen w-full max-w-4xl flex-1 items-center px-4 py-10 sm:px-6 lg:px-8">
+            class="relative mx-auto flex w-full max-w-4xl flex-1 items-center px-4 py-10 sm:px-6 lg:px-8">
             <UiCard
                 :show-accent-bar="false"
                 class="w-full overflow-hidden border-slate-200/80 bg-white/95 shadow-[0_26px_70px_-38px_rgba(15,23,42,0.35)] backdrop-blur">
@@ -24,7 +24,7 @@
                                 </p>
                                 <h1
                                     class="text-3xl font-semibold tracking-tight text-slate-900">
-                                    授权 {{ consent.client.name }}
+                                    授权 {{ consent.client.name }} App
                                 </h1>
                                 <p class="text-sm leading-6 text-slate-600">
                                     该应用希望访问你的 Open CRH Tracker
@@ -131,7 +131,7 @@
                                 "
                                 :disabled="isSubmitting"
                                 @click="submitDecision('approve')">
-                                允许授权
+                                授权
                             </UiButton>
                             <UiButton
                                 type="button"
@@ -177,6 +177,7 @@
                 </div>
             </UiCard>
         </div>
+        <AppFooter />
     </main>
 </template>
 
@@ -258,7 +259,7 @@ const statusClasses = computed(
 
 useSiteSeo({
     title: consent
-        ? `授权 ${consent.client.name} | Open CRH Tracker`
+        ? `授权 ${consent.client.name} App | Open CRH Tracker`
         : 'OAuth 授权 | Open CRH Tracker',
     description: consent
         ? `确认 ${consent.client.name} 请求的账户访问权限。`
