@@ -63,9 +63,7 @@ export default defineNuxtConfig({
                 }
             },
             '/oauth/token': {
-                security: {
-                    csrf: false
-                }
+                csurf: false
             }
         },
         experimental: {
