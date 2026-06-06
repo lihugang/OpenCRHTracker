@@ -128,7 +128,7 @@ export function getAuthorizeContext(
 
         return {
             mode: 'redirect',
-            location: '/login'
+            location: '/login?oauth=1'
         };
     }
 

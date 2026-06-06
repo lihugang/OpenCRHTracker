@@ -182,9 +182,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import useTrackedRequestFetch, {
-    type TrackedRequestFetch
-} from '~/composables/useTrackedRequestFetch';
+import type { TrackedRequestFetch } from '~/composables/useTrackedRequestFetch';
 import type {
     OAuthAuthorizeContextResponse,
     OAuthAuthorizeDecisionResponse
@@ -197,16 +195,38 @@ definePageMeta({
 });
 
 const route = useRoute();
-const requestFetch: TrackedRequestFetch = import.meta.server
-    ? useTrackedRequestFetch()
-    : ($fetch as TrackedRequestFetch);
 
-const context = await requestFetch<OAuthAuthorizeContextResponse>(
-    '/api/v1/oauth/authorize/context',
-    {
-        query: route.query
+async function resolveAuthorizeContext() {
+    if (import.meta.server) {
+        const event = useRequestEvent();
+        if (!event) {
+            throw createError({
+                statusCode: 500,
+                statusMessage: 'OAuth authorize request event missing'
+            });
+        }
+
+        const [{ getAuthorizeContext, parseAuthorizeRequest }, ensureAuthRateLimit] =
+            await Promise.all([
+                import('~/server/utils/oauth/authorizeRequest'),
+                import('~/server/utils/api/authRateLimit/ensureAuthRateLimit')
+                    .then((module) => module.default)
+            ]);
+
+        ensureAuthRateLimit(event, 'oauthAuthorize');
+        return getAuthorizeContext(event, parseAuthorizeRequest(event));
     }
-);
+
+    const requestFetch: TrackedRequestFetch = $fetch as TrackedRequestFetch;
+    return await requestFetch<OAuthAuthorizeContextResponse>(
+        '/api/v1/oauth/authorize/context',
+        {
+            query: route.query
+        }
+    );
+}
+
+const context = await resolveAuthorizeContext();
 
 if (context.mode === 'redirect') {
     await navigateTo(context.location, {

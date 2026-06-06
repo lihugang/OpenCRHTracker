@@ -234,7 +234,13 @@ watch(
 watch(isLogin, (nextValue) => {
     const targetPath = nextValue ? '/login' : '/register';
     if (authPaths.has(route.path) && route.path !== targetPath) {
-        void navigateTo(targetPath, { replace: true });
+        void navigateTo(
+            {
+                path: targetPath,
+                query: getAuthFlowQuery()
+            },
+            { replace: true }
+        );
     }
 
     clearStatus();
@@ -275,6 +281,14 @@ function clearStatus() {
 function setStatus(message: string, tone: 'success' | 'error') {
     statusMessage.value = message;
     statusTone.value = tone;
+}
+
+function isOauthAuthFlow() {
+    return route.query.oauth === '1';
+}
+
+function getAuthFlowQuery() {
+    return isOauthAuthFlow() ? { oauth: '1' } : {};
 }
 
 function switchMode(nextValue: boolean) {
@@ -408,12 +422,7 @@ async function submitAuth() {
                 : '注册成功，系统已自动登录并写入浏览器 Cookie。',
             'success'
         );
-        const hasOauthContinuation = useCookie<string | null>(
-            'oauth_continuation'
-        ).value;
-        await navigateTo(
-            hasOauthContinuation ? '/oauth/authorize/resume' : '/'
-        );
+        await navigateTo(isOauthAuthFlow() ? '/oauth/authorize/resume' : '/');
     } catch (error) {
         setStatus(
             getApiErrorMessage(error, '认证请求失败，请稍后重试。'),
