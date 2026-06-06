@@ -422,7 +422,14 @@ async function submitAuth() {
                 : '注册成功，系统已自动登录并写入浏览器 Cookie。',
             'success'
         );
-        await navigateTo(isOauthAuthFlow() ? '/oauth/authorize/resume' : '/');
+        if (isOauthAuthFlow()) {
+            await navigateTo('/oauth/authorize/resume', {
+                external: true
+            });
+            return;
+        }
+
+        await navigateTo('/');
     } catch (error) {
         setStatus(
             getApiErrorMessage(error, '认证请求失败，请稍后重试。'),
