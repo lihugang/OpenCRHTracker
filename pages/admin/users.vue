@@ -406,7 +406,7 @@ async function saveQuotaOverride() {
     isSavingQuota.value = true;
 
     try {
-        const response = await requestFetch<
+        const { data, error } = await useCsrfFetch<
             TrackerApiResponse<AdminUpdateUserQuotaResponse>
         >('/api/v1/admin/users/quota', {
             method: 'POST',
@@ -415,8 +415,20 @@ async function saveQuotaOverride() {
                 userId,
                 tokenLimit,
                 refillAmount
-            }
+            },
+            key: `admin:users:quota:${userId}:${Date.now()}`,
+            watch: false,
+            server: false
         });
+
+        if (error.value) {
+            throw error.value;
+        }
+
+        const response = data.value;
+        if (!response) {
+            throw new Error('Missing admin user quota update response');
+        }
 
         if (!response.ok) {
             throw {
