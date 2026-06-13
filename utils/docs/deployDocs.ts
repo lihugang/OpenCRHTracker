@@ -275,10 +275,13 @@ export const deployDocsSections: DocsContentSection[] = [
                         path: 'data.assets.EMUList',
                         valueType: 'object',
                         required: true,
-                        description: 'EMU 列表文件路径、下载地址与刷新时间。',
+                        description:
+                            '动车组清单 allocation export JSON 文件路径、下载地址与刷新时间。',
                         notes: [
+                            '默认文件建议为 data/emu_list.json。',
                             'refresh.enabled=true 时 provider 必填。',
-                            'refresh.refreshAt 必须是 HHmm 字符串。'
+                            'refresh.refreshAt 必须是 HHmm 字符串。',
+                            '管理员页面支持本地重载和远程刷新，刷新后会立即影响畅行码探测和车组别名解析。'
                         ]
                     },
                     {
@@ -1221,6 +1224,29 @@ export const deployDocsSections: DocsContentSection[] = [
             {
                 type: 'paragraph',
                 text: '应用会在 logs/ 目录下按天滚动写入日志，同时按 data.runtime 配置把管理员流量统计和服务器监控统计分别写入独立文件。'
+            }
+        ]
+    },
+    {
+        id: 'emu-list',
+        title: 'emu_list.json',
+        summary:
+            '为畅行码探测、车组别名解析和重联判断提供动车组基础清单。',
+        blocks: [
+            {
+                type: 'paragraph',
+                text: '动车组清单文件默认建议放在 data/emu_list.json，实际路径由 data/config.json 中的 data.assets.EMUList.file 决定。默认远程来源为 https://allocation.crhdata.top/api/v1/allocation/export.json，文件内容使用 allocation export JSON 范式。'
+            },
+            {
+                type: 'code',
+                language: 'json',
+                code: '{\n    "schema_version": 1,\n    "railway_bureaus": [],\n    "train_depots": [],\n    "emu_depots": [],\n    "trainset_models": [],\n    "coach_layouts": [],\n    "emu_trainsets": []\n}'
+            },
+            {
+                type: 'list',
+                items: [
+                    '管理员页面“配置文件”支持对该文件执行本地重载和远程刷新，刷新后会同步固定车组畅行码检测依赖。'
+                ]
             }
         ]
     },

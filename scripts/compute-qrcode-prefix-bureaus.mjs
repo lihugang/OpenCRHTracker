@@ -5,7 +5,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const DEFAULT_QRCODE_PATH = 'data/qrcode.jsonl';
-const DEFAULT_EMU_LIST_PATH = 'data/emu_list.jsonl';
+const DEFAULT_EMU_LIST_PATH = 'data/emu_list.json';
 const DEFAULT_PREFIX_LENGTH = 1;
 const DEFAULT_CODE_SCOPE = 'short';
 const DEFAULT_FORMAT = 'table';
@@ -19,7 +19,7 @@ function printHelp() {
 
 Options:
     --qrcode=<path>         QRCode JSONL input path. Default: ${DEFAULT_QRCODE_PATH}
-    --emu-list=<path>       EMU list JSONL input path. Default: ${DEFAULT_EMU_LIST_PATH}
+    --emu-list=<path>       EMU list allocation JSON input path. Default: ${DEFAULT_EMU_LIST_PATH}
     --prefix-length=<n>     Prefix length to group by. Default: ${DEFAULT_PREFIX_LENGTH}
     --code-scope=<scope>    Code scope: short | all. Default: ${DEFAULT_CODE_SCOPE}
     --format=<format>       Output format: table | json. Default: ${DEFAULT_FORMAT}
@@ -150,6 +150,24 @@ function readJsonlRows(filePath) {
         });
 }
 
+function readJsonObject(filePath) {
+    if (!existsSync(filePath)) {
+        throw new Error(`Input file does not exist: ${filePath}`);
+    }
+
+    let text = readFileSync(filePath, 'utf8');
+    if (text.charCodeAt(0) === 0xfeff) {
+        text = text.slice(1);
+    }
+
+    const parsed = JSON.parse(text);
+    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        throw new Error(`Invalid JSON object in ${filePath}.`);
+    }
+
+    return parsed;
+}
+
 function normalizeCode(value) {
     if (typeof value !== 'string') {
         return '';
@@ -166,23 +184,129 @@ function normalizeBureau(value) {
     return value.trim();
 }
 
+function readRequiredArray(value, fieldName) {
+    if (!Array.isArray(value)) {
+        throw new Error(`EMU list field ${fieldName} must be an array.`);
+    }
+
+    return value;
+}
+
+function normalizeId(value, fieldName) {
+    if (!Number.isInteger(value) || value <= 0) {
+        throw new Error(`EMU list field ${fieldName} must be a positive integer.`);
+    }
+
+    return value;
+}
+
+function buildRecordById(rows, fieldName) {
+    const recordsById = new Map();
+
+    for (const [index, row] of rows.entries()) {
+        const id = normalizeId(row?.id, `${fieldName}[${index}].id`);
+        if (recordsById.has(id)) {
+            throw new Error(`EMU list field ${fieldName} has duplicate id ${id}.`);
+        }
+        recordsById.set(id, row);
+    }
+
+    return recordsById;
+}
+
+function normalizeRequiredString(value, fieldName) {
+    if (typeof value !== 'string') {
+        throw new Error(`EMU list field ${fieldName} must be a string.`);
+    }
+
+    const normalized = value.trim();
+    if (normalized.length === 0) {
+        throw new Error(`EMU list field ${fieldName} must be non-empty.`);
+    }
+
+    return normalized;
+}
+
 function buildJoinKey(model, trainSetNo) {
     return `${normalizeCode(model)}#${normalizeCode(trainSetNo)}`;
 }
 
-function buildEmuIndex(rows) {
+function getTrainsets(emuList) {
+    if (Array.isArray(emuList.emu_trainsets)) {
+        return emuList.emu_trainsets;
+    }
+
+    return readRequiredArray(emuList.trainsets, 'trainsets');
+}
+
+function buildEmuIndex(emuList) {
+    const railwayBureauById = buildRecordById(
+        readRequiredArray(emuList.railway_bureaus, 'railway_bureaus'),
+        'railway_bureaus'
+    );
+    const trainDepotById = buildRecordById(
+        readRequiredArray(emuList.train_depots, 'train_depots'),
+        'train_depots'
+    );
+    const emuDepotById = buildRecordById(
+        readRequiredArray(emuList.emu_depots, 'emu_depots'),
+        'emu_depots'
+    );
+    const trainsetModelById = buildRecordById(
+        readRequiredArray(emuList.trainset_models, 'trainset_models'),
+        'trainset_models'
+    );
+    const trainsets = getTrainsets(emuList);
     const bureauByJoinKey = new Map();
 
-    for (const [index, row] of rows.entries()) {
-        if (row.enableSeatCode === false) {
+    for (const [index, row] of trainsets.entries()) {
+        if (row.railway_travel_code_enabled === false) {
             continue;
         }
 
-        const joinKey = buildJoinKey(row.model, row.trainSetNo);
-        const bureau = normalizeBureau(row.bureau);
-        if (joinKey.length === 0 || bureau.length === 0) {
-            continue;
+        const modelId = normalizeId(row.model_id, `trainsets[${index}].model_id`);
+        const trainsetModel = trainsetModelById.get(modelId);
+        if (!trainsetModel) {
+            throw new Error(`EMU list row ${index + 1} has missing model_id ${modelId}.`);
         }
+        const emuDepotId = normalizeId(
+            row.emu_depot_id,
+            `trainsets[${index}].emu_depot_id`
+        );
+        const emuDepot = emuDepotById.get(emuDepotId);
+        if (!emuDepot) {
+            throw new Error(
+                `EMU list row ${index + 1} has missing emu_depot_id ${emuDepotId}.`
+            );
+        }
+        const trainDepotId = normalizeId(
+            emuDepot.train_depot_id,
+            `emu_depots[${emuDepotId}].train_depot_id`
+        );
+        const trainDepot = trainDepotById.get(trainDepotId);
+        if (!trainDepot) {
+            throw new Error(
+                `EMU list row ${index + 1} has missing train_depot_id ${trainDepotId}.`
+            );
+        }
+        const bureauId = normalizeId(
+            trainDepot.bureau_id,
+            `train_depots[${trainDepotId}].bureau_id`
+        );
+        const bureauRecord = railwayBureauById.get(bureauId);
+        if (!bureauRecord) {
+            throw new Error(
+                `EMU list row ${index + 1} has missing bureau_id ${bureauId}.`
+            );
+        }
+
+        const joinKey = buildJoinKey(
+            normalizeRequiredString(trainsetModel.model, 'trainset_models.model'),
+            normalizeRequiredString(row.car_no, 'trainsets.car_no')
+        );
+        const bureau = normalizeBureau(
+            normalizeRequiredString(bureauRecord.name, 'railway_bureaus.name')
+        );
 
         const existingBureau = bureauByJoinKey.get(joinKey);
         if (
@@ -363,9 +487,9 @@ function writeJsonReport(filePath, report) {
 
 function main() {
     const options = parseArgs(process.argv.slice(2));
-    const emuRows = readJsonlRows(options.emuListPath);
+    const emuList = readJsonObject(options.emuListPath);
     const qrcodeRows = readJsonlRows(options.qrcodePath);
-    const bureauByJoinKey = buildEmuIndex(emuRows);
+    const bureauByJoinKey = buildEmuIndex(emuList);
     const report = analyzePrefixBureaus(qrcodeRows, bureauByJoinKey, options);
 
     if (options.outputPath.length > 0) {

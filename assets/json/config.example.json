@@ -65,8 +65,8 @@
     "data": {
         "assets": {
             "EMUList": {
-                "file": "data/emu_list.jsonl",
-                "provider": "https://storage.lihugang.top/open_crh_tracker/initialized_data/emu_list.jsonl",
+                "file": "data/emu_list.json",
+                "provider": "https://allocation.crhdata.top/api/v1/allocation/export.json",
                 "refresh": {
                     "enabled": true,
                     "refreshAt": "0000"

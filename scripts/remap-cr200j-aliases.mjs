@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const DEFAULT_INPUT_PATH = 'data/emu_list.jsonl';
+const DEFAULT_INPUT_PATH = 'data/emu_list.json';
 const DEFAULT_DB_PATH = 'data/emu.db';
 const MAX_CONFLICT_SAMPLES = 20;
 
@@ -16,7 +16,7 @@ function printHelp() {
 Options:
     --apply         Apply the remap. Without this flag the script only
                     analyzes the database and prints a dry-run summary.
-    --input=<path>  Alias JSONL input path. Default: ${DEFAULT_INPUT_PATH}
+    --input=<path>  Allocation export JSON input path. Default: ${DEFAULT_INPUT_PATH}
     --db=<path>     SQLite database path. Default: ${DEFAULT_DB_PATH}
     --help          Show this message
 `);
@@ -109,25 +109,52 @@ function normalizeStatus(value) {
     return Number.isInteger(value) ? value : 0;
 }
 
-function readJsonlRows(filePath) {
+function readEmuListRows(filePath) {
     if (!existsSync(filePath)) {
         throw new Error(`Input file does not exist: ${filePath}`);
     }
 
-    return readUtf8File(filePath)
-        .split(/\r?\n/u)
-        .filter((line) => line.trim().length > 0)
-        .map((line, index) => {
-            try {
-                return JSON.parse(line);
-            } catch (error) {
-                const message =
-                    error instanceof Error ? error.message : String(error);
-                throw new Error(
-                    `Failed to parse ${filePath} line ${index + 1}: ${message}`
-                );
-            }
-        });
+    const parsed = JSON.parse(readUtf8File(filePath));
+    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        throw new Error('Input file must contain an allocation export JSON object');
+    }
+
+    const models = Array.isArray(parsed.trainset_models)
+        ? parsed.trainset_models
+        : [];
+    const modelById = new Map(
+        models
+            .filter((row) => Number.isInteger(row?.id) && row.id > 0)
+            .map((row) => [row.id, row])
+    );
+    const trainsets = Array.isArray(parsed.emu_trainsets)
+        ? parsed.emu_trainsets
+        : Array.isArray(parsed.trainsets)
+          ? parsed.trainsets
+          : [];
+
+    return trainsets.map((row, index) => {
+        const modelId = row?.model_id;
+        const modelRow = modelById.get(modelId);
+        if (!modelRow) {
+            throw new Error(
+                `Input row ${index + 1} references missing model_id ${modelId}`
+            );
+        }
+
+        const remark =
+            row?.remark !== null &&
+            typeof row?.remark === 'object' &&
+            !Array.isArray(row.remark)
+                ? row.remark
+                : {};
+
+        return {
+            model: modelRow.model,
+            trainSetNo: row?.car_no,
+            alias: remark.alias
+        };
+    });
 }
 
 function buildCanonicalEmuCode(row, index) {
@@ -186,7 +213,7 @@ function buildAliasMapping(rows) {
 
     if (aliasRowCount === 0 || aliasToCanonical.size === 0) {
         throw new Error(
-            'No CR200J alias rows were found in the input file. Update data/emu_list.jsonl first.'
+            'No CR200J alias rows were found in the input file. Update data/emu_list.json first.'
         );
     }
 
@@ -544,7 +571,7 @@ function applyActions(db, statements, dailyActions, probeActions) {
 
 function main() {
     const options = parseArgs(process.argv.slice(2));
-    const inputRows = readJsonlRows(options.inputPath);
+    const inputRows = readEmuListRows(options.inputPath);
     const mapping = buildAliasMapping(inputRows);
     const summary = buildSummarySkeleton(
         options.inputPath,

@@ -263,36 +263,6 @@ async function collectStaticText() {
     };
 }
 
-function parseJsonlRecords(input) {
-    const trimmed = input.trim();
-
-    if (!trimmed) {
-        return [];
-    }
-
-    return trimmed
-        .split(/\r?\n/u)
-        .map((line, index) => {
-            const normalizedLine = line.trim();
-
-            if (!normalizedLine) {
-                return null;
-            }
-
-            let parsed;
-            try {
-                parsed = JSON.parse(normalizedLine);
-            } catch {
-                throw new Error(
-                    `Invalid JSONL at line ${index + 1}: not valid JSON.`,
-                );
-            }
-
-            return ensureObjectRecord(parsed, `emu_list.jsonl line ${index + 1}`);
-        })
-        .filter(Boolean);
-}
-
 async function collectScheduleStations(schedulePath) {
     const raw = await fs.readFile(schedulePath, 'utf8');
     const parsed = ensureObjectRecord(JSON.parse(raw), 'schedule.json');
@@ -347,15 +317,31 @@ async function collectScheduleStations(schedulePath) {
 
 async function collectEmuTags(emuListPath) {
     const raw = await fs.readFile(emuListPath, 'utf8');
-    const rows = parseJsonlRecords(raw);
+    const parsed = ensureObjectRecord(JSON.parse(raw), 'emu_list.json');
+    const rows = Array.isArray(parsed.emu_trainsets)
+        ? parsed.emu_trainsets
+        : Array.isArray(parsed.trainsets)
+          ? parsed.trainsets
+          : [];
     const tags = new Set();
 
     for (const row of rows) {
-        if (!Array.isArray(row.tags)) {
+        if (typeof row !== 'object' || row === null || Array.isArray(row)) {
             continue;
         }
 
-        for (const tag of row.tags) {
+        const remark =
+            typeof row.remark === 'object' &&
+            row.remark !== null &&
+            !Array.isArray(row.remark)
+                ? row.remark
+                : {};
+
+        if (!Array.isArray(remark.tags)) {
+            continue;
+        }
+
+        for (const tag of remark.tags) {
             const normalizedTag = normalizeString(tag);
             if (normalizedTag) {
                 tags.add(normalizedTag);

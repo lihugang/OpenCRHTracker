@@ -28,7 +28,7 @@ SINGLE_LENGTH = 800.0
 SMALL_GAP_THRESHOLD = 400.0
 REPO_ROOT = Path(__file__).resolve().parents[1]
 QRCODE_PATH = REPO_ROOT / 'data' / 'qrcode.jsonl'
-EMU_LIST_PATH = REPO_ROOT / 'data' / 'emu_list.jsonl'
+EMU_LIST_PATH = REPO_ROOT / 'data' / 'emu_list.json'
 
 
 @dataclass(frozen=True)
@@ -75,14 +75,71 @@ def load_jsonl(path: Path) -> list[dict[str, Any]]:
     return rows
 
 
-def build_emu_index(rows: list[dict[str, Any]]) -> dict[tuple[str, str], bool]:
-    index: dict[tuple[str, str], bool] = {}
+def load_json_object(path: Path) -> dict[str, Any]:
+    with path.open('r', encoding='utf-8-sig') as handle:
+        parsed = json.load(handle)
+    if not isinstance(parsed, dict):
+        raise ValueError(f'{path} must contain a JSON object')
+    return parsed
+
+
+def require_rows(value: Any, field_name: str) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        raise ValueError(f'EMU list field {field_name} must be an array')
+    return [row for row in value if isinstance(row, dict)]
+
+
+def build_by_id(rows: list[dict[str, Any]], field_name: str) -> dict[int, dict[str, Any]]:
+    index: dict[int, dict[str, Any]] = {}
     for row in rows:
-        model = normalize_code(row.get('model'))
-        train_set_no = normalize_code(row.get('trainSetNo'))
+        row_id = row.get('id')
+        if not isinstance(row_id, int) or row_id <= 0:
+            raise ValueError(f'EMU list field {field_name}.id must be a positive integer')
+        index[row_id] = row
+    return index
+
+
+def build_coach_count_by_model_id(rows: list[dict[str, Any]]) -> dict[int, int]:
+    coach_nos_by_model_id: dict[int, set[int]] = defaultdict(set)
+    for row in rows:
+        model_id = row.get('model_id')
+        coach_no = row.get('coach_no')
+        if isinstance(model_id, int) and isinstance(coach_no, int):
+            coach_nos_by_model_id[model_id].add(coach_no)
+    return {
+        model_id: len(coach_nos)
+        for model_id, coach_nos in coach_nos_by_model_id.items()
+    }
+
+
+def build_emu_index(emu_list: dict[str, Any]) -> dict[tuple[str, str], bool]:
+    trainset_models = build_by_id(
+        require_rows(emu_list.get('trainset_models'), 'trainset_models'),
+        'trainset_models'
+    )
+    coach_count_by_model_id = build_coach_count_by_model_id(
+        require_rows(emu_list.get('coach_layouts'), 'coach_layouts')
+    )
+    trainsets = require_rows(
+        emu_list.get('emu_trainsets', emu_list.get('trainsets')),
+        'emu_trainsets'
+    )
+    index: dict[tuple[str, str], bool] = {}
+    for row in trainsets:
+        if row.get('railway_travel_code_enabled') is False:
+            continue
+        model_id = row.get('model_id')
+        if not isinstance(model_id, int):
+            continue
+        model_row = trainset_models.get(model_id)
+        if model_row is None:
+            continue
+        coach_count = coach_count_by_model_id.get(model_id)
+        model = normalize_code(model_row.get('model'))
+        train_set_no = normalize_code(row.get('car_no'))
         if not model or not train_set_no:
             continue
-        index[(model, train_set_no)] = row.get('multiple') is True
+        index[(model, train_set_no)] = True if not coach_count else coach_count <= 8
     return index
 
 
@@ -373,8 +430,8 @@ def main() -> int:
     args = parser.parse_args()
 
     qrcode_rows = load_jsonl(QRCODE_PATH)
-    emu_rows = load_jsonl(EMU_LIST_PATH)
-    emu_index = build_emu_index(emu_rows)
+    emu_list = load_json_object(EMU_LIST_PATH)
+    emu_index = build_emu_index(emu_list)
     records = extract_candidate_qrcodes(qrcode_rows)
 
     if not records:
