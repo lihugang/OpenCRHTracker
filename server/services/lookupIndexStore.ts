@@ -1,20 +1,11 @@
 import fs from 'fs';
 import path from 'path';
 import useConfig from '~/server/config';
+import { parseEmuListAssetText } from '~/server/services/probeAssetStore';
 import { loadActiveScheduleState } from '~/server/utils/12306/scheduleProbe/stateStore';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
 import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
-import parseJsonlToJson from '~/server/utils/json/parseJsonlToJson';
 import type { LookupSuggestItem } from '~/types/lookup';
-
-interface RawEmuListRecord extends Record<string, unknown> {
-    model?: unknown;
-    trainSetNo?: unknown;
-    bureau?: unknown;
-    depot?: unknown;
-    enableSeatCode?: unknown;
-    tags?: unknown;
-}
 
 interface LookupIndexCache {
     scheduleFilePath: string;
@@ -63,24 +54,6 @@ function buildTrainSubtitle(startStation: string, endStation: string) {
 
 function buildEmuCode(model: string, trainSetNo: string) {
     return `${model}-${trainSetNo}`;
-}
-
-function normalizeTags(value: unknown): string[] {
-    if (!Array.isArray(value)) {
-        return [];
-    }
-
-    return value
-        .filter((item): item is string => typeof item === 'string')
-        .map((item) => item.trim())
-        .filter(
-            (item, index, array) =>
-                item.length > 0 && array.indexOf(item) === index
-        );
-}
-
-function isSeatCodeEnabled(value: unknown): boolean {
-    return value !== false;
 }
 
 function buildEmuSubtitle(record: { bureau: string; depot: string }) {
@@ -158,21 +131,10 @@ function loadStationItems(scheduleFilePath: string) {
 
 function loadEmuItems(emuListFilePath: string) {
     const text = fs.readFileSync(resolveAssetPath(emuListFilePath), 'utf8');
-    const rows = parseJsonlToJson<RawEmuListRecord>(text);
+    const rows = parseEmuListAssetText(text);
     const deduplicated = new Map<string, LookupSuggestItem>();
 
     for (const row of rows) {
-        if (
-            typeof row.model !== 'string' ||
-            typeof row.trainSetNo !== 'string'
-        ) {
-            continue;
-        }
-
-        if (!isSeatCodeEnabled(row.enableSeatCode)) {
-            continue;
-        }
-
         const model = normalizeCode(row.model);
         const trainSetNo = normalizeCode(row.trainSetNo);
         if (!model || !trainSetNo) {
@@ -187,10 +149,10 @@ function loadEmuItems(emuListFilePath: string) {
         deduplicated.set(code, {
             type: 'emu',
             code,
-            tags: normalizeTags(row.tags),
+            tags: row.tags,
             subtitle: buildEmuSubtitle({
-                bureau: typeof row.bureau === 'string' ? row.bureau.trim() : '',
-                depot: typeof row.depot === 'string' ? row.depot.trim() : ''
+                bureau: row.bureau,
+                depot: row.depot
             })
         });
     }
