@@ -52,6 +52,14 @@ interface OAuthClientScopeRequestRow {
     reviewed_at: number | null;
 }
 
+interface OAuthClientAdminGrantRow {
+    client_id: string;
+    grant_key: string;
+    enabled: number;
+    updated_by: string | null;
+    updated_at: number;
+}
+
 interface OAuthAuthorizationCodeRow {
     code_hash: string;
     client_id: string;
@@ -135,6 +143,8 @@ type OAuthSqlKey =
     | 'deleteOauthClientScopeRequests'
     | 'selectOauthClientScopeRequests'
     | 'updateOauthClientScopeReview'
+    | 'selectOauthClientAdminGrants'
+    | 'upsertOauthClientAdminGrant'
     | 'insertOauthAuthorizationCode'
     | 'selectOauthAuthorizationCodeByHash'
     | 'consumeOauthAuthorizationCode'
@@ -152,6 +162,10 @@ const oauthStatements = createPreparedSqlStore<OAuthSqlKey>({
     scope: 'users/oauth',
     sql: oauthSql
 });
+
+const OAUTH_ADMIN_GRANT_KEYS = {
+    notificationSend: 'notification_send'
+} as const;
 
 function randomId(bytes = 24) {
     return crypto.randomBytes(bytes).toString('base64url');
@@ -188,6 +202,30 @@ function toScopeRequestItem(
     };
 }
 
+function getOauthClientAdminGrantMap(clientId: string) {
+    return new Map(
+        oauthStatements
+            .all<OAuthClientAdminGrantRow>(
+                'selectOauthClientAdminGrants',
+                clientId
+            )
+            .map((row) => [row.grant_key, row])
+    );
+}
+
+function resolveOauthClientAdminGrants(clientId: string) {
+    const grants = getOauthClientAdminGrantMap(clientId);
+    const notificationSend = grants.get(
+        OAUTH_ADMIN_GRANT_KEYS.notificationSend
+    );
+
+    return {
+        notificationSend: notificationSend?.enabled === 1,
+        notificationSendUpdatedBy: notificationSend?.updated_by ?? null,
+        notificationSendUpdatedAt: notificationSend?.updated_at ?? null
+    };
+}
+
 function hydrateClient(row: OAuthClientRow): OAuthClient {
     const redirectUris = oauthStatements
         .all<OAuthClientRedirectUriRow>(
@@ -215,7 +253,19 @@ function hydrateClient(row: OAuthClientRow): OAuthClient {
         createdAt: row.created_at,
         updatedAt: row.updated_at,
         redirectUris,
-        scopeRequests
+        scopeRequests,
+        adminGrants: resolveOauthClientAdminGrants(row.client_id)
+    };
+}
+
+function toOwnerVisibleClient(client: OAuthClient): OAuthClientPublicItem {
+    return {
+        ...client,
+        adminGrants: {
+            notificationSend: false,
+            notificationSendUpdatedBy: null,
+            notificationSendUpdatedAt: null
+        }
     };
 }
 
@@ -259,7 +309,8 @@ function getRequestedScopeReviewStatuses(
 export function listOauthClientsByOwner(ownerUserId: string) {
     return oauthStatements
         .all<OAuthClientRow>('selectOauthClientsByOwner', ownerUserId)
-        .map(hydrateClient);
+        .map(hydrateClient)
+        .map(toOwnerVisibleClient);
 }
 
 export function listAllOauthClients() {
@@ -285,7 +336,7 @@ export function getOauthClientByIdAndOwner(
         clientId,
         ownerUserId
     );
-    return row ? hydrateClient(row) : undefined;
+    return row ? toOwnerVisibleClient(hydrateClient(row)) : undefined;
 }
 
 export function createOauthClient(
@@ -381,6 +432,9 @@ export function updateOauthClientAdmin(
     input: {
         status: OAuthClientStatus;
         isTrusted: boolean;
+        adminGrants?: {
+            notificationSend?: boolean;
+        };
         scopeReviews: Array<{
             scope: string;
             reviewStatus: OAuthClientScopeReviewStatus;
@@ -416,6 +470,17 @@ export function updateOauthClientAdmin(
                 review.scope
             );
         }
+
+        if (typeof input.adminGrants?.notificationSend === 'boolean') {
+            oauthStatements.run(
+                'upsertOauthClientAdminGrant',
+                clientId,
+                OAUTH_ADMIN_GRANT_KEYS.notificationSend,
+                input.adminGrants.notificationSend ? 1 : 0,
+                input.reviewedBy,
+                now
+            );
+        }
     });
 
     update();
@@ -425,6 +490,16 @@ export function updateOauthClientAdmin(
     }
 
     return getOauthClientById(clientId);
+}
+
+function resolveOauthTokenScopes(client: OAuthClient, approvedScopes: string[]) {
+    const scopes = [...approvedScopes];
+
+    if (client.adminGrants.notificationSend) {
+        scopes.push(API_SCOPES.notifications.send);
+    }
+
+    return normalizeScopeRequests(scopes);
 }
 
 export function createOauthLoginContinuation(
@@ -662,10 +737,11 @@ export function exchangeAuthorizationCode(input: {
     }
 
     const approvedScopes = JSON.parse(row.approved_scopes_json) as string[];
+    const tokenScopes = resolveOauthTokenScopes(client, approvedScopes);
     const accessToken = createApiKey(row.user_id, {
         issuer: 'oauth',
         oauthClientId: row.client_id,
-        scopes: approvedScopes,
+        scopes: tokenScopes,
         name: `OAuth ${client.name}`,
         activeFrom: now,
         expiresAt: now + useConfig().oauth.accessTokenTtlSeconds
@@ -675,7 +751,7 @@ export function exchangeAuthorizationCode(input: {
         return undefined;
     }
 
-    const canReadProfile = hasScope(approvedScopes, API_SCOPES.auth.me);
+    const canReadProfile = hasScope(tokenScopes, API_SCOPES.auth.me);
     const nonce = row.nonce?.trim() ? row.nonce : undefined;
 
     const idToken = signOidcIdToken({
@@ -696,7 +772,7 @@ export function exchangeAuthorizationCode(input: {
         token_type: 'Bearer',
         expires_in: useConfig().oauth.accessTokenTtlSeconds,
         id_token: idToken,
-        scope: approvedScopes.join(' ')
+        scope: tokenScopes.join(' ')
     };
 
     return response;

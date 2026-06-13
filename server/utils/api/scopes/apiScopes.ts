@@ -80,6 +80,9 @@ export const API_SCOPES = {
         reply: 'api.feedback.reply',
         manage: 'api.feedback.manage'
     },
+    notifications: {
+        send: 'api.notifications.send'
+    },
     debug: {
         echoError: 'api.debug.echo-error'
     }

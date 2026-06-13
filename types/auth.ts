@@ -117,6 +117,12 @@ export interface OAuthClientScopeRequestItem {
     reviewedAt: number | null;
 }
 
+export interface OAuthClientAdminGrants {
+    notificationSend: boolean;
+    notificationSendUpdatedBy: string | null;
+    notificationSendUpdatedAt: number | null;
+}
+
 export interface OAuthClientPublicItem {
     clientId: string;
     ownerUserId: string;
@@ -129,6 +135,7 @@ export interface OAuthClientPublicItem {
     updatedAt: number;
     redirectUris: OAuthClientRedirectUriItem[];
     scopeRequests: OAuthClientScopeRequestItem[];
+    adminGrants: OAuthClientAdminGrants;
 }
 
 export interface OAuthClient extends OAuthClientPublicItem {}

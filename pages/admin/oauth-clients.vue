@@ -272,6 +272,53 @@
                                     </div>
                                 </div>
                             </div>
+
+                            <div
+                                class="dashboard-soft-surface flex flex-col gap-4 rounded-[1rem] border px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+                                <div class="min-w-0 space-y-2">
+                                    <p
+                                        class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
+                                        管理员权限
+                                    </p>
+                                    <div class="flex flex-wrap gap-2">
+                                        <span
+                                            :class="
+                                                getAdminGrantBadgeClass(
+                                                    item.adminGrants
+                                                        .notificationSend
+                                                )
+                                            ">
+                                            通知发送
+                                            {{
+                                                item.adminGrants
+                                                    .notificationSend
+                                                    ? '已启用'
+                                                    : '未启用'
+                                            }}
+                                        </span>
+                                    </div>
+                                    <p
+                                        v-if="
+                                            item.adminGrants
+                                                .notificationSendUpdatedAt
+                                        "
+                                        class="text-xs leading-5 text-slate-500">
+                                        {{
+                                            formatAdminGrantUpdate(item)
+                                        }}
+                                    </p>
+                                </div>
+                                <UiButton
+                                    type="button"
+                                    variant="secondary"
+                                    @click="toggleNotificationSend(item)">
+                                    {{
+                                        item.adminGrants.notificationSend
+                                            ? '关闭通知权限'
+                                            : '启用通知权限'
+                                    }}
+                                </UiButton>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -328,6 +375,9 @@ async function patchClient(
     overrides: Partial<{
         status: 'active' | 'disabled';
         isTrusted: boolean;
+        adminGrants: {
+            notificationSend: boolean;
+        };
         scopeReviews: Array<{
             scope: string;
             reviewStatus: OAuthClientScopeReviewStatus;
@@ -341,6 +391,11 @@ async function patchClient(
         body: {
             status: overrides.status ?? item.status,
             isTrusted: overrides.isTrusted ?? item.isTrusted,
+            adminGrants:
+                overrides.adminGrants ??
+                {
+                    notificationSend: item.adminGrants.notificationSend
+                },
             scopeReviews:
                 overrides.scopeReviews ??
                 item.scopeRequests.map((scope) => ({
@@ -414,6 +469,14 @@ async function toggleStatus(item: OAuthClientPublicItem) {
     });
 }
 
+async function toggleNotificationSend(item: OAuthClientPublicItem) {
+    await patchClient(item, {
+        adminGrants: {
+            notificationSend: !item.adminGrants.notificationSend
+        }
+    });
+}
+
 async function updateScopeReview(
     item: OAuthClientPublicItem,
     scopeName: string,
@@ -464,6 +527,24 @@ function getScopeReviewBadgeClass(status: OAuthClientScopeReviewStatus) {
     }
 
     return 'inline-flex shrink-0 whitespace-nowrap items-center rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.1em] text-amber-700';
+}
+
+function getAdminGrantBadgeClass(enabled: boolean) {
+    if (enabled) {
+        return 'inline-flex shrink-0 whitespace-nowrap items-center rounded-full bg-sky-50 px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.1em] text-sky-700';
+    }
+
+    return 'inline-flex shrink-0 whitespace-nowrap items-center rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.1em] text-slate-600';
+}
+
+function formatAdminGrantUpdate(item: OAuthClientPublicItem) {
+    const updatedAt = item.adminGrants.notificationSendUpdatedAt;
+    if (!updatedAt) {
+        return '';
+    }
+
+    const actor = item.adminGrants.notificationSendUpdatedBy ?? '未知管理员';
+    return `${actor} 于 ${formatTimestamp(updatedAt)} 更新`;
 }
 
 function formatTimestamp(timestamp: number) {

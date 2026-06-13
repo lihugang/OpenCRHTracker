@@ -12,6 +12,7 @@ import type {
 interface AdminOAuthClientUpdateBody {
     status?: unknown;
     isTrusted?: unknown;
+    adminGrants?: unknown;
     scopeReviews?: unknown;
 }
 
@@ -48,6 +49,29 @@ export default defineEventHandler(async (event) => {
             const client = updateOauthClientAdmin(clientId, {
                 status: body.status as OAuthClientStatus,
                 isTrusted: body.isTrusted,
+                adminGrants:
+                    typeof body.adminGrants === 'object' &&
+                    body.adminGrants !== null &&
+                    !Array.isArray(body.adminGrants)
+                        ? {
+                              notificationSend:
+                                  typeof (
+                                      body.adminGrants as Record<
+                                          string,
+                                          unknown
+                                      >
+                                  ).notificationSend === 'boolean'
+                                      ? Boolean(
+                                            (
+                                                body.adminGrants as Record<
+                                                    string,
+                                                    unknown
+                                                >
+                                            ).notificationSend
+                                        )
+                                      : undefined
+                          }
+                        : undefined,
                 scopeReviews: body.scopeReviews.map((item) => {
                     const row = item as Record<string, unknown>;
                     const reviewStatus = row.reviewStatus;

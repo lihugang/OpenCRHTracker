@@ -3,6 +3,7 @@ import { updateOauthClientByOwner } from '~/server/services/oauthStore';
 import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';
 import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
+import hasScope from '~/server/utils/api/scopes/hasScope';
 import type {
     OAuthClientCreateInput,
     OAuthClientMutationResponse
@@ -66,6 +67,14 @@ export default defineEventHandler(async (event) => {
                     String(item ?? '').trim()
                 )
             };
+            ensure(
+                !input.requestedScopes.some(
+                    (scope) => hasScope([scope], API_SCOPES.notifications.send)
+                ),
+                403,
+                'forbidden_scope',
+                '该权限只能由管理员在后台启用'
+            );
 
             const client = updateOauthClientByOwner(
                 clientId,

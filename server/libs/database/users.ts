@@ -39,6 +39,7 @@ function ensureUsersSchema(db: Database.Database) {
         'createOauthClientsTable',
         'createOauthClientRedirectUrisTable',
         'createOauthClientScopeRequestsTable',
+        'createOauthClientAdminGrantsTable',
         'createOauthAuthorizationCodesTable',
         'createOauthConsentsTable',
         'createOauthLoginContinuationsTable'
