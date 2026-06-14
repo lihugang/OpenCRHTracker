@@ -33,6 +33,8 @@ export interface TodayScheduleStop {
     departAt: number | null;
     stationTrainCode: string;
     wicket: string;
+    distance: number | null;
+    platformNo: number | null;
     isStart: boolean;
     isEnd: boolean;
 }
@@ -147,6 +149,8 @@ function rebuildCache(): TodayScheduleCache {
                               ),
                     stationTrainCode: stop.stationTrainCode.trim(),
                     wicket: stop.wicket.trim(),
+                    distance: stop.distance ?? null,
+                    platformNo: stop.platformNo ?? null,
                     isStart: stop.isStart,
                     isEnd: stop.isEnd
                 }))

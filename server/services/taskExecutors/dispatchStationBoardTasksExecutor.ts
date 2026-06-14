@@ -10,16 +10,7 @@ import {
 } from '~/server/services/stationBoardTaskDispatch';
 import { registerTaskExecutor } from '~/server/services/taskExecutorRegistry';
 import { loadScheduleDocument } from '~/server/utils/12306/scheduleProbe/stateStore';
-import type {
-    ScheduleDocument,
-    ScheduleItem,
-    ScheduleState
-} from '~/server/utils/12306/scheduleProbe/types';
-import {
-    buildCodeIndex,
-    buildGroupIndex,
-    getGroupKey
-} from '~/server/utils/12306/scheduleProbe/taskHelpers';
+import type { ScheduleState } from '~/server/utils/12306/scheduleProbe/types';
 import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
@@ -33,9 +24,9 @@ import { recordStationBoardDispatchResult } from '~/server/services/trainProvena
 export const DISPATCH_STATION_BOARD_TASKS_EXECUTOR =
     'dispatch_station_board_tasks';
 
-interface StationBoardCandidateGroup {
-    groupKey: string;
-    departureStationNames: string[];
+interface StationBoardStationCandidate {
+    stationName: string;
+    stationTelecode: string;
 }
 
 interface StationBoardDispatchTaskDetail {
@@ -54,156 +45,42 @@ const logger = getLogger('task-executor:dispatch-station-board-tasks');
 
 let registered = false;
 
-function resolveItemDepartureStationName(item: ScheduleItem) {
-    const startStationName = normalizeStationName(item.startStation);
-    if (startStationName.length > 0) {
-        return startStationName;
-    }
+function collectScheduleStationCandidates(
+    state: ScheduleState
+): StationBoardStationCandidate[] {
+    const candidatesByKey = new Map<string, StationBoardStationCandidate>();
 
-    const explicitStartStop = item.stops.find((stop) => stop.isStart);
-    const fallbackStop = explicitStartStop ?? item.stops[0] ?? null;
-    return normalizeStationName(fallbackStop?.stationName ?? '');
-}
-
-function collectGroupDepartureStationNames(
-    state: ScheduleState,
-    groupIndexes: readonly number[]
-) {
-    const seenStations = new Set<string>();
-    const stationNames: string[] = [];
-
-    for (const groupIndex of groupIndexes) {
-        const item = state.items[groupIndex];
-        if (!item) {
-            continue;
-        }
-
-        const stationName = resolveItemDepartureStationName(item);
-        if (stationName.length === 0 || seenStations.has(stationName)) {
-            continue;
-        }
-
-        seenStations.add(stationName);
-        stationNames.push(stationName);
-    }
-
-    return stationNames;
-}
-
-function getOrCreateCandidateGroup(
-    candidatesByGroupKey: Map<string, StationBoardCandidateGroup>,
-    item: ScheduleItem,
-    stationNames: string[]
-) {
-    const groupKey = getGroupKey(item);
-    const existing = candidatesByGroupKey.get(groupKey);
-    if (existing) {
-        const seenStations = new Set(existing.departureStationNames);
-        for (const stationName of stationNames) {
-            if (seenStations.has(stationName)) {
+    for (const item of state.items) {
+        for (const stop of item.stops) {
+            const stationName = normalizeStationName(stop.stationName);
+            const stationTelecode = normalizeCode(stop.stationTelecode);
+            if (stationName.length === 0 && stationTelecode.length === 0) {
                 continue;
             }
 
-            seenStations.add(stationName);
-            existing.departureStationNames.push(stationName);
-        }
-        return existing;
-    }
-
-    const candidate: StationBoardCandidateGroup = {
-        groupKey,
-        departureStationNames: [...stationNames]
-    };
-    candidatesByGroupKey.set(groupKey, candidate);
-    return candidate;
-}
-
-function collectSelectedStationNames(
-    candidateGroups: readonly StationBoardCandidateGroup[]
-) {
-    const selectedStations = new Set<string>();
-
-    for (const candidateGroup of candidateGroups) {
-        for (const stationName of candidateGroup.departureStationNames) {
-            if (stationName.length > 0) {
-                selectedStations.add(stationName);
+            const candidateKey =
+                stationTelecode.length > 0
+                    ? `telecode:${stationTelecode}`
+                    : `name:${stationName}`;
+            if (candidatesByKey.has(candidateKey)) {
+                continue;
             }
+
+            candidatesByKey.set(candidateKey, {
+                stationName,
+                stationTelecode
+            });
         }
     }
 
-    // 12306 only returns circulation data when the queried station is the
-    // train's departure station, so we query every distinct departure station
-    // instead of solving a minimum cover from intermediate stops.
-    return [...selectedStations].sort((left, right) =>
-        left.localeCompare(right, 'zh-Hans-CN')
+    return [...candidatesByKey.values()].sort((left, right) =>
+        (left.stationTelecode || left.stationName).localeCompare(
+            right.stationTelecode || right.stationName,
+            'zh-Hans-CN'
+        )
     );
 }
 
-function collectCandidates(
-    document: ScheduleDocument,
-    state: ScheduleState
-): StationBoardCandidateGroup[] {
-    const codeIndex = buildCodeIndex(state.items);
-    const groupIndex = buildGroupIndex(state.items);
-    const candidatesByGroupKey = new Map<string, StationBoardCandidateGroup>();
-
-    for (const queueEntry of document.routeRefreshQueue) {
-        if (queueEntry.serviceDate !== state.date) {
-            continue;
-        }
-
-        const itemIndex = codeIndex.get(queueEntry.trainCode);
-        if (itemIndex === undefined) {
-            continue;
-        }
-
-        const item = state.items[itemIndex]!;
-        const groupIndexes = groupIndex.get(getGroupKey(item)) ?? [itemIndex];
-        const stationNames = collectGroupDepartureStationNames(
-            state,
-            groupIndexes
-        );
-        if (stationNames.length === 0) {
-            continue;
-        }
-
-        getOrCreateCandidateGroup(candidatesByGroupKey, item, stationNames);
-    }
-
-    const visitedGroups = new Set<string>();
-    for (const item of state.items) {
-        const internalCode = normalizeCode(item.internalCode);
-        if (internalCode.length === 0 || document.circulation[internalCode]) {
-            continue;
-        }
-
-        const groupKey = getGroupKey(item);
-        if (visitedGroups.has(groupKey)) {
-            continue;
-        }
-        visitedGroups.add(groupKey);
-
-        const itemIndex = codeIndex.get(normalizeCode(item.code));
-        if (itemIndex === undefined) {
-            continue;
-        }
-
-        const groupIndexes = groupIndex.get(groupKey) ?? [itemIndex];
-        const stationNames = collectGroupDepartureStationNames(
-            state,
-            groupIndexes
-        );
-        if (stationNames.length === 0) {
-            continue;
-        }
-
-        getOrCreateCandidateGroup(candidatesByGroupKey, item, stationNames);
-    }
-
-    return [...candidatesByGroupKey.values()].sort((left, right) =>
-        left.groupKey.localeCompare(right.groupKey, 'zh-Hans-CN')
-    );
-}
 function maybeRecordDispatchResult(input: {
     serviceDate: string;
     candidateGroupCount: number;
@@ -250,17 +127,21 @@ async function executeDispatchStationBoardTasks() {
         return;
     }
 
-    const candidateGroups = collectCandidates(document, state);
-    if (candidateGroups.length === 0) {
+    const stationCandidates = collectScheduleStationCandidates(state);
+    if (stationCandidates.length === 0) {
         logger.info(
-            `done candidateGroups=0 queueEntries=${document.routeRefreshQueue.length} currentDate=${state.date}`
+            `done stationCandidates=0 scheduleItems=${state.items.length} currentDate=${state.date}`
         );
         return;
     }
 
-    const selectedStations = collectSelectedStationNames(candidateGroups);
-    const telecodesByStationName = buildStationTelecodeLookup(
-        await fetchAllStations()
+    const telecodesByStationName = stationCandidates.some(
+        (candidate) => candidate.stationTelecode.length === 0
+    )
+        ? buildStationTelecodeLookup(await fetchAllStations())
+        : new Map();
+    const selectedStations = stationCandidates.map(
+        (candidate) => candidate.stationName || candidate.stationTelecode
     );
 
     const executionTime = getNowSeconds();
@@ -277,19 +158,29 @@ async function executeDispatchStationBoardTasks() {
 
     recordCurrentTrainProvenanceEvent({
         serviceDate: state.date,
-        eventType: 'station_board_cover_solved',
+        eventType: 'station_board_schedule_stations_collected',
         result: 'selected',
         payload: {
-            candidateGroupCount: candidateGroups.length,
+            candidateGroupCount: stationCandidates.length,
             selectedStations
         }
     });
 
-    for (const stationName of selectedStations) {
-        const telecodeResolution = resolveStationTelecodeFromLookup(
-            telecodesByStationName,
-            stationName
-        );
+    for (const candidate of stationCandidates) {
+        const stationName = candidate.stationName;
+        const stationTelecode = candidate.stationTelecode;
+        const telecodeResolution =
+            stationTelecode.length > 0
+                ? {
+                      status: 'resolved' as const,
+                      stationTelecode,
+                      ambiguousTelecodes: [] as []
+                  }
+                : resolveStationTelecodeFromLookup(
+                      telecodesByStationName,
+                      stationName
+                  );
+
         if (telecodeResolution.status === 'not_found') {
             skippedNotFound += 1;
             dispatchDetail.push({
@@ -319,14 +210,17 @@ async function executeDispatchStationBoardTasks() {
             continue;
         }
 
-        const stationTelecode = telecodeResolution.stationTelecode;
-        const taskKey = buildStationBoardTaskKey(state.date, stationTelecode);
+        const resolvedStationTelecode = telecodeResolution.stationTelecode;
+        const taskKey = buildStationBoardTaskKey(
+            state.date,
+            resolvedStationTelecode
+        );
         const pendingTask = pendingTasks.get(taskKey) ?? null;
         if (pendingTask) {
             reusedTasks += 1;
             dispatchDetail.push({
                 stationName,
-                stationTelecode,
+                stationTelecode: resolvedStationTelecode,
                 action: 'reused',
                 schedulerTaskId: pendingTask.taskId,
                 ambiguousTelecodes: []
@@ -337,7 +231,7 @@ async function executeDispatchStationBoardTasks() {
         const stationBoardTask = enqueueOrReuseStationBoardFetchTask({
             serviceDate: state.date,
             stationName,
-            stationTelecode,
+            stationTelecode: resolvedStationTelecode,
             executionTime,
             retryRemaining
         });
@@ -347,7 +241,7 @@ async function executeDispatchStationBoardTasks() {
         createdTasks += 1;
         dispatchDetail.push({
             stationName,
-            stationTelecode,
+            stationTelecode: resolvedStationTelecode,
             action: 'created',
             schedulerTaskId: stationBoardTask.schedulerTaskId,
             ambiguousTelecodes: []
@@ -356,7 +250,7 @@ async function executeDispatchStationBoardTasks() {
 
     maybeRecordDispatchResult({
         serviceDate: state.date,
-        candidateGroupCount: candidateGroups.length,
+        candidateGroupCount: stationCandidates.length,
         selectedStations,
         createdTaskCount: createdTasks,
         reusedTaskCount: reusedTasks,
@@ -366,7 +260,7 @@ async function executeDispatchStationBoardTasks() {
     });
 
     logger.info(
-        `done candidateGroups=${candidateGroups.length} selectedStations=${selectedStations.length} createdTasks=${createdTasks} reusedTasks=${reusedTasks} skippedNotFound=${skippedNotFound} skippedAmbiguous=${skippedAmbiguous} retryRemaining=${retryRemaining} currentDate=${state.date}`
+        `done stationCandidates=${stationCandidates.length} selectedStations=${selectedStations.length} createdTasks=${createdTasks} reusedTasks=${reusedTasks} skippedNotFound=${skippedNotFound} skippedAmbiguous=${skippedAmbiguous} retryRemaining=${retryRemaining} currentDate=${state.date}`
     );
 }
 

@@ -36,6 +36,18 @@ interface ScheduleDocumentCache {
     document: ScheduleDocument;
 }
 
+export interface ScheduleStopMetadataUpdate {
+    trainNo: string;
+    stationTrainCode: string;
+    stationTelecode: string;
+    distance: number | null;
+    platformNo: number | null;
+}
+
+export interface SaveScheduleStopMetadataResult {
+    updatedStopCount: number;
+}
+
 const SCHEDULE_SCHEMA_RELATIVE_PATH = '../assets/json/scheduleScheme.json';
 const CURRENT_SCHEDULE_DOCUMENT_VERSION = 7;
 let cachedScheduleDocument: ScheduleDocumentCache | null = null;
@@ -461,6 +473,18 @@ function ensureScheduleItem(
     );
 }
 
+function normalizeOptionalNonNegativeInteger(value: unknown): number | null {
+    if (
+        typeof value !== 'number' ||
+        !Number.isInteger(value) ||
+        value < 0
+    ) {
+        return null;
+    }
+
+    return value;
+}
+
 function normalizeScheduleStop(
     value: unknown,
     fallbackStationNo: number
@@ -494,6 +518,8 @@ function normalizeScheduleStop(
         stop.departAt >= 0
             ? stop.departAt
             : null;
+    const distance = normalizeOptionalNonNegativeInteger(stop.distance);
+    const platformNo = normalizeOptionalNonNegativeInteger(stop.platformNo);
 
     return {
         stationNo,
@@ -509,6 +535,8 @@ function normalizeScheduleStop(
                 ? stop.stationTrainCode.trim().toUpperCase()
                 : '',
         wicket: typeof stop.wicket === 'string' ? stop.wicket.trim() : '',
+        ...(distance !== null ? { distance } : {}),
+        ...(platformNo !== null ? { platformNo } : {}),
         isStart: stop.isStart === true,
         isEnd: stop.isEnd === true
     };
@@ -1244,6 +1272,119 @@ export function saveScheduleCirculationEntries(
 
     saveScheduleDocument(scheduleFilePath, document);
     return [...savedKeys];
+}
+
+function hasScheduleStopMetadataUpdate(update: ScheduleStopMetadataUpdate) {
+    return update.distance !== null || update.platformNo !== null;
+}
+
+function matchesScheduleStopMetadataItem(
+    item: ScheduleItem,
+    update: ScheduleStopMetadataUpdate
+) {
+    const trainNo = normalizeCode(update.trainNo);
+    const stationTrainCode = normalizeCode(update.stationTrainCode);
+    if (trainNo.length > 0) {
+        return normalizeCode(item.internalCode) === trainNo;
+    }
+
+    if (stationTrainCode.length === 0) {
+        return false;
+    }
+
+    return uniqueNormalizedCodes([item.code, ...item.allCodes]).includes(
+        stationTrainCode
+    );
+}
+
+function applyScheduleStopMetadataUpdate(
+    stop: ScheduleStop,
+    update: ScheduleStopMetadataUpdate
+) {
+    let changed = false;
+
+    if (update.distance !== null && stop.distance !== update.distance) {
+        stop.distance = update.distance;
+        changed = true;
+    }
+    if (update.platformNo !== null && stop.platformNo !== update.platformNo) {
+        stop.platformNo = update.platformNo;
+        changed = true;
+    }
+
+    return changed;
+}
+
+export function saveScheduleStopMetadataFromStationBoard(
+    scheduleFilePath: string,
+    serviceDate: string,
+    updates: readonly ScheduleStopMetadataUpdate[]
+): SaveScheduleStopMetadataResult {
+    if (!/^\d{8}$/.test(serviceDate)) {
+        return {
+            updatedStopCount: 0
+        };
+    }
+
+    const normalizedUpdates = updates
+        .map((update) => ({
+            trainNo: normalizeCode(update.trainNo),
+            stationTrainCode: normalizeCode(update.stationTrainCode),
+            stationTelecode: normalizeCode(update.stationTelecode),
+            distance: normalizeOptionalNonNegativeInteger(update.distance),
+            platformNo: normalizeOptionalNonNegativeInteger(update.platformNo)
+        }))
+        .filter(
+            (update): update is ScheduleStopMetadataUpdate =>
+                update.stationTelecode.length > 0 &&
+                hasScheduleStopMetadataUpdate(update)
+        );
+    if (normalizedUpdates.length === 0) {
+        return {
+            updatedStopCount: 0
+        };
+    }
+
+    const document = cloneScheduleDocument(
+        loadScheduleDocument(scheduleFilePath) ?? createInitialScheduleDocument()
+    );
+    if (!document.published || document.published.date !== serviceDate) {
+        return {
+            updatedStopCount: 0
+        };
+    }
+
+    const updatedStops = new Set<ScheduleStop>();
+    for (const update of normalizedUpdates) {
+        for (const item of document.published.items) {
+            if (!matchesScheduleStopMetadataItem(item, update)) {
+                continue;
+            }
+
+            for (const stop of item.stops) {
+                if (
+                    normalizeCode(stop.stationTelecode) !==
+                    update.stationTelecode
+                ) {
+                    continue;
+                }
+                if (applyScheduleStopMetadataUpdate(stop, update)) {
+                    updatedStops.add(stop);
+                }
+            }
+        }
+    }
+
+    if (updatedStops.size === 0) {
+        return {
+            updatedStopCount: 0
+        };
+    }
+
+    saveScheduleDocument(scheduleFilePath, document);
+    return {
+        updatedStopCount: updatedStops.size
+    };
 }
 
 export function deleteScheduleCirculationEntry(

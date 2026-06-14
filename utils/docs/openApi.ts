@@ -835,6 +835,8 @@ export const developerDocsOpenApi = {
                     'departAt',
                     'stationTrainCode',
                     'wicket',
+                    'distance',
+                    'platformNo',
                     'isStart',
                     'isEnd'
                 ],
@@ -866,6 +868,19 @@ export const developerDocsOpenApi = {
                         type: 'string',
                         nullable: true,
                         example: '检票口 12A'
+                    },
+                    distance: {
+                        type: 'integer',
+                        nullable: true,
+                        description: '该站距离列车始发站的累计里程，单位为公里。',
+                        example: 0
+                    },
+                    platformNo: {
+                        type: 'integer',
+                        nullable: true,
+                        description:
+                            '从 12306 站板 platform_no 中提取的站台或候车室数字。',
+                        example: 2
                     },
                     isStart: {
                         type: 'boolean',
@@ -2506,6 +2521,8 @@ export const developerDocsOpenApi = {
                                                 departAt: 1778887920,
                                                 stationTrainCode: 'G2492',
                                                 wicket: '一层2检票口',
+                                                distance: 0,
+                                                platformNo: 2,
                                                 isStart: true,
                                                 isEnd: false
                                             },
@@ -2516,6 +2533,8 @@ export const developerDocsOpenApi = {
                                                 departAt: 1778891760,
                                                 stationTrainCode: 'G2492',
                                                 wicket: '4检票口',
+                                                distance: 165,
+                                                platformNo: 4,
                                                 isStart: false,
                                                 isEnd: false
                                             },
@@ -2526,6 +2545,8 @@ export const developerDocsOpenApi = {
                                                 departAt: 1778899800,
                                                 stationTrainCode: 'G2492',
                                                 wicket: '',
+                                                distance: null,
+                                                platformNo: null,
                                                 isStart: false,
                                                 isEnd: true
                                             }

@@ -9,7 +9,8 @@ import {
 import {
     consumeRouteRefreshQueueEntries,
     loadScheduleDocument,
-    saveScheduleCirculationEntries
+    saveScheduleCirculationEntries,
+    saveScheduleStopMetadataFromStationBoard
 } from '~/server/utils/12306/scheduleProbe/stateStore';
 import type {
     ScheduleCirculationEntry,
@@ -717,6 +718,17 @@ async function executeFetchStationBoardTask(rawArgs: unknown) {
         return;
     }
 
+    const stopMetadataResult = saveScheduleStopMetadataFromStationBoard(
+        scheduleFilePath,
+        args.serviceDate,
+        rows.map((row) => ({
+            trainNo: row.trainNo,
+            stationTrainCode: row.stationTrainCode,
+            stationTelecode: args.stationTelecode,
+            distance: row.distance,
+            platformNo: row.platformNo
+        }))
+    );
     const parsedEntries = rows.map((row) => parseCirculationTrainToEntry(row));
     const chosenEntries = chooseCirculationEntries(parsedEntries);
     const persistedRows = parsedEntries.map((item) => item.row);
@@ -746,12 +758,14 @@ async function executeFetchStationBoardTask(rawArgs: unknown) {
                 rowCount: rows.length,
                 parsedEntryCount,
                 savedEntryCount: 0,
+                updatedStopMetadataCount:
+                    stopMetadataResult.updatedStopCount,
                 consumedQueueEntryCount: 0,
                 parentSchedulerTaskId: args.parentSchedulerTaskId
             }
         });
         logger.info(
-            `done_no_official_entries serviceDate=${args.serviceDate} stationName=${args.stationName} stationTelecode=${args.stationTelecode} rows=${rows.length}`
+            `done_no_official_entries serviceDate=${args.serviceDate} stationName=${args.stationName} stationTelecode=${args.stationTelecode} rows=${rows.length} updatedStopMetadata=${stopMetadataResult.updatedStopCount}`
         );
         return;
     }
@@ -791,6 +805,7 @@ async function executeFetchStationBoardTask(rawArgs: unknown) {
             rowCount: rows.length,
             parsedEntryCount,
             savedEntryCount: chosenEntries.length,
+            updatedStopMetadataCount: stopMetadataResult.updatedStopCount,
             consumedQueueEntryCount: removedQueueEntries.length,
             savedKeys,
             parentSchedulerTaskId: args.parentSchedulerTaskId
@@ -798,7 +813,7 @@ async function executeFetchStationBoardTask(rawArgs: unknown) {
     });
 
     logger.info(
-        `done serviceDate=${args.serviceDate} stationName=${args.stationName} stationTelecode=${args.stationTelecode} rows=${rows.length} parsedEntries=${parsedEntryCount} savedEntries=${chosenEntries.length} savedKeys=${savedKeys.length} consumedQueueEntries=${removedQueueEntries.length}`
+        `done serviceDate=${args.serviceDate} stationName=${args.stationName} stationTelecode=${args.stationTelecode} rows=${rows.length} parsedEntries=${parsedEntryCount} savedEntries=${chosenEntries.length} savedKeys=${savedKeys.length} updatedStopMetadata=${stopMetadataResult.updatedStopCount} consumedQueueEntries=${removedQueueEntries.length}`
     );
 }
 

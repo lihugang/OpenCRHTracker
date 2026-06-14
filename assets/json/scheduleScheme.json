@@ -130,6 +130,20 @@
                 "wicket": {
                     "type": "string"
                 },
+                "distance": {
+                    "type": [
+                        "integer",
+                        "null"
+                    ],
+                    "minimum": 0
+                },
+                "platformNo": {
+                    "type": [
+                        "integer",
+                        "null"
+                    ],
+                    "minimum": 0
+                },
                 "isStart": {
                     "type": "boolean"
                 },

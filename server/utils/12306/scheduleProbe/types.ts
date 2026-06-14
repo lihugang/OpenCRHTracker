@@ -21,6 +21,8 @@ export interface ScheduleStop {
     departAt: number | null;
     stationTrainCode: string;
     wicket: string;
+    distance?: number | null;
+    platformNo?: number | null;
     isStart: boolean;
     isEnd: boolean;
 }

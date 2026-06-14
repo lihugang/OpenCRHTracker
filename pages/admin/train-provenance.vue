@@ -2032,7 +2032,7 @@
                         交路数据刷新
                     </h2>
                     <p class="text-sm leading-6 text-slate-600">
-                        展示当日交路数据刷新派发任务、按始发站去重后的车站，以及每个车站抓取任务返回的原始站板数据。
+                        展示当日交路数据刷新派发任务、从时刻表经停站去重后的车站，以及每个车站抓取任务返回的原始站板数据。
                     </p>
                 </div>
 
@@ -2146,7 +2146,7 @@
                                                 item.selectedStationCount
                                             )
                                         }}
-                                        / 候选组
+                                        / 候选车站
                                         {{
                                             formatNumber(
                                                 item.candidateGroupCount
