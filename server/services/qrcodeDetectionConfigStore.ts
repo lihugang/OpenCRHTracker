@@ -15,6 +15,12 @@ export interface QrcodeDetectionConfig {
 
 export interface QrcodeDetectionConfigLoadResult {
     config: QrcodeDetectionConfig;
+    missingEmuListMappings: string[];
+    missingQrcodeMappings: string[];
+}
+
+interface QrcodeDetectionConfigMappingValidation {
+    missingEmuListMappings: string[];
     missingQrcodeMappings: string[];
 }
 
@@ -98,8 +104,11 @@ function parseEmuList(value: unknown): string[] {
     return result;
 }
 
-async function assertEmuMappings(emuCodes: string[]): Promise<string[]> {
+async function assertEmuMappings(
+    emuCodes: string[]
+): Promise<QrcodeDetectionConfigMappingValidation> {
     const assets = await loadProbeAssets();
+    const missingEmuListMappings: string[] = [];
     const missingQrcodeMappings: string[] = [];
 
     for (const emuCode of emuCodes) {
@@ -113,17 +122,20 @@ async function assertEmuMappings(emuCodes: string[]): Promise<string[]> {
             parsedEmuCode.model,
             parsedEmuCode.trainSetNo
         );
-        assert(
-            assets.emuByModelAndTrainSetNo.has(key),
-            `emu ${emuCode} does not exist in EMUList`
-        );
+        if (!assets.emuByModelAndTrainSetNo.has(key)) {
+            missingEmuListMappings.push(emuCode);
+            continue;
+        }
 
         if (!assets.qrcodeByModelAndTrainSetNo.has(key)) {
             missingQrcodeMappings.push(emuCode);
         }
     }
 
-    return missingQrcodeMappings;
+    return {
+        missingEmuListMappings,
+        missingQrcodeMappings
+    };
 }
 
 async function validateQrcodeDetectionConfig(
@@ -135,10 +147,28 @@ async function validateQrcodeDetectionConfig(
         emu: parseEmuList(root.emu)
     };
 
+    const mappingValidation = await assertEmuMappings(config.emu);
+
     return {
         config,
-        missingQrcodeMappings: await assertEmuMappings(config.emu)
+        missingEmuListMappings: mappingValidation.missingEmuListMappings,
+        missingQrcodeMappings: mappingValidation.missingQrcodeMappings
     };
+}
+
+function formatSamples(values: readonly string[]): string {
+    const samples = values.slice(0, 3).join(', ');
+    return values.length > 3 ? `${samples} etc. ` : samples;
+}
+
+export function formatQrcodeDetectionMissingEmuListWarning(
+    missingEmuListMappings: readonly string[]
+): string {
+    if (missingEmuListMappings.length === 0) {
+        return '';
+    }
+
+    return `${missingEmuListMappings.length} qrcode detection trains missing in EMUList. Samples: ${formatSamples(missingEmuListMappings)}`;
 }
 
 export function formatQrcodeDetectionMissingMappingsWarning(
@@ -148,10 +178,23 @@ export function formatQrcodeDetectionMissingMappingsWarning(
         return '';
     }
 
-    const samples = missingQrcodeMappings.slice(0, 3).join(', ');
-    const sampleSuffix =
-        missingQrcodeMappings.length > 3 ? `${samples} etc. ` : samples;
-    return `${missingQrcodeMappings.length} train qrcode missing. Samples: ${sampleSuffix}`;
+    return `${missingQrcodeMappings.length} train qrcode missing. Samples: ${formatSamples(missingQrcodeMappings)}`;
+}
+
+export function formatQrcodeDetectionConfigWarnings(
+    result: Pick<
+        QrcodeDetectionConfigLoadResult,
+        'missingEmuListMappings' | 'missingQrcodeMappings'
+    >
+): string {
+    return [
+        formatQrcodeDetectionMissingEmuListWarning(
+            result.missingEmuListMappings
+        ),
+        formatQrcodeDetectionMissingMappingsWarning(result.missingQrcodeMappings)
+    ]
+        .filter((warning) => warning.length > 0)
+        .join(' ');
 }
 
 export function getQrcodeDetectionConfigPath(): string {

@@ -8,7 +8,7 @@ import { listDailyRecordsAll } from '~/server/services/emuRoutesStore';
 import { clearProbeStatus } from '~/server/services/probeStatusStore';
 import { rehydrateProbeRuntimeState } from '~/server/services/probeRuntimeState';
 import {
-    formatQrcodeDetectionMissingMappingsWarning,
+    formatQrcodeDetectionConfigWarnings,
     reloadQrcodeDetectionConfig
 } from '~/server/services/qrcodeDetectionConfigStore';
 import { loadStationCoordAssets } from '~/server/services/stationCoordStore';
@@ -195,10 +195,9 @@ export default defineNitroPlugin(async () => {
         await loadProbeAssets();
         await loadStationCoordAssets();
         const qrcodeDetectionConfigResult = await reloadQrcodeDetectionConfig();
-        const qrcodeDetectionWarning =
-            formatQrcodeDetectionMissingMappingsWarning(
-                qrcodeDetectionConfigResult.missingQrcodeMappings
-            );
+        const qrcodeDetectionWarning = formatQrcodeDetectionConfigWarnings(
+            qrcodeDetectionConfigResult
+        );
         if (qrcodeDetectionWarning.length > 0) {
             logger.warn(
                 `qrcode_detection_config_warning ${qrcodeDetectionWarning}`

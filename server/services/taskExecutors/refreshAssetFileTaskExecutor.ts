@@ -7,6 +7,7 @@ import {
     validateDownloadedQrCodeAssetText
 } from '~/server/services/probeAssetStore';
 import {
+    formatQrcodeDetectionConfigWarnings,
     invalidateQrcodeDetectionConfigCache,
     reloadQrcodeDetectionConfig,
     validateQrcodeDetectionConfigText
@@ -102,13 +103,25 @@ async function reloadQrcodeDependenciesAfterProbeAssetChange(): Promise<void> {
     invalidateProbeAssetsCache();
     preloadProbeAssetsFromLocalFiles();
     invalidateQrcodeDetectionConfigCache();
-    await reloadQrcodeDetectionConfig();
+    const result = await reloadQrcodeDetectionConfig();
+    const warning = formatQrcodeDetectionConfigWarnings(result);
+    if (warning.length > 0) {
+        getRefreshDefinition('qrcodeDetection').logger.warn(
+            `qrcode_detection_config_warning ${warning}`
+        );
+    }
     await synchronizeQrcodeDetectionDispatchTasks();
 }
 
 async function reloadQrcodeDetectionAssetOnly(): Promise<void> {
     invalidateQrcodeDetectionConfigCache();
-    await reloadQrcodeDetectionConfig();
+    const result = await reloadQrcodeDetectionConfig();
+    const warning = formatQrcodeDetectionConfigWarnings(result);
+    if (warning.length > 0) {
+        getRefreshDefinition('qrcodeDetection').logger.warn(
+            `qrcode_detection_config_warning ${warning}`
+        );
+    }
     await synchronizeQrcodeDetectionDispatchTasks();
 }
 

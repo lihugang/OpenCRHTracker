@@ -13,7 +13,7 @@ import {
     validateDownloadedQrCodeAssetText
 } from '~/server/services/probeAssetStore';
 import {
-    formatQrcodeDetectionMissingMappingsWarning,
+    formatQrcodeDetectionConfigWarnings,
     getQrcodeDetectionConfigPath,
     invalidateQrcodeDetectionConfigCache,
     reloadQrcodeDetectionConfig,
@@ -174,9 +174,7 @@ async function reloadQrcodeDetectionAfterAssetChange(): Promise<string> {
     invalidateQrcodeDetectionConfigCache();
     const result = await reloadQrcodeDetectionConfig();
     await synchronizeQrcodeDetectionDispatchTasks();
-    return formatQrcodeDetectionMissingMappingsWarning(
-        result.missingQrcodeMappings
-    );
+    return formatQrcodeDetectionConfigWarnings(result);
 }
 
 function reloadStationCoordAssetFromLocal(): void {
@@ -240,9 +238,8 @@ async function reloadQrcodeDetectionFromLocal(): Promise<AdminConfigFileActionRe
 
     const item = buildConfigFileItem('qrcodeDetection');
     logger.info(`admin_qrcode_detection_reload_local file=${filePath}`);
-    const warningSummary = formatQrcodeDetectionMissingMappingsWarning(
-        validationResult.missingQrcodeMappings
-    );
+    const warningSummary =
+        formatQrcodeDetectionConfigWarnings(validationResult);
 
     return {
         target: 'qrcodeDetection',
