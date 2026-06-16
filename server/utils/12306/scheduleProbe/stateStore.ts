@@ -3,6 +3,7 @@ import path from 'path';
 import getCurrentDateString from '../../date/getCurrentDateString';
 import normalizeCode from '../normalizeCode';
 import uniqueNormalizedCodes from '../uniqueNormalizedCodes';
+import { filterInvalidScheduleItems } from './filterInvalidScheduleItems';
 import { getInitialKeywords } from './prefixTree';
 import type {
     ScheduleCirculationEntry,
@@ -1473,7 +1474,9 @@ export function savePublishedScheduleState(
         loadScheduleDocument(scheduleFilePath) ??
             createInitialScheduleDocument()
     );
-    document.published = state ? cloneScheduleState(state) : null;
+    document.published = state
+        ? filterInvalidScheduleItems(cloneScheduleState(state)).state
+        : null;
     document.stations = mergeScheduleStationMaps(document.stations, stations);
     saveScheduleDocument(scheduleFilePath, document);
     bumpScheduleStateVersion();
@@ -1495,7 +1498,9 @@ export function saveBuildingScheduleState(
         loadScheduleDocument(scheduleFilePath) ??
             createInitialScheduleDocument()
     );
-    document.building = state ? cloneScheduleState(state) : null;
+    document.building = state
+        ? filterInvalidScheduleItems(cloneScheduleState(state)).state
+        : null;
     document.stations = mergeScheduleStationMaps(document.stations, stations);
     saveScheduleDocument(scheduleFilePath, document);
     bumpScheduleStateVersion();
@@ -1512,10 +1517,12 @@ export function promoteBuildingScheduleState(
     const buildingState = document.building
         ? cloneScheduleState(document.building)
         : cloneScheduleState(fallbackState);
-    const promotedState = mergePublishedRouteInfo(
-        buildingState,
-        document.published ? cloneScheduleState(document.published) : null
-    );
+    const promotedState = filterInvalidScheduleItems(
+        mergePublishedRouteInfo(
+            buildingState,
+            document.published ? cloneScheduleState(document.published) : null
+        )
+    ).state;
     document.published = promotedState;
     document.building = null;
     saveScheduleDocument(scheduleFilePath, document);
