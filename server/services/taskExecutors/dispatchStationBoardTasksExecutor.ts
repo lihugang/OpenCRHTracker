@@ -81,6 +81,32 @@ function collectScheduleStationCandidates(
     );
 }
 
+function buildSelectedStationNames(
+    candidates: StationBoardStationCandidate[]
+): string[] {
+    const stationNamesByKey = new Map<string, string>();
+
+    for (const candidate of candidates) {
+        const stationName = normalizeStationName(candidate.stationName);
+        const stationTelecode = normalizeCode(candidate.stationTelecode);
+        if (stationName.length === 0 && stationTelecode.length === 0) {
+            continue;
+        }
+
+        const key =
+            stationTelecode.length > 0
+                ? `telecode:${stationTelecode}`
+                : `name:${stationName}`;
+        if (stationNamesByKey.has(key)) {
+            continue;
+        }
+
+        stationNamesByKey.set(key, stationName || stationTelecode);
+    }
+
+    return [...stationNamesByKey.values()];
+}
+
 function maybeRecordDispatchResult(input: {
     serviceDate: string;
     candidateGroupCount: number;
@@ -140,9 +166,7 @@ async function executeDispatchStationBoardTasks() {
     )
         ? buildStationTelecodeLookup(await fetchAllStations())
         : new Map();
-    const selectedStations = stationCandidates.map(
-        (candidate) => candidate.stationName || candidate.stationTelecode
-    );
+    const selectedStations = buildSelectedStationNames(stationCandidates);
 
     const executionTime = getNowSeconds();
     const pendingTasks = listPendingStationBoardTasks();

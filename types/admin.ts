@@ -690,6 +690,7 @@ export interface AdminStationBoardDispatchTaskListItem {
     skippedNotFoundCount: number;
     skippedAmbiguousCount: number;
     selectedStations: string[];
+    selectedStationItems: AdminStationBoardSelectedStationItem[];
     taskArgs: unknown;
 }
 
@@ -721,9 +722,18 @@ export type AdminStationBoardFetchResultStatus =
     | 'saved_entries'
     | 'no_official_entries';
 
-export interface AdminStationBoardStationTaskItem {
+export interface AdminStationBoardSelectedStationItem {
+    key: string;
     stationName: string;
     stationTelecode: string;
+    displayName: string;
+}
+
+export interface AdminStationBoardStationTaskItem {
+    key: string;
+    stationName: string;
+    stationTelecode: string;
+    displayName: string;
     action: AdminStationBoardStationTaskAction;
     schedulerTaskId: number | null;
     taskRunId: number | null;
@@ -749,6 +759,7 @@ export interface AdminStationBoardDispatchDetailResponse {
     finishedAt: number | null;
     candidateGroupCount: number;
     selectedStations: string[];
+    selectedStationItems: AdminStationBoardSelectedStationItem[];
     createdTaskCount: number;
     reusedTaskCount: number;
     skippedNotFoundCount: number;

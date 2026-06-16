@@ -52,6 +52,7 @@ import type {
     AdminStationBoardDispatchTaskListItem,
     AdminStationBoardFetchResultStatus,
     AdminStationBoardRow,
+    AdminStationBoardSelectedStationItem,
     AdminStationBoardStationTaskAction,
     AdminStationBoardStationTaskItem,
     AdminStationBoardTaskListResponse,
@@ -190,9 +191,136 @@ function isStationBoardFetchResultStatus(
 }
 
 function toStationBoardSelectedStations(value: unknown) {
-    return getStringArray(value)
-        .map((item) => item.trim())
-        .filter((item) => item.length > 0);
+    return Array.from(
+        new Set(
+            getStringArray(value)
+                .map((item) => item.trim())
+                .filter((item) => item.length > 0)
+        )
+    );
+}
+
+function buildStationBoardStationKey(
+    stationName: string,
+    stationTelecode: string
+) {
+    const normalizedStationTelecode = normalizeCode(stationTelecode);
+    if (normalizedStationTelecode.length > 0) {
+        return `telecode:${normalizedStationTelecode}`;
+    }
+
+    return `name:${stationName.trim()}`;
+}
+
+function toStationBoardSelectedStationItemsFromDetails(
+    details: StationBoardDispatchDetailPayload[]
+): AdminStationBoardSelectedStationItem[] {
+    const itemsByKey = new Map<string, AdminStationBoardSelectedStationItem>();
+
+    for (const detail of details) {
+        const stationName = detail.stationName.trim();
+        const stationTelecode = normalizeCode(detail.stationTelecode);
+        if (stationName.length === 0 && stationTelecode.length === 0) {
+            continue;
+        }
+
+        const key = buildStationBoardStationKey(stationName, stationTelecode);
+        if (itemsByKey.has(key)) {
+            continue;
+        }
+
+        itemsByKey.set(key, {
+            key,
+            stationName: stationName || stationTelecode,
+            stationTelecode,
+            displayName: stationName || stationTelecode
+        });
+    }
+
+    return withStationBoardDisplayNames([...itemsByKey.values()]);
+}
+
+function toStationBoardSelectedStationItemsFromNames(
+    selectedStations: string[]
+): AdminStationBoardSelectedStationItem[] {
+    const itemsByKey = new Map<string, AdminStationBoardSelectedStationItem>();
+
+    for (const selectedStation of selectedStations) {
+        const stationName = selectedStation.trim();
+        if (stationName.length === 0) {
+            continue;
+        }
+
+        const key = buildStationBoardStationKey(stationName, '');
+        if (itemsByKey.has(key)) {
+            continue;
+        }
+
+        itemsByKey.set(key, {
+            key,
+            stationName,
+            stationTelecode: '',
+            displayName: stationName
+        });
+    }
+
+    return [...itemsByKey.values()];
+}
+
+function withStationBoardDisplayNames(
+    items: AdminStationBoardSelectedStationItem[]
+): AdminStationBoardSelectedStationItem[] {
+    const keyCountByStationName = new Map<string, Set<string>>();
+
+    for (const item of items) {
+        const stationName = item.stationName.trim();
+        if (stationName.length === 0) {
+            continue;
+        }
+
+        const existing = keyCountByStationName.get(stationName);
+        if (existing) {
+            existing.add(item.key);
+            continue;
+        }
+
+        keyCountByStationName.set(stationName, new Set([item.key]));
+    }
+
+    return items.map((item) => {
+        const hasDuplicateName =
+            (keyCountByStationName.get(item.stationName)?.size ?? 0) > 1;
+        const displayName =
+            hasDuplicateName && item.stationTelecode.length > 0
+                ? `${item.stationName} / ${item.stationTelecode}`
+                : item.stationName;
+
+        return {
+            ...item,
+            displayName
+        };
+    });
+}
+
+function withStationBoardStationTaskDisplayNames(
+    items: AdminStationBoardStationTaskItem[]
+): AdminStationBoardStationTaskItem[] {
+    const displayItems = withStationBoardDisplayNames(
+        items.map((item) => ({
+            key: item.key,
+            stationName: item.stationName,
+            stationTelecode: item.stationTelecode,
+            displayName: item.displayName
+        }))
+    );
+    const displayNameByKey = new Map(
+        displayItems.map((item) => [item.key, item.displayName])
+    );
+
+    return items.map((item) => ({
+        ...item,
+        displayName: displayNameByKey.get(item.key) ?? item.displayName
+    }));
 }
 
 function toStationBoardDispatchDetailPayloads(
@@ -2092,6 +2220,13 @@ function toStationBoardDispatchTaskListItem(
     const selectedStations = toStationBoardSelectedStations(
         result?.selectedStations ?? []
     );
+    const dispatchDetails = toStationBoardDispatchDetailPayloads(
+        result?.detail ?? []
+    );
+    const selectedStationItems =
+        dispatchDetails.length > 0
+            ? toStationBoardSelectedStationItemsFromDetails(dispatchDetails)
+            : toStationBoardSelectedStationItemsFromNames(selectedStations);
 
     return {
         taskRunId: taskRun.id,
@@ -2109,6 +2244,7 @@ function toStationBoardDispatchTaskListItem(
         skippedNotFoundCount: result?.skippedNotFoundCount ?? 0,
         skippedAmbiguousCount: result?.skippedAmbiguousCount ?? 0,
         selectedStations,
+        selectedStationItems,
         taskArgs: taskRun.taskArgs
     };
 }
@@ -2120,11 +2256,15 @@ function buildStationBoardStationTaskItem(input: {
 }): AdminStationBoardStationTaskItem {
     const fetchTaskRun = input.fetchTaskRun;
     const fetchResult = input.fetchResult;
+    const stationName = input.detail.stationName;
+    const stationTelecode =
+        fetchResult?.stationTelecode || input.detail.stationTelecode || '';
 
     return {
-        stationName: input.detail.stationName,
-        stationTelecode:
-            fetchResult?.stationTelecode || input.detail.stationTelecode || '',
+        key: buildStationBoardStationKey(stationName, stationTelecode),
+        stationName,
+        stationTelecode,
+        displayName: stationName || stationTelecode || '',
         action: input.detail.action,
         schedulerTaskId: input.detail.schedulerTaskId,
         taskRunId: fetchTaskRun?.id ?? null,
@@ -2218,6 +2358,7 @@ export function getAdminStationBoardDispatchDetail(
             finishedAt: null,
             candidateGroupCount: 0,
             selectedStations: [],
+            selectedStationItems: [],
             createdTaskCount: 0,
             reusedTaskCount: 0,
             skippedNotFoundCount: 0,
@@ -2235,6 +2376,10 @@ export function getAdminStationBoardDispatchDetail(
     const dispatchDetails = toStationBoardDispatchDetailPayloads(
         result?.detail ?? []
     );
+    const selectedStationItems =
+        dispatchDetails.length > 0
+            ? toStationBoardSelectedStationItemsFromDetails(dispatchDetails)
+            : toStationBoardSelectedStationItemsFromNames(selectedStations);
     const fetchTaskRuns = /^\d{8}$/.test(serviceDate)
         ? listTrainProvenanceTaskRunsByDateAndExecutor(
               serviceDate,
@@ -2285,23 +2430,26 @@ export function getAdminStationBoardDispatchDetail(
         }
     }
 
-    const stations = dispatchDetails.map((detail) => {
-        const fetchTaskRun =
-            detail.schedulerTaskId !== null
-                ? (fetchTaskRunBySchedulerTaskId.get(detail.schedulerTaskId) ??
-                  null)
-                : null;
-        const fetchResult =
-            fetchTaskRun !== null
-                ? (fetchResultByTaskRunId.get(fetchTaskRun.id) ?? null)
-                : null;
+    const stations = withStationBoardStationTaskDisplayNames(
+        dispatchDetails.map((detail) => {
+            const fetchTaskRun =
+                detail.schedulerTaskId !== null
+                    ? (fetchTaskRunBySchedulerTaskId.get(
+                          detail.schedulerTaskId
+                      ) ?? null)
+                    : null;
+            const fetchResult =
+                fetchTaskRun !== null
+                    ? (fetchResultByTaskRunId.get(fetchTaskRun.id) ?? null)
+                    : null;
 
-        return buildStationBoardStationTaskItem({
-            detail,
-            fetchTaskRun,
-            fetchResult
-        });
-    });
+            return buildStationBoardStationTaskItem({
+                detail,
+                fetchTaskRun,
+                fetchResult
+            });
+        })
+    );
 
     return {
         enabled: true,
@@ -2313,6 +2461,7 @@ export function getAdminStationBoardDispatchDetail(
         finishedAt: taskRun?.finishedAt ?? null,
         candidateGroupCount: result?.candidateGroupCount ?? 0,
         selectedStations,
+        selectedStationItems,
         createdTaskCount: result?.createdTaskCount ?? 0,
         reusedTaskCount: result?.reusedTaskCount ?? 0,
         skippedNotFoundCount: result?.skippedNotFoundCount ?? 0,

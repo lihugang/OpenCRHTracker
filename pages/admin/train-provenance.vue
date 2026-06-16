@@ -2360,20 +2360,20 @@
                             class="flex flex-wrap gap-2">
                             <button
                                 v-for="item in filteredStationBoardDetailStations"
-                                :key="`station-board-station:${item.stationName}`"
+                                :key="`station-board-station:${getStationBoardStationKey(item)}`"
                                 type="button"
                                 class="rounded-full border px-3 py-2 text-sm transition"
                                 :class="
-                                    item.stationName ===
-                                    activeStationBoardStation?.stationName
+                                    getStationBoardStationKey(item) ===
+                                    activeStationBoardStationKey
                                         ? 'border-sky-500 bg-sky-50 text-sky-700'
                                         : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
                                 "
                                 @click="
-                                    selectedStationBoardStationName =
-                                        item.stationName
+                                    selectedStationBoardStationKey =
+                                        getStationBoardStationKey(item)
                                 ">
-                                {{ item.stationName }}
+                                {{ getStationBoardStationLabel(item) }}
                             </button>
                         </div>
                     </div>
@@ -2833,7 +2833,7 @@ const expandedScannedRouteEventIds = ref<number[]>([]);
 const selectedCouplingTaskBureau = ref('');
 const selectedCouplingTaskModel = ref('');
 const selectedStationBoardTelecodeInitial = ref('A');
-const selectedStationBoardStationName = ref('');
+const selectedStationBoardStationKey = ref('');
 const hideEmptyStationBoardCirculationRows = ref(true);
 const couplingDetailStatus = ref<'idle' | 'pending' | 'success' | 'error'>(
     'idle'
@@ -3205,13 +3205,44 @@ const filteredStationBoardDetailStations = computed<
         );
     })
 );
+const stationBoardDetailDuplicateNames = computed(() => {
+    const keysByName = new Map<string, Set<string>>();
+
+    for (const item of stationBoardDetailStations.value) {
+        const stationName = item.stationName.trim();
+        if (stationName.length === 0) {
+            continue;
+        }
+
+        const existingKeys = keysByName.get(stationName);
+        if (existingKeys) {
+            existingKeys.add(getStationBoardStationKey(item));
+            continue;
+        }
+
+        keysByName.set(stationName, new Set([getStationBoardStationKey(item)]));
+    }
+
+    return new Set(
+        [...keysByName.entries()]
+            .filter(([, keys]) => keys.size > 1)
+            .map(([stationName]) => stationName)
+    );
+});
 const activeStationBoardStation = computed(
     () =>
         filteredStationBoardDetailStations.value.find(
-            (item) => item.stationName === selectedStationBoardStationName.value
+            (item) =>
+                getStationBoardStationKey(item) ===
+                selectedStationBoardStationKey.value
         ) ??
         filteredStationBoardDetailStations.value[0] ??
         null
+);
+const activeStationBoardStationKey = computed(() =>
+    activeStationBoardStation.value
+        ? getStationBoardStationKey(activeStationBoardStation.value)
+        : ''
 );
 const activeStationBoardRows = computed(() => {
     const rows = activeStationBoardStation.value?.rows ?? [];
@@ -3243,13 +3274,17 @@ watch(selectedCouplingTaskBureau, () => {
 watch(filteredStationBoardDetailStations, (items) => {
     if (
         items.some(
-            (item) => item.stationName === selectedStationBoardStationName.value
+            (item) =>
+                getStationBoardStationKey(item) ===
+                selectedStationBoardStationKey.value
         )
     ) {
         return;
     }
 
-    selectedStationBoardStationName.value = items[0]?.stationName ?? '';
+    selectedStationBoardStationKey.value = items[0]
+        ? getStationBoardStationKey(items[0])
+        : '';
 });
 
 useSiteSeo({
@@ -3426,7 +3461,7 @@ function closeStationBoardDetailDialog() {
     isStationBoardDetailDialogOpen.value = false;
     stationBoardDetailErrorMessage.value = '';
     selectedStationBoardTelecodeInitial.value = 'A';
-    selectedStationBoardStationName.value = '';
+    selectedStationBoardStationKey.value = '';
     hideEmptyStationBoardCirculationRows.value = true;
 }
 
@@ -3517,7 +3552,7 @@ async function openStationBoardDetail(taskRunId: number) {
     stationBoardDetailErrorMessage.value = '';
     stationBoardDetailData.value = null;
     selectedStationBoardTelecodeInitial.value = 'A';
-    selectedStationBoardStationName.value = '';
+    selectedStationBoardStationKey.value = '';
     hideEmptyStationBoardCirculationRows.value = true;
 
     try {
@@ -3560,6 +3595,34 @@ function getStationBoardActionLabel(item: AdminStationBoardStationTaskItem) {
         default:
             return item.action;
     }
+}
+
+function getStationBoardStationKey(item: AdminStationBoardStationTaskItem) {
+    if (item.key.trim().length > 0) {
+        return item.key;
+    }
+
+    const stationTelecode = item.stationTelecode.trim().toUpperCase();
+    if (stationTelecode.length > 0) {
+        return `telecode:${stationTelecode}`;
+    }
+
+    return `name:${item.stationName.trim()}`;
+}
+
+function getStationBoardStationLabel(item: AdminStationBoardStationTaskItem) {
+    if (item.displayName.trim().length > 0) {
+        return item.displayName;
+    }
+
+    if (
+        stationBoardDetailDuplicateNames.value.has(item.stationName) &&
+        item.stationTelecode.trim().length > 0
+    ) {
+        return `${item.stationName} / ${item.stationTelecode}`;
+    }
+
+    return item.stationName || item.stationTelecode || '--';
 }
 
 function getStationBoardTelecodeInitial(telecode: string): string {
