@@ -191,6 +191,29 @@ export default async function fetchStationBoardByStation(
             );
         }
 
+        if (json.data.length === 0) {
+            requestStatRecorded = true;
+            record12306RequestHourlyStat({
+                requestType: 'fetch_station_board',
+                isSuccess: false
+            });
+            log12306RequestFailure({
+                logger,
+                operation: 'empty_response',
+                url,
+                context: {
+                    serviceDate: normalizedServiceDate,
+                    stationTelecode: normalizedStationTelecode
+                },
+                responseStatus: response.status,
+                responseOk: response.ok,
+                businessStatus: json.status,
+                detail: 'data is an empty array'
+            });
+            failureLogged = true;
+            throw new Error('fetch_station_board_empty_response data_empty');
+        }
+
         const rows = json.data
             .map((row) => normalizeStationBoardRow(row))
             .filter((row): row is StationBoardTrainRow => row !== null);
