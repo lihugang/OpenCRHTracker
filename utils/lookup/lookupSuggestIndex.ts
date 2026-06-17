@@ -89,6 +89,19 @@ function buildTagVariants(value: string) {
     return variants;
 }
 
+function resolveEmuTrainSetNo(code: string) {
+    const normalizedCode = normalizeKeyword(code);
+    const separatorIndex = normalizedCode.lastIndexOf('-');
+    if (
+        separatorIndex <= 0 ||
+        separatorIndex >= normalizedCode.length - 1
+    ) {
+        return '';
+    }
+
+    return normalizedCode.slice(separatorIndex + 1);
+}
+
 function resolveSearchLimit(limit?: number) {
     if (!limit || !Number.isFinite(limit) || limit <= 0) {
         return Number.POSITIVE_INFINITY;
@@ -104,6 +117,7 @@ function buildLookupSuggestIndex(
     const trainCodeTrie = new Trie<number>();
     const emuCodeTrie = new Trie<number>();
     const emuTagTrie = new Trie<number>();
+    const emuTrainSetNoTrie = new Trie<number>();
 
     items.forEach((item, itemIndex) => {
         const normalizedCode = normalizeKeyword(item.code);
@@ -116,6 +130,10 @@ function buildLookupSuggestIndex(
 
         if (item.type === 'emu') {
             emuCodeTrie.insert(normalizedCode, itemIndex);
+            emuTrainSetNoTrie.insert(
+                resolveEmuTrainSetNo(normalizedCode),
+                itemIndex
+            );
             for (const tag of item.tags) {
                 emuTagTrie.insertMany(buildTagVariants(tag), itemIndex);
             }
@@ -150,6 +168,10 @@ function buildLookupSuggestIndex(
             if (type === 'emu') {
                 return collectItems([
                     ...emuCodeTrie.search(normalizedQuery, searchLimit),
+                    ...emuTrainSetNoTrie.search(
+                        normalizedQuery,
+                        searchLimit
+                    ),
                     ...emuTagTrie.search(normalizedQuery, searchLimit)
                 ])
                     .sort(compareSuggestionOrder(normalizedQuery))
@@ -158,6 +180,7 @@ function buildLookupSuggestIndex(
 
             return collectItems([
                 ...allCodeTrie.search(normalizedQuery, searchLimit),
+                ...emuTrainSetNoTrie.search(normalizedQuery, searchLimit),
                 ...emuTagTrie.search(normalizedQuery, searchLimit)
             ])
                 .sort(compareSuggestionOrder(normalizedQuery))
