@@ -62,10 +62,7 @@ function buildEmuSubtitle(record: { bureau: string; depot: string }) {
         parts.push(record.bureau);
     }
     if (record.depot) {
-        const depotLabel = record.depot.endsWith('动车所')
-            ? record.depot
-            : `${record.depot}动车所`;
-        parts.push(depotLabel);
+        parts.push(record.depot);
     }
 
     return parts.join(' · ') || DEFAULT_EMU_SUBTITLE;
