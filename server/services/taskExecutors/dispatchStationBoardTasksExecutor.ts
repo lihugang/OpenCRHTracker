@@ -107,6 +107,18 @@ function buildSelectedStationNames(
     return [...stationNamesByKey.values()];
 }
 
+function buildResolvedStationCandidateKey(
+    stationName: string,
+    stationTelecode: string
+) {
+    const normalizedStationTelecode = normalizeCode(stationTelecode);
+    if (normalizedStationTelecode.length > 0) {
+        return `telecode:${normalizedStationTelecode}`;
+    }
+
+    return `name:${normalizeStationName(stationName)}`;
+}
+
 function maybeRecordDispatchResult(input: {
     serviceDate: string;
     candidateGroupCount: number;
@@ -179,6 +191,7 @@ async function executeDispatchStationBoardTasks() {
     let skippedNotFound = 0;
     let skippedAmbiguous = 0;
     const dispatchDetail: StationBoardDispatchTaskDetail[] = [];
+    const dispatchedStationKeys = new Set<string>();
 
     recordCurrentTrainProvenanceEvent({
         serviceDate: state.date,
@@ -206,6 +219,14 @@ async function executeDispatchStationBoardTasks() {
                   );
 
         if (telecodeResolution.status === 'not_found') {
+            const stationKey = buildResolvedStationCandidateKey(
+                stationName,
+                ''
+            );
+            if (dispatchedStationKeys.has(stationKey)) {
+                continue;
+            }
+            dispatchedStationKeys.add(stationKey);
             skippedNotFound += 1;
             dispatchDetail.push({
                 stationName,
@@ -220,6 +241,14 @@ async function executeDispatchStationBoardTasks() {
             continue;
         }
         if (telecodeResolution.status === 'ambiguous') {
+            const stationKey = buildResolvedStationCandidateKey(
+                stationName,
+                ''
+            );
+            if (dispatchedStationKeys.has(stationKey)) {
+                continue;
+            }
+            dispatchedStationKeys.add(stationKey);
             skippedAmbiguous += 1;
             dispatchDetail.push({
                 stationName,
@@ -235,6 +264,14 @@ async function executeDispatchStationBoardTasks() {
         }
 
         const resolvedStationTelecode = telecodeResolution.stationTelecode;
+        const stationKey = buildResolvedStationCandidateKey(
+            stationName,
+            resolvedStationTelecode
+        );
+        if (dispatchedStationKeys.has(stationKey)) {
+            continue;
+        }
+        dispatchedStationKeys.add(stationKey);
         const taskKey = buildStationBoardTaskKey(
             state.date,
             resolvedStationTelecode

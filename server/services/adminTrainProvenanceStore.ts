@@ -2283,6 +2283,115 @@ function buildStationBoardStationTaskItem(input: {
     };
 }
 
+function getStationBoardStationTaskActionPriority(
+    action: AdminStationBoardStationTaskAction
+) {
+    switch (action) {
+        case 'created':
+            return 4;
+        case 'reused':
+            return 3;
+        case 'station_telecode_ambiguous':
+            return 2;
+        case 'station_telecode_not_found':
+            return 1;
+        default:
+            return 0;
+    }
+}
+
+function getStationBoardStationTaskDataPriority(
+    item: AdminStationBoardStationTaskItem
+) {
+    return [
+        item.taskRunId === null ? 0 : 1,
+        item.resultStatus === null ? 0 : 1,
+        item.rows.length,
+        item.rowCount,
+        item.savedEntryCount,
+        item.parsedEntryCount,
+        item.consumedQueueEntryCount,
+        getStationBoardStationTaskActionPriority(item.action)
+    ];
+}
+
+function shouldReplaceStationBoardStationTaskItem(
+    current: AdminStationBoardStationTaskItem,
+    next: AdminStationBoardStationTaskItem
+) {
+    const currentPriority = getStationBoardStationTaskDataPriority(current);
+    const nextPriority = getStationBoardStationTaskDataPriority(next);
+
+    for (let index = 0; index < currentPriority.length; index += 1) {
+        if (nextPriority[index]! > currentPriority[index]!) {
+            return true;
+        }
+        if (nextPriority[index]! < currentPriority[index]!) {
+            return false;
+        }
+    }
+
+    return false;
+}
+
+function mergeStationBoardStationTaskItem(
+    current: AdminStationBoardStationTaskItem,
+    next: AdminStationBoardStationTaskItem
+): AdminStationBoardStationTaskItem {
+    const base = shouldReplaceStationBoardStationTaskItem(current, next)
+        ? next
+        : current;
+    const fallback = base === current ? next : current;
+
+    return {
+        ...base,
+        schedulerTaskId: base.schedulerTaskId ?? fallback.schedulerTaskId,
+        taskRunId: base.taskRunId ?? fallback.taskRunId,
+        taskStatus: base.taskStatus ?? fallback.taskStatus,
+        startedAt: base.startedAt ?? fallback.startedAt,
+        finishedAt: base.finishedAt ?? fallback.finishedAt,
+        resultStatus: base.resultStatus ?? fallback.resultStatus,
+        rowCount: Math.max(base.rowCount, fallback.rowCount),
+        parsedEntryCount: Math.max(
+            base.parsedEntryCount,
+            fallback.parsedEntryCount
+        ),
+        savedEntryCount: Math.max(
+            base.savedEntryCount,
+            fallback.savedEntryCount
+        ),
+        consumedQueueEntryCount: Math.max(
+            base.consumedQueueEntryCount,
+            fallback.consumedQueueEntryCount
+        ),
+        rows: base.rows.length > 0 ? base.rows : fallback.rows,
+        ambiguousTelecodes: Array.from(
+            new Set([...base.ambiguousTelecodes, ...fallback.ambiguousTelecodes])
+        )
+    };
+}
+
+function dedupeStationBoardStationTaskItems(
+    items: AdminStationBoardStationTaskItem[]
+): AdminStationBoardStationTaskItem[] {
+    const itemsByKey = new Map<string, AdminStationBoardStationTaskItem>();
+
+    for (const item of items) {
+        const key = item.key.trim();
+        if (key.length === 0 || !itemsByKey.has(key)) {
+            itemsByKey.set(key, item);
+            continue;
+        }
+
+        itemsByKey.set(
+            key,
+            mergeStationBoardStationTaskItem(itemsByKey.get(key)!, item)
+        );
+    }
+
+    return [...itemsByKey.values()];
+}
+
 export function getAdminStationBoardTaskList(
     date: string
 ): AdminStationBoardTaskListResponse {
@@ -2430,25 +2539,26 @@ export function getAdminStationBoardDispatchDetail(
         }
     }
 
-    const stations = withStationBoardStationTaskDisplayNames(
-        dispatchDetails.map((detail) => {
-            const fetchTaskRun =
-                detail.schedulerTaskId !== null
-                    ? (fetchTaskRunBySchedulerTaskId.get(
-                          detail.schedulerTaskId
-                      ) ?? null)
-                    : null;
-            const fetchResult =
-                fetchTaskRun !== null
-                    ? (fetchResultByTaskRunId.get(fetchTaskRun.id) ?? null)
-                    : null;
+    const stationTaskItems = dispatchDetails.map((detail) => {
+        const fetchTaskRun =
+            detail.schedulerTaskId !== null
+                ? (fetchTaskRunBySchedulerTaskId.get(
+                      detail.schedulerTaskId
+                  ) ?? null)
+                : null;
+        const fetchResult =
+            fetchTaskRun !== null
+                ? (fetchResultByTaskRunId.get(fetchTaskRun.id) ?? null)
+                : null;
 
-            return buildStationBoardStationTaskItem({
-                detail,
-                fetchTaskRun,
-                fetchResult
-            });
-        })
+        return buildStationBoardStationTaskItem({
+            detail,
+            fetchTaskRun,
+            fetchResult
+        });
+    });
+    const stations = withStationBoardStationTaskDisplayNames(
+        dedupeStationBoardStationTaskItems(stationTaskItems)
     );
 
     return {
