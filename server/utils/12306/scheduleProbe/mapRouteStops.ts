@@ -29,6 +29,7 @@ export function toScheduleStops(
                 : toShanghaiDayOffsetFromUnixSeconds(date, stop.departAt),
         stationTrainCode: stop.stationTrainCode,
         wicket: stop.wicket,
+        ...(stop.distance !== null ? { distance: stop.distance } : {}),
         isStart: stop.isStart,
         isEnd: stop.isEnd
     }));

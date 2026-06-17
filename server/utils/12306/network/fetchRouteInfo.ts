@@ -108,6 +108,7 @@ export interface RouteStopData {
     stationTrainCode: string;
     lat: number | null;
     lon: number | null;
+    distance: number | null;
     wicket: string;
     isStart: boolean;
     isEnd: boolean;
@@ -222,6 +223,7 @@ export default async function fetchRouteInfo(
                         .toUpperCase(),
                     lat: parseOptionalCoordinate(stop.lat),
                     lon: parseOptionalCoordinate(stop.lon),
+                    distance: parseOptionalNonNegativeInteger(stop.distance),
                     wicket: normalizeOptionalField(stop.wicket),
                     isStart: index === 0,
                     isEnd: index === rawStops.length - 1
@@ -369,6 +371,22 @@ function parseOptionalCoordinate(value: string | undefined): number | null {
 
     const parsed = Number.parseFloat(normalized);
     return Number.isFinite(parsed) ? parsed : null;
+}
+
+function parseOptionalNonNegativeInteger(
+    value: string | undefined
+): number | null {
+    if (typeof value !== 'string') {
+        return null;
+    }
+
+    const normalized = value.trim();
+    if (normalized.length === 0 || !/^\d+$/.test(normalized)) {
+        return null;
+    }
+
+    const parsed = Number.parseInt(normalized, 10);
+    return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : null;
 }
 
 function resolveRouteMetadata(

@@ -61,6 +61,8 @@ interface RefreshRouteGroupUpdate {
     stops: ScheduleState['items'][number]['stops'];
 }
 
+type ScheduleStop = ScheduleState['items'][number]['stops'][number];
+
 function parseTaskArgs(
     raw: unknown,
     maxBatchSize: number
@@ -94,6 +96,81 @@ function parseTaskArgs(
     return { codes };
 }
 
+function getStopPrimaryMetadataKey(stop: ScheduleStop) {
+    const stationTelecode = normalizeCode(stop.stationTelecode);
+    const stationTrainCode = normalizeCode(stop.stationTrainCode);
+    if (stationTelecode.length === 0 || stationTrainCode.length === 0) {
+        return '';
+    }
+
+    return `${stationTelecode}:${stationTrainCode}`;
+}
+
+function getStopFallbackMetadataKey(stop: ScheduleStop) {
+    const stationName = stop.stationName.trim();
+    if (stationName.length === 0) {
+        return '';
+    }
+
+    return `${stop.stationNo}:${stationName}`;
+}
+
+function indexStopsByMetadataKey(stops: readonly ScheduleStop[]) {
+    const primary = new Map<string, ScheduleStop>();
+    const fallback = new Map<string, ScheduleStop>();
+
+    for (const stop of stops) {
+        const primaryKey = getStopPrimaryMetadataKey(stop);
+        if (primaryKey.length > 0 && !primary.has(primaryKey)) {
+            primary.set(primaryKey, stop);
+        }
+
+        const fallbackKey = getStopFallbackMetadataKey(stop);
+        if (fallbackKey.length > 0 && !fallback.has(fallbackKey)) {
+            fallback.set(fallbackKey, stop);
+        }
+    }
+
+    return { primary, fallback };
+}
+
+function findExistingStopMetadata(
+    indexes: ReturnType<typeof indexStopsByMetadataKey>,
+    stop: ScheduleStop
+) {
+    const primaryKey = getStopPrimaryMetadataKey(stop);
+    if (primaryKey.length > 0) {
+        const existingStop = indexes.primary.get(primaryKey);
+        if (existingStop) {
+            return existingStop;
+        }
+    }
+
+    const fallbackKey = getStopFallbackMetadataKey(stop);
+    return fallbackKey.length > 0
+        ? (indexes.fallback.get(fallbackKey) ?? null)
+        : null;
+}
+
+function mergeStopMetadata(
+    nextStops: readonly ScheduleStop[],
+    existingStops: readonly ScheduleStop[]
+): ScheduleStop[] {
+    const indexes = indexStopsByMetadataKey(existingStops);
+
+    return nextStops.map((stop) => {
+        const existingStop = findExistingStopMetadata(indexes, stop);
+        const distance = stop.distance ?? existingStop?.distance ?? null;
+        const platformNo = stop.platformNo ?? existingStop?.platformNo ?? null;
+
+        return {
+            ...stop,
+            ...(distance !== null ? { distance } : {}),
+            ...(platformNo !== null ? { platformNo } : {})
+        };
+    });
+}
+
 function applyGroupUpdate(
     state: ScheduleState,
     update: RefreshRouteGroupUpdate
@@ -117,9 +194,7 @@ function applyGroupUpdate(
         item.startAt = update.startAt;
         item.endAt = update.endAt;
         item.lastRouteRefreshAt = update.lastRouteRefreshAt;
-        item.stops = update.stops.map((stop) => ({
-            ...stop
-        }));
+        item.stops = mergeStopMetadata(update.stops, item.stops);
         if (item.internalCode.length === 0 && update.internalCode.length > 0) {
             item.internalCode = update.internalCode;
         }
@@ -249,8 +324,11 @@ async function executeRefreshRouteBatchTaskInternal(rawArgs: unknown) {
             ...(await toScheduleStationMap(routeResult.data.route.stops))
         };
         let groupChanged = false;
+        const appliedGroupStops = new Map<number, ScheduleStop[]>();
         for (const index of groupItemIndexes) {
             const groupItem = state.items[index]!;
+            const mergedStops = mergeStopMetadata(nextStops, groupItem.stops);
+            appliedGroupStops.set(index, mergedStops);
             if (
                 groupItem.allCodes.join('/') !== nextAllCodes.join('/') ||
                 groupItem.bureauCode !== nextBureauCode ||
@@ -261,7 +339,7 @@ async function executeRefreshRouteBatchTaskInternal(rawArgs: unknown) {
                 groupItem.endStation !== nextEndStation ||
                 groupItem.startAt !== nextStartAt ||
                 groupItem.endAt !== nextEndAt ||
-                JSON.stringify(groupItem.stops) !== JSON.stringify(nextStops)
+                JSON.stringify(groupItem.stops) !== JSON.stringify(mergedStops)
             ) {
                 groupChanged = true;
             }
@@ -275,7 +353,7 @@ async function executeRefreshRouteBatchTaskInternal(rawArgs: unknown) {
             groupItem.startAt = nextStartAt;
             groupItem.endAt = nextEndAt;
             groupItem.lastRouteRefreshAt = refreshedAt;
-            groupItem.stops = nextStops.map((stop) => ({
+            groupItem.stops = mergedStops.map((stop) => ({
                 ...stop
             }));
             if (
@@ -303,7 +381,11 @@ async function executeRefreshRouteBatchTaskInternal(rawArgs: unknown) {
             endAt: nextEndAt,
             lastRouteRefreshAt: refreshedAt,
             internalCode: refreshedInternalCode,
-            stops: nextStops
+            stops:
+                appliedGroupStops.get(groupItemIndexes[0]!) ??
+                nextStops.map((stop) => ({
+                    ...stop
+                }))
         });
         if (groupChanged) {
             changed += 1;
