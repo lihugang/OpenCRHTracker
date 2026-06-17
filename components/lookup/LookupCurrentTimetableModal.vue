@@ -174,9 +174,14 @@
                             </p>
 
                             <div
-                                class="hidden overflow-hidden rounded-[1.25rem] border border-slate-200 md:block">
+                                class="hidden overflow-x-auto overflow-y-hidden rounded-[1.25rem] border border-slate-200 md:block">
                                 <table
-                                    class="min-w-full border-separate border-spacing-0 bg-white/90">
+                                    class="border-separate border-spacing-0 bg-white/90"
+                                    :class="
+                                        shouldShowDistanceColumns
+                                            ? 'min-w-[58rem]'
+                                            : 'min-w-full'
+                                    ">
                                     <thead>
                                         <tr class="bg-slate-50/80 text-left">
                                             <th
@@ -189,7 +194,9 @@
                                     </thead>
                                     <tbody>
                                         <tr
-                                            v-for="stop in displayedTimetable.stops"
+                                            v-for="(
+                                                stop, stopIndex
+                                            ) in displayedTimetable.stops"
                                             :key="'desktop:' + stop.stationNo"
                                             class="align-top">
                                             <td
@@ -235,7 +242,27 @@
                                             <td
                                                 v-if="isCurrentView"
                                                 class="border-b border-slate-100 px-4 py-3 text-sm text-slate-500 last:border-b-0">
-                                                {{ stop.wicket || '--' }}
+                                                {{ formatStopWicket(stop) }}
+                                            </td>
+                                            <td
+                                                v-if="shouldShowDistanceColumns"
+                                                class="border-b border-slate-100 px-4 py-3 font-mono text-sm text-slate-500 last:border-b-0">
+                                                {{
+                                                    formatStopDistance(
+                                                        stop,
+                                                        stopIndex
+                                                    )
+                                                }}
+                                            </td>
+                                            <td
+                                                v-if="shouldShowDistanceColumns"
+                                                class="border-b border-slate-100 px-4 py-3 font-mono text-sm text-slate-500 last:border-b-0">
+                                                {{
+                                                    formatStopSectionSpeed(
+                                                        stop,
+                                                        stopIndex
+                                                    )
+                                                }}
                                             </td>
                                         </tr>
                                     </tbody>
@@ -244,7 +271,9 @@
 
                             <div class="space-y-2.5 md:hidden">
                                 <UiCard
-                                    v-for="stop in displayedTimetable.stops"
+                                    v-for="(
+                                        stop, stopIndex
+                                    ) in displayedTimetable.stops"
                                     :key="'mobile:' + stop.stationNo"
                                     :show-accent-bar="false"
                                     variant="subtle">
@@ -328,7 +357,43 @@
                                                 </p>
                                                 <p
                                                     class="mt-1 text-sm text-slate-500">
-                                                    {{ stop.wicket || '--' }}
+                                                    {{ formatStopWicket(stop) }}
+                                                </p>
+                                            </div>
+                                            <div
+                                                v-if="
+                                                    shouldShowDistanceColumns
+                                                ">
+                                                <p
+                                                    class="text-[11px] uppercase tracking-[0.16em] text-slate-400">
+                                                    里程
+                                                </p>
+                                                <p
+                                                    class="mt-1 font-mono text-sm text-slate-500">
+                                                    {{
+                                                        formatStopDistance(
+                                                            stop,
+                                                            stopIndex
+                                                        )
+                                                    }}
+                                                </p>
+                                            </div>
+                                            <div
+                                                v-if="
+                                                    shouldShowDistanceColumns
+                                                ">
+                                                <p
+                                                    class="text-[11px] uppercase tracking-[0.16em] text-slate-400">
+                                                    区间均速
+                                                </p>
+                                                <p
+                                                    class="mt-1 font-mono text-sm text-slate-500">
+                                                    {{
+                                                        formatStopSectionSpeed(
+                                                            stop,
+                                                            stopIndex
+                                                        )
+                                                    }}
                                                 </p>
                                             </div>
                                         </div>
@@ -1005,6 +1070,9 @@ interface DisplayTimetableStop {
     arriveAt: number | null;
     departAt: number | null;
     wicket: string | null;
+    distance: number | null;
+    platformNo: number | null;
+    isStart: boolean;
 }
 
 interface PersistedSectionState {
@@ -1081,7 +1149,8 @@ const { state, timetable, errorMessage, normalizedTrainCode } =
         computed(() => props.modelValue)
     );
 
-const columns = ['站序', '车次', '站名', '到点', '开点', '检票口'];
+const currentColumns = ['站序', '车次', '站名', '到点', '开点', '检票口'];
+const distanceColumns = ['里程', '区间均速'];
 const historyColumns = ['站序', '车次', '站名', '到点', '开点'];
 const isTimetableExpanded = ref(true);
 const isCirculationExpanded = ref(true);
@@ -1225,7 +1294,10 @@ const displayedTimetable = computed<DisplayTimetableData | null>(() => {
                 stationTrainCode: stop.stationTrainCode,
                 arriveAt: stop.arriveAt,
                 departAt: stop.departAt,
-                wicket: stop.wicket
+                wicket: stop.wicket,
+                distance: stop.distance,
+                platformNo: stop.platformNo,
+                isStart: stop.isStart
             })),
             updatedAt: timetable.value.updatedAt,
             circulation: timetable.value.circulation,
@@ -1257,7 +1329,10 @@ const displayedTimetable = computed<DisplayTimetableData | null>(() => {
             stationTrainCode: stop.stationTrainCode,
             arriveAt: stop.arriveOffset,
             departAt: stop.departOffset,
-            wicket: null
+            wicket: null,
+            distance: null,
+            platformNo: null,
+            isStart: stop.isStart
         })),
         updatedAt: null,
         circulation: null,
@@ -1482,9 +1557,29 @@ const responsibilitySummary = computed(() => {
     return `${leadingText}, ${passengerDepartment}`;
 });
 
-const visibleColumns = computed(() =>
-    isCurrentView.value ? columns : historyColumns
-);
+const shouldShowDistanceColumns = computed(() => {
+    if (!isCurrentView.value || !displayedTimetable.value) {
+        return false;
+    }
+
+    return displayedTimetable.value.stops.every((stop, index) => {
+        if (isStartStop(stop, index)) {
+            return true;
+        }
+
+        return isFiniteNumber(stop.distance);
+    });
+});
+
+const visibleColumns = computed(() => {
+    if (!isCurrentView.value) {
+        return historyColumns;
+    }
+
+    return shouldShowDistanceColumns.value
+        ? [...currentColumns, ...distanceColumns]
+        : currentColumns;
+});
 
 const viewState = computed<ViewState>(() => {
     if (displayedTimetable.value) {
@@ -1570,6 +1665,84 @@ function normalizeTrainCodes(codes: string[]) {
                 .filter((code) => code.length > 0)
         )
     );
+}
+
+function isFiniteNumber(value: number | null | undefined): value is number {
+    return typeof value === 'number' && Number.isFinite(value);
+}
+
+function isStartStop(stop: DisplayTimetableStop, index: number) {
+    return index === 0 || stop.isStart;
+}
+
+function formatStopWicket(stop: DisplayTimetableStop) {
+    const wicket = stop.wicket?.trim() || '--';
+
+    if (!isFiniteNumber(stop.platformNo)) {
+        return wicket;
+    }
+
+    return `${wicket} (${Math.round(stop.platformNo)} 站台)`;
+}
+
+function formatStopDistance(stop: DisplayTimetableStop, index: number) {
+    if (isStartStop(stop, index) || !isFiniteNumber(stop.distance)) {
+        return '-';
+    }
+
+    return `${Math.round(stop.distance)} 千米`;
+}
+
+function formatStopSectionSpeed(stop: DisplayTimetableStop, index: number) {
+    if (isStartStop(stop, index) || !isFiniteNumber(stop.distance)) {
+        return '-';
+    }
+
+    const currentDistance = stop.distance;
+    const previousStop = displayedTimetable.value?.stops[index - 1] ?? null;
+    if (
+        !previousStop ||
+        !isFiniteNumber(previousStop.departAt) ||
+        !isFiniteNumber(stop.arriveAt)
+    ) {
+        return '-';
+    }
+
+    const previousDistance = isFiniteNumber(previousStop.distance)
+        ? previousStop.distance
+        : isStartStop(previousStop, index - 1)
+          ? 0
+          : null;
+
+    if (!isFiniteNumber(previousDistance)) {
+        return '-';
+    }
+
+    const arriveAt = stop.arriveAt;
+    const previousDepartAt = previousStop.departAt;
+    const distanceDelta = currentDistance - previousDistance;
+    const timeDelta = normalizeForwardTimeDeltaSeconds(
+        arriveAt - previousDepartAt
+    );
+
+    if (distanceDelta < 0 || timeDelta <= 0) {
+        return '-';
+    }
+
+    return `${Math.round(distanceDelta / (timeDelta / 3600))} km/h`;
+}
+
+function normalizeForwardTimeDeltaSeconds(delta: number) {
+    if (!Number.isFinite(delta)) {
+        return 0;
+    }
+
+    let normalizedDelta = delta;
+    while (normalizedDelta <= 0) {
+        normalizedDelta += DAY_SECONDS;
+    }
+
+    return normalizedDelta;
 }
 
 function resolveStopFocusTrainCodes(stop: DisplayTimetableStop) {
