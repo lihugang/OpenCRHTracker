@@ -36,6 +36,7 @@
         "better-sqlite3": "^12.6.2",
         "date-fns": "^4.1.0",
         "jsqr": "^1.4.0",
+        "localforage": "^1.10.0",
         "log4js": "^6.9.1",
         "lru-cache": "^11.2.7",
         "nuxt": "^4.1.3",

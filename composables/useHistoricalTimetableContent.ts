@@ -1,10 +1,9 @@
-import type { TrackerApiResponse } from '~/types/homepage';
 import type {
     EmuHistoryRecord,
-    HistoricalTimetableData,
     LookupHistoryListItem,
     TrainHistoryRecord
 } from '~/types/lookup';
+import { fetchHistoricalTimetableContentWithCache } from '~/utils/lookup/historicalTimetableContentCache';
 import getShanghaiDayStartUnixSeconds from '~/utils/time/getShanghaiDayStartUnixSeconds';
 
 type RequestFetch = <T>(
@@ -30,66 +29,6 @@ export interface HydratedEmuHistoryRecord
     extends EmuHistoryRecord, HydratedHistoryFields {}
 
 const DEFAULT_CONCURRENCY = 6;
-const timetableContentCache = new Map<number, HistoricalTimetableData | null>();
-const timetableContentRequestCache = new Map<
-    number,
-    Promise<HistoricalTimetableData | null>
->();
-
-function normalizeTrainCode(trainCode: string) {
-    return trainCode.trim().toUpperCase();
-}
-
-function buildTimetableContentCacheKey(historyId: number) {
-    return historyId;
-}
-
-async function fetchHistoricalTimetableContent(
-    requestFetch: RequestFetch,
-    trainCode: string,
-    historyId: number
-) {
-    const normalizedTrainCode = normalizeTrainCode(trainCode);
-    if (normalizedTrainCode.length === 0) {
-        return null;
-    }
-
-    // The backend resolves immutable historical timetable content by historyId,
-    // so alias train codes can safely reuse the same cached response.
-    const cacheKey = buildTimetableContentCacheKey(historyId);
-    const cached = timetableContentCache.get(cacheKey);
-    if (cached !== undefined) {
-        return cached;
-    }
-
-    const pending = timetableContentRequestCache.get(cacheKey);
-    if (pending) {
-        return pending;
-    }
-
-    const request = requestFetch<TrackerApiResponse<HistoricalTimetableData>>(
-        `/api/v1/timetable/train/${encodeURIComponent(normalizedTrainCode)}/history/${encodeURIComponent(String(historyId))}`
-    )
-        .then((response) => {
-            if (!response.ok) {
-                timetableContentCache.set(cacheKey, null);
-                return null;
-            }
-
-            timetableContentCache.set(cacheKey, response.data);
-            return response.data;
-        })
-        .catch(() => {
-            timetableContentCache.set(cacheKey, null);
-            return null;
-        })
-        .finally(() => {
-            timetableContentRequestCache.delete(cacheKey);
-        });
-
-    timetableContentRequestCache.set(cacheKey, request);
-    return request;
-}
 
 async function mapWithConcurrency<TInput, TOutput>(
     items: readonly TInput[],
@@ -137,7 +76,7 @@ async function resolveHydratedHistoryFields(
     }
 
     const dayStart = getShanghaiDayStartUnixSeconds(serviceDate);
-    const timetable = await fetchHistoricalTimetableContent(
+    const timetable = await fetchHistoricalTimetableContentWithCache(
         requestFetch,
         trainCode,
         timetableId

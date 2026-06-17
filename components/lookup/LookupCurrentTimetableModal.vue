@@ -997,7 +997,6 @@ import {
     onBeforeUnmount,
     onMounted,
     ref,
-    shallowRef,
     watch
 } from 'vue';
 import type {
@@ -1019,6 +1018,11 @@ import getApiErrorMessage from '~/utils/api/getApiErrorMessage';
 import hasClientScope, {
     CLIENT_AUTH_SCOPES
 } from '~/utils/auth/hasClientScope';
+import {
+    fetchHistoricalTimetableContentWithCache,
+    getHistoricalTimetableContentMemoryCacheValue,
+    setHistoricalTimetableContentMemoryCacheValue
+} from '~/utils/lookup/historicalTimetableContentCache';
 import { buildLookupPath } from '~/utils/lookup/lookupTarget';
 import formatShanghaiDateString from '~/utils/time/formatShanghaiDateString';
 
@@ -1120,13 +1124,7 @@ interface DisplayTimetableData {
 
 type PdfJsModule = typeof import('pdfjs-dist/legacy/build/pdf.mjs');
 
-const historyContentCache = shallowRef(
-    new Map<number, HistoricalTimetableData | null>()
-);
-const historyContentRequestCache = new Map<
-    number,
-    Promise<HistoricalTimetableData | null>
->();
+const historyContentCacheVersion = ref(0);
 
 const props = defineProps<{
     modelValue: boolean;
@@ -1182,7 +1180,7 @@ const circulationPdfFullscreenViewport = ref<HTMLDivElement | null>(null);
 const circulationPdfFullscreenCanvas = ref<HTMLCanvasElement | null>(null);
 const circulationPdfObjectUrl = ref<string | null>(null);
 let historyListRequestToken = 0;
-let historyContentRequestToken = 0;
+let historyContentLoadToken = 0;
 let circulationPdfRequestToken = 0;
 let circulationPdfPreviewLastRenderKey = '';
 let circulationPdfPreviewPendingRenderKey = '';
@@ -1232,12 +1230,17 @@ const selectedHistoricalItem = computed(() => {
 });
 
 const selectedHistoricalContent = computed(() => {
+    historyContentCacheVersion.value;
+
     const selected = selectedHistoricalItem.value;
     if (!selected) {
         return null;
     }
 
-    return historyContentCache.value.get(selected.historyId) ?? null;
+    return (
+        getHistoricalTimetableContentMemoryCacheValue(selected.historyId) ??
+        null
+    );
 });
 
 const currentTimetableOptionLabel = computed(() => {
@@ -3272,12 +3275,12 @@ function setHistoryContentCacheValue(
     historyId: number,
     value: HistoricalTimetableData | null
 ) {
-    const nextCache = new Map(historyContentCache.value);
-    nextCache.set(historyId, value);
-    historyContentCache.value = nextCache;
+    setHistoricalTimetableContentMemoryCacheValue(historyId, value);
+    historyContentCacheVersion.value += 1;
 }
 
 function resetHistoryViewState() {
+    historyContentLoadToken += 1;
     historyLoadingState.value = 'idle';
     historyErrorMessage.value = '';
     historyItems.value = [];
@@ -3374,69 +3377,51 @@ async function fetchHistoricalTimetableList() {
 }
 
 async function fetchHistoricalTimetableContent(historyId: number) {
-    const cached = historyContentCache.value.get(historyId);
+    const loadToken = ++historyContentLoadToken;
+    const cached = getHistoricalTimetableContentMemoryCacheValue(historyId);
     if (cached !== undefined) {
         historyContentState.value = cached ? 'ready' : 'error';
         historyContentErrorMessage.value = cached
             ? ''
             : '历史时刻表加载失败，请稍后重试。';
+        historyContentCacheVersion.value += 1;
         return cached;
     }
 
-    const pending = historyContentRequestCache.get(historyId);
-    if (pending) {
-        return pending;
-    }
-
-    const requestToken = ++historyContentRequestToken;
     const requestTrainCode = normalizedTrainCode.value;
-
-    const request = requestFetch<TrackerApiResponse<HistoricalTimetableData>>(
-        `/api/v1/timetable/train/${encodeURIComponent(normalizedTrainCode.value)}/history/${encodeURIComponent(String(historyId))}`
-    )
-        .then((response) => {
-            if (
-                requestToken !== historyContentRequestToken ||
-                requestTrainCode !== normalizedTrainCode.value
-            ) {
-                return null;
-            }
-
-            if (!response.ok) {
-                setHistoryContentCacheValue(historyId, null);
-                historyContentState.value = 'error';
-                historyContentErrorMessage.value =
-                    '历史时刻表加载失败，请稍后重试。';
-                return null;
-            }
-
-            setHistoryContentCacheValue(historyId, response.data);
-            historyContentState.value = 'ready';
-            historyContentErrorMessage.value = '';
-            return response.data;
-        })
-        .catch(() => {
-            if (
-                requestToken !== historyContentRequestToken ||
-                requestTrainCode !== normalizedTrainCode.value
-            ) {
-                return null;
-            }
-
-            setHistoryContentCacheValue(historyId, null);
-            historyContentState.value = 'error';
-            historyContentErrorMessage.value =
-                '历史时刻表加载失败，请稍后重试。';
-            return null;
-        })
-        .finally(() => {
-            historyContentRequestCache.delete(historyId);
-        });
+    if (requestTrainCode.length === 0) {
+        setHistoryContentCacheValue(historyId, null);
+        historyContentState.value = 'error';
+        historyContentErrorMessage.value = '历史时刻表加载失败，请稍后重试。';
+        return null;
+    }
 
     historyContentState.value = 'loading';
     historyContentErrorMessage.value = '';
-    historyContentRequestCache.set(historyId, request);
-    return request;
+
+    const timetable = await fetchHistoricalTimetableContentWithCache(
+        requestFetch,
+        requestTrainCode,
+        historyId
+    );
+
+    if (
+        loadToken !== historyContentLoadToken ||
+        requestTrainCode !== normalizedTrainCode.value
+    ) {
+        return null;
+    }
+
+    historyContentCacheVersion.value += 1;
+    if (!timetable) {
+        historyContentState.value = 'error';
+        historyContentErrorMessage.value = '历史时刻表加载失败，请稍后重试。';
+        return null;
+    }
+
+    historyContentState.value = 'ready';
+    historyContentErrorMessage.value = '';
+    return timetable;
 }
 
 function readPersistedSectionState(): PersistedSectionState {
@@ -3578,6 +3563,7 @@ watch(
 watch(
     () => selectedTimetableSourceKey.value,
     () => {
+        historyContentLoadToken += 1;
         if (selectedTimetableSourceKey.value !== 'current') {
             historyContentState.value = 'idle';
             historyContentErrorMessage.value = '';
