@@ -115,7 +115,45 @@
             v-if="favoriteItem && eventSubscriptionTarget"
             class="px-1 min-[960px]:landscape:hidden">
             <div class="space-y-2">
-                <div class="flex items-center justify-between gap-3">
+                <div
+                    v-if="isEmuTarget"
+                    class="space-y-2">
+                    <div class="flex items-center gap-2">
+                        <UiFavoriteButton
+                            guide="favorite-button"
+                            :active="isFavorited(favoriteItem)"
+                            :loading="isFavoritePending(favoriteItem)"
+                            @click="toggleFavoriteItem" />
+                        <UiSubscriptionButton
+                            guide="subscription-button"
+                            :active="isSubscribed(eventSubscriptionTarget)"
+                            :loading="isSubscriptionActionPending"
+                            @click="toggleEventSubscriptionItem" />
+                    </div>
+
+                    <div class="flex items-center justify-between gap-2">
+                        <UiButton
+                            data-guide="allocation-button"
+                            variant="secondary"
+                            size="sm"
+                            class="shrink-0"
+                            @click="openAllocationModal">
+                            配属信息
+                        </UiButton>
+                        <UiButton
+                            data-guide="future-prediction-button"
+                            variant="secondary"
+                            size="sm"
+                            class="shrink-0"
+                            :disabled="!canOpenFuturePrediction"
+                            @click="openFuturePredictionModal">
+                            未来担当预测
+                        </UiButton>
+                    </div>
+                </div>
+                <div
+                    v-else
+                    class="flex items-center justify-between gap-3">
                     <div class="flex items-center gap-2">
                         <UiFavoriteButton
                             guide="favorite-button"
@@ -130,15 +168,6 @@
                     </div>
 
                     <div class="flex flex-wrap justify-end gap-2">
-                        <UiButton
-                            v-if="isEmuTarget"
-                            data-guide="allocation-button"
-                            variant="secondary"
-                            size="sm"
-                            class="shrink-0"
-                            @click="openAllocationModal">
-                            配属信息
-                        </UiButton>
                         <UiButton
                             data-guide="future-prediction-button"
                             variant="secondary"
