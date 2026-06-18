@@ -356,6 +356,20 @@ const shouldAllowCoreColumnWrap = computed(() => {
     return width < requiredWidth;
 });
 
+const shouldAllowWicketColumnWrap = computed(() => {
+    const width = tableWidth.value;
+    if (width <= 0) {
+        return true;
+    }
+
+    const requiredWidth = getColumnConfigs(showMeasurementUnits.value).reduce(
+        (total, column) =>
+            total + (column.key === 'wicket' ? column.ideal : column.min),
+        0
+    );
+    return width < requiredWidth;
+});
+
 const tableColumnLayouts = computed<TimetableColumnLayout[]>(() => {
     const columns = getColumnConfigs(showMeasurementUnits.value);
     return allocateColumnLayouts(columns, tableWidth.value);
@@ -404,7 +418,10 @@ function buildColumnConfig(
         label,
         min: Math.min(singleLineWidth, minimumVisibleWidth),
         ideal: singleLineWidth,
-        max: Number.POSITIVE_INFINITY
+        max:
+            key === 'stationName'
+                ? Math.max(singleLineWidth, getStationNameComfortMaxWidth())
+                : Number.POSITIVE_INFINITY
     };
 }
 
@@ -490,6 +507,10 @@ function getColumnHorizontalPadding() {
     return tableWidth.value >= 1024 ? 32 : 20;
 }
 
+function getStationNameComfortMaxWidth() {
+    return tableWidth.value >= 1024 ? 180 : 150;
+}
+
 function getComfortWidthForUnits(columns: TimetableColumnConfig[]) {
     return columns.reduce((total, column) => {
         if (coreColumnKeys.has(column.key) || column.key === 'stationNo') {
@@ -545,10 +566,10 @@ function allocateColumnLayouts(
         ]
     );
     remainingWidth = distributeColumnWidth(columns, widths, remainingWidth, [
-        'stationName'
+        'wicket'
     ]);
     remainingWidth = distributeColumnWidth(columns, widths, remainingWidth, [
-        'wicket'
+        'stationName'
     ]);
     remainingWidth = distributeWeightedExtraWidth(
         columns,
@@ -614,7 +635,7 @@ function distributeWeightedExtraWidth(
     }
 
     const weights: Partial<Record<TimetableColumnKey, number>> = {
-        stationName: 3,
+        stationName: 1,
         wicket: 1,
         trainCode: 0.5
     };
@@ -701,6 +722,10 @@ function getColumnWrapClass(columnKey: TimetableColumnKey) {
         (coreColumnKeys.has(columnKey) || columnKey === 'stationNo') &&
         !shouldAllowCoreColumnWrap.value
     ) {
+        return 'lookup-timetable-cell--nowrap';
+    }
+
+    if (columnKey === 'wicket' && !shouldAllowWicketColumnWrap.value) {
         return 'lookup-timetable-cell--nowrap';
     }
 
