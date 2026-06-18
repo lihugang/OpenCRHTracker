@@ -32,7 +32,10 @@ const generatedCssPath = path.join(
 );
 const charsetPath = path.join(outputDir, 'charset.txt');
 const reportPath = path.join(outputDir, 'report.json');
-const configPath = path.join(rootDir, 'data', 'config.json');
+const configCandidatePaths = [
+    path.join(rootDir, 'data', 'config.dev.json'),
+    path.join(rootDir, 'data', 'config.json'),
+];
 const conservativeCharsPath = path.join(
     rootDir,
     'scripts',
@@ -148,10 +151,6 @@ function addCharsToSet(target, text) {
     }
 }
 
-function normalizeString(value) {
-    return typeof value === 'string' ? value.trim() : '';
-}
-
 function ensureObjectRecord(value, label) {
     if (typeof value !== 'object' || value === null || Array.isArray(value)) {
         throw new Error(`${label} must be a JSON object`);
@@ -178,18 +177,40 @@ async function readConservativeChars() {
         .join('');
 }
 
-async function readRuntimeAssetPaths() {
-    const raw = await fs.readFile(configPath, 'utf8');
-    const parsed = ensureObjectRecord(JSON.parse(raw), 'data/config.json');
-    const data = ensureObjectRecord(parsed.data, 'data/config.json data');
-    const assets = ensureObjectRecord(data.assets, 'data/config.json data.assets');
+async function resolveRuntimeConfigPath() {
+    for (const candidatePath of configCandidatePaths) {
+        try {
+            await fs.access(candidatePath);
+            return candidatePath;
+        } catch (error) {
+            if (error && typeof error === 'object' && error.code === 'ENOENT') {
+                continue;
+            }
+
+            throw error;
+        }
+    }
+
+    throw new Error(
+        `runtime config file not found; tried ${configCandidatePaths
+            .map(relativeFromRoot)
+            .join(', ')}`,
+    );
+}
+
+async function readRuntimeAssetPaths(runtimeConfigPath) {
+    const configLabel = relativeFromRoot(runtimeConfigPath);
+    const raw = await fs.readFile(runtimeConfigPath, 'utf8');
+    const parsed = ensureObjectRecord(JSON.parse(raw), configLabel);
+    const data = ensureObjectRecord(parsed.data, `${configLabel} data`);
+    const assets = ensureObjectRecord(data.assets, `${configLabel} data.assets`);
     const schedule = ensureObjectRecord(
         assets.schedule,
-        'data/config.json data.assets.schedule',
+        `${configLabel} data.assets.schedule`,
     );
     const emuList = ensureObjectRecord(
         assets.EMUList,
-        'data/config.json data.assets.EMUList',
+        `${configLabel} data.assets.EMUList`,
     );
 
     return {
@@ -263,7 +284,31 @@ async function collectStaticText() {
     };
 }
 
-async function collectScheduleStations(schedulePath) {
+function collectJsonChars(value, charSet) {
+    if (typeof value === 'string') {
+        addCharsToSet(charSet, value);
+        return;
+    }
+
+    if (!value || typeof value !== 'object') {
+        return;
+    }
+
+    if (Array.isArray(value)) {
+        for (const item of value) {
+            collectJsonChars(item, charSet);
+        }
+
+        return;
+    }
+
+    for (const [key, item] of Object.entries(value)) {
+        addCharsToSet(charSet, key);
+        collectJsonChars(item, charSet);
+    }
+}
+
+async function collectScheduleJsonChars(schedulePath) {
     const raw = await fs.readFile(schedulePath, 'utf8');
     const parsed = ensureObjectRecord(JSON.parse(raw), 'schedule.json');
     const published =
@@ -271,51 +316,17 @@ async function collectScheduleStations(schedulePath) {
             ? null
             : ensureObjectRecord(parsed.published, 'schedule.json published');
     const items = Array.isArray(published?.items) ? published.items : [];
-    const stationNames = new Set();
-
-    for (const item of items) {
-        if (typeof item !== 'object' || item === null || Array.isArray(item)) {
-            continue;
-        }
-
-        const startStation = normalizeString(item.startStation);
-        const endStation = normalizeString(item.endStation);
-        if (startStation) {
-            stationNames.add(startStation);
-        }
-        if (endStation) {
-            stationNames.add(endStation);
-        }
-
-        const stops = Array.isArray(item.stops) ? item.stops : [];
-        for (const stop of stops) {
-            if (typeof stop !== 'object' || stop === null || Array.isArray(stop)) {
-                continue;
-            }
-
-            const stationName = normalizeString(stop.stationName);
-            if (stationName) {
-                stationNames.add(stationName);
-            }
-        }
-    }
-
     const charSet = new Set();
 
-    for (const stationName of stationNames) {
-        addCharsToSet(charSet, stationName);
-    }
+    collectJsonChars(parsed, charSet);
 
     return {
         scheduleItemCount: items.length,
-        stationNames: [...stationNames].sort((left, right) =>
-            left.localeCompare(right, 'zh-Hans-CN'),
-        ),
         charSet,
     };
 }
 
-async function collectEmuTags(emuListPath) {
+async function collectEmuListJsonChars(emuListPath) {
     const raw = await fs.readFile(emuListPath, 'utf8');
     const parsed = ensureObjectRecord(JSON.parse(raw), 'emu_list.json');
     const rows = Array.isArray(parsed.emu_trainsets)
@@ -323,41 +334,12 @@ async function collectEmuTags(emuListPath) {
         : Array.isArray(parsed.trainsets)
           ? parsed.trainsets
           : [];
-    const tags = new Set();
-
-    for (const row of rows) {
-        if (typeof row !== 'object' || row === null || Array.isArray(row)) {
-            continue;
-        }
-
-        const remark =
-            typeof row.remark === 'object' &&
-            row.remark !== null &&
-            !Array.isArray(row.remark)
-                ? row.remark
-                : {};
-
-        if (!Array.isArray(remark.tags)) {
-            continue;
-        }
-
-        for (const tag of remark.tags) {
-            const normalizedTag = normalizeString(tag);
-            if (normalizedTag) {
-                tags.add(normalizedTag);
-            }
-        }
-    }
-
     const charSet = new Set();
 
-    for (const tag of tags) {
-        addCharsToSet(charSet, tag);
-    }
+    collectJsonChars(parsed, charSet);
 
     return {
         emuRecordCount: rows.length,
-        tags: [...tags].sort((left, right) => left.localeCompare(right, 'zh-Hans-CN')),
         charSet,
     };
 }
@@ -577,17 +559,16 @@ async function writeGeneratedCss(unicodeRange, generatedFonts) {
 }
 
 async function buildReport({
+    configPath,
     schedulePath,
     emuListPath,
     staticFiles,
     staticChars,
     conservativeChars,
     scheduleItemCount,
-    scheduleStationNames,
-    scheduleStationChars,
+    scheduleChars,
     emuRecordCount,
-    emuTags,
-    emuTagChars,
+    emuListChars,
     totalChars,
     unicodeRange,
     generatedFonts,
@@ -617,6 +598,7 @@ async function buildReport({
         generatedAt: new Date().toISOString(),
         timezone,
         inputs: {
+            configPath: relativeFromRoot(configPath),
             schedulePath: relativeFromRoot(schedulePath),
             emuListPath: relativeFromRoot(emuListPath),
             staticFileCount: staticFiles.length,
@@ -624,13 +606,9 @@ async function buildReport({
             staticCharCount: staticChars.size,
             conservativeCharCount: conservativeChars.size,
             scheduleItemCount,
-            scheduleStationNameCount: scheduleStationNames.length,
-            scheduleStationNames,
-            scheduleStationCharCount: scheduleStationChars.size,
+            scheduleJsonCharCount: scheduleChars.size,
             emuRecordCount,
-            emuTagCount: emuTags.length,
-            emuTags,
-            emuTagCharCount: emuTagChars.size,
+            emuListJsonCharCount: emuListChars.size,
         },
         outputs: {
             charsetPath: relativeFromRoot(charsetPath),
@@ -646,21 +624,22 @@ async function buildReport({
 }
 
 logStep('checking required input files');
-await fs.access(configPath);
 await fs.access(conservativeCharsPath);
 await fs.mkdir(outputDir, { recursive: true });
 await ensureSourceFonts();
 logStep(`source fonts ready in ${relativeFromRoot(sourceDir)}`);
 
-const assetPaths = await readRuntimeAssetPaths();
+const configPath = await resolveRuntimeConfigPath();
+logStep(`using runtime config: ${relativeFromRoot(configPath)}`);
+const assetPaths = await readRuntimeAssetPaths(configPath);
 await fs.access(assetPaths.schedulePath);
 await fs.access(assetPaths.emuListPath);
 
 logStep('collecting characters from repository and runtime assets');
 const staticResult = await collectStaticText();
 const conservativeCharsRaw = await readConservativeChars();
-const scheduleResult = await collectScheduleStations(assetPaths.schedulePath);
-const emuTagResult = await collectEmuTags(assetPaths.emuListPath);
+const scheduleResult = await collectScheduleJsonChars(assetPaths.schedulePath);
+const emuListResult = await collectEmuListJsonChars(assetPaths.emuListPath);
 
 const mergedChars = new Set();
 
@@ -678,7 +657,7 @@ for (const char of scheduleResult.charSet) {
     mergedChars.add(char);
 }
 
-for (const char of emuTagResult.charSet) {
+for (const char of emuListResult.charSet) {
     mergedChars.add(char);
 }
 
@@ -690,8 +669,8 @@ const unicodeRange = buildUnicodeRange(totalChars);
 await fs.writeFile(charsetPath, totalChars.join(''), 'utf8');
 logStep(
     `collected ${totalChars.length} total chars from ${staticResult.files.length} static files, ` +
-        `${scheduleResult.stationNames.length} schedule station names, ` +
-        `${emuTagResult.tags.length} emu tags`,
+        `${scheduleResult.charSet.size} schedule JSON chars, ` +
+        `${emuListResult.charSet.size} emu list JSON chars`,
 );
 logStep(`wrote charset file: ${relativeFromRoot(charsetPath)}`);
 
@@ -720,17 +699,16 @@ const removedSubsetFiles = await cleanupOldSubsetOutputs(
 );
 
 const report = await buildReport({
+    configPath,
     schedulePath: assetPaths.schedulePath,
     emuListPath: assetPaths.emuListPath,
     staticFiles: staticResult.files,
     staticChars: staticResult.charSet,
     conservativeChars: new Set(conservativeCharsRaw),
     scheduleItemCount: scheduleResult.scheduleItemCount,
-    scheduleStationNames: scheduleResult.stationNames,
-    scheduleStationChars: scheduleResult.charSet,
-    emuRecordCount: emuTagResult.emuRecordCount,
-    emuTags: emuTagResult.tags,
-    emuTagChars: emuTagResult.charSet,
+    scheduleChars: scheduleResult.charSet,
+    emuRecordCount: emuListResult.emuRecordCount,
+    emuListChars: emuListResult.charSet,
     totalChars,
     unicodeRange,
     generatedFonts,
@@ -748,12 +726,13 @@ logStep(
 console.log(
     JSON.stringify(
         {
+            configPath: relativeFromRoot(configPath),
             charsetPath: relativeFromRoot(charsetPath),
             reportPath: relativeFromRoot(reportPath),
             generatedCssPath: relativeFromRoot(generatedCssPath),
             totalChars: totalChars.length,
-            scheduleStationNameCount: scheduleResult.stationNames.length,
-            emuTagCount: emuTagResult.tags.length,
+            scheduleJsonCharCount: scheduleResult.charSet.size,
+            emuListJsonCharCount: emuListResult.charSet.size,
             subsetFiles: generatedFonts.map((font) => font.subsetName),
         },
         null,
