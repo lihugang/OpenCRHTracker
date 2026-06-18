@@ -697,7 +697,10 @@ function getTableBodyCellClass(columnKey: TimetableColumnKey) {
 }
 
 function getColumnWrapClass(columnKey: TimetableColumnKey) {
-    if (coreColumnKeys.has(columnKey) && !shouldAllowCoreColumnWrap.value) {
+    if (
+        (coreColumnKeys.has(columnKey) || columnKey === 'stationNo') &&
+        !shouldAllowCoreColumnWrap.value
+    ) {
         return 'lookup-timetable-cell--nowrap';
     }
 
