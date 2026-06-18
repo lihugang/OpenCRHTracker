@@ -35,6 +35,7 @@
     "dependencies": {
         "better-sqlite3": "^12.6.2",
         "date-fns": "^4.1.0",
+        "driver.js": "^1.4.0",
         "jsqr": "^1.4.0",
         "localforage": "^1.10.0",
         "log4js": "^6.9.1",
