@@ -1066,7 +1066,8 @@ export const developerDocsOpenApi = {
                     distance: {
                         type: 'integer',
                         nullable: true,
-                        description: '该站距离列车始发站的累计里程，单位为公里。',
+                        description:
+                            '该站距离列车始发站的累计里程，单位为公里。',
                         example: 0
                     },
                     platformNo: {

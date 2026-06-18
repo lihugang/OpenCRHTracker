@@ -475,11 +475,7 @@ function ensureScheduleItem(
 }
 
 function normalizeOptionalNonNegativeInteger(value: unknown): number | null {
-    if (
-        typeof value !== 'number' ||
-        !Number.isInteger(value) ||
-        value < 0
-    ) {
+    if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
         return null;
     }
 
@@ -1347,7 +1343,8 @@ export function saveScheduleStopMetadataFromStationBoard(
     }
 
     const document = cloneScheduleDocument(
-        loadScheduleDocument(scheduleFilePath) ?? createInitialScheduleDocument()
+        loadScheduleDocument(scheduleFilePath) ??
+            createInitialScheduleDocument()
     );
     if (!document.published || document.published.date !== serviceDate) {
         return {

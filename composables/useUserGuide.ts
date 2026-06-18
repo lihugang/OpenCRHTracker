@@ -135,8 +135,7 @@ function prepareGuideElement(element: HTMLElement) {
 }
 
 function resolveGuideTarget(target: GuideTarget) {
-    const element =
-        typeof target === 'string' ? getElement(target) : target;
+    const element = typeof target === 'string' ? getElement(target) : target;
     if (!element) {
         return getFallbackGuideElement();
     }
@@ -475,7 +474,9 @@ async function startHomeGuide() {
     activeStage = 'home';
     setGuideStage('home');
     const driver = await createGuideDriver();
-    const inputElement = await waitForElement('[data-guide="home-lookup-input"]');
+    const inputElement = await waitForElement(
+        '[data-guide="home-lookup-input"]'
+    );
     const submitElement = await waitForElement(
         '[data-guide="home-lookup-submit"]'
     );
@@ -501,8 +502,7 @@ async function startHomeGuide() {
         createGuideStep('[data-guide="home-lookup-submit"]', {
             popover: {
                 title: '开始查询',
-                description:
-                    '点击查询按钮',
+                description: '点击查询按钮',
                 side: 'top',
                 align: 'center',
                 onNextClick: () => {
@@ -565,11 +565,15 @@ async function startTrainDetailGuide(options: {
     const dateElement = await waitForElement(
         '[data-guide="history-date-export"]'
     );
-    const codeElement = await waitForElement('[data-guide="history-code-link"]');
+    const codeElement = await waitForElement(
+        '[data-guide="history-code-link"]'
+    );
     const stationElement = await waitForElement(
         '[data-guide="history-station-link"]'
     );
-    const timeElement = await waitForElement('[data-guide="history-time-button"]');
+    const timeElement = await waitForElement(
+        '[data-guide="history-time-button"]'
+    );
 
     if (!dateElement || !codeElement || !stationElement || !timeElement) {
         abortGuideWithSeen();
@@ -590,8 +594,7 @@ async function startTrainDetailGuide(options: {
         createGuideStep('[data-guide="history-code-link"]', {
             popover: {
                 title: '查看车组担当历史',
-                description:
-                    '点击车组号可以查看该车组的最近担当记录。',
+                description: '点击车组号可以查看该车组的最近担当记录。',
                 side: 'bottom',
                 align: 'start'
             }
@@ -599,8 +602,7 @@ async function startTrainDetailGuide(options: {
         createGuideStep('[data-guide="history-station-link"]', {
             popover: {
                 title: '查看车站停靠列车',
-                description:
-                    '点击车站名称可查看该车站的停靠车次和时刻表。',
+                description: '点击车站名称可查看该车站的停靠车次和时刻表。',
                 side: 'bottom',
                 align: 'start'
             }
@@ -608,8 +610,7 @@ async function startTrainDetailGuide(options: {
         createGuideStep('[data-guide="history-time-button"]', {
             popover: {
                 title: '打开时刻与交路',
-                description:
-                    '点击时刻，可以查看担当路局、交路表和时刻表。',
+                description: '点击时刻，可以查看担当路局、交路表和时刻表。',
                 side: 'top',
                 align: 'center',
                 onNextClick: () => {
@@ -678,8 +679,7 @@ async function startCurrentTimetableGuide() {
             createGuideStep('[data-guide="current-circulation-section"]', {
                 popover: {
                     title: '交路表',
-                    description:
-                        '交路表可以展示同一组车底前后衔接的运行链路。',
+                    description: '交路表可以展示同一组车底前后衔接的运行链路。',
                     side: 'top',
                     align: 'center'
                 }
@@ -691,8 +691,7 @@ async function startCurrentTimetableGuide() {
         createGuideStep('[data-guide="current-timetable-section"]', {
             popover: {
                 title: '时刻表',
-                description:
-                    '可以查看停站、到发时刻、检票口、里程等信息。',
+                description: '可以查看停站、到发时刻、检票口、里程等信息。',
                 side: 'top',
                 align: 'center',
                 onNextClick: () => {
@@ -728,7 +727,9 @@ async function startFutureAndActionsGuide(options: {
     const futureElement = await waitForElement(
         '[data-guide="future-prediction-button"]'
     );
-    const favoriteElement = await waitForElement('[data-guide="favorite-button"]');
+    const favoriteElement = await waitForElement(
+        '[data-guide="favorite-button"]'
+    );
     const subscriptionElement = await waitForElement(
         '[data-guide="subscription-button"]'
     );
@@ -756,7 +757,8 @@ async function startFutureAndActionsGuide(options: {
         {
             popover: {
                 title: '未来担当预测',
-                description: '这个功能会根据交路表和已有担当记录推测后续可能担当的车组，推测结果仅供参考。',
+                description:
+                    '这个功能会根据交路表和已有担当记录推测后续可能担当的车组，推测结果仅供参考。',
                 onNextClick: () => {
                     closeLatestModal();
                     window.setTimeout(() => {
@@ -768,8 +770,7 @@ async function startFutureAndActionsGuide(options: {
         createGuideStep('[data-guide="favorite-button"]', {
             popover: {
                 title: '收藏',
-                description:
-                    '收藏车次、车组和车站，方便快速查询。',
+                description: '收藏车次、车组和车站，方便快速查询。',
                 side: 'bottom',
                 align: 'center'
             }
@@ -777,8 +778,7 @@ async function startFutureAndActionsGuide(options: {
         createGuideStep('[data-guide="subscription-button"]', {
             popover: {
                 title: '订阅',
-                description:
-                    '当订阅车次有新运行记录时，您将会收到通知。',
+                description: '当订阅车次有新运行记录时，您将会收到通知。',
                 side: 'bottom',
                 align: 'center',
                 onNextClick: () => {
@@ -825,8 +825,7 @@ async function startEmuSearchGuide() {
         createGuideStep('[data-guide="detail-lookup-input"]', {
             popover: {
                 title: '查查车组',
-                description:
-                    '输入 CRH380AL-2541，看看动车组详情。',
+                description: '输入 CRH380AL-2541，看看动车组详情。',
                 side: 'bottom',
                 align: 'center'
             }
@@ -834,8 +833,7 @@ async function startEmuSearchGuide() {
         createGuideStep('[data-guide="detail-lookup-submit"]', {
             popover: {
                 title: '进入车组详情',
-                description:
-                    '点击重新查询按钮即可开始查询。',
+                description: '点击重新查询按钮即可开始查询。',
                 side: 'top',
                 align: 'center',
                 onNextClick: () => {
@@ -884,8 +882,7 @@ async function startEmuAllocationGuide(options: {
         createGuideStep('[data-guide="allocation-button"]', {
             popover: {
                 title: '查看配属信息',
-                description:
-                    '车组详情页可以查看该车的配属信息。',
+                description: '车组详情页可以查看该车的配属信息。',
                 side: 'bottom',
                 align: 'center',
                 onNextClick: async () => {
@@ -929,8 +926,7 @@ async function startEmuAllocationGuide(options: {
                         {
                             popover: {
                                 title: '配属信息',
-                                description:
-                                    '配属信息没有加载成功哦~',
+                                description: '配属信息没有加载成功哦~',
                                 showButtons: ['previous', 'next', 'close'],
                                 doneBtnText: '完成',
                                 onNextClick: finishGuide

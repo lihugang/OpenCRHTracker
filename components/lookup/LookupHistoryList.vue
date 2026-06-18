@@ -233,7 +233,9 @@
                                     <span
                                         class="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
                                         <template
-                                            v-for="(code, codeIndex) in item.codes"
+                                            v-for="(
+                                                code, codeIndex
+                                            ) in item.codes"
                                             :key="`${item.id}:${code}`">
                                             <NuxtLink
                                                 :to="buildCodeLink(code)"

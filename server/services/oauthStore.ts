@@ -492,7 +492,10 @@ export function updateOauthClientAdmin(
     return getOauthClientById(clientId);
 }
 
-function resolveOauthTokenScopes(client: OAuthClient, approvedScopes: string[]) {
+function resolveOauthTokenScopes(
+    client: OAuthClient,
+    approvedScopes: string[]
+) {
     const scopes = [...approvedScopes];
 
     if (client.adminGrants.notificationSend) {

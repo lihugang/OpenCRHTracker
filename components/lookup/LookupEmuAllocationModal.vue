@@ -116,9 +116,7 @@
             <section
                 v-if="profile.tags.length > 0 || profile.alias.length > 0"
                 class="space-y-3">
-                <h3 class="text-sm font-semibold text-crh-grey-dark">
-                    标记
-                </h3>
+                <h3 class="text-sm font-semibold text-crh-grey-dark">标记</h3>
 
                 <div class="grid gap-3 sm:grid-cols-2">
                     <div
@@ -193,7 +191,8 @@
                                 </td>
                                 <td
                                     class="border-b border-slate-100 px-3 py-2 last:border-b-0">
-                                    <span class="font-medium text-crh-grey-dark">
+                                    <span
+                                        class="font-medium text-crh-grey-dark">
                                         {{ formatCoachType(layout) }}
                                     </span>
                                 </td>

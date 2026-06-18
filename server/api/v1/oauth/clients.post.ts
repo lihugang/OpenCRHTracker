@@ -69,8 +69,8 @@ export default defineEventHandler(async (event) => {
                 )
             };
             ensure(
-                !input.requestedScopes.some(
-                    (scope) => hasScope([scope], API_SCOPES.notifications.send)
+                !input.requestedScopes.some((scope) =>
+                    hasScope([scope], API_SCOPES.notifications.send)
                 ),
                 403,
                 'forbidden_scope',

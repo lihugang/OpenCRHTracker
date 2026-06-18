@@ -298,17 +298,18 @@ function parseJsonObject(text: string): RawAllocationExport {
         throw new Error(`EMUList asset content must be valid JSON: ${message}`);
     }
 
-    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    if (
+        parsed === null ||
+        typeof parsed !== 'object' ||
+        Array.isArray(parsed)
+    ) {
         throw new Error('EMUList asset content must be a JSON object');
     }
 
     return parsed as RawAllocationExport;
 }
 
-function getRequiredArray<T>(
-    value: unknown,
-    fieldName: string
-): T[] {
+function getRequiredArray<T>(value: unknown, fieldName: string): T[] {
     if (!Array.isArray(value)) {
         throw new Error(`EMUList field ${fieldName} must be an array`);
     }
@@ -326,7 +327,9 @@ function getOptionalArray<T>(value: unknown): T[] {
 
 function normalizeId(value: unknown, fieldName: string): number {
     if (typeof value !== 'number' || !Number.isInteger(value) || value <= 0) {
-        throw new Error(`EMUList field ${fieldName} must be a positive integer`);
+        throw new Error(
+            `EMUList field ${fieldName} must be a positive integer`
+        );
     }
 
     return value;
@@ -341,7 +344,9 @@ function buildRecordById<T extends RawAllocationIdRecord>(
     for (const [index, row] of rows.entries()) {
         const id = normalizeId(row.id, `${fieldName}[${index}].id`);
         if (recordsById.has(id)) {
-            throw new Error(`EMUList field ${fieldName} has duplicate id ${id}`);
+            throw new Error(
+                `EMUList field ${fieldName} has duplicate id ${id}`
+            );
         }
         recordsById.set(id, row);
     }
@@ -443,7 +448,10 @@ function buildCoachLayoutsByModelId(
         );
         const coachType = coachTypesById.get(coachTypeId);
         const layout: EmuCoachLayoutRecord = {
-            coachNo: normalizeId(row.coach_no, `coach_layouts[${index}].coach_no`),
+            coachNo: normalizeId(
+                row.coach_no,
+                `coach_layouts[${index}].coach_no`
+            ),
             coachTypeCode: normalizeOptionalString(coachType?.type_code),
             coachTypeName: normalizeOptionalString(coachType?.type_name),
             capacity:
@@ -455,9 +463,7 @@ function buildCoachLayoutsByModelId(
             hasPower: normalizeBoolean(row.has_power),
             hasPantograph: normalizeBoolean(row.has_pantograph),
             hasLargeLuggageArea: normalizeBoolean(row.has_large_luggage_area),
-            hasAccessibleFacility: normalizeBoolean(
-                row.has_accessible_facility
-            )
+            hasAccessibleFacility: normalizeBoolean(row.has_accessible_facility)
         };
         const layouts = layoutsByModelId.get(modelId) ?? [];
         layouts.push(layout);
@@ -521,10 +527,7 @@ export function parseEmuListAssetText(text: string): EmuListRecord[] {
         socketLocations,
         'socket_locations'
     );
-    const toiletStatusById = buildRecordById(
-        toiletStatuses,
-        'toilet_statuses'
-    );
+    const toiletStatusById = buildRecordById(toiletStatuses, 'toilet_statuses');
     const businessSeatTypeById = buildRecordById(
         businessSeatTypes,
         'business_seat_types'
@@ -592,11 +595,15 @@ export function parseEmuListAssetText(text: string): EmuListRecord[] {
         }
 
         const coachCount = coachCountByModelId.get(modelId);
-        const multiple = typeof coachCount === 'number' ? coachCount <= 8 : true;
+        const multiple =
+            typeof coachCount === 'number' ? coachCount <= 8 : true;
 
         const remark = getRemark(row.remark);
         const model = normalizeCode(
-            normalizeRequiredString(trainsetModel.model, 'trainset_models.model')
+            normalizeRequiredString(
+                trainsetModel.model,
+                'trainset_models.model'
+            )
         );
         const trainSetNo = normalizeCode(
             normalizeRequiredString(
@@ -662,7 +669,9 @@ export function parseEmuListAssetText(text: string): EmuListRecord[] {
     }
 
     if (emuList.length === 0) {
-        throw new Error('EMUList asset content must include at least one trainset');
+        throw new Error(
+            'EMUList asset content must include at least one trainset'
+        );
     }
 
     buildCanonicalEmuCodeByAnyCode(emuList);

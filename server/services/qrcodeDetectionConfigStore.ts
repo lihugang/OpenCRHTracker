@@ -191,7 +191,9 @@ export function formatQrcodeDetectionConfigWarnings(
         formatQrcodeDetectionMissingEmuListWarning(
             result.missingEmuListMappings
         ),
-        formatQrcodeDetectionMissingMappingsWarning(result.missingQrcodeMappings)
+        formatQrcodeDetectionMissingMappingsWarning(
+            result.missingQrcodeMappings
+        )
     ]
         .filter((warning) => warning.length > 0)
         .join(' ');

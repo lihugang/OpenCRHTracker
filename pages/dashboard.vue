@@ -618,8 +618,8 @@
                             {{ oauthClientDeleteTarget.clientId }}
                         </p>
                         <p class="text-sm leading-6 text-slate-600">
-                            删除后，该 OAuth 客户端的配置、授权记录和现有
-                            OAuth 访问令牌会失效。这个操作不能撤销。
+                            删除后，该 OAuth 客户端的配置、授权记录和现有 OAuth
+                            访问令牌会失效。这个操作不能撤销。
                         </p>
                     </div>
                 </div>

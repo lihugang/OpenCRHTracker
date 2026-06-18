@@ -57,16 +57,13 @@
                         v-for="(stop, stopIndex) in timetable.stops"
                         :key="'desktop:' + stop.stationNo"
                         class="align-top">
-                        <td
-                            :class="getTableBodyCellClass('stationNo')">
+                        <td :class="getTableBodyCellClass('stationNo')">
                             {{ stop.stationNo }}
                         </td>
-                        <td
-                            :class="getTableBodyCellClass('trainCode')">
+                        <td :class="getTableBodyCellClass('trainCode')">
                             {{ stop.stationTrainCode || '--' }}
                         </td>
-                        <td
-                            :class="getTableBodyCellClass('stationName')">
+                        <td :class="getTableBodyCellClass('stationName')">
                             <LookupStationLink
                                 :station-name="stop.stationName"
                                 :focus-train-codes="
@@ -75,12 +72,10 @@
                                 class="lookup-timetable-text-wrap"
                                 fallback-text="--" />
                         </td>
-                        <td
-                            :class="getTableBodyCellClass('arriveAt')">
+                        <td :class="getTableBodyCellClass('arriveAt')">
                             {{ formatStopTime(stop.arriveAt) }}
                         </td>
-                        <td
-                            :class="getTableBodyCellClass('departAt')">
+                        <td :class="getTableBodyCellClass('departAt')">
                             {{ formatStopTime(stop.departAt) }}
                         </td>
                         <td
@@ -245,7 +240,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import {
+    computed,
+    nextTick,
+    onBeforeUnmount,
+    onMounted,
+    ref,
+    watch
+} from 'vue';
 import LookupExpandableSection from './LookupExpandableSection.vue';
 import type {
     DisplayTimetableData,
@@ -376,9 +378,7 @@ const tableColumnLayouts = computed<TimetableColumnLayout[]>(() => {
     return allocateColumnLayouts(columns, tableWidth.value);
 });
 
-function getColumnConfigs(
-    shouldShowUnits: boolean
-): TimetableColumnConfig[] {
+function getColumnConfigs(shouldShowUnits: boolean): TimetableColumnConfig[] {
     return props.visibleColumns
         .map((label) => {
             const key = columnKeyByLabel[label];
@@ -431,7 +431,12 @@ function getMaxColumnContentWidth(
     shouldShowUnits: boolean
 ) {
     return props.timetable.stops.reduce((maxWidth, stop, stopIndex) => {
-        const text = getColumnDisplayText(key, stop, stopIndex, shouldShowUnits);
+        const text = getColumnDisplayText(
+            key,
+            stop,
+            stopIndex,
+            shouldShowUnits
+        );
         return Math.max(
             maxWidth,
             estimateColumnTextWidth(
@@ -553,19 +558,14 @@ function allocateColumnLayouts(
     }
 
     let remainingWidth = targetWidth - minWidth;
-    remainingWidth = distributeColumnWidth(
-        columns,
-        widths,
-        remainingWidth,
-        [
-            'stationNo',
-            'trainCode',
-            'arriveAt',
-            'departAt',
-            'distance',
-            'sectionSpeed'
-        ]
-    );
+    remainingWidth = distributeColumnWidth(columns, widths, remainingWidth, [
+        'stationNo',
+        'trainCode',
+        'arriveAt',
+        'departAt',
+        'distance',
+        'sectionSpeed'
+    ]);
     remainingWidth = distributeColumnWidth(columns, widths, remainingWidth, [
         'wicket'
     ]);
@@ -813,7 +813,11 @@ watch(
 );
 
 watch(
-    () => [props.isCurrentView, props.showDistanceColumns, props.visibleColumns],
+    () => [
+        props.isCurrentView,
+        props.showDistanceColumns,
+        props.visibleColumns
+    ],
     () => {
         void nextTick(updateTableWidth);
     }

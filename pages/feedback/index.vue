@@ -573,8 +573,7 @@
 
                     <div
                         v-if="
-                            !isAllocationDataWrongCategory &&
-                            isSecurityCategory
+                            !isAllocationDataWrongCategory && isSecurityCategory
                         "
                         class="rounded-[1rem] border border-amber-200 bg-amber-50/80 px-4 py-4 text-sm leading-6 text-amber-900">
                         安全性问题反馈会被强制设为不公开，仅作者与管理员可见并可回复。

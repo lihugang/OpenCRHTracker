@@ -207,12 +207,15 @@ async function resolveAuthorizeContext() {
             });
         }
 
-        const [{ getAuthorizeContext, parseAuthorizeRequest }, ensureAuthRateLimit] =
-            await Promise.all([
-                import('~/server/utils/oauth/authorizeRequest'),
-                import('~/server/utils/api/authRateLimit/ensureAuthRateLimit')
-                    .then((module) => module.default)
-            ]);
+        const [
+            { getAuthorizeContext, parseAuthorizeRequest },
+            ensureAuthRateLimit
+        ] = await Promise.all([
+            import('~/server/utils/oauth/authorizeRequest'),
+            import('~/server/utils/api/authRateLimit/ensureAuthRateLimit').then(
+                (module) => module.default
+            )
+        ]);
 
         ensureAuthRateLimit(event, 'oauthAuthorize');
         return getAuthorizeContext(event, parseAuthorizeRequest(event));

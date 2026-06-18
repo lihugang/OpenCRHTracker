@@ -758,8 +758,7 @@ async function executeFetchStationBoardTask(rawArgs: unknown) {
                 rowCount: rows.length,
                 parsedEntryCount,
                 savedEntryCount: 0,
-                updatedStopMetadataCount:
-                    stopMetadataResult.updatedStopCount,
+                updatedStopMetadataCount: stopMetadataResult.updatedStopCount,
                 consumedQueueEntryCount: 0,
                 parentSchedulerTaskId: args.parentSchedulerTaskId
             }

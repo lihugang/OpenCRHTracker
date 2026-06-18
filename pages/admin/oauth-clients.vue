@@ -303,9 +303,7 @@
                                                 .notificationSendUpdatedAt
                                         "
                                         class="text-xs leading-5 text-slate-500">
-                                        {{
-                                            formatAdminGrantUpdate(item)
-                                        }}
+                                        {{ formatAdminGrantUpdate(item) }}
                                     </p>
                                 </div>
                                 <UiButton
@@ -391,11 +389,9 @@ async function patchClient(
         body: {
             status: overrides.status ?? item.status,
             isTrusted: overrides.isTrusted ?? item.isTrusted,
-            adminGrants:
-                overrides.adminGrants ??
-                {
-                    notificationSend: item.adminGrants.notificationSend
-                },
+            adminGrants: overrides.adminGrants ?? {
+                notificationSend: item.adminGrants.notificationSend
+            },
             scopeReviews:
                 overrides.scopeReviews ??
                 item.scopeRequests.map((scope) => ({

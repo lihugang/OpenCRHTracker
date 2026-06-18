@@ -2366,7 +2366,10 @@ function mergeStationBoardStationTaskItem(
         ),
         rows: base.rows.length > 0 ? base.rows : fallback.rows,
         ambiguousTelecodes: Array.from(
-            new Set([...base.ambiguousTelecodes, ...fallback.ambiguousTelecodes])
+            new Set([
+                ...base.ambiguousTelecodes,
+                ...fallback.ambiguousTelecodes
+            ])
         )
     };
 }
@@ -2542,9 +2545,8 @@ export function getAdminStationBoardDispatchDetail(
     const stationTaskItems = dispatchDetails.map((detail) => {
         const fetchTaskRun =
             detail.schedulerTaskId !== null
-                ? (fetchTaskRunBySchedulerTaskId.get(
-                      detail.schedulerTaskId
-                  ) ?? null)
+                ? (fetchTaskRunBySchedulerTaskId.get(detail.schedulerTaskId) ??
+                  null)
                 : null;
         const fetchResult =
             fetchTaskRun !== null

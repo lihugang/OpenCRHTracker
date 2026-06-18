@@ -92,10 +92,7 @@ function buildTagVariants(value: string) {
 function resolveEmuTrainSetNo(code: string) {
     const normalizedCode = normalizeKeyword(code);
     const separatorIndex = normalizedCode.lastIndexOf('-');
-    if (
-        separatorIndex <= 0 ||
-        separatorIndex >= normalizedCode.length - 1
-    ) {
+    if (separatorIndex <= 0 || separatorIndex >= normalizedCode.length - 1) {
         return '';
     }
 
@@ -168,10 +165,7 @@ function buildLookupSuggestIndex(
             if (type === 'emu') {
                 return collectItems([
                     ...emuCodeTrie.search(normalizedQuery, searchLimit),
-                    ...emuTrainSetNoTrie.search(
-                        normalizedQuery,
-                        searchLimit
-                    ),
+                    ...emuTrainSetNoTrie.search(normalizedQuery, searchLimit),
                     ...emuTagTrie.search(normalizedQuery, searchLimit)
                 ])
                     .sort(compareSuggestionOrder(normalizedQuery))
