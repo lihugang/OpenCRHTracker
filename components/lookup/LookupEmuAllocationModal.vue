@@ -36,6 +36,7 @@
             v-else-if="profile"
             class="space-y-5">
             <div
+                data-guide="allocation-summary"
                 class="overflow-hidden rounded-[1rem] border border-slate-200 bg-slate-50/80">
                 <div class="flex flex-wrap items-start justify-between gap-3">
                     <div class="min-w-0 px-4 py-4">

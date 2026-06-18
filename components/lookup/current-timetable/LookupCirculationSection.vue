@@ -3,6 +3,7 @@
         :model-value="modelValue"
         title="交路表"
         :section-id="sectionId"
+        guide="current-circulation-section"
         :summary="nodes.length > 0 ? summary : ''"
         collapse-label="折叠交路表"
         expand-label="展开交路表"

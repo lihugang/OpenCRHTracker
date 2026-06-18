@@ -174,7 +174,7 @@
                         </thead>
                         <tbody>
                             <tr
-                                v-for="item in groupedItems"
+                                v-for="(item, itemIndex) in groupedItems"
                                 :key="item.id"
                                 :class="[
                                     'history-table-row align-top',
@@ -200,6 +200,11 @@
                                                 item.startAt
                                             )
                                         "
+                                        :data-guide="
+                                            itemIndex === 0
+                                                ? 'history-date-export'
+                                                : undefined
+                                        "
                                         class="history-date-link">
                                         {{
                                             formatDateLabel(
@@ -208,7 +213,13 @@
                                             )
                                         }}
                                     </NuxtLink>
-                                    <span v-else>
+                                    <span
+                                        v-else
+                                        :data-guide="
+                                            itemIndex === 0
+                                                ? 'history-date-export'
+                                                : undefined
+                                        ">
                                         {{
                                             formatDateLabel(
                                                 item.serviceDate,
@@ -222,16 +233,22 @@
                                     <span
                                         class="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
                                         <template
-                                            v-for="(code, index) in item.codes"
+                                            v-for="(code, codeIndex) in item.codes"
                                             :key="`${item.id}:${code}`">
                                             <NuxtLink
                                                 :to="buildCodeLink(code)"
+                                                :data-guide="
+                                                    itemIndex === 0 &&
+                                                    codeIndex === 0
+                                                        ? 'history-code-link'
+                                                        : undefined
+                                                "
                                                 class="cursor-pointer transition hover:underline">
                                                 {{ formatCodeText(code) }}
                                             </NuxtLink>
                                             <span
                                                 v-if="
-                                                    index <
+                                                    codeIndex <
                                                     item.codes.length - 1
                                                 "
                                                 class="text-slate-400">
@@ -249,6 +266,11 @@
                                     ]">
                                     <LookupStationLink
                                         :station-name="item.startStation || ''"
+                                        :data-guide="
+                                            itemIndex === 0
+                                                ? 'history-station-link'
+                                                : undefined
+                                        "
                                         :focus-train-codes="
                                             resolveStationFocusTrainCodes(item)
                                         "
@@ -266,6 +288,11 @@
                                     ]">
                                     <button
                                         type="button"
+                                        :data-guide="
+                                            itemIndex === 0
+                                                ? 'history-time-button'
+                                                : undefined
+                                        "
                                         :disabled="!canOpenTimetable(item)"
                                         class="inline-flex cursor-pointer items-center rounded-md transition enabled:hover:text-crh-blue enabled:hover:underline disabled:cursor-default"
                                         @click="openTimetable(item)">
@@ -342,6 +369,11 @@
                                         item.startAt
                                     )
                                 "
+                                :data-guide="
+                                    index === 0
+                                        ? 'history-date-export'
+                                        : undefined
+                                "
                                 class="history-date-link">
                                 {{
                                     formatDateLabel(
@@ -350,7 +382,13 @@
                                     )
                                 }}
                             </NuxtLink>
-                            <span v-else>
+                            <span
+                                v-else
+                                :data-guide="
+                                    index === 0
+                                        ? 'history-date-export'
+                                        : undefined
+                                ">
                                 {{
                                     formatDateLabel(
                                         item.serviceDate,
@@ -378,6 +416,12 @@
                                             :key="`${item.id}:mobile:${code}`">
                                             <NuxtLink
                                                 :to="buildCodeLink(code)"
+                                                :data-guide="
+                                                    index === 0 &&
+                                                    codeIndex === 0
+                                                        ? 'history-code-link'
+                                                        : undefined
+                                                "
                                                 class="cursor-pointer transition hover:underline">
                                                 {{ formatCodeText(code) }}
                                             </NuxtLink>
@@ -413,6 +457,11 @@
                                                 <LookupStationLink
                                                     :station-name="
                                                         item.startStation || ''
+                                                    "
+                                                    :data-guide="
+                                                        index === 0
+                                                            ? 'history-station-link'
+                                                            : undefined
                                                     "
                                                     :focus-train-codes="
                                                         resolveStationFocusTrainCodes(
@@ -482,6 +531,11 @@
                                         class="mt-3 flex items-center gap-3 border-t border-slate-100 pt-3">
                                         <button
                                             type="button"
+                                            :data-guide="
+                                                index === 0
+                                                    ? 'history-time-button'
+                                                    : undefined
+                                            "
                                             class="min-w-0 flex-1 cursor-pointer text-left transition enabled:hover:text-crh-blue disabled:cursor-default"
                                             :disabled="!canOpenTimetable(item)"
                                             @click="openTimetable(item)">

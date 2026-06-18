@@ -1,6 +1,7 @@
 <template>
     <button
         type="button"
+        :data-guide="guide"
         :disabled="disabled || loading"
         :aria-pressed="active ? 'true' : 'false'"
         :class="[
@@ -47,6 +48,7 @@ withDefaults(
         showLabel?: boolean;
         activeLabel?: string;
         inactiveLabel?: string;
+        guide?: string;
     }>(),
     {
         loading: false,
@@ -54,7 +56,8 @@ withDefaults(
         size: 'md',
         showLabel: true,
         activeLabel: '已订阅',
-        inactiveLabel: '订阅'
+        inactiveLabel: '订阅',
+        guide: undefined
     }
 );
 

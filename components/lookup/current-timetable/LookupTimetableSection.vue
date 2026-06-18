@@ -3,6 +3,7 @@
         :model-value="modelValue"
         title="时刻表"
         :section-id="sectionId"
+        guide="current-timetable-section"
         :summary="summary"
         collapse-label="折叠时刻表"
         expand-label="展开时刻表"

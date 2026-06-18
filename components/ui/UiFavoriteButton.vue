@@ -1,6 +1,7 @@
 <template>
     <button
         type="button"
+        :data-guide="guide"
         :disabled="disabled || loading"
         :aria-pressed="active ? 'true' : 'false'"
         :class="[
@@ -42,6 +43,7 @@ const props = withDefaults(
         showLabel?: boolean;
         activeLabel?: string;
         inactiveLabel?: string;
+        guide?: string;
     }>(),
     {
         loading: false,
@@ -49,7 +51,8 @@ const props = withDefaults(
         size: 'md',
         showLabel: true,
         activeLabel: '已收藏',
-        inactiveLabel: '收藏'
+        inactiveLabel: '收藏',
+        guide: undefined
     }
 );
 

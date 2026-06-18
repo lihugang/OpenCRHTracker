@@ -32,7 +32,7 @@
                         :station-name="transitionTarget.code"
                         state="loading"
                         :items="[]"
-                        summary="正在加载车站时刻表，并准备跳转到对应详情页…"
+                        summary="正在加载车站时刻表…"
                         :is-loading-more="false"
                         :can-load-more="false"
                         error-message="" />
@@ -43,7 +43,7 @@
                         :code="transitionTarget.code"
                         state="loading"
                         :items="[]"
-                        summary="正在加载历史记录，并准备跳转到对应详情页…"
+                        summary="正在加载历史记录…"
                         :is-loading-more="false"
                         :can-load-more="false"
                         error-message="" />
@@ -68,6 +68,8 @@
                         <LookupSearchCard
                             class="landing-hero-card"
                             v-model="draftCode"
+                            input-guide="home-lookup-input"
+                            submit-guide="home-lookup-submit"
                             eyebrow="OpenCRHTracker"
                             title="动车组运用情况查询"
                             description="输入车次号、车组号可查询列车担当情况"
@@ -82,12 +84,43 @@
             </div>
 
             <AppFooter />
+
+            <component
+                :is="usesGuideBottomSheet ? UiBottomSheet : UiModal"
+                v-model="isGuidePromptOpen"
+                title="查看网站使用指引？"
+                eyebrow="GUIDE"
+                description="欢迎访问 Open CRH Tracker"
+                :close-on-backdrop="false"
+                @update:model-value="handleGuidePromptVisibilityChange">
+                <div class="space-y-4 text-sm leading-6 text-slate-600">
+                    <p>
+                        本网站旨在追踪动车组的运用情况及其配套数据。只需几步，即可快速上手。
+                    </p>
+                </div>
+
+                <template #footer>
+                    <div
+                        class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                        <UiButton
+                            variant="ghost"
+                            @click="dismissGuidePrompt">
+                            稍后再说
+                        </UiButton>
+                        <UiButton @click="acceptGuidePrompt">
+                            查看指引
+                        </UiButton>
+                    </div>
+                </template>
+            </component>
         </main>
     </Transition>
 </template>
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import UiBottomSheet from '~/components/ui/UiBottomSheet.vue';
+import UiModal from '~/components/ui/UiModal.vue';
 import type { LookupTarget } from '~/types/lookup';
 import {
     buildLookupPath,
@@ -107,7 +140,10 @@ const isNavigating = ref(false);
 const isLandscapeWide = ref(false);
 const splitPreviewVisible = ref(false);
 const transitionTarget = ref<LookupTarget | null>(null);
+const isGuidePromptOpen = ref(false);
+const isStartingGuide = ref(false);
 const route = useRoute();
+const { hasSeenGuide, markGuideSeen, startHomeGuide } = useUserGuide();
 
 let mediaQueryList: MediaQueryList | null = null;
 let mediaQueryHandler: ((event: MediaQueryListEvent) => void) | null = null;
@@ -125,6 +161,7 @@ const previewSearchTitle = computed(() => {
     return '车站时刻表查询';
 });
 const previewSearchDescription = computed(() => '');
+const usesGuideBottomSheet = computed(() => !isLandscapeWide.value);
 
 useSiteSeo({
     title: '首页 | Open CRH Tracker',
@@ -145,6 +182,20 @@ onMounted(() => {
         isLandscapeWide.value = event.matches;
     };
     mediaQueryList.addEventListener('change', mediaQueryHandler);
+
+    window.setTimeout(() => {
+        if (
+            route.path !== '/' ||
+            hasSeenGuide() ||
+            draftCode.value.trim().length > 0 ||
+            inputError.value.length > 0 ||
+            isNavigating.value
+        ) {
+            return;
+        }
+
+        isGuidePromptOpen.value = true;
+    }, 800);
 });
 
 onBeforeUnmount(() => {
@@ -180,6 +231,28 @@ async function submitLookup(selectedCode?: string) {
             splitPreviewVisible.value = false;
             transitionTarget.value = null;
         }
+    }
+}
+
+function dismissGuidePrompt() {
+    markGuideSeen();
+    isGuidePromptOpen.value = false;
+}
+
+function handleGuidePromptVisibilityChange(value: boolean) {
+    isGuidePromptOpen.value = value;
+    if (!value && !isStartingGuide.value) {
+        markGuideSeen();
+    }
+}
+
+async function acceptGuidePrompt() {
+    isStartingGuide.value = true;
+    isGuidePromptOpen.value = false;
+    try {
+        await startHomeGuide();
+    } finally {
+        isStartingGuide.value = false;
     }
 }
 </script>

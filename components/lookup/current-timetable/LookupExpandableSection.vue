@@ -1,5 +1,6 @@
 <template>
     <UiCard
+        :data-guide="guide"
         :show-accent-bar="false"
         variant="subtle">
         <div class="space-y-4">
@@ -72,6 +73,7 @@ defineProps<{
     collapseLabel: string;
     expandLabel: string;
     showToggle?: boolean;
+    guide?: string;
 }>();
 
 const emit = defineEmits<{

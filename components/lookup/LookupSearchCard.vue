@@ -83,6 +83,7 @@
                             <input
                                 id="lookup-input"
                                 ref="inputRef"
+                                :data-guide="inputGuide"
                                 :value="modelValue"
                                 type="text"
                                 inputmode="text"
@@ -285,6 +286,7 @@
 
                         <UiButton
                             type="submit"
+                            :data-guide="submitGuide"
                             :loading="loading"
                             :class="[
                                 'w-full px-6',
@@ -509,6 +511,8 @@ const props = withDefaults(
         autoFocus?: boolean;
         layoutMode?: 'responsive' | 'stacked';
         overlayFallbackProfile?: OverlayFallbackProfile;
+        inputGuide?: string;
+        submitGuide?: string;
     }>(),
     {
         eyebrow: 'OpenCRHTracker',
@@ -521,7 +525,9 @@ const props = withDefaults(
         submitLabel: '查询',
         placeholder: 'D2212 或 CR400AF-C-2214',
         layoutMode: 'responsive',
-        overlayFallbackProfile: 'none'
+        overlayFallbackProfile: 'none',
+        inputGuide: undefined,
+        submitGuide: undefined
     }
 );
 

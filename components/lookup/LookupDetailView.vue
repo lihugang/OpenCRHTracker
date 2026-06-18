@@ -17,6 +17,8 @@
                 :detected-type="detectedTarget?.type ?? null"
                 :error-message="inputError"
                 overlay-fallback-profile="detail-sticky"
+                input-guide="detail-lookup-input"
+                submit-guide="detail-lookup-submit"
                 submit-label="重新查询"
                 @submit="submitSearch" />
         </template>
@@ -42,6 +44,7 @@
                             </div>
 
                             <UiFavoriteButton
+                                guide="favorite-button"
                                 :active="isFavorited(favoriteItem)"
                                 :loading="isFavoritePending(favoriteItem)"
                                 size="sm"
@@ -50,6 +53,7 @@
 
                         <div class="flex justify-end">
                             <UiSubscriptionButton
+                                guide="subscription-button"
                                 :active="isSubscribed(eventSubscriptionTarget)"
                                 :loading="isSubscriptionActionPending"
                                 size="sm"
@@ -58,6 +62,7 @@
 
                         <UiButton
                             v-if="isEmuTarget"
+                            data-guide="allocation-button"
                             variant="secondary"
                             size="sm"
                             block
@@ -66,6 +71,7 @@
                         </UiButton>
 
                         <UiButton
+                            data-guide="future-prediction-button"
                             variant="secondary"
                             size="sm"
                             block
@@ -112,10 +118,12 @@
                 <div class="flex items-center justify-between gap-3">
                     <div class="flex items-center gap-2">
                         <UiFavoriteButton
+                            guide="favorite-button"
                             :active="isFavorited(favoriteItem)"
                             :loading="isFavoritePending(favoriteItem)"
                             @click="toggleFavoriteItem" />
                         <UiSubscriptionButton
+                            guide="subscription-button"
                             :active="isSubscribed(eventSubscriptionTarget)"
                             :loading="isSubscriptionActionPending"
                             @click="toggleEventSubscriptionItem" />
@@ -124,6 +132,7 @@
                     <div class="flex flex-wrap justify-end gap-2">
                         <UiButton
                             v-if="isEmuTarget"
+                            data-guide="allocation-button"
                             variant="secondary"
                             size="sm"
                             class="shrink-0"
@@ -131,6 +140,7 @@
                             配属信息
                         </UiButton>
                         <UiButton
+                            data-guide="future-prediction-button"
                             variant="secondary"
                             size="sm"
                             class="shrink-0"
@@ -216,6 +226,8 @@ import {
 const MOBILE_QUERY = '(max-width: 767px)';
 const MOBILE_COLLAPSE_OFFSET = 28;
 const MOBILE_STICKY_MIN_SCROLLABLE_SPACE = 160;
+const USER_GUIDE_STAGE_CHANGE_EVENT = 'opencrhtracker:user-guide-stage-change';
+const USER_GUIDE_STAGE_RESUME_DELAY_MS = 240;
 type LookupDetailTargetType = Extract<LookupTargetType, 'train' | 'emu'>;
 
 const props = defineProps<{
@@ -403,6 +415,7 @@ watch(
     async () => {
         await nextTick();
         syncMobileStickyHeaderState();
+        void continueUserGuideOnDetail();
     }
 );
 
@@ -420,7 +433,12 @@ onMounted(() => {
     window.addEventListener('scroll', handleScroll, {
         passive: true
     });
+    window.addEventListener(
+        USER_GUIDE_STAGE_CHANGE_EVENT,
+        handleUserGuideStageChange
+    );
     syncMobileStickyHeaderState();
+    void continueUserGuideOnDetail();
 });
 
 onBeforeUnmount(() => {
@@ -430,6 +448,10 @@ onBeforeUnmount(() => {
 
     window.removeEventListener('resize', syncMobileStickyHeaderState);
     window.removeEventListener('scroll', handleScroll);
+    window.removeEventListener(
+        USER_GUIDE_STAGE_CHANGE_EVENT,
+        handleUserGuideStageChange
+    );
 });
 
 useSiteSeo({
@@ -454,6 +476,49 @@ function openFuturePredictionModal() {
     }
 
     isFuturePredictionModalOpen.value = true;
+}
+
+async function continueUserGuideOnDetail() {
+    const {
+        startTrainDetailGuide,
+        startFutureAndActionsGuide,
+        startEmuSearchGuide,
+        startEmuAllocationGuide
+    } = useUserGuide();
+
+    await startTrainDetailGuide({
+        route,
+        state: state.value,
+        itemCount: items.value.length,
+        openTimetable: openFirstGuideTimetable,
+        openFuturePrediction: openFuturePredictionModal
+    });
+
+    await startFutureAndActionsGuide({
+        openFuturePrediction: openFuturePredictionModal
+    });
+
+    await startEmuSearchGuide();
+
+    await startEmuAllocationGuide({
+        route,
+        isEmuTarget: isEmuTarget.value,
+        openAllocation: openAllocationModal
+    });
+}
+
+async function handleUserGuideStageChange() {
+    await nextTick();
+    window.setTimeout(() => {
+        void continueUserGuideOnDetail();
+    }, USER_GUIDE_STAGE_RESUME_DELAY_MS);
+}
+
+function openFirstGuideTimetable() {
+    const button = document.querySelector<HTMLButtonElement>(
+        '[data-guide="history-time-button"]'
+    );
+    button?.click();
 }
 
 function openAllocationModal() {

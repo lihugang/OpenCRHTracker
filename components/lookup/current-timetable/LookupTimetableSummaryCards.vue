@@ -32,6 +32,7 @@
 
         <UiCard
             v-if="isCurrentView && responsibilitySummary"
+            data-guide="current-responsibility-summary"
             :show-accent-bar="false"
             variant="subtle"
             class="sm:col-span-2">

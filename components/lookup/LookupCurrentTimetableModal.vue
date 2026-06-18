@@ -114,7 +114,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import type { ComponentPublicInstance } from 'vue';
 import LookupCirculationPdfOverlay from '~/components/lookup/current-timetable/LookupCirculationPdfOverlay.vue';
 import LookupCirculationSection from '~/components/lookup/current-timetable/LookupCirculationSection.vue';
@@ -449,6 +449,23 @@ function persistSectionState() {
 }
 
 watch([isTimetableExpanded, isCirculationExpanded], persistSectionState);
+
+watch(
+    () => [props.modelValue, viewState.value, displayedTimetable.value],
+    async () => {
+        if (
+            !props.modelValue ||
+            viewState.value !== 'success' ||
+            !displayedTimetable.value
+        ) {
+            return;
+        }
+
+        await nextTick();
+        const { startCurrentTimetableGuide } = useUserGuide();
+        await startCurrentTimetableGuide();
+    }
+);
 
 onMounted(() => {
     const persistedState = readPersistedSectionState();

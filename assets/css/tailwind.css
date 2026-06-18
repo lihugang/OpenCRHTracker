@@ -98,6 +98,175 @@
 }
 
 @layer components {
+    .opencrh-user-guide-popover.driver-popover {
+        box-sizing: border-box;
+        width: min(21rem, calc(100vw - 2rem));
+        min-width: min(17rem, calc(100vw - 2rem));
+        max-width: calc(100vw - 2rem);
+        padding: 1rem;
+        border: 1px solid rgba(0, 82, 155, 0.14);
+        border-radius: 0.75rem;
+        background:
+            linear-gradient(135deg, rgba(239, 246, 255, 0.92), transparent 48%),
+            linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+        color: var(--color-crh-grey-dark);
+        box-shadow:
+            0 24px 58px -32px rgba(15, 23, 42, 0.36),
+            0 10px 28px -24px rgba(0, 82, 155, 0.38),
+            inset 0 1px 0 rgba(255, 255, 255, 0.86);
+    }
+
+    .opencrh-user-guide-popover.driver-popover * {
+        box-sizing: border-box;
+        font-family: var(--font-sans);
+    }
+
+    .opencrh-user-guide-popover .driver-popover-title {
+        padding-right: 2rem;
+        color: var(--color-crh-grey-dark);
+        font-size: 1rem;
+        font-weight: 600;
+        line-height: 1.55;
+    }
+
+    .opencrh-user-guide-popover
+        .driver-popover-title[style*='block']
+        + .driver-popover-description {
+        margin-top: 0.45rem;
+    }
+
+    .opencrh-user-guide-popover .driver-popover-description {
+        color: #64748b;
+        font-size: 0.875rem;
+        font-weight: 400;
+        line-height: 1.7;
+    }
+
+    .opencrh-user-guide-popover .driver-popover-close-btn {
+        top: 0.65rem;
+        right: 0.65rem;
+        display: inline-flex;
+        width: 1.85rem;
+        height: 1.85rem;
+        align-items: center;
+        justify-content: center;
+        border-radius: 999px;
+        color: #94a3b8;
+        font-size: 1.25rem;
+        line-height: 1;
+        transition:
+            background-color 160ms ease,
+            color 160ms ease;
+    }
+
+    .opencrh-user-guide-popover .driver-popover-close-btn:hover,
+    .opencrh-user-guide-popover .driver-popover-close-btn:focus {
+        background: rgba(219, 234, 254, 0.8);
+        color: var(--color-crh-blue);
+    }
+
+    .opencrh-user-guide-popover .driver-popover-footer {
+        margin-top: 1rem;
+        gap: 0.75rem;
+    }
+
+    .opencrh-user-guide-popover .driver-popover-progress-text {
+        color: rgba(0, 82, 155, 0.68);
+        font-size: 0.75rem;
+        font-weight: 500;
+        white-space: nowrap;
+    }
+
+    .opencrh-user-guide-popover .driver-popover-navigation-btns {
+        gap: 0.45rem;
+    }
+
+    .opencrh-user-guide-popover .driver-popover-navigation-btns button + button {
+        margin-left: 0;
+    }
+
+    .opencrh-user-guide-popover .driver-popover-footer button {
+        min-height: 2.15rem;
+        padding: 0.45rem 0.85rem;
+        border-radius: 0.65rem;
+        font-size: 0.8125rem;
+        font-weight: 500;
+        line-height: 1.25;
+        text-shadow: none;
+        transition:
+            border-color 160ms ease,
+            background-color 160ms ease,
+            box-shadow 160ms ease,
+            color 160ms ease;
+    }
+
+    .opencrh-user-guide-popover .driver-popover-prev-btn {
+        border: 1px solid rgba(203, 213, 225, 0.95);
+        background: rgba(255, 255, 255, 0.92);
+        color: var(--color-crh-blue);
+        box-shadow: 0 6px 16px -14px rgba(15, 23, 42, 0.32);
+    }
+
+    .opencrh-user-guide-popover .driver-popover-prev-btn:hover,
+    .opencrh-user-guide-popover .driver-popover-prev-btn:focus {
+        border-color: rgba(0, 82, 155, 0.24);
+        background: #eff6ff;
+        color: var(--color-crh-blue);
+    }
+
+    .opencrh-user-guide-popover .driver-popover-next-btn {
+        border: 1px solid rgba(0, 82, 155, 0.08);
+        background: linear-gradient(180deg, #00529b 0%, #004c92 100%);
+        color: #ffffff;
+        box-shadow: 0 10px 22px -14px rgba(0, 82, 155, 0.72);
+    }
+
+    .opencrh-user-guide-popover .driver-popover-next-btn:hover,
+    .opencrh-user-guide-popover .driver-popover-next-btn:focus {
+        border-color: rgba(0, 82, 155, 0.16);
+        background: linear-gradient(180deg, #004f96 0%, #00478a 100%);
+        color: #ffffff;
+        box-shadow: 0 14px 28px -18px rgba(0, 82, 155, 0.72);
+    }
+
+    .opencrh-user-guide-popover
+        .driver-popover-footer
+        .driver-popover-btn-disabled {
+        opacity: 0.42;
+    }
+
+    .opencrh-user-guide-popover .driver-popover-arrow {
+        border-color: #ffffff;
+    }
+
+    .opencrh-user-guide-popover
+        .driver-popover-arrow-side-left {
+        border-right-color: transparent;
+        border-bottom-color: transparent;
+        border-top-color: transparent;
+    }
+
+    .opencrh-user-guide-popover
+        .driver-popover-arrow-side-right {
+        border-left-color: transparent;
+        border-bottom-color: transparent;
+        border-top-color: transparent;
+    }
+
+    .opencrh-user-guide-popover
+        .driver-popover-arrow-side-top {
+        border-right-color: transparent;
+        border-bottom-color: transparent;
+        border-left-color: transparent;
+    }
+
+    .opencrh-user-guide-popover
+        .driver-popover-arrow-side-bottom {
+        border-left-color: transparent;
+        border-top-color: transparent;
+        border-right-color: transparent;
+    }
+
     .ticket-card {
         position: relative;
         overflow: hidden;
