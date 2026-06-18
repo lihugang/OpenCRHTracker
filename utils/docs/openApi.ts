@@ -193,7 +193,7 @@ export const developerDocsOpenApi = {
             TrainCirculationImageFormatQuery: {
                 name: 'format',
                 in: 'query',
-                description: '运行图输出格式；留空时默认使用 png。',
+                description: '交路图输出格式；留空时默认使用 png。',
                 schema: {
                     type: 'string',
                     enum: ['png', 'pdf'],
@@ -2627,8 +2627,8 @@ export const developerDocsOpenApi = {
             get: {
                 operationId: 'trainCirculationImage',
                 tags: ['Timetable'],
-                summary: '获取交路运行图图片',
-                description: '根据交路表和首末站坐标生成交路运行图',
+                summary: '获取交路图图片',
+                description: '根据交路表和首末站坐标生成交路图',
                 parameters: [
                     {
                         $ref: '#/components/parameters/TrainCodeParam'
@@ -2643,7 +2643,7 @@ export const developerDocsOpenApi = {
                 security: [{}, { bearerAuth: [] }, { cookieAuth: [] }],
                 responses: {
                     '200': {
-                        description: '运行图生成成功。',
+                        description: '交路图生成成功。',
                         headers: {
                             'x-api-remain': {
                                 $ref: '#/components/headers/ApiRemain'
@@ -2732,7 +2732,7 @@ export const developerDocsOpenApi = {
                         }
                     },
                     '422': {
-                        description: '今日时刻表数据不完整，无法生成运行图。',
+                        description: '今日时刻表数据不完整，无法生成交路图。',
                         headers: {
                             'x-api-remain': {
                                 $ref: '#/components/headers/ApiRemain'
@@ -2771,7 +2771,7 @@ export const developerDocsOpenApi = {
                                 },
                                 example: {
                                     ok: false,
-                                    data: '运行图渲染服务暂时不可用',
+                                    data: '交路图渲染服务暂时不可用',
                                     error: 'upstream_unavailable'
                                 }
                             }
@@ -2789,7 +2789,7 @@ export const developerDocsOpenApi = {
                     {
                         id: 'circulation-image-json',
                         label: '图片地址',
-                        summary: '返回运行图图片直链，适合在页面中直接展示。',
+                        summary: '返回交路图图片直链，适合在页面中直接展示。',
                         authMode: 'anonymous',
                         pathParams: {
                             trainCode: 'G2492'
@@ -2802,7 +2802,7 @@ export const developerDocsOpenApi = {
                         id: 'circulation-image-pdf-json',
                         label: 'PDF 地址',
                         summary:
-                            '返回运行图 PDF 直链，适合交给下载器或文档预览组件。',
+                            '返回交路图 PDF 直链，适合交给下载器或文档预览组件。',
                         authMode: 'anonymous',
                         pathParams: {
                             trainCode: 'G2492'

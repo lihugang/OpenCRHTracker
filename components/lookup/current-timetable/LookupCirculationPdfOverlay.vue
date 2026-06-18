@@ -26,7 +26,7 @@
                 <button
                     type="button"
                     class="absolute right-4 top-4 z-[2] inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-2xl text-white backdrop-blur-sm transition hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/35 sm:right-6 sm:top-6"
-                    aria-label="关闭运行图预览"
+                    aria-label="关闭交路图预览"
                     @click="emit('close')">
                     ×
                 </button>

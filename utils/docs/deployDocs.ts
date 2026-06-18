@@ -855,7 +855,7 @@ export const deployDocsSections: DocsContentSection[] = [
                         notes: [
                             '这组配置直接决定公开可匿名调用的接口范围。',
                             '如果要公开车次详情页时刻表弹窗，需要包含 api.timetable.train.current.read。',
-                            '如果要公开列车交路运行图图片接口，需要包含 api.timetable.train.circulation.image.read。',
+                            '如果要公开列车交路图图片接口，需要包含 api.timetable.train.circulation.image.read。',
                             '如果要公开车站页时刻表接口，需要包含 api.timetable.station.read。'
                         ]
                     },
@@ -866,7 +866,7 @@ export const deployDocsSections: DocsContentSection[] = [
                         description: '新签发 API Key 的默认权限集合。',
                         notes: [
                             '如需默认允许当前车次时刻表接口，请包含 api.timetable.train.current.read；如需默认允许历史车次时刻表接口，请同时包含 api.timetable.train.history.read。',
-                            '如需默认允许列车交路运行图图片接口，请包含 api.timetable.train.circulation.image.read。',
+                            '如需默认允许列车交路图图片接口，请包含 api.timetable.train.circulation.image.read。',
                             '如需默认允许车站时刻表接口，请包含 api.timetable.station.read。',
                             '如需让 Web 端收藏功能开箱即用，请包含 api.auth.favorites.read 和 api.auth.favorites.write。',
                             '如需让 Web 端用户删除自己创建的 OAuth 客户端，请包含 api.auth.oauth-clients.delete；已有登录会话可能需要重新登录后才会拿到新增 scope。'
@@ -880,7 +880,7 @@ export const deployDocsSections: DocsContentSection[] = [
                             '前端可签发 API Key 时允许选择的最大权限范围。',
                         notes: [
                             '若希望外部调用方可勾选当前车次时刻表接口，这里也要包含 api.timetable.train.current.read；若希望可勾选历史车次时刻表接口，这里也要包含 api.timetable.train.history.read。',
-                            '若希望外部调用方可勾选列车交路运行图图片接口，这里也要包含 api.timetable.train.circulation.image.read。',
+                            '若希望外部调用方可勾选列车交路图图片接口，这里也要包含 api.timetable.train.circulation.image.read。',
                             '若希望外部调用方可勾选车站时刻表接口，这里也要包含 api.timetable.station.read。'
                         ]
                     }
@@ -896,7 +896,7 @@ export const deployDocsSections: DocsContentSection[] = [
                         valueType: 'string',
                         required: true,
                         description:
-                            'simple-latex-container 服务的基础地址，用于生成单组车底运行图。',
+                            'simple-latex-container 服务的基础地址，用于生成单组车底交路图。',
                         notes: [
                             '必须以 http:// 或 https:// 开头。',
                             '程序会自动去掉结尾多余的 /。'
@@ -1096,10 +1096,10 @@ export const deployDocsSections: DocsContentSection[] = [
                         valueType: 'integer',
                         required: true,
                         description:
-                            '搜索、当前时刻表、运行图图片与导出接口的固定成本。',
+                            '搜索、当前时刻表、交路图图片与导出接口的固定成本。',
                         notes: [
-                            'trainCirculationImageCacheHit 控制运行图图片缓存命中成本，默认 2。',
-                            'trainCirculationImageFailure 控制运行图图片失败成本，默认 2。'
+                            'trainCirculationImageCacheHit 控制交路图图片缓存命中成本，默认 2。',
+                            'trainCirculationImageFailure 控制交路图图片失败成本，默认 2。'
                         ]
                     },
                     {
@@ -1192,7 +1192,7 @@ export const deployDocsSections: DocsContentSection[] = [
             },
             {
                 type: 'paragraph',
-                text: '如果需要启用单组车底运行图图片接口，请在配置文件中为 LaTeX 渲染微服务设置 URL 地址（`services.simpleLatexContainer.baseUrl`），并在环境变量中设置 API Key。使用的 LaTeX 渲染微服务为 https://github.com/lihugang/simple-latex-container。'
+                text: '如果需要启用单组车底交路图图片接口，请在配置文件中为 LaTeX 渲染微服务设置 URL 地址（`services.simpleLatexContainer.baseUrl`），并在环境变量中设置 API Key。使用的 LaTeX 渲染微服务为 https://github.com/lihugang/simple-latex-container。'
             },
             {
                 type: 'code',

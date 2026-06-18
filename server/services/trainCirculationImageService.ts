@@ -1471,7 +1471,7 @@ async function fetchWithTimeout(
         throw new ApiRequestError(
             502,
             'upstream_unavailable',
-            '运行图渲染服务暂时不可用'
+            '交路图渲染服务暂时不可用'
         );
     } finally {
         clearTimeout(timeoutHandle);
@@ -1484,7 +1484,7 @@ function parseLatexCompileEnvelope(payload: unknown): LatexCompileResult {
         throw new ApiRequestError(
             502,
             'upstream_unavailable',
-            '运行图渲染服务返回了无效响应'
+            '交路图渲染服务返回了无效响应'
         );
     }
 
@@ -1494,8 +1494,8 @@ function parseLatexCompileEnvelope(payload: unknown): LatexCompileResult {
             502,
             'upstream_compile_failed',
             errorMessage.length > 0
-                ? `运行图编译失败：${errorMessage}`
-                : '运行图编译失败，请稍后再试'
+                ? `交路图编译失败：${errorMessage}`
+                : '交路图编译失败，请稍后再试'
         );
     }
 
@@ -1514,7 +1514,7 @@ function parseLatexCompileEnvelope(payload: unknown): LatexCompileResult {
         throw new ApiRequestError(
             502,
             'upstream_unavailable',
-            '运行图渲染服务返回了无效响应'
+            '交路图渲染服务返回了无效响应'
         );
     }
 
@@ -1522,7 +1522,7 @@ function parseLatexCompileEnvelope(payload: unknown): LatexCompileResult {
         throw new ApiRequestError(
             502,
             'upstream_unavailable',
-            '运行图渲染服务返回了无效响应'
+            '交路图渲染服务返回了无效响应'
         );
     }
 
@@ -1555,7 +1555,7 @@ async function compileLatexDocument(latexSource: string) {
         throw new ApiRequestError(
             502,
             'upstream_unavailable',
-            '运行图渲染服务暂时不可用'
+            '交路图渲染服务暂时不可用'
         );
     }
 
@@ -1578,7 +1578,7 @@ async function fetchBinaryContent(
         throw new ApiRequestError(
             502,
             'upstream_unavailable',
-            format === 'pdf' ? '运行图 PDF 暂时不可用' : '运行图图片暂时不可用'
+            format === 'pdf' ? '交路图 PDF 暂时不可用' : '交路图图片暂时不可用'
         );
     }
 

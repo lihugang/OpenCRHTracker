@@ -192,7 +192,7 @@
             v-if="showPdfPreview"
             class="space-y-3 border-t border-slate-100 pt-4">
             <p class="text-xs uppercase tracking-[0.16em] text-slate-400">
-                列车运行图
+                列车交路图
             </p>
 
             <div
@@ -220,7 +220,7 @@
                     class="text-xs font-medium uppercase tracking-[0.16em] text-rose-500">
                     预览失败
                 </p>
-                <p class="mt-2 text-sm font-semibold">运行图预览加载失败</p>
+                <p class="mt-2 text-sm font-semibold">交路图预览加载失败</p>
                 <p
                     class="mt-2 whitespace-pre-wrap break-all font-mono text-xs leading-5 text-rose-700">
                     {{ previewErrorMessage }}

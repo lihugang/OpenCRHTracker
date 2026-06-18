@@ -705,7 +705,7 @@ export default function useLookupCirculationPdf(options: {
             if (mode === 'preview') {
                 circulationPreviewErrorMessage.value = getApiErrorMessage(
                     error,
-                    '运行图预览渲染失败'
+                    '交路图预览渲染失败'
                 );
                 circulationPdfState.value = 'error';
                 await cleanupPreview({
@@ -855,7 +855,7 @@ export default function useLookupCirculationPdf(options: {
 
             circulationPreviewErrorMessage.value = getApiErrorMessage(
                 error,
-                '运行图预览加载失败，请稍后重试。'
+                '交路图预览加载失败，请稍后重试。'
             );
             circulationPdfState.value = 'error';
             circulationPdfFullscreenState.value = 'error';

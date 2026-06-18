@@ -185,7 +185,7 @@ export default function useLookupCirculationAssetExport(options: {
         } catch (error) {
             circulationExportErrorMessage.value = getApiErrorMessage(
                 error,
-                '运行图导出失败，请稍后重试。'
+                '交路图导出失败，请稍后重试。'
             );
         } finally {
             circulationExportState.value = null;
