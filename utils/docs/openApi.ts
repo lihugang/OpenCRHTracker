@@ -29,6 +29,10 @@ export const developerDocsOpenApi = {
             description: '查询车次和车组的担当历史。'
         },
         {
+            name: 'Allocation',
+            description: '查询动车组配属基础信息。'
+        },
+        {
             name: 'Timetable',
             description: '读取当前日期下的完整车次时刻表。'
         },
@@ -816,6 +820,196 @@ export const developerDocsOpenApi = {
                                 type: 'array',
                                 items: {
                                     $ref: '#/components/schemas/EmuHistoryItem'
+                                }
+                            }
+                        }
+                    },
+                    error: {
+                        type: 'string',
+                        example: ''
+                    }
+                }
+            },
+            EmuAllocationProfileResponse: {
+                type: 'object',
+                required: ['ok', 'data', 'error'],
+                properties: {
+                    ok: {
+                        type: 'boolean',
+                        example: true
+                    },
+                    data: {
+                        type: 'object',
+                        required: [
+                            'requestEmuCode',
+                            'emuCode',
+                            'model',
+                            'trainSetNo',
+                            'bureau',
+                            'trainDepot',
+                            'depot',
+                            'subModel',
+                            'customType',
+                            'trainsetManufacturer',
+                            'trailerManufacturer',
+                            'manufactureMonth',
+                            'isPublic',
+                            'railwayTravelCodeEnabled',
+                            'firstClassPowerLegrest',
+                            'toiletStatus',
+                            'socketLocation',
+                            'businessSeatType',
+                            'modelRemark',
+                            'note',
+                            'tags',
+                            'alias',
+                            'coachLayouts'
+                        ],
+                        properties: {
+                            requestEmuCode: {
+                                type: 'string',
+                                example: 'CR400AF-C-2214'
+                            },
+                            emuCode: {
+                                type: 'string',
+                                example: 'CR400AF-C-2214'
+                            },
+                            model: {
+                                type: 'string',
+                                example: 'CR400AF-C'
+                            },
+                            trainSetNo: {
+                                type: 'string',
+                                example: '2214'
+                            },
+                            bureau: {
+                                type: 'string',
+                                example: '北京局集团'
+                            },
+                            trainDepot: {
+                                type: 'string',
+                                example: '北京动车段'
+                            },
+                            depot: {
+                                type: 'string',
+                                example: '雄安动车所'
+                            },
+                            subModel: {
+                                type: 'string',
+                                example: ''
+                            },
+                            customType: {
+                                type: 'string',
+                                example: ''
+                            },
+                            trainsetManufacturer: {
+                                type: 'string',
+                                example: '中车青岛四方'
+                            },
+                            trailerManufacturer: {
+                                type: 'string',
+                                example: '中车青岛四方'
+                            },
+                            manufactureMonth: {
+                                type: 'string',
+                                example: '2020-09'
+                            },
+                            isPublic: {
+                                type: 'boolean',
+                                example: true
+                            },
+                            railwayTravelCodeEnabled: {
+                                type: 'boolean',
+                                example: true
+                            },
+                            firstClassPowerLegrest: {
+                                type: 'boolean',
+                                example: true
+                            },
+                            toiletStatus: {
+                                type: 'string',
+                                example: '蹲厕、马桶均有'
+                            },
+                            socketLocation: {
+                                type: 'string',
+                                example:
+                                    '洗手台，首末排侧面；一二等座：坐垫接缝处，前排座椅后背(USB Type A)'
+                            },
+                            businessSeatType: {
+                                type: 'string',
+                                example: '鱼骨式'
+                            },
+                            modelRemark: {
+                                type: 'string',
+                                example:
+                                    '本车座椅靠背硬度较大，可能导致一定程度不适。'
+                            },
+                            note: {
+                                type: 'string',
+                                example: ''
+                            },
+                            tags: {
+                                type: 'array',
+                                items: {
+                                    type: 'string'
+                                },
+                                example: ['京雄城际定制', 'ATO']
+                            },
+                            alias: {
+                                type: 'array',
+                                items: {
+                                    type: 'string'
+                                },
+                                example: []
+                            },
+                            coachLayouts: {
+                                type: 'array',
+                                items: {
+                                    type: 'object',
+                                    required: [
+                                        'coachNo',
+                                        'coachTypeCode',
+                                        'coachTypeName',
+                                        'capacity',
+                                        'hasPower',
+                                        'hasPantograph',
+                                        'hasLargeLuggageArea',
+                                        'hasAccessibleFacility'
+                                    ],
+                                    properties: {
+                                        coachNo: {
+                                            type: 'integer',
+                                            example: 1
+                                        },
+                                        coachTypeCode: {
+                                            type: 'string',
+                                            example: 'ZYS'
+                                        },
+                                        coachTypeName: {
+                                            type: 'string',
+                                            example: '一等/商务座车'
+                                        },
+                                        capacity: {
+                                            type: 'integer',
+                                            example: 34
+                                        },
+                                        hasPower: {
+                                            type: 'boolean',
+                                            example: false
+                                        },
+                                        hasPantograph: {
+                                            type: 'boolean',
+                                            example: false
+                                        },
+                                        hasLargeLuggageArea: {
+                                            type: 'boolean',
+                                            example: false
+                                        },
+                                        hasAccessibleFacility: {
+                                            type: 'boolean',
+                                            example: false
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -3410,8 +3604,8 @@ export const developerDocsOpenApi = {
             get: {
                 operationId: 'historyEmu',
                 tags: ['History'],
-                summary: '返回单个车组的历史担当记录',
-                description: '返回单个车组的历史担当记录。',
+                summary: '返回单一车组的历史担当记录',
+                description: '返回单一车组的历史担当记录。',
                 parameters: [
                     {
                         $ref: '#/components/parameters/EmuCodeParam'
@@ -3510,7 +3704,7 @@ export const developerDocsOpenApi = {
                     {
                         id: 'emu-first-page',
                         label: '第一页',
-                        summary: '读取单个车组最新的历史担当记录。',
+                        summary: '读取单一车组最新的历史担当记录。',
                         authMode: 'anonymous',
                         pathParams: {
                             emuCode: 'CR400BF-A-5156'
@@ -3531,6 +3725,214 @@ export const developerDocsOpenApi = {
                         query: {
                             limit: '2',
                             cursor: '20260425:528424'
+                        }
+                    }
+                ]
+            }
+        },
+        '/allocation/emu/{emuCode}': {
+            get: {
+                operationId: 'allocationEmu',
+                tags: ['Allocation'],
+                summary: '返回单一车组的配属信息',
+                description: '返回单一车组的配属信息。',
+                parameters: [
+                    {
+                        $ref: '#/components/parameters/EmuCodeParam'
+                    }
+                ],
+                security: [{}, { bearerAuth: [] }, { cookieAuth: [] }],
+                responses: {
+                    '200': {
+                        description: '动车组配属基础信息。',
+                        headers: {
+                            'x-api-remain': {
+                                $ref: '#/components/headers/ApiRemain'
+                            },
+                            'x-api-cost': {
+                                $ref: '#/components/headers/ApiCost'
+                            }
+                        },
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    $ref: '#/components/schemas/EmuAllocationProfileResponse'
+                                },
+                                example: {
+                                    ok: true,
+                                    data: {
+                                        requestEmuCode: 'CR400AF-C-2214',
+                                        emuCode: 'CR400AF-C-2214',
+                                        model: 'CR400AF-C',
+                                        trainSetNo: '2214',
+                                        bureau: '北京局集团',
+                                        trainDepot: '北京动车段',
+                                        depot: '雄安动车所',
+                                        subModel: '',
+                                        customType: '',
+                                        trainsetManufacturer: '中车青岛四方',
+                                        trailerManufacturer: '中车青岛四方',
+                                        manufactureMonth: '2020-09',
+                                        isPublic: true,
+                                        railwayTravelCodeEnabled: true,
+                                        firstClassPowerLegrest: true,
+                                        toiletStatus: '蹲厕、马桶均有',
+                                        socketLocation:
+                                            '洗手台，首末排侧面；一二等座：坐垫接缝处，前排座椅后背(USB Type A)',
+                                        businessSeatType: '鱼骨式',
+                                        modelRemark:
+                                            '本车座椅靠背硬度较大，可能导致一定程度不适。',
+                                        note: '',
+                                        tags: ['京雄城际定制', 'ATO'],
+                                        alias: [],
+                                        coachLayouts: [
+                                            {
+                                                coachNo: 1,
+                                                coachTypeCode: 'ZYS',
+                                                coachTypeName: '一等/商务座车',
+                                                capacity: 34,
+                                                hasPower: false,
+                                                hasPantograph: false,
+                                                hasLargeLuggageArea: false,
+                                                hasAccessibleFacility: false
+                                            },
+                                            {
+                                                coachNo: 2,
+                                                coachTypeCode: 'ZE',
+                                                coachTypeName: '二等座车',
+                                                capacity: 90,
+                                                hasPower: true,
+                                                hasPantograph: false,
+                                                hasLargeLuggageArea: false,
+                                                hasAccessibleFacility: false
+                                            },
+                                            {
+                                                coachNo: 3,
+                                                coachTypeCode: 'ZE',
+                                                coachTypeName: '二等座车',
+                                                capacity: 90,
+                                                hasPower: false,
+                                                hasPantograph: true,
+                                                hasLargeLuggageArea: false,
+                                                hasAccessibleFacility: false
+                                            },
+                                            {
+                                                coachNo: 4,
+                                                coachTypeCode: 'ZE',
+                                                coachTypeName: '二等座车',
+                                                capacity: 75,
+                                                hasPower: true,
+                                                hasPantograph: false,
+                                                hasLargeLuggageArea: true,
+                                                hasAccessibleFacility: true
+                                            },
+                                            {
+                                                coachNo: 5,
+                                                coachTypeCode: 'ZEC',
+                                                coachTypeName: '二等座车/餐车',
+                                                capacity: 63,
+                                                hasPower: true,
+                                                hasPantograph: false,
+                                                hasLargeLuggageArea: false,
+                                                hasAccessibleFacility: false
+                                            },
+                                            {
+                                                coachNo: 6,
+                                                coachTypeCode: 'ZE',
+                                                coachTypeName: '二等座车',
+                                                capacity: 90,
+                                                hasPower: false,
+                                                hasPantograph: true,
+                                                hasLargeLuggageArea: false,
+                                                hasAccessibleFacility: false
+                                            },
+                                            {
+                                                coachNo: 7,
+                                                coachTypeCode: 'ZE',
+                                                coachTypeName: '二等座车',
+                                                capacity: 90,
+                                                hasPower: true,
+                                                hasPantograph: false,
+                                                hasLargeLuggageArea: false,
+                                                hasAccessibleFacility: false
+                                            },
+                                            {
+                                                coachNo: 8,
+                                                coachTypeCode: 'ZES',
+                                                coachTypeName: '二等/商务座车',
+                                                capacity: 46,
+                                                hasPower: false,
+                                                hasPantograph: false,
+                                                hasLargeLuggageArea: false,
+                                                hasAccessibleFacility: false
+                                            }
+                                        ]
+                                    },
+                                    error: ''
+                                }
+                            }
+                        }
+                    },
+                    '400': {
+                        description: 'Invalid path parameter.',
+                        headers: {
+                            'x-api-remain': {
+                                $ref: '#/components/headers/ApiRemain'
+                            },
+                            'x-api-cost': {
+                                $ref: '#/components/headers/ApiCost'
+                            }
+                        },
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    $ref: '#/components/schemas/ApiFailureResponse'
+                                },
+                                example: {
+                                    ok: false,
+                                    data: 'emuCode 不能为空。',
+                                    error: 'invalid_param'
+                                }
+                            }
+                        }
+                    },
+                    '404': {
+                        description: 'Allocation profile not found.',
+                        headers: {
+                            'x-api-remain': {
+                                $ref: '#/components/headers/ApiRemain'
+                            },
+                            'x-api-cost': {
+                                $ref: '#/components/headers/ApiCost'
+                            }
+                        },
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    $ref: '#/components/schemas/ApiFailureResponse'
+                                },
+                                example: {
+                                    ok: false,
+                                    data: '未找到该动车组配属信息',
+                                    error: 'allocation_not_found'
+                                }
+                            }
+                        }
+                    }
+                },
+                'x-slug': 'allocation-emu',
+                'x-group': '配属',
+                'x-sort-order': 35,
+                'x-auth-modes': ['anonymous', 'cookie', 'apiKey'],
+                'x-required-scopes': ['api.allocation.emu.read'],
+                'x-examples': [
+                    {
+                        id: 'emu-allocation-profile',
+                        label: '配属信息',
+                        summary: '读取单一车组的配属基础信息。',
+                        authMode: 'anonymous',
+                        pathParams: {
+                            emuCode: 'CR400AF-C-2214'
                         }
                     }
                 ]

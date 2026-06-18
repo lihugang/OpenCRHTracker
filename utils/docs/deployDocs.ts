@@ -281,7 +281,7 @@ export const deployDocsSections: DocsContentSection[] = [
                             '默认文件建议为 data/emu_list.json。',
                             'refresh.enabled=true 时 provider 必填。',
                             'refresh.refreshAt 必须是 HHmm 字符串。',
-                            '管理员页面支持本地重载和远程刷新，刷新后会立即影响畅行码探测和车组别名解析。'
+                            '管理员页面支持本地重载和远程刷新，刷新后会立即影响配属信息查询、畅行码探测和车组别名解析。'
                         ]
                     },
                     {
@@ -854,6 +854,7 @@ export const deployDocsSections: DocsContentSection[] = [
                         description: '匿名访问允许拥有的 scopes。',
                         notes: [
                             '这组配置直接决定公开可匿名调用的接口范围。',
+                            '如果要公开动车组配属信息接口，需要包含 api.allocation.emu.read。',
                             '如果要公开车次详情页时刻表弹窗，需要包含 api.timetable.train.current.read。',
                             '如果要公开列车交路图图片接口，需要包含 api.timetable.train.circulation.image.read。',
                             '如果要公开车站页时刻表接口，需要包含 api.timetable.station.read。'
@@ -865,6 +866,7 @@ export const deployDocsSections: DocsContentSection[] = [
                         required: true,
                         description: '新签发 API Key 的默认权限集合。',
                         notes: [
+                            '如需默认允许动车组配属信息接口，请包含 api.allocation.emu.read。',
                             '如需默认允许当前车次时刻表接口，请包含 api.timetable.train.current.read；如需默认允许历史车次时刻表接口，请同时包含 api.timetable.train.history.read。',
                             '如需默认允许列车交路图图片接口，请包含 api.timetable.train.circulation.image.read。',
                             '如需默认允许车站时刻表接口，请包含 api.timetable.station.read。',
@@ -879,6 +881,7 @@ export const deployDocsSections: DocsContentSection[] = [
                         description:
                             '前端可签发 API Key 时允许选择的最大权限范围。',
                         notes: [
+                            '若希望外部调用方可勾选动车组配属信息接口，这里也要包含 api.allocation.emu.read。',
                             '若希望外部调用方可勾选当前车次时刻表接口，这里也要包含 api.timetable.train.current.read；若希望可勾选历史车次时刻表接口，这里也要包含 api.timetable.train.history.read。',
                             '若希望外部调用方可勾选列车交路图图片接口，这里也要包含 api.timetable.train.circulation.image.read。',
                             '若希望外部调用方可勾选车站时刻表接口，这里也要包含 api.timetable.station.read。'
@@ -1092,12 +1095,13 @@ export const deployDocsSections: DocsContentSection[] = [
                             'API Key 管理接口与 OAuth 客户端创建、删除接口的固定成本。'
                     },
                     {
-                        path: 'cost.fixed.searchIndex / timetableTrainCurrent / trainCirculationImage / trainCirculationImageCacheHit / trainCirculationImageFailure / timetableTrainHistory / exportDailyIndex / exportDaily',
+                        path: 'cost.fixed.searchIndex / allocationEmu / timetableTrainCurrent / trainCirculationImage / trainCirculationImageCacheHit / trainCirculationImageFailure / timetableTrainHistory / exportDailyIndex / exportDaily',
                         valueType: 'integer',
                         required: true,
                         description:
-                            '搜索、当前时刻表、交路图图片与导出接口的固定成本。',
+                            '搜索、动车组配属信息、当前时刻表、交路图图片与导出接口的固定成本。',
                         notes: [
+                            'allocationEmu 控制单一车组配属信息查询接口的固定成本，默认 1。',
                             'trainCirculationImageCacheHit 控制交路图图片缓存命中成本，默认 2。',
                             'trainCirculationImageFailure 控制交路图图片失败成本，默认 2。'
                         ]
@@ -1231,11 +1235,11 @@ export const deployDocsSections: DocsContentSection[] = [
         id: 'emu-list',
         title: 'emu_list.json',
         summary:
-            '为畅行码探测、车组别名解析和重联判断提供动车组基础清单。',
+            '为配属信息查询、畅行码探测、车组别名解析和重联判断提供动车组基础清单。',
         blocks: [
             {
                 type: 'paragraph',
-                text: '动车组清单文件默认建议放在 data/emu_list.json，实际路径由 data/config.json 中的 data.assets.EMUList.file 决定。默认远程来源为 https://allocation.crhdata.top/api/v1/allocation/export.json，文件内容使用 allocation export JSON 范式。'
+                text: '动车组清单文件默认建议放在 data/emu_list.json，实际路径由 data/config.json 中的 data.assets.EMUList.file 决定。默认远程来源为 https://allocation.crhdata.top/api/v1/allocation/export.json，文件内容使用 allocation export JSON 范式。GET /api/v1/allocation/emu/{emuCode} 会读取这个资产返回单一车组的配属信息。'
             },
             {
                 type: 'code',
@@ -1245,7 +1249,9 @@ export const deployDocsSections: DocsContentSection[] = [
             {
                 type: 'list',
                 items: [
-                    '管理员页面“配置文件”支持对该文件执行本地重载和远程刷新，刷新后会同步固定车组畅行码检测依赖。'
+                    '配属信息接口需要请求方具备 api.allocation.emu.read scope；如果需要匿名访问，应在 api.permissions.anonymousScopes 中开放该 scope。',
+                    '该接口成本由 cost.fixed.allocationEmu 控制，默认成本为 1。',
+                    '管理员页面“配置文件”支持对该文件执行本地重载和远程刷新，刷新后会立即影响配属信息查询，并同步固定车组畅行码检测依赖。'
                 ]
             }
         ]

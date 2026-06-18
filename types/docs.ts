@@ -190,6 +190,7 @@ export interface DocsApiCostRuntimeConfig {
     fixed: {
         authMe: number;
         authCreateOauthClient: number;
+        allocationEmu: number;
         timetableTrainCurrent: number;
         trainCirculationImageCacheHit: number;
         trainCirculationImage: number;

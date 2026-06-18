@@ -21,6 +21,7 @@ export const adminServerMetricsRouteTemplates = {
         { template: '/api/v1/timetable/train/:trainCode/current', segments: ['api', 'v1', 'timetable', 'train', ':trainCode', 'current'] },
         { template: '/api/v1/timetable/train/:trainCode/history', segments: ['api', 'v1', 'timetable', 'train', ':trainCode', 'history'] },
         { template: '/api/v1/admin/official-circulations/:entryKey', segments: ['api', 'v1', 'admin', 'official-circulations', ':entryKey'] },
+        { template: '/api/v1/allocation/emu/:emuCode', segments: ['api', 'v1', 'allocation', 'emu', ':emuCode'] },
         { template: '/api/v1/auth/api-keys/:revokeId', segments: ['api', 'v1', 'auth', 'api-keys', ':revokeId'] },
         { template: '/api/v1/auth/authorizations/:clientId', segments: ['api', 'v1', 'auth', 'authorizations', ':clientId'] },
         { template: '/api/v1/auth/subscriptions/:id', segments: ['api', 'v1', 'auth', 'subscriptions', ':id'] },

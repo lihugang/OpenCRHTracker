@@ -57,6 +57,7 @@ export default defineEventHandler(async (event) => {
                             authMe: config.cost.fixed.authMe,
                             authCreateOauthClient:
                                 config.cost.fixed.authCreateOauthClient,
+                            allocationEmu: config.cost.fixed.allocationEmu,
                             timetableTrainCurrent:
                                 config.cost.fixed.timetableTrainCurrent,
                             trainCirculationImageCacheHit:

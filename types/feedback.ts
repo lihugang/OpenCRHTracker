@@ -13,8 +13,9 @@ export const FEEDBACK_SECONDARY_TYPES_BY_PRIMARY = {
     data: [
         'train_missing',
         'train_wrong',
-        'route_wrong',
         'coupling_missing',
+        'route_wrong',
+        'allocation_wrong',
         'other'
     ],
     api: ['bug', 'feature', 'more_quota'],
@@ -88,15 +89,22 @@ export const FEEDBACK_CATEGORY_OPTIONS = [
         key: 'data.train_missing',
         primaryType: 'data',
         secondaryType: 'train_missing',
-        label: '数据 / 车次数据缺失',
-        shortLabel: '车次数据缺失'
+        label: '数据 / 担当数据缺失',
+        shortLabel: '担当数据缺失'
     },
     {
         key: 'data.train_wrong',
         primaryType: 'data',
         secondaryType: 'train_wrong',
-        label: '数据 / 车次数据错误',
-        shortLabel: '车次数据错误'
+        label: '数据 / 担当数据错误',
+        shortLabel: '担当数据错误'
+    },
+    {
+        key: 'data.coupling_missing',
+        primaryType: 'data',
+        secondaryType: 'coupling_missing',
+        label: '数据 / 未检出重联车',
+        shortLabel: '未检出重联车'
     },
     {
         key: 'data.route_wrong',
@@ -106,11 +114,11 @@ export const FEEDBACK_CATEGORY_OPTIONS = [
         shortLabel: '交路数据错误'
     },
     {
-        key: 'data.coupling_missing',
+        key: 'data.allocation_wrong',
         primaryType: 'data',
-        secondaryType: 'coupling_missing',
-        label: '数据 / 未检出重联车',
-        shortLabel: '未检出重联车'
+        secondaryType: 'allocation_wrong',
+        label: '数据 / 配属数据错误',
+        shortLabel: '配属数据错误'
     },
     {
         key: 'data.other',

@@ -57,6 +57,15 @@
                         </div>
 
                         <UiButton
+                            v-if="isEmuTarget"
+                            variant="secondary"
+                            size="sm"
+                            block
+                            @click="openAllocationModal">
+                            配属信息
+                        </UiButton>
+
+                        <UiButton
                             variant="secondary"
                             size="sm"
                             block
@@ -111,14 +120,25 @@
                             :loading="isSubscriptionActionPending"
                             @click="toggleEventSubscriptionItem" />
                     </div>
-                    <UiButton
-                        variant="secondary"
-                        size="sm"
-                        class="shrink-0"
-                        :disabled="!canOpenFuturePrediction"
-                        @click="openFuturePredictionModal">
-                        未来担当预测
-                    </UiButton>
+
+                    <div class="flex flex-wrap justify-end gap-2">
+                        <UiButton
+                            v-if="isEmuTarget"
+                            variant="secondary"
+                            size="sm"
+                            class="shrink-0"
+                            @click="openAllocationModal">
+                            配属信息
+                        </UiButton>
+                        <UiButton
+                            variant="secondary"
+                            size="sm"
+                            class="shrink-0"
+                            :disabled="!canOpenFuturePrediction"
+                            @click="openFuturePredictionModal">
+                            未来担当预测
+                        </UiButton>
+                    </div>
                 </div>
                 <p
                     v-if="futurePredictionActionHint"
@@ -166,6 +186,12 @@
             :anchor-train-code="futurePredictionAnchorTrainCode"
             :display-codes="futurePredictionDisplayCodes"
             @update:model-value="isFuturePredictionModalOpen = $event" />
+
+        <LookupEmuAllocationModal
+            v-if="isEmuTarget"
+            :model-value="isAllocationModalOpen"
+            :emu-code="normalizedCode"
+            @update:model-value="isAllocationModalOpen = $event" />
     </LookupDetailShell>
 </template>
 
@@ -203,6 +229,7 @@ const isMobileViewport = ref(false);
 const isMobileHeaderCollapsed = ref(false);
 const shouldUseMobileStickyHeader = ref(false);
 const isFuturePredictionModalOpen = ref(false);
+const isAllocationModalOpen = ref(false);
 
 let mobileQueryList: MediaQueryList | null = null;
 let mobileQueryHandler: ((event: MediaQueryListEvent) => void) | null = null;
@@ -287,6 +314,7 @@ const latestHistoryItem = computed<LookupHistoryListItem | null>(() => {
 });
 
 const futurePredictionSourceType = computed(() => props.targetType);
+const isEmuTarget = computed(() => props.targetType === 'emu');
 
 const futurePredictionSourceCode = computed(() => normalizedCode.value);
 
@@ -363,6 +391,7 @@ watch(
         draftCode.value = value;
         inputError.value = '';
         isFuturePredictionModalOpen.value = false;
+        isAllocationModalOpen.value = false;
     },
     {
         immediate: true
@@ -425,6 +454,14 @@ function openFuturePredictionModal() {
     }
 
     isFuturePredictionModalOpen.value = true;
+}
+
+function openAllocationModal() {
+    if (!isEmuTarget.value || normalizedCode.value.length === 0) {
+        return;
+    }
+
+    isAllocationModalOpen.value = true;
 }
 
 async function toggleFavoriteItem() {

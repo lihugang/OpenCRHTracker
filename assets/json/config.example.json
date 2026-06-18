@@ -254,6 +254,7 @@
             "anonymousScopes": [
                 "api.config.read",
                 "api.search.read",
+                "api.allocation.emu.read",
                 "api.records.daily.read",
                 "api.history.train.read",
                 "api.history.emu.read",
@@ -268,6 +269,7 @@
             "issuedKeyDefaultScopes": [
                 "api.config.read",
                 "api.search.read",
+                "api.allocation.emu.read",
                 "api.records.daily.read",
                 "api.history.train.read",
                 "api.history.emu.read",
@@ -298,6 +300,7 @@
             ],
             "creatableKeyMaxScopes": [
                 "api.auth.me.read",
+                "api.allocation.emu.read",
                 "api.records.daily.read",
                 "api.history.train.read",
                 "api.history.emu.read",
@@ -409,6 +412,7 @@
             "authUpdateSubscription": 1,
             "authDeleteSubscription": 1,
             "searchIndex": 1,
+            "allocationEmu": 1,
             "timetableTrainCurrent": 1,
             "trainCirculationImageCacheHit": 2,
             "trainCirculationImage": 20,

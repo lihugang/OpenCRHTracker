@@ -1483,6 +1483,10 @@
                             "type": "integer",
                             "minimum": 0
                         },
+                        "allocationEmu": {
+                            "type": "integer",
+                            "minimum": 0
+                        },
                         "timetableTrainCurrent": {
                             "type": "integer",
                             "minimum": 0
@@ -1534,6 +1538,7 @@
                         "authUpdateSubscription",
                         "authDeleteSubscription",
                         "searchIndex",
+                        "allocationEmu",
                         "timetableTrainCurrent",
                         "trainCirculationImageCacheHit",
                         "trainCirculationImage",

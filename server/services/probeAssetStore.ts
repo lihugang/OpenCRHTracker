@@ -9,6 +9,11 @@ interface RawAllocationExport extends Record<string, unknown> {
     railway_bureaus?: unknown;
     train_depots?: unknown;
     emu_depots?: unknown;
+    manufacturers?: unknown;
+    socket_locations?: unknown;
+    toilet_statuses?: unknown;
+    business_seat_types?: unknown;
+    coach_types?: unknown;
     trainset_models?: unknown;
     coach_layouts?: unknown;
     emu_trainsets?: unknown;
@@ -35,22 +40,61 @@ interface RawEmuDepotRecord extends RawAllocationIdRecord {
 
 interface RawTrainsetModelRecord extends RawAllocationIdRecord {
     model?: unknown;
+    sub_model?: unknown;
+    custom_type?: unknown;
+    remark?: unknown;
+    first_class_power_legrest?: unknown;
+    socket_location_id?: unknown;
+    toilet_status_id?: unknown;
+    business_seat_type_id?: unknown;
 }
 
 interface RawCoachLayoutRecord extends RawAllocationIdRecord {
     model_id?: unknown;
     coach_no?: unknown;
+    coach_type_id?: unknown;
+    capacity?: unknown;
+    has_power?: unknown;
+    has_pantograph?: unknown;
+    has_large_luggage_area?: unknown;
+    has_accessible_facility?: unknown;
+}
+
+interface RawManufacturerRecord extends RawAllocationIdRecord {
+    name?: unknown;
+}
+
+interface RawSocketLocationRecord extends RawAllocationIdRecord {
+    text?: unknown;
+}
+
+interface RawToiletStatusRecord extends RawAllocationIdRecord {
+    text?: unknown;
+}
+
+interface RawBusinessSeatTypeRecord extends RawAllocationIdRecord {
+    text?: unknown;
+}
+
+interface RawCoachTypeRecord extends RawAllocationIdRecord {
+    type_code?: unknown;
+    type_name?: unknown;
 }
 
 interface RawEmuTrainsetRemark extends Record<string, unknown> {
     tags?: unknown;
     alias?: unknown;
+    note?: unknown;
 }
 
 interface RawEmuTrainsetRecord extends Record<string, unknown> {
     model_id?: unknown;
     car_no?: unknown;
     emu_depot_id?: unknown;
+    trainset_manufacturer_id?: unknown;
+    trailer_manufacturer_id?: unknown;
+    manufacture_month?: unknown;
+    is_public?: unknown;
     railway_travel_code_enabled?: unknown;
     remark?: unknown;
 }
@@ -65,10 +109,36 @@ export interface EmuListRecord {
     model: string;
     trainSetNo: string;
     bureau: string;
+    trainDepot: string;
     depot: string;
     multiple: boolean;
+    subModel: string;
+    customType: string;
+    trainsetManufacturer: string;
+    trailerManufacturer: string;
+    manufactureMonth: string;
+    isPublic: boolean;
+    railwayTravelCodeEnabled: boolean;
+    firstClassPowerLegrest: boolean;
+    toiletStatus: string;
+    socketLocation: string;
+    businessSeatType: string;
+    modelRemark: string;
+    note: string;
     tags: string[];
     alias: string[];
+    coachLayouts: EmuCoachLayoutRecord[];
+}
+
+export interface EmuCoachLayoutRecord {
+    coachNo: number;
+    coachTypeCode: string;
+    coachTypeName: string;
+    capacity: number;
+    hasPower: boolean;
+    hasPantograph: boolean;
+    hasLargeLuggageArea: boolean;
+    hasAccessibleFacility: boolean;
 }
 
 export type ProbeEmuMultipleState = 'multiple' | 'non_multiple' | 'unknown';
@@ -106,6 +176,27 @@ function normalizeRequiredString(value: unknown, fieldName: string): string {
     }
 
     return normalizedValue;
+}
+
+function normalizeOptionalString(value: unknown): string {
+    if (typeof value !== 'string') {
+        return '';
+    }
+
+    return value.trim();
+}
+
+function normalizeOptionalDisplayString(value: unknown): string {
+    const normalizedValue = normalizeOptionalString(value);
+    return normalizedValue === '-' ? '' : normalizedValue;
+}
+
+function normalizeBoolean(value: unknown, defaultValue = false): boolean {
+    if (typeof value === 'boolean') {
+        return value;
+    }
+
+    return defaultValue;
 }
 
 function isSeatCodeEnabled(value: unknown): boolean {
@@ -225,6 +316,14 @@ function getRequiredArray<T>(
     return value as T[];
 }
 
+function getOptionalArray<T>(value: unknown): T[] {
+    if (!Array.isArray(value)) {
+        return [];
+    }
+
+    return value as T[];
+}
+
 function normalizeId(value: unknown, fieldName: string): number {
     if (typeof value !== 'number' || !Number.isInteger(value) || value <= 0) {
         throw new Error(`EMUList field ${fieldName} must be a positive integer`);
@@ -305,6 +404,73 @@ function getRemark(value: unknown): RawEmuTrainsetRemark {
     return value as RawEmuTrainsetRemark;
 }
 
+function getOptionalRecordName(
+    recordsById: Map<number, { name?: unknown }>,
+    id: unknown
+): string {
+    if (typeof id !== 'number' || !Number.isInteger(id) || id <= 0) {
+        return '';
+    }
+
+    return normalizeOptionalString(recordsById.get(id)?.name);
+}
+
+function getOptionalRecordText(
+    recordsById: Map<number, { text?: unknown }>,
+    id: unknown
+): string {
+    if (typeof id !== 'number' || !Number.isInteger(id) || id <= 0) {
+        return '';
+    }
+
+    return normalizeOptionalDisplayString(recordsById.get(id)?.text);
+}
+
+function buildCoachLayoutsByModelId(
+    coachLayouts: RawCoachLayoutRecord[],
+    coachTypesById: Map<number, RawCoachTypeRecord>
+): Map<number, EmuCoachLayoutRecord[]> {
+    const layoutsByModelId = new Map<number, EmuCoachLayoutRecord[]>();
+
+    for (const [index, row] of coachLayouts.entries()) {
+        const modelId = normalizeId(
+            row.model_id,
+            `coach_layouts[${index}].model_id`
+        );
+        const coachTypeId = normalizeId(
+            row.coach_type_id,
+            `coach_layouts[${index}].coach_type_id`
+        );
+        const coachType = coachTypesById.get(coachTypeId);
+        const layout: EmuCoachLayoutRecord = {
+            coachNo: normalizeId(row.coach_no, `coach_layouts[${index}].coach_no`),
+            coachTypeCode: normalizeOptionalString(coachType?.type_code),
+            coachTypeName: normalizeOptionalString(coachType?.type_name),
+            capacity:
+                typeof row.capacity === 'number' &&
+                Number.isInteger(row.capacity) &&
+                row.capacity >= 0
+                    ? row.capacity
+                    : 0,
+            hasPower: normalizeBoolean(row.has_power),
+            hasPantograph: normalizeBoolean(row.has_pantograph),
+            hasLargeLuggageArea: normalizeBoolean(row.has_large_luggage_area),
+            hasAccessibleFacility: normalizeBoolean(
+                row.has_accessible_facility
+            )
+        };
+        const layouts = layoutsByModelId.get(modelId) ?? [];
+        layouts.push(layout);
+        layoutsByModelId.set(modelId, layouts);
+    }
+
+    for (const layouts of layoutsByModelId.values()) {
+        layouts.sort((left, right) => left.coachNo - right.coachNo);
+    }
+
+    return layoutsByModelId;
+}
+
 export function parseEmuListAssetText(text: string): EmuListRecord[] {
     const exportObject = parseJsonObject(text);
     const railwayBureaus = getRequiredArray<RawRailwayBureauRecord>(
@@ -318,6 +484,21 @@ export function parseEmuListAssetText(text: string): EmuListRecord[] {
     const emuDepots = getRequiredArray<RawEmuDepotRecord>(
         exportObject.emu_depots,
         'emu_depots'
+    );
+    const manufacturers = getOptionalArray<RawManufacturerRecord>(
+        exportObject.manufacturers
+    );
+    const socketLocations = getOptionalArray<RawSocketLocationRecord>(
+        exportObject.socket_locations
+    );
+    const toiletStatuses = getOptionalArray<RawToiletStatusRecord>(
+        exportObject.toilet_statuses
+    );
+    const businessSeatTypes = getOptionalArray<RawBusinessSeatTypeRecord>(
+        exportObject.business_seat_types
+    );
+    const coachTypes = getOptionalArray<RawCoachTypeRecord>(
+        exportObject.coach_types
     );
     const trainsetModels = getRequiredArray<RawTrainsetModelRecord>(
         exportObject.trainset_models,
@@ -335,11 +516,29 @@ export function parseEmuListAssetText(text: string): EmuListRecord[] {
     );
     const trainDepotById = buildRecordById(trainDepots, 'train_depots');
     const emuDepotById = buildRecordById(emuDepots, 'emu_depots');
+    const manufacturerById = buildRecordById(manufacturers, 'manufacturers');
+    const socketLocationById = buildRecordById(
+        socketLocations,
+        'socket_locations'
+    );
+    const toiletStatusById = buildRecordById(
+        toiletStatuses,
+        'toilet_statuses'
+    );
+    const businessSeatTypeById = buildRecordById(
+        businessSeatTypes,
+        'business_seat_types'
+    );
+    const coachTypeById = buildRecordById(coachTypes, 'coach_types');
     const trainsetModelById = buildRecordById(
         trainsetModels,
         'trainset_models'
     );
     const coachCountByModelId = buildCoachCountByModelId(coachLayouts);
+    const coachLayoutsByModelId = buildCoachLayoutsByModelId(
+        coachLayouts,
+        coachTypeById
+    );
     const emuList: EmuListRecord[] = [];
 
     for (const [index, row] of trainsetTable.rows.entries()) {
@@ -410,15 +609,55 @@ export function parseEmuListAssetText(text: string): EmuListRecord[] {
             'railway_bureaus.name'
         );
         const depot = normalizeRequiredString(emuDepot.name, 'emu_depots.name');
+        const trainDepotName = normalizeRequiredString(
+            trainDepot.name,
+            'train_depots.name'
+        );
 
         emuList.push({
             model,
             trainSetNo,
             bureau: bureauName,
+            trainDepot: trainDepotName,
             depot,
             multiple,
+            subModel: normalizeOptionalDisplayString(trainsetModel.sub_model),
+            customType: normalizeOptionalDisplayString(
+                trainsetModel.custom_type
+            ),
+            trainsetManufacturer: getOptionalRecordName(
+                manufacturerById,
+                row.trainset_manufacturer_id
+            ),
+            trailerManufacturer: getOptionalRecordName(
+                manufacturerById,
+                row.trailer_manufacturer_id
+            ),
+            manufactureMonth: normalizeOptionalString(row.manufacture_month),
+            isPublic: normalizeBoolean(row.is_public),
+            railwayTravelCodeEnabled: isSeatCodeEnabled(
+                row.railway_travel_code_enabled
+            ),
+            firstClassPowerLegrest: normalizeBoolean(
+                trainsetModel.first_class_power_legrest
+            ),
+            toiletStatus: getOptionalRecordText(
+                toiletStatusById,
+                trainsetModel.toilet_status_id
+            ),
+            socketLocation: getOptionalRecordText(
+                socketLocationById,
+                trainsetModel.socket_location_id
+            ),
+            businessSeatType: getOptionalRecordText(
+                businessSeatTypeById,
+                trainsetModel.business_seat_type_id
+            ),
+            modelRemark: normalizeOptionalDisplayString(trainsetModel.remark),
+            note: normalizeOptionalDisplayString(remark.note),
             tags: normalizeTags(remark.tags),
-            alias: normalizeAliases(remark.alias)
+            alias: normalizeAliases(remark.alias),
+            coachLayouts: [...(coachLayoutsByModelId.get(modelId) ?? [])]
         });
     }
 

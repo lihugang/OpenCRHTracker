@@ -295,7 +295,7 @@ const HISTORY_EMU_EXAMPLES = [
     {
         id: 'emu-first-page',
         label: '第一页',
-        summary: '读取单个车组最新的历史担当记录。',
+        summary: '读取单一车组最新的历史担当记录。',
         authMode: 'anonymous',
         pathParams: {
             emuCode: 'CR400BF-5028'
@@ -425,6 +425,7 @@ export const DEFAULT_DOCS_API_RUNTIME_CONFIG: DocsApiRuntimeConfig = {
         fixed: {
             authMe: 1,
             authCreateOauthClient: 500,
+            allocationEmu: 1,
             timetableTrainCurrent: 1,
             trainCirculationImageCacheHit: 2,
             trainCirculationImage: 20,
@@ -468,6 +469,7 @@ const PUBLIC_DOCS_API_SLUGS = new Set<string>([
     'timetable-station',
     'history-train',
     'history-emu',
+    'allocation-emu',
     'exports-daily-index',
     'exports-daily-date'
 ]);
@@ -730,6 +732,7 @@ const tagDescriptionMap = new Map(
 const FIXED_COST_ENDPOINT_KEYS = {
     'auth-me': 'authMe',
     'oauth-clients-create': 'authCreateOauthClient',
+    'allocation-emu': 'allocationEmu',
     'timetable-train-current': 'timetableTrainCurrent',
     'timetable-train-circulation-image': 'trainCirculationImage',
     'timetable-train-history-detail': 'timetableTrainHistory',

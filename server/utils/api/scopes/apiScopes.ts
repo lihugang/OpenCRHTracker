@@ -38,6 +38,11 @@ export const API_SCOPES = {
     search: {
         read: 'api.search.read'
     },
+    allocation: {
+        emu: {
+            read: 'api.allocation.emu.read'
+        }
+    },
     records: {
         daily: {
             read: 'api.records.daily.read'

@@ -83,6 +83,43 @@ export interface StationTimetableResponse extends HistoryResponseBase<StationTim
     stationName: string;
 }
 
+export interface EmuAllocationProfileResponse {
+    requestEmuCode: string;
+    emuCode: string;
+    model: string;
+    trainSetNo: string;
+    bureau: string;
+    trainDepot: string;
+    depot: string;
+    subModel: string;
+    customType: string;
+    trainsetManufacturer: string;
+    trailerManufacturer: string;
+    manufactureMonth: string;
+    isPublic: boolean;
+    railwayTravelCodeEnabled: boolean;
+    firstClassPowerLegrest: boolean;
+    toiletStatus: string;
+    socketLocation: string;
+    businessSeatType: string;
+    modelRemark: string;
+    note: string;
+    tags: string[];
+    alias: string[];
+    coachLayouts: EmuAllocationCoachLayoutItem[];
+}
+
+export interface EmuAllocationCoachLayoutItem {
+    coachNo: number;
+    coachTypeCode: string;
+    coachTypeName: string;
+    capacity: number;
+    hasPower: boolean;
+    hasPantograph: boolean;
+    hasLargeLuggageArea: boolean;
+    hasAccessibleFacility: boolean;
+}
+
 export interface LookupHistoryListItem {
     id: string;
     serviceDate: string;

@@ -48,13 +48,15 @@ export function buildFeedbackAutoTitle(
     if (primaryType === 'data') {
         switch (secondaryType) {
             case 'train_missing':
-                return '数据异常：车次数据缺失';
+                return '数据异常：担当数据缺失';
             case 'train_wrong':
-                return '数据异常：车次数据错误';
-            case 'route_wrong':
-                return '数据异常：交路数据错误';
+                return '数据异常：担当数据错误';
             case 'coupling_missing':
                 return '数据异常：未检出重联车';
+            case 'route_wrong':
+                return '数据异常：交路数据错误';
+            case 'allocation_wrong':
+                return '数据异常：配属数据错误';
             default:
                 return '数据异常：其他';
         }

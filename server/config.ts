@@ -365,6 +365,7 @@ export interface Config {
             authUpdateSubscription: number;
             authDeleteSubscription: number;
             searchIndex: number;
+            allocationEmu: number;
             timetableTrainCurrent: number;
             trainCirculationImageCacheHit: number;
             trainCirculationImage: number;
@@ -1853,6 +1854,11 @@ function validateConfig(raw: unknown): Config {
                     costFixed.searchIndex,
                     'cost.fixed.searchIndex',
                     0
+                ),
+                allocationEmu: asNumber(
+                    costFixed.allocationEmu,
+                    'cost.fixed.allocationEmu',
+                    1
                 ),
                 timetableTrainCurrent: asNumber(
                     costFixed.timetableTrainCurrent,

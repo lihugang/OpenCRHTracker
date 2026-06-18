@@ -311,6 +311,20 @@
                     v-if="canShowComposerFields"
                     ref="composerFieldsSectionRef">
                     <div
+                        v-if="isAllocationDataWrongCategory"
+                        class="rounded-[1rem] border border-blue-200 bg-blue-50/80 px-4 py-4 text-sm leading-6 text-slate-700">
+                        配属数据错误请前往
+                        <a
+                            :href="allocationFeedbackUrl"
+                            class="font-semibold text-crh-blue underline decoration-crh-blue/35 underline-offset-4 transition hover:text-crh-blue-dark"
+                            rel="noreferrer"
+                            target="_blank">
+                            allocation.crhdata.top
+                        </a>
+                        反馈。
+                    </div>
+
+                    <div
                         v-if="isTrainDataCategory"
                         class="grid gap-4 md:grid-cols-2">
                         <UiField
@@ -539,6 +553,7 @@
                     </div>
 
                     <UiField
+                        v-if="!isAllocationDataWrongCategory"
                         label="补充说明"
                         help="选填，描述你看到的问题、预期结果或建议内容。">
                         <textarea
@@ -557,13 +572,18 @@
                     </UiField>
 
                     <div
-                        v-if="isSecurityCategory"
+                        v-if="
+                            !isAllocationDataWrongCategory &&
+                            isSecurityCategory
+                        "
                         class="rounded-[1rem] border border-amber-200 bg-amber-50/80 px-4 py-4 text-sm leading-6 text-amber-900">
                         安全性问题反馈会被强制设为不公开，仅作者与管理员可见并可回复。
                     </div>
 
                     <button
-                        v-else-if="isAuthenticated"
+                        v-else-if="
+                            !isAllocationDataWrongCategory && isAuthenticated
+                        "
                         type="button"
                         role="checkbox"
                         :aria-checked="isPublicVisibility"
@@ -598,12 +618,13 @@
                     </button>
 
                     <div
-                        v-else
+                        v-else-if="!isAllocationDataWrongCategory"
                         class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-4 py-4 text-sm leading-6 text-slate-600">
                         当前未登录，只能提交公开反馈；安全性问题需登录后提交。
                     </div>
 
                     <button
+                        v-if="!isAllocationDataWrongCategory"
                         type="button"
                         class="flex w-full cursor-pointer items-start gap-3 rounded-[1rem] border px-4 py-4 text-sm leading-6 transition"
                         :class="
@@ -820,6 +841,7 @@ const { officialOrigin, shouldShowUnofficialWarning } = useOfficialInstance();
 const MOBILE_QUERY = '(max-width: 767px)';
 const githubProjectUrl = 'https://github.com/lihugang/OpenCRHTracker';
 const officialFeedbackUrl = `${officialOrigin}/feedback`;
+const allocationFeedbackUrl = 'https://allocation.crhdata.top/';
 
 const desktopPrimaryOptions = feedbackPrimaryTypeSelectOptions.filter(
     (option): option is { value: FeedbackPrimaryType; label: string } =>
@@ -979,6 +1001,13 @@ const isRouteDataWrongCategory = computed(() => {
     );
 });
 
+const isAllocationDataWrongCategory = computed(() => {
+    return (
+        composerForm.primaryType === 'data' &&
+        composerForm.secondaryType === 'allocation_wrong'
+    );
+});
+
 const showTravelCodeQuestion = computed(() => {
     return (
         isCouplingCategory.value &&
@@ -1000,6 +1029,10 @@ const canShowComposerFields = computed(() => {
 
 const canSubmitComposer = computed(() => {
     if (!canShowComposerFields.value) {
+        return false;
+    }
+
+    if (isAllocationDataWrongCategory.value) {
         return false;
     }
 
