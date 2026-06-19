@@ -113,48 +113,6 @@
                 </div>
             </section>
 
-            <section
-                v-if="profile.tags.length > 0 || profile.alias.length > 0"
-                class="space-y-3">
-                <h3 class="text-sm font-semibold text-crh-grey-dark">标记</h3>
-
-                <div class="grid gap-3 sm:grid-cols-2">
-                    <div
-                        v-if="profile.tags.length > 0"
-                        class="rounded-[0.9rem] border border-slate-200/80 bg-white/90 px-4 py-3">
-                        <p
-                            class="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">
-                            标签
-                        </p>
-                        <div class="mt-2 flex flex-wrap gap-2">
-                            <span
-                                v-for="tag in profile.tags"
-                                :key="tag"
-                                class="inline-flex items-center rounded-full border border-crh-blue/15 bg-blue-50 px-2.5 py-1 text-xs font-medium text-crh-blue">
-                                {{ tag }}
-                            </span>
-                        </div>
-                    </div>
-
-                    <div
-                        v-if="profile.alias.length > 0"
-                        class="rounded-[0.9rem] border border-slate-200/80 bg-white/90 px-4 py-3">
-                        <p
-                            class="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">
-                            别名
-                        </p>
-                        <div class="mt-2 flex flex-wrap gap-2">
-                            <span
-                                v-for="alias in profile.alias"
-                                :key="alias"
-                                class="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 font-mono text-xs font-medium text-slate-600">
-                                {{ alias }}
-                            </span>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
             <section class="space-y-3">
                 <h3 class="text-sm font-semibold text-crh-grey-dark">
                     编组布局

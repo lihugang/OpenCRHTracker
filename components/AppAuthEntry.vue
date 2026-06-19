@@ -10,14 +10,6 @@
                         文档
                     </NuxtLink>
                     <NuxtLink
-                        v-if="
-                            isAuthenticated && route.path !== '/exports/daily'
-                        "
-                        to="/exports/daily"
-                        class="inline-flex items-center gap-2 rounded-full border border-crh-blue/12 bg-blue-50/85 px-4 py-2 text-sm font-semibold text-crh-blue transition hover:border-crh-blue/20 hover:bg-blue-100/80 hover:text-slate-950">
-                        导出每日数据
-                    </NuxtLink>
-                    <NuxtLink
                         v-if="isAuthenticated && session"
                         to="/dashboard"
                         class="inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-white/55 hover:text-slate-950">
@@ -47,12 +39,6 @@
                     to="/docs"
                     class="inline-flex items-center gap-2 rounded-full border border-slate-200/70 bg-white/80 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-white hover:text-slate-950">
                     文档
-                </NuxtLink>
-                <NuxtLink
-                    v-if="isAuthenticated && route.path !== '/exports/daily'"
-                    to="/exports/daily"
-                    class="inline-flex items-center gap-2 rounded-full border border-crh-blue/12 bg-blue-50/80 px-4 py-2 text-sm font-semibold text-crh-blue transition hover:border-crh-blue/20 hover:bg-blue-100/80 hover:text-slate-950">
-                    导出每日数据
                 </NuxtLink>
                 <NuxtLink
                     v-if="isAuthenticated && session"
