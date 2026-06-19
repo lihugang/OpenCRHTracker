@@ -108,6 +108,22 @@ interface PersistedUntrackedGroupSummary {
     coupledCount: number;
 }
 
+interface AssignedCandidateScanState {
+    shouldSkip: boolean;
+    detail: {
+        assignmentState: 'active' | 'expired' | 'unknown';
+        trackedGroups: Array<{
+            trainKey: string;
+            trainCodes: string[];
+            startAt: number;
+            endAt: number;
+        }>;
+        unresolvedTrainCodes: string[];
+        endAts: number[];
+        nowSeconds: number;
+    };
+}
+
 let registered = false;
 
 function parseTaskArgs(raw: unknown): DetectCoupledEmuGroupTaskArgs {
@@ -424,6 +440,66 @@ function collectTrackedGroupHintsByEmuCode(
     };
 }
 
+function resolveAssignedCandidateScanState(
+    emuCode: string,
+    dayStart: number,
+    nextDayStart: number,
+    nowSeconds: number,
+    cache: Map<string, TrackedTrainGroup | null>
+): AssignedCandidateScanState {
+    const rows = listProbeStatusByEmuCodeInRange(
+        emuCode,
+        dayStart,
+        nextDayStart
+    );
+    const trackedGroupsByKey = new Map<string, TrackedTrainGroup>();
+    const unresolvedTrainCodes = new Set<string>();
+
+    for (const row of rows) {
+        const trackedGroup = resolveTrackedGroupByTrainCode(
+            row.train_code,
+            cache
+        );
+        if (!trackedGroup) {
+            unresolvedTrainCodes.add(normalizeCode(row.train_code));
+            continue;
+        }
+
+        trackedGroupsByKey.set(trackedGroup.group.trainKey, trackedGroup);
+    }
+
+    const trackedGroups = Array.from(trackedGroupsByKey.values());
+    const activeGroups = trackedGroups.filter(
+        (trackedGroup) => trackedGroup.group.endAt >= nowSeconds
+    );
+    const assignmentState =
+        trackedGroups.length === 0
+            ? 'unknown'
+            : activeGroups.length > 0
+              ? 'active'
+              : 'expired';
+
+    return {
+        shouldSkip: assignmentState !== 'expired',
+        detail: {
+            assignmentState,
+            trackedGroups: trackedGroups.map((trackedGroup) => ({
+                trainKey: trackedGroup.group.trainKey,
+                trainCodes: trackedGroup.trainCodes,
+                startAt: trackedGroup.group.startAt,
+                endAt: trackedGroup.group.endAt
+            })),
+            unresolvedTrainCodes: Array.from(unresolvedTrainCodes).filter(
+                (trainCode) => trainCode.length > 0
+            ),
+            endAts: trackedGroups
+                .map((trackedGroup) => trackedGroup.group.endAt)
+                .sort((left, right) => left - right),
+            nowSeconds
+        }
+    };
+}
+
 function collectPendingTrackedGroups(
     candidates: EmuListRecord[],
     dayStart: number,
@@ -597,7 +673,8 @@ async function scanUnassignedCandidates(
     candidates: EmuListRecord[],
     cache: Map<string, TrackedTrainGroup | null>,
     dayStart: number,
-    nextDayStart: number
+    nextDayStart: number,
+    nowSeconds: number
 ): Promise<{
     matchedGroups: Map<string, TrackedTrainGroup>;
     matchedEmuScanRecordsByTrainKey: Map<string, Map<string, string>>;
@@ -625,24 +702,38 @@ async function scanUnassignedCandidates(
         }
 
         if (isEmuAssignedToday(candidateEmuCode)) {
-            skippedAssignedCount += 1;
-            const hint = collectTrackedGroupHintsByEmuCode(
+            const assignedScanState = resolveAssignedCandidateScanState(
                 candidateEmuCode,
                 dayStart,
                 nextDayStart,
+                nowSeconds,
                 cache
             );
+            if (assignedScanState.shouldSkip) {
+                skippedAssignedCount += 1;
+                recordCurrentCouplingScanCandidate({
+                    candidateOrder,
+                    serviceDate: getCurrentDateString(),
+                    bureau,
+                    model,
+                    candidateEmuCode,
+                    status: 'skipped',
+                    reason: 'already_assigned',
+                    detail: assignedScanState.detail
+                });
+                continue;
+            }
+
             recordCurrentCouplingScanCandidate({
                 candidateOrder,
                 serviceDate: getCurrentDateString(),
                 bureau,
                 model,
                 candidateEmuCode,
-                status: 'skipped',
-                reason: 'already_assigned',
-                detail: hint
+                status: 'pending',
+                reason: 'already_assigned_expired',
+                detail: assignedScanState.detail
             });
-            continue;
         }
 
         const seatCode = assets.qrcodeByModelAndTrainSetNo.get(
@@ -1255,7 +1346,8 @@ async function executeDetectCoupledEmuGroupTaskInternal(
         candidates,
         trackedGroupCache,
         dayStart,
-        nextDayStart
+        nextDayStart,
+        nowSeconds
     );
 
     const scheduleRoutesByTrainCode = getTodayScheduleCache();

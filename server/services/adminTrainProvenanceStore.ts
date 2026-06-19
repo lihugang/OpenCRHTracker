@@ -1067,7 +1067,10 @@ function buildDepartureFallback(events: TrainProvenanceEventRecord[]): {
 function resolveOccupiedRoutes(
     candidate: CouplingScanCandidateRecord
 ): AdminTrainRouteSnapshot[] {
-    if (candidate.reason !== 'already_assigned') {
+    if (
+        candidate.reason !== 'already_assigned' &&
+        candidate.reason !== 'already_assigned_expired'
+    ) {
         return [];
     }
 
@@ -1083,6 +1086,33 @@ function resolveOccupiedRoutes(
     }
 
     const detailPayload = getPayloadObject(candidate.detail);
+    const trackedGroupPayloads = Array.isArray(detailPayload?.trackedGroups)
+        ? detailPayload.trackedGroups
+        : [];
+    const trackedGroupSnapshots = trackedGroupPayloads
+        .map((item) => {
+            const payload = getPayloadObject(item);
+            const trainCodes = getStringArray(payload?.trainCodes);
+            const startAt = getOptionalInteger(payload?.startAt);
+            if (trainCodes.length === 0 || startAt === null) {
+                return null;
+            }
+
+            return fillRouteStationsFromTodayCache(
+                resolveExactRouteSnapshot(
+                    trainCodes,
+                    startAt,
+                    formatServiceDateFromStartAt(startAt)
+                )
+            );
+        })
+        .filter(
+            (snapshot): snapshot is AdminTrainRouteSnapshot => snapshot !== null
+        );
+    if (trackedGroupSnapshots.length > 0) {
+        return trackedGroupSnapshots;
+    }
+
     const hintedTrainCodes = getStringArray(detailPayload?.trainCodes);
     const hintedStartAts = Array.isArray(detailPayload?.startAts)
         ? detailPayload.startAts
@@ -1337,6 +1367,8 @@ function formatCouplingScanCandidateReason(
     switch (reason) {
         case 'already_assigned':
             return '该车组今日已被占用';
+        case 'already_assigned_expired':
+            return '该车组今日占用已过期，继续扫描';
         case 'seat_code_missing':
             return '未配置畅行码';
         case 'seat_code_request_failed':
