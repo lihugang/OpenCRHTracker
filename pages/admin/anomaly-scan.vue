@@ -393,6 +393,11 @@ const anomalyCounts = computed(
                 count: 0
             },
             {
+                type: 'train_coupled_model_mismatch' as const,
+                label: '重联车型不一致',
+                count: 0
+            },
+            {
                 type: 'emu_single_short_route' as const,
                 label: '车组短交路异常',
                 count: 0
@@ -621,12 +626,24 @@ function formatDuration(seconds: number | null) {
 }
 
 function getAnomalyTypeLabel(type: AdminAnomalyType) {
-    return type === 'train_multi_emu' ? '车次重联异常' : '车组短交路异常';
+    switch (type) {
+        case 'train_multi_emu':
+            return '车次重联异常';
+        case 'train_coupled_model_mismatch':
+            return '重联车型不一致';
+        case 'emu_single_short_route':
+            return '车组短交路异常';
+    }
 }
 
 function getAnomalyTypeBadgeClass(type: AdminAnomalyType) {
-    return type === 'train_multi_emu'
-        ? 'inline-flex items-center rounded-full bg-crh-blue/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-crh-blue'
-        : 'inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-emerald-800';
+    switch (type) {
+        case 'train_multi_emu':
+            return 'inline-flex items-center rounded-full bg-crh-blue/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-crh-blue';
+        case 'train_coupled_model_mismatch':
+            return 'inline-flex items-center rounded-full bg-rose-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-rose-700';
+        case 'emu_single_short_route':
+            return 'inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-emerald-800';
+    }
 }
 </script>

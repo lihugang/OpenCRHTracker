@@ -2,6 +2,7 @@ import {
     listDailyRecordsAll,
     type DailyEmuRouteRow
 } from '~/server/services/emuRoutesStore';
+import parseEmuCode from '~/server/utils/12306/parseEmuCode';
 import getDayTimestampRange from '~/server/utils/date/getDayTimestampRange';
 import type {
     AdminAnomalyItem,
@@ -35,6 +36,22 @@ function countItemsByType(
     return items.filter((item) => item.type === type).length;
 }
 
+function buildModelMismatchSummary(
+    trainCode: string,
+    date: string,
+    emuCodesByModel: Map<string, string[]>
+) {
+    const modelParts = Array.from(emuCodesByModel.entries())
+        .sort(([leftModel], [rightModel]) => leftModel.localeCompare(rightModel))
+        .map(([model, emuCodes]) => `${model}: ${emuCodes.sort().join(' / ')}`);
+
+    return (
+        `车次 ${trainCode} 在 ${date} 存在重联车组车型不一致：` +
+        modelParts.join('；') +
+        '。'
+    );
+}
+
 export function scanDailyAnomalies(date: string): AdminAnomalyScanResponse {
     const dayRange = getDayTimestampRange(date);
     const rows = listDailyRecordsAll(dayRange.startAt, dayRange.endAt).sort(
@@ -65,22 +82,53 @@ export function scanDailyAnomalies(date: string): AdminAnomalyScanResponse {
         const uniqueEmuCodes = Array.from(
             new Set(trainRows.map((row) => row.emu_code))
         ).sort();
-        if (uniqueEmuCodes.length <= 2) {
-            continue;
+
+        if (uniqueEmuCodes.length >= 2) {
+            const emuCodesByModel = new Map<string, string[]>();
+            for (const emuCode of uniqueEmuCodes) {
+                const parsedEmuCode = parseEmuCode(emuCode);
+                if (!parsedEmuCode) {
+                    continue;
+                }
+
+                const existingEmuCodes =
+                    emuCodesByModel.get(parsedEmuCode.model) ?? [];
+                existingEmuCodes.push(emuCode);
+                emuCodesByModel.set(parsedEmuCode.model, existingEmuCodes);
+            }
+
+            if (emuCodesByModel.size > 1) {
+                items.push({
+                    type: 'train_coupled_model_mismatch',
+                    subjectCode: trainCode,
+                    title: '同日同车次重联车型不一致',
+                    summary: buildModelMismatchSummary(
+                        trainCode,
+                        date,
+                        emuCodesByModel
+                    ),
+                    trainCodes: [trainCode],
+                    emuCodes: uniqueEmuCodes,
+                    durationSeconds: null,
+                    routes: trainRows.map(toAnomalyRouteRecord)
+                });
+            }
         }
 
-        items.push({
-            type: 'train_multi_emu',
-            subjectCode: trainCode,
-            title: '同日同车次关联车组超过 2 组',
-            summary:
-                `车次 ${trainCode} 在 ${date} 关联了 ${uniqueEmuCodes.length} 组车组，` +
-                '已超过允许阈值。',
-            trainCodes: [trainCode],
-            emuCodes: uniqueEmuCodes,
-            durationSeconds: null,
-            routes: trainRows.map(toAnomalyRouteRecord)
-        });
+        if (uniqueEmuCodes.length > 2) {
+            items.push({
+                type: 'train_multi_emu',
+                subjectCode: trainCode,
+                title: '同日同车次关联车组超过 2 组',
+                summary:
+                    `车次 ${trainCode} 在 ${date} 关联了 ${uniqueEmuCodes.length} 组车组，` +
+                    '已超过允许阈值。',
+                trainCodes: [trainCode],
+                emuCodes: uniqueEmuCodes,
+                durationSeconds: null,
+                routes: trainRows.map(toAnomalyRouteRecord)
+            });
+        }
     }
 
     for (const [emuCode, emuRows] of rowsByEmuCode.entries()) {
@@ -130,6 +178,11 @@ export function scanDailyAnomalies(date: string): AdminAnomalyScanResponse {
                 type: 'train_multi_emu',
                 label: '车次重联异常',
                 count: countItemsByType(items, 'train_multi_emu')
+            },
+            {
+                type: 'train_coupled_model_mismatch',
+                label: '重联车型不一致',
+                count: countItemsByType(items, 'train_coupled_model_mismatch')
             },
             {
                 type: 'emu_single_short_route',

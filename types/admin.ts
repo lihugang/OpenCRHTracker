@@ -1,4 +1,7 @@
-export type AdminAnomalyType = 'train_multi_emu' | 'emu_single_short_route';
+export type AdminAnomalyType =
+    | 'train_multi_emu'
+    | 'train_coupled_model_mismatch'
+    | 'emu_single_short_route';
 
 export interface AdminAnomalyRouteRecord {
     id: string;
