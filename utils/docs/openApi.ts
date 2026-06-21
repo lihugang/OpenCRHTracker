@@ -1067,14 +1067,14 @@ export const developerDocsOpenApi = {
                         type: 'integer',
                         nullable: true,
                         description:
-                            '该站距离列车始发站的累计里程，单位为公里。',
+                            '该站距离列车始发站的累计计价里程，单位为公里。',
                         example: 0
                     },
                     platformNo: {
                         type: 'integer',
                         nullable: true,
                         description:
-                            '从 12306 站板 platform_no 中提取的站台或候车室数字。',
+                            '列车停靠站台',
                         example: 2
                     },
                     isStart: {

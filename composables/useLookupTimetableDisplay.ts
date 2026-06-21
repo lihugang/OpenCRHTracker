@@ -19,7 +19,7 @@ import {
 } from '~/utils/lookup/timetableDisplay';
 
 const currentColumns = ['站序', '车次', '站名', '到点', '开点', '检票口'];
-const distanceColumns = ['里程', '区间均速'];
+const distanceColumns = ['计价里程', '区间均速'];
 const historyColumns = ['站序', '车次', '站名', '到点', '开点'];
 
 export default function useLookupTimetableDisplay(options: {

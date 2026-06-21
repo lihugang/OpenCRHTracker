@@ -213,7 +213,7 @@
                             class="min-w-0">
                             <p
                                 class="text-[11px] uppercase tracking-[0.16em] text-slate-400">
-                                里程
+                                计价里程
                             </p>
                             <p
                                 class="lookup-timetable-text-wrap mt-1 font-mono text-sm text-slate-500">
@@ -321,7 +321,7 @@ const columnKeyByLabel: Record<string, TimetableColumnKey> = {
     到点: 'arriveAt',
     开点: 'departAt',
     检票口: 'wicket',
-    里程: 'distance',
+    计价里程: 'distance',
     区间均速: 'sectionSpeed'
 };
 
