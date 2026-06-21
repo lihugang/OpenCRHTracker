@@ -57,6 +57,7 @@ type TimetableHistorySqlKey =
     | 'deleteCoverageById'
     | 'insertContent'
     | 'insertCoverage'
+    | 'selectCoverageById'
     | 'selectContentById'
     | 'selectContentByHash'
     | 'selectCoverageByTrainCodeAtDate'
@@ -132,6 +133,19 @@ export function getTimetableHistoryContentById(contentId: number) {
     );
 }
 
+export function getTimetableHistoryCoverageById(coverageId: number) {
+    if (!Number.isInteger(coverageId) || coverageId <= 0) {
+        return null;
+    }
+
+    return (
+        timetableHistoryStatements.get<TimetableHistoryCoverageRow>(
+            'selectCoverageById',
+            coverageId
+        ) ?? null
+    );
+}
+
 export function getTimetableHistoryCoverageByTrainCodeAtDate(
     trainCode: string,
     serviceDate: string
@@ -198,6 +212,101 @@ export function listTimetableHistoryCoveragesByTrainCodePaged(
         cursorPoint.id,
         limit
     );
+}
+
+export function listTimetableHistoryCoveragesByTrainCode(trainCode: string) {
+    const normalizedTrainCode = normalizeCode(trainCode);
+    if (normalizedTrainCode.length === 0) {
+        return [];
+    }
+
+    return timetableHistoryStatements.all<TimetableHistoryCoverageRow>(
+        'selectCoveragesByTrainCode',
+        normalizedTrainCode
+    );
+}
+
+export interface TimetableHistoryMergedCoverageResult {
+    trainCode: string;
+    previous: TimetableHistoryCoverageRow;
+    middle: TimetableHistoryCoverageRow;
+    next: TimetableHistoryCoverageRow;
+    merged: TimetableHistoryCoverageRow;
+    deletedCoverageIds: number[];
+}
+
+export function isTimetableHistoryMergeCandidate(
+    previous: TimetableHistoryCoverageRow,
+    middle: TimetableHistoryCoverageRow,
+    next: TimetableHistoryCoverageRow
+) {
+    return (
+        previous.train_code === middle.train_code &&
+        middle.train_code === next.train_code &&
+        previous.service_date_end_exclusive ===
+            middle.service_date_start &&
+        middle.service_date_end_exclusive === next.service_date_start &&
+        previous.content_id === next.content_id &&
+        middle.content_id !== previous.content_id
+    );
+}
+
+export function mergeTimetableHistoryCoverageByMiddleId(
+    coverageId: number,
+    nowSeconds = getNowSeconds()
+): TimetableHistoryMergedCoverageResult | null {
+    if (!Number.isInteger(coverageId) || coverageId <= 0) {
+        return null;
+    }
+
+    const transaction = useTimetableHistoryDatabase().transaction(() => {
+        const middle = getTimetableHistoryCoverageById(coverageId);
+        if (!middle) {
+            return null;
+        }
+
+        const rows = listTimetableHistoryCoveragesByTrainCode(
+            middle.train_code
+        );
+        const middleIndex = rows.findIndex((row) => row.id === middle.id);
+        const previous = rows[middleIndex - 1] ?? null;
+        const next = rows[middleIndex + 1] ?? null;
+
+        if (
+            !previous ||
+            !next ||
+            !isTimetableHistoryMergeCandidate(previous, middle, next)
+        ) {
+            return null;
+        }
+
+        timetableHistoryStatements.run(
+            'updateCoverageEndById',
+            next.service_date_end_exclusive,
+            nowSeconds,
+            previous.id
+        );
+        timetableHistoryStatements.run('deleteCoverageById', middle.id);
+        timetableHistoryStatements.run('deleteCoverageById', next.id);
+
+        const merged = getTimetableHistoryCoverageById(previous.id);
+        if (!merged) {
+            throw new Error(
+                `timetable_history_merge_missing_previous id=${previous.id}`
+            );
+        }
+
+        return {
+            trainCode: previous.train_code,
+            previous,
+            middle,
+            next,
+            merged,
+            deletedCoverageIds: [middle.id, next.id]
+        } satisfies TimetableHistoryMergedCoverageResult;
+    });
+
+    return transaction();
 }
 
 export function listLatestTimetableHistoryCoveragesByTrainCodeAtOrBeforeDate(

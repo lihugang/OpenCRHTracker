@@ -19,7 +19,7 @@
                             检索并删除记录
                         </h2>
                         <p class="text-sm leading-6 text-slate-600">
-                            日期使用当前管理员日期。车次与车组可单独填写，也可组合检索。
+                            可单独选择检索日期。车次与车组可单独填写，也可组合检索。
                         </p>
                     </div>
 
@@ -36,10 +36,20 @@
                             placeholder="例如 CR400AF-2010" />
                     </div>
 
+                    <UiField
+                        label="日期"
+                        help="默认同步当前管理员日期；修改此处不会影响页面顶部日期。">
+                        <input
+                            v-model="deleteDateInput"
+                            type="date"
+                            class="harmony-input w-full px-4 py-3 text-base text-crh-grey-dark"
+                            :max="todayDateInputValue" />
+                    </UiField>
+
                     <div
                         class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <p class="text-sm leading-6 text-slate-500">
-                            当前日期：{{ selectedDateYmd }}
+                            检索日期：{{ deleteDateYmd }}
                         </p>
                         <div class="flex flex-wrap gap-3">
                             <UiButton
@@ -366,6 +376,239 @@
             </UiCard>
         </div>
 
+        <UiCard
+            :show-accent-bar="false"
+            allow-overflow
+            class="mt-6">
+            <div class="space-y-6">
+                <div class="space-y-2">
+                    <p
+                        class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                        Timetable History
+                    </p>
+                    <h2 class="text-2xl font-semibold text-slate-900">
+                        历史时刻表维护
+                    </h2>
+                    <p class="text-sm leading-6 text-slate-600">
+                        扫描同一车次连续三段历史时刻表覆盖。当前后两段
+                        timetable_id 相同且中间段不同时，可删除中间段并合并前后覆盖。
+                    </p>
+                </div>
+
+                <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto]">
+                    <AdminLookupCodeInput
+                        v-model="timetableTrainCodeInput"
+                        type-filter="train"
+                        label="车次"
+                        placeholder="例如 G1"
+                        required />
+                    <div class="flex items-end">
+                        <UiButton
+                            type="button"
+                            class="w-full lg:w-auto"
+                            :loading="timetableMergeStatus === 'pending'"
+                            :disabled="!canScanTimetableMerge"
+                            @click="scanTimetableMergeCandidates">
+                            扫描可合并片段
+                        </UiButton>
+                    </div>
+                </div>
+
+                <div
+                    v-if="timetableMergeSuccessMessage"
+                    class="rounded-[1rem] border border-emerald-200 bg-emerald-50/80 px-4 py-4 text-sm leading-6 text-emerald-800">
+                    {{ timetableMergeSuccessMessage }}
+                </div>
+
+                <UiEmptyState
+                    v-if="timetableMergeStatus === 'idle'"
+                    eyebrow="待扫描"
+                    title="输入车次后扫描"
+                    description="系统会找出前后相同、中间不同的连续历史时刻表覆盖段。" />
+
+                <div
+                    v-else-if="timetableMergeStatus === 'pending'"
+                    class="grid gap-3 lg:grid-cols-2">
+                    <div
+                        v-for="index in 2"
+                        :key="`timetable-merge-loading:${index}`"
+                        class="h-48 animate-pulse rounded-[1rem] bg-slate-100/90" />
+                </div>
+
+                <UiEmptyState
+                    v-else-if="timetableMergeErrorMessage"
+                    eyebrow="扫描失败"
+                    title="可合并片段扫描失败"
+                    :description="timetableMergeErrorMessage"
+                    tone="danger">
+                    <UiButton
+                        type="button"
+                        variant="secondary"
+                        @click="scanTimetableMergeCandidates">
+                        重试
+                    </UiButton>
+                </UiEmptyState>
+
+                <template v-else>
+                    <div
+                        class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-4 py-4">
+                        <p
+                            class="text-xs uppercase tracking-[0.18em] text-slate-400">
+                            可合并片段
+                        </p>
+                        <p
+                            class="mt-2 text-3xl font-semibold text-slate-900">
+                            {{ timetableMergeData?.total ?? 0 }}
+                        </p>
+                    </div>
+
+                    <UiEmptyState
+                        v-if="timetableMergeItems.length === 0"
+                        eyebrow="无结果"
+                        title="没有可合并片段"
+                        description="该车次当前没有前后相同且中间不同的连续历史时刻表覆盖段。" />
+
+                    <div
+                        v-else
+                        class="grid gap-4 xl:grid-cols-2">
+                        <article
+                            v-for="item in timetableMergeItems"
+                            :key="getTimetableMergeCandidateKey(item)"
+                            class="rounded-[1rem] border border-slate-200 bg-white/90 px-4 py-4 shadow-sm">
+                            <div class="space-y-4">
+                                <div
+                                    class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                                    <div class="space-y-2">
+                                        <div
+                                            class="flex flex-wrap items-center gap-2">
+                                            <span
+                                                class="inline-flex items-center rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
+                                                coverage #{{ item.coverageId }}
+                                            </span>
+                                            <span
+                                                class="font-mono text-sm font-semibold text-slate-900">
+                                                {{
+                                                    item.mergedServiceDateStart
+                                                }}
+                                                -
+                                                {{
+                                                    item.mergedServiceDateEndExclusive
+                                                }}
+                                            </span>
+                                        </div>
+                                        <p
+                                            class="text-sm leading-6 text-slate-600">
+                                            删除中间覆盖段后，前段将延长到后段结束日期。
+                                        </p>
+                                    </div>
+                                    <UiButton
+                                        type="button"
+                                        variant="secondary"
+                                        size="sm"
+                                        class="border-rose-200 text-rose-700 hover:border-rose-300 hover:bg-rose-50/80 hover:text-rose-800"
+                                        :loading="
+                                            mergingCoverageId ===
+                                            item.coverageId
+                                        "
+                                        :disabled="
+                                            mergingCoverageId !== null
+                                        "
+                                        @click="
+                                            openTimetableMergeDialog(item)
+                                        ">
+                                        删除并合并
+                                    </UiButton>
+                                </div>
+
+                                <div class="grid gap-3 lg:grid-cols-3">
+                                    <div
+                                        class="rounded-[1rem] border border-emerald-200 bg-emerald-50/70 px-3 py-3">
+                                        <p
+                                            class="text-xs font-semibold text-emerald-700">
+                                            前段保留
+                                        </p>
+                                        <p
+                                            class="mt-2 font-mono text-xs leading-5 text-slate-700">
+                                            {{
+                                                formatCoverageRange(
+                                                    item.previous
+                                                )
+                                            }}
+                                        </p>
+                                        <p
+                                            class="mt-2 font-mono text-xs leading-5 text-slate-600">
+                                            timetable_id:
+                                            {{ item.previous.timetableId }}
+                                        </p>
+                                        <p
+                                            class="mt-1 text-xs leading-5 text-slate-600">
+                                            {{
+                                                formatCoverageStations(
+                                                    item.previous
+                                                )
+                                            }}
+                                        </p>
+                                    </div>
+                                    <div
+                                        class="rounded-[1rem] border border-rose-200 bg-rose-50/70 px-3 py-3">
+                                        <p
+                                            class="text-xs font-semibold text-rose-700">
+                                            中段删除
+                                        </p>
+                                        <p
+                                            class="mt-2 font-mono text-xs leading-5 text-slate-700">
+                                            {{
+                                                formatCoverageRange(
+                                                    item.middle
+                                                )
+                                            }}
+                                        </p>
+                                        <p
+                                            class="mt-2 font-mono text-xs leading-5 text-slate-600">
+                                            timetable_id:
+                                            {{ item.middle.timetableId }}
+                                        </p>
+                                        <p
+                                            class="mt-1 text-xs leading-5 text-slate-600">
+                                            {{
+                                                formatCoverageStations(
+                                                    item.middle
+                                                )
+                                            }}
+                                        </p>
+                                    </div>
+                                    <div
+                                        class="rounded-[1rem] border border-emerald-200 bg-emerald-50/70 px-3 py-3">
+                                        <p
+                                            class="text-xs font-semibold text-emerald-700">
+                                            后段并入
+                                        </p>
+                                        <p
+                                            class="mt-2 font-mono text-xs leading-5 text-slate-700">
+                                            {{ formatCoverageRange(item.next) }}
+                                        </p>
+                                        <p
+                                            class="mt-2 font-mono text-xs leading-5 text-slate-600">
+                                            timetable_id:
+                                            {{ item.next.timetableId }}
+                                        </p>
+                                        <p
+                                            class="mt-1 text-xs leading-5 text-slate-600">
+                                            {{
+                                                formatCoverageStations(
+                                                    item.next
+                                                )
+                                            }}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </article>
+                    </div>
+                </template>
+            </div>
+        </UiCard>
+
         <UiModal
             :model-value="isDeleteDialogOpen"
             eyebrow="危险操作"
@@ -419,6 +662,90 @@
                 </div>
             </template>
         </UiModal>
+
+        <UiModal
+            :model-value="isTimetableMergeDialogOpen"
+            eyebrow="危险操作"
+            title="确认删除并合并时刻表覆盖"
+            :description="timetableMergeDialogDescription"
+            size="lg"
+            :close-on-backdrop="mergingCoverageId === null"
+            @update:model-value="handleTimetableMergeDialogVisibilityChange">
+            <div
+                v-if="pendingTimetableMergeCandidate"
+                class="space-y-4">
+                <div
+                    class="rounded-[1rem] border border-rose-200 bg-rose-50/80 px-4 py-4">
+                    <p
+                        class="text-xs font-medium uppercase tracking-[0.18em] text-rose-700">
+                        将删除的覆盖段
+                    </p>
+                    <p
+                        class="mt-2 font-mono text-sm font-semibold text-slate-900">
+                        coverage #{{ pendingTimetableMergeCandidate.coverageId }}
+                        / timetable_id:
+                        {{
+                            pendingTimetableMergeCandidate.middle.timetableId
+                        }}
+                    </p>
+                    <p class="mt-2 text-sm leading-6 text-slate-700">
+                        {{
+                            formatCoverageRange(
+                                pendingTimetableMergeCandidate.middle
+                            )
+                        }}
+                        ，{{
+                            formatCoverageStations(
+                                pendingTimetableMergeCandidate.middle
+                            )
+                        }}
+                    </p>
+                </div>
+
+                <div
+                    class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-4 py-4">
+                    <p class="text-sm leading-6 text-slate-700">
+                        合并后覆盖范围：
+                        <span class="font-mono font-semibold">
+                            {{
+                                pendingTimetableMergeCandidate.mergedServiceDateStart
+                            }}
+                            -
+                            {{
+                                pendingTimetableMergeCandidate.mergedServiceDateEndExclusive
+                            }}
+                        </span>
+                    </p>
+                    <p class="mt-2 text-sm leading-6 text-slate-500">
+                        此操作不会删除时刻表内容记录，也不会修改已有最终日记录。
+                    </p>
+                </div>
+
+                <div
+                    v-if="timetableMergeActionErrorMessage"
+                    class="rounded-[1rem] border border-rose-200 bg-rose-50/80 px-4 py-4 text-sm leading-6 text-rose-700">
+                    {{ timetableMergeActionErrorMessage }}
+                </div>
+            </div>
+
+            <template #footer>
+                <div class="flex flex-wrap justify-end gap-3">
+                    <UiButton
+                        type="button"
+                        variant="secondary"
+                        :disabled="mergingCoverageId !== null"
+                        @click="closeTimetableMergeDialog">
+                        取消
+                    </UiButton>
+                    <UiButton
+                        type="button"
+                        :loading="mergingCoverageId !== null"
+                        @click="confirmTimetableMerge">
+                        确认删除并合并
+                    </UiButton>
+                </div>
+            </template>
+        </UiModal>
     </AdminShell>
 </template>
 
@@ -437,7 +764,11 @@ import type {
     AdminDailyRouteSearchResponse,
     AdminDailyRouteTimetableCandidate,
     AdminDailyRouteTimetableCandidatesResponse,
-    AdminDailyRouteTimetableResolution
+    AdminDailyRouteTimetableResolution,
+    AdminTimetableHistoryCoverageMergeCandidate,
+    AdminTimetableHistoryCoverageMergeResponse,
+    AdminTimetableHistoryCoverageSummary,
+    AdminTimetableHistoryMergeCandidatesResponse
 } from '~/types/admin';
 import type { TrackerApiResponse } from '~/types/homepage';
 import getApiErrorMessage from '~/utils/api/getApiErrorMessage';
@@ -452,14 +783,14 @@ const requestFetch: TrackedRequestFetch = import.meta.server
     ? useTrackedRequestFetch()
     : ($fetch as TrackedRequestFetch);
 const { session } = useAuthState();
-const { selectedDateInput, selectedDateYmd, todayDateInputValue } =
-    await useAdminDateQuery();
+const { selectedDateInput, todayDateInputValue } = await useAdminDateQuery();
 
 const deleteTrainCodeInput = ref('');
 const deleteEmuCodeInput = ref('');
 const deleteSearchStatus = ref<'idle' | 'pending' | 'success' | 'error'>(
     'idle'
 );
+const deleteDateInput = ref(selectedDateInput.value);
 const deleteSearchData = ref<AdminDailyRouteSearchResponse | null>(null);
 const deleteErrorMessage = ref('');
 const deleteSuccessMessage = ref('');
@@ -480,6 +811,19 @@ const selectedTimetableId = ref<number | null>(null);
 const createStatus = ref<'idle' | 'pending' | 'success' | 'error'>('idle');
 const createSuccessMessage = ref('');
 const createErrorMessage = ref('');
+const timetableTrainCodeInput = ref('');
+const timetableMergeStatus = ref<'idle' | 'pending' | 'success' | 'error'>(
+    'idle'
+);
+const timetableMergeData =
+    ref<AdminTimetableHistoryMergeCandidatesResponse | null>(null);
+const timetableMergeErrorMessage = ref('');
+const timetableMergeSuccessMessage = ref('');
+const pendingTimetableMergeCandidate =
+    ref<AdminTimetableHistoryCoverageMergeCandidate | null>(null);
+const isTimetableMergeDialogOpen = ref(false);
+const mergingCoverageId = ref<number | null>(null);
+const timetableMergeActionErrorMessage = ref('');
 
 const normalizedDeleteTrainCode = computed(() =>
     normalizeLookupCode(deleteTrainCodeInput.value)
@@ -493,15 +837,25 @@ const normalizedCreateTrainCode = computed(() =>
 const normalizedCreateEmuCode = computed(() =>
     normalizeLookupCode(createEmuCodeInput.value)
 );
+const normalizedTimetableTrainCode = computed(() =>
+    normalizeLookupCode(timetableTrainCodeInput.value)
+);
+const deleteDateYmd = computed(() =>
+    fromAdminDateInputValue(deleteDateInput.value)
+);
 const createDateYmd = computed(() =>
     fromAdminDateInputValue(createDateInput.value)
 );
 const deleteRouteItems = computed(() => deleteSearchData.value?.items ?? []);
 const candidateItems = computed(() => candidateData.value?.items ?? []);
+const timetableMergeItems = computed(
+    () => timetableMergeData.value?.items ?? []
+);
 const canSearchDelete = computed(
     () =>
-        normalizedDeleteTrainCode.value.length > 0 ||
-        normalizedDeleteEmuCode.value.length > 0
+        /^\d{8}$/.test(deleteDateYmd.value) &&
+        (normalizedDeleteTrainCode.value.length > 0 ||
+            normalizedDeleteEmuCode.value.length > 0)
 );
 const canLoadCandidates = computed(
     () =>
@@ -519,6 +873,11 @@ const canCreateRoute = computed(
         ) &&
         createStatus.value !== 'pending'
 );
+const canScanTimetableMerge = computed(
+    () =>
+        normalizedTimetableTrainCode.value.length > 0 &&
+        timetableMergeStatus.value !== 'pending'
+);
 const deleteDialogDescription = computed(() => {
     if (!pendingDeleteRoute.value) {
         return '';
@@ -529,12 +888,24 @@ const deleteDialogDescription = computed(() => {
         ? '这会删除最终日记录，并同步清理今天同条 probe status 与内存运行态。'
         : '这会删除历史最终日记录，不会清理 probe status 或内存运行态。';
 });
+const timetableMergeDialogDescription = computed(() => {
+    const candidate = pendingTimetableMergeCandidate.value;
+    if (!candidate) {
+        return '';
+    }
+
+    return `这会删除 ${candidate.middle.serviceDateStart} 至 ${candidate.middle.serviceDateEndExclusive} 的历史时刻表覆盖段，并把前后相同的覆盖段合并。`;
+});
 
 watch(selectedDateInput, (value) => {
     createDateInput.value = value;
+
+    if (deleteSearchStatus.value !== 'success') {
+        deleteDateInput.value = value;
+    }
 });
 
-watch(selectedDateYmd, () => {
+watch([normalizedDeleteTrainCode, normalizedDeleteEmuCode, deleteDateYmd], () => {
     deleteSearchStatus.value = 'idle';
     deleteSearchData.value = null;
     deleteErrorMessage.value = '';
@@ -549,6 +920,14 @@ watch([normalizedCreateTrainCode, createDateYmd], () => {
     selectedTimetableId.value = null;
     createSuccessMessage.value = '';
     createErrorMessage.value = '';
+});
+
+watch(normalizedTimetableTrainCode, () => {
+    timetableMergeStatus.value = 'idle';
+    timetableMergeData.value = null;
+    timetableMergeErrorMessage.value = '';
+    timetableMergeSuccessMessage.value = '';
+    closeTimetableMergeDialog();
 });
 
 useSiteSeo({
@@ -573,7 +952,7 @@ async function searchDeleteRoutes() {
         >('/api/v1/admin/daily-routes', {
             retry: 0,
             query: {
-                date: selectedDateYmd.value,
+                date: deleteDateYmd.value,
                 trainCode: normalizedDeleteTrainCode.value,
                 emuCode: normalizedDeleteEmuCode.value
             }
@@ -596,6 +975,7 @@ async function searchDeleteRoutes() {
 function clearDeleteSearch() {
     deleteTrainCodeInput.value = '';
     deleteEmuCodeInput.value = '';
+    deleteDateInput.value = selectedDateInput.value;
     deleteSearchStatus.value = 'idle';
     deleteSearchData.value = null;
     deleteErrorMessage.value = '';
@@ -692,10 +1072,50 @@ async function createDailyRoute() {
     }
 }
 
+async function scanTimetableMergeCandidates(options?: {
+    preserveSuccessMessage?: boolean;
+}) {
+    if (!canScanTimetableMerge.value) {
+        return;
+    }
+
+    timetableMergeStatus.value = 'pending';
+    timetableMergeErrorMessage.value = '';
+    if (!options?.preserveSuccessMessage) {
+        timetableMergeSuccessMessage.value = '';
+    }
+
+    try {
+        const response = await requestFetch<
+            TrackerApiResponse<AdminTimetableHistoryMergeCandidatesResponse>
+        >('/api/v1/admin/timetable-history/merge-candidates', {
+            retry: 0,
+            query: {
+                trainCode: normalizedTimetableTrainCode.value
+            }
+        });
+
+        if (!response.ok) {
+            throw {
+                data: response
+            };
+        }
+
+        timetableMergeData.value = response.data;
+        timetableMergeStatus.value = 'success';
+    } catch (error) {
+        timetableMergeErrorMessage.value = getApiErrorMessage(
+            error,
+            '扫描可合并片段失败。'
+        );
+        timetableMergeStatus.value = 'error';
+    }
+}
+
 async function refreshDeleteSearchIfMatchingCreate() {
     if (
         deleteSearchStatus.value !== 'success' ||
-        selectedDateYmd.value !== createDateYmd.value ||
+        deleteDateYmd.value !== createDateYmd.value ||
         !canSearchDelete.value
     ) {
         return;
@@ -727,6 +1147,33 @@ function handleDeleteDialogVisibilityChange(nextValue: boolean) {
     }
 
     closeDeleteDialog();
+}
+
+function openTimetableMergeDialog(
+    item: AdminTimetableHistoryCoverageMergeCandidate
+) {
+    pendingTimetableMergeCandidate.value = item;
+    timetableMergeActionErrorMessage.value = '';
+    isTimetableMergeDialogOpen.value = true;
+}
+
+function closeTimetableMergeDialog() {
+    if (mergingCoverageId.value !== null) {
+        return;
+    }
+
+    isTimetableMergeDialogOpen.value = false;
+    pendingTimetableMergeCandidate.value = null;
+    timetableMergeActionErrorMessage.value = '';
+}
+
+function handleTimetableMergeDialogVisibilityChange(nextValue: boolean) {
+    if (nextValue) {
+        isTimetableMergeDialogOpen.value = true;
+        return;
+    }
+
+    closeTimetableMergeDialog();
 }
 
 function removeDeletedRoute(routeId: string) {
@@ -794,6 +1241,63 @@ async function confirmDeleteRoute() {
     }
 }
 
+async function confirmTimetableMerge() {
+    if (
+        !pendingTimetableMergeCandidate.value ||
+        mergingCoverageId.value !== null
+    ) {
+        return;
+    }
+
+    const targetCandidate = pendingTimetableMergeCandidate.value;
+    mergingCoverageId.value = targetCandidate.coverageId;
+    timetableMergeActionErrorMessage.value = '';
+    timetableMergeSuccessMessage.value = '';
+
+    try {
+        const { data, error } = await useCsrfFetch<
+            TrackerApiResponse<AdminTimetableHistoryCoverageMergeResponse>
+        >(
+            `/api/v1/admin/timetable-history/coverages/${encodeURIComponent(targetCandidate.coverageId)}`,
+            {
+                method: 'DELETE',
+                key: `admin:timetable-history-merge:${targetCandidate.coverageId}:${Date.now()}`,
+                watch: false,
+                server: false
+            }
+        );
+
+        if (error.value) {
+            throw error.value;
+        }
+
+        const response = data.value;
+        if (!response) {
+            throw new Error('Missing timetable history merge response');
+        }
+
+        if (!response.ok) {
+            throw {
+                data: response
+            };
+        }
+
+        timetableMergeSuccessMessage.value = `已删除 coverage #${targetCandidate.coverageId}，并合并为 ${response.data.merged.serviceDateStart} 至 ${response.data.merged.serviceDateEndExclusive}。`;
+        isTimetableMergeDialogOpen.value = false;
+        pendingTimetableMergeCandidate.value = null;
+        await scanTimetableMergeCandidates({
+            preserveSuccessMessage: true
+        });
+    } catch (error) {
+        timetableMergeActionErrorMessage.value = getApiErrorMessage(
+            error,
+            '删除并合并时刻表覆盖失败。'
+        );
+    } finally {
+        mergingCoverageId.value = null;
+    }
+}
+
 function formatTimestamp(timestamp: number) {
     if (!Number.isFinite(timestamp) || timestamp <= 0) {
         return '--';
@@ -814,8 +1318,26 @@ function formatCandidateStations(item: AdminDailyRouteTimetableCandidate) {
     return `${start} 到 ${end}`;
 }
 
+function formatCoverageStations(item: AdminTimetableHistoryCoverageSummary) {
+    const start = item.startStation || '--';
+    const end = item.endStation || '--';
+    const stopCountLabel =
+        item.stopCount > 0 ? `${item.stopCount} 站` : '站数未知';
+    return `${start} 到 ${end}，${stopCountLabel}`;
+}
+
+function formatCoverageRange(item: AdminTimetableHistoryCoverageSummary) {
+    return `${item.serviceDateStart} 至 ${item.serviceDateEndExclusive}`;
+}
+
 function getCandidateKey(item: AdminDailyRouteTimetableCandidate) {
     return `${item.timetableId ?? 'null'}:${item.serviceDateStart}:${item.serviceDateEndExclusive}`;
+}
+
+function getTimetableMergeCandidateKey(
+    item: AdminTimetableHistoryCoverageMergeCandidate
+) {
+    return `${item.coverageId}:${item.previous.coverageId}:${item.next.coverageId}`;
 }
 
 function getResolutionLabel(resolution: AdminDailyRouteTimetableResolution) {

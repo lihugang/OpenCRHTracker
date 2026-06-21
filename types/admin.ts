@@ -124,6 +124,40 @@ export interface AdminDailyRouteDeleteResponse {
     clearedDetectionGroups: number;
 }
 
+export interface AdminTimetableHistoryCoverageSummary {
+    coverageId: number;
+    timetableId: number;
+    serviceDateStart: string;
+    serviceDateEndExclusive: string;
+    startStation: string;
+    endStation: string;
+    stopCount: number;
+}
+
+export interface AdminTimetableHistoryCoverageMergeCandidate {
+    coverageId: number;
+    previous: AdminTimetableHistoryCoverageSummary;
+    middle: AdminTimetableHistoryCoverageSummary;
+    next: AdminTimetableHistoryCoverageSummary;
+    mergedServiceDateStart: string;
+    mergedServiceDateEndExclusive: string;
+}
+
+export interface AdminTimetableHistoryMergeCandidatesResponse {
+    trainCode: string;
+    total: number;
+    items: AdminTimetableHistoryCoverageMergeCandidate[];
+}
+
+export interface AdminTimetableHistoryCoverageMergeResponse {
+    trainCode: string;
+    deletedCoverageIds: number[];
+    previous: AdminTimetableHistoryCoverageSummary;
+    middle: AdminTimetableHistoryCoverageSummary;
+    next: AdminTimetableHistoryCoverageSummary;
+    merged: AdminTimetableHistoryCoverageSummary;
+}
+
 export type AdminOfficialCirculationMatchType = 'internal_code' | 'all_code';
 
 export interface AdminOfficialCirculationNodePreview {
