@@ -109,14 +109,10 @@
                                     type="button"
                                     variant="secondary"
                                     size="sm"
-                                    :loading="
-                                        bulkDeletingType === action.type
-                                    "
+                                    :loading="bulkDeletingType === action.type"
                                     :disabled="isBulkDeleteButtonDisabled"
                                     class="border-rose-200 text-rose-700 hover:border-rose-300 hover:bg-rose-50/80 hover:text-rose-800"
-                                    @click="
-                                        openBulkDeleteDialog(action.type)
-                                    ">
+                                    @click="openBulkDeleteDialog(action.type)">
                                     {{ action.buttonLabel }}
                                 </UiButton>
                             </div>

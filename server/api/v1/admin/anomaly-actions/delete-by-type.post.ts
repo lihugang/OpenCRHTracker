@@ -17,9 +17,8 @@ export default defineEventHandler(async (event) => {
         },
         async () => {
             const body =
-                (await readBody<DeleteAnomalyRoutesByTypeBody | null>(
-                    event
-                )) ?? {};
+                (await readBody<DeleteAnomalyRoutesByTypeBody | null>(event)) ??
+                {};
 
             ensure(
                 typeof body === 'object' &&
@@ -39,12 +38,7 @@ export default defineEventHandler(async (event) => {
                 'invalid_param',
                 'date 必须是 YYYYMMDD'
             );
-            ensure(
-                type.length > 0,
-                400,
-                'invalid_param',
-                'type 不能为空'
-            );
+            ensure(type.length > 0, 400, 'invalid_param', 'type 不能为空');
 
             return deleteAnomalyRoutesByType(date, type);
         }

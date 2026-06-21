@@ -42,7 +42,9 @@ function buildModelMismatchSummary(
     emuCodesByModel: Map<string, string[]>
 ) {
     const modelParts = Array.from(emuCodesByModel.entries())
-        .sort(([leftModel], [rightModel]) => leftModel.localeCompare(rightModel))
+        .sort(([leftModel], [rightModel]) =>
+            leftModel.localeCompare(rightModel)
+        )
         .map(([model, emuCodes]) => `${model}: ${emuCodes.sort().join(' / ')}`);
 
     return (

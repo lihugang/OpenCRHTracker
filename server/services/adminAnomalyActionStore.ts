@@ -73,7 +73,9 @@ function collectDetectionGroupsFromEmuCodes(
     return Array.from(detectionGroups.values());
 }
 
-function ensureAdminAnomalyType(type: string): asserts type is AdminAnomalyType {
+function ensureAdminAnomalyType(
+    type: string
+): asserts type is AdminAnomalyType {
     if (!ADMIN_ANOMALY_TYPES.includes(type as AdminAnomalyType)) {
         throw new ApiRequestError(400, 'invalid_param', '异常类型无效');
     }
@@ -84,7 +86,9 @@ function doesRouteBelongToDate(
     date: string
 ) {
     const dayRange = getDayTimestampRange(date);
-    return route.start_at >= dayRange.startAt && route.start_at <= dayRange.endAt;
+    return (
+        route.start_at >= dayRange.startAt && route.start_at <= dayRange.endAt
+    );
 }
 
 function assertRouteBelongsToDate(
@@ -188,9 +192,7 @@ export async function deleteAnomalyRoute(
         const trainCode = route?.train_code ?? '';
         const emuCode = route?.emu_code ?? '';
         const startAt = route?.start_at ?? 0;
-        const trainGroup = getTodayScheduleProbeGroupByTrainCode(
-            trainCode
-        ) ?? {
+        const trainGroup = getTodayScheduleProbeGroupByTrainCode(trainCode) ?? {
             trainKey: buildTrainKey(trainCode, '', startAt)
         };
         const trainKey = trainGroup.trainKey;
