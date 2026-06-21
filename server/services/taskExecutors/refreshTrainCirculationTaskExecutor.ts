@@ -1,5 +1,6 @@
 import getLogger from '~/server/libs/log4js';
 import { registerTaskExecutor } from '~/server/services/taskExecutorRegistry';
+import { rescheduleTaskUntilScheduleReady } from '~/server/services/scheduleReadinessGuard';
 import {
     enqueueOrReuseStationBoardFetchTask,
     resolveStationTelecodeByStationName
@@ -69,6 +70,16 @@ function resolveDepartureStationName(trainCode: string) {
 
 async function executeRefreshTrainCirculationTask(rawArgs: unknown) {
     const args = parseTaskArgs(rawArgs);
+    const readiness = rescheduleTaskUntilScheduleReady(
+        REFRESH_TRAIN_CIRCULATION_TASK_EXECUTOR,
+        args
+    );
+    if (!readiness.ready) {
+        logger.info(
+            `schedule_refresh_pending_reschedule executor=${REFRESH_TRAIN_CIRCULATION_TASK_EXECUTOR} trainCode=${args.trainCode} reason=${readiness.state.reason} nextExecutionTime=${readiness.nextExecutionTime ?? 'null'} taskId=${readiness.rescheduledTaskId ?? 'null'} action=${readiness.action ?? 'null'}`
+        );
+        return;
+    }
     const scheduleFilePath = useConfig().data.assets.schedule.file;
     const state = loadPublishedScheduleState(scheduleFilePath);
     if (!state) {

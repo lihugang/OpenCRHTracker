@@ -10,6 +10,7 @@ import {
     type TodayScheduleTimetable
 } from '~/server/services/todayScheduleCache';
 import {
+    getScheduleStateVersion,
     loadScheduleCirculationEntry,
     loadScheduleCirculationMap
 } from '~/server/utils/12306/scheduleProbe/stateStore';
@@ -66,6 +67,7 @@ interface CirculationWindowStats {
 
 interface TrainCirculationIndexCache {
     currentDate: string;
+    scheduleStateVersion: number;
     windowDays: number;
     windowStart: number;
     windowEnd: number;
@@ -1349,6 +1351,7 @@ export function rebuildTrainCirculationIndex(): TrainCirculationIndexCache {
 
     cached = {
         currentDate,
+        scheduleStateVersion: getScheduleStateVersion(),
         windowDays: config.windowDays,
         windowStart: startAt,
         windowEnd: endAt,
@@ -1368,7 +1371,7 @@ export function rebuildTrainCirculationIndex(): TrainCirculationIndexCache {
 }
 
 function getActiveCache() {
-    if (cached) {
+    if (cached && cached.scheduleStateVersion === getScheduleStateVersion()) {
         return cached;
     }
 

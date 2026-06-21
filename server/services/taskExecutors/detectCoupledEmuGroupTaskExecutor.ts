@@ -35,6 +35,7 @@ import {
 } from '~/server/services/emuRoutesStore';
 import { notifyLookupStatusChanges } from '~/server/services/eventNotificationService';
 import { registerTaskExecutor } from '~/server/services/taskExecutorRegistry';
+import { rescheduleTaskUntilScheduleReady } from '~/server/services/scheduleReadinessGuard';
 import {
     markCurrentTrainProvenanceTaskSkipped,
     recordCurrentCouplingScanCandidate,
@@ -43,6 +44,7 @@ import {
 } from '~/server/services/trainProvenanceRecorder';
 import {
     getTodayScheduleCache,
+    getSafeTodayScheduleProbeTrainCodes,
     getTodayScheduleProbeGroupByTrainCode,
     getTodayScheduleProbeGroupByTrainInternalCode,
     type TodayScheduleProbeGroup,
@@ -358,10 +360,7 @@ function resolveTrackedGroupByTrainCode(
         return null;
     }
 
-    const trainCodes = uniqueNormalizedCodes([
-        group.trainCode,
-        ...group.allCodes
-    ]);
+    const trainCodes = getSafeTodayScheduleProbeTrainCodes(group);
     const rowsByKey = new Map<string, ProbeStatusRow>();
     for (const code of trainCodes) {
         const rows = listProbeStatusByTrainCode(code, group.startAt);
@@ -557,7 +556,7 @@ function resolveDirectHitTrainTarget(
             return {
                 trainCodes: uniqueNormalizedCodes([
                     internalCodeGroup.trainCode,
-                    ...internalCodeGroup.allCodes
+                    ...getSafeTodayScheduleProbeTrainCodes(internalCodeGroup)
                 ]),
                 startAt: internalCodeGroup.startAt,
                 serviceDate: formatShanghaiDateString(
@@ -579,7 +578,7 @@ function resolveDirectHitTrainTarget(
         return {
             trainCodes: uniqueNormalizedCodes([
                 scheduleGroup.trainCode,
-                ...scheduleGroup.allCodes
+                ...getSafeTodayScheduleProbeTrainCodes(scheduleGroup)
             ]),
             startAt: scheduleGroup.startAt,
             serviceDate: formatShanghaiDateString(scheduleGroup.startAt * 1000),
@@ -1279,6 +1278,32 @@ async function executeDetectCoupledEmuGroupTaskInternal(
 ): Promise<void> {
     ensureProbeStateForToday();
     const args = parseTaskArgs(rawArgs);
+    const readiness = rescheduleTaskUntilScheduleReady(
+        DETECT_COUPLED_EMU_GROUP_TASK_EXECUTOR,
+        args
+    );
+    if (!readiness.ready) {
+        markCurrentTrainProvenanceTaskSkipped('schedule_refresh_pending');
+        recordCurrentTrainProvenanceEvent({
+            serviceDate: getCurrentDateString(),
+            eventType: 'coupling_scan_skipped',
+            result: 'schedule_refresh_pending',
+            linkedSchedulerTaskId: readiness.rescheduledTaskId,
+            payload: {
+                bureau: args.bureau,
+                model: args.model,
+                readiness: readiness.state,
+                rescheduleAction: readiness.action,
+                nextExecutionTime: readiness.nextExecutionTime,
+                removedTaskIds: readiness.removedTaskIds,
+                reusedExecutionTime: readiness.reusedExecutionTime
+            }
+        });
+        logger.info(
+            `schedule_refresh_pending_reschedule executor=${DETECT_COUPLED_EMU_GROUP_TASK_EXECUTOR} bureau=${args.bureau} model=${args.model} reason=${readiness.state.reason} nextExecutionTime=${readiness.nextExecutionTime ?? 'null'} taskId=${readiness.rescheduledTaskId ?? 'null'} action=${readiness.action ?? 'null'}`
+        );
+        return;
+    }
     const assets = await loadProbeAssets();
     const bureau = args.bureau;
     const config = useConfig();

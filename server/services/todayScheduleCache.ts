@@ -1,4 +1,5 @@
 import useConfig from '~/server/config';
+import getLogger from '~/server/libs/log4js';
 import { buildTrainKey } from '~/server/services/probeRuntimeState';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
 import {
@@ -10,6 +11,7 @@ import {
     toUnixSecondsFromShanghaiDayOffset
 } from '~/server/utils/date/shanghaiDateTime';
 import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
+import type { ScheduleItem } from '~/server/utils/12306/scheduleProbe/types';
 
 export interface TodayScheduleRoute {
     trainCode: string;
@@ -71,6 +73,7 @@ interface TodayScheduleCache {
 }
 
 let cached: TodayScheduleCache | null = null;
+const logger = getLogger('today-schedule-cache');
 
 function rebuildCache(): TodayScheduleCache {
     const config = useConfig();
@@ -92,6 +95,9 @@ function rebuildCache(): TodayScheduleCache {
     >();
 
     if (state) {
+        const scheduleItemIdentityIndex = buildScheduleItemIdentityIndex(
+            state.items
+        );
         for (const item of state.items) {
             if (item.startAt === null || item.endAt === null) {
                 continue;
@@ -116,7 +122,11 @@ function rebuildCache(): TodayScheduleCache {
                 trainInternalCode,
                 startAt
             );
-            const allCodes = normalizeAliasCodes(item.allCodes, trainCode);
+            const allCodes = normalizeAliasCodes(
+                item,
+                trainCode,
+                scheduleItemIdentityIndex
+            );
             const timetable: TodayScheduleTimetable = {
                 trainCode,
                 trainInternalCode,
@@ -317,6 +327,12 @@ export function getTodayScheduleProbeGroupByTrainInternalCode(
     return activeCache.groupsByTrainKey.get(trainKey) ?? null;
 }
 
+export function getSafeTodayScheduleProbeTrainCodes(
+    group: Pick<TodayScheduleProbeGroup, 'trainCode' | 'allCodes'>
+): string[] {
+    return uniqueNormalizedScheduleCodes([group.trainCode, ...group.allCodes]);
+}
+
 export function invalidateTodayScheduleCache(): void {
     cached = null;
 }
@@ -329,18 +345,114 @@ function getActiveCache(): TodayScheduleCache {
     return rebuildCache();
 }
 
-function normalizeAliasCodes(allCodes: string[], trainCode: string): string[] {
-    const codes = new Set<string>();
-    codes.add(trainCode);
+interface ScheduleItemIdentityIndex {
+    itemsByCode: Map<string, ScheduleItem>;
+}
 
-    for (const value of allCodes) {
-        const normalized = normalizeCode(value);
-        if (normalized.length > 0) {
-            codes.add(normalized);
+function buildScheduleItemIdentityIndex(
+    items: ScheduleItem[]
+): ScheduleItemIdentityIndex {
+    const itemsByCode = new Map<string, ScheduleItem>();
+    for (const item of items) {
+        const trainCode = normalizeCode(item.code);
+        if (trainCode.length > 0 && !itemsByCode.has(trainCode)) {
+            itemsByCode.set(trainCode, item);
         }
     }
 
+    return {
+        itemsByCode
+    };
+}
+
+function hasMatchingFallbackRouteIdentity(
+    sourceItem: ScheduleItem,
+    aliasItem: ScheduleItem
+): boolean {
+    return (
+        sourceItem.startAt !== null &&
+        sourceItem.endAt !== null &&
+        sourceItem.startAt === aliasItem.startAt &&
+        sourceItem.endAt === aliasItem.endAt &&
+        sourceItem.startStation.trim() === aliasItem.startStation.trim() &&
+        sourceItem.endStation.trim() === aliasItem.endStation.trim()
+    );
+}
+
+function isSafeScheduleAlias(
+    sourceItem: ScheduleItem,
+    aliasCode: string,
+    index: ScheduleItemIdentityIndex
+): boolean {
+    const sourceCode = normalizeCode(sourceItem.code);
+    if (aliasCode === sourceCode) {
+        return true;
+    }
+
+    const aliasItem = index.itemsByCode.get(aliasCode);
+    if (!aliasItem) {
+        return true;
+    }
+
+    const sourceInternalCode = normalizeCode(sourceItem.internalCode);
+    const aliasInternalCode = normalizeCode(aliasItem.internalCode);
+    if (sourceInternalCode.length > 0 || aliasInternalCode.length > 0) {
+        return (
+            sourceInternalCode.length > 0 &&
+            sourceInternalCode === aliasInternalCode
+        );
+    }
+
+    return hasMatchingFallbackRouteIdentity(sourceItem, aliasItem);
+}
+
+function logUnsafeScheduleAlias(
+    sourceItem: ScheduleItem,
+    aliasCode: string,
+    index: ScheduleItemIdentityIndex
+): void {
+    const aliasItem = index.itemsByCode.get(aliasCode);
+    logger.warn(
+        `drop_unsafe_schedule_alias sourceCode=${normalizeCode(sourceItem.code)} aliasCode=${aliasCode} sourceInternalCode=${normalizeCode(sourceItem.internalCode)} aliasInternalCode=${normalizeCode(aliasItem?.internalCode ?? '')} sourceStartAt=${sourceItem.startAt ?? 'null'} aliasStartAt=${aliasItem?.startAt ?? 'null'} sourceRoute=${sourceItem.startStation.trim()}-${sourceItem.endStation.trim()} aliasRoute=${aliasItem ? `${aliasItem.startStation.trim()}-${aliasItem.endStation.trim()}` : 'unknown'}`
+    );
+}
+
+function normalizeAliasCodes(
+    item: ScheduleItem,
+    trainCode: string,
+    index: ScheduleItemIdentityIndex
+): string[] {
+    const codes = new Set<string>();
+    codes.add(trainCode);
+
+    for (const value of item.allCodes) {
+        const normalized = normalizeCode(value);
+        if (normalized.length === 0) {
+            continue;
+        }
+
+        if (!isSafeScheduleAlias(item, normalized, index)) {
+            logUnsafeScheduleAlias(item, normalized, index);
+            continue;
+        }
+
+        codes.add(normalized);
+    }
+
     return [...codes];
+}
+
+function uniqueNormalizedScheduleCodes(codes: string[]): string[] {
+    const normalizedCodes = new Set<string>();
+
+    for (const code of codes) {
+        const normalized = normalizeCode(code);
+        if (normalized.length > 0) {
+            normalizedCodes.add(normalized);
+        }
+    }
+
+    return [...normalizedCodes];
 }
 
 function upsertProbeGroup(

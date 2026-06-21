@@ -9,6 +9,7 @@
             <UiButton
                 type="button"
                 :loading="anomalyScanStatus === 'pending'"
+                :disabled="isAnyAnomalyActionRunning"
                 @click="runAnomalyScan">
                 开始检测
             </UiButton>
@@ -37,6 +38,7 @@
                     <UiButton
                         type="button"
                         :loading="anomalyScanStatus === 'pending'"
+                        :disabled="isAnyAnomalyActionRunning"
                         @click="runAnomalyScan">
                         开始检测
                     </UiButton>
@@ -84,6 +86,46 @@
                                 {{ item.count }}
                             </p>
                         </div>
+                    </div>
+
+                    <div
+                        class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-4 py-4">
+                        <div
+                            class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                            <div class="space-y-1">
+                                <h3
+                                    class="text-base font-semibold text-slate-900">
+                                    批量删除非今日异常
+                                </h3>
+                                <p class="text-sm leading-6 text-slate-600">
+                                    按当前日期重新扫描后删除指定类型的全部异常交路；今天的数据不可批量删除。
+                                </p>
+                            </div>
+                            <div
+                                class="grid gap-2 sm:grid-cols-3 lg:min-w-[34rem]">
+                                <UiButton
+                                    v-for="action in bulkDeleteActions"
+                                    :key="action.type"
+                                    type="button"
+                                    variant="secondary"
+                                    size="sm"
+                                    :loading="
+                                        bulkDeletingType === action.type
+                                    "
+                                    :disabled="isBulkDeleteButtonDisabled"
+                                    class="border-rose-200 text-rose-700 hover:border-rose-300 hover:bg-rose-50/80 hover:text-rose-800"
+                                    @click="
+                                        openBulkDeleteDialog(action.type)
+                                    ">
+                                    {{ action.buttonLabel }}
+                                </UiButton>
+                            </div>
+                        </div>
+                        <p
+                            v-if="isTodaySelected"
+                            class="mt-3 rounded-[0.8rem] border border-amber-200 bg-amber-50/80 px-3 py-2 text-sm leading-6 text-amber-900">
+                            当前日期是今天，只允许逐条处理，不能一键批量删除。
+                        </p>
                     </div>
 
                     <div
@@ -204,8 +246,7 @@
                                                         route.id
                                                     "
                                                     :disabled="
-                                                        deletingRouteId.length >
-                                                        0
+                                                        isAnyAnomalyActionRunning
                                                     "
                                                     class="border-rose-200 text-rose-700 hover:border-rose-300 hover:bg-rose-50/80 hover:text-rose-800"
                                                     @click="
@@ -330,6 +371,73 @@
                 </div>
             </template>
         </component>
+
+        <component
+            :is="isMobileActionSheet ? UiBottomSheet : UiModal"
+            :model-value="isBulkDeleteDialogOpen"
+            eyebrow="危险操作"
+            title="确认批量删除"
+            :description="bulkDeleteDialogDescription"
+            size="lg"
+            :close-on-backdrop="!isBulkDeleting"
+            @update:model-value="handleBulkDeleteDialogVisibilityChange">
+            <div
+                v-if="pendingBulkDeleteType"
+                class="space-y-4">
+                <div
+                    class="rounded-[1rem] border border-rose-200 bg-rose-50/80 px-4 py-4">
+                    <p
+                        class="text-xs font-medium uppercase tracking-[0.18em] text-rose-700">
+                        将批量删除的异常
+                    </p>
+                    <div class="mt-3 space-y-2 text-sm leading-6 text-rose-900">
+                        <p>处理日期：{{ selectedDateYmd }}</p>
+                        <p>
+                            异常类型：{{
+                                getAnomalyTypeLabel(pendingBulkDeleteType)
+                            }}
+                        </p>
+                        <p>
+                            当前页面命中：{{
+                                getCurrentAnomalyCount(pendingBulkDeleteType)
+                            }}
+                            项
+                        </p>
+                    </div>
+                </div>
+
+                <p
+                    class="rounded-[1rem] border border-amber-200 bg-amber-50/80 px-4 py-4 text-sm leading-6 text-amber-900">
+                    服务端会在确认后重新扫描当前日期，再删除该类型下所有匹配交路；若页面数据已经过期，以服务端扫描结果为准。
+                </p>
+
+                <p
+                    v-if="bulkDeleteErrorMessage"
+                    class="rounded-[1rem] border border-rose-200 bg-rose-50/80 px-4 py-4 text-sm leading-6 text-rose-700">
+                    {{ bulkDeleteErrorMessage }}
+                </p>
+            </div>
+
+            <template #footer>
+                <div
+                    class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                    <UiButton
+                        type="button"
+                        variant="secondary"
+                        :disabled="isBulkDeleting"
+                        @click="closeBulkDeleteDialog">
+                        取消
+                    </UiButton>
+                    <UiButton
+                        type="button"
+                        :loading="isBulkDeleting"
+                        class="bg-[linear-gradient(180deg,#c53030_0%,#b91c1c_100%)] text-white hover:bg-[linear-gradient(180deg,#b91c1c_0%,#991b1b_100%)]"
+                        @click="confirmBulkDelete">
+                        确认批量删除
+                    </UiButton>
+                </div>
+            </template>
+        </component>
     </AdminShell>
 </template>
 
@@ -345,6 +453,7 @@ import {
     useAdminDateQuery
 } from '~/composables/useAdminDateQuery';
 import type {
+    AdminAnomalyBulkDeleteResponse,
     AdminAnomalyDeleteRouteResponse,
     AdminAnomalyRouteRecord,
     AdminAnomalyScanResponse,
@@ -366,6 +475,11 @@ interface PendingDeleteRouteContext {
     route: AdminAnomalyRouteRecord;
 }
 
+interface BulkDeleteAction {
+    type: AdminAnomalyType;
+    buttonLabel: string;
+}
+
 const requestFetch: TrackedRequestFetch = import.meta.server
     ? useTrackedRequestFetch()
     : ($fetch as TrackedRequestFetch);
@@ -378,11 +492,30 @@ const anomalyScanData = ref<AdminAnomalyScanResponse | null>(null);
 const anomalyScanErrorMessage = ref('');
 const anomalyActionSuccessMessage = ref('');
 const deletingRouteId = ref('');
+const bulkDeletingType = ref<AdminAnomalyType | ''>('');
 const isDeleteRouteDialogOpen = ref(false);
+const isBulkDeleteDialogOpen = ref(false);
 const pendingDeleteRouteContext = ref<PendingDeleteRouteContext | null>(null);
+const pendingBulkDeleteType = ref<AdminAnomalyType | null>(null);
 const deleteRouteErrorMessage = ref('');
+const bulkDeleteErrorMessage = ref('');
 const isMobileActionSheet = ref(false);
 const dialogMediaQuery = ref<MediaQueryList | null>(null);
+
+const bulkDeleteActions: BulkDeleteAction[] = [
+    {
+        type: 'train_multi_emu',
+        buttonLabel: '删除重联异常'
+    },
+    {
+        type: 'train_coupled_model_mismatch',
+        buttonLabel: '删除车型不一致'
+    },
+    {
+        type: 'emu_single_short_route',
+        buttonLabel: '删除短交路异常'
+    }
+];
 
 const anomalyCounts = computed(
     () =>
@@ -413,6 +546,21 @@ const deleteRouteDialogDescription = computed(() =>
         ? '这会删除选中的异常交路，并同步清理该条数据对应的 probe status 与 probe 运行态。'
         : '这会永久删除选中的异常交路，请确认后再继续。'
 );
+const isBulkDeleting = computed(() => bulkDeletingType.value.length > 0);
+const isAnyAnomalyActionRunning = computed(
+    () => isDeletingRoute.value || isBulkDeleting.value
+);
+const isBulkDeleteButtonDisabled = computed(
+    () =>
+        isTodaySelected.value ||
+        anomalyScanStatus.value === 'pending' ||
+        isAnyAnomalyActionRunning.value
+);
+const bulkDeleteDialogDescription = computed(() =>
+    pendingBulkDeleteType.value
+        ? `这会删除 ${selectedDateYmd.value} 的全部${getAnomalyTypeLabel(pendingBulkDeleteType.value)}数据。`
+        : '这会批量删除当前日期的指定异常数据。'
+);
 
 watch(selectedDateYmd, () => {
     anomalyScanStatus.value = 'idle';
@@ -420,6 +568,7 @@ watch(selectedDateYmd, () => {
     anomalyScanErrorMessage.value = '';
     anomalyActionSuccessMessage.value = '';
     closeDeleteRouteDialog();
+    closeBulkDeleteDialog();
 });
 
 useSiteSeo({
@@ -449,7 +598,10 @@ onBeforeUnmount(() => {
 });
 
 async function runAnomalyScan() {
-    if (anomalyScanStatus.value === 'pending') {
+    if (
+        anomalyScanStatus.value === 'pending' ||
+        isAnyAnomalyActionRunning.value
+    ) {
         return;
     }
 
@@ -507,6 +659,35 @@ function closeDeleteRouteDialog() {
     deleteRouteErrorMessage.value = '';
 }
 
+function openBulkDeleteDialog(type: AdminAnomalyType) {
+    if (isBulkDeleteButtonDisabled.value) {
+        return;
+    }
+
+    pendingBulkDeleteType.value = type;
+    bulkDeleteErrorMessage.value = '';
+    isBulkDeleteDialogOpen.value = true;
+}
+
+function closeBulkDeleteDialog() {
+    if (isBulkDeleting.value) {
+        return;
+    }
+
+    isBulkDeleteDialogOpen.value = false;
+    pendingBulkDeleteType.value = null;
+    bulkDeleteErrorMessage.value = '';
+}
+
+function handleBulkDeleteDialogVisibilityChange(nextValue: boolean) {
+    if (nextValue) {
+        isBulkDeleteDialogOpen.value = true;
+        return;
+    }
+
+    closeBulkDeleteDialog();
+}
+
 function handleDeleteRouteDialogVisibilityChange(nextValue: boolean) {
     if (nextValue) {
         isDeleteRouteDialogOpen.value = true;
@@ -514,6 +695,10 @@ function handleDeleteRouteDialogVisibilityChange(nextValue: boolean) {
     }
 
     closeDeleteRouteDialog();
+}
+
+function getCurrentAnomalyCount(type: AdminAnomalyType) {
+    return anomalyCounts.value.find((item) => item.type === type)?.count ?? 0;
 }
 
 function removeDeletedRouteFromCurrentScan(routeId: string) {
@@ -598,6 +783,97 @@ async function confirmDeleteRoute() {
         );
     } finally {
         deletingRouteId.value = '';
+    }
+}
+
+async function runAnomalyScanAfterBulkDelete() {
+    anomalyScanStatus.value = 'pending';
+    anomalyScanErrorMessage.value = '';
+
+    try {
+        const response = await requestFetch<
+            TrackerApiResponse<AdminAnomalyScanResponse>
+        >('/api/v1/admin/anomaly-scan', {
+            retry: 0,
+            query: {
+                date: selectedDateYmd.value
+            }
+        });
+
+        if (!response.ok) {
+            throw {
+                data: response
+            };
+        }
+
+        anomalyScanData.value = response.data;
+        anomalyScanStatus.value = 'success';
+    } catch (error) {
+        anomalyScanErrorMessage.value = getApiErrorMessage(
+            error,
+            '刷新主动检测结果失败。'
+        );
+        anomalyScanStatus.value = 'error';
+    }
+}
+
+async function confirmBulkDelete() {
+    if (!pendingBulkDeleteType.value || isBulkDeleting.value) {
+        return;
+    }
+
+    const targetType = pendingBulkDeleteType.value;
+    bulkDeletingType.value = targetType;
+    bulkDeleteErrorMessage.value = '';
+    anomalyActionSuccessMessage.value = '';
+
+    try {
+        const { data, error } = await useCsrfFetch<
+            TrackerApiResponse<AdminAnomalyBulkDeleteResponse>
+        >('/api/v1/admin/anomaly-actions/delete-by-type', {
+            method: 'POST',
+            body: {
+                date: selectedDateYmd.value,
+                type: targetType
+            },
+            key: `admin:anomaly-delete-by-type:${targetType}:${selectedDateYmd.value}:${Date.now()}`,
+            watch: false,
+            server: false
+        });
+
+        if (error.value) {
+            throw error.value;
+        }
+
+        const response = data.value;
+        if (!response) {
+            throw new Error('Missing anomaly bulk delete response');
+        }
+
+        if (!response.ok) {
+            throw {
+                data: response
+            };
+        }
+
+        anomalyActionSuccessMessage.value =
+            `已删除 ${getAnomalyTypeLabel(targetType)}：` +
+            `${response.data.deletedDailyRoutes} 条异常交路，` +
+            `${response.data.deletedProbeStatusRows} 条 probe status。` +
+            (response.data.skippedRoutes > 0
+                ? `另有 ${response.data.skippedRoutes} 条已不存在，已跳过。`
+                : '');
+
+        isBulkDeleteDialogOpen.value = false;
+        pendingBulkDeleteType.value = null;
+        await runAnomalyScanAfterBulkDelete();
+    } catch (error) {
+        bulkDeleteErrorMessage.value = getApiErrorMessage(
+            error,
+            '批量删除异常数据失败。'
+        );
+    } finally {
+        bulkDeletingType.value = '';
     }
 }
 

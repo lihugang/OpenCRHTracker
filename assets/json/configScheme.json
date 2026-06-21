@@ -1315,6 +1315,19 @@
                         "dailyTimesHHmm"
                     ]
                 },
+                "scheduleReadiness": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "rescheduleDelaySeconds": {
+                            "type": "integer",
+                            "minimum": 0
+                        }
+                    },
+                    "required": [
+                        "rescheduleDelaySeconds"
+                    ]
+                },
                 "scheduler": {
                     "type": "object",
                     "additionalProperties": false,
@@ -1359,6 +1372,7 @@
                 "dailyExport",
                 "referenceModel",
                 "circulation",
+                "scheduleReadiness",
                 "scheduler"
             ]
         },

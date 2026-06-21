@@ -48,11 +48,13 @@ import {
     applyResolvedProbeResult,
     queueCoupledDetectionTask
 } from '~/server/services/taskExecutors/probeResolutionShared';
+import { rescheduleTaskUntilScheduleReady } from '~/server/services/scheduleReadinessGuard';
 import {
     markCurrentTrainProvenanceTaskSkipped,
     recordCurrentTrainProvenanceEventsForTrainCodes
 } from '~/server/services/trainProvenanceRecorder';
 import {
+    getSafeTodayScheduleProbeTrainCodes,
     getTodayScheduleProbeGroupByTrainCode,
     type TodayScheduleProbeGroup
 } from '~/server/services/todayScheduleCache';
@@ -347,7 +349,23 @@ function buildFallbackGroupFromRouteRow(
 }
 
 function getGroupTrainCodes(group: TodayScheduleProbeGroup): string[] {
-    return uniqueNormalizedCodes([group.trainCode, ...group.allCodes]);
+    return getSafeTodayScheduleProbeTrainCodes(group);
+}
+
+function filterSafeProbeTaskTrainCodes(
+    args: ProbeTrainDepartureTaskArgs
+): string[] {
+    const scheduleGroup = getTodayScheduleProbeGroupByTrainCode(args.trainCode);
+    if (!scheduleGroup) {
+        return uniqueNormalizedCodes([args.trainCode]);
+    }
+
+    const allowedCodes = new Set(
+        getSafeTodayScheduleProbeTrainCodes(scheduleGroup)
+    );
+    return uniqueNormalizedCodes([args.trainCode, ...args.allCodes]).filter(
+        (trainCode) => allowedCodes.has(trainCode)
+    );
 }
 
 function isRouteTimeOverlapping(
@@ -1516,6 +1534,35 @@ async function executeProbeTrainDepartureTaskInternal(
     const nowSeconds = getNowSeconds();
     const serviceDate = formatShanghaiDateString(args.startAt * 1000);
 
+    const readiness = rescheduleTaskUntilScheduleReady(
+        PROBE_TRAIN_DEPARTURE_TASK_EXECUTOR,
+        args
+    );
+    if (!readiness.ready) {
+        markCurrentTrainProvenanceTaskSkipped('schedule_refresh_pending');
+        recordCurrentTrainProvenanceEventsForTrainCodes(
+            [args.trainCode, ...args.allCodes],
+            {
+                serviceDate,
+                startAt: args.startAt,
+                eventType: 'probe_task_skipped',
+                result: 'schedule_refresh_pending',
+                linkedSchedulerTaskId: readiness.rescheduledTaskId,
+                payload: {
+                    readiness: readiness.state,
+                    rescheduleAction: readiness.action,
+                    nextExecutionTime: readiness.nextExecutionTime,
+                    removedTaskIds: readiness.removedTaskIds,
+                    reusedExecutionTime: readiness.reusedExecutionTime
+                }
+            }
+        );
+        logger.info(
+            `schedule_refresh_pending_reschedule executor=${PROBE_TRAIN_DEPARTURE_TASK_EXECUTOR} trainCode=${args.trainCode} reason=${readiness.state.reason} nextExecutionTime=${readiness.nextExecutionTime ?? 'null'} taskId=${readiness.rescheduledTaskId ?? 'null'} action=${readiness.action ?? 'null'}`
+        );
+        return;
+    }
+
     const trainKey = buildTrainKey(
         args.trainCode,
         args.trainInternalCode,
@@ -1558,10 +1605,7 @@ async function executeProbeTrainDepartureTaskInternal(
         return;
     }
 
-    const allTrainCodes = uniqueNormalizedCodes([
-        args.trainCode,
-        ...args.allCodes
-    ]);
+    const allTrainCodes = filterSafeProbeTaskTrainCodes(args);
     const successfulRouteProbe = await probeEmuByTrainCodes(allTrainCodes);
     if (!successfulRouteProbe) {
         if (args.retry > 0) {

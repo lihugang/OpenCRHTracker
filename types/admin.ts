@@ -49,6 +49,17 @@ export interface AdminAnomalyDeleteRouteResponse {
     clearedDetectionGroups: number;
 }
 
+export interface AdminAnomalyBulkDeleteResponse {
+    date: string;
+    type: AdminAnomalyType;
+    wasToday: false;
+    matchedItems: number;
+    matchedRoutes: number;
+    deletedDailyRoutes: number;
+    deletedProbeStatusRows: number;
+    skippedRoutes: number;
+}
+
 export type AdminDailyRouteTimetableResolution =
     | 'exact'
     | 'latest_fallback'

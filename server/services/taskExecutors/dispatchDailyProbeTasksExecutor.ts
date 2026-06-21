@@ -1,7 +1,10 @@
 import getLogger from '~/server/libs/log4js';
 import useConfig from '~/server/config';
 import { registerTaskExecutor } from '~/server/services/taskExecutorRegistry';
-import { getTodayScheduleProbeGroups } from '~/server/services/todayScheduleCache';
+import {
+    getSafeTodayScheduleProbeTrainCodes,
+    getTodayScheduleProbeGroups
+} from '~/server/services/todayScheduleCache';
 import {
     enqueueTasks,
     type EnqueueTaskInput
@@ -74,10 +77,11 @@ async function executeDispatchDailyProbeTasks(): Promise<void> {
         config.spider.scheduleProbe.probe.latestExecutionTimeHHmm;
     const tasksToEnqueue: EnqueueTaskInput[] = [];
     for (const group of getTodayScheduleProbeGroups().values()) {
+        const trainCodes = getSafeTodayScheduleProbeTrainCodes(group);
         const args = {
             trainCode: group.trainCode,
             trainInternalCode: group.trainInternalCode,
-            allCodes: group.allCodes.slice(0, MAX_CODES_PER_GROUP),
+            allCodes: trainCodes.slice(0, MAX_CODES_PER_GROUP),
             startStation: group.startStation,
             endStation: group.endStation,
             startAt: group.startAt,
@@ -107,7 +111,7 @@ async function executeDispatchDailyProbeTasks(): Promise<void> {
         }
 
         recordCurrentTrainProvenanceEventsForTrainCodes(
-            [group.trainCode, ...group.allCodes],
+            getSafeTodayScheduleProbeTrainCodes(group),
             {
                 serviceDate: scheduleState.date,
                 startAt: group.startAt,
@@ -117,7 +121,7 @@ async function executeDispatchDailyProbeTasks(): Promise<void> {
                 payload: {
                     executor: PROBE_TRAIN_DEPARTURE_TASK_EXECUTOR,
                     executionTime: tasksToEnqueue[index]?.executionTime ?? now,
-                    allTrainCodes: [group.trainCode, ...group.allCodes],
+                    allTrainCodes: getSafeTodayScheduleProbeTrainCodes(group),
                     startStation: group.startStation,
                     endStation: group.endStation,
                     retry: defaultRetry

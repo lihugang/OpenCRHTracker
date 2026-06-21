@@ -107,6 +107,10 @@ interface CirculationTaskConfig {
     };
 }
 
+interface ScheduleReadinessTaskConfig {
+    rescheduleDelaySeconds: number;
+}
+
 interface LoggingConfig {
     retentionDays: number;
 }
@@ -328,6 +332,7 @@ export interface Config {
         dailyExport: DailyExportTaskConfig;
         referenceModel: ReferenceModelTaskConfig;
         circulation: CirculationTaskConfig;
+        scheduleReadiness: ScheduleReadinessTaskConfig;
         scheduler: {
             pollIntervalMs: number;
             maxTasksPerQuery: number;
@@ -950,6 +955,10 @@ function validateConfig(raw: unknown): Config {
             ? {}
             : taskCirculation.stationBoard,
         'task.circulation.stationBoard'
+    );
+    const taskScheduleReadiness = asObject(
+        task.scheduleReadiness === undefined ? {} : task.scheduleReadiness,
+        'task.scheduleReadiness'
     );
     const taskScheduler = asObject(task.scheduler, 'task.scheduler');
     const taskSchedulerIdle = asObject(
@@ -1720,6 +1729,15 @@ function validateConfig(raw: unknown): Config {
                         0
                     )
                 }
+            },
+            scheduleReadiness: {
+                rescheduleDelaySeconds: asInteger(
+                    taskScheduleReadiness.rescheduleDelaySeconds === undefined
+                        ? 30 * 60
+                        : taskScheduleReadiness.rescheduleDelaySeconds,
+                    'task.scheduleReadiness.rescheduleDelaySeconds',
+                    0
+                )
             },
             scheduler: {
                 pollIntervalMs: asInteger(

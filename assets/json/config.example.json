@@ -374,6 +374,9 @@
                 "retryDelaySeconds": 1800
             }
         },
+        "scheduleReadiness": {
+            "rescheduleDelaySeconds": 1800
+        },
         "scheduler": {
             "pollIntervalMs": 180000,
             "maxTasksPerQuery": 65535,
