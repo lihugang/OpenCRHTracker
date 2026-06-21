@@ -281,6 +281,10 @@ const navItems = [
         path: '/admin/anomaly-scan'
     },
     {
+        label: '数据维护',
+        path: '/admin/data-maintenance'
+    },
+    {
         label: '12306 数据',
         path: '/admin/train-provenance'
     },

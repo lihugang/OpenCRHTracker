@@ -49,6 +49,70 @@ export interface AdminAnomalyDeleteRouteResponse {
     clearedDetectionGroups: number;
 }
 
+export type AdminDailyRouteTimetableResolution =
+    | 'exact'
+    | 'latest_fallback'
+    | 'unresolved';
+
+export interface AdminDailyRouteRecord {
+    id: string;
+    serviceDate: string;
+    trainCode: string;
+    emuCode: string;
+    timetableId: number | null;
+    startStation: string;
+    endStation: string;
+    startAt: number;
+    endAt: number;
+}
+
+export interface AdminDailyRouteSearchResponse {
+    date: string;
+    trainCode: string;
+    emuCode: string;
+    total: number;
+    items: AdminDailyRouteRecord[];
+}
+
+export interface AdminDailyRouteTimetableCandidate {
+    timetableId: number | null;
+    serviceDateStart: string;
+    serviceDateEndExclusive: string;
+    startStation: string;
+    endStation: string;
+    startAt: number;
+    endAt: number;
+    resolution: AdminDailyRouteTimetableResolution;
+    isDefault: boolean;
+}
+
+export interface AdminDailyRouteTimetableCandidatesResponse {
+    date: string;
+    trainCode: string;
+    defaultTimetableId: number | null;
+    items: AdminDailyRouteTimetableCandidate[];
+}
+
+export interface AdminDailyRouteCreateResponse {
+    date: string;
+    trainCode: string;
+    emuCode: string;
+    timetableId: number | null;
+    createdRecord: AdminDailyRouteRecord | null;
+    inserted: boolean;
+}
+
+export interface AdminDailyRouteDeleteResponse {
+    date: string;
+    routeId: string;
+    wasToday: boolean;
+    deletedDailyRoute: boolean;
+    deletedProbeStatusRows: number;
+    clearedRuntimeTrainKey: boolean;
+    clearedRuntimeEmuCodes: string[];
+    clearedDetectionGroups: number;
+}
+
 export type AdminOfficialCirculationMatchType = 'internal_code' | 'all_code';
 
 export interface AdminOfficialCirculationNodePreview {

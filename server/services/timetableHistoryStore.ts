@@ -63,6 +63,7 @@ type TimetableHistorySqlKey =
     | 'selectCoveragesByTrainCode'
     | 'selectCoveragesByTrainCodePaged'
     | 'selectLatestCoverageByTrainCodeAtOrBeforeDate'
+    | 'selectLatestCoveragesByTrainCodeAtOrBeforeDate'
     | 'updateCoverageContentById'
     | 'updateCoverageEndById';
 
@@ -195,6 +196,30 @@ export function listTimetableHistoryCoveragesByTrainCodePaged(
         cursorServiceDate,
         cursorServiceDate,
         cursorPoint.id,
+        limit
+    );
+}
+
+export function listLatestTimetableHistoryCoveragesByTrainCodeAtOrBeforeDate(
+    trainCode: string,
+    serviceDate: string,
+    limit: number
+) {
+    const normalizedTrainCode = normalizeCode(trainCode);
+    if (
+        normalizedTrainCode.length === 0 ||
+        !Number.isInteger(limit) ||
+        limit <= 0
+    ) {
+        return [];
+    }
+
+    const normalizedServiceDate = normalizeServiceDateInteger(serviceDate);
+    return timetableHistoryStatements.all<TimetableHistoryCoverageRow>(
+        'selectLatestCoveragesByTrainCodeAtOrBeforeDate',
+        normalizedTrainCode,
+        normalizedServiceDate,
+        normalizedServiceDate,
         limit
     );
 }

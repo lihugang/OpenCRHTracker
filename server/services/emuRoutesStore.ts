@@ -30,9 +30,11 @@ export interface DailyEmuRouteRow extends RawDailyEmuRouteRow {
 
 type EmuRouteSqlKey =
     | 'deleteDailyRouteById'
+    | 'deleteDailyRouteByTrainCodeAndEmuCodeAtServiceDate'
     | 'deleteDailyRouteByTrainCodeAndEmuCodeAtStartAt'
     | 'deleteDailyRoutesByTrainCodeInRange'
     | 'insertDailyEmuRoute'
+    | 'insertDailyEmuRouteWithIdentity'
     | 'selectDailyRecordById'
     | 'selectDailyRoutesByEmuCodeInRange'
     | 'selectDailyRoutesByTrainCodeInRange'
@@ -356,6 +358,41 @@ export function insertDailyEmuRoute(
         identityLink.serviceDate,
         identityLink.timetableId
     );
+}
+
+export function insertDailyEmuRouteWithIdentity(
+    trainCode: string,
+    emuCode: string,
+    serviceDate: string,
+    timetableId: number | null
+): number {
+    const normalizedTrainCode = normalizeCode(trainCode);
+    const normalizedEmuCode = normalizeCode(emuCode);
+    if (
+        normalizedTrainCode.length === 0 ||
+        normalizedEmuCode.length === 0 ||
+        !/^\d{8}$/.test(serviceDate) ||
+        (timetableId !== null &&
+            (!Number.isInteger(timetableId) || timetableId <= 0))
+    ) {
+        return 0;
+    }
+
+    emuRouteStatements.run(
+        'deleteDailyRouteByTrainCodeAndEmuCodeAtServiceDate',
+        normalizedTrainCode,
+        normalizedEmuCode,
+        serviceDate
+    );
+
+    const result = emuRouteStatements.run(
+        'insertDailyEmuRouteWithIdentity',
+        normalizedTrainCode,
+        normalizedEmuCode,
+        serviceDate,
+        timetableId
+    );
+    return Number(result.lastInsertRowid);
 }
 
 export function deleteDailyRoutesByTrainCodeInRange(

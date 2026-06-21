@@ -510,3 +510,27 @@ export function deleteProbeStatusByTrainCodeAndEmuCodeAtStartAt(
     );
     return result.changes;
 }
+
+export function deleteProbeStatusByTrainCodeAndEmuCodeAtServiceDate(
+    trainCode: string,
+    emuCode: string,
+    serviceDate: string
+): number {
+    const normalizedTrainCode = normalizeTrainCode(trainCode);
+    const normalizedEmuCode = normalizeEmuCode(emuCode);
+    if (
+        normalizedTrainCode.length === 0 ||
+        normalizedEmuCode.length === 0 ||
+        !/^\d{8}$/.test(serviceDate)
+    ) {
+        return 0;
+    }
+
+    const result = probeStatusStatements.run(
+        'deleteProbeStatusByTrainCodeAndEmuCodeAtStartAt',
+        normalizedTrainCode,
+        normalizedEmuCode,
+        serviceDate
+    );
+    return result.changes;
+}
