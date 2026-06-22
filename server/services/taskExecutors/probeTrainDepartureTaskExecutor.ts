@@ -40,6 +40,7 @@ import {
     listDailyRoutesByTrainCodeInRange,
     type DailyEmuRouteRow
 } from '~/server/services/emuRoutesStore';
+import { persistProbeTrackingRows } from '~/server/services/probeTrackingMutations';
 import { notifyLookupStatusChanges } from '~/server/services/eventNotificationService';
 import { registerTaskExecutor } from '~/server/services/taskExecutorRegistry';
 import { enqueueTask } from '~/server/services/taskQueue';
@@ -48,6 +49,7 @@ import {
     applyResolvedProbeResult,
     queueCoupledDetectionTask
 } from '~/server/services/taskExecutors/probeResolutionShared';
+import type { ProbeTrackingMutation } from '~/server/services/probeTrackingMutations';
 import { rescheduleTaskUntilScheduleReady } from '~/server/services/scheduleReadinessGuard';
 import {
     markCurrentTrainProvenanceTaskSkipped,
@@ -949,7 +951,7 @@ async function tryAutoMergeResolvedInternalGroup(
         ...mergedFromTrainCodes
     ]);
 
-    await applyResolvedResult(
+    const trackingMutations = await applyResolvedResult(
         args,
         trainKey,
         mergedTrainCodes,
@@ -967,7 +969,8 @@ async function tryAutoMergeResolvedInternalGroup(
             source: 'internal_code_auto_merge',
             emuCodes: mergedEmuCodes,
             mergedFromEmuCodes,
-            mergedFromTrainCodes
+            mergedFromTrainCodes,
+            trackingMutations
         }
     });
     logger.info(
@@ -1387,8 +1390,8 @@ async function applyResolvedResult(
     allEmuCodes: string[],
     status: ProbeStatusValue,
     nowSeconds: number
-): Promise<void> {
-    await applyResolvedProbeResult({
+): Promise<ProbeTrackingMutation[]> {
+    return applyResolvedProbeResult({
         trainCode: args.trainCode,
         trainInternalCode: args.trainInternalCode,
         allTrainCodes,
@@ -1462,7 +1465,7 @@ async function tryReuseHistoricalProbeStatus(
         return false;
     }
 
-    await applyResolvedResult(
+    const trackingMutations = await applyResolvedResult(
         args,
         trainKey,
         allTrainCodes,
@@ -1486,7 +1489,8 @@ async function tryReuseHistoricalProbeStatus(
             historicalStartAt: latestResolvedRow.start_at,
             historicalStatus: latestResolvedRow.status,
             historicalTrainCodes,
-            emuCodes: allEmuCodes
+            emuCodes: allEmuCodes,
+            trackingMutations
         }
     });
     return true;
@@ -1913,7 +1917,7 @@ async function executeProbeTrainDepartureTaskInternal(
         logger.warn(
             `main_emu_asset_not_found trainCode=${args.trainCode} mainEmuCode=${mainEmuCode}`
         );
-        await applyResolvedResult(
+        const trackingMutations = await applyResolvedResult(
             args,
             trainKey,
             allTrainCodes,
@@ -1928,14 +1932,15 @@ async function executeProbeTrainDepartureTaskInternal(
             eventType: 'resolved_single',
             result: 'asset_missing',
             payload: {
-                source: 'route_probe'
+                source: 'route_probe',
+                trackingMutations
             }
         });
         return;
     }
 
     if (getProbeEmuMultipleStateFromRecord(mainRecord) === 'non_multiple') {
-        await applyResolvedResult(
+        const trackingMutations = await applyResolvedResult(
             args,
             trainKey,
             allTrainCodes,
@@ -1950,7 +1955,8 @@ async function executeProbeTrainDepartureTaskInternal(
             eventType: 'resolved_single',
             result: 'non_multiple',
             payload: {
-                source: 'asset_flag'
+                source: 'asset_flag',
+                trackingMutations
             }
         });
         logger.info(
@@ -1986,7 +1992,7 @@ async function executeProbeTrainDepartureTaskInternal(
                 effectiveKnownGroup.finalStatus
             );
         }
-        await applyResolvedResult(
+        const trackingMutations = await applyResolvedResult(
             args,
             trainKey,
             allTrainCodes,
@@ -2007,7 +2013,8 @@ async function executeProbeTrainDepartureTaskInternal(
                     ? 'coupled'
                     : 'single',
             payload: {
-                emuCodes: effectiveKnownGroup.emuCodes
+                emuCodes: effectiveKnownGroup.emuCodes,
+                trackingMutations
             }
         });
         logger.info(
@@ -2028,22 +2035,15 @@ async function executeProbeTrainDepartureTaskInternal(
         return;
     }
 
-    for (const trainCode of allTrainCodes) {
-        ensureProbeStatus(
-            trainCode,
-            mainEmuCode,
-            args.startAt,
-            ProbeStatusValue.PendingCouplingDetection
-        );
-    }
-    persistDailyRoutes(
-        allTrainCodes,
-        [mainEmuCode],
-        args.startStation,
-        args.endStation,
-        args.startAt,
-        args.endAt
-    );
+    const trackingMutations = persistProbeTrackingRows({
+        trainCodes: allTrainCodes,
+        emuCodes: [mainEmuCode],
+        startStation: args.startStation,
+        endStation: args.endStation,
+        startAt: args.startAt,
+        endAt: args.endAt,
+        status: ProbeStatusValue.PendingCouplingDetection
+    });
     markEmuCodesAssignedToday(
         [mainEmuCode],
         trainKey,
@@ -2068,7 +2068,8 @@ async function executeProbeTrainDepartureTaskInternal(
         payload: {
             bureau: mainRecord.bureau,
             model: mainRecord.model,
-            attemptedTrainCodes: allTrainCodes
+            attemptedTrainCodes: allTrainCodes,
+            trackingMutations
         }
     });
     logger.info(

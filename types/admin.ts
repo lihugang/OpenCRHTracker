@@ -526,6 +526,66 @@ export type AdminTrainProvenanceLatestStatus =
     | 'single'
     | 'coupled';
 
+export interface AdminDailyRouteTrackingRecord {
+    id: number;
+    trainCode: string;
+    emuCode: string;
+    serviceDate: string;
+    timetableId: number | null;
+    startStation: string;
+    endStation: string;
+    startAt: number;
+    endAt: number;
+    isTimetableResolved: boolean;
+}
+
+export interface AdminProbeStatusRecord {
+    id: number;
+    trainCode: string;
+    emuCode: string;
+    serviceDate: string;
+    timetableId: number | null;
+    status: number;
+    statusLabel: AdminTrainProvenanceLatestStatus;
+    startAt: number;
+    isTimetableResolved: boolean;
+}
+
+export type AdminTrackingMutationTable = 'daily_emu_routes' | 'probe_status';
+
+export type AdminTrackingMutationAction =
+    | 'created'
+    | 'updated'
+    | 'deleted'
+    | 'unchanged'
+    | 'cleared'
+    | 'downgraded';
+
+export interface AdminTrackingMutation {
+    table: AdminTrackingMutationTable;
+    action: AdminTrackingMutationAction;
+    id: number | null;
+    trainCode: string;
+    emuCode: string;
+    serviceDate: string;
+    timetableId: number | null;
+    startAt: number | null;
+    previousStatus: number | null;
+    nextStatus: number | null;
+    rowCount: number;
+}
+
+export interface AdminTrackingMutationSummary {
+    mutations: AdminTrackingMutation[];
+    dailyRouteCreated: number;
+    dailyRouteUpdated: number;
+    dailyRouteDeleted: number;
+    probeStatusCreated: number;
+    probeStatusUpdated: number;
+    probeStatusDeleted: number;
+    probeStatusUnchanged: number;
+}
+
 export interface AdminTrainProvenanceDeparture {
     startAt: number;
     endAt: number | null;
@@ -533,6 +593,8 @@ export interface AdminTrainProvenanceDeparture {
     endStation: string;
     latestStatus: AdminTrainProvenanceLatestStatus;
     emuCodes: string[];
+    dailyRouteRows: AdminDailyRouteTrackingRecord[];
+    probeStatusRows: AdminProbeStatusRecord[];
 }
 
 export type AdminTrainProvenanceConflictState =
@@ -622,6 +684,7 @@ export interface AdminTrainProvenanceEvent {
     scannedRoute: AdminTrainRouteSnapshot | null;
     historicalReuse: AdminTrainProvenanceHistoricalReuseDetail | null;
     coupledResolution: AdminTrainProvenanceCoupledResolutionDetail | null;
+    trackingMutations: AdminTrackingMutationSummary | null;
     payload: unknown;
 }
 

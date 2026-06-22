@@ -11,7 +11,10 @@ import {
     ProbeStatusValue,
     updateProbeStatusByTrainCode
 } from '~/server/services/probeStatusStore';
-import { insertDailyEmuRoute } from '~/server/services/emuRoutesStore';
+import {
+    persistProbeTrackingRows,
+    type ProbeTrackingMutation
+} from '~/server/services/probeTrackingMutations';
 import { notifyLookupStatusChanges } from '~/server/services/eventNotificationService';
 import { enqueueTask } from '~/server/services/taskQueue';
 import { DETECT_COUPLED_EMU_GROUP_TASK_EXECUTOR } from '~/server/services/taskExecutors/detectCoupledEmuGroupTaskExecutor';
@@ -37,28 +40,6 @@ interface ApplyPendingCouplingProbeResultInput extends Omit<
     ApplyResolvedProbeResultInput,
     'status'
 > {}
-
-function persistDailyRoutes(
-    trainCodes: string[],
-    emuCodes: string[],
-    startStation: string,
-    endStation: string,
-    startAt: number,
-    endAt: number
-): void {
-    for (const trainCode of trainCodes) {
-        for (const emuCode of emuCodes) {
-            insertDailyEmuRoute(
-                trainCode,
-                emuCode,
-                startStation,
-                endStation,
-                startAt,
-                endAt
-            );
-        }
-    }
-}
 
 function collectLookupStatusNotificationCandidates(
     allTrainCodes: string[],
@@ -86,7 +67,7 @@ function collectLookupStatusNotificationCandidates(
 
 export async function applyResolvedProbeResult(
     input: ApplyResolvedProbeResultInput
-): Promise<void> {
+): Promise<ProbeTrackingMutation[]> {
     const notificationCandidates = collectLookupStatusNotificationCandidates(
         input.allTrainCodes,
         input.allEmuCodes,
@@ -99,20 +80,15 @@ export async function applyResolvedProbeResult(
         input.startAt
     );
 
-    for (const trainCode of input.allTrainCodes) {
-        for (const emuCode of input.allEmuCodes) {
-            ensureProbeStatus(trainCode, emuCode, input.startAt, input.status);
-        }
-    }
-
-    persistDailyRoutes(
-        input.allTrainCodes,
-        input.allEmuCodes,
-        input.startStation,
-        input.endStation,
-        input.startAt,
-        input.endAt
-    );
+    const trackingMutations = persistProbeTrackingRows({
+        trainCodes: input.allTrainCodes,
+        emuCodes: input.allEmuCodes,
+        startStation: input.startStation,
+        endStation: input.endStation,
+        startAt: input.startAt,
+        endAt: input.endAt,
+        status: input.status
+    });
     markEmuCodesAssignedToday(
         input.allEmuCodes,
         input.trainKey,
@@ -122,11 +98,12 @@ export async function applyResolvedProbeResult(
     );
     markQueriedTrainKey(input.trainKey);
     await notifyLookupStatusChanges(notificationCandidates);
+    return trackingMutations;
 }
 
 export async function applyPendingCouplingProbeResult(
     input: ApplyPendingCouplingProbeResultInput
-): Promise<void> {
+): Promise<ProbeTrackingMutation[]> {
     const notificationCandidates = collectLookupStatusNotificationCandidates(
         input.allTrainCodes,
         input.allEmuCodes,
@@ -145,24 +122,17 @@ export async function applyPendingCouplingProbeResult(
             input.startAt,
             ProbeStatusValue.PendingCouplingDetection
         );
-        for (const emuCode of input.allEmuCodes) {
-            ensureProbeStatus(
-                trainCode,
-                emuCode,
-                input.startAt,
-                ProbeStatusValue.PendingCouplingDetection
-            );
-        }
     }
 
-    persistDailyRoutes(
-        input.allTrainCodes,
-        input.allEmuCodes,
-        input.startStation,
-        input.endStation,
-        input.startAt,
-        input.endAt
-    );
+    const trackingMutations = persistProbeTrackingRows({
+        trainCodes: input.allTrainCodes,
+        emuCodes: input.allEmuCodes,
+        startStation: input.startStation,
+        endStation: input.endStation,
+        startAt: input.startAt,
+        endAt: input.endAt,
+        status: ProbeStatusValue.PendingCouplingDetection
+    });
     markEmuCodesAssignedToday(
         input.allEmuCodes,
         input.trainKey,
@@ -172,6 +142,7 @@ export async function applyPendingCouplingProbeResult(
     );
     markQueriedTrainKey(input.trainKey);
     await notifyLookupStatusChanges(notificationCandidates);
+    return trackingMutations;
 }
 
 export function queueCoupledDetectionTask(mainRecord: EmuListRecord): number {

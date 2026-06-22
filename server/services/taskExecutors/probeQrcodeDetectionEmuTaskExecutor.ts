@@ -212,7 +212,7 @@ async function executeProbeQrcodeDetectionEmuTask(rawArgs: unknown) {
     });
 
     if (getProbeEmuMultipleStateFromRecord(resolvedRecord) === 'non_multiple') {
-        await applyResolvedProbeResult({
+        const trackingMutations = await applyResolvedProbeResult({
             trainCode: routeTrainCode,
             trainInternalCode: routeTrainInternalCode,
             allTrainCodes,
@@ -233,13 +233,14 @@ async function executeProbeQrcodeDetectionEmuTask(rawArgs: unknown) {
             result: 'qrcode_detection',
             payload: {
                 detectedAt: args.detectedAt,
-                source: 'qrcode_detection'
+                source: 'qrcode_detection',
+                trackingMutations
             }
         });
         return;
     }
 
-    await applyPendingCouplingProbeResult({
+    const trackingMutations = await applyPendingCouplingProbeResult({
         trainCode: routeTrainCode,
         trainInternalCode: routeTrainInternalCode,
         allTrainCodes,
@@ -263,7 +264,8 @@ async function executeProbeQrcodeDetectionEmuTask(rawArgs: unknown) {
             detectedAt: args.detectedAt,
             bureau: resolvedRecord.bureau,
             model: resolvedRecord.model,
-            source: 'qrcode_detection'
+            source: 'qrcode_detection',
+            trackingMutations
         }
     });
 }

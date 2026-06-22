@@ -56,6 +56,12 @@ import type {
     AdminStationBoardStationTaskAction,
     AdminStationBoardStationTaskItem,
     AdminStationBoardTaskListResponse,
+    AdminDailyRouteTrackingRecord,
+    AdminProbeStatusRecord,
+    AdminTrackingMutation,
+    AdminTrackingMutationAction,
+    AdminTrackingMutationSummary,
+    AdminTrackingMutationTable,
     AdminTrainDataRequestHourBucket,
     AdminTrainDataRequestStatsResponse,
     AdminTrainDataRequestSummary,
@@ -101,6 +107,50 @@ function toLatestStatus(
     }
 }
 
+function toStatusLabel(status: number): AdminTrainProvenanceLatestStatus {
+    switch (status) {
+        case ProbeStatusValue.PendingCouplingDetection:
+            return 'pending';
+        case ProbeStatusValue.SingleFormationResolved:
+            return 'single';
+        case ProbeStatusValue.CoupledFormationResolved:
+            return 'coupled';
+        default:
+            return 'unknown';
+    }
+}
+
+function toDailyRouteTrackingRecord(
+    row: DailyEmuRouteRow
+): AdminDailyRouteTrackingRecord {
+    return {
+        id: row.id,
+        trainCode: row.train_code,
+        emuCode: row.emu_code,
+        serviceDate: row.service_date,
+        timetableId: row.timetable_id,
+        startStation: row.start_station_name,
+        endStation: row.end_station_name,
+        startAt: row.start_at,
+        endAt: row.end_at,
+        isTimetableResolved: row.timetable_id !== null && row.start_at > 0
+    };
+}
+
+function toProbeStatusRecord(row: ProbeStatusRow): AdminProbeStatusRecord {
+    return {
+        id: row.id,
+        trainCode: row.train_code,
+        emuCode: row.emu_code,
+        serviceDate: row.service_date,
+        timetableId: row.timetable_id,
+        status: row.status,
+        statusLabel: toStatusLabel(row.status),
+        startAt: row.start_at,
+        isTimetableResolved: row.timetable_id !== null && row.start_at > 0
+    };
+}
+
 function toDeparture(
     startAt: number,
     routeRows: DailyEmuRouteRow[],
@@ -130,7 +180,9 @@ function toDeparture(
         endStation:
             firstRouteRow?.end_station_name || fallbackRoute?.endStation || '',
         latestStatus: toLatestStatus(probeRows),
-        emuCodes
+        emuCodes,
+        dailyRouteRows: routeRows.map(toDailyRouteTrackingRecord),
+        probeStatusRows: probeRows.map(toProbeStatusRecord)
     };
 }
 
@@ -163,6 +215,131 @@ function getStringArray(value: unknown): string[] {
     return Array.isArray(value)
         ? value.filter((item): item is string => typeof item === 'string')
         : [];
+}
+
+function isTrackingMutationTable(
+    value: unknown
+): value is AdminTrackingMutationTable {
+    return value === 'daily_emu_routes' || value === 'probe_status';
+}
+
+function isTrackingMutationAction(
+    value: unknown
+): value is AdminTrackingMutationAction {
+    return (
+        value === 'created' ||
+        value === 'updated' ||
+        value === 'deleted' ||
+        value === 'unchanged' ||
+        value === 'cleared' ||
+        value === 'downgraded'
+    );
+}
+
+function getNullableInteger(value: unknown): number | null {
+    return typeof value === 'number' && Number.isInteger(value) ? value : null;
+}
+
+function toTrackingMutation(value: unknown): AdminTrackingMutation | null {
+    const payload = getPayloadObject(value);
+    if (!payload) {
+        return null;
+    }
+
+    const table = payload.table;
+    const action = payload.action;
+    if (!isTrackingMutationTable(table) || !isTrackingMutationAction(action)) {
+        return null;
+    }
+
+    const rowCount = getOptionalInteger(payload.rowCount) ?? 1;
+    return {
+        table,
+        action,
+        id: getNullableInteger(payload.id),
+        trainCode: normalizeCode(getOptionalString(payload.trainCode) ?? ''),
+        emuCode: normalizeCode(getOptionalString(payload.emuCode) ?? ''),
+        serviceDate: getOptionalString(payload.serviceDate) ?? '',
+        timetableId: getNullableInteger(payload.timetableId),
+        startAt: getNullableInteger(payload.startAt),
+        previousStatus: getNullableInteger(payload.previousStatus),
+        nextStatus: getNullableInteger(payload.nextStatus),
+        rowCount
+    };
+}
+
+function buildTrackingMutationSummary(
+    mutations: AdminTrackingMutation[]
+): AdminTrackingMutationSummary {
+    return {
+        mutations,
+        dailyRouteCreated: mutations
+            .filter(
+                (mutation) =>
+                    mutation.table === 'daily_emu_routes' &&
+                    mutation.action === 'created'
+            )
+            .reduce((total, mutation) => total + mutation.rowCount, 0),
+        dailyRouteUpdated: mutations
+            .filter(
+                (mutation) =>
+                    mutation.table === 'daily_emu_routes' &&
+                    mutation.action === 'updated'
+            )
+            .reduce((total, mutation) => total + mutation.rowCount, 0),
+        dailyRouteDeleted: mutations
+            .filter(
+                (mutation) =>
+                    mutation.table === 'daily_emu_routes' &&
+                    (mutation.action === 'deleted' ||
+                        mutation.action === 'cleared')
+            )
+            .reduce((total, mutation) => total + mutation.rowCount, 0),
+        probeStatusCreated: mutations
+            .filter(
+                (mutation) =>
+                    mutation.table === 'probe_status' &&
+                    mutation.action === 'created'
+            )
+            .reduce((total, mutation) => total + mutation.rowCount, 0),
+        probeStatusUpdated: mutations
+            .filter(
+                (mutation) =>
+                    mutation.table === 'probe_status' &&
+                    (mutation.action === 'updated' ||
+                        mutation.action === 'downgraded')
+            )
+            .reduce((total, mutation) => total + mutation.rowCount, 0),
+        probeStatusDeleted: mutations
+            .filter(
+                (mutation) =>
+                    mutation.table === 'probe_status' &&
+                    (mutation.action === 'deleted' ||
+                        mutation.action === 'cleared')
+            )
+            .reduce((total, mutation) => total + mutation.rowCount, 0),
+        probeStatusUnchanged: mutations
+            .filter(
+                (mutation) =>
+                    mutation.table === 'probe_status' &&
+                    mutation.action === 'unchanged'
+            )
+            .reduce((total, mutation) => total + mutation.rowCount, 0)
+    };
+}
+
+function extractTrackingMutationSummary(
+    event: TrainProvenanceEventRecord
+): AdminTrackingMutationSummary | null {
+    const payload = getPayloadObject(event.payload);
+    const rawMutations = Array.isArray(payload?.trackingMutations)
+        ? payload.trackingMutations
+        : [];
+    const mutations = rawMutations
+        .map(toTrackingMutation)
+        .filter((mutation): mutation is AdminTrackingMutation => mutation !== null);
+
+    return mutations.length > 0 ? buildTrackingMutationSummary(mutations) : null;
 }
 
 interface StationBoardDispatchDetailPayload {
@@ -1561,6 +1738,7 @@ function toTimelineEvent(
     const scannedRoute = resolveEventScannedRoute(event);
     const historicalReuse = extractHistoricalReuseDetail(event);
     const coupledResolution = extractCoupledResolutionDetail(event);
+    const trackingMutations = extractTrackingMutationSummary(event);
     const couplingScan =
         event.eventType === 'coupling_scan_candidate_direct_hit'
             ? {
@@ -1604,6 +1782,7 @@ function toTimelineEvent(
         scannedRoute,
         historicalReuse,
         coupledResolution,
+        trackingMutations,
         payload: event.payload
     };
 }
@@ -1944,7 +2123,7 @@ export function getAdminTrainProvenance(
         normalizedTrainCode,
         null
     );
-    const departureStartAts = listTrainProvenanceDepartureStartAts(
+    const eventDepartureStartAts = listTrainProvenanceDepartureStartAts(
         date,
         normalizedTrainCode
     );
@@ -1972,6 +2151,14 @@ export function getAdminTrainProvenance(
         currentEvents.push(event);
         timelineRecordsByStartAt.set(event.startAt, currentEvents);
     }
+
+    const tableDepartureStartAts = [
+        ...routeRows.map((row) => row.start_at),
+        ...probeRows.map((row) => row.start_at)
+    ].filter((candidateStartAt) => candidateStartAt > 0);
+    const departureStartAts = Array.from(
+        new Set([...eventDepartureStartAts, ...tableDepartureStartAts])
+    ).sort((left, right) => left - right);
 
     const departures = departureStartAts.map((candidateStartAt) => {
         const fallback = buildDepartureFallback(

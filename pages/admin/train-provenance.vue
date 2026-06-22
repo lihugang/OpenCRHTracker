@@ -600,8 +600,236 @@
                                                     : '--'
                                             }}
                                         </p>
+                                        <p
+                                            class="text-xs leading-5 text-slate-500">
+                                            daily_emu_routes
+                                            {{ item.dailyRouteRows.length }} 行
+                                            / probe_status
+                                            {{ item.probeStatusRows.length }} 行
+                                        </p>
                                     </div>
                                 </button>
+                            </div>
+                        </div>
+
+                        <div
+                            v-if="activeDeparture"
+                            class="space-y-3">
+                            <div class="space-y-1">
+                                <p
+                                    class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                                    Table Snapshot
+                                </p>
+                                <h3
+                                    class="text-xl font-semibold text-slate-900">
+                                    当前表快照
+                                </h3>
+                                <p class="text-sm leading-6 text-slate-600">
+                                    直接来自 daily_emu_routes 和 probe_status
+                                    的当前记录；即使没有来源事件，这里也会显示表内状态。
+                                </p>
+                            </div>
+
+                            <div class="grid gap-4 xl:grid-cols-2">
+                                <div
+                                    class="rounded-[1rem] border border-slate-200 bg-white/90 px-4 py-4">
+                                    <div
+                                        class="flex items-center justify-between gap-3">
+                                        <p
+                                            class="text-sm font-semibold text-slate-900">
+                                            daily_emu_routes
+                                        </p>
+                                        <span
+                                            class="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
+                                            {{
+                                                activeDeparture.dailyRouteRows
+                                                    .length
+                                            }}
+                                            行
+                                        </span>
+                                    </div>
+                                    <div
+                                        v-if="
+                                            activeDeparture.dailyRouteRows
+                                                .length === 0
+                                        "
+                                        class="mt-4 rounded-[0.75rem] bg-slate-50 px-3 py-3 text-sm text-slate-500">
+                                        当前班次没有 daily_emu_routes 记录。
+                                    </div>
+                                    <div
+                                        v-else
+                                        class="mt-4 overflow-x-auto">
+                                        <table
+                                            class="min-w-full text-left text-sm">
+                                            <thead class="text-xs text-slate-400">
+                                                <tr>
+                                                    <th class="px-3 py-2">
+                                                        ID
+                                                    </th>
+                                                    <th class="px-3 py-2">
+                                                        车次
+                                                    </th>
+                                                    <th class="px-3 py-2">
+                                                        车组
+                                                    </th>
+                                                    <th class="px-3 py-2">
+                                                        service_date
+                                                    </th>
+                                                    <th class="px-3 py-2">
+                                                        timetable_id
+                                                    </th>
+                                                    <th class="px-3 py-2">
+                                                        运行区间
+                                                    </th>
+                                                </tr>
+                                            </thead>
+                                            <tbody
+                                                class="divide-y divide-slate-100">
+                                                <tr
+                                                    v-for="row in activeDeparture.dailyRouteRows"
+                                                    :key="`daily-route:${row.id}`">
+                                                    <td
+                                                        class="px-3 py-2 font-mono text-xs text-slate-500">
+                                                        {{ row.id }}
+                                                    </td>
+                                                    <td class="px-3 py-2">
+                                                        {{ row.trainCode }}
+                                                    </td>
+                                                    <td class="px-3 py-2">
+                                                        {{ row.emuCode }}
+                                                    </td>
+                                                    <td
+                                                        class="px-3 py-2 font-mono text-xs">
+                                                        {{
+                                                            row.serviceDate
+                                                        }}
+                                                    </td>
+                                                    <td
+                                                        class="px-3 py-2 font-mono text-xs"
+                                                        :class="
+                                                            row.isTimetableResolved
+                                                                ? 'text-slate-600'
+                                                                : 'text-amber-700'
+                                                        ">
+                                                        {{
+                                                            row.timetableId ??
+                                                            'unresolved'
+                                                        }}
+                                                    </td>
+                                                    <td class="px-3 py-2">
+                                                        {{
+                                                            formatRouteRowSummary(
+                                                                row
+                                                            )
+                                                        }}
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+
+                                <div
+                                    class="rounded-[1rem] border border-slate-200 bg-white/90 px-4 py-4">
+                                    <div
+                                        class="flex items-center justify-between gap-3">
+                                        <p
+                                            class="text-sm font-semibold text-slate-900">
+                                            probe_status
+                                        </p>
+                                        <span
+                                            class="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
+                                            {{
+                                                activeDeparture.probeStatusRows
+                                                    .length
+                                            }}
+                                            行
+                                        </span>
+                                    </div>
+                                    <div
+                                        v-if="
+                                            activeDeparture.probeStatusRows
+                                                .length === 0
+                                        "
+                                        class="mt-4 rounded-[0.75rem] bg-slate-50 px-3 py-3 text-sm text-slate-500">
+                                        当前班次没有 probe_status 记录。
+                                    </div>
+                                    <div
+                                        v-else
+                                        class="mt-4 overflow-x-auto">
+                                        <table
+                                            class="min-w-full text-left text-sm">
+                                            <thead class="text-xs text-slate-400">
+                                                <tr>
+                                                    <th class="px-3 py-2">
+                                                        ID
+                                                    </th>
+                                                    <th class="px-3 py-2">
+                                                        车次
+                                                    </th>
+                                                    <th class="px-3 py-2">
+                                                        车组
+                                                    </th>
+                                                    <th class="px-3 py-2">
+                                                        service_date
+                                                    </th>
+                                                    <th class="px-3 py-2">
+                                                        timetable_id
+                                                    </th>
+                                                    <th class="px-3 py-2">
+                                                        状态
+                                                    </th>
+                                                </tr>
+                                            </thead>
+                                            <tbody
+                                                class="divide-y divide-slate-100">
+                                                <tr
+                                                    v-for="row in activeDeparture.probeStatusRows"
+                                                    :key="`probe-status:${row.id}`">
+                                                    <td
+                                                        class="px-3 py-2 font-mono text-xs text-slate-500">
+                                                        {{ row.id }}
+                                                    </td>
+                                                    <td class="px-3 py-2">
+                                                        {{ row.trainCode }}
+                                                    </td>
+                                                    <td class="px-3 py-2">
+                                                        {{ row.emuCode }}
+                                                    </td>
+                                                    <td
+                                                        class="px-3 py-2 font-mono text-xs">
+                                                        {{
+                                                            row.serviceDate
+                                                        }}
+                                                    </td>
+                                                    <td
+                                                        class="px-3 py-2 font-mono text-xs"
+                                                        :class="
+                                                            row.isTimetableResolved
+                                                                ? 'text-slate-600'
+                                                                : 'text-amber-700'
+                                                        ">
+                                                        {{
+                                                            row.timetableId ??
+                                                            'unresolved'
+                                                        }}
+                                                    </td>
+                                                    <td class="px-3 py-2">
+                                                        {{
+                                                            getDepartureStatusLabel(
+                                                                row.statusLabel
+                                                            )
+                                                        }}
+                                                        <span
+                                                            class="text-xs text-slate-400">
+                                                            ({{ row.status }})
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
@@ -813,6 +1041,100 @@
                                                             .cacheNote
                                                     }}
                                                 </p>
+                                            </div>
+                                        </div>
+
+                                        <div
+                                            v-if="
+                                                item.trackingMutations &&
+                                                item.trackingMutations
+                                                    .mutations.length > 0
+                                            "
+                                            class="rounded-[0.875rem] border border-emerald-200 bg-emerald-50/70 px-4 py-4">
+                                            <div class="space-y-3">
+                                                <div
+                                                    class="flex flex-col gap-1 lg:flex-row lg:items-center lg:justify-between">
+                                                    <p
+                                                        class="text-sm font-semibold text-slate-900">
+                                                        本事件表变更
+                                                    </p>
+                                                    <p
+                                                        class="text-xs leading-5 text-emerald-700">
+                                                        {{
+                                                            formatTrackingMutationSummary(
+                                                                item
+                                                                    .trackingMutations
+                                                            )
+                                                        }}
+                                                    </p>
+                                                </div>
+                                                <div
+                                                    class="grid gap-2 md:grid-cols-2">
+                                                    <div
+                                                        v-for="(
+                                                            mutation, index
+                                                        ) in item
+                                                            .trackingMutations
+                                                            .mutations"
+                                                        :key="`${item.id}:mutation:${index}`"
+                                                        class="rounded-[0.75rem] border border-white/80 bg-white/90 px-3 py-3">
+                                                        <p
+                                                            class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+                                                            {{
+                                                                mutation.table
+                                                            }}
+                                                            /
+                                                            {{
+                                                                getTrackingMutationActionLabel(
+                                                                    mutation.action
+                                                                )
+                                                            }}
+                                                        </p>
+                                                        <p
+                                                            class="mt-1 text-sm font-semibold text-slate-900">
+                                                            {{
+                                                                formatTrackingMutationTarget(
+                                                                    mutation
+                                                                )
+                                                            }}
+                                                        </p>
+                                                        <p
+                                                            class="text-xs leading-5 text-slate-500">
+                                                            row #{{
+                                                                mutation.id ??
+                                                                '--'
+                                                            }}
+                                                            ·
+                                                            {{
+                                                                mutation.serviceDate ||
+                                                                '--'
+                                                            }}
+                                                            · timetable
+                                                            {{
+                                                                mutation.timetableId ??
+                                                                'unresolved'
+                                                            }}
+                                                        </p>
+                                                        <p
+                                                            v-if="
+                                                                mutation.table ===
+                                                                'probe_status'
+                                                            "
+                                                            class="text-xs leading-5 text-slate-500">
+                                                            状态：{{
+                                                                formatMutationStatus(
+                                                                    mutation.previousStatus
+                                                                )
+                                                            }}
+                                                            →
+                                                            {{
+                                                                formatMutationStatus(
+                                                                    mutation.nextStatus
+                                                                )
+                                                            }}
+                                                        </p>
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
 
@@ -2767,6 +3089,7 @@ import type {
     AdminTrainProvenanceEvent,
     AdminTrainProvenanceLatestStatus,
     AdminTrainProvenanceResponse,
+    AdminTrackingMutation,
     AdminTrainRouteSnapshot,
     AdminTrainProvenanceTaskRunStatus
 } from '~/types/admin';
@@ -3106,6 +3429,11 @@ const departureItems = computed<AdminTrainProvenanceDeparture[]>(
 );
 const activeStartAt = computed(
     () => provenanceData.value?.selectedStartAt ?? null
+);
+const activeDeparture = computed(
+    () =>
+        departureItems.value.find((item) => item.startAt === activeStartAt.value) ??
+        null
 );
 const timelineItems = computed<AdminTrainProvenanceEvent[]>(
     () => provenanceData.value?.timeline ?? []
@@ -3926,6 +4254,92 @@ function getQrcodeScanSourceLabel(manualNow: boolean) {
 
 function formatEmuCodeList(emuCodes: string[]) {
     return emuCodes.length > 0 ? emuCodes.join(' / ') : '--';
+}
+
+function formatRouteRowSummary(
+    row: AdminTrainProvenanceDeparture['dailyRouteRows'][number]
+) {
+    const stationText =
+        row.startStation.length > 0 || row.endStation.length > 0
+            ? `${row.startStation || '--'} 至 ${row.endStation || '--'}`
+            : '-- 至 --';
+    const timeText =
+        row.startAt > 0 || row.endAt > 0
+            ? `${row.startAt > 0 ? formatShanghaiTime(row.startAt) : '--'}-${row.endAt > 0 ? formatShanghaiTime(row.endAt) : '--'}`
+            : '--';
+
+    return `${stationText} / ${timeText}`;
+}
+
+function getTrackingMutationActionLabel(
+    action: AdminTrackingMutation['action']
+) {
+    switch (action) {
+        case 'created':
+            return '新增';
+        case 'updated':
+            return '更新';
+        case 'deleted':
+            return '删除';
+        case 'unchanged':
+            return '未变化';
+        case 'cleared':
+            return '清空';
+        case 'downgraded':
+            return '降级';
+        default:
+            return action;
+    }
+}
+
+function formatTrackingMutationTarget(mutation: AdminTrackingMutation) {
+    const trainCode = mutation.trainCode || '--';
+    const emuCode = mutation.emuCode || '--';
+    return `${trainCode} / ${emuCode}`;
+}
+
+function formatMutationStatus(status: number | null) {
+    switch (status) {
+        case 1:
+            return '待重联确认';
+        case 2:
+            return '单组';
+        case 3:
+            return '重联';
+        case null:
+            return '--';
+        default:
+            return String(status);
+    }
+}
+
+function formatTrackingMutationSummary(
+    summary: NonNullable<AdminTrainProvenanceEvent['trackingMutations']>
+) {
+    const parts = [];
+    if (summary.dailyRouteCreated > 0) {
+        parts.push(`daily +${summary.dailyRouteCreated}`);
+    }
+    if (summary.dailyRouteUpdated > 0) {
+        parts.push(`daily 更新 ${summary.dailyRouteUpdated}`);
+    }
+    if (summary.dailyRouteDeleted > 0) {
+        parts.push(`daily 删除 ${summary.dailyRouteDeleted}`);
+    }
+    if (summary.probeStatusCreated > 0) {
+        parts.push(`probe +${summary.probeStatusCreated}`);
+    }
+    if (summary.probeStatusUpdated > 0) {
+        parts.push(`probe 更新 ${summary.probeStatusUpdated}`);
+    }
+    if (summary.probeStatusDeleted > 0) {
+        parts.push(`probe 删除 ${summary.probeStatusDeleted}`);
+    }
+    if (summary.probeStatusUnchanged > 0) {
+        parts.push(`probe 未变 ${summary.probeStatusUnchanged}`);
+    }
+
+    return parts.length > 0 ? parts.join(' / ') : '无实际变更';
 }
 
 function formatRouteSnapshotTrainCodes(route: AdminTrainRouteSnapshot | null) {
