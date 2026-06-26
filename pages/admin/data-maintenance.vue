@@ -25,12 +25,12 @@
 
                     <div class="grid gap-4 md:grid-cols-2">
                         <AdminLookupCodeInput
-                            v-model="deleteTrainCodeInput"
+                            v-model="trainCodeInput"
                             type-filter="train"
                             label="车次"
                             placeholder="例如 G1" />
                         <AdminLookupCodeInput
-                            v-model="deleteEmuCodeInput"
+                            v-model="emuCodeInput"
                             type-filter="emu"
                             label="车组"
                             placeholder="例如 CR400AF-2010" />
@@ -38,9 +38,9 @@
 
                     <UiField
                         label="日期"
-                        help="默认同步当前管理员日期；修改此处不会影响页面顶部日期。">
+                        help="与页面顶部管理员日期同步。">
                         <input
-                            v-model="deleteDateInput"
+                            v-model="selectedDateInput"
                             type="date"
                             class="harmony-input w-full px-4 py-3 text-base text-crh-grey-dark"
                             :max="todayDateInputValue" />
@@ -219,13 +219,13 @@
 
                     <div class="grid gap-4 md:grid-cols-2">
                         <AdminLookupCodeInput
-                            v-model="createTrainCodeInput"
+                            v-model="trainCodeInput"
                             type-filter="train"
                             label="车次"
                             placeholder="例如 G1"
                             required />
                         <AdminLookupCodeInput
-                            v-model="createEmuCodeInput"
+                            v-model="emuCodeInput"
                             type-filter="emu"
                             label="车组"
                             placeholder="例如 CR400AF-2010"
@@ -234,9 +234,9 @@
 
                     <UiField
                         label="日期"
-                        help="默认同步当前管理员日期；修改此处不会影响左侧删除检索日期。">
+                        help="与页面顶部管理员日期同步。">
                         <input
-                            v-model="createDateInput"
+                            v-model="selectedDateInput"
                             type="date"
                             class="harmony-input w-full px-4 py-3 text-base text-crh-grey-dark"
                             :max="todayDateInputValue" />
@@ -397,7 +397,7 @@
 
                 <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto]">
                     <AdminLookupCodeInput
-                        v-model="timetableTrainCodeInput"
+                        v-model="trainCodeInput"
                         type-filter="train"
                         label="车次"
                         placeholder="例如 G1"
@@ -785,12 +785,11 @@ const requestFetch: TrackedRequestFetch = import.meta.server
 const { session } = useAuthState();
 const { selectedDateInput, todayDateInputValue } = await useAdminDateQuery();
 
-const deleteTrainCodeInput = ref('');
-const deleteEmuCodeInput = ref('');
+const trainCodeInput = ref('');
+const emuCodeInput = ref('');
 const deleteSearchStatus = ref<'idle' | 'pending' | 'success' | 'error'>(
     'idle'
 );
-const deleteDateInput = ref(selectedDateInput.value);
 const deleteSearchData = ref<AdminDailyRouteSearchResponse | null>(null);
 const deleteErrorMessage = ref('');
 const deleteSuccessMessage = ref('');
@@ -799,9 +798,6 @@ const isDeleteDialogOpen = ref(false);
 const pendingDeleteRoute = ref<AdminDailyRouteRecord | null>(null);
 const deleteActionErrorMessage = ref('');
 
-const createTrainCodeInput = ref('');
-const createEmuCodeInput = ref('');
-const createDateInput = ref(selectedDateInput.value);
 const candidateStatus = ref<'idle' | 'pending' | 'success' | 'error'>('idle');
 const candidateData = ref<AdminDailyRouteTimetableCandidatesResponse | null>(
     null
@@ -811,7 +807,6 @@ const selectedTimetableId = ref<number | null>(null);
 const createStatus = ref<'idle' | 'pending' | 'success' | 'error'>('idle');
 const createSuccessMessage = ref('');
 const createErrorMessage = ref('');
-const timetableTrainCodeInput = ref('');
 const timetableMergeStatus = ref<'idle' | 'pending' | 'success' | 'error'>(
     'idle'
 );
@@ -825,27 +820,14 @@ const isTimetableMergeDialogOpen = ref(false);
 const mergingCoverageId = ref<number | null>(null);
 const timetableMergeActionErrorMessage = ref('');
 
-const normalizedDeleteTrainCode = computed(() =>
-    normalizeLookupCode(deleteTrainCodeInput.value)
+const normalizedTrainCode = computed(() =>
+    normalizeLookupCode(trainCodeInput.value)
 );
-const normalizedDeleteEmuCode = computed(() =>
-    normalizeLookupCode(deleteEmuCodeInput.value)
-);
-const normalizedCreateTrainCode = computed(() =>
-    normalizeLookupCode(createTrainCodeInput.value)
-);
-const normalizedCreateEmuCode = computed(() =>
-    normalizeLookupCode(createEmuCodeInput.value)
-);
-const normalizedTimetableTrainCode = computed(() =>
-    normalizeLookupCode(timetableTrainCodeInput.value)
-);
+const normalizedEmuCode = computed(() => normalizeLookupCode(emuCodeInput.value));
 const deleteDateYmd = computed(() =>
-    fromAdminDateInputValue(deleteDateInput.value)
+    fromAdminDateInputValue(selectedDateInput.value)
 );
-const createDateYmd = computed(() =>
-    fromAdminDateInputValue(createDateInput.value)
-);
+const createDateYmd = deleteDateYmd;
 const deleteRouteItems = computed(() => deleteSearchData.value?.items ?? []);
 const candidateItems = computed(() => candidateData.value?.items ?? []);
 const timetableMergeItems = computed(
@@ -854,13 +836,13 @@ const timetableMergeItems = computed(
 const canSearchDelete = computed(
     () =>
         /^\d{8}$/.test(deleteDateYmd.value) &&
-        (normalizedDeleteTrainCode.value.length > 0 ||
-            normalizedDeleteEmuCode.value.length > 0)
+        (normalizedTrainCode.value.length > 0 ||
+            normalizedEmuCode.value.length > 0)
 );
 const canLoadCandidates = computed(
     () =>
-        normalizedCreateTrainCode.value.length > 0 &&
-        normalizedCreateEmuCode.value.length > 0 &&
+        normalizedTrainCode.value.length > 0 &&
+        normalizedEmuCode.value.length > 0 &&
         /^\d{8}$/.test(createDateYmd.value) &&
         candidateStatus.value !== 'pending'
 );
@@ -875,7 +857,7 @@ const canCreateRoute = computed(
 );
 const canScanTimetableMerge = computed(
     () =>
-        normalizedTimetableTrainCode.value.length > 0 &&
+        normalizedTrainCode.value.length > 0 &&
         timetableMergeStatus.value !== 'pending'
 );
 const deleteDialogDescription = computed(() => {
@@ -897,15 +879,7 @@ const timetableMergeDialogDescription = computed(() => {
     return `这会删除 ${candidate.middle.serviceDateStart} 至 ${candidate.middle.serviceDateEndExclusive} 的历史时刻表覆盖段，并把前后相同的覆盖段合并。`;
 });
 
-watch(selectedDateInput, (value) => {
-    createDateInput.value = value;
-
-    if (deleteSearchStatus.value !== 'success') {
-        deleteDateInput.value = value;
-    }
-});
-
-watch([normalizedDeleteTrainCode, normalizedDeleteEmuCode, deleteDateYmd], () => {
+watch([normalizedTrainCode, normalizedEmuCode, deleteDateYmd], () => {
     deleteSearchStatus.value = 'idle';
     deleteSearchData.value = null;
     deleteErrorMessage.value = '';
@@ -913,7 +887,7 @@ watch([normalizedDeleteTrainCode, normalizedDeleteEmuCode, deleteDateYmd], () =>
     closeDeleteDialog();
 });
 
-watch([normalizedCreateTrainCode, createDateYmd], () => {
+watch([normalizedTrainCode, normalizedEmuCode, createDateYmd], () => {
     candidateStatus.value = 'idle';
     candidateData.value = null;
     candidateErrorMessage.value = '';
@@ -922,7 +896,7 @@ watch([normalizedCreateTrainCode, createDateYmd], () => {
     createErrorMessage.value = '';
 });
 
-watch(normalizedTimetableTrainCode, () => {
+watch(normalizedTrainCode, () => {
     timetableMergeStatus.value = 'idle';
     timetableMergeData.value = null;
     timetableMergeErrorMessage.value = '';
@@ -953,8 +927,8 @@ async function searchDeleteRoutes() {
             retry: 0,
             query: {
                 date: deleteDateYmd.value,
-                trainCode: normalizedDeleteTrainCode.value,
-                emuCode: normalizedDeleteEmuCode.value
+                trainCode: normalizedTrainCode.value,
+                emuCode: normalizedEmuCode.value
             }
         });
 
@@ -973,9 +947,8 @@ async function searchDeleteRoutes() {
 }
 
 function clearDeleteSearch() {
-    deleteTrainCodeInput.value = '';
-    deleteEmuCodeInput.value = '';
-    deleteDateInput.value = selectedDateInput.value;
+    trainCodeInput.value = '';
+    emuCodeInput.value = '';
     deleteSearchStatus.value = 'idle';
     deleteSearchData.value = null;
     deleteErrorMessage.value = '';
@@ -999,7 +972,7 @@ async function loadTimetableCandidates() {
             retry: 0,
             query: {
                 date: createDateYmd.value,
-                trainCode: normalizedCreateTrainCode.value
+                trainCode: normalizedTrainCode.value
             }
         });
 
@@ -1037,8 +1010,8 @@ async function createDailyRoute() {
             method: 'POST',
             body: {
                 date: createDateYmd.value,
-                trainCode: normalizedCreateTrainCode.value,
-                emuCode: normalizedCreateEmuCode.value,
+                trainCode: normalizedTrainCode.value,
+                emuCode: normalizedEmuCode.value,
                 timetableId: selectedTimetableId.value
             },
             key: `admin:daily-route-create:${Date.now()}`,
@@ -1091,7 +1064,7 @@ async function scanTimetableMergeCandidates(options?: {
         >('/api/v1/admin/timetable-history/merge-candidates', {
             retry: 0,
             query: {
-                trainCode: normalizedTimetableTrainCode.value
+                trainCode: normalizedTrainCode.value
             }
         });
 
