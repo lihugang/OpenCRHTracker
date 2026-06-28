@@ -149,7 +149,7 @@ interface RefreshableAssetConfig {
     provider?: string;
     refresh: {
         enabled: boolean;
-        refreshAt: string;
+        refreshAt: string[];
     };
 }
 
@@ -491,6 +491,29 @@ function parseNonEmptyStringList(value: unknown, name: string) {
     );
 }
 
+function parseUniqueNonEmptyStringArray(value: unknown, name: string) {
+    const seen = new Set<string>();
+    const result: string[] = [];
+
+    for (const [index, item] of asArray(value, name).entries()) {
+        const normalized = asString(item, `${name}[${index}]`).trim();
+        assert(
+            normalized.length > 0,
+            `${name}[${index}] must be a non-empty string`
+        );
+        assert(
+            !seen.has(normalized),
+            `${name}[${index}] is duplicated: ${normalized}`
+        );
+        seen.add(normalized);
+        result.push(normalized);
+    }
+
+    assert(result.length > 0, `${name} must not be empty`);
+    result.sort((left, right) => left.localeCompare(right));
+    return result;
+}
+
 function parseClientIpHeaderList(value: unknown, name: string) {
     const headers = normalizeUniqueStringList(
         asArray(value, name).map((item, index) =>
@@ -545,8 +568,11 @@ function parseRefreshableAssetConfig(
                     : asBoolean(refresh.enabled, `${name}.refresh.enabled`),
             refreshAt:
                 refresh?.refreshAt === undefined
-                    ? '0000'
-                    : asString(refresh.refreshAt, `${name}.refresh.refreshAt`)
+                    ? ['0000']
+                    : parseUniqueNonEmptyStringArray(
+                          refresh.refreshAt,
+                          `${name}.refresh.refreshAt`
+                      )
         }
     };
 }
@@ -2076,15 +2102,27 @@ function validateConfig(raw: unknown): Config {
         'qrcodeDetection'
     ] as const) {
         const asset = configResult.data.assets[key];
-        try {
-            parseDailyTimeHHmm(asset.refresh.refreshAt);
-        } catch (error) {
-            const message =
-                error instanceof Error ? error.message : String(error);
+        assert(
+            asset.refresh.refreshAt.length > 0,
+            `data.assets.${key}.refresh.refreshAt must not be empty`
+        );
+        const refreshAtSet = new Set<string>();
+        for (const [index, refreshAt] of asset.refresh.refreshAt.entries()) {
+            try {
+                parseDailyTimeHHmm(refreshAt);
+            } catch (error) {
+                const message =
+                    error instanceof Error ? error.message : String(error);
+                assert(
+                    false,
+                    `data.assets.${key}.refresh.refreshAt[${index}] is invalid: ${message}`
+                );
+            }
             assert(
-                false,
-                `data.assets.${key}.refresh.refreshAt is invalid: ${message}`
+                !refreshAtSet.has(refreshAt),
+                `data.assets.${key}.refresh.refreshAt[${index}] is duplicated: ${refreshAt}`
             );
+            refreshAtSet.add(refreshAt);
         }
         if (asset.refresh.enabled) {
             assert(

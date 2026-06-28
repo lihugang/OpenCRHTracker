@@ -14,9 +14,13 @@ import {
 import { loadStationCoordAssets } from '~/server/services/stationCoordStore';
 import { startTaskScheduler } from '~/server/services/taskScheduler';
 import {
+    listPendingTasksByExecutor,
     removePendingTasksByExecutor,
+    removePendingTasksByExecutorAndArgs,
+    reconcileFuturePendingTaskByExecutorAndArgs,
     reconcileSingletonPendingTask,
     type EnqueueTaskOptions,
+    type TaskRecord,
     type ReconcileSingletonTaskResult
 } from '~/server/services/taskQueue';
 import { loadProbeAssets } from '~/server/services/probeAssetStore';
@@ -127,6 +131,20 @@ function catchUpOverdueProbeStatusClear(
     }
 }
 
+function parseRefreshAssetTaskRefreshAt(task: TaskRecord): string | null {
+    try {
+        const raw = JSON.parse(task.arguments) as unknown;
+        if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+            return null;
+        }
+
+        const refreshAt = (raw as { refreshAt?: unknown }).refreshAt;
+        return typeof refreshAt === 'string' ? refreshAt.trim() : null;
+    } catch {
+        return null;
+    }
+}
+
 function reconcileRefreshAssetTasks(): string[] {
     const config = useConfig();
     const taskSummaries: string[] = [];
@@ -141,12 +159,44 @@ function reconcileRefreshAssetTasks(): string[] {
             continue;
         }
 
-        const executionTime = getNextExecutionTimeInShanghaiSeconds(
-            Date.now(),
-            assetConfig.refresh.refreshAt
-        );
-        const task = reconcileStartupTask(definition.executor, executionTime);
-        taskSummaries.push(`${definition.executor}:${task.taskId}`);
+        const configuredRefreshAt = new Set(assetConfig.refresh.refreshAt);
+        const existingTasks = listPendingTasksByExecutor(definition.executor);
+        for (const task of existingTasks) {
+            const refreshAt = parseRefreshAssetTaskRefreshAt(task);
+            if (refreshAt !== null && configuredRefreshAt.has(refreshAt)) {
+                continue;
+            }
+
+            const result =
+                refreshAt === null
+                    ? removePendingTasksByExecutorAndArgs(
+                          definition.executor,
+                          {}
+                      )
+                    : removePendingTasksByExecutorAndArgs(
+                          definition.executor,
+                          { refreshAt }
+                      );
+            logger.info(
+                `refresh_asset_task_removed_obsolete asset=${definition.key} executor=${definition.executor} refreshAt=${refreshAt ?? 'null'} removedTaskIds=${JSON.stringify(result.removedTaskIds)}`
+            );
+        }
+
+        for (const refreshAt of assetConfig.refresh.refreshAt) {
+            const executionTime = getNextExecutionTimeInShanghaiSeconds(
+                Date.now(),
+                refreshAt
+            );
+            const task = reconcileFuturePendingTaskByExecutorAndArgs(
+                definition.executor,
+                { refreshAt },
+                executionTime
+            );
+            logger.info(
+                `refresh_asset_task_reconciled asset=${definition.key} executor=${definition.executor} refreshAt=${refreshAt} action=${task.action} taskId=${task.taskId} removedTaskIds=${JSON.stringify(task.removedTaskIds)} reusedExecutionTime=${task.reusedExecutionTime ?? 'null'}`
+            );
+            taskSummaries.push(`${definition.executor}:${refreshAt}:${task.taskId}`);
+        }
     }
 
     return taskSummaries;

@@ -9,6 +9,7 @@ import { invalidateLookupIndexCache } from '~/server/services/lookupIndexStore';
 import {
     invalidateProbeAssetsCache,
     preloadProbeAssetsFromLocalFiles,
+    readLocalProbeQrcodeMap,
     validateDownloadedEmuListAssetText,
     validateDownloadedQrCodeAssetText
 } from '~/server/services/probeAssetStore';
@@ -30,6 +31,7 @@ import {
     validateTrainStyleMappingText
 } from '~/server/services/trainStyleMappingStore';
 import { synchronizeQrcodeDetectionDispatchTasks } from '~/server/services/taskExecutors/dispatchQrcodeDetectionTasksExecutor';
+import { reloadQrcodeAssetAfterRefresh } from '~/server/services/taskExecutors/refreshAssetFileTaskExecutor';
 import ensure from '~/server/utils/api/executor/ensure';
 import {
     getAssetFilePath,
@@ -313,6 +315,20 @@ async function refreshAssetFromRemote(
         '所选资产未配置远程数据源'
     );
 
+    let previousQrcodeByModelAndTrainSetNo: Map<string, string> | null = null;
+    if (target === 'QRCode') {
+        try {
+            previousQrcodeByModelAndTrainSetNo = readLocalProbeQrcodeMap();
+        } catch (error) {
+            const message =
+                error instanceof Error
+                    ? `${error.name}: ${error.message}`
+                    : String(error);
+            logger.warn(`admin_qrcode_previous_cache_unavailable ${message}`);
+            previousQrcodeByModelAndTrainSetNo = new Map();
+        }
+    }
+
     const result = await refreshAssetFileFromProvider(target, {
         validateContent:
             target === 'EMUList'
@@ -348,6 +364,11 @@ async function refreshAssetFromRemote(
         reloadStationCoordAssetFromLocal();
     } else if (target === 'trainStyleMapping') {
         reloadTrainStyleMappingAssetFromLocal();
+    } else if (target === 'QRCode') {
+        await reloadQrcodeAssetAfterRefresh(
+            previousQrcodeByModelAndTrainSetNo ?? new Map()
+        );
+        invalidateLookupIndexCache();
     } else {
         invalidateProbeAssetsCache();
         preloadProbeAssetsFromLocalFiles();

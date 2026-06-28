@@ -43,6 +43,7 @@ interface ProbeQrcodeDetectionEmuTaskArgs {
     detectedAt: string;
     emuCode: string;
     manualNow: boolean;
+    temporary: boolean;
 }
 
 let registered = false;
@@ -56,6 +57,7 @@ function parseTaskArgs(raw: unknown): ProbeQrcodeDetectionEmuTaskArgs {
         detectedAt?: unknown;
         emuCode?: unknown;
         manualNow?: unknown;
+        temporary?: unknown;
     };
     const detectedAt =
         typeof body.detectedAt === 'string' ? body.detectedAt.trim() : '';
@@ -72,7 +74,8 @@ function parseTaskArgs(raw: unknown): ProbeQrcodeDetectionEmuTaskArgs {
     return {
         detectedAt,
         emuCode,
-        manualNow: body.manualNow === true
+        manualNow: body.manualNow === true,
+        temporary: body.temporary === true
     };
 }
 
@@ -96,9 +99,10 @@ async function executeProbeQrcodeDetectionEmuTask(rawArgs: unknown) {
     ensureProbeStateForToday();
     const args = parseTaskArgs(rawArgs);
     const config = await loadQrcodeDetectionConfig();
+    const bypassFixedConfig = args.manualNow || args.temporary;
     if (
-        (!args.manualNow && !config.detectedAt.includes(args.detectedAt)) ||
-        !config.emu.includes(args.emuCode)
+        (!bypassFixedConfig && !config.detectedAt.includes(args.detectedAt)) ||
+        (!bypassFixedConfig && !config.emu.includes(args.emuCode))
     ) {
         markCurrentTrainProvenanceTaskSkipped(
             'qrcode_detection_target_removed'
@@ -135,7 +139,8 @@ async function executeProbeQrcodeDetectionEmuTask(rawArgs: unknown) {
             result: 'seat_code_missing',
             payload: {
                 detectedAt: args.detectedAt,
-                emuCode: args.emuCode
+                emuCode: args.emuCode,
+                temporary: args.temporary
             }
         });
         logger.warn(`seat_code_missing emuCode=${args.emuCode}`);
@@ -155,6 +160,7 @@ async function executeProbeQrcodeDetectionEmuTask(rawArgs: unknown) {
             payload: {
                 detectedAt: args.detectedAt,
                 emuCode: args.emuCode,
+                temporary: args.temporary,
                 seatCodeFailure: seatCodeResult
             }
         });
@@ -206,6 +212,7 @@ async function executeProbeQrcodeDetectionEmuTask(rawArgs: unknown) {
             detectedAt: args.detectedAt,
             configuredEmuCode: args.emuCode,
             scannedEmuCode,
+            temporary: args.temporary,
             trainInternalCode: seatCodeResult.route.internalCode,
             trainRepeat: seatCodeResult.route.trainRepeat
         }
@@ -234,6 +241,7 @@ async function executeProbeQrcodeDetectionEmuTask(rawArgs: unknown) {
             payload: {
                 detectedAt: args.detectedAt,
                 source: 'qrcode_detection',
+                temporary: args.temporary,
                 trackingMutations
             }
         });
@@ -265,6 +273,7 @@ async function executeProbeQrcodeDetectionEmuTask(rawArgs: unknown) {
             bureau: resolvedRecord.bureau,
             model: resolvedRecord.model,
             source: 'qrcode_detection',
+            temporary: args.temporary,
             trackingMutations
         }
     });

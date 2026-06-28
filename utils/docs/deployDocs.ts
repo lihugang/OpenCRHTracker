@@ -280,7 +280,7 @@ export const deployDocsSections: DocsContentSection[] = [
                         notes: [
                             '默认文件建议为 data/emu_list.json。',
                             'refresh.enabled=true 时 provider 必填。',
-                            'refresh.refreshAt 必须是 HHmm 字符串。',
+                            'refresh.refreshAt 必须是非空 HHmm 字符串数组。',
                             '管理员页面支持本地重载和远程刷新，刷新后会立即影响配属信息查询、畅行码探测和车组别名解析。'
                         ]
                     },
@@ -292,7 +292,7 @@ export const deployDocsSections: DocsContentSection[] = [
                             '铁路畅行码资产文件路径、下载地址与刷新时间。',
                         notes: [
                             'refresh.enabled=true 时 provider 必填。',
-                            'refresh.refreshAt 必须是 HHmm 字符串。'
+                            'refresh.refreshAt 必须是非空 HHmm 字符串数组。'
                         ]
                     },
                     {
@@ -304,7 +304,7 @@ export const deployDocsSections: DocsContentSection[] = [
                         notes: [
                             '默认文件建议为 data/qrcode_detection.json。',
                             'refresh.enabled=true 时 provider 必填。',
-                            'refresh.refreshAt 必须是 HHmm 字符串。',
+                            'refresh.refreshAt 必须是非空 HHmm 字符串数组。',
                             '管理员页面支持本地重载和远程刷新，刷新后会重新校验并同步未来派发任务。'
                         ]
                     },
@@ -317,7 +317,7 @@ export const deployDocsSections: DocsContentSection[] = [
                         notes: [
                             '默认文件建议为 data/train_style_mapping.json。',
                             'refresh.enabled=true 时 provider 必填。',
-                            'refresh.refreshAt 必须是 HHmm 字符串。',
+                            'refresh.refreshAt 必须是非空 HHmm 字符串数组。',
                             '管理员页面支持本地重载和远程刷新，刷新后会立即影响 referenceModels 的 schedule 回退映射结果。'
                         ]
                     },
@@ -330,7 +330,7 @@ export const deployDocsSections: DocsContentSection[] = [
                         notes: [
                             '默认文件建议为 data/stationCoord.jsonl。',
                             'refresh.enabled=true 时 provider 必填。',
-                            'refresh.refreshAt 必须是 HHmm 字符串。',
+                            'refresh.refreshAt 必须是非空 HHmm 字符串数组。',
                             '管理员页面支持本地重载和远程刷新，刷新后会立即影响后续线路时刻表下载任务。'
                         ]
                     },

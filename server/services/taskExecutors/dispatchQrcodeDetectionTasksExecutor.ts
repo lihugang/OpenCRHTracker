@@ -81,6 +81,26 @@ export async function enqueueQrcodeDetectionProbeTasksForDetectedAt(
     return enqueueTasks(tasks);
 }
 
+export async function enqueueTemporaryQrcodeDetectionProbeTasks(
+    detectedAt: string,
+    emuCodes: readonly string[],
+    executionTime = getNowSeconds()
+): Promise<number[]> {
+    parseDailyTimeHHmm(detectedAt);
+    const tasks: EnqueueTaskInput[] = emuCodes.map((emuCode) => ({
+        executor: PROBE_QRCODE_DETECTION_EMU_TASK_EXECUTOR,
+        args: {
+            detectedAt,
+            emuCode,
+            manualNow: true,
+            temporary: true
+        },
+        executionTime
+    }));
+
+    return enqueueTasks(tasks);
+}
+
 export async function synchronizeQrcodeDetectionDispatchTasks(): Promise<void> {
     const config = await loadQrcodeDetectionConfig();
     const configuredTimes = new Set(config.detectedAt);

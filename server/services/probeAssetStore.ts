@@ -151,6 +151,11 @@ export interface ProbeAssets {
     canonicalEmuCodeByAnyCode: Map<string, string>;
 }
 
+export interface ProbeAssetsReloadDiff {
+    assets: ProbeAssets;
+    newQrcodeEmuCodes: string[];
+}
+
 let cached: ProbeAssets | null = null;
 
 function buildModelAndTrainSetNoKey(model: string, trainSetNo: string): string {
@@ -786,6 +791,51 @@ export function preloadProbeAssetsFromLocalFiles(): ProbeAssets {
 
     cached = buildProbeAssets(emuList, rawQrCodeRecords);
     return cached;
+}
+
+export function readLocalProbeQrcodeMap(): Map<string, string> {
+    const emuFilePath = getAssetFilePath('EMUList');
+    const qrCodeFilePath = getAssetFilePath('QRCode');
+    if (!fs.existsSync(emuFilePath) || !fs.existsSync(qrCodeFilePath)) {
+        return new Map();
+    }
+
+    const emuListText = fs.readFileSync(emuFilePath, 'utf8');
+    const qrCodeJsonlText = fs.readFileSync(qrCodeFilePath, 'utf8');
+    const emuList = parseEmuListAssetText(emuListText);
+    const rawQrCodeRecords = parseJsonlToJson<RawQrCodeRecord>(qrCodeJsonlText);
+
+    return new Map(
+        buildProbeAssets(emuList, rawQrCodeRecords).qrcodeByModelAndTrainSetNo
+    );
+}
+
+export function reloadProbeAssetsFromLocalFilesWithQrcodeDiff(
+    previousQrcodeByModelAndTrainSetNo: ReadonlyMap<string, string>
+): ProbeAssetsReloadDiff {
+    const assets = preloadProbeAssetsFromLocalFiles();
+    const newQrcodeEmuCodes: string[] = [];
+
+    for (const key of assets.qrcodeByModelAndTrainSetNo.keys()) {
+        if (previousQrcodeByModelAndTrainSetNo.has(key)) {
+            continue;
+        }
+
+        const record = assets.emuByModelAndTrainSetNo.get(key);
+        if (!record) {
+            continue;
+        }
+
+        newQrcodeEmuCodes.push(
+            buildCanonicalEmuCode(record.model, record.trainSetNo)
+        );
+    }
+
+    newQrcodeEmuCodes.sort((left, right) => left.localeCompare(right));
+    return {
+        assets,
+        newQrcodeEmuCodes
+    };
 }
 
 export function buildProbeAssetKey(model: string, trainSetNo: string): string {

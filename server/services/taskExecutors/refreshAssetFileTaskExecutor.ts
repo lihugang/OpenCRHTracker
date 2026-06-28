@@ -3,6 +3,8 @@ import useConfig from '~/server/config';
 import {
     invalidateProbeAssetsCache,
     preloadProbeAssetsFromLocalFiles,
+    readLocalProbeQrcodeMap,
+    reloadProbeAssetsFromLocalFilesWithQrcodeDiff,
     validateDownloadedEmuListAssetText,
     validateDownloadedQrCodeAssetText
 } from '~/server/services/probeAssetStore';
@@ -23,11 +25,16 @@ import {
     validateTrainStyleMappingText
 } from '~/server/services/trainStyleMappingStore';
 import { registerTaskExecutor } from '~/server/services/taskExecutorRegistry';
-import { synchronizeQrcodeDetectionDispatchTasks } from '~/server/services/taskExecutors/dispatchQrcodeDetectionTasksExecutor';
+import {
+    enqueueTemporaryQrcodeDetectionProbeTasks,
+    synchronizeQrcodeDetectionDispatchTasks
+} from '~/server/services/taskExecutors/dispatchQrcodeDetectionTasksExecutor';
 import { enqueueTask } from '~/server/services/taskQueue';
+import getNowSeconds from '~/server/utils/time/getNowSeconds';
 import {
     formatShanghaiDateTime,
-    getNextDayExecutionTimeInShanghaiSeconds
+    getNextDayExecutionTimeInShanghaiSeconds,
+    parseDailyTimeHHmm
 } from '~/server/utils/date/shanghaiDateTime';
 import {
     refreshAssetFileFromProvider,
@@ -45,6 +52,10 @@ interface RefreshAssetTaskDefinition {
     key: RefreshableAssetKey;
     executor: string;
     logger: ReturnType<typeof getLogger>;
+}
+
+interface RefreshAssetTaskArgs {
+    refreshAt: string;
 }
 
 export const REFRESH_EMU_LIST_ASSET_TASK_EXECUTOR = 'refresh_emu_list_asset';
@@ -99,6 +110,21 @@ function getRefreshDefinition(
     return definition;
 }
 
+function parseRefreshAssetTaskArgs(raw: unknown): RefreshAssetTaskArgs {
+    if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+        throw new Error('task arguments must be an object');
+    }
+
+    const body = raw as { refreshAt?: unknown };
+    const refreshAt =
+        typeof body.refreshAt === 'string' ? body.refreshAt.trim() : '';
+    parseDailyTimeHHmm(refreshAt);
+
+    return {
+        refreshAt
+    };
+}
+
 async function reloadQrcodeDependenciesAfterProbeAssetChange(): Promise<void> {
     invalidateProbeAssetsCache();
     preloadProbeAssetsFromLocalFiles();
@@ -111,6 +137,58 @@ async function reloadQrcodeDependenciesAfterProbeAssetChange(): Promise<void> {
         );
     }
     await synchronizeQrcodeDetectionDispatchTasks();
+}
+
+function getCurrentShanghaiHHmm(): string {
+    const formatter = new Intl.DateTimeFormat('zh-CN', {
+        timeZone: 'Asia/Shanghai',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+    });
+    const parts = formatter.formatToParts(new Date());
+    const hour = parts.find((part) => part.type === 'hour')?.value ?? '';
+    const minute = parts.find((part) => part.type === 'minute')?.value ?? '';
+    const detectedAt = `${hour}${minute}`;
+    if (!/^\d{4}$/.test(detectedAt)) {
+        throw new Error('failed to resolve current Shanghai HHmm');
+    }
+    return detectedAt;
+}
+
+export async function reloadQrcodeAssetAfterRefresh(
+    previousQrcodeByModelAndTrainSetNo: ReadonlyMap<string, string>
+): Promise<number[]> {
+    const { newQrcodeEmuCodes } = reloadProbeAssetsFromLocalFilesWithQrcodeDiff(
+        previousQrcodeByModelAndTrainSetNo
+    );
+    invalidateQrcodeDetectionConfigCache();
+    const result = await reloadQrcodeDetectionConfig();
+    const warning = formatQrcodeDetectionConfigWarnings(result);
+    if (warning.length > 0) {
+        getRefreshDefinition('qrcodeDetection').logger.warn(
+            `qrcode_detection_config_warning ${warning}`
+        );
+    }
+    await synchronizeQrcodeDetectionDispatchTasks();
+
+    if (newQrcodeEmuCodes.length === 0) {
+        getRefreshDefinition('QRCode').logger.info(
+            'qrcode_new_emu_scan_skipped count=0'
+        );
+        return [];
+    }
+
+    const detectedAt = getCurrentShanghaiHHmm();
+    const taskIds = await enqueueTemporaryQrcodeDetectionProbeTasks(
+        detectedAt,
+        newQrcodeEmuCodes,
+        getNowSeconds()
+    );
+    getRefreshDefinition('QRCode').logger.info(
+        `qrcode_new_emu_scan_queued detectedAt=${detectedAt} count=${newQrcodeEmuCodes.length} taskIds=${taskIds.join(',')} emuCodes=${newQrcodeEmuCodes.join(',')}`
+    );
+    return taskIds;
 }
 
 async function reloadQrcodeDetectionAssetOnly(): Promise<void> {
@@ -136,25 +214,58 @@ function reloadTrainStyleMappingAssetOnly(): void {
 }
 
 function enqueueNextRefreshTask(
-    definition: RefreshAssetTaskDefinition
+    definition: RefreshAssetTaskDefinition,
+    refreshAt: string
 ): number {
-    const refreshAt = useConfig().data.assets[definition.key].refresh.refreshAt;
     const nextExecutionTime = getNextDayExecutionTimeInShanghaiSeconds(
         Date.now(),
         refreshAt
     );
-    const taskId = enqueueTask(definition.executor, {}, nextExecutionTime);
+    const taskId = enqueueTask(
+        definition.executor,
+        { refreshAt },
+        nextExecutionTime
+    );
     definition.logger.info(
-        `enqueued_next_daily_task id=${taskId} executor=${definition.executor} asset=${definition.key} executionTime=${nextExecutionTime} executionTimeAsiaShanghai=${formatShanghaiDateTime(nextExecutionTime)}`
+        `enqueued_next_daily_task id=${taskId} executor=${definition.executor} asset=${definition.key} refreshAt=${refreshAt} executionTime=${nextExecutionTime} executionTimeAsiaShanghai=${formatShanghaiDateTime(nextExecutionTime)}`
     );
     return taskId;
 }
 
 async function executeRefreshAssetTask(
-    definition: RefreshAssetTaskDefinition
+    definition: RefreshAssetTaskDefinition,
+    rawArgs: unknown
 ): Promise<void> {
+    const args = parseRefreshAssetTaskArgs(rawArgs);
     let caughtError: unknown = null;
     try {
+        const configuredRefreshAt =
+            useConfig().data.assets[definition.key].refresh.refreshAt;
+        if (!configuredRefreshAt.includes(args.refreshAt)) {
+            definition.logger.info(
+                `skip_removed_refresh_time asset=${definition.key} refreshAt=${args.refreshAt}`
+            );
+            return;
+        }
+
+        let previousQrcodeByModelAndTrainSetNo: Map<string, string> | null =
+            null;
+        if (definition.key === 'QRCode') {
+            try {
+                previousQrcodeByModelAndTrainSetNo =
+                    readLocalProbeQrcodeMap();
+            } catch (error) {
+                const message =
+                    error instanceof Error
+                        ? `${error.name}: ${error.message}`
+                        : String(error);
+                definition.logger.warn(
+                    `qrcode_previous_cache_unavailable error=${message}`
+                );
+                previousQrcodeByModelAndTrainSetNo = new Map();
+            }
+        }
+
         const result = await refreshAssetFileFromProvider(
             definition.key as AssetKey,
             {
@@ -181,6 +292,10 @@ async function executeRefreshAssetTask(
                 reloadStationCoordAssetOnly();
             } else if (definition.key === 'trainStyleMapping') {
                 reloadTrainStyleMappingAssetOnly();
+            } else if (definition.key === 'QRCode') {
+                await reloadQrcodeAssetAfterRefresh(
+                    previousQrcodeByModelAndTrainSetNo ?? new Map()
+                );
             } else {
                 await reloadQrcodeDependenciesAfterProbeAssetChange();
             }
@@ -211,7 +326,7 @@ async function executeRefreshAssetTask(
         );
     } finally {
         try {
-            enqueueNextRefreshTask(definition);
+            enqueueNextRefreshTask(definition, args.refreshAt);
         } catch (error) {
             const message =
                 error instanceof Error
@@ -237,8 +352,8 @@ export function registerRefreshAssetFileTaskExecutors(): void {
     }
 
     for (const definition of REFRESH_ASSET_TASK_DEFINITIONS) {
-        registerTaskExecutor(definition.executor, async () => {
-            await executeRefreshAssetTask(definition);
+        registerTaskExecutor(definition.executor, async (args) => {
+            await executeRefreshAssetTask(definition, args);
         });
         definition.logger.info(`registered executor=${definition.executor}`);
     }
