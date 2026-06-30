@@ -81,6 +81,12 @@ function parseRequestBody(body: CreateAdminTaskBody): AdminCreateTaskRequest {
                 }
             };
         }
+        case 'refresh_all_routes_and_requeue_probe_now': {
+            return {
+                type,
+                payload: {}
+            };
+        }
         case 'detect_coupled_emu_group_now': {
             const bureau =
                 typeof payload.bureau === 'string' ? payload.bureau.trim() : '';

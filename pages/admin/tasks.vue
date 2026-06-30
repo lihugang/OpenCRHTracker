@@ -4,7 +4,7 @@
         :today-date-input-value="todayDateInputValue"
         :session="session"
         title="任务"
-        description="查看当前剩余任务规模，并手动创建后台任务，用于补跑导出、刷新指定车次线路信息、手动刷新单个车次交路表、创建交路数据刷新任务、发起重联扫描或立即执行固定车组畅行码检测。">
+        description="查看当前剩余任务规模，并手动创建后台任务，用于补跑导出、刷新线路信息、重排发车探测、刷新单个车次交路表、创建交路数据刷新任务、发起重联扫描或立即执行固定车组畅行码检测。">
         <template #toolbar>
             <UiButton
                 type="button"
@@ -119,7 +119,7 @@
                             手动创建任务
                         </h2>
                         <p class="text-sm leading-6 text-slate-600">
-                            按任务模板立即补派后台任务，适用于导出补跑、线路刷新、单车次交路表刷新、重联扫描和固定车组畅行码检测。
+                            按任务模板立即补派后台任务，适用于导出补跑、线路刷新、发车探测重排、单车次交路表刷新、重联扫描和固定车组畅行码检测。
                         </p>
                     </div>
 
@@ -246,6 +246,69 @@
                                         "
                                         @click="createStationBoardDispatchTask">
                                         创建交路数据刷新任务
+                                    </UiButton>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div
+                            class="rounded-[1rem] border border-slate-200 bg-white/90 px-5 py-5">
+                            <div class="space-y-6">
+                                <div class="space-y-2">
+                                    <p
+                                        class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                                        重排
+                                    </p>
+                                    <h3
+                                        class="text-xl font-semibold text-slate-900">
+                                        全量刷新线路并重排发车探测
+                                    </h3>
+                                    <p class="text-sm leading-6 text-slate-600">
+                                        创建一个后台任务，任务内部会按今天已发布时刻表顺序刷新全部线路信息；完成后删除旧的发车探测待执行任务，并按刷新后的时刻表重新生成。
+                                    </p>
+                                </div>
+
+                                <div
+                                    class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-4 py-4">
+                                    <p
+                                        class="text-xs uppercase tracking-[0.18em] text-slate-400">
+                                        执行限制
+                                    </p>
+                                    <p
+                                        class="mt-2 text-sm leading-6 text-slate-700">
+                                        {{
+                                            isSelectedDateToday
+                                                ? '当前选中的管理员日期就是今天，可以创建全量刷新与重排任务。'
+                                                : '该功能仅支持今天。请把管理员共享日期切换到今天后再提交。'
+                                        }}
+                                    </p>
+                                    <p
+                                        class="mt-2 text-sm leading-6 text-slate-500">
+                                        只会创建一个编排任务；中间线路刷新不会再拆成额外任务。
+                                    </p>
+                                </div>
+
+                                <StatusPanel
+                                    :error-message="
+                                        refreshAllRoutesTaskErrorMessage
+                                    "
+                                    :response="refreshAllRoutesTaskResponse"
+                                    :format-execution-time="
+                                        formatExecutionTime
+                                    " />
+
+                                <div class="flex justify-end">
+                                    <UiButton
+                                        type="button"
+                                        :disabled="
+                                            !canCreateRefreshAllRoutesTask
+                                        "
+                                        :loading="
+                                            refreshAllRoutesTaskStatus ===
+                                            'pending'
+                                        "
+                                        @click="createRefreshAllRoutesTask">
+                                        创建全量刷新与重排任务
                                     </UiButton>
                                 </div>
                             </div>
@@ -626,6 +689,7 @@ import type {
     AdminCouplingScanOptionGroup,
     AdminDetectCoupledEmuGroupNowTaskRequest,
     AdminDispatchStationBoardTasksNowTaskRequest,
+    AdminRefreshAllRoutesAndRequeueProbeNowTaskRequest,
     AdminRefreshTrainCirculationNowTaskRequest,
     AdminRunQrcodeDetectionNowTaskRequest,
     AdminTaskOverviewResponse,
@@ -724,6 +788,10 @@ const refreshCirculationTaskResponse = ref<AdminCreateTaskResponse | null>(
     null
 );
 
+const refreshAllRoutesTaskStatus = ref<TaskRequestStatus>('idle');
+const refreshAllRoutesTaskErrorMessage = ref('');
+const refreshAllRoutesTaskResponse = ref<AdminCreateTaskResponse | null>(null);
+
 const couplingScanTaskStatus = ref<TaskRequestStatus>('idle');
 const couplingScanTaskErrorMessage = ref('');
 const couplingScanTaskResponse = ref<AdminCreateTaskResponse | null>(null);
@@ -799,6 +867,7 @@ const canCreateRefreshCirculationTask = computed(
         refreshCirculationTrainCodeParts.value.length === 1 &&
         refreshCirculationTrainCodePreview.value.length > 0
 );
+const canCreateRefreshAllRoutesTask = computed(() => isSelectedDateToday.value);
 const couplingScanOptions = computed<AdminCouplingScanOptionGroup[]>(
     () => taskOverviewData.value?.couplingScanOptions ?? []
 );
@@ -1017,6 +1086,36 @@ async function createRefreshCirculationTask() {
     }
 }
 
+async function createRefreshAllRoutesTask() {
+    refreshAllRoutesTaskErrorMessage.value = '';
+    refreshAllRoutesTaskResponse.value = null;
+
+    if (!isSelectedDateToday.value) {
+        refreshAllRoutesTaskErrorMessage.value =
+            '该功能仅支持今天，请先把管理员共享日期切换到今天。';
+        return;
+    }
+
+    refreshAllRoutesTaskStatus.value = 'pending';
+
+    const body: AdminRefreshAllRoutesAndRequeueProbeNowTaskRequest = {
+        type: 'refresh_all_routes_and_requeue_probe_now',
+        payload: {}
+    };
+
+    try {
+        refreshAllRoutesTaskResponse.value = await postAdminTask(body);
+        await refreshOverviewSilently();
+    } catch (error) {
+        refreshAllRoutesTaskErrorMessage.value = getApiErrorMessage(
+            error,
+            '创建全量刷新与重排任务失败。'
+        );
+    } finally {
+        refreshAllRoutesTaskStatus.value = 'idle';
+    }
+}
+
 async function createCouplingScanTask() {
     if (!canCreateCouplingScanTask.value) {
         couplingScanTaskErrorMessage.value = '请先选择有效的路局和车型。';
@@ -1117,7 +1216,7 @@ function formatNumber(value: number) {
 useSiteSeo({
     title: '任务 | Open CRH Tracker',
     description:
-        '管理员任务页面，用于查看待执行任务规模，并手动创建导出、线路刷新、单车次交路表刷新、交路数据刷新、重联扫描和固定车组畅行码检测任务。',
+        '管理员任务页面，用于查看待执行任务规模，并手动创建导出、线路刷新、发车探测重排、单车次交路表刷新、交路数据刷新、重联扫描和固定车组畅行码检测任务。',
     path: '/admin/tasks',
     noindex: true
 });

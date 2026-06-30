@@ -19,6 +19,7 @@ import {
     toScheduleStationMap,
     toScheduleStops
 } from '~/server/utils/12306/scheduleProbe/mapRouteStops';
+import uniqueNormalizedCodes from '~/server/utils/12306/uniqueNormalizedCodes';
 import {
     appendRouteRefreshQueueTrainCodes,
     loadPublishedScheduleState,
@@ -43,6 +44,14 @@ let registered = false;
 
 interface RefreshRouteBatchTaskArgs {
     codes: string[];
+}
+
+export interface RefreshRouteBatchResult {
+    processed: number;
+    success: number;
+    failed: number;
+    changed: number;
+    totalAttempts: number;
 }
 
 interface RefreshRouteGroupUpdate {
@@ -204,15 +213,22 @@ function applyGroupUpdate(
     return applied;
 }
 
-async function executeRefreshRouteBatchTaskInternal(rawArgs: unknown) {
+export async function refreshRouteBatchForCodes(
+    codes: readonly string[]
+): Promise<RefreshRouteBatchResult> {
     const config = useConfig();
-    const batchSize = config.spider.scheduleProbe.refresh.batchSize;
     const retryAttempts = config.spider.scheduleProbe.retryAttempts;
-    const args = parseTaskArgs(rawArgs, batchSize);
-    if (args.codes.length === 0) {
+    const requestedCodes = uniqueNormalizedCodes([...codes]);
+    if (requestedCodes.length === 0) {
         markCurrentTrainProvenanceTaskSkipped('empty_codes');
         logger.info('skip empty_codes');
-        return;
+        return {
+            processed: 0,
+            success: 0,
+            failed: 0,
+            changed: 0,
+            totalAttempts: 0
+        };
     }
 
     const scheduleFilePath = config.data.assets.schedule.file;
@@ -220,7 +236,13 @@ async function executeRefreshRouteBatchTaskInternal(rawArgs: unknown) {
     if (!state) {
         markCurrentTrainProvenanceTaskSkipped('schedule_not_found');
         logger.warn(`skip schedule_not_found file=${scheduleFilePath}`);
-        return;
+        return {
+            processed: 0,
+            success: 0,
+            failed: 0,
+            changed: 0,
+            totalAttempts: 0
+        };
     }
     const currentDate = getCurrentDateString();
     if (state.date !== currentDate) {
@@ -228,7 +250,13 @@ async function executeRefreshRouteBatchTaskInternal(rawArgs: unknown) {
         logger.warn(
             `skip_non_current_schedule scheduleDate=${state.date} currentDate=${currentDate} file=${scheduleFilePath}`
         );
-        return;
+        return {
+            processed: 0,
+            success: 0,
+            failed: 0,
+            changed: 0,
+            totalAttempts: 0
+        };
     }
 
     const groupIndex = buildGroupIndex(state.items);
@@ -243,7 +271,7 @@ async function executeRefreshRouteBatchTaskInternal(rawArgs: unknown) {
     let mutated = false;
     let stationUpdates: ScheduleStationMap = {};
 
-    for (const code of args.codes) {
+    for (const code of requestedCodes) {
         const itemIndex = codeIndex.get(code);
         if (itemIndex === undefined) {
             continue;
@@ -283,7 +311,7 @@ async function executeRefreshRouteBatchTaskInternal(rawArgs: unknown) {
                         ? routeResult.data.status
                         : 'request_failed',
                     payload: {
-                        requestedCodes: args.codes,
+                        requestedCodes,
                         attempts: routeResult.attempts,
                         groupCodes: [item.code, ...item.allCodes]
                     }
@@ -397,7 +425,7 @@ async function executeRefreshRouteBatchTaskInternal(rawArgs: unknown) {
             eventType: 'route_refresh_succeeded',
             result: groupChanged ? 'changed' : 'unchanged',
             payload: {
-                requestedCodes: args.codes,
+                requestedCodes,
                 attempts: routeResult.attempts,
                 startStation: nextStartStation,
                 endStation: nextEndStation,
@@ -466,6 +494,19 @@ async function executeRefreshRouteBatchTaskInternal(rawArgs: unknown) {
     logger.info(
         `done processed=${processed} success=${success} failed=${failed} changed=${changed} apiCalls=${totalAttempts} file=${scheduleFilePath}`
     );
+    return {
+        processed,
+        success,
+        failed,
+        changed,
+        totalAttempts
+    };
+}
+
+async function executeRefreshRouteBatchTaskInternal(rawArgs: unknown) {
+    const batchSize = useConfig().spider.scheduleProbe.refresh.batchSize;
+    const args = parseTaskArgs(rawArgs, batchSize);
+    await refreshRouteBatchForCodes(args.codes);
 }
 
 async function executeRefreshRouteBatchTask(rawArgs: unknown) {

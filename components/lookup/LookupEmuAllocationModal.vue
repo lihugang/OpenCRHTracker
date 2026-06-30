@@ -30,7 +30,7 @@
             v-else-if="state === 'empty'"
             eyebrow="No Data"
             title="暂无配属信息"
-            description="当前配属清单中没有找到这个车组号。" />
+            description="" />
 
         <div
             v-else-if="profile"

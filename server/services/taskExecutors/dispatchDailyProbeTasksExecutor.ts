@@ -27,6 +27,12 @@ const DISABLED_LATEST_EXECUTION_TIME_HHMM = '0000';
 
 let registered = false;
 
+export interface DispatchDailyProbeTasksResult {
+    date: string | null;
+    groupCount: number;
+    createdTaskIds: number[];
+}
+
 function resolveProbeTaskExecutionTime(
     startAt: number,
     now: number,
@@ -48,7 +54,7 @@ function resolveProbeTaskExecutionTime(
     return plannedExecutionTime > now ? plannedExecutionTime : now;
 }
 
-async function executeDispatchDailyProbeTasks(): Promise<void> {
+export async function dispatchDailyProbeTasks(): Promise<DispatchDailyProbeTasksResult> {
     const config = useConfig();
     const scheduleState = loadPublishedScheduleState(
         config.data.assets.schedule.file
@@ -60,7 +66,11 @@ async function executeDispatchDailyProbeTasks(): Promise<void> {
         logger.warn(
             `schedule_not_found file=${config.data.assets.schedule.file}`
         );
-        return;
+        return {
+            date: null,
+            groupCount: 0,
+            createdTaskIds: []
+        };
     }
 
     const currentDate = getCurrentDateString();
@@ -69,14 +79,19 @@ async function executeDispatchDailyProbeTasks(): Promise<void> {
         logger.warn(
             `skip_non_current_schedule scheduleDate=${scheduleState.date} currentDate=${currentDate} file=${config.data.assets.schedule.file}`
         );
-        return;
+        return {
+            date: scheduleState.date,
+            groupCount: 0,
+            createdTaskIds: []
+        };
     }
 
     const defaultRetry = config.spider.scheduleProbe.probe.defaultRetry;
     const latestExecutionTimeHHmm =
         config.spider.scheduleProbe.probe.latestExecutionTimeHHmm;
     const tasksToEnqueue: EnqueueTaskInput[] = [];
-    for (const group of getTodayScheduleProbeGroups().values()) {
+    const probeGroups = Array.from(getTodayScheduleProbeGroups().values());
+    for (const group of probeGroups) {
         const trainCodes = getSafeTodayScheduleProbeTrainCodes(group);
         const args = {
             trainCode: group.trainCode,
@@ -102,9 +117,7 @@ async function executeDispatchDailyProbeTasks(): Promise<void> {
     }
 
     const taskIds = enqueueTasks(tasksToEnqueue);
-    for (const [index, group] of Array.from(
-        getTodayScheduleProbeGroups().values()
-    ).entries()) {
+    for (const [index, group] of probeGroups.entries()) {
         const createdTaskId = taskIds[index];
         if (!createdTaskId) {
             continue;
@@ -130,8 +143,13 @@ async function executeDispatchDailyProbeTasks(): Promise<void> {
         );
     }
     logger.info(
-        `done date=${scheduleState.date} groups=${getTodayScheduleProbeGroups().size} createdTasks=${tasksToEnqueue.length} defaultRetry=${defaultRetry} latestExecutionTimeHHmm=${latestExecutionTimeHHmm} firstTaskId=${taskIds[0] ?? 'null'}`
+        `done date=${scheduleState.date} groups=${probeGroups.length} createdTasks=${tasksToEnqueue.length} defaultRetry=${defaultRetry} latestExecutionTimeHHmm=${latestExecutionTimeHHmm} firstTaskId=${taskIds[0] ?? 'null'}`
     );
+    return {
+        date: scheduleState.date,
+        groupCount: probeGroups.length,
+        createdTaskIds: taskIds
+    };
 }
 
 export function registerDispatchDailyProbeTasksExecutor(): void {
@@ -140,7 +158,7 @@ export function registerDispatchDailyProbeTasksExecutor(): void {
     }
 
     registerTaskExecutor(DISPATCH_DAILY_PROBE_TASKS_EXECUTOR, async () => {
-        await executeDispatchDailyProbeTasks();
+        await dispatchDailyProbeTasks();
     });
     registered = true;
     logger.info(`registered executor=${DISPATCH_DAILY_PROBE_TASKS_EXECUTOR}`);

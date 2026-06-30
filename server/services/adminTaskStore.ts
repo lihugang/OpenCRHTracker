@@ -14,6 +14,7 @@ import { EXPORT_DAILY_RECORDS_MANUAL_TASK_EXECUTOR } from '~/server/services/tas
 import { loadProbeAssets } from '~/server/services/probeAssetStore';
 import { PROBE_QRCODE_DETECTION_EMU_TASK_EXECUTOR } from '~/server/services/taskExecutors/probeQrcodeDetectionEmuTaskExecutor';
 import { REFRESH_ROUTE_BATCH_TASK_EXECUTOR } from '~/server/services/taskExecutors/refreshRouteBatchTaskExecutor';
+import { REFRESH_ALL_ROUTES_AND_REQUEUE_PROBE_TASK_EXECUTOR } from '~/server/services/taskExecutors/refreshAllRoutesAndRequeueProbeTaskExecutor';
 import { DISPATCH_STATION_BOARD_TASKS_EXECUTOR } from '~/server/services/taskExecutors/dispatchStationBoardTasksExecutor';
 import { REFRESH_TRAIN_CIRCULATION_TASK_EXECUTOR } from '~/server/services/taskExecutors/refreshTrainCirculationTaskExecutor';
 import { getStationBoardIdleTaskOptions } from '~/server/services/stationBoardTaskScheduling';
@@ -345,6 +346,38 @@ function createRefreshTrainCirculationNowTask(
     };
 }
 
+function createRefreshAllRoutesAndRequeueProbeNowTask(
+    request: Extract<
+        AdminCreateTaskRequest,
+        { type: 'refresh_all_routes_and_requeue_probe_now' }
+    >
+): AdminCreateTaskResponse {
+    assertPublishedScheduleReadyForRefresh();
+
+    const executionTime = getNowSeconds();
+    const taskId = enqueueTask(
+        REFRESH_ALL_ROUTES_AND_REQUEUE_PROBE_TASK_EXECUTOR,
+        {},
+        executionTime
+    );
+
+    logger.info(
+        `admin_task_created type=${request.type} executor=${REFRESH_ALL_ROUTES_AND_REQUEUE_PROBE_TASK_EXECUTOR} taskId=${taskId}`
+    );
+
+    return {
+        type: request.type,
+        createdCount: 1,
+        createdTasks: toCreatedTaskRecords(
+            [taskId],
+            REFRESH_ALL_ROUTES_AND_REQUEUE_PROBE_TASK_EXECUTOR,
+            executionTime
+        ),
+        summary:
+            '已创建 1 条全量线路刷新与发车探测重排任务；该任务运行时会一次完成线路刷新、删除旧发车探测任务并重新生成。'
+    };
+}
+
 async function createDetectCoupledEmuGroupNowTask(
     request: Extract<
         AdminCreateTaskRequest,
@@ -451,6 +484,8 @@ export async function createAdminTask(
             return createRefreshRouteInfoNowTask(request);
         case 'refresh_train_circulation_now':
             return createRefreshTrainCirculationNowTask(request);
+        case 'refresh_all_routes_and_requeue_probe_now':
+            return createRefreshAllRoutesAndRequeueProbeNowTask(request);
         case 'detect_coupled_emu_group_now':
             return await createDetectCoupledEmuGroupNowTask(request);
         case 'run_qrcode_detection_now':

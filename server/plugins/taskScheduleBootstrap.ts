@@ -35,6 +35,7 @@ import {
     registerGenerateRouteRefreshTasksExecutor
 } from '~/server/services/taskExecutors/generateRouteRefreshTasksExecutor';
 import { registerRefreshRouteBatchTaskExecutor } from '~/server/services/taskExecutors/refreshRouteBatchTaskExecutor';
+import { registerRefreshAllRoutesAndRequeueProbeTaskExecutor } from '~/server/services/taskExecutors/refreshAllRoutesAndRequeueProbeTaskExecutor';
 import { registerDispatchDailyProbeTasksExecutor } from '~/server/services/taskExecutors/dispatchDailyProbeTasksExecutor';
 import { registerDispatchStationBoardTasksExecutor } from '~/server/services/taskExecutors/dispatchStationBoardTasksExecutor';
 import {
@@ -267,6 +268,7 @@ export default defineNitroPlugin(async () => {
 
         registerBuildScheduleTaskExecutor();
         registerRefreshRouteBatchTaskExecutor();
+        registerRefreshAllRoutesAndRequeueProbeTaskExecutor();
         registerGenerateRouteRefreshTasksExecutor();
         registerDispatchDailyProbeTasksExecutor();
         registerDispatchStationBoardTasksExecutor();
