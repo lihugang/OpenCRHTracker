@@ -39,23 +39,32 @@ function getSuggestionRank(item: LookupSuggestItem, query: string) {
     }
 
     const normalizedQuery = normalizeKeyword(query);
+    const trainNumber = resolveTrainNumber(item.code);
+    if (trainNumber.length > 0 && trainNumber === normalizedQuery) {
+        return 2;
+    }
+
+    if (trainNumber.length > 0 && trainNumber.startsWith(normalizedQuery)) {
+        return 3;
+    }
+
     const normalizedTags = Array.isArray(item.tags)
         ? item.tags.map(normalizeKeyword)
         : [];
 
     if (normalizedTags.some((tag) => tag === normalizedQuery)) {
-        return 2;
-    }
-
-    if (normalizedTags.some((tag) => tag.startsWith(normalizedQuery))) {
-        return 3;
-    }
-
-    if (normalizedTags.some((tag) => tag.includes(normalizedQuery))) {
         return 4;
     }
 
-    return 5;
+    if (normalizedTags.some((tag) => tag.startsWith(normalizedQuery))) {
+        return 5;
+    }
+
+    if (normalizedTags.some((tag) => tag.includes(normalizedQuery))) {
+        return 6;
+    }
+
+    return 7;
 }
 
 function compareSuggestionOrder(query: string) {
@@ -99,6 +108,10 @@ function resolveEmuTrainSetNo(code: string) {
     return normalizedCode.slice(separatorIndex + 1);
 }
 
+function resolveTrainNumber(code: string) {
+    return normalizeKeyword(code).match(/^[A-Z]+(\d+)/)?.[1] ?? '';
+}
+
 function resolveSearchLimit(limit?: number) {
     if (!limit || !Number.isFinite(limit) || limit <= 0) {
         return Number.POSITIVE_INFINITY;
@@ -112,6 +125,7 @@ function buildLookupSuggestIndex(
 ): LookupSuggestIndex {
     const allCodeTrie = new Trie<number>();
     const trainCodeTrie = new Trie<number>();
+    const trainNumberTrie = new Trie<number>();
     const emuCodeTrie = new Trie<number>();
     const emuTagTrie = new Trie<number>();
     const emuTrainSetNoTrie = new Trie<number>();
@@ -122,6 +136,10 @@ function buildLookupSuggestIndex(
 
         if (item.type === 'train') {
             trainCodeTrie.insert(normalizedCode, itemIndex);
+            trainNumberTrie.insert(
+                resolveTrainNumber(normalizedCode),
+                itemIndex
+            );
             return;
         }
 
@@ -155,9 +173,10 @@ function buildLookupSuggestIndex(
             const searchLimit = resolveSearchLimit(limit);
 
             if (type === 'train') {
-                return collectItems(
-                    trainCodeTrie.search(normalizedQuery, searchLimit)
-                )
+                return collectItems([
+                    ...trainCodeTrie.search(normalizedQuery, searchLimit),
+                    ...trainNumberTrie.search(normalizedQuery, searchLimit)
+                ])
                     .sort(compareSuggestionOrder(normalizedQuery))
                     .slice(0, searchLimit);
             }
@@ -174,6 +193,7 @@ function buildLookupSuggestIndex(
 
             return collectItems([
                 ...allCodeTrie.search(normalizedQuery, searchLimit),
+                ...trainNumberTrie.search(normalizedQuery, searchLimit),
                 ...emuTrainSetNoTrie.search(normalizedQuery, searchLimit),
                 ...emuTagTrie.search(normalizedQuery, searchLimit)
             ])
