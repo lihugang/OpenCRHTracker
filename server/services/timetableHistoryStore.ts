@@ -13,6 +13,7 @@ import type {
 } from '~/server/utils/12306/scheduleProbe/types';
 import uniqueNormalizedCodes from '~/server/utils/12306/uniqueNormalizedCodes';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
+import normalizeTimetableBoundaryStopTimes from '~/server/utils/12306/normalizeTimetableBoundaryStopTimes';
 import { formatShanghaiDateString } from '~/server/utils/date/getCurrentDateString';
 import { getShanghaiDayStartUnixSeconds } from '~/server/utils/date/shanghaiDateTime';
 import importSqlBatch from '~/server/utils/sql/importSqlBatch';
@@ -352,13 +353,15 @@ function getNextServiceDateInteger(serviceDate: number): number {
 function buildCanonicalTimetablePayload(
     stops: ScheduleStop[]
 ): CanonicalTimetablePayload {
-    const normalizedStops = stops
-        .map((stop) => ({
+    const boundaryNormalizedStops = normalizeTimetableBoundaryStopTimes(stops);
+    const normalizedStops = boundaryNormalizedStops
+        .map((stop, index) => ({
             stationNo: stop.stationNo,
             stationName: stop.stationName.trim(),
             arriveAt: stop.arriveAt,
             departAt: stop.departAt,
-            stationTrainCode: stop.stationTrainCode.trim().toUpperCase()
+            stationTrainCode: stop.stationTrainCode.trim().toUpperCase(),
+            inputIndex: index
         }))
         .sort((left, right) => {
             if (left.stationNo !== right.stationNo) {
@@ -381,11 +384,16 @@ function buildCanonicalTimetablePayload(
             if (leftDepartAt !== rightDepartAt) {
                 return leftDepartAt - rightDepartAt;
             }
-            return left.stationTrainCode.localeCompare(
+            const codeDiff = left.stationTrainCode.localeCompare(
                 right.stationTrainCode,
                 'zh-Hans-CN'
             );
-        });
+            if (codeDiff !== 0) {
+                return codeDiff;
+            }
+            return left.inputIndex - right.inputIndex;
+        })
+        .map(({ inputIndex: _inputIndex, ...stop }) => stop);
 
     return {
         stops: normalizedStops

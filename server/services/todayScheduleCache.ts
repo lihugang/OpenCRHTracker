@@ -2,6 +2,7 @@ import useConfig from '~/server/config';
 import getLogger from '~/server/libs/log4js';
 import { buildTrainKey } from '~/server/services/probeRuntimeState';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
+import normalizeTimetableBoundaryStopTimes from '~/server/utils/12306/normalizeTimetableBoundaryStopTimes';
 import {
     getScheduleStateVersion,
     loadActiveScheduleState
@@ -127,6 +128,9 @@ function rebuildCache(): TodayScheduleCache {
                 trainCode,
                 scheduleItemIdentityIndex
             );
+            const normalizedStops = normalizeTimetableBoundaryStopTimes(
+                item.stops
+            );
             const timetable: TodayScheduleTimetable = {
                 trainCode,
                 trainInternalCode,
@@ -140,7 +144,7 @@ function rebuildCache(): TodayScheduleCache {
                 updatedAt: item.lastRouteRefreshAt,
                 startStation: item.startStation.trim(),
                 endStation: item.endStation.trim(),
-                stops: item.stops.map((stop) => ({
+                stops: normalizedStops.map((stop) => ({
                     stationNo: stop.stationNo,
                     stationName: stop.stationName.trim(),
                     arriveAt:
