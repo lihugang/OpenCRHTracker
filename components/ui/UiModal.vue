@@ -2,7 +2,10 @@
     <Teleport to="body">
         <div
             v-if="isRendered"
-            class="fixed inset-0 z-[90] p-4 sm:p-6">
+            :class="[
+                'fixed inset-0 p-4 sm:p-6',
+                layerClass
+            ]">
             <Transition
                 appear
                 enter-active-class="transition duration-200 ease-out"
@@ -94,6 +97,7 @@ const props = withDefaults(
         description?: string;
         size?: 'md' | 'lg' | 'screen';
         height?: 'default' | 'tall' | 'screen';
+        layer?: 'base' | 'raised';
         closeOnBackdrop?: boolean;
     }>(),
     {
@@ -101,6 +105,7 @@ const props = withDefaults(
         description: '',
         size: 'md',
         height: 'default',
+        layer: 'base',
         closeOnBackdrop: true
     }
 );
@@ -124,6 +129,9 @@ const heightClass = computed(() =>
           : 'max-h-[min(86vh,48rem)]'
 );
 const panelClass = computed(() => [sizeClass.value, heightClass.value]);
+const layerClass = computed(() =>
+    props.layer === 'raised' ? 'z-[100]' : 'z-[90]'
+);
 const isRendered = ref(props.modelValue);
 
 function applyGlobalModalState() {

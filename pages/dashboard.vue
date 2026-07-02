@@ -431,6 +431,7 @@
         <UiModal
             :model-value="revokeTarget !== null"
             title="吊销 API 密钥"
+            layer="raised"
             :close-on-backdrop="!isRevoking"
             @update:model-value="handleRevokeModalVisibilityChange">
             <div
@@ -602,6 +603,7 @@
         <UiModal
             :model-value="oauthClientDeleteTarget !== null"
             title="删除 OAuth 客户端"
+            layer="raised"
             :close-on-backdrop="!isDeletingOauthClient"
             @update:model-value="handleOauthClientDeleteModalVisibilityChange">
             <div
