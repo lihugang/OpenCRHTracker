@@ -123,6 +123,10 @@
                                         class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                                         自定义恢复速度
                                     </th>
+                                    <th
+                                        class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                        操作
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-slate-100">
@@ -164,9 +168,40 @@
                                             )
                                         }}
                                     </td>
+                                    <td class="px-4 py-3 text-right">
+                                        <UiButton
+                                            type="button"
+                                            variant="secondary"
+                                            size="sm"
+                                            :loading="
+                                                resettingQuotaUserId ===
+                                                item.userId
+                                            "
+                                            :disabled="
+                                                usersStatus === 'pending' ||
+                                                resettingQuotaUserId.length > 0
+                                            "
+                                            @click="
+                                                resetUserQuota(item.userId)
+                                            ">
+                                            重置限额
+                                        </UiButton>
+                                    </td>
                                 </tr>
                             </tbody>
                         </table>
+                    </div>
+
+                    <div
+                        v-if="quotaResetErrorMessage"
+                        class="rounded-[1rem] border border-rose-200 bg-rose-50/80 px-4 py-4 text-sm leading-6 text-rose-700">
+                        {{ quotaResetErrorMessage }}
+                    </div>
+
+                    <div
+                        v-else-if="quotaResetSuccessMessage"
+                        class="rounded-[1rem] border border-emerald-200 bg-emerald-50/80 px-4 py-4 text-sm leading-6 text-emerald-800">
+                        {{ quotaResetSuccessMessage }}
                     </div>
 
                     <div
@@ -264,6 +299,7 @@ import useTrackedRequestFetch, {
 } from '~/composables/useTrackedRequestFetch';
 import { useAdminDateQuery } from '~/composables/useAdminDateQuery';
 import type {
+    AdminResetUserQuotaResponse,
     AdminUpdateUserQuotaResponse,
     AdminUsersResponse
 } from '~/types/admin';
@@ -319,6 +355,9 @@ const quotaForm = reactive({
 const isSavingQuota = ref(false);
 const quotaSaveErrorMessage = ref('');
 const quotaSaveSuccessMessage = ref('');
+const resettingQuotaUserId = ref('');
+const quotaResetErrorMessage = ref('');
+const quotaResetSuccessMessage = ref('');
 
 useSiteSeo({
     title: '用户 | Open CRH Tracker',
@@ -460,6 +499,57 @@ async function saveQuotaOverride() {
         );
     } finally {
         isSavingQuota.value = false;
+    }
+}
+
+async function resetUserQuota(userId: string) {
+    if (resettingQuotaUserId.value.length > 0) {
+        return;
+    }
+
+    quotaResetErrorMessage.value = '';
+    quotaResetSuccessMessage.value = '';
+    resettingQuotaUserId.value = userId;
+
+    try {
+        const { data, error } = await useCsrfFetch<
+            TrackerApiResponse<AdminResetUserQuotaResponse>
+        >('/api/v1/admin/users/quota/reset', {
+            method: 'POST',
+            retry: 0,
+            body: {
+                userId
+            },
+            key: `admin:users:quota:reset:${userId}:${Date.now()}`,
+            watch: false,
+            server: false
+        });
+
+        if (error.value) {
+            throw error.value;
+        }
+
+        const response = data.value;
+        if (!response) {
+            throw new Error('Missing admin user quota reset response');
+        }
+
+        if (!response.ok) {
+            throw {
+                data: response
+            };
+        }
+
+        quotaResetSuccessMessage.value = `已重置用户 ${response.data.userId} 的当前 API 剩余额度。`;
+
+        await refreshUsers();
+    } catch (error) {
+        quotaResetErrorMessage.value = getApiErrorMessage(
+            error,
+            '重置用户当前 API 剩余额度失败。'
+        );
+    } finally {
+        resettingQuotaUserId.value = '';
     }
 }
 </script>

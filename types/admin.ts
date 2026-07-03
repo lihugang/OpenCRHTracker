@@ -311,6 +311,20 @@ export interface AdminUpdateUserQuotaResponse {
     };
 }
 
+export interface AdminResetUserQuotaRequest {
+    userId: string;
+}
+
+export interface AdminResetUserQuotaResponse {
+    userId: string;
+    apiRemainCost: number;
+    effectiveQuota: {
+        tokenLimit: number;
+        refillAmount: number;
+        refillIntervalSeconds: number;
+    };
+}
+
 export type AdminConfigFileTarget =
     | 'config'
     | 'EMUList'

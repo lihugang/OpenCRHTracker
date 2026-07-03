@@ -12,6 +12,8 @@ import resolveUserQuotaSubject from '~/server/utils/api/quota/resolveUserQuotaSu
 import importSqlBatch from '~/server/utils/sql/importSqlBatch';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
 import type {
+    AdminResetUserQuotaRequest,
+    AdminResetUserQuotaResponse,
     AdminUpdateUserQuotaRequest,
     AdminUpdateUserQuotaResponse,
     AdminUserListItem,
@@ -98,6 +100,29 @@ export function updateAdminUserQuotaOverride(
     return {
         userId: input.userId,
         quotaOverride,
+        effectiveQuota: {
+            tokenLimit: effectiveQuota.tokenLimit,
+            refillAmount: effectiveQuota.refillAmount,
+            refillIntervalSeconds: effectiveQuota.refillIntervalSeconds
+        }
+    };
+}
+
+export function resetAdminUserQuota(
+    input: AdminResetUserQuotaRequest
+): AdminResetUserQuotaResponse {
+    ensureUserExists(input.userId);
+
+    const now = getNowSeconds();
+    const effectiveQuota = resolveUserQuotaSubject(input.userId);
+    getQuotaStore().buckets.set(effectiveQuota.bucketKey, {
+        tokens: effectiveQuota.tokenLimit,
+        updatedAt: now
+    });
+
+    return {
+        userId: input.userId,
+        apiRemainCost: effectiveQuota.tokenLimit,
         effectiveQuota: {
             tokenLimit: effectiveQuota.tokenLimit,
             refillAmount: effectiveQuota.refillAmount,
