@@ -326,14 +326,15 @@ export const crawlDocsSections: DocsContentSection[] = [
                 title: '抓取链路关键配置',
                 cards: [
                     {
-                        path: 'data.assets.schedule.file',
+                        path: 'data.databases.schedule',
                         valueType: 'string',
-                        required: true,
+                        required: false,
                         description:
-                            'published schedule 和 building schedule 都围绕这个资产文件读写，todayScheduleCache 也会观察它的修改时间。',
+                            'schedule.db 的 SQLite 文件路径，默认 data/schedule.db。',
                         notes: [
-                            '文件路径必须可读写，私有部署时建议放在持久化 data 目录内。',
-                            '内部历史时刻表不会直接把整份 schedule.json 当作快照归档，而是在确认过的车次组落盘后提取规范化 stops 内容写入独立数据库。'
+                            '库内索引覆盖车次别名、内部车号、车站时刻和官方交路查询。',
+                            'published schedule、building schedule 和 todayScheduleCache 都以该数据库为权威来源。',
+                            '内部历史时刻表不会直接把整份 schedule.db 当作快照归档，而是在确认过的车次组落盘后提取规范化 stops 内容写入独立数据库。'
                         ]
                     },
                     {
@@ -428,7 +429,7 @@ export const crawlDocsSections: DocsContentSection[] = [
                 title: '建议先检查的点',
                 items: [
                     '看启动日志是否出现 registered executor=build_today_schedule、generate_route_refresh_tasks、probe_train_departure、rebuild_train_circulation_index 等关键注册日志。',
-                    '确认 data.assets.schedule.file 指向的时刻表更新时间是否为当天，而不是旧文件或状态处于构建中。',
+                    '确认 schedule.db 内的 published schedule 是否为当天，而不是旧状态或 building 状态仍在构建中。',
                     '确认 task.startup.disabledExecutors 没有禁用 build_today_schedule、generate_route_refresh_tasks、rebuild_reference_model_index 或 rebuild_train_circulation_index。',
                     '如果当天探测没有生成，优先检查 build_today_schedule 是否成功，以及是否添加了 dispatch_daily_probe_tasks。'
                 ]

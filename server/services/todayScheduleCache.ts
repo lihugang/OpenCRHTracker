@@ -1,18 +1,29 @@
-import useConfig from '~/server/config';
 import getLogger from '~/server/libs/log4js';
 import { buildTrainKey } from '~/server/services/probeRuntimeState';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
 import normalizeTimetableBoundaryStopTimes from '~/server/utils/12306/normalizeTimetableBoundaryStopTimes';
 import {
-    getScheduleStateVersion,
-    loadActiveScheduleState
+    ensureScheduleDocumentMigrated,
+    getScheduleStateVersion
 } from '~/server/utils/12306/scheduleProbe/stateStore';
+import {
+    listScheduleAliasesByStateKind,
+    loadScheduleItemCodeByStateKindAndAlias,
+    loadScheduleItemByStateKindAndCode,
+    listScheduleItemsByStateKind,
+    listScheduleStopsByStateKindAndItemCode,
+    listScheduleStopsByStateKindAndStationName,
+    resolveActiveScheduleStateSummary,
+    type ScheduleDbItemRow,
+    type ScheduleDbStationStopRow,
+    type ScheduleStateKind
+} from '~/server/utils/12306/scheduleProbe/sqliteStore';
 import {
     toShanghaiDayOffsetFromUnixSeconds,
     toUnixSecondsFromShanghaiDayOffset
 } from '~/server/utils/date/shanghaiDateTime';
 import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
-import type { ScheduleItem } from '~/server/utils/12306/scheduleProbe/types';
+import type { ScheduleStop } from '~/server/utils/12306/scheduleProbe/types';
 
 export interface TodayScheduleRoute {
     trainCode: string;
@@ -64,191 +75,108 @@ export interface TodayScheduleStationIndexRow extends TodayScheduleRoute {
 
 interface TodayScheduleCache {
     date: string;
+    activeStateKind: ScheduleStateKind | null;
     scheduleStateVersion: number;
     routesByTrainCode: Map<string, TodayScheduleRoute>;
-    timetablesByTrainCode: Map<string, TodayScheduleTimetable>;
     groupsByTrainKey: Map<string, TodayScheduleProbeGroup>;
     groupKeysByTrainCode: Map<string, string>;
     groupKeysByTrainInternalCode: Map<string, string>;
-    stationRowsByStationName: Map<string, TodayScheduleStationIndexRow[]>;
 }
 
 let cached: TodayScheduleCache | null = null;
 const logger = getLogger('today-schedule-cache');
 
 function rebuildCache(): TodayScheduleCache {
-    const config = useConfig();
     const currentDate = getCurrentDateString();
-    const scheduleFilePath = config.data.assets.schedule.file;
-    const state = loadActiveScheduleState(scheduleFilePath);
     const routesByTrainCode = new Map<string, TodayScheduleRoute>();
-    const timetablesByTrainCode = new Map<string, TodayScheduleTimetable>();
     const groupsByTrainKey = new Map<string, TodayScheduleProbeGroup>();
     const groupKeysByTrainCode = new Map<string, string>();
     const groupKeysByTrainInternalCode = new Map<string, string>();
-    const stationRowsByStationName = new Map<
-        string,
-        TodayScheduleStationIndexRow[]
-    >();
-    const stationRowIndexesByStationName = new Map<
-        string,
-        Map<string, TodayScheduleStationIndexRow>
-    >();
+    let activeStateKind: ScheduleStateKind | null = null;
+    let activeDate = currentDate;
 
-    if (state) {
-        const scheduleItemIdentityIndex = buildScheduleItemIdentityIndex(
-            state.items
-        );
-        for (const item of state.items) {
-            if (item.startAt === null || item.endAt === null) {
-                continue;
-            }
+    if (ensureScheduleDocumentMigrated()) {
+        const activeSummary = resolveActiveScheduleStateSummary(currentDate);
+        activeStateKind = activeSummary?.kind ?? null;
+        activeDate = activeSummary?.date ?? currentDate;
+    }
 
-            const trainCode = normalizeCode(item.code);
+    if (activeStateKind) {
+        const items = listScheduleItemsByStateKind(activeStateKind);
+        const aliasesByItemCode =
+            listScheduleAliasesByStateKind(activeStateKind);
+        const scheduleItemIdentityIndex = buildScheduleItemIdentityIndex(items);
+
+        for (const item of items) {
+            const trainCode = normalizeCode(item.itemCode);
             if (trainCode.length === 0) {
                 continue;
             }
 
-            const trainInternalCode = normalizeCode(item.internalCode);
-            const startAt = toUnixSecondsFromShanghaiDayOffset(
-                state.date,
-                item.startAt
-            );
-            const endAt = toUnixSecondsFromShanghaiDayOffset(
-                state.date,
-                item.endAt
-            );
-            const trainKey = buildTrainKey(
-                trainCode,
-                trainInternalCode,
-                startAt
-            );
+            const aliases = aliasesByItemCode.get(trainCode) ?? [trainCode];
             const allCodes = normalizeAliasCodes(
                 item,
                 trainCode,
+                aliases,
                 scheduleItemIdentityIndex
             );
-            const normalizedStops = normalizeTimetableBoundaryStopTimes(
-                item.stops
+            const timetable = buildTimetableRouteFromItemRow(
+                activeDate,
+                item,
+                allCodes
             );
-            const timetable: TodayScheduleTimetable = {
-                trainCode,
-                trainInternalCode,
-                allCodes,
-                bureauCode: item.bureauCode.trim(),
-                trainStyle: item.trainStyle.trim(),
-                trainDepartment: item.trainDepartment.trim(),
-                passengerDepartment: item.passengerDepartment.trim(),
-                startAt,
-                endAt,
-                updatedAt: item.lastRouteRefreshAt,
-                startStation: item.startStation.trim(),
-                endStation: item.endStation.trim(),
-                stops: normalizedStops.map((stop) => ({
-                    stationNo: stop.stationNo,
-                    stationName: stop.stationName.trim(),
-                    arriveAt:
-                        stop.arriveAt === null
-                            ? null
-                            : toUnixSecondsFromShanghaiDayOffset(
-                                  state.date,
-                                  stop.arriveAt
-                              ),
-                    departAt:
-                        stop.departAt === null
-                            ? null
-                            : toUnixSecondsFromShanghaiDayOffset(
-                                  state.date,
-                                  stop.departAt
-                              ),
-                    stationTrainCode: stop.stationTrainCode.trim(),
-                    wicket: stop.wicket.trim(),
-                    distance: stop.distance ?? null,
-                    platformNo: stop.platformNo ?? null,
-                    isStart: stop.isStart,
-                    isEnd: stop.isEnd
-                }))
-            };
-
-            const activeGroup = upsertProbeGroup(
-                groupsByTrainKey,
-                trainKey,
-                timetable
-            );
-
-            for (const stop of timetable.stops) {
-                const stationName = stop.stationName.trim();
-                if (stationName.length === 0) {
-                    continue;
-                }
-
-                upsertStationRow(
-                    stationRowsByStationName,
-                    stationRowIndexesByStationName,
-                    state.date,
-                    stationName,
-                    activeGroup,
-                    timetable,
-                    stop
-                );
+            if (!timetable) {
+                continue;
             }
+
+            const trainKey = buildTrainKey(
+                timetable.trainCode,
+                timetable.trainInternalCode,
+                timetable.startAt
+            );
+            upsertProbeGroup(groupsByTrainKey, trainKey, timetable);
 
             for (const aliasCode of timetable.allCodes) {
                 if (!routesByTrainCode.has(aliasCode)) {
                     routesByTrainCode.set(aliasCode, {
-                        trainCode,
-                        trainInternalCode,
+                        trainCode: timetable.trainCode,
+                        trainInternalCode: timetable.trainInternalCode,
                         allCodes: timetable.allCodes,
                         bureauCode: timetable.bureauCode,
                         trainStyle: timetable.trainStyle,
                         trainDepartment: timetable.trainDepartment,
                         passengerDepartment: timetable.passengerDepartment,
-                        startAt,
-                        endAt,
+                        startAt: timetable.startAt,
+                        endAt: timetable.endAt,
                         updatedAt: timetable.updatedAt,
                         startStation: timetable.startStation,
                         endStation: timetable.endStation
                     });
                 }
 
-                if (!timetablesByTrainCode.has(aliasCode)) {
-                    timetablesByTrainCode.set(aliasCode, timetable);
-                }
-            }
-
-            for (const aliasCode of timetable.allCodes) {
                 groupKeysByTrainCode.set(aliasCode, trainKey);
             }
 
             if (
-                trainInternalCode.length > 0 &&
-                !groupKeysByTrainInternalCode.has(trainInternalCode)
+                timetable.trainInternalCode.length > 0 &&
+                !groupKeysByTrainInternalCode.has(timetable.trainInternalCode)
             ) {
-                groupKeysByTrainInternalCode.set(trainInternalCode, trainKey);
+                groupKeysByTrainInternalCode.set(
+                    timetable.trainInternalCode,
+                    trainKey
+                );
             }
         }
-    }
-
-    for (const rows of stationRowsByStationName.values()) {
-        for (const row of rows) {
-            const activeGroup = groupsByTrainKey.get(row.trainKey);
-            if (activeGroup) {
-                applyGroupToStationRow(row, activeGroup);
-            }
-        }
-
-        rows.sort(compareStationRows);
     }
 
     cached = {
-        date: currentDate,
+        date: activeDate,
+        activeStateKind,
         scheduleStateVersion: getScheduleStateVersion(),
         routesByTrainCode,
-        timetablesByTrainCode,
         groupsByTrainKey,
         groupKeysByTrainCode,
-        groupKeysByTrainInternalCode,
-        stationRowsByStationName
+        groupKeysByTrainInternalCode
     };
     return cached;
 }
@@ -274,11 +202,42 @@ export function getTodayScheduleTimetableByTrainCode(
 ): TodayScheduleTimetable | null {
     const activeCache = getActiveCache();
     const normalizedTrainCode = normalizeCode(trainCode);
-    if (normalizedTrainCode.length === 0) {
+    if (
+        normalizedTrainCode.length === 0 ||
+        activeCache.activeStateKind === null
+    ) {
         return null;
     }
 
-    return activeCache.timetablesByTrainCode.get(normalizedTrainCode) ?? null;
+    const route = activeCache.routesByTrainCode.get(normalizedTrainCode);
+    if (!route) {
+        return null;
+    }
+
+    const itemCode =
+        loadScheduleItemCodeByStateKindAndAlias(
+            activeCache.activeStateKind,
+            normalizedTrainCode
+        ) ?? route.trainCode;
+    const item = loadScheduleItemByStateKindAndCode(
+        activeCache.activeStateKind,
+        itemCode
+    );
+    if (!item) {
+        return null;
+    }
+
+    const stops = normalizeTimetableBoundaryStopTimes(
+        listScheduleStopsByStateKindAndItemCode(
+            activeCache.activeStateKind,
+            item.itemCode
+        )
+    ).map((stop) => toTodayScheduleStop(activeCache.date, stop));
+
+    return {
+        ...route,
+        stops
+    };
 }
 
 export function getTodayStationTimetableByStationName(
@@ -286,13 +245,67 @@ export function getTodayStationTimetableByStationName(
 ): TodayScheduleStationIndexRow[] {
     const activeCache = getActiveCache();
     const normalizedStationName = stationName.trim();
-    if (normalizedStationName.length === 0) {
+    if (
+        normalizedStationName.length === 0 ||
+        activeCache.activeStateKind === null
+    ) {
         return [];
     }
 
-    return (
-        activeCache.stationRowsByStationName.get(normalizedStationName) ?? []
-    );
+    const stationRowsByStationName = new Map<
+        string,
+        TodayScheduleStationIndexRow[]
+    >();
+    const stationRowIndexesByStationName = new Map<
+        string,
+        Map<string, TodayScheduleStationIndexRow>
+    >();
+
+    for (const row of listScheduleStopsByStateKindAndStationName(
+        activeCache.activeStateKind,
+        normalizedStationName
+    )) {
+        const route = activeCache.routesByTrainCode.get(
+            normalizeCode(row.itemCode)
+        );
+        if (!route) {
+            continue;
+        }
+
+        const trainKey = buildTrainKey(
+            route.trainCode,
+            route.trainInternalCode,
+            route.startAt
+        );
+        const group = activeCache.groupsByTrainKey.get(trainKey);
+        if (!group) {
+            continue;
+        }
+
+        upsertStationRow(
+            stationRowsByStationName,
+            stationRowIndexesByStationName,
+            activeCache.date,
+            normalizedStationName,
+            group,
+            {
+                ...route,
+                stops: []
+            },
+            toTodayScheduleStopFromStationRow(activeCache.date, row)
+        );
+    }
+
+    const rows = stationRowsByStationName.get(normalizedStationName) ?? [];
+    for (const row of rows) {
+        const activeGroup = activeCache.groupsByTrainKey.get(row.trainKey);
+        if (activeGroup) {
+            applyGroupToStationRow(row, activeGroup);
+        }
+    }
+
+    rows.sort(compareStationRows);
+    return rows;
 }
 
 export function getTodayScheduleProbeGroupByTrainCode(
@@ -350,15 +363,15 @@ function getActiveCache(): TodayScheduleCache {
 }
 
 interface ScheduleItemIdentityIndex {
-    itemsByCode: Map<string, ScheduleItem>;
+    itemsByCode: Map<string, ScheduleDbItemRow>;
 }
 
 function buildScheduleItemIdentityIndex(
-    items: ScheduleItem[]
+    items: ScheduleDbItemRow[]
 ): ScheduleItemIdentityIndex {
-    const itemsByCode = new Map<string, ScheduleItem>();
+    const itemsByCode = new Map<string, ScheduleDbItemRow>();
     for (const item of items) {
-        const trainCode = normalizeCode(item.code);
+        const trainCode = normalizeCode(item.itemCode);
         if (trainCode.length > 0 && !itemsByCode.has(trainCode)) {
             itemsByCode.set(trainCode, item);
         }
@@ -370,8 +383,8 @@ function buildScheduleItemIdentityIndex(
 }
 
 function hasMatchingFallbackRouteIdentity(
-    sourceItem: ScheduleItem,
-    aliasItem: ScheduleItem
+    sourceItem: ScheduleDbItemRow,
+    aliasItem: ScheduleDbItemRow
 ): boolean {
     return (
         sourceItem.startAt !== null &&
@@ -384,11 +397,11 @@ function hasMatchingFallbackRouteIdentity(
 }
 
 function isSafeScheduleAlias(
-    sourceItem: ScheduleItem,
+    sourceItem: ScheduleDbItemRow,
     aliasCode: string,
     index: ScheduleItemIdentityIndex
 ): boolean {
-    const sourceCode = normalizeCode(sourceItem.code);
+    const sourceCode = normalizeCode(sourceItem.itemCode);
     if (aliasCode === sourceCode) {
         return true;
     }
@@ -411,25 +424,26 @@ function isSafeScheduleAlias(
 }
 
 function logUnsafeScheduleAlias(
-    sourceItem: ScheduleItem,
+    sourceItem: ScheduleDbItemRow,
     aliasCode: string,
     index: ScheduleItemIdentityIndex
 ): void {
     const aliasItem = index.itemsByCode.get(aliasCode);
     logger.warn(
-        `drop_unsafe_schedule_alias sourceCode=${normalizeCode(sourceItem.code)} aliasCode=${aliasCode} sourceInternalCode=${normalizeCode(sourceItem.internalCode)} aliasInternalCode=${normalizeCode(aliasItem?.internalCode ?? '')} sourceStartAt=${sourceItem.startAt ?? 'null'} aliasStartAt=${aliasItem?.startAt ?? 'null'} sourceRoute=${sourceItem.startStation.trim()}-${sourceItem.endStation.trim()} aliasRoute=${aliasItem ? `${aliasItem.startStation.trim()}-${aliasItem.endStation.trim()}` : 'unknown'}`
+        `drop_unsafe_schedule_alias sourceCode=${normalizeCode(sourceItem.itemCode)} aliasCode=${aliasCode} sourceInternalCode=${normalizeCode(sourceItem.internalCode)} aliasInternalCode=${normalizeCode(aliasItem?.internalCode ?? '')} sourceStartAt=${sourceItem.startAt ?? 'null'} aliasStartAt=${aliasItem?.startAt ?? 'null'} sourceRoute=${sourceItem.startStation.trim()}-${sourceItem.endStation.trim()} aliasRoute=${aliasItem ? `${aliasItem.startStation.trim()}-${aliasItem.endStation.trim()}` : 'unknown'}`
     );
 }
 
 function normalizeAliasCodes(
-    item: ScheduleItem,
+    item: ScheduleDbItemRow,
     trainCode: string,
+    aliases: string[],
     index: ScheduleItemIdentityIndex
 ): string[] {
     const codes = new Set<string>();
     codes.add(trainCode);
 
-    for (const value of item.allCodes) {
+    for (const value of aliases) {
         const normalized = normalizeCode(value);
         if (normalized.length === 0) {
             continue;
@@ -444,6 +458,88 @@ function normalizeAliasCodes(
     }
 
     return [...codes];
+}
+
+function buildTimetableRouteFromItemRow(
+    date: string,
+    item: ScheduleDbItemRow,
+    allCodes: string[]
+): TodayScheduleTimetable | null {
+    if (item.startAt === null || item.endAt === null) {
+        return null;
+    }
+
+    const trainCode = normalizeCode(item.itemCode);
+    if (trainCode.length === 0) {
+        return null;
+    }
+
+    return {
+        trainCode,
+        trainInternalCode: normalizeCode(item.internalCode),
+        allCodes,
+        bureauCode: item.bureauCode.trim(),
+        trainStyle: item.trainStyle.trim(),
+        trainDepartment: item.trainDepartment.trim(),
+        passengerDepartment: item.passengerDepartment.trim(),
+        startAt: toUnixSecondsFromShanghaiDayOffset(date, item.startAt),
+        endAt: toUnixSecondsFromShanghaiDayOffset(date, item.endAt),
+        updatedAt: item.lastRouteRefreshAt,
+        startStation: item.startStation.trim(),
+        endStation: item.endStation.trim(),
+        stops: []
+    };
+}
+
+function toTodayScheduleStop(
+    date: string,
+    stop: ScheduleStop
+): TodayScheduleStop {
+    return {
+        stationNo: stop.stationNo,
+        stationName: stop.stationName.trim(),
+        arriveAt:
+            stop.arriveAt === null
+                ? null
+                : toUnixSecondsFromShanghaiDayOffset(date, stop.arriveAt),
+        departAt:
+            stop.departAt === null
+                ? null
+                : toUnixSecondsFromShanghaiDayOffset(date, stop.departAt),
+        stationTrainCode: stop.stationTrainCode.trim(),
+        wicket: stop.wicket.trim(),
+        distance: stop.distance ?? null,
+        platformNo: stop.platformNo ?? null,
+        isStart: stop.isStart,
+        isEnd: stop.isEnd
+    };
+}
+
+function toTodayScheduleStopFromStationRow(
+    date: string,
+    row: ScheduleDbStationStopRow
+): TodayScheduleStop {
+    const isStart = row.isStart === 1;
+    const isEnd = row.isEnd === 1;
+
+    return {
+        stationNo: row.stationNo,
+        stationName: row.stationName.trim(),
+        arriveAt:
+            isStart || row.arriveAt === null
+                ? null
+                : toUnixSecondsFromShanghaiDayOffset(date, row.arriveAt),
+        departAt:
+            isEnd || row.departAt === null
+                ? null
+                : toUnixSecondsFromShanghaiDayOffset(date, row.departAt),
+        stationTrainCode: row.stationTrainCode.trim(),
+        wicket: row.wicket.trim(),
+        distance: row.distance ?? null,
+        platformNo: row.platformNo ?? null,
+        isStart,
+        isEnd
+    };
 }
 
 function uniqueNormalizedScheduleCodes(codes: string[]): string[] {

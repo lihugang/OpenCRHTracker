@@ -5,7 +5,11 @@ import {
 } from '~/server/services/taskQueue';
 import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
-import { loadScheduleDocument } from '~/server/utils/12306/scheduleProbe/stateStore';
+import { ensureScheduleDocumentMigrated } from '~/server/utils/12306/scheduleProbe/stateStore';
+import {
+    loadScheduleStateSummaries,
+    type ScheduleStateSummary
+} from '~/server/utils/12306/scheduleProbe/sqliteStore';
 import type { ScheduleState } from '~/server/utils/12306/scheduleProbe/types';
 
 export type ScheduleReadinessReason =
@@ -56,20 +60,11 @@ export type ScheduleReadinessRescheduleResult =
           reusedExecutionTime: number | null;
       };
 
-function hasUsablePublishedTimetable(state: ScheduleState): boolean {
-    return state.items.some(
-        (item) =>
-            item.startAt !== null &&
-            item.endAt !== null &&
-            item.stops.length > 0
-    );
-}
-
 function buildPendingState(
     reason: ScheduleReadinessReason,
     currentDate: string,
-    published: ScheduleState | null,
-    building: ScheduleState | null
+    published: ScheduleStateSummary | null,
+    building: ScheduleStateSummary | null
 ): ScheduleReadinessPendingState {
     return {
         ready: false,
@@ -77,7 +72,7 @@ function buildPendingState(
         currentDate,
         publishedDate: published?.date ?? null,
         publishedStatus: published?.status ?? null,
-        publishedPhase: published?.progress.phase ?? null,
+        publishedPhase: published?.phase ?? null,
         buildingDate: building?.date ?? null,
         buildingStatus: building?.status ?? null
     };
@@ -85,11 +80,12 @@ function buildPendingState(
 
 export function getScheduleReadinessState(): ScheduleReadinessState {
     const currentDate = getCurrentDateString();
-    const document = loadScheduleDocument(
-        useConfig().data.assets.schedule.file
-    );
-    const published = document?.published ?? null;
-    const building = document?.building ?? null;
+    const migrated = ensureScheduleDocumentMigrated();
+    const summaries = migrated ? loadScheduleStateSummaries() : [];
+    const published =
+        summaries.find((summary) => summary.kind === 'published') ?? null;
+    const building =
+        summaries.find((summary) => summary.kind === 'building') ?? null;
 
     if (!published) {
         return buildPendingState(
@@ -118,7 +114,7 @@ export function getScheduleReadinessState(): ScheduleReadinessState {
         );
     }
 
-    if (published.status === 'running' || published.progress.phase !== 'done') {
+    if (published.status === 'running' || published.phase !== 'done') {
         return buildPendingState(
             'schedule_not_done',
             currentDate,
@@ -127,7 +123,7 @@ export function getScheduleReadinessState(): ScheduleReadinessState {
         );
     }
 
-    if (!hasUsablePublishedTimetable(published)) {
+    if (published.usableTimetableCount <= 0) {
         return buildPendingState(
             'schedule_missing_usable_timetable',
             currentDate,

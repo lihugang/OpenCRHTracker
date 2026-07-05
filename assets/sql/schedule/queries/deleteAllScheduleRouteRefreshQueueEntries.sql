@@ -1,0 +1,1 @@
+DELETE FROM schedule_route_refresh_queue;

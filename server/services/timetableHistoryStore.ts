@@ -8,9 +8,16 @@ import {
     getGroupKey
 } from '~/server/utils/12306/scheduleProbe/taskHelpers';
 import type {
+    ScheduleItem,
     ScheduleState,
     ScheduleStop
 } from '~/server/utils/12306/scheduleProbe/types';
+import {
+    listScheduleItemsWithStopsByStateKindAndInternalCode,
+    loadScheduleItemCodeByStateKindAndAlias,
+    loadScheduleItemWithStopsByStateKindAndCode,
+    type ScheduleStateKind
+} from '~/server/utils/12306/scheduleProbe/sqliteStore';
 import uniqueNormalizedCodes from '~/server/utils/12306/uniqueNormalizedCodes';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
 import normalizeTimetableBoundaryStopTimes from '~/server/utils/12306/normalizeTimetableBoundaryStopTimes';
@@ -244,8 +251,7 @@ export function isTimetableHistoryMergeCandidate(
     return (
         previous.train_code === middle.train_code &&
         middle.train_code === next.train_code &&
-        previous.service_date_end_exclusive ===
-            middle.service_date_start &&
+        previous.service_date_end_exclusive === middle.service_date_start &&
         middle.service_date_end_exclusive === next.service_date_start &&
         previous.content_id === next.content_id &&
         middle.content_id !== previous.content_id
@@ -652,7 +658,96 @@ export function syncConfirmedTimetableHistoryForPublishedState(
 ): TimetableHistorySyncResult {
     const normalizedConfirmedTrainCodes =
         uniqueNormalizedCodes(confirmedTrainCodes);
-    const result: TimetableHistorySyncResult = {
+    const groupItemsByGroupKey = new Map<string, ScheduleItem[]>();
+
+    const codeIndex = buildCodeIndex(state.items);
+    const groupIndex = buildGroupIndex(state.items);
+
+    for (const confirmedTrainCode of normalizedConfirmedTrainCodes) {
+        const itemIndex = codeIndex.get(confirmedTrainCode);
+        if (itemIndex === undefined) {
+            continue;
+        }
+
+        const groupKey = getGroupKey(state.items[itemIndex]!);
+        if (groupItemsByGroupKey.has(groupKey)) {
+            continue;
+        }
+
+        const groupItemIndexes = groupIndex.get(groupKey);
+        if (!groupItemIndexes || groupItemIndexes.length === 0) {
+            groupItemsByGroupKey.set(groupKey, []);
+            continue;
+        }
+
+        groupItemsByGroupKey.set(
+            groupKey,
+            groupItemIndexes.map((currentItemIndex) => {
+                return state.items[currentItemIndex]!;
+            })
+        );
+    }
+
+    return syncConfirmedTimetableHistoryGroups(
+        state.date,
+        normalizedConfirmedTrainCodes,
+        [...groupItemsByGroupKey.values()],
+        nowSeconds
+    );
+}
+
+export function syncConfirmedTimetableHistoryForScheduleStateKind(
+    kind: ScheduleStateKind,
+    serviceDate: string,
+    confirmedTrainCodes: string[],
+    nowSeconds = getNowSeconds()
+): TimetableHistorySyncResult {
+    const normalizedConfirmedTrainCodes =
+        uniqueNormalizedCodes(confirmedTrainCodes);
+    const groupItemsByGroupKey = new Map<string, ScheduleItem[]>();
+
+    for (const confirmedTrainCode of normalizedConfirmedTrainCodes) {
+        const itemCode =
+            loadScheduleItemCodeByStateKindAndAlias(kind, confirmedTrainCode) ??
+            confirmedTrainCode;
+        const item = loadScheduleItemWithStopsByStateKindAndCode(
+            kind,
+            itemCode
+        );
+        if (!item) {
+            continue;
+        }
+
+        const groupKey = getGroupKey(item);
+        if (groupItemsByGroupKey.has(groupKey)) {
+            continue;
+        }
+
+        const groupItems =
+            item.internalCode.trim().length > 0
+                ? listScheduleItemsWithStopsByStateKindAndInternalCode(
+                      kind,
+                      item.internalCode
+                  )
+                : [item];
+        groupItemsByGroupKey.set(
+            groupKey,
+            groupItems.length > 0 ? groupItems : [item]
+        );
+    }
+
+    return syncConfirmedTimetableHistoryGroups(
+        serviceDate,
+        normalizedConfirmedTrainCodes,
+        [...groupItemsByGroupKey.values()],
+        nowSeconds
+    );
+}
+
+function createTimetableHistorySyncResult(
+    normalizedConfirmedTrainCodes: readonly string[]
+): TimetableHistorySyncResult {
+    return {
         confirmedGroups: 0,
         confirmedTrainCodes: normalizedConfirmedTrainCodes.length,
         skippedGroups: 0,
@@ -663,37 +758,31 @@ export function syncConfirmedTimetableHistoryForPublishedState(
         noopedCoverages: 0,
         routeRefreshTrainCodes: []
     };
+}
+
+function syncConfirmedTimetableHistoryGroups(
+    serviceDateString: string,
+    normalizedConfirmedTrainCodes: readonly string[],
+    groups: ScheduleItem[][],
+    nowSeconds: number
+): TimetableHistorySyncResult {
+    const result = createTimetableHistorySyncResult(
+        normalizedConfirmedTrainCodes
+    );
 
     if (normalizedConfirmedTrainCodes.length === 0) {
         return result;
     }
 
-    const codeIndex = buildCodeIndex(state.items);
-    const groupIndex = buildGroupIndex(state.items);
-    const confirmedGroupKeys = new Set<string>();
-
-    for (const confirmedTrainCode of normalizedConfirmedTrainCodes) {
-        const itemIndex = codeIndex.get(confirmedTrainCode);
-        if (itemIndex === undefined) {
-            continue;
-        }
-
-        confirmedGroupKeys.add(getGroupKey(state.items[itemIndex]!));
-    }
-
-    const serviceDate = normalizeServiceDateInteger(state.date);
+    const serviceDate = normalizeServiceDateInteger(serviceDateString);
     const nextServiceDate = getNextServiceDateInteger(serviceDate);
     const transaction = useTimetableHistoryDatabase().transaction(() => {
-        for (const confirmedGroupKey of confirmedGroupKeys) {
-            const groupItemIndexes = groupIndex.get(confirmedGroupKey);
-            if (!groupItemIndexes || groupItemIndexes.length === 0) {
+        for (const groupItems of groups) {
+            if (groupItems.length === 0) {
                 result.skippedGroups += 1;
                 continue;
             }
 
-            const groupItems = groupItemIndexes.map(
-                (itemIndex) => state.items[itemIndex]!
-            );
             const representativeItem = groupItems.find(
                 (item) => item.stops.length > 0
             );

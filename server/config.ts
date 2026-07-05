@@ -115,7 +115,7 @@ interface LoggingConfig {
     retentionDays: number;
 }
 
-interface SimpleLatexContainerServiceConfig {
+interface TypstCompilerServiceConfig {
     baseUrl: string;
     apiKey: string;
 }
@@ -151,11 +151,6 @@ interface RefreshableAssetConfig {
         enabled: boolean;
         refreshAt: string[];
     };
-}
-
-interface AssetConfig {
-    file: string;
-    provider?: string;
 }
 
 interface RuntimeAdminTrafficConfig {
@@ -207,7 +202,6 @@ export interface Config {
             stationCoord: RefreshableAssetConfig;
             trainStyleMapping: RefreshableAssetConfig;
             qrcodeDetection: RefreshableAssetConfig;
-            schedule: AssetConfig;
         };
         databases: Record<
             | 'task'
@@ -215,7 +209,8 @@ export interface Config {
             | 'users'
             | 'feedback'
             | 'trainProvenance'
-            | 'timetableHistory',
+            | 'timetableHistory'
+            | 'schedule',
             string
         >;
         runtime: {
@@ -322,7 +317,7 @@ export interface Config {
     };
     oauth: OAuthConfig;
     services: {
-        simpleLatexContainer: SimpleLatexContainerServiceConfig;
+        typstCompiler: TypstCompilerServiceConfig;
     };
     task: {
         startup: {
@@ -574,19 +569,6 @@ function parseRefreshableAssetConfig(
                           `${name}.refresh.refreshAt`
                       )
         }
-    };
-}
-
-function parseAssetConfig(value: unknown, name: string): AssetConfig {
-    const asset = asObject(value, name);
-    return {
-        file: asString(asset.file, `${name}.file`),
-        provider: (() => {
-            if (asset.provider === undefined) {
-                return undefined;
-            }
-            return asString(asset.provider, `${name}.provider`);
-        })()
     };
 }
 
@@ -926,32 +908,30 @@ function validateConfig(raw: unknown): Config {
     const oauthPkce = asObject(oauth.pkce, 'oauth.pkce');
     const oauthDiscovery = asObject(oauth.discovery, 'oauth.discovery');
     const services = asObject(root.services, 'services');
-    const simpleLatexContainer = asObject(
-        services.simpleLatexContainer,
-        'services.simpleLatexContainer'
+    const typstCompiler = asObject(
+        services.typstCompiler,
+        'services.typstCompiler'
     );
-    const envSimpleLatexContainerApiKey =
-        process.env.OCRH_SIMPLE_LATEX_CONTAINER_API_KEY?.trim();
-    const configSimpleLatexContainerApiKey =
-        simpleLatexContainer.apiKey === undefined
+    const envTypstCompilerApiKey =
+        process.env.OCRH_TYPST_COMPILER_API_KEY?.trim();
+    const configTypstCompilerApiKey =
+        typstCompiler.apiKey === undefined
             ? ''
             : asString(
-                  simpleLatexContainer.apiKey,
-                  'services.simpleLatexContainer.apiKey'
+                  typstCompiler.apiKey,
+                  'services.typstCompiler.apiKey'
               ).trim();
-    const simpleLatexContainerApiKey =
-        envSimpleLatexContainerApiKey &&
-        envSimpleLatexContainerApiKey.length > 0
-            ? envSimpleLatexContainerApiKey
-            : configSimpleLatexContainerApiKey;
+    const typstCompilerApiKey =
+        envTypstCompilerApiKey && envTypstCompilerApiKey.length > 0
+            ? envTypstCompilerApiKey
+            : configTypstCompilerApiKey;
     if (
         !import.meta.dev &&
-        (!envSimpleLatexContainerApiKey ||
-            envSimpleLatexContainerApiKey.length === 0) &&
-        configSimpleLatexContainerApiKey.length > 0
+        (!envTypstCompilerApiKey || envTypstCompilerApiKey.length === 0) &&
+        configTypstCompilerApiKey.length > 0
     ) {
         console.warn(
-            '[config] WARNING: simple-latex-container API key was loaded from config instead of process.env.OCRH_SIMPLE_LATEX_CONTAINER_API_KEY'
+            '[config] WARNING: Typst compiler API key was loaded from config instead of process.env.OCRH_TYPST_COMPILER_API_KEY'
         );
     }
     const task = asObject(root.task, 'task');
@@ -1190,10 +1170,6 @@ function validateConfig(raw: unknown): Config {
                 qrcodeDetection: parseRefreshableAssetConfig(
                     assets.qrcodeDetection,
                     'data.assets.qrcodeDetection'
-                ),
-                schedule: parseAssetConfig(
-                    assets.schedule,
-                    'data.assets.schedule'
                 )
             },
             databases: {
@@ -1220,6 +1196,13 @@ function validateConfig(raw: unknown): Config {
                         : asString(
                               databases.timetableHistory,
                               'data.databases.timetableHistory'
+                          ),
+                schedule:
+                    databases.schedule === undefined
+                        ? 'data/schedule.db'
+                        : asString(
+                              databases.schedule,
+                              'data.databases.schedule'
                           )
             },
             runtime: {
@@ -1654,14 +1637,14 @@ function validateConfig(raw: unknown): Config {
             }
         },
         services: {
-            simpleLatexContainer: {
+            typstCompiler: {
                 baseUrl: asString(
-                    simpleLatexContainer.baseUrl,
-                    'services.simpleLatexContainer.baseUrl'
+                    typstCompiler.baseUrl,
+                    'services.typstCompiler.baseUrl'
                 )
                     .trim()
                     .replace(/\/+$/, ''),
-                apiKey: simpleLatexContainerApiKey
+                apiKey: typstCompilerApiKey
             }
         },
         task: {
@@ -2185,16 +2168,16 @@ function validateConfig(raw: unknown): Config {
         'oauth.idTokenSigning.privateKeyPem must be a PEM private key'
     );
     assert(
-        configResult.services.simpleLatexContainer.baseUrl.length > 0,
-        'services.simpleLatexContainer.baseUrl must be configured'
+        configResult.services.typstCompiler.baseUrl.length > 0,
+        'services.typstCompiler.baseUrl must be configured'
     );
     assert(
-        /^https?:\/\//.test(configResult.services.simpleLatexContainer.baseUrl),
-        'services.simpleLatexContainer.baseUrl must start with http:// or https://'
+        /^https?:\/\//.test(configResult.services.typstCompiler.baseUrl),
+        'services.typstCompiler.baseUrl must start with http:// or https://'
     );
     assert(
-        configResult.services.simpleLatexContainer.apiKey.length > 0,
-        'services.simpleLatexContainer.apiKey must be configured'
+        configResult.services.typstCompiler.apiKey.length > 0,
+        'services.typstCompiler.apiKey must be configured'
     );
     const disabledStartupExecutors = new Set<string>();
     for (const executor of configResult.task.startup.disabledExecutors) {

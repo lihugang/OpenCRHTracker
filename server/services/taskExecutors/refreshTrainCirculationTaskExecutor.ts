@@ -7,13 +7,9 @@ import {
 } from '~/server/services/stationBoardTaskDispatch';
 import { getTodayScheduleTimetableByTrainCode } from '~/server/services/todayScheduleCache';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
-import {
-    appendRouteRefreshQueueTrainCodes,
-    loadPublishedScheduleState
-} from '~/server/utils/12306/scheduleProbe/stateStore';
-import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
+import { appendRouteRefreshQueueTrainCodes } from '~/server/utils/12306/scheduleProbe/stateStore';
+import { LEGACY_SCHEDULE_JSON_PATH } from '~/server/utils/12306/scheduleProbe/constants';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
-import useConfig from '~/server/config';
 
 export const REFRESH_TRAIN_CIRCULATION_TASK_EXECUTOR =
     'refresh_train_circulation';
@@ -80,22 +76,13 @@ async function executeRefreshTrainCirculationTask(rawArgs: unknown) {
         );
         return;
     }
-    const scheduleFilePath = useConfig().data.assets.schedule.file;
-    const state = loadPublishedScheduleState(scheduleFilePath);
-    if (!state) {
-        throw new Error('当前已发布时刻表暂不可用');
-    }
-
-    const currentDate = getCurrentDateString();
-    if (state.date !== currentDate) {
-        throw new Error('当前已发布时刻表尚未更新到今天');
-    }
+    const serviceDate = readiness.state.publishedDate;
 
     const stationName = resolveDepartureStationName(args.trainCode);
     const executionTime = getNowSeconds();
     const appendedQueueEntries = appendRouteRefreshQueueTrainCodes(
-        scheduleFilePath,
-        state.date,
+        LEGACY_SCHEDULE_JSON_PATH,
+        serviceDate,
         [args.trainCode],
         executionTime
     );
@@ -113,7 +100,7 @@ async function executeRefreshTrainCirculationTask(rawArgs: unknown) {
     }
 
     const stationBoardTask = enqueueOrReuseStationBoardFetchTask({
-        serviceDate: state.date,
+        serviceDate,
         stationName,
         stationTelecode: telecodeResolution.stationTelecode,
         executionTime

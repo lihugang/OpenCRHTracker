@@ -1,6 +1,7 @@
 import getLogger from '~/server/libs/log4js';
 import useConfig from '~/server/config';
 import { ensureEmuDatabaseSchema } from '~/server/libs/database/emu';
+import { ensureScheduleDatabaseSchema } from '~/server/libs/database/schedule';
 import { ensureTaskDatabaseSchema } from '~/server/libs/database/task';
 import { ensureTrainProvenanceDatabaseSchema } from '~/server/libs/database/trainProvenance';
 import { estimateIdleTaskDurationMs } from '~/server/services/idleTaskEstimator';
@@ -174,10 +175,9 @@ function reconcileRefreshAssetTasks(): string[] {
                           definition.executor,
                           {}
                       )
-                    : removePendingTasksByExecutorAndArgs(
-                          definition.executor,
-                          { refreshAt }
-                      );
+                    : removePendingTasksByExecutorAndArgs(definition.executor, {
+                          refreshAt
+                      });
             logger.info(
                 `refresh_asset_task_removed_obsolete asset=${definition.key} executor=${definition.executor} refreshAt=${refreshAt ?? 'null'} removedTaskIds=${JSON.stringify(result.removedTaskIds)}`
             );
@@ -196,7 +196,9 @@ function reconcileRefreshAssetTasks(): string[] {
             logger.info(
                 `refresh_asset_task_reconciled asset=${definition.key} executor=${definition.executor} refreshAt=${refreshAt} action=${task.action} taskId=${task.taskId} removedTaskIds=${JSON.stringify(task.removedTaskIds)} reusedExecutionTime=${task.reusedExecutionTime ?? 'null'}`
             );
-            taskSummaries.push(`${definition.executor}:${refreshAt}:${task.taskId}`);
+            taskSummaries.push(
+                `${definition.executor}:${refreshAt}:${task.taskId}`
+            );
         }
     }
 
@@ -242,6 +244,7 @@ export default defineNitroPlugin(async () => {
         ensureTaskDatabaseSchema();
         ensureEmuDatabaseSchema();
         ensureTrainProvenanceDatabaseSchema();
+        ensureScheduleDatabaseSchema();
         cleanupExpiredTrainProvenance();
         await loadProbeAssets();
         await loadStationCoordAssets();

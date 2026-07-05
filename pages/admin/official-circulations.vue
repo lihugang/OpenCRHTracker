@@ -5,7 +5,7 @@
         :session="session"
         :show-date-input="false"
         title="官方交路表"
-        description="搜索、预览并删除 schedule.json 中的官方交路表定义。">
+        description="搜索、预览并删除时刻表数据库中的官方交路表定义。">
         <UiCard :show-accent-bar="false">
             <div class="space-y-6">
                 <div class="space-y-2">
@@ -17,8 +17,7 @@
                         搜索并删除官方交路表
                     </h2>
                     <p class="text-sm leading-6 text-slate-600">
-                        输入任意车次号或 internalCode，系统会在 `schedule.json`
-                        的 `circulation` 中做精确归一化匹配。
+                        输入任意车次号或 internalCode，系统会在时刻表数据库的官方交路表中做精确归一化匹配。
                     </p>
                 </div>
 
@@ -156,7 +155,7 @@
                         v-if="searchData.items.length === 0"
                         eyebrow="无结果"
                         title="没有匹配的官方交路表"
-                        description="当前关键字没有命中 schedule.json 中的官方交路表 entry。" />
+                        description="当前关键字没有命中时刻表数据库中的官方交路表 entry。" />
 
                     <div
                         v-else
@@ -318,7 +317,7 @@
 
                 <div
                     class="rounded-[1rem] border border-amber-200 bg-amber-50/80 px-4 py-4 text-sm leading-6 text-amber-900">
-                    该操作只会删除 `schedule.json` 中这张官方交路表，不会删除
+                    该操作只会删除时刻表数据库中的这张官方交路表，不会删除
                     `daily_emu_routes`、probe status 或其他运行数据。
                 </div>
 
@@ -401,7 +400,7 @@ const normalizedKeywordInput = computed(() =>
 const isDeletingEntry = computed(() => deletingEntryKey.value.length > 0);
 const deleteDialogDescription = computed(
     () =>
-        '删除后会立即写回 schedule.json，并使官方交路表缓存失效。之后同车次若存在推测交路，仍可能显示推测结果。'
+        '删除后会立即写回时刻表数据库，并使官方交路表缓存失效。之后同车次若存在推测交路，仍可能显示推测结果。'
 );
 
 function applyViewportState(mediaQueryList: MediaQueryList) {
@@ -593,7 +592,7 @@ async function confirmDelete() {
 useSiteSeo({
     title: '官方交路表 | Open CRH Tracker',
     description:
-        '管理员官方交路表页面，用于搜索、预览并删除 schedule.json 中的官方交路表定义。',
+        '管理员官方交路表页面，用于搜索、预览并删除时刻表数据库中的官方交路表定义。',
     path: '/admin/official-circulations',
     noindex: true
 });

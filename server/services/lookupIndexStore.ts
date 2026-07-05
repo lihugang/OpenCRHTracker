@@ -2,14 +2,23 @@ import fs from 'fs';
 import path from 'path';
 import useConfig from '~/server/config';
 import { parseEmuListAssetText } from '~/server/services/probeAssetStore';
-import { loadActiveScheduleState } from '~/server/utils/12306/scheduleProbe/stateStore';
+import {
+    ensureScheduleDocumentMigrated,
+    getScheduleStateVersion
+} from '~/server/utils/12306/scheduleProbe/stateStore';
+import {
+    getScheduleDatabaseFilePath,
+    listScheduleStationLookupRows,
+    listScheduleTrainLookupRows,
+    resolveActiveScheduleStateSummary
+} from '~/server/utils/12306/scheduleProbe/sqliteStore';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
 import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
 import type { LookupSuggestItem } from '~/types/lookup';
 
 interface LookupIndexCache {
-    scheduleFilePath: string;
-    scheduleMtimeMs: number;
+    scheduleDatabasePath: string;
+    scheduleStateVersion: number;
     emuListFilePath: string;
     emuListMtimeMs: number;
     items: LookupSuggestItem[];
@@ -68,12 +77,22 @@ function buildEmuSubtitle(record: { bureau: string; depot: string }) {
     return parts.join(' · ') || DEFAULT_EMU_SUBTITLE;
 }
 
-function loadTrainItems(scheduleFilePath: string) {
-    const state = loadActiveScheduleState(scheduleFilePath);
+function loadTrainItems() {
+    if (!ensureScheduleDocumentMigrated()) {
+        return [];
+    }
+
+    const activeSummary = resolveActiveScheduleStateSummary(
+        getCurrentDateString()
+    );
+    if (!activeSummary) {
+        return [];
+    }
+
     const deduplicated = new Map<string, LookupSuggestItem>();
 
-    for (const item of state?.items ?? []) {
-        const code = normalizeCode(item.code);
+    for (const row of listScheduleTrainLookupRows(activeSummary.kind)) {
+        const code = normalizeCode(row.itemCode);
         if (!code || deduplicated.has(code)) {
             continue;
         }
@@ -81,7 +100,7 @@ function loadTrainItems(scheduleFilePath: string) {
         deduplicated.set(code, {
             type: 'train',
             code,
-            subtitle: buildTrainSubtitle(item.startStation, item.endStation),
+            subtitle: buildTrainSubtitle(row.startStation, row.endStation),
             tags: []
         });
     }
@@ -89,36 +108,22 @@ function loadTrainItems(scheduleFilePath: string) {
     return Array.from(deduplicated.values());
 }
 
-function loadStationItems(scheduleFilePath: string) {
-    const state = loadActiveScheduleState(scheduleFilePath);
-    const currentDate = getCurrentDateString();
-    if (!state || state.date !== currentDate) {
+function loadStationItems() {
+    if (!ensureScheduleDocumentMigrated()) {
         return [];
     }
 
-    const stationCounts = new Map<string, number>();
-    for (const item of state.items) {
-        for (const stop of item.stops) {
-            const stationName =
-                typeof stop.stationName === 'string'
-                    ? stop.stationName.trim()
-                    : '';
-            if (stationName.length === 0) {
-                continue;
-            }
-
-            stationCounts.set(
-                stationName,
-                (stationCounts.get(stationName) ?? 0) + 1
-            );
-        }
+    const currentDate = getCurrentDateString();
+    const activeSummary = resolveActiveScheduleStateSummary(currentDate);
+    if (!activeSummary || activeSummary.date !== currentDate) {
+        return [];
     }
 
-    return Array.from(stationCounts.entries())
-        .map<LookupSuggestItem>(([stationName, count]) => ({
+    return listScheduleStationLookupRows(activeSummary.kind)
+        .map<LookupSuggestItem>((row) => ({
             type: 'station',
-            code: stationName,
-            subtitle: `时刻表 · ${count} 个车次`,
+            code: row.stationName,
+            subtitle: `时刻表 · ${row.stopCount} 个车次`,
             tags: []
         }))
         .sort((left, right) =>
@@ -171,19 +176,20 @@ function compareIndexItems(left: LookupSuggestItem, right: LookupSuggestItem) {
 
 function rebuildCache() {
     const config = useConfig();
-    const scheduleFilePath = config.data.assets.schedule.file;
+    const scheduleDatabasePath = getScheduleDatabaseFilePath();
     const emuListFilePath = config.data.assets.EMUList.file;
+    const items = [
+        ...loadTrainItems(),
+        ...loadEmuItems(emuListFilePath),
+        ...loadStationItems()
+    ].sort(compareIndexItems);
 
     const nextCache: LookupIndexCache = {
-        scheduleFilePath,
-        scheduleMtimeMs: getFileMtimeMs(scheduleFilePath),
+        scheduleDatabasePath,
+        scheduleStateVersion: getScheduleStateVersion(),
         emuListFilePath,
         emuListMtimeMs: getFileMtimeMs(emuListFilePath),
-        items: [
-            ...loadTrainItems(scheduleFilePath),
-            ...loadEmuItems(emuListFilePath),
-            ...loadStationItems(scheduleFilePath)
-        ].sort(compareIndexItems)
+        items
     };
 
     cached = nextCache;
@@ -192,15 +198,15 @@ function rebuildCache() {
 
 export function getLookupIndex() {
     const config = useConfig();
-    const scheduleFilePath = config.data.assets.schedule.file;
+    const scheduleDatabasePath = getScheduleDatabaseFilePath();
     const emuListFilePath = config.data.assets.EMUList.file;
-    const scheduleMtimeMs = getFileMtimeMs(scheduleFilePath);
+    const scheduleStateVersion = getScheduleStateVersion();
     const emuListMtimeMs = getFileMtimeMs(emuListFilePath);
 
     if (
         cached &&
-        cached.scheduleFilePath === scheduleFilePath &&
-        cached.scheduleMtimeMs === scheduleMtimeMs &&
+        cached.scheduleDatabasePath === scheduleDatabasePath &&
+        cached.scheduleStateVersion === scheduleStateVersion &&
         cached.emuListFilePath === emuListFilePath &&
         cached.emuListMtimeMs === emuListMtimeMs
     ) {

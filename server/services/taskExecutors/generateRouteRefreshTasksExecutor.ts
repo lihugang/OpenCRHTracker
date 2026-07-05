@@ -8,6 +8,7 @@ import {
     type EnqueueTaskInput
 } from '~/server/services/taskQueue';
 import { loadPublishedScheduleState } from '~/server/utils/12306/scheduleProbe/stateStore';
+import { getScheduleDatabaseFilePath } from '~/server/utils/12306/scheduleProbe/sqliteStore';
 import {
     getGroupKey,
     splitIntoBatches
@@ -52,8 +53,8 @@ function enqueueSelfTask(
 
 async function executeGenerateRouteRefreshTasks() {
     const config = useConfig();
-    const scheduleFilePath = config.data.assets.schedule.file;
-    const state = loadPublishedScheduleState(scheduleFilePath);
+    const scheduleFilePath = getScheduleDatabaseFilePath();
+    const state = loadPublishedScheduleState();
     const now = getNowSeconds();
     const selfExpectedDurationMs = estimateGenerateRouteRefreshTaskDurationMs();
     const generateIntervalSeconds =

@@ -1,14 +1,15 @@
 import useConfig from '~/server/config';
 import getLogger from '~/server/libs/log4js';
 import { syncCurrentDayTimetableIdsForTrainCodes } from '~/server/services/currentDayTimetableIdSync';
-import { syncConfirmedTimetableHistoryForPublishedState } from '~/server/services/timetableHistoryStore';
+import { syncConfirmedTimetableHistoryForScheduleStateKind } from '~/server/services/timetableHistoryStore';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
-import { ensureAssetFile } from '~/server/utils/dataAssets/store';
+import { getScheduleDatabaseFilePath } from '~/server/utils/12306/scheduleProbe/sqliteStore';
 import runScheduleProbe from './scheduleProbe/runner';
 import { getGroupKey } from './scheduleProbe/taskHelpers';
+import { LEGACY_SCHEDULE_JSON_PATH } from './scheduleProbe/constants';
 import {
     appendRouteRefreshQueueTrainCodes,
-    createInitialScheduleDocument,
+    ensureScheduleDocumentMigrated,
     loadOrInitBuildingScheduleState,
     loadPublishedScheduleState,
     promoteBuildingScheduleState,
@@ -80,8 +81,9 @@ function syncBuildConfirmedTimetableHistory(
     promotedState: ScheduleState,
     confirmedTrainCodes: string[]
 ) {
-    const syncResult = syncConfirmedTimetableHistoryForPublishedState(
-        promotedState,
+    const syncResult = syncConfirmedTimetableHistoryForScheduleStateKind(
+        'published',
+        promotedState.date,
         confirmedTrainCodes,
         promotedState.generatedAt
     );
@@ -116,12 +118,10 @@ export default async function buildTodaySchedule(): Promise<BuildScheduleResult>
         checkpointFlushEvery: config.spider.scheduleProbe.checkpointFlushEvery,
         prefixRules: config.spider.scheduleProbe.prefixRules
     };
-    const defaultDocument = createInitialScheduleDocument();
-    const ensuredAsset = await ensureAssetFile('schedule', {
-        defaultContent: `${JSON.stringify(defaultDocument, null, 4)}\n`
-    });
-    const scheduleFilePath = ensuredAsset.filePath;
-    const publishedState = loadPublishedScheduleState(scheduleFilePath);
+    const scheduleFilePath = LEGACY_SCHEDULE_JSON_PATH;
+    const scheduleDatabasePath = getScheduleDatabaseFilePath();
+    ensureScheduleDocumentMigrated();
+    const publishedState = loadPublishedScheduleState();
 
     const { state, resumed, reason, publishPending } =
         loadOrInitBuildingScheduleState(scheduleFilePath, runtimeConfig);
@@ -129,9 +129,9 @@ export default async function buildTodaySchedule(): Promise<BuildScheduleResult>
 
     if (reason === 'reuse_published_terminal') {
         logger.info(
-            `skip_reuse_published runId=${runId} status=${state.status} date=${state.date} file=${scheduleFilePath}`
+            `skip_reuse_published runId=${runId} status=${state.status} date=${state.date} file=${scheduleDatabasePath}`
         );
-        return buildResultFromState(state, resumed, scheduleFilePath);
+        return buildResultFromState(state, resumed, scheduleDatabasePath);
     }
 
     const shouldReusePreviousRouteInfo =
@@ -149,7 +149,7 @@ export default async function buildTodaySchedule(): Promise<BuildScheduleResult>
             : undefined;
 
     logger.info(
-        `start runId=${runId} resumed=${resumed} reason=${reason} date=${state.date} file=${scheduleFilePath} retryAttempts=${runtimeConfig.retryAttempts} maxBatchSize=${runtimeConfig.maxBatchSize} checkpointFlushEvery=${runtimeConfig.checkpointFlushEvery} prefixRules=${JSON.stringify(runtimeConfig.prefixRules)}`
+        `start runId=${runId} resumed=${resumed} reason=${reason} date=${state.date} file=${scheduleDatabasePath} retryAttempts=${runtimeConfig.retryAttempts} maxBatchSize=${runtimeConfig.maxBatchSize} checkpointFlushEvery=${runtimeConfig.checkpointFlushEvery} prefixRules=${JSON.stringify(runtimeConfig.prefixRules)}`
     );
 
     if (publishPending) {
@@ -168,7 +168,7 @@ export default async function buildTodaySchedule(): Promise<BuildScheduleResult>
         logger.info(
             `finish_pending_publish runId=${runId} status=${promotedState.status} date=${promotedState.date} durationMs=${promotedState.stats.durationMs} apiCalls=${promotedState.progress.counters.apiCalls} apiRetries=${promotedState.progress.counters.apiRetries} processedKeywords=${promotedState.progress.discoverProcessed.length} pendingKeywords=${promotedState.progress.discoverQueue.length} rawItems=${promotedState.stats.rawItems} uniqueItems=${promotedState.stats.uniqueItems} failedKeywords=${promotedState.progress.failedKeywords.length} failedEnrichCodes=${promotedState.progress.failedEnrichCodes.length}`
         );
-        return buildResultFromState(promotedState, resumed, scheduleFilePath);
+        return buildResultFromState(promotedState, resumed, scheduleDatabasePath);
     }
 
     saveBuildingScheduleState(scheduleFilePath, state);
@@ -187,7 +187,7 @@ export default async function buildTodaySchedule(): Promise<BuildScheduleResult>
                 ? `${error.name}: ${error.message}`
                 : String(error);
         logger.error(
-            `fatal runId=${runId} date=${state.date} file=${scheduleFilePath} error=${message}`
+            `fatal runId=${runId} date=${state.date} file=${scheduleDatabasePath} error=${message}`
         );
         throw error;
     }
@@ -205,5 +205,5 @@ export default async function buildTodaySchedule(): Promise<BuildScheduleResult>
         `finish runId=${runId} status=${promotedState.status} date=${promotedState.date} durationMs=${promotedState.stats.durationMs} apiCalls=${promotedState.progress.counters.apiCalls} apiRetries=${promotedState.progress.counters.apiRetries} processedKeywords=${promotedState.progress.discoverProcessed.length} pendingKeywords=${promotedState.progress.discoverQueue.length} rawItems=${promotedState.stats.rawItems} uniqueItems=${promotedState.stats.uniqueItems} failedKeywords=${promotedState.progress.failedKeywords.length} failedEnrichCodes=${promotedState.progress.failedEnrichCodes.length}`
     );
 
-    return buildResultFromState(promotedState, resumed, scheduleFilePath);
+    return buildResultFromState(promotedState, resumed, scheduleDatabasePath);
 }

@@ -11,6 +11,7 @@ import { removePendingTasksByExecutor } from '~/server/services/taskQueue';
 import {
     loadPublishedScheduleState
 } from '~/server/utils/12306/scheduleProbe/stateStore';
+import { getScheduleDatabaseFilePath } from '~/server/utils/12306/scheduleProbe/sqliteStore';
 import {
     getGroupKey,
     splitIntoBatches
@@ -41,8 +42,8 @@ function collectRouteRefreshTrainCodes(): {
     date: string;
     trainCodes: string[];
 } {
-    const scheduleFilePath = useConfig().data.assets.schedule.file;
-    const state = loadPublishedScheduleState(scheduleFilePath);
+    const scheduleFilePath = getScheduleDatabaseFilePath();
+    const state = loadPublishedScheduleState();
     if (!state) {
         throw new Error(`published schedule not found: ${scheduleFilePath}`);
     }

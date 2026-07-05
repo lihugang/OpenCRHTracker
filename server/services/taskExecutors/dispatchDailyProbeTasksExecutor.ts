@@ -13,7 +13,8 @@ import {
     markCurrentTrainProvenanceTaskSkipped,
     recordCurrentTrainProvenanceEventsForTrainCodes
 } from '~/server/services/trainProvenanceRecorder';
-import { loadPublishedScheduleState } from '~/server/utils/12306/scheduleProbe/stateStore';
+import { loadPublishedScheduleStateSummary } from '~/server/utils/12306/scheduleProbe/stateStore';
+import { getScheduleDatabaseFilePath } from '~/server/utils/12306/scheduleProbe/sqliteStore';
 import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
 import { getShanghaiUnixSecondsFromDateAndTime } from '~/server/utils/date/shanghaiDateTime';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
@@ -56,16 +57,13 @@ function resolveProbeTaskExecutionTime(
 
 export async function dispatchDailyProbeTasks(): Promise<DispatchDailyProbeTasksResult> {
     const config = useConfig();
-    const scheduleState = loadPublishedScheduleState(
-        config.data.assets.schedule.file
-    );
+    const scheduleState = loadPublishedScheduleStateSummary();
+    const scheduleFilePath = getScheduleDatabaseFilePath();
     const now = getNowSeconds();
 
     if (!scheduleState) {
         markCurrentTrainProvenanceTaskSkipped('schedule_not_found');
-        logger.warn(
-            `schedule_not_found file=${config.data.assets.schedule.file}`
-        );
+        logger.warn(`schedule_not_found file=${scheduleFilePath}`);
         return {
             date: null,
             groupCount: 0,
@@ -77,7 +75,7 @@ export async function dispatchDailyProbeTasks(): Promise<DispatchDailyProbeTasks
     if (scheduleState.date !== currentDate) {
         markCurrentTrainProvenanceTaskSkipped('schedule_not_current');
         logger.warn(
-            `skip_non_current_schedule scheduleDate=${scheduleState.date} currentDate=${currentDate} file=${config.data.assets.schedule.file}`
+            `skip_non_current_schedule scheduleDate=${scheduleState.date} currentDate=${currentDate} file=${scheduleFilePath}`
         );
         return {
             date: scheduleState.date,

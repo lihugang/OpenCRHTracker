@@ -97,10 +97,6 @@
                     "refreshAt": ["0000"]
                 }
             },
-            "schedule": {
-                "file": "data/schedule.json",
-                "provider": "https://storage.lihugang.top/open_crh_tracker/initialized_data/schedule.json"
-            },
             "qrcodeDetection": {
                 "file": "data/qrcode_detection.json",
                 "provider": "https://storage.lihugang.top/open_crh_tracker/initialized_data/qrcode_detection.json",
@@ -116,7 +112,8 @@
             "users": "data/users.db",
             "feedback": "data/feedback.db",
             "trainProvenance": "data/train-provenance.db",
-            "timetableHistory": "data/timetable-history.db"
+            "timetableHistory": "data/timetable-history.db",
+            "schedule": "data/schedule.db"
         },
         "runtime": {
             "adminTraffic": {
@@ -238,7 +235,7 @@
         "cache": {
             "currentDayMaxAgeSeconds": 300,
             "historicalMaxAgeSeconds": 31536000,
-            "searchIndexMaxAgeSeconds": 1800,
+            "searchIndexMaxAgeSeconds": 21600,
             "sitemapMaxAgeSeconds": 86400,
             "timetableMaxAgeSeconds": 21600
         },
@@ -335,7 +332,7 @@
         }
     },
     "services": {
-        "simpleLatexContainer": {
+        "typstCompiler": {
             "baseUrl": "http://127.0.0.1:8080",
             "apiKey": "change-me"
         }

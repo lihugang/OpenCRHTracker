@@ -161,7 +161,7 @@ export const deployDocsSections: DocsContentSection[] = [
                 type: 'list',
                 items: [
                     '`data.databases.trainProvenance`：来源事件数据库文件路径，用于管理端“来源时间线”和“重联扫描结果”查询。',
-                    '`data.databases.timetableHistory`：内部历史时刻表积累数据库文件路径，用于保存规范化 stops 内容、sha256 hash 和按 service date 压缩后的 coverage 段。',
+                    '`data.databases.timetableHistory`：内部历史时刻表积累数据库文件路径，用于保存规范化停站内容、停站数据哈希值和按日期压缩后的时刻表覆盖时间段。',
                     '`data.runtime.trainProvenance.enabled`：是否启用来源事件记录，默认值为 true；关闭后不再为任务写入新的来源事件，相关管理端查询会返回禁用状态。',
                     '`data.runtime.trainProvenance.retentionDays`：来源事件保留天数，默认值为 7，最小值为 1；服务启动时会按该值清理过期记录。'
                 ]
@@ -269,14 +269,14 @@ export const deployDocsSections: DocsContentSection[] = [
             {
                 type: 'field-cards',
                 title: 'data：数据库与静态资产文件',
-                text: '这一组决定数据库文件、schedule 文件和初始化资产的实际落盘位置。',
+                text: '这一组决定数据库文件、时刻表文件和初始化资产的实际落盘位置。',
                 cards: [
                     {
                         path: 'data.assets.EMUList',
                         valueType: 'object',
                         required: true,
                         description:
-                            '动车组清单 allocation export JSON 文件路径、下载地址与刷新时间。',
+                            '动车组清单导出 JSON 文件路径、下载地址与刷新时间。',
                         notes: [
                             '默认文件建议为 data/emu_list.json。',
                             'refresh.enabled=true 时 provider 必填。',
@@ -313,12 +313,12 @@ export const deployDocsSections: DocsContentSection[] = [
                         valueType: 'object',
                         required: true,
                         description:
-                            '参考车型回退使用的 trainStyle 映射文件路径、下载地址与刷新时间。',
+                            '参考车型回退使用的 12306 列车样式映射文件路径、下载地址与刷新时间。',
                         notes: [
                             '默认文件建议为 data/train_style_mapping.json。',
                             'refresh.enabled=true 时 provider 必填。',
                             'refresh.refreshAt 必须是非空 HHmm 字符串数组。',
-                            '管理员页面支持本地重载和远程刷新，刷新后会立即影响 referenceModels 的 schedule 回退映射结果。'
+                            '管理员页面支持本地重载和远程刷新，刷新后会立即影响参考车型的回退映射结果。'
                         ]
                     },
                     {
@@ -335,14 +335,14 @@ export const deployDocsSections: DocsContentSection[] = [
                         ]
                     },
                     {
-                        path: 'data.assets.schedule',
-                        valueType: 'object',
-                        required: true,
-                        description: '时刻表文件路径与来源地址。',
+                        path: 'data.databases.schedule',
+                        valueType: 'string',
+                        required: false,
+                        description:
+                            '时刻表 SQLite 数据库路径，默认 data/schedule.db。',
                         notes: [
-                            'file 路径必须可读写；provider 建议保持可用。',
-                            'schedule.json 会在旧版格式下自动升级，无需手工删除旧文件。',
-                            '当前格式会持久化完整经停站、当前站车次与检票口信息。'
+                            '数据库内保存时刻表更新状态、车次别名、经停站、车站索引、官方交路和线路刷新队列。',
+                            '运行时代码以该数据库为时刻表权威数据源，新部署建议显式配置并放在持久化数据目录内。'
                         ]
                     },
                     {
@@ -376,9 +376,9 @@ export const deployDocsSections: DocsContentSection[] = [
                         required: true,
                         description: '内部历史时刻表积累数据库路径。',
                         notes: [
-                            '数据库会保存规范化后的 stops JSON 内容、sha256 hash 和按 service date 压缩的 coverage 段。',
-                            '只有 build_today_schedule 的 enrich 成功或 refresh_route_batch 成功落盘后，才会把确认过的车次组写入这个库。',
-                            '仅从昨天复用的 route 信息不会计为新的历史确认。'
+                            '数据库会保存规范化后的停站 JSON 内容、时刻表哈希和按日期压缩的时刻表覆盖时间段。',
+                            '只有今日时刻表更新成功或者批量车次刷新任务成功后，才会把确认过的车次组写入这个库。',
+                            '仅从昨天复用的路线信息不会计为新的历史确认。'
                         ]
                     }
                 ]
@@ -453,7 +453,7 @@ export const deployDocsSections: DocsContentSection[] = [
                         valueType: 'object',
                         required: true,
                         description:
-                            '分别定义站内登录态签名、普通 API Key 和 OAuth access token 的前缀。',
+                            '分别定义站内登录态签名、普通 API Key 和 OAuth 访问密钥的前缀。',
                         notes: [
                             '当前必须同时提供 webapp、api、oauth 三个前缀。',
                             '三个前缀都不能为空，且彼此不能重复。'
@@ -497,7 +497,7 @@ export const deployDocsSections: DocsContentSection[] = [
                         valueType: 'array<string>',
                         required: false,
                         description:
-                            '管理员用户 ID 列表，命中的 webapp 登录用户会额外获得 api.admin 权限。',
+                            '管理员用户 ID 列表，命中的网页登录用户会额外获得 api.admin 权限。',
                         notes: [
                             '可以留空；留空表示不通过配置文件授予管理员。',
                             '生产环境建议通过 OCRH_ADMIN_USERS 覆盖，格式为逗号分隔的用户 ID 列表。',
@@ -519,12 +519,12 @@ export const deployDocsSections: DocsContentSection[] = [
                         valueType: 'integer',
                         required: true,
                         description:
-                            '已存储 PushSubscription 端点的设备数量上限、预留的事件订阅规则数量上限，以及当前设备同步超时时间（秒）。',
+                            '已存储浏览器通知订阅的设备数量上限、预留的事件订阅规则数量上限，以及当前设备同步超时时间（秒）。',
                         notes: [
-                            'maxDevices 按每个用户已存储的 PushSubscription 端点数量计数。',
+                            '最大设备数按每个用户已存储的浏览器通知订阅数量计数。',
                             '同一台物理设备在使用不同浏览器、不同用户配置或不同 PWA 安装时，可能会占用多条记录。',
-                            'maxEventSubscriptions 为后续事件订阅规则预留，当前代码尚未实际强制这一上限。',
-                            'syncTimeoutSeconds 控制控制台等待权限弹窗、Service Worker 就绪和浏览器订阅调用的最长时间；默认值为 30 秒。'
+                            '最大事件数为后续事件订阅规则预留，当前代码尚未实际强制这一上限。',
+                            '同步超时时间控制控制台等待权限弹窗、Service Worker 就绪和浏览器订阅调用的最长时间；默认值为 30 秒。'
                         ]
                     },
                     {
@@ -532,11 +532,11 @@ export const deployDocsSections: DocsContentSection[] = [
                         valueType: 'string',
                         required: true,
                         description:
-                            'Web Push 所需的 VAPID 公钥、私钥和联系邮箱。',
+                            '浏览器通知推送所需的 VAPID 公钥、私钥和联系邮箱。',
                         notes: [
                             '生产环境建议通过 OCRH_VAPID_PUBLIC_KEY、OCRH_VAPID_PRIVATE_KEY 和 OCRH_VAPID_EMAIL 覆盖，而不是把真实值直接写进配置文件。',
                             'vapidEmail 只填写纯邮箱地址，例如 push@example.com；程序会自动补上 mailto: 前缀。',
-                            'Apple 的 Safari / iOS Web Push 对 VAPID subject 更严格，邮箱缺失、非法或使用本地占位值时都可能导致推送被拒绝。'
+                            'Apple 的 Safari / iOS 通知推送对 VAPID 更严格，邮箱缺失、非法或使用本地占位值时都可能导致推送被拒绝。'
                         ]
                     },
                     {
@@ -561,18 +561,18 @@ export const deployDocsSections: DocsContentSection[] = [
             {
                 type: 'field-cards',
                 title: 'oauth：OAuth 2.0 / OpenID Connect 授权服务器配置',
-                text: '这一组决定站点对外暴露的 OAuth 2.0 与 OIDC 行为，包括 issuer、授权码与 token 生命周期、PKCE 策略、discovery 文档地址以及 id_token 签名密钥。',
+                text: '这一组决定站点对外暴露的 OAuth 2.0 与 OIDC 行为，包括签发者、授权码与令牌生命周期、PKCE 策略、发现文档地址以及 id_token 签名密钥。',
                 cards: [
                     {
                         path: 'oauth.issuer',
                         valueType: 'string(URL)',
                         required: true,
                         description:
-                            'OAuth/OIDC 对外声明的 issuer，用于写入 discovery 文档、id_token 的 iss claim，以及第三方客户端校验授权服务器身份。',
+                            'OAuth/OIDC 对外声明的签发者，用于写入发现文档、id_token 的 iss claim，以及第三方客户端校验授权服务器身份。',
                         notes: [
                             '必须以 http:// 或 https:// 开头。',
                             '生产环境应填写第三方应用实际可访问到的外部地址，而不是容器内部地址或仅本机可见的回环地址。',
-                            '它应与对外公开的授权服务器域名保持稳定；修改后，依赖旧 issuer 的客户端通常需要重新配置。'
+                            '它应与对外公开的授权服务器域名保持稳定；修改后，依赖旧签发者的客户端通常需要重新配置。'
                         ]
                     },
                     {
@@ -580,7 +580,7 @@ export const deployDocsSections: DocsContentSection[] = [
                         valueType: 'integer(seconds)',
                         required: true,
                         description:
-                            'authorization code 的有效期，单位秒；从用户完成授权开始计时，超过时限后 /oauth/token 必须拒绝换取 token。',
+                            '一次性鉴权令牌的有效期，单位秒；从用户完成授权开始计时，超时后 /oauth/token 接口必须拒绝换取 API 密钥。',
                         notes: [
                             '必须为正整数。',
                             '建议保持较短时长，减少授权码泄露后的可利用窗口。'
@@ -591,11 +591,11 @@ export const deployDocsSections: DocsContentSection[] = [
                         valueType: 'integer(seconds)',
                         required: true,
                         description:
-                            'OAuth access token 的有效期，单位秒；会写入复用的签名 API Key 记录，并影响现有 Bearer Token 资源访问链路的过期判断。',
+                            'OAuth 访问密钥的有效期，单位秒；会写入复用的签名 API Key 记录，并影响现有访问密钥资源访问链路的过期判断。',
                         notes: [
                             '必须为正整数。',
-                            'access token 会直接作为现有 /api/v1/* 接口的 Bearer Token 使用，因此过期时间会影响第三方应用访问所有受 scope 保护资源的可用窗口。',
-                            '暂不支持 refresh token，过期后需要重新走授权流程。'
+                            '访问密钥会直接作为现有 /api/v1/* 接口的 Bearer Token 使用，因此过期时间会影响第三方应用访问所有受访问域保护资源的可用窗口。',
+                            '暂不支持刷新令牌，过期后需要重新走授权流程。'
                         ]
                     },
                     {
@@ -606,7 +606,7 @@ export const deployDocsSections: DocsContentSection[] = [
                             'OIDC id_token 的有效期，单位秒；用于控制第三方客户端持有身份断言的时间窗口。',
                         notes: [
                             '必须为正整数。',
-                            'id_token 与 access token 分离签发，不复用现有 HMAC API Key 格式。',
+                            'id_token 与访问密钥分离签发，不复用现有 HMAC API Key 格式。',
                             '时长不宜过长，否则客户端长期缓存旧身份断言时，撤销或策略变更的收敛会更慢。'
                         ]
                     },
@@ -627,7 +627,7 @@ export const deployDocsSections: DocsContentSection[] = [
                         valueType: 'string',
                         required: true,
                         description:
-                            '生成 OIDC subject 标识时使用的服务端盐值，用于把站内用户 ID 稳定映射为对外暴露的 sub。',
+                            '生成 OIDC 对象标识时使用的服务端盐值，用于把站内用户 ID 稳定映射为对外暴露的 sub。',
                         notes: [
                             '不能为空。',
                             '应使用独立、不可预测的随机字符串，避免直接暴露站内用户主键或让第三方推导真实用户 ID。',
@@ -642,7 +642,7 @@ export const deployDocsSections: DocsContentSection[] = [
                             '允许客户端在授权请求中使用的 PKCE code_challenge_method 列表。',
                         notes: [
                             '当前实现要求该数组必须精确为 ["S256"]，不接受 plain，也不接受额外方法。',
-                            '这是对 public client 的强制安全约束，所有客户端都必须带 PKCE。'
+                            '这是对公开客户端的强制安全约束，所有客户端都必须带 PKCE。'
                         ]
                     },
                     {
@@ -650,10 +650,10 @@ export const deployDocsSections: DocsContentSection[] = [
                         valueType: 'boolean',
                         required: true,
                         description:
-                            '是否启用标准 OIDC discovery 文档与关联元数据暴露。',
+                            '是否启用标准 OIDC 发现文档与关联元数据暴露。',
                         notes: [
-                            '开启后，第三方客户端可通过 /.well-known/openid-configuration 自动发现授权端点、token 端点、userinfo 端点和 JWKS 地址。',
-                            '如果关闭 discovery，协议端点实现仍可存在，但接入方需要手工配置所有地址和签名信息来源。'
+                            '开启后，第三方客户端可通过 /.well-known/openid-configuration 自动发现授权端点、令牌端点、用户信息端点和 JWKS 地址。',
+                            '如果关闭发现功能，协议端点实现仍可存在，但接入方需要手工配置所有地址和签名信息来源。'
                         ]
                     },
                     {
@@ -661,11 +661,11 @@ export const deployDocsSections: DocsContentSection[] = [
                         valueType: 'string(URL)',
                         required: true,
                         description:
-                            'discovery 与 JWKS 文档中生成公开 URL 时使用的外部基础地址。',
+                            '发现与 JWKS 文档中生成公开 URL 时使用的外部基础地址。',
                         notes: [
                             '必须以 http:// 或 https:// 开头；服务启动时会自动去掉末尾多余的 /。',
-                            '通常应与 oauth.issuer 指向同一对外域名；若站点通过网关、反代或单独公开 OAuth 子路径，这里可以明确指定 discovery 文档里应返回的基准地址。',
-                            '如果填写内网地址或错误前缀，标准 OIDC 客户端即使能拿到 discovery 文档，也会因为端点 URL 不可达而接入失败。'
+                            '通常应与 oauth.issuer 指向同一对外域名；若站点通过网关、反代或单独公开 OAuth 子路径，这里可以明确指定发现文档里应返回的基准地址。',
+                            '如果填写内网地址或错误前缀，标准 OIDC 客户端即使能拿到发现文档，也会因为端点 URL 不可达而接入失败。'
                         ]
                     },
                     {
@@ -673,7 +673,7 @@ export const deployDocsSections: DocsContentSection[] = [
                         valueType: 'string',
                         required: true,
                         description:
-                            'JWKS 中发布的当前签名密钥标识，以及 id_token JWT header 里的 kid。',
+                            'JWKS 中发布的当前签名密钥标识，以及 id_token JWT 头中的 kid。',
                         notes: [
                             '不能为空。',
                             '生产环境建议通过 OCRH_OAUTH_ID_TOKEN_SIGNING_KID 覆盖，而不是把真实运行值直接写进配置文件。',
@@ -779,14 +779,14 @@ export const deployDocsSections: DocsContentSection[] = [
                         valueType: 'object',
                         required: true,
                         description:
-                            '用户记录、用户资料和 API Key 记录缓存的容量与 TTL。'
+                            '用户记录、用户资料和 API Key 记录缓存的容量与过期时长。'
                     },
                     {
                         path: 'api.authCache.userProfile',
                         valueType: 'object',
                         required: true,
                         description:
-                            'user profile 数据 JSON 的服务端缓存容量与 TTL。',
+                            '用户档案数据 JSON 的服务端缓存容量与过期时长。',
                         notes: [
                             '收藏接口读写成功后会直接回写这一层缓存，而不是简单删除缓存。',
                             '本次推荐值为 maxEntries=256，defaultTtlSeconds=21600。'
@@ -805,9 +805,9 @@ export const deployDocsSections: DocsContentSection[] = [
                         description:
                             '反馈接口后端校验使用的长度限制配置，分别控制创建反馈正文、回复正文和管理员修改标题时的最小/最大长度。',
                         notes: [
-                            'createBody 对应 POST /api/v1/feedback/topics 的 body 长度范围。',
-                            'replyBody 对应 POST /api/v1/feedback/topics/[id]/messages 的 body 长度范围。',
-                            'title 对应 PATCH /api/v1/feedback/topics/[id] 的 title 长度范围。'
+                            'createBody 对应 POST /api/v1/feedback/topics 的正文长度范围。',
+                            'replyBody 对应 POST /api/v1/feedback/topics/[id]/messages 的正文长度范围。',
+                            'title 对应 PATCH /api/v1/feedback/topics/[id] 的标题长度范围。'
                         ]
                     },
                     {
@@ -821,7 +821,7 @@ export const deployDocsSections: DocsContentSection[] = [
                         valueType: 'object',
                         required: true,
                         description:
-                            '当前日、历史、搜索索引、sitemap 和 timetable 接口成功响应的缓存时长。',
+                            '当前日、历史、搜索索引、时刻表和全站地图接口成功响应的缓存时长。',
                         notes: [
                             'sitemapMaxAgeSeconds 用于控制 /sitemap.xml 响应的 Cache-Control max-age。',
                             'timetableMaxAgeSeconds 用于控制 /api/v1/timetable/train/*/current、/api/v1/timetable/train/*/history/* 和 /api/v1/timetable/station/* 成功响应的 Cache-Control max-age。'
@@ -832,7 +832,7 @@ export const deployDocsSections: DocsContentSection[] = [
                         valueType: 'object',
                         required: true,
                         description: '分页默认大小和最大上限。',
-                        notes: ['maxLimit 必须不小于 defaultLimit。']
+                        notes: ['最大上限必须不小于默认大小。']
                     },
                     {
                         path: 'api.timestampUnit',
@@ -851,7 +851,7 @@ export const deployDocsSections: DocsContentSection[] = [
                         path: 'api.permissions.anonymousScopes',
                         valueType: 'array<string>',
                         required: true,
-                        description: '匿名访问允许拥有的 scopes。',
+                        description: '匿名访问允许拥有的访问域。',
                         notes: [
                             '这组配置直接决定公开可匿名调用的接口范围。',
                             '如果要公开动车组配属信息接口，需要包含 api.allocation.emu.read。',
@@ -870,8 +870,8 @@ export const deployDocsSections: DocsContentSection[] = [
                             '如需默认允许当前车次时刻表接口，请包含 api.timetable.train.current.read；如需默认允许历史车次时刻表接口，请同时包含 api.timetable.train.history.read。',
                             '如需默认允许列车交路图图片接口，请包含 api.timetable.train.circulation.image.read。',
                             '如需默认允许车站时刻表接口，请包含 api.timetable.station.read。',
-                            '如需让 Web 端收藏功能开箱即用，请包含 api.auth.favorites.read 和 api.auth.favorites.write。',
-                            '如需让 Web 端用户删除自己创建的 OAuth 客户端，请包含 api.auth.oauth-clients.delete；已有登录会话可能需要重新登录后才会拿到新增 scope。'
+                            '如需让网页端收藏功能开箱即用，请包含 api.auth.favorites.read 和 api.auth.favorites.write。',
+                            '如需让网页端用户删除自己创建的 OAuth 客户端，请包含 api.auth.oauth-clients.delete；已有登录会话可能需要重新登录后才会拿到新增 scope。'
                         ]
                     },
                     {
@@ -892,27 +892,27 @@ export const deployDocsSections: DocsContentSection[] = [
             {
                 type: 'field-cards',
                 title: 'services：外部微服务依赖',
-                text: '这一组声明本服务依赖的外部渲染微服务地址和鉴权参数。',
+                text: '这一组声明本服务依赖的外部 Typst 编译微服务地址和鉴权参数。',
                 cards: [
                     {
-                        path: 'services.simpleLatexContainer.baseUrl',
+                        path: 'services.typstCompiler.baseUrl',
                         valueType: 'string',
                         required: true,
                         description:
-                            'simple-latex-container 服务的基础地址，用于生成单组车底交路图。',
+                            'Typst 编译服务的基础地址，用于生成单组车底交路图。',
                         notes: [
                             '必须以 http:// 或 https:// 开头。',
                             '程序会自动去掉结尾多余的 /。'
                         ]
                     },
                     {
-                        path: 'services.simpleLatexContainer.apiKey',
+                        path: 'services.typstCompiler.apiKey',
                         valueType: 'string',
                         required: true,
                         description:
-                            '调用 simple-latex-container 的 Bearer API Key。',
+                            '调用 Typst 编译服务的 Bearer API Key。',
                         notes: [
-                            '生产环境建议通过 OCRH_SIMPLE_LATEX_CONTAINER_API_KEY 覆盖，而不是把真实密钥直接写进配置文件。',
+                            '生产环境建议通过 OCRH_TYPST_COMPILER_API_KEY 覆盖，而不是把真实密钥直接写进配置文件。',
                             '如果未设置环境变量，生产环境启动时会输出警告。'
                         ]
                     }
@@ -958,10 +958,10 @@ export const deployDocsSections: DocsContentSection[] = [
                         description: '参考车型索引重建任务的配置项。',
                         notes: [
                             'windowDays 用于设置历史窗口天数，当前默认值为 14。',
-                            'batchSize 用于设置扫描 daily_emu_routes 时的分页批大小，当前默认值为 1000。',
-                            'threshold 是 weightedShare 的阈值，必须大于 0 且小于等于 1。',
-                            '当历史窗口内完全没有命中记录时，系统会回退到 schedule.json 的 trainStyle，并再经过 train_style_mapping.json 映射后返回 weightedShare=0 的参考车型。',
-                            'dailyTimesHHmm 用于手动填写多个 HHmm 时刻，控制 rebuild_reference_model_index 在一天内多次重建。'
+                            'batchSize 用于设置扫描每日担当记录时的分页批大小，当前默认值为 1000。',
+                            'threshold 是权重的阈值，必须大于 0 且小于等于 1。',
+                            '当历史窗口内完全没有命中记录时，系统会回退到数据库中当前时刻表的列车样式，并再经过 train_style_mapping.json 映射后返回权重为 0 的参考车型。',
+                            'dailyTimesHHmm 用于手动填写多个 HHmm 时刻，控制生成参考车型任务在一天内多次重建。'
                         ]
                     },
                     {
@@ -971,9 +971,9 @@ export const deployDocsSections: DocsContentSection[] = [
                         description: '列车交路推断索引重建任务的配置项。',
                         notes: [
                             'windowDays 用于设置交路推断历史窗口天数，当前默认值为 14。',
-                            'batchSize 用于流式扫描 daily_emu_routes 时的分页批大小，当前默认值为 2000。',
+                            'batchSize 用于流式扫描每日担当记录时的分页批大小，当前默认值为 2000。',
                             'threshold 是归一化边权重的阈值，必须大于 0 且小于等于 1，当前默认值为 0.8。',
-                            'dailyTimesHHmm 用于配置 rebuild_train_circulation_index 的每日重建时刻，默认值为 ["0200"]，结果会并入列车时刻表接口的 circulation 字段。',
+                            'dailyTimesHHmm 用于配置生成推断交路的每日重建时刻，默认值为 ["0200"]，结果会并入列车时刻表接口的 circulation 字段。',
                             'stationBoard 可选；省略时默认使用 maxAttempts=5、retryDelaySeconds=1800。'
                         ]
                     },
@@ -1004,7 +1004,7 @@ export const deployDocsSections: DocsContentSection[] = [
                         path: 'task.scheduler.idle.maxTasksPerTick',
                         valueType: 'integer',
                         required: true,
-                        description: '空闲模式下每个 tick 最多拉起的任务数。'
+                        description: '空闲模式下每个任务轮次最多拉起的任务数。'
                     },
                     {
                         path: 'task.scheduler.idle.emaAlpha',
@@ -1196,12 +1196,12 @@ export const deployDocsSections: DocsContentSection[] = [
             },
             {
                 type: 'paragraph',
-                text: '如果需要启用单组车底交路图图片接口，请在配置文件中为 LaTeX 渲染微服务设置 URL 地址（`services.simpleLatexContainer.baseUrl`），并在环境变量中设置 API Key。使用的 LaTeX 渲染微服务为 https://github.com/lihugang/simple-latex-container。'
+                text: '如果需要启用单组车底交路图图片接口，请在配置文件中为 Typst 编译微服务设置 URL 地址（`services.typstCompiler.baseUrl`），并在环境变量中设置 API Key。'
             },
             {
                 type: 'code',
                 language: 'bash',
-                code: 'export OCRH_SIMPLE_LATEX_CONTAINER_API_KEY=<simple-latex-container-api-key>'
+                code: 'export OCRH_TYPST_COMPILER_API_KEY=<typst-compiler-api-key>'
             },
             {
                 type: 'paragraph',
@@ -1239,7 +1239,7 @@ export const deployDocsSections: DocsContentSection[] = [
         blocks: [
             {
                 type: 'paragraph',
-                text: '动车组清单文件默认建议放在 data/emu_list.json，实际路径由 data/config.json 中的 data.assets.EMUList.file 决定。默认远程来源为 https://allocation.crhdata.top/api/v1/allocation/export.json，文件内容使用 allocation export JSON 范式。GET /api/v1/allocation/emu/{emuCode} 会读取这个资产返回单一车组的配属信息。'
+                text: '动车组清单文件默认建议放在 data/emu_list.json，实际路径由配置文件中的 data.assets.EMUList.file 决定。默认远程来源为 https://allocation.crhdata.top/api/v1/allocation/export.json，文件内容使用 allocation export JSON 范式。GET /api/v1/allocation/emu/{emuCode} 会读取这个资产返回单一车组的配属信息。'
             },
             {
                 type: 'code',
@@ -1249,7 +1249,7 @@ export const deployDocsSections: DocsContentSection[] = [
             {
                 type: 'list',
                 items: [
-                    '配属信息接口需要请求方具备 api.allocation.emu.read scope；如果需要匿名访问，应在 api.permissions.anonymousScopes 中开放该 scope。',
+                    '配属信息接口需要请求方具备 api.allocation.emu.read 访问域；如果需要匿名访问，应在 api.permissions.anonymousScopes 中开放该访问域。',
                     '该接口成本由 cost.fixed.allocationEmu 控制，默认成本为 1。',
                     '管理员页面“配置文件”支持对该文件执行本地重载和远程刷新，刷新后会立即影响配属信息查询，并同步固定车组畅行码检测依赖。'
                 ]
@@ -1263,7 +1263,7 @@ export const deployDocsSections: DocsContentSection[] = [
         blocks: [
             {
                 type: 'paragraph',
-                text: '车站坐标回退文件默认建议放在 data/stationCoord.jsonl，实际路径由 data/config.json 中的 data.assets.stationCoord.file 决定。仅当 12306 路线查询返回的某个停站缺少 lat/lon 时，线路时刻表下载任务才会读取本文件按站名回退坐标。'
+                text: '车站坐标回退文件默认建议放在 data/stationCoord.jsonl，实际路径由 data/config.json 中的 data.assets.stationCoord.file 决定。仅当 12306 路线查询返回的某个停站缺少经纬度时，线路时刻表下载任务才会读取本文件按站名回退坐标。'
             },
             {
                 type: 'code',
@@ -1299,7 +1299,7 @@ export const deployDocsSections: DocsContentSection[] = [
                 items: [
                     '文件格式为 JSONL，每行一个 JSON 对象。',
                     '管理员页面“配置文件”支持对该文件执行本地重载和远程刷新。',
-                    '重载或刷新后，只会影响后续线路时刻表下载或线路刷新任务；不会自动回填当前已有的 schedule.json。',
+                    '重载或刷新后，只会影响后续线路时刻表下载或线路刷新任务；不会自动回填当前已有的时刻表数据库',
                     '如果同名车站在文件中出现多次，当前实现会取第一条记录，并在日志中输出告警；部署时应尽量避免同名冲突。'
                 ]
             }
@@ -1312,7 +1312,7 @@ export const deployDocsSections: DocsContentSection[] = [
         blocks: [
             {
                 type: 'paragraph',
-                text: '固定车组畅行码检测计划文件默认建议放在 data/qrcode_detection.json，实际路径由 data/config.json 中的 data.assets.qrcodeDetection.file 决定。加载或刷新该文件时，会同时结合本地动车组配属清单和畅行码映射做校验。'
+                text: '固定车组畅行码检测计划文件默认建议放在 data/qrcode_detection.json，实际路径由配置文件中的 data.assets.qrcodeDetection.file 决定。加载或刷新该文件时，会同时结合本地动车组配属清单和畅行码映射做校验。'
             },
             {
                 type: 'code',
@@ -1327,7 +1327,7 @@ export const deployDocsSections: DocsContentSection[] = [
                         valueType: 'string',
                         required: false,
                         description:
-                            '可选的 schema 引用，建议填写 ../assets/json/qrcodeDetectionScheme.json。'
+                            '可选的范式引用，建议填写 ../assets/json/qrcodeDetectionScheme.json。'
                     },
                     {
                         path: 'detectedAt',
@@ -1341,7 +1341,7 @@ export const deployDocsSections: DocsContentSection[] = [
                         valueType: 'array<string>',
                         required: true,
                         description:
-                            '每个检测时间都要执行的车组编号列表。加载时会校验这些车组是否存在于 EMUList 中，并检查畅行码映射是否缺失。'
+                            '每个检测时间都要执行的车组编号列表。加载时会校验这些车组是否存在于动车组清单中，并检查畅行码映射是否缺失。'
                     }
                 ]
             },
@@ -1350,8 +1350,8 @@ export const deployDocsSections: DocsContentSection[] = [
                 items: [
                     '文件路径不再写死，实际使用 data.assets.qrcodeDetection.file。',
                     '管理员页面“配置文件”支持对该文件执行本地重载和远程刷新。',
-                    '重载或刷新该文件后，会重新校验内容并同步未来的 dispatch_qrcode_detection_tasks 派发任务。',
-                    '重载或刷新 EMUList、QRCode 资产后，也会重新校验本文件并同步这些未来派发任务。'
+                    '重载或刷新该文件后，会重新校验内容并同步未来的固定车组探测派发任务。',
+                    '重载或刷新动车组清单、畅行码映射资产后，也会重新校验本文件并同步这些未来派发任务。'
                 ]
             }
         ]
@@ -1360,11 +1360,11 @@ export const deployDocsSections: DocsContentSection[] = [
         id: 'train-style-mapping',
         title: 'train_style_mapping.json',
         summary:
-            '为 referenceModels 的 schedule 回退提供 trainStyle 到规范车型名的映射。',
+            '为参考车型回退提供从 12306 列车样式到规范车型名的映射。',
         blocks: [
             {
                 type: 'paragraph',
-                text: '车型映射文件默认建议放在 data/train_style_mapping.json，实际路径由 data/config.json 中的 data.assets.trainStyleMapping.file 决定。仅当 referenceModels 在历史窗口内完全没有命中任何运行记录、需要从 schedule.json 的 trainStyle 回退时，系统才会读取本文件做映射。'
+                text: '车型映射文件默认建议放在 data/train_style_mapping.json，实际路径由配置文件中的 data.assets.trainStyleMapping.file 决定。仅当本车次在历史窗口内完全没有命中任何运行记录、需要从时刻表数据库当前时刻表的列车样式回退时，系统才会读取本文件做映射。'
             },
             {
                 type: 'code',
@@ -1379,14 +1379,14 @@ export const deployDocsSections: DocsContentSection[] = [
                         valueType: 'string',
                         required: false,
                         description:
-                            '可选的 schema 引用，建议填写 ../assets/json/trainStyleMappingScheme.json。'
+                            '可选的范式引用，建议填写 ../assets/json/trainStyleMappingScheme.json。'
                     },
                     {
                         path: '<trainStyle>',
                         valueType: 'string',
                         required: true,
                         description:
-                            '键是 schedule.json 中保存的原始 trainStyle，值是期望输出到 referenceModels 的规范车型名。'
+                            '键是时刻表数据库中当前时刻表中保存的原始列车样式，值是期望输出到参考车型的规范车型名。'
                     }
                 ]
             },
@@ -1395,8 +1395,8 @@ export const deployDocsSections: DocsContentSection[] = [
                 items: [
                     '文件格式为单个 JSON 对象，除 $schema 外其余键值都必须是非空字符串。',
                     '管理员页面“配置文件”支持对该文件执行本地重载和远程刷新。',
-                    '未命中映射时，系统会保留原始 trainStyle，并记录 warning 日志。',
-                    '通过该文件回退得到的 referenceModels 会返回 weightedShare=0，表示它不是历史推断结果。'
+                    '未命中映射时，系统会保留原始列车样式，并记录警告日志。',
+                    '通过该文件回退得到的参考车型会返回 weightedShare=0，表示它不是历史推断结果。'
                 ]
             }
         ]
@@ -1408,7 +1408,7 @@ export const deployDocsSections: DocsContentSection[] = [
         blocks: [
             {
                 type: 'paragraph',
-                text: '更新代码前建议先停服务、备份 data 目录和当前生效的配置文件，再替换代码、重新构建并启动。'
+                text: '更新代码前建议先停服务、备份数据目录和当前生效的配置文件，再替换代码、重新构建并启动。'
             },
             {
                 type: 'paragraph',
@@ -1416,7 +1416,7 @@ export const deployDocsSections: DocsContentSection[] = [
             },
             {
                 type: 'paragraph',
-                text: '当前运行时统计文件按单实例设计；如果部署多实例，请避免多个进程同时写同一份 runtime 文件。'
+                text: '当前运行时统计文件按单实例设计；如果部署多实例，请避免多个进程同时写同一份运维文件。'
             }
         ]
     }

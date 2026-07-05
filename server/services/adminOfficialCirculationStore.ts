@@ -1,14 +1,16 @@
-import fs from 'fs';
-import path from 'path';
-import useConfig from '~/server/config';
 import getLogger from '~/server/libs/log4js';
 import { invalidateTrainCirculationIndexCache } from '~/server/services/trainCirculationIndexStore';
+import { ensureScheduleDocumentMigrated } from '~/server/utils/12306/scheduleProbe/stateStore';
 import {
-    deleteScheduleCirculationEntry,
-    loadScheduleDocument
-} from '~/server/utils/12306/scheduleProbe/stateStore';
+    deleteScheduleCirculationEntryFromDatabase,
+    getScheduleDatabaseFilePath,
+    getScheduleDatabaseModifiedAtMs,
+    listScheduleCirculationRecordsByLookupCode,
+    loadScheduleCirculationRecordFromDatabase
+} from '~/server/utils/12306/scheduleProbe/sqliteStore';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
 import ApiRequestError from '~/server/utils/api/errors/ApiRequestError';
+import type { ScheduleCirculationEntry } from '~/server/utils/12306/scheduleProbe/types';
 import type {
     AdminOfficialCirculationDeleteResponse,
     AdminOfficialCirculationMatchType,
@@ -22,28 +24,15 @@ function toTimestampSeconds(value: number): number {
     return Math.floor(value / 1000);
 }
 
-function getScheduleFilePath() {
-    return useConfig().data.assets.schedule.file;
-}
-
-function getResolvedScheduleFilePath() {
-    return path.resolve(getScheduleFilePath());
-}
-
-function getScheduleFileModifiedAt(filePath: string) {
-    try {
-        return toTimestampSeconds(fs.statSync(filePath).mtimeMs);
-    } catch {
-        return null;
-    }
+function getScheduleDatabaseModifiedAt() {
+    const modifiedAtMs = getScheduleDatabaseModifiedAtMs();
+    return modifiedAtMs >= 0 ? toTimestampSeconds(modifiedAtMs) : null;
 }
 
 function createSearchItem(
     entryKey: string,
     normalizedKeyword: string,
-    entry: NonNullable<
-        ReturnType<typeof loadScheduleDocument>
-    >['circulation'][string]
+    entry: ScheduleCirculationEntry
 ): AdminOfficialCirculationSearchItem | null {
     const matchedBy = new Set<AdminOfficialCirculationMatchType>();
     const matchedCodes = new Set<string>();
@@ -100,20 +89,19 @@ export function searchAdminOfficialCirculations(
         throw new ApiRequestError(400, 'invalid_param', 'keyword 不能为空');
     }
 
-    const scheduleFilePath = getScheduleFilePath();
-    const resolvedFilePath = getResolvedScheduleFilePath();
-    const document = loadScheduleDocument(scheduleFilePath);
-    if (!document) {
+    if (!ensureScheduleDocumentMigrated()) {
         throw new ApiRequestError(
             404,
             'not_found',
-            'schedule.json 不存在或内容无效'
+            '时刻表数据库不存在或内容无效'
         );
     }
 
-    const matchedItems = Object.entries(document.circulation)
-        .map(([entryKey, entry]) =>
-            createSearchItem(entryKey, normalizedKeyword, entry)
+    const matchedItems = listScheduleCirculationRecordsByLookupCode(
+        normalizedKeyword
+    )
+        .map((record) =>
+            createSearchItem(record.entryKey, normalizedKeyword, record.entry)
         )
         .filter(
             (item): item is NonNullable<ReturnType<typeof createSearchItem>> =>
@@ -131,8 +119,8 @@ export function searchAdminOfficialCirculations(
     return {
         keyword,
         normalizedKeyword,
-        filePath: resolvedFilePath,
-        modifiedAt: getScheduleFileModifiedAt(resolvedFilePath),
+        filePath: getScheduleDatabaseFilePath(),
+        modifiedAt: getScheduleDatabaseModifiedAt(),
         total: items.length,
         items
     };
@@ -146,25 +134,20 @@ export function deleteAdminOfficialCirculation(
         throw new ApiRequestError(400, 'invalid_param', 'entryKey 不能为空');
     }
 
-    const scheduleFilePath = getScheduleFilePath();
-    const resolvedFilePath = getResolvedScheduleFilePath();
-    const document = loadScheduleDocument(scheduleFilePath);
-    if (!document) {
+    if (!ensureScheduleDocumentMigrated()) {
         throw new ApiRequestError(
             404,
             'not_found',
-            'schedule.json 不存在或内容无效'
+            '时刻表数据库不存在或内容无效'
         );
     }
 
-    if (!document.circulation[normalizedEntryKey]) {
+    if (!loadScheduleCirculationRecordFromDatabase(normalizedEntryKey)) {
         throw new ApiRequestError(404, 'not_found', '官方交路表不存在');
     }
 
-    const deletedKeys = deleteScheduleCirculationEntry(
-        scheduleFilePath,
-        normalizedEntryKey
-    );
+    const deletedKeys =
+        deleteScheduleCirculationEntryFromDatabase(normalizedEntryKey);
     if (deletedKeys.length === 0) {
         throw new ApiRequestError(409, 'conflict', '官方交路表删除失败');
     }
@@ -178,6 +161,6 @@ export function deleteAdminOfficialCirculation(
         entryKey: normalizedEntryKey,
         deletedKeys,
         deletedKeyCount: deletedKeys.length,
-        modifiedAt: getScheduleFileModifiedAt(resolvedFilePath)
+        modifiedAt: getScheduleDatabaseModifiedAt()
     };
 }

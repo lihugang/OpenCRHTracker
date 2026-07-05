@@ -2,7 +2,7 @@ import getLogger from '~/server/libs/log4js';
 import useConfig from '~/server/config';
 import { syncCurrentDayTimetableIdsForTrainCodes } from '~/server/services/currentDayTimetableIdSync';
 import { registerTaskExecutor } from '~/server/services/taskExecutorRegistry';
-import { syncConfirmedTimetableHistoryForPublishedState } from '~/server/services/timetableHistoryStore';
+import { syncConfirmedTimetableHistoryForScheduleStateKind } from '~/server/services/timetableHistoryStore';
 import {
     markCurrentTrainProvenanceTaskSkipped,
     recordCurrentTrainProvenanceEventsForTrainCodes
@@ -25,6 +25,8 @@ import {
     loadPublishedScheduleState,
     savePublishedScheduleState
 } from '~/server/utils/12306/scheduleProbe/stateStore';
+import { LEGACY_SCHEDULE_JSON_PATH } from '~/server/utils/12306/scheduleProbe/constants';
+import { getScheduleDatabaseFilePath } from '~/server/utils/12306/scheduleProbe/sqliteStore';
 import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
 import {
@@ -231,8 +233,9 @@ export async function refreshRouteBatchForCodes(
         };
     }
 
-    const scheduleFilePath = config.data.assets.schedule.file;
-    const state = loadPublishedScheduleState(scheduleFilePath);
+    const scheduleStorePath = LEGACY_SCHEDULE_JSON_PATH;
+    const scheduleFilePath = getScheduleDatabaseFilePath();
+    const state = loadPublishedScheduleState();
     if (!state) {
         markCurrentTrainProvenanceTaskSkipped('schedule_not_found');
         logger.warn(`skip schedule_not_found file=${scheduleFilePath}`);
@@ -438,7 +441,7 @@ export async function refreshRouteBatchForCodes(
     }
 
     if (mutated) {
-        const latestState = loadPublishedScheduleState(scheduleFilePath);
+        const latestState = loadPublishedScheduleState();
         if (!latestState) {
             logger.warn(
                 `skip_save schedule_not_found_after_refresh file=${scheduleFilePath}`
@@ -458,13 +461,14 @@ export async function refreshRouteBatchForCodes(
             }
             if (appliedGroups > 0) {
                 savePublishedScheduleState(
-                    scheduleFilePath,
+                    scheduleStorePath,
                     latestState,
                     stationUpdates
                 );
                 const syncResult =
-                    syncConfirmedTimetableHistoryForPublishedState(
-                        latestState,
+                    syncConfirmedTimetableHistoryForScheduleStateKind(
+                        'published',
+                        latestState.date,
                         appliedConfirmedTrainCodes,
                         getNowSeconds()
                     );
@@ -472,7 +476,7 @@ export async function refreshRouteBatchForCodes(
                     `history_sync date=${latestState.date} confirmedGroups=${syncResult.confirmedGroups} confirmedTrainCodes=${syncResult.confirmedTrainCodes} skippedGroups=${syncResult.skippedGroups} createdContents=${syncResult.createdContents} insertedCoverages=${syncResult.insertedCoverages} updatedCoverages=${syncResult.updatedCoverages} deletedCoverages=${syncResult.deletedCoverages} noopedCoverages=${syncResult.noopedCoverages}`
                 );
                 const appendedQueueEntries = appendRouteRefreshQueueTrainCodes(
-                    scheduleFilePath,
+                    scheduleStorePath,
                     latestState.date,
                     syncResult.routeRefreshTrainCodes,
                     getNowSeconds()

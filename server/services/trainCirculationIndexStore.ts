@@ -14,6 +14,7 @@ import {
     loadScheduleCirculationEntry,
     loadScheduleCirculationMap
 } from '~/server/utils/12306/scheduleProbe/stateStore';
+import { LEGACY_SCHEDULE_JSON_PATH } from '~/server/utils/12306/scheduleProbe/constants';
 import type { ScheduleCirculationEntry } from '~/server/utils/12306/scheduleProbe/types';
 import { getRelativeDateString } from '~/server/utils/date/getCurrentDateString';
 import {
@@ -176,9 +177,8 @@ function buildFallbackNodeMeta(trainCode: string): CirculationNodeMeta {
 }
 
 function loadOfficialCirculationInternalCodes() {
-    const scheduleFilePath = useConfig().data.assets.schedule.file;
     return new Set(
-        Object.keys(loadScheduleCirculationMap(scheduleFilePath))
+        Object.keys(loadScheduleCirculationMap())
             .map((internalCode) => normalizeCode(internalCode))
             .filter((internalCode) => internalCode.length > 0)
     );
@@ -1110,8 +1110,7 @@ function buildValidatedOfficialCirculationMap(
     fullBuild: InternalCirculationBuildResult,
     refreshAt: number | null
 ) {
-    const scheduleFilePath = useConfig().data.assets.schedule.file;
-    const officialMap = loadScheduleCirculationMap(scheduleFilePath);
+    const officialMap = loadScheduleCirculationMap();
     const validatedOfficialByInternalCode = new Map<string, TrainCirculation>();
     let splitCount = 0;
     let unmatchedCount = 0;
@@ -1444,7 +1443,7 @@ function toPublicOfficialTrainCirculation(
     }
 
     const entry = loadScheduleCirculationEntry(
-        useConfig().data.assets.schedule.file,
+        LEGACY_SCHEDULE_JSON_PATH,
         normalizedInternalCode
     );
     if (!entry) {

@@ -2,20 +2,24 @@ import getLogger from '~/server/libs/log4js';
 import useConfig from '~/server/config';
 import { registerTaskExecutor } from '~/server/services/taskExecutorRegistry';
 import { enqueueTask } from '~/server/services/taskQueue';
-import {
-    buildCodeIndex,
-    getGroupKey
-} from '~/server/utils/12306/scheduleProbe/taskHelpers';
+import { getGroupKey } from '~/server/utils/12306/scheduleProbe/taskHelpers';
 import {
     consumeRouteRefreshQueueEntries,
-    loadScheduleDocument,
+    loadPublishedScheduleStateSummary,
     saveScheduleCirculationEntries,
     saveScheduleStopMetadataFromStationBoard
 } from '~/server/utils/12306/scheduleProbe/stateStore';
+import { LEGACY_SCHEDULE_JSON_PATH } from '~/server/utils/12306/scheduleProbe/constants';
 import type {
     ScheduleCirculationEntry,
     ScheduleRouteRefreshQueueEntry
 } from '~/server/utils/12306/scheduleProbe/types';
+import {
+    getScheduleDatabaseFilePath,
+    listScheduleRouteRefreshQueueEntries,
+    loadScheduleCirculationEntryFromDatabase,
+    loadScheduleItemByStateKindAndCode
+} from '~/server/utils/12306/scheduleProbe/sqliteStore';
 import fetchStationBoardByStation, {
     type StationBoardTrainRow
 } from '~/server/utils/12306/network/fetchStationBoardByStation';
@@ -598,32 +602,25 @@ function chooseCirculationEntries(
     return chosenEntries;
 }
 
-function collectResolvedQueueEntries(
-    serviceDate: string,
-    queue: readonly ScheduleRouteRefreshQueueEntry[]
-) {
-    const scheduleFilePath = useConfig().data.assets.schedule.file;
-    const document = loadScheduleDocument(scheduleFilePath);
-    if (!document?.published || document.published.date !== serviceDate) {
-        return [];
-    }
-
-    const codeIndex = buildCodeIndex(document.published.items);
+function collectResolvedQueueEntries(serviceDate: string) {
     const resolvedEntries: ScheduleRouteRefreshQueueEntry[] = [];
 
-    for (const queueEntry of queue) {
-        if (queueEntry.serviceDate !== serviceDate) {
+    for (const queueEntry of listScheduleRouteRefreshQueueEntries(
+        serviceDate
+    )) {
+        const item = loadScheduleItemByStateKindAndCode(
+            'published',
+            queueEntry.trainCode
+        );
+        if (!item) {
             continue;
         }
 
-        const itemIndex = codeIndex.get(queueEntry.trainCode);
-        if (itemIndex === undefined) {
-            continue;
-        }
-
-        const item = document.published.items[itemIndex]!;
         const internalCode = normalizeCode(item.internalCode);
-        if (internalCode.length === 0 || !document.circulation[internalCode]) {
+        if (
+            internalCode.length === 0 ||
+            !loadScheduleCirculationEntryFromDatabase(internalCode)
+        ) {
             continue;
         }
 
@@ -687,18 +684,16 @@ function maybeRequeueTask(args: FetchStationBoardTaskArgs, reason: string) {
 async function executeFetchStationBoardTask(rawArgs: unknown) {
     const args = parseFetchStationBoardTaskArgs(rawArgs);
     const currentDate = getCurrentDateString();
-    const scheduleFilePath = useConfig().data.assets.schedule.file;
-    const document = loadScheduleDocument(scheduleFilePath);
-    if (!document?.published) {
+    const scheduleFilePath = getScheduleDatabaseFilePath();
+    const scheduleStorePath = LEGACY_SCHEDULE_JSON_PATH;
+    const published = loadPublishedScheduleStateSummary();
+    if (!published) {
         logger.warn(`skip schedule_not_found file=${scheduleFilePath}`);
         return;
     }
-    if (
-        document.published.date !== currentDate ||
-        document.published.date !== args.serviceDate
-    ) {
+    if (published.date !== currentDate || published.date !== args.serviceDate) {
         logger.info(
-            `skip_non_current_schedule taskServiceDate=${args.serviceDate} scheduleDate=${document.published.date} currentDate=${currentDate} stationTelecode=${args.stationTelecode}`
+            `skip_non_current_schedule taskServiceDate=${args.serviceDate} scheduleDate=${published.date} currentDate=${currentDate} stationTelecode=${args.stationTelecode}`
         );
         return;
     }
@@ -719,7 +714,7 @@ async function executeFetchStationBoardTask(rawArgs: unknown) {
     }
 
     const stopMetadataResult = saveScheduleStopMetadataFromStationBoard(
-        scheduleFilePath,
+        scheduleStorePath,
         args.serviceDate,
         rows.map((row) => ({
             trainNo: row.trainNo,
@@ -770,15 +765,12 @@ async function executeFetchStationBoardTask(rawArgs: unknown) {
     }
 
     const savedKeys = saveScheduleCirculationEntries(
-        scheduleFilePath,
+        scheduleStorePath,
         chosenEntries
     );
-    const resolvedQueueEntries = collectResolvedQueueEntries(
-        args.serviceDate,
-        document.routeRefreshQueue
-    );
+    const resolvedQueueEntries = collectResolvedQueueEntries(args.serviceDate);
     const removedQueueEntries = consumeRouteRefreshQueueEntries(
-        scheduleFilePath,
+        scheduleStorePath,
         resolvedQueueEntries
     );
 

@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import Database from 'better-sqlite3';
 
 const execFileAsync = promisify(execFile);
 
@@ -36,6 +37,7 @@ const configCandidatePaths = [
     path.join(rootDir, 'data', 'config.dev.json'),
     path.join(rootDir, 'data', 'config.json'),
 ];
+const legacyScheduleJsonPath = path.join(rootDir, 'data', 'schedule.json');
 const conservativeCharsPath = path.join(
     rootDir,
     'scripts',
@@ -204,17 +206,22 @@ async function readRuntimeAssetPaths(runtimeConfigPath) {
     const parsed = ensureObjectRecord(JSON.parse(raw), configLabel);
     const data = ensureObjectRecord(parsed.data, `${configLabel} data`);
     const assets = ensureObjectRecord(data.assets, `${configLabel} data.assets`);
-    const schedule = ensureObjectRecord(
-        assets.schedule,
-        `${configLabel} data.assets.schedule`,
+    const databases = ensureObjectRecord(
+        data.databases,
+        `${configLabel} data.databases`,
     );
     const emuList = ensureObjectRecord(
         assets.EMUList,
         `${configLabel} data.assets.EMUList`,
     );
+    const scheduleDatabasePath =
+        typeof databases.schedule === 'string' && databases.schedule.trim().length > 0
+            ? databases.schedule
+            : 'data/schedule.db';
 
     return {
-        schedulePath: resolveConfigFilePath(schedule.file),
+        scheduleDatabasePath: resolveConfigFilePath(scheduleDatabasePath),
+        legacyScheduleJsonPath,
         emuListPath: resolveConfigFilePath(emuList.file),
     };
 }
@@ -308,21 +315,152 @@ function collectJsonChars(value, charSet) {
     }
 }
 
-async function collectScheduleJsonChars(schedulePath) {
-    const raw = await fs.readFile(schedulePath, 'utf8');
-    const parsed = ensureObjectRecord(JSON.parse(raw), 'schedule.json');
+async function fileExists(filePath) {
+    try {
+        await fs.access(filePath);
+        return true;
+    } catch (error) {
+        if (error && typeof error === 'object' && error.code === 'ENOENT') {
+            return false;
+        }
+
+        throw error;
+    }
+}
+
+function parseJsonText(value, label) {
+    if (typeof value !== 'string' || value.length === 0) {
+        return null;
+    }
+
+    try {
+        return JSON.parse(value);
+    } catch (error) {
+        if (error instanceof SyntaxError) {
+            throw new Error(`Failed to parse ${label}: ${error.message}`);
+        }
+        throw error;
+    }
+}
+
+function tableExists(db, tableName) {
+    const row = db
+        .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?")
+        .get(tableName);
+    return row !== undefined;
+}
+
+function collectScheduleDatabaseChars(scheduleDatabasePath) {
+    const db = new Database(scheduleDatabasePath, {
+        readonly: true,
+        fileMustExist: true,
+    });
+    const charSet = new Set();
+    let scheduleItemCount = 0;
+
+    try {
+        if (tableExists(db, 'schedule_states')) {
+            const rows = db
+                .prepare('SELECT kind, state_json FROM schedule_states')
+                .all();
+            for (const row of rows) {
+                const state = parseJsonText(
+                    row.state_json,
+                    `schedule state ${row.kind}`,
+                );
+                collectJsonChars(
+                    {
+                        kind: row.kind,
+                        state,
+                    },
+                    charSet,
+                );
+                if (row.kind === 'published' && Array.isArray(state?.items)) {
+                    scheduleItemCount = state.items.length;
+                }
+            }
+        }
+
+        if (tableExists(db, 'schedule_circulations')) {
+            const rows = db
+                .prepare(
+                    'SELECT entry_key, refreshed_at, entry_json FROM schedule_circulations',
+                )
+                .all();
+            for (const row of rows) {
+                collectJsonChars(
+                    {
+                        entryKey: row.entry_key,
+                        refreshedAt: row.refreshed_at,
+                        entry: parseJsonText(
+                            row.entry_json,
+                            `schedule circulation ${row.entry_key}`,
+                        ),
+                    },
+                    charSet,
+                );
+            }
+        }
+
+        if (tableExists(db, 'schedule_stations')) {
+            collectJsonChars(
+                db.prepare('SELECT * FROM schedule_stations').all(),
+                charSet,
+            );
+        }
+
+        if (tableExists(db, 'schedule_route_refresh_queue')) {
+            collectJsonChars(
+                db.prepare('SELECT * FROM schedule_route_refresh_queue').all(),
+                charSet,
+            );
+        }
+    } finally {
+        db.close();
+    }
+
+    return {
+        source: 'database',
+        scheduleItemCount,
+        charSet,
+    };
+}
+
+async function collectLegacyScheduleJsonChars(legacySchedulePath) {
+    const raw = await fs.readFile(legacySchedulePath, 'utf8');
+    const parsed = ensureObjectRecord(JSON.parse(raw), 'legacy schedule JSON');
     const published =
         parsed.published === null || parsed.published === undefined
             ? null
-            : ensureObjectRecord(parsed.published, 'schedule.json published');
+            : ensureObjectRecord(parsed.published, 'legacy schedule published');
     const items = Array.isArray(published?.items) ? published.items : [];
     const charSet = new Set();
 
     collectJsonChars(parsed, charSet);
 
     return {
+        source: 'legacy-json',
         scheduleItemCount: items.length,
         charSet,
+    };
+}
+
+async function collectScheduleDataChars({
+    scheduleDatabasePath,
+    legacyScheduleJsonPath,
+}) {
+    if (await fileExists(scheduleDatabasePath)) {
+        return collectScheduleDatabaseChars(scheduleDatabasePath);
+    }
+
+    if (await fileExists(legacyScheduleJsonPath)) {
+        return collectLegacyScheduleJsonChars(legacyScheduleJsonPath);
+    }
+
+    return {
+        source: 'empty',
+        scheduleItemCount: 0,
+        charSet: new Set(),
     };
 }
 
@@ -560,7 +698,9 @@ async function writeGeneratedCss(unicodeRange, generatedFonts) {
 
 async function buildReport({
     configPath,
-    schedulePath,
+    scheduleDatabasePath,
+    legacyScheduleJsonPath,
+    scheduleSource,
     emuListPath,
     staticFiles,
     staticChars,
@@ -599,14 +739,16 @@ async function buildReport({
         timezone,
         inputs: {
             configPath: relativeFromRoot(configPath),
-            schedulePath: relativeFromRoot(schedulePath),
+            scheduleDatabasePath: relativeFromRoot(scheduleDatabasePath),
+            legacyScheduleJsonPath: relativeFromRoot(legacyScheduleJsonPath),
+            scheduleSource,
             emuListPath: relativeFromRoot(emuListPath),
             staticFileCount: staticFiles.length,
             staticFiles,
             staticCharCount: staticChars.size,
             conservativeCharCount: conservativeChars.size,
             scheduleItemCount,
-            scheduleJsonCharCount: scheduleChars.size,
+            scheduleDataCharCount: scheduleChars.size,
             emuRecordCount,
             emuListJsonCharCount: emuListChars.size,
         },
@@ -632,13 +774,12 @@ logStep(`source fonts ready in ${relativeFromRoot(sourceDir)}`);
 const configPath = await resolveRuntimeConfigPath();
 logStep(`using runtime config: ${relativeFromRoot(configPath)}`);
 const assetPaths = await readRuntimeAssetPaths(configPath);
-await fs.access(assetPaths.schedulePath);
 await fs.access(assetPaths.emuListPath);
 
 logStep('collecting characters from repository and runtime assets');
 const staticResult = await collectStaticText();
 const conservativeCharsRaw = await readConservativeChars();
-const scheduleResult = await collectScheduleJsonChars(assetPaths.schedulePath);
+const scheduleResult = await collectScheduleDataChars(assetPaths);
 const emuListResult = await collectEmuListJsonChars(assetPaths.emuListPath);
 
 const mergedChars = new Set();
@@ -669,7 +810,7 @@ const unicodeRange = buildUnicodeRange(totalChars);
 await fs.writeFile(charsetPath, totalChars.join(''), 'utf8');
 logStep(
     `collected ${totalChars.length} total chars from ${staticResult.files.length} static files, ` +
-        `${scheduleResult.charSet.size} schedule JSON chars, ` +
+        `${scheduleResult.charSet.size} schedule data chars, ` +
         `${emuListResult.charSet.size} emu list JSON chars`,
 );
 logStep(`wrote charset file: ${relativeFromRoot(charsetPath)}`);
@@ -700,7 +841,9 @@ const removedSubsetFiles = await cleanupOldSubsetOutputs(
 
 const report = await buildReport({
     configPath,
-    schedulePath: assetPaths.schedulePath,
+    scheduleDatabasePath: assetPaths.scheduleDatabasePath,
+    legacyScheduleJsonPath: assetPaths.legacyScheduleJsonPath,
+    scheduleSource: scheduleResult.source,
     emuListPath: assetPaths.emuListPath,
     staticFiles: staticResult.files,
     staticChars: staticResult.charSet,
@@ -731,7 +874,7 @@ console.log(
             reportPath: relativeFromRoot(reportPath),
             generatedCssPath: relativeFromRoot(generatedCssPath),
             totalChars: totalChars.length,
-            scheduleJsonCharCount: scheduleResult.charSet.size,
+            scheduleDataCharCount: scheduleResult.charSet.size,
             emuListJsonCharCount: emuListResult.charSet.size,
             subsetFiles: generatedFonts.map((font) => font.subsetName),
         },

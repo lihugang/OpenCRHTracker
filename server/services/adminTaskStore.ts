@@ -19,7 +19,7 @@ import { DISPATCH_STATION_BOARD_TASKS_EXECUTOR } from '~/server/services/taskExe
 import { REFRESH_TRAIN_CIRCULATION_TASK_EXECUTOR } from '~/server/services/taskExecutors/refreshTrainCirculationTaskExecutor';
 import { getStationBoardIdleTaskOptions } from '~/server/services/stationBoardTaskScheduling';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
-import { loadPublishedScheduleState } from '~/server/utils/12306/scheduleProbe/stateStore';
+import { loadPublishedScheduleStateSummary } from '~/server/utils/12306/scheduleProbe/stateStore';
 import { splitIntoBatches } from '~/server/utils/12306/scheduleProbe/taskHelpers';
 import uniqueNormalizedCodes from '~/server/utils/12306/uniqueNormalizedCodes';
 import ensure from '~/server/utils/api/executor/ensure';
@@ -171,8 +171,7 @@ async function normalizeCouplingScanTarget(
 }
 
 function assertPublishedScheduleReadyForRefresh(): void {
-    const scheduleFilePath = useConfig().data.assets.schedule.file;
-    const state = loadPublishedScheduleState(scheduleFilePath);
+    const state = loadPublishedScheduleStateSummary();
     ensure(
         state !== null,
         409,

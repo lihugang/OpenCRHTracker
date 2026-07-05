@@ -810,7 +810,7 @@ export function getDocsApiCostDisplay(
             return {
                 summary: '扣费规则：' + ruleText,
                 ruleText,
-                description: '根据上游 LaTeX 编译是否命中缓存决定扣费档位。',
+                description: '根据上游 Typst 编译是否命中缓存决定扣费档位。',
                 note:
                     '实际扣费以响应头 ' + runtimeConfig.headers.cost + ' 为准。'
             };

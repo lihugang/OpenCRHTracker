@@ -9,8 +9,12 @@ import {
     resolveStationTelecodeFromLookup
 } from '~/server/services/stationBoardTaskDispatch';
 import { registerTaskExecutor } from '~/server/services/taskExecutorRegistry';
-import { loadScheduleDocument } from '~/server/utils/12306/scheduleProbe/stateStore';
-import type { ScheduleState } from '~/server/utils/12306/scheduleProbe/types';
+import { loadPublishedScheduleStateSummary } from '~/server/utils/12306/scheduleProbe/stateStore';
+import {
+    getScheduleDatabaseFilePath,
+    listScheduleStopStationCandidateRowsByStateKind,
+    type ScheduleStopStationCandidateRow
+} from '~/server/utils/12306/scheduleProbe/sqliteStore';
 import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
@@ -46,31 +50,29 @@ const logger = getLogger('task-executor:dispatch-station-board-tasks');
 let registered = false;
 
 function collectScheduleStationCandidates(
-    state: ScheduleState
+    rows: readonly ScheduleStopStationCandidateRow[]
 ): StationBoardStationCandidate[] {
     const candidatesByKey = new Map<string, StationBoardStationCandidate>();
 
-    for (const item of state.items) {
-        for (const stop of item.stops) {
-            const stationName = normalizeStationName(stop.stationName);
-            const stationTelecode = normalizeCode(stop.stationTelecode);
-            if (stationName.length === 0 && stationTelecode.length === 0) {
-                continue;
-            }
-
-            const candidateKey =
-                stationTelecode.length > 0
-                    ? `telecode:${stationTelecode}`
-                    : `name:${stationName}`;
-            if (candidatesByKey.has(candidateKey)) {
-                continue;
-            }
-
-            candidatesByKey.set(candidateKey, {
-                stationName,
-                stationTelecode
-            });
+    for (const row of rows) {
+        const stationName = normalizeStationName(row.stationName);
+        const stationTelecode = normalizeCode(row.stationTelecode);
+        if (stationName.length === 0 && stationTelecode.length === 0) {
+            continue;
         }
+
+        const candidateKey =
+            stationTelecode.length > 0
+                ? `telecode:${stationTelecode}`
+                : `name:${stationName}`;
+        if (candidatesByKey.has(candidateKey)) {
+            continue;
+        }
+
+        candidatesByKey.set(candidateKey, {
+            stationName,
+            stationTelecode
+        });
     }
 
     return [...candidatesByKey.values()].sort((left, right) =>
@@ -149,26 +151,27 @@ function maybeRecordDispatchResult(input: {
 
 async function executeDispatchStationBoardTasks() {
     const config = useConfig();
-    const scheduleFilePath = config.data.assets.schedule.file;
-    const document = loadScheduleDocument(scheduleFilePath);
-    if (!document?.published) {
+    const scheduleFilePath = getScheduleDatabaseFilePath();
+    const published = loadPublishedScheduleStateSummary();
+    if (!published) {
         logger.warn(`skip schedule_not_found file=${scheduleFilePath}`);
         return;
     }
 
-    const state = document.published;
     const currentDate = getCurrentDateString();
-    if (state.date !== currentDate) {
+    if (published.date !== currentDate) {
         logger.warn(
-            `skip_non_current_schedule scheduleDate=${state.date} currentDate=${currentDate} file=${scheduleFilePath}`
+            `skip_non_current_schedule scheduleDate=${published.date} currentDate=${currentDate} file=${scheduleFilePath}`
         );
         return;
     }
 
-    const stationCandidates = collectScheduleStationCandidates(state);
+    const stationCandidates = collectScheduleStationCandidates(
+        listScheduleStopStationCandidateRowsByStateKind('published')
+    );
     if (stationCandidates.length === 0) {
         logger.info(
-            `done stationCandidates=0 scheduleItems=${state.items.length} currentDate=${state.date}`
+            `done stationCandidates=0 scheduleItems=${published.uniqueItems} currentDate=${published.date}`
         );
         return;
     }
@@ -194,7 +197,7 @@ async function executeDispatchStationBoardTasks() {
     const dispatchedStationKeys = new Set<string>();
 
     recordCurrentTrainProvenanceEvent({
-        serviceDate: state.date,
+        serviceDate: published.date,
         eventType: 'station_board_schedule_stations_collected',
         result: 'selected',
         payload: {
@@ -273,7 +276,7 @@ async function executeDispatchStationBoardTasks() {
         }
         dispatchedStationKeys.add(stationKey);
         const taskKey = buildStationBoardTaskKey(
-            state.date,
+            published.date,
             resolvedStationTelecode
         );
         const pendingTask = pendingTasks.get(taskKey) ?? null;
@@ -290,7 +293,7 @@ async function executeDispatchStationBoardTasks() {
         }
 
         const stationBoardTask = enqueueOrReuseStationBoardFetchTask({
-            serviceDate: state.date,
+            serviceDate: published.date,
             stationName,
             stationTelecode: resolvedStationTelecode,
             executionTime,
@@ -310,7 +313,7 @@ async function executeDispatchStationBoardTasks() {
     }
 
     maybeRecordDispatchResult({
-        serviceDate: state.date,
+        serviceDate: published.date,
         candidateGroupCount: stationCandidates.length,
         selectedStations,
         createdTaskCount: createdTasks,
@@ -321,7 +324,7 @@ async function executeDispatchStationBoardTasks() {
     });
 
     logger.info(
-        `done stationCandidates=${stationCandidates.length} selectedStations=${selectedStations.length} createdTasks=${createdTasks} reusedTasks=${reusedTasks} skippedNotFound=${skippedNotFound} skippedAmbiguous=${skippedAmbiguous} retryRemaining=${retryRemaining} currentDate=${state.date}`
+        `done stationCandidates=${stationCandidates.length} selectedStations=${selectedStations.length} createdTasks=${createdTasks} reusedTasks=${reusedTasks} skippedNotFound=${skippedNotFound} skippedAmbiguous=${skippedAmbiguous} retryRemaining=${retryRemaining} currentDate=${published.date}`
     );
 }
 

@@ -2950,7 +2950,7 @@ export const developerDocsOpenApi = {
                         }
                     },
                     '502': {
-                        description: '上游 LaTeX 渲染服务不可用或编译失败。',
+                        description: '上游 Typst 编译服务不可用或编译失败。',
                         headers: {
                             'x-api-remain': {
                                 $ref: '#/components/headers/ApiRemain'

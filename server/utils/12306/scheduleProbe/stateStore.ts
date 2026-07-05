@@ -3,8 +3,29 @@ import path from 'path';
 import getCurrentDateString from '../../date/getCurrentDateString';
 import normalizeCode from '../normalizeCode';
 import uniqueNormalizedCodes from '../uniqueNormalizedCodes';
+import {
+    CURRENT_SCHEDULE_DOCUMENT_VERSION,
+    LEGACY_SCHEDULE_JSON_PATH,
+    SCHEDULE_SCHEMA_RELATIVE_PATH
+} from './constants';
 import { filterInvalidScheduleItems } from './filterInvalidScheduleItems';
 import { getInitialKeywords } from './prefixTree';
+import {
+    appendScheduleRouteRefreshQueueEntries,
+    consumeScheduleRouteRefreshQueueEntries,
+    deleteScheduleCirculationEntryFromDatabase,
+    hasScheduleDatabaseDocument,
+    loadScheduleCirculationEntryFromDatabase,
+    loadScheduleCirculationMapFromDatabase,
+    loadScheduleDocumentFromDatabase,
+    loadScheduleStateFromDatabase,
+    loadScheduleStateSummaryByKind,
+    resolveActiveScheduleStateKind,
+    saveScheduleCirculationEntriesToDatabase,
+    saveScheduleDocumentToDatabase,
+    saveScheduleStopMetadataByStateKind,
+    type ScheduleStateSummary
+} from './sqliteStore';
 import type {
     ScheduleCirculationEntry,
     ScheduleCirculationMap,
@@ -33,10 +54,6 @@ interface LoadedBuildingScheduleState {
         | 'reset_invalid_file';
 }
 
-interface ScheduleDocumentCache {
-    document: ScheduleDocument;
-}
-
 export interface ScheduleStopMetadataUpdate {
     trainNo: string;
     stationTrainCode: string;
@@ -49,21 +66,10 @@ export interface SaveScheduleStopMetadataResult {
     updatedStopCount: number;
 }
 
-const SCHEDULE_SCHEMA_RELATIVE_PATH = '../assets/json/scheduleScheme.json';
-const CURRENT_SCHEDULE_DOCUMENT_VERSION = 7;
-let cachedScheduleDocument: ScheduleDocumentCache | null = null;
 let scheduleStateVersion = 0;
 
 function cloneScheduleState(state: ScheduleState): ScheduleState {
     return JSON.parse(JSON.stringify(state)) as ScheduleState;
-}
-
-function cloneRouteRefreshQueue(
-    queue: ScheduleRouteRefreshQueueEntry[]
-): ScheduleRouteRefreshQueueEntry[] {
-    return JSON.parse(
-        JSON.stringify(queue)
-    ) as ScheduleRouteRefreshQueueEntry[];
 }
 
 function cloneScheduleCirculationEntry(
@@ -88,13 +94,8 @@ function cloneScheduleDocument(document: ScheduleDocument): ScheduleDocument {
     return JSON.parse(JSON.stringify(document)) as ScheduleDocument;
 }
 
-function setCachedScheduleDocument(document: ScheduleDocument) {
-    cachedScheduleDocument = {
-        document: cloneScheduleDocument(document)
-    };
-}
-
-function bumpScheduleStateVersion() {
+function bumpPublishedScheduleStateVersion() {
+    // This version tracks published timetable replacement only.
     scheduleStateVersion += 1;
 }
 
@@ -417,49 +418,6 @@ function normalizeScheduleCirculation(value: unknown): {
         circulation,
         migrated
     };
-}
-
-function collectOverlappingScheduleCirculationKeys(
-    circulation: ScheduleCirculationMap,
-    normalizedEntry: ScheduleCirculationEntry
-) {
-    const staleKeys = new Set<string>();
-
-    for (const key of getScheduleCirculationKeysFromEntry(normalizedEntry)) {
-        const existingEntry = circulation[key];
-        if (!existingEntry) {
-            continue;
-        }
-
-        for (const existingKey of getScheduleCirculationKeysFromEntry(
-            existingEntry
-        )) {
-            if (circulation[existingKey]) {
-                staleKeys.add(existingKey);
-            }
-        }
-    }
-
-    return [...staleKeys];
-}
-
-function persistScheduleCirculationEntry(
-    circulation: ScheduleCirculationMap,
-    normalizedEntry: ScheduleCirculationEntry
-) {
-    for (const staleKey of collectOverlappingScheduleCirculationKeys(
-        circulation,
-        normalizedEntry
-    )) {
-        delete circulation[staleKey];
-    }
-
-    const savedKeys = getScheduleCirculationKeysFromEntry(normalizedEntry);
-    for (const key of savedKeys) {
-        circulation[key] = cloneScheduleCirculationEntry(normalizedEntry);
-    }
-
-    return savedKeys;
 }
 
 function ensureScheduleItem(
@@ -956,15 +914,6 @@ function mergePublishedRouteInfo(
     return nextPublished;
 }
 
-function hasUsableTimetableData(state: ScheduleState): boolean {
-    return state.items.some(
-        (item) =>
-            item.startAt !== null &&
-            item.endAt !== null &&
-            item.stops.length > 0
-    );
-}
-
 export function createInitialScheduleState(
     date: string,
     config: ScheduleProbeRuntimeConfig
@@ -1036,39 +985,17 @@ export function appendRouteRefreshQueueTrainCodes(
         return [];
     }
 
-    const document = cloneScheduleDocument(
-        loadScheduleDocument(scheduleFilePath) ??
-            createInitialScheduleDocument()
-    );
-    const existingQueue = cloneRouteRefreshQueue(document.routeRefreshQueue);
-    const existingKeys = new Set(
-        existingQueue.map((item) => `${item.serviceDate}:${item.trainCode}`)
-    );
-    const appendedEntries: ScheduleRouteRefreshQueueEntry[] = [];
-
-    for (const trainCode of normalizedTrainCodes) {
-        const dedupeKey = `${serviceDate}:${trainCode}`;
-        if (existingKeys.has(dedupeKey)) {
-            continue;
-        }
-
-        const entry: ScheduleRouteRefreshQueueEntry = {
-            trainCode,
-            serviceDate,
-            enqueuedAt
-        };
-        existingQueue.push(entry);
-        existingKeys.add(dedupeKey);
-        appendedEntries.push(entry);
-    }
-
-    if (appendedEntries.length === 0) {
+    if (!ensureScheduleDocumentMigrated(scheduleFilePath)) {
         return [];
     }
 
-    document.routeRefreshQueue = existingQueue;
-    saveScheduleDocument(scheduleFilePath, document);
-    return appendedEntries;
+    return appendScheduleRouteRefreshQueueEntries(
+        normalizedTrainCodes.map((trainCode) => ({
+            trainCode,
+            serviceDate,
+            enqueuedAt
+        }))
+    );
 }
 
 export function consumeRouteRefreshQueueEntries(
@@ -1100,40 +1027,31 @@ export function consumeRouteRefreshQueueEntries(
         return [];
     }
 
-    const activeDocument = loadScheduleDocument(scheduleFilePath);
-    if (!activeDocument || activeDocument.routeRefreshQueue.length === 0) {
+    if (!ensureScheduleDocumentMigrated(scheduleFilePath)) {
         return [];
     }
-    const document = cloneScheduleDocument(activeDocument);
-
-    const existingQueue = cloneRouteRefreshQueue(document.routeRefreshQueue);
-    const removedEntries: ScheduleRouteRefreshQueueEntry[] = [];
-    const retainedQueue: ScheduleRouteRefreshQueueEntry[] = [];
-
-    for (const entry of existingQueue) {
-        const consumptionKey = `${entry.serviceDate}:${entry.trainCode}`;
-        if (consumptionKeys.has(consumptionKey)) {
-            removedEntries.push(entry);
-            continue;
-        }
-
-        retainedQueue.push(entry);
-    }
-
-    if (removedEntries.length === 0) {
-        return [];
-    }
-
-    document.routeRefreshQueue = retainedQueue;
-    saveScheduleDocument(scheduleFilePath, document);
-    return removedEntries;
+    return consumeScheduleRouteRefreshQueueEntries(
+        [...consumptionKeys].map((consumptionKey) => {
+            const [serviceDate = '', trainCode = ''] =
+                consumptionKey.split(':');
+            return {
+                serviceDate,
+                trainCode
+            };
+        })
+    );
 }
 
 export function loadScheduleDocument(
-    scheduleFilePath: string
+    scheduleFilePath: string = LEGACY_SCHEDULE_JSON_PATH
 ): ScheduleDocument | null {
-    if (cachedScheduleDocument) {
-        return cachedScheduleDocument.document;
+    const databaseDocument = loadScheduleDocumentFromDatabase();
+    if (databaseDocument) {
+        return databaseDocument;
+    }
+
+    if (hasScheduleDatabaseDocument()) {
+        return null;
     }
 
     const absolutePath = path.resolve(scheduleFilePath);
@@ -1148,11 +1066,11 @@ export function loadScheduleDocument(
             return null;
         }
 
-        if (parsed.migrated) {
-            saveScheduleDocument(scheduleFilePath, parsed.document);
-        }
-
-        setCachedScheduleDocument(parsed.document);
+        const stat = fs.statSync(absolutePath);
+        saveScheduleDocumentToDatabase(parsed.document, {
+            jsonPath: absolutePath,
+            jsonMtimeMs: Number.isFinite(stat.mtimeMs) ? stat.mtimeMs : null
+        });
         return parsed.document;
     } catch {
         return null;
@@ -1167,29 +1085,49 @@ export function saveScheduleDocument(
     document.version = CURRENT_SCHEDULE_DOCUMENT_VERSION;
     document.stations = cloneScheduleStationMap(document.stations);
     document.circulation = cloneScheduleCirculationMap(document.circulation);
-    const absolutePath = path.resolve(scheduleFilePath);
-    const directory = path.dirname(absolutePath);
-    fs.mkdirSync(directory, { recursive: true });
-    fs.writeFileSync(
-        absolutePath,
-        `${JSON.stringify(document, null, 4)}\n`,
-        'utf8'
-    );
-    setCachedScheduleDocument(document);
+    saveScheduleDocumentToDatabase(document);
+}
+
+export function ensureScheduleDocumentMigrated(
+    scheduleFilePath: string = LEGACY_SCHEDULE_JSON_PATH
+): boolean {
+    if (hasScheduleDatabaseDocument()) {
+        return true;
+    }
+
+    return loadScheduleDocument(scheduleFilePath) !== null;
 }
 
 export function loadPublishedScheduleState(
-    scheduleFilePath: string
+    scheduleFilePath: string = LEGACY_SCHEDULE_JSON_PATH
 ): ScheduleState | null {
-    const document = loadScheduleDocument(scheduleFilePath);
-    return document?.published ? cloneScheduleState(document.published) : null;
+    if (!ensureScheduleDocumentMigrated(scheduleFilePath)) {
+        return null;
+    }
+
+    const state = loadScheduleStateFromDatabase('published');
+    return state ? cloneScheduleState(state) : null;
+}
+
+export function loadPublishedScheduleStateSummary(
+    scheduleFilePath: string = LEGACY_SCHEDULE_JSON_PATH
+): ScheduleStateSummary | null {
+    if (!ensureScheduleDocumentMigrated(scheduleFilePath)) {
+        return null;
+    }
+
+    return loadScheduleStateSummaryByKind('published');
 }
 
 export function loadScheduleCirculationMap(
-    scheduleFilePath: string
+    scheduleFilePath: string = LEGACY_SCHEDULE_JSON_PATH
 ): ScheduleCirculationMap {
-    const document = loadScheduleDocument(scheduleFilePath);
-    return document ? cloneScheduleCirculationMap(document.circulation) : {};
+    if (!ensureScheduleDocumentMigrated(scheduleFilePath)) {
+        return {};
+    }
+
+    const circulation = loadScheduleCirculationMapFromDatabase();
+    return circulation ? cloneScheduleCirculationMap(circulation) : {};
 }
 
 export function loadScheduleCirculationEntry(
@@ -1201,8 +1139,13 @@ export function loadScheduleCirculationEntry(
         return null;
     }
 
-    const document = loadScheduleDocument(scheduleFilePath);
-    const entry = document?.circulation[normalizedInternalCode];
+    if (!ensureScheduleDocumentMigrated(scheduleFilePath)) {
+        return null;
+    }
+
+    const entry = loadScheduleCirculationEntryFromDatabase(
+        normalizedInternalCode
+    );
     return entry ? cloneScheduleCirculationEntry(entry) : null;
 }
 
@@ -1223,13 +1166,14 @@ export function saveScheduleCirculationEntry(
         return null;
     }
 
-    const document = cloneScheduleDocument(
-        loadScheduleDocument(scheduleFilePath) ??
-            createInitialScheduleDocument()
-    );
-    persistScheduleCirculationEntry(document.circulation, normalizedEntry);
-    saveScheduleDocument(scheduleFilePath, document);
-    return normalizedKey;
+    if (!ensureScheduleDocumentMigrated(scheduleFilePath)) {
+        return null;
+    }
+
+    const savedKeys = saveScheduleCirculationEntriesToDatabase([
+        normalizedEntry
+    ]);
+    return savedKeys.includes(normalizedKey) ? normalizedKey : null;
 }
 
 export function saveScheduleCirculationEntries(
@@ -1240,12 +1184,11 @@ export function saveScheduleCirculationEntries(
         return [];
     }
 
-    const document = cloneScheduleDocument(
-        loadScheduleDocument(scheduleFilePath) ??
-            createInitialScheduleDocument()
-    );
-    const savedKeys = new Set<string>();
+    if (!ensureScheduleDocumentMigrated(scheduleFilePath)) {
+        return [];
+    }
 
+    const normalizedEntries: ScheduleCirculationEntry[] = [];
     for (const entry of entries) {
         const normalizedEntry = normalizeScheduleCirculationEntry(
             getScheduleCirculationKeyFromEntry(entry),
@@ -1255,61 +1198,14 @@ export function saveScheduleCirculationEntries(
             continue;
         }
 
-        for (const key of persistScheduleCirculationEntry(
-            document.circulation,
-            normalizedEntry
-        )) {
-            savedKeys.add(key);
-        }
+        normalizedEntries.push(normalizedEntry);
     }
 
-    if (savedKeys.size === 0) {
-        return [];
-    }
-
-    saveScheduleDocument(scheduleFilePath, document);
-    return [...savedKeys];
+    return saveScheduleCirculationEntriesToDatabase(normalizedEntries);
 }
 
 function hasScheduleStopMetadataUpdate(update: ScheduleStopMetadataUpdate) {
     return update.distance !== null || update.platformNo !== null;
-}
-
-function matchesScheduleStopMetadataItem(
-    item: ScheduleItem,
-    update: ScheduleStopMetadataUpdate
-) {
-    const trainNo = normalizeCode(update.trainNo);
-    const stationTrainCode = normalizeCode(update.stationTrainCode);
-    if (trainNo.length > 0) {
-        return normalizeCode(item.internalCode) === trainNo;
-    }
-
-    if (stationTrainCode.length === 0) {
-        return false;
-    }
-
-    return uniqueNormalizedCodes([item.code, ...item.allCodes]).includes(
-        stationTrainCode
-    );
-}
-
-function applyScheduleStopMetadataUpdate(
-    stop: ScheduleStop,
-    update: ScheduleStopMetadataUpdate
-) {
-    let changed = false;
-
-    if (update.distance !== null && stop.distance !== update.distance) {
-        stop.distance = update.distance;
-        changed = true;
-    }
-    if (update.platformNo !== null && stop.platformNo !== update.platformNo) {
-        stop.platformNo = update.platformNo;
-        changed = true;
-    }
-
-    return changed;
 }
 
 export function saveScheduleStopMetadataFromStationBoard(
@@ -1342,46 +1238,24 @@ export function saveScheduleStopMetadataFromStationBoard(
         };
     }
 
-    const document = cloneScheduleDocument(
-        loadScheduleDocument(scheduleFilePath) ??
-            createInitialScheduleDocument()
-    );
-    if (!document.published || document.published.date !== serviceDate) {
+    if (!ensureScheduleDocumentMigrated(scheduleFilePath)) {
         return {
             updatedStopCount: 0
         };
     }
 
-    const updatedStops = new Set<ScheduleStop>();
-    for (const update of normalizedUpdates) {
-        for (const item of document.published.items) {
-            if (!matchesScheduleStopMetadataItem(item, update)) {
-                continue;
-            }
-
-            for (const stop of item.stops) {
-                if (
-                    normalizeCode(stop.stationTelecode) !==
-                    update.stationTelecode
-                ) {
-                    continue;
-                }
-                if (applyScheduleStopMetadataUpdate(stop, update)) {
-                    updatedStops.add(stop);
-                }
-            }
-        }
-    }
-
-    if (updatedStops.size === 0) {
+    const published = loadScheduleStateSummaryByKind('published');
+    if (!published || published.date !== serviceDate) {
         return {
             updatedStopCount: 0
         };
     }
 
-    saveScheduleDocument(scheduleFilePath, document);
     return {
-        updatedStopCount: updatedStops.size
+        updatedStopCount: saveScheduleStopMetadataByStateKind(
+            'published',
+            normalizedUpdates
+        )
     };
 }
 
@@ -1394,72 +1268,27 @@ export function deleteScheduleCirculationEntry(
         return [];
     }
 
-    const activeDocument = loadScheduleDocument(scheduleFilePath);
-    if (!activeDocument) {
+    if (!ensureScheduleDocumentMigrated(scheduleFilePath)) {
         return [];
     }
-
-    const targetEntry = activeDocument.circulation[normalizedEntryKey];
-    if (!targetEntry) {
-        return [];
-    }
-
-    const document = cloneScheduleDocument(activeDocument);
-    const deletedKeys: string[] = [];
-    const deletionKeys = uniqueNormalizedCodes([
-        normalizedEntryKey,
-        ...getScheduleCirculationKeysFromEntry(targetEntry)
-    ]);
-
-    for (const key of deletionKeys) {
-        if (!document.circulation[key]) {
-            continue;
-        }
-
-        delete document.circulation[key];
-        deletedKeys.push(key);
-    }
-
-    if (deletedKeys.length === 0) {
-        return [];
-    }
-
-    saveScheduleDocument(scheduleFilePath, document);
-    return deletedKeys;
+    return deleteScheduleCirculationEntryFromDatabase(normalizedEntryKey);
 }
 
 export function loadActiveScheduleState(
-    scheduleFilePath: string
+    scheduleFilePath: string = LEGACY_SCHEDULE_JSON_PATH
 ): ScheduleState | null {
-    const document = loadScheduleDocument(scheduleFilePath);
-    if (!document) {
+    if (!ensureScheduleDocumentMigrated(scheduleFilePath)) {
         return null;
     }
 
     const today = getCurrentDateString();
-    const published = document.published;
-    if (published && published.date === today) {
-        return cloneScheduleState(published);
+    const activeKind = resolveActiveScheduleStateKind(today);
+    if (!activeKind) {
+        return null;
     }
 
-    const building = document.building;
-    if (
-        building &&
-        building.date === today &&
-        hasUsableTimetableData(building)
-    ) {
-        return cloneScheduleState(building);
-    }
-
-    if (published) {
-        return cloneScheduleState(published);
-    }
-
-    if (building && building.date === today) {
-        return cloneScheduleState(building);
-    }
-
-    return building ? cloneScheduleState(building) : null;
+    const state = loadScheduleStateFromDatabase(activeKind);
+    return state ? cloneScheduleState(state) : null;
 }
 
 export function savePublishedScheduleState(
@@ -1476,14 +1305,17 @@ export function savePublishedScheduleState(
         : null;
     document.stations = mergeScheduleStationMaps(document.stations, stations);
     saveScheduleDocument(scheduleFilePath, document);
-    bumpScheduleStateVersion();
 }
 
 export function loadBuildingScheduleState(
-    scheduleFilePath: string
+    scheduleFilePath: string = LEGACY_SCHEDULE_JSON_PATH
 ): ScheduleState | null {
-    const document = loadScheduleDocument(scheduleFilePath);
-    return document?.building ? cloneScheduleState(document.building) : null;
+    if (!ensureScheduleDocumentMigrated(scheduleFilePath)) {
+        return null;
+    }
+
+    const state = loadScheduleStateFromDatabase('building');
+    return state ? cloneScheduleState(state) : null;
 }
 
 export function saveBuildingScheduleState(
@@ -1500,7 +1332,6 @@ export function saveBuildingScheduleState(
         : null;
     document.stations = mergeScheduleStationMaps(document.stations, stations);
     saveScheduleDocument(scheduleFilePath, document);
-    bumpScheduleStateVersion();
 }
 
 export function promoteBuildingScheduleState(
@@ -1523,7 +1354,7 @@ export function promoteBuildingScheduleState(
     document.published = promotedState;
     document.building = null;
     saveScheduleDocument(scheduleFilePath, document);
-    bumpScheduleStateVersion();
+    bumpPublishedScheduleStateVersion();
     return cloneScheduleState(promotedState);
 }
 
