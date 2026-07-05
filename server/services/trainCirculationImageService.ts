@@ -6,7 +6,12 @@ import { getPreferredTrainCirculation } from '~/server/services/trainCirculation
 import { getTodayScheduleTimetableByTrainCode } from '~/server/services/todayScheduleCache';
 import ApiRequestError from '~/server/utils/api/errors/ApiRequestError';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
-import { loadScheduleDocument } from '~/server/utils/12306/scheduleProbe/stateStore';
+import { ensureScheduleDocumentMigrated } from '~/server/utils/12306/scheduleProbe/stateStore';
+import {
+    listScheduleCandidateItemsForCodes,
+    loadScheduleStateSummaries,
+    loadScheduleStationsByTelecodes
+} from '~/server/utils/12306/scheduleProbe/sqliteStore';
 import type {
     ScheduleItem,
     ScheduleStationEntry,
@@ -26,7 +31,7 @@ import type {
 } from '~/types/lookup';
 import resolveBureauNameByCode from '~/utils/railway/resolveBureauNameByCode';
 
-interface LatexCompileSuccessPayload {
+interface TypstCompileSuccessPayload {
     id?: unknown;
     pageNumber?: unknown;
     cacheHit?: unknown;
@@ -55,7 +60,7 @@ interface StationAxisPoint {
     cumulativeDistanceKm: number;
 }
 
-interface LatexCompileResult {
+interface TypstCompileResult {
     id: string;
     pageCount: number;
     cacheHit: boolean;
@@ -86,31 +91,6 @@ export interface TrainCirculationImageRenderResult {
     binaryContentType: 'image/png' | 'application/pdf';
 }
 
-const TEMPLATE_PATH = path.resolve('assets/latex/train-circulation-image.tex');
-const MIN_STATION_GAP_CM = 1.0;
-const PLOT_TOP_PADDING_CM = 0.9;
-const PLOT_BOTTOM_PADDING_CM = 0.9;
-const ENDPOINT_TIME_MIN_X_GAP_CM = 0.26;
-const ENDPOINT_TIME_HORIZONTAL_STEP_CM = 0.32;
-const ENDPOINT_TIME_MAX_HORIZONTAL_STEPS = 96;
-const ENDPOINT_TIME_LAYOUT_MAX_ITERATIONS = 6;
-const ENDPOINT_TIME_RELAYOUT_GROWTH_CM = 2.4;
-const ENDPOINT_TIME_RIGHT_PADDING_CM = 0.5;
-const TRAIN_LABEL_SAFE_MIN_X_CM = 1.4;
-const TRAIN_LABEL_SAFE_MAX_X_PADDING_CM = 0.4;
-const TRAIN_LABEL_CANDIDATE_PROGRESS = [0.25, 0.4, 0.55] as const;
-const TRAIN_LABEL_OFFSET_X_CM = 0.32;
-const ENDPOINT_TIME_OFFSET_Y_CM = 0.16;
-const MIDNIGHT_MARKER_OFFSET_Y_CM = 0.2;
-const HEADER_INFO_OFFSET_Y_CM = 0.8;
-const STATION_LABEL_RIGHT_PROTECTION_X_CM = 0.2;
-const SHANGHAI_TIME_FORMATTER = new Intl.DateTimeFormat('zh-CN', {
-    timeZone: 'Asia/Shanghai',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false
-});
-
 interface TextBox {
     minX: number;
     maxX: number;
@@ -138,11 +118,6 @@ interface TopRightTextPlacement {
     box: TextBox;
 }
 
-interface StationAxisLayout {
-    chartBodyHeightCm: number;
-    projectedDistanceByTelecode: Map<string, number>;
-}
-
 interface EndpointTimePlacement extends TextPlacement {
     occupiedBox: TextBox;
 }
@@ -161,9 +136,43 @@ interface EndpointTimePlacementResult {
     hadOverlapFallback: boolean;
 }
 
+const TEMPLATE_PATH = path.resolve('assets/typst/train-circulation-image.typ');
+const DOCUMENT_BORDER_CM = 10 / 28.3464567;
+const MIN_STATION_GAP_CM = 1.0;
+const PLOT_TOP_PADDING_CM = 0.9;
+const PLOT_BOTTOM_PADDING_CM = 0.9;
+const ENDPOINT_TIME_MIN_X_GAP_CM = 0.26;
+const ENDPOINT_TIME_HORIZONTAL_STEP_CM = 0.32;
+const ENDPOINT_TIME_MAX_HORIZONTAL_STEPS = 96;
+const ENDPOINT_TIME_LAYOUT_MAX_ITERATIONS = 6;
+const ENDPOINT_TIME_RELAYOUT_GROWTH_CM = 2.4;
+const ENDPOINT_TIME_RIGHT_PADDING_CM = 0.5;
+const TRAIN_LABEL_SAFE_MIN_X_CM = 1.4;
+const TRAIN_LABEL_SAFE_MAX_X_PADDING_CM = 0.4;
+const TRAIN_LABEL_CANDIDATE_PROGRESS = [0.25, 0.4, 0.55] as const;
+const TRAIN_LABEL_OFFSET_X_CM = 0.32;
+const ENDPOINT_TIME_OFFSET_Y_CM = 0.16;
+const MIDNIGHT_MARKER_OFFSET_Y_CM = 0.2;
+const HEADER_INFO_OFFSET_Y_CM = 0.8;
+const STATION_LABEL_RIGHT_PROTECTION_X_CM = 0.2;
+const SHANGHAI_TIME_FORMATTER = new Intl.DateTimeFormat('zh-CN', {
+    timeZone: 'Asia/Shanghai',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+});
+
 interface TrainCirculationHeaderInfo {
     text: string;
 }
+
+type TypstLiteral =
+    | null
+    | boolean
+    | number
+    | string
+    | TypstLiteral[]
+    | { [key: string]: TypstLiteral };
 
 function asRecord(value: unknown): Record<string, unknown> | null {
     if (typeof value !== 'object' || value === null || Array.isArray(value)) {
@@ -181,41 +190,69 @@ function getNonEmptyString(value: unknown) {
     return value.trim();
 }
 
-function escapeLatexText(value: string) {
-    return value.replaceAll(/([\\{}$&#_^%~])/g, (character) => {
-        switch (character) {
-            case '\\':
-                return '\\textbackslash{}';
-            case '{':
-                return '\\{';
-            case '}':
-                return '\\}';
-            case '$':
-                return '\\$';
-            case '&':
-                return '\\&';
-            case '#':
-                return '\\#';
-            case '_':
-                return '\\_';
-            case '^':
-                return '\\textasciicircum{}';
-            case '%':
-                return '\\%';
-            case '~':
-                return '\\textasciitilde{}';
-            default:
-                return character;
-        }
-    });
-}
-
-function quoteTikzText(value: string) {
-    return `{${escapeLatexText(value)}}`;
+function quoteTypstText(value: string) {
+    return JSON.stringify(value);
 }
 
 function formatCoordinate(value: number) {
     return value.toFixed(3);
+}
+
+function formatTypstNumber(value: number) {
+    if (!Number.isFinite(value)) {
+        throw new Error('Typst literal only supports finite numbers');
+    }
+
+    if (Object.is(value, -0)) {
+        return '0';
+    }
+
+    if (Number.isInteger(value)) {
+        return String(value);
+    }
+
+    return value
+        .toFixed(6)
+        .replace(/0+$/, '')
+        .replace(/\.$/, '');
+}
+
+function serializeTypstLiteral(value: TypstLiteral): string {
+    if (value === null) {
+        return 'none';
+    }
+    if (typeof value === 'boolean') {
+        return value ? 'true' : 'false';
+    }
+    if (typeof value === 'number') {
+        return formatTypstNumber(value);
+    }
+    if (typeof value === 'string') {
+        return JSON.stringify(value);
+    }
+    if (Array.isArray(value)) {
+        if (value.length === 0) {
+            return '()';
+        }
+
+        const serializedItems = value.map((item) => serializeTypstLiteral(item));
+        return `(${serializedItems.join(', ')}${value.length === 1 ? ',' : ''})`;
+    }
+
+    const entries = Object.entries(value);
+    if (entries.length === 0) {
+        throw new Error('Typst literal does not support empty objects');
+    }
+
+    return `(${entries
+        .map(([key, entryValue]) => {
+            if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) {
+                throw new Error(`Unsupported Typst literal key: ${key}`);
+            }
+
+            return `${key}: ${serializeTypstLiteral(entryValue)}`;
+        })
+        .join(', ')})`;
 }
 
 function formatShanghaiTimeLabel(timestampSeconds: number) {
@@ -623,47 +660,6 @@ function formatTrainCodeLabel(trainCodes: string[]) {
     return normalizedCodes.join('/');
 }
 
-function buildStationAxisLayout(
-    stationAxisPoints: StationAxisPoint[]
-): StationAxisLayout {
-    const maxStationDistanceKm =
-        stationAxisPoints[stationAxisPoints.length - 1]?.cumulativeDistanceKm ??
-        0;
-    const baseChartBodyHeightCm =
-        Math.max(
-            8,
-            stationAxisPoints.length * 0.9,
-            maxStationDistanceKm / 180
-        ) * 2;
-    const baseYScale =
-        maxStationDistanceKm > 0
-            ? baseChartBodyHeightCm / maxStationDistanceKm
-            : 0;
-    const projectedDistanceByTelecode = new Map<string, number>();
-    let projectedDistanceCm = 0;
-
-    stationAxisPoints.forEach((stationAxisPoint, index) => {
-        if (index > 0) {
-            const previousStationAxisPoint = stationAxisPoints[index - 1]!;
-            const rawGapKm =
-                stationAxisPoint.cumulativeDistanceKm -
-                previousStationAxisPoint.cumulativeDistanceKm;
-            const rawGapCm = rawGapKm * baseYScale;
-            projectedDistanceCm += Math.max(rawGapCm, MIN_STATION_GAP_CM);
-        }
-
-        projectedDistanceByTelecode.set(
-            stationAxisPoint.stationTelecode,
-            projectedDistanceCm
-        );
-    });
-
-    return {
-        chartBodyHeightCm: Math.max(baseChartBodyHeightCm, projectedDistanceCm),
-        projectedDistanceByTelecode
-    };
-}
-
 async function buildTrainCirculationHeaderInfo(input: {
     bureauCode: string;
     trainDepartment: string;
@@ -701,47 +697,47 @@ async function buildTrainCirculationHeaderInfo(input: {
 
 function getTextMetricsKindWidthCm(character: string, kind: TextMetricKind) {
     if (character === ' ') {
-        return kind === 'time' || kind === 'marker' ? 0.08 : 0.1;
+        return kind === 'time' || kind === 'marker' ? 0.08 : 0.12;
     }
 
     if (/[\u3400-\u9fff\uf900-\ufaff]/u.test(character)) {
         switch (kind) {
             case 'station':
-                return 0.34;
+                return 0.49;
             case 'train':
-                return 0.27;
+                return 0.39;
             case 'time':
             case 'marker':
-                return 0.18;
+                return 0.36;
             default:
-                return 0.27;
+                return 0.39;
         }
     }
 
     if (/[A-Za-z0-9]/.test(character)) {
         switch (kind) {
             case 'station':
-                return 0.18;
+                return 0.26;
             case 'train':
-                return 0.15;
+                return 0.2;
             case 'time':
             case 'marker':
-                return 0.14;
+                return 0.18;
             default:
-                return 0.15;
+                return 0.2;
         }
     }
 
     switch (kind) {
         case 'station':
-            return 0.24;
+            return 0.3;
         case 'train':
-            return 0.1;
+            return 0.16;
         case 'time':
         case 'marker':
-            return 0.1;
+            return 0.14;
         default:
-            return 0.1;
+            return 0.16;
     }
 }
 
@@ -1173,7 +1169,144 @@ function placeTrainLabels(
     return placedLabels;
 }
 
-function buildLatexSource(
+function getTypstColor(value: string) {
+    return `rgb(${quoteTypstText(value)})`;
+}
+
+function buildTypstStroke(color: string, thicknessCm: number) {
+    return `(paint: ${getTypstColor(color)}, thickness: ${formatCoordinate(thicknessCm)}cm)`;
+}
+
+function toTypstX(shiftXCm: number, x: number) {
+    return shiftXCm + x;
+}
+
+function toTypstY(chartHeightCm: number, y: number) {
+    return DOCUMENT_BORDER_CM + chartHeightCm - y;
+}
+
+function pushTypstLine(
+    contentLines: string[],
+    input: {
+        chartHeightCm: number;
+        shiftXCm: number;
+        xStart: number;
+        yStart: number;
+        xEnd: number;
+        yEnd: number;
+        strokeColor: string;
+        strokeWidthCm: number;
+    }
+) {
+    const xStart = toTypstX(input.shiftXCm, input.xStart);
+    const yStart = toTypstY(input.chartHeightCm, input.yStart);
+    const xEnd = toTypstX(input.shiftXCm, input.xEnd);
+    const yEnd = toTypstY(input.chartHeightCm, input.yEnd);
+    const dx = xEnd - xStart;
+    const dy = yEnd - yStart;
+    const lengthCm = Math.hypot(dx, dy);
+    if (lengthCm <= 0) {
+        return;
+    }
+
+    const angleDeg = (Math.atan2(dy, dx) * 180) / Math.PI;
+    contentLines.push(
+        `#place(dx: ${formatCoordinate(xStart)}cm, dy: ${formatCoordinate(yStart)}cm, line(length: ${formatCoordinate(lengthCm)}cm, angle: ${formatCoordinate(angleDeg)}deg, stroke: ${buildTypstStroke(input.strokeColor, input.strokeWidthCm)}))`
+    );
+}
+
+function pushTypstCircle(
+    contentLines: string[],
+    input: {
+        chartHeightCm: number;
+        shiftXCm: number;
+        x: number;
+        y: number;
+        radiusCm: number;
+        fillColor: string;
+    }
+) {
+    contentLines.push(
+        `#place(dx: ${formatCoordinate(toTypstX(input.shiftXCm, input.x) - input.radiusCm)}cm, dy: ${formatCoordinate(toTypstY(input.chartHeightCm, input.y) - input.radiusCm)}cm, circle(radius: ${formatCoordinate(input.radiusCm)}cm, fill: ${getTypstColor(input.fillColor)}))`
+    );
+}
+
+function buildShiftedTextPlacement(
+    placement: TextPlacement,
+    shiftYCm: number
+): TextPlacement {
+    return {
+        ...placement,
+        y: placement.y + shiftYCm,
+        box: {
+            minX: placement.box.minX,
+            maxX: placement.box.maxX,
+            minY: placement.box.minY + shiftYCm,
+            maxY: placement.box.maxY + shiftYCm
+        }
+    };
+}
+
+function buildShiftedTopRightTextPlacement(
+    placement: TopRightTextPlacement,
+    shiftYCm: number
+): TopRightTextPlacement {
+    return {
+        ...placement,
+        y: placement.y + shiftYCm,
+        box: {
+            minX: placement.box.minX,
+            maxX: placement.box.maxX,
+            minY: placement.box.minY + shiftYCm,
+            maxY: placement.box.maxY + shiftYCm
+        }
+    };
+}
+
+function getTextAlign(anchor: TextAnchor): 'left' | 'right' | 'center' {
+    switch (anchor) {
+        case 'east':
+            return 'right';
+        case 'west':
+            return 'left';
+        case 'north':
+        case 'south':
+            return 'center';
+        default:
+            return 'center';
+    }
+}
+
+function pushTypstTextBox(
+    contentLines: string[],
+    input: {
+        chartHeightCm: number;
+        shiftXCm: number;
+        box: TextBox;
+        text: string;
+        fontSizePt: number;
+        align: 'left' | 'right' | 'center';
+        textColor?: string;
+        fillColor?: string;
+        insetPt?: number;
+        verticalAlign?: 'top' | 'middle';
+    }
+) {
+    const widthCm = Math.max(0.01, input.box.maxX - input.box.minX);
+    const verticalAlign = input.verticalAlign ?? 'top';
+    const yCm =
+        verticalAlign === 'middle'
+            ? DOCUMENT_BORDER_CM +
+              input.chartHeightCm -
+              (input.box.minY + input.box.maxY) / 2
+            : DOCUMENT_BORDER_CM + input.chartHeightCm - input.box.maxY;
+
+    contentLines.push(
+        `#opencrhTextBox(${formatCoordinate(toTypstX(input.shiftXCm, input.box.minX))}cm, ${formatCoordinate(yCm)}cm, ${formatCoordinate(widthCm)}cm, ${quoteTypstText(input.align)}, ${formatCoordinate(input.fontSizePt)}pt, ${getTypstColor(input.textColor ?? '#000000')}, ${input.fillColor ? getTypstColor(input.fillColor) : 'none'}, ${formatCoordinate(input.insetPt ?? 0)}pt, ${quoteTypstText(verticalAlign)}, ${quoteTypstText(input.text)})`
+    );
+}
+
+function buildTypstSource(
     _requestTrainCode: string,
     nodes: ResolvedCirculationNode[],
     stationAxisPoints: StationAxisPoint[],
@@ -1181,20 +1314,6 @@ function buildLatexSource(
     headerInfo: TrainCirculationHeaderInfo | null
 ) {
     const template = fs.readFileSync(TEMPLATE_PATH, 'utf8');
-    const stationYByTelecode = new Map<string, number>();
-    const { chartBodyHeightCm, projectedDistanceByTelecode } =
-        buildStationAxisLayout(stationAxisPoints);
-
-    for (const stationAxisPoint of stationAxisPoints) {
-        stationYByTelecode.set(
-            stationAxisPoint.stationTelecode,
-            chartBodyHeightCm -
-                (projectedDistanceByTelecode.get(
-                    stationAxisPoint.stationTelecode
-                ) ?? 0)
-        );
-    }
-
     const minTimestamp = Math.min(...nodes.map((node) => node.start.timestamp));
     const maxTimestamp = Math.max(...nodes.map((node) => node.end.timestamp));
     const paddingSeconds = 15 * 60;
@@ -1218,240 +1337,104 @@ function buildLatexSource(
         timeGridStepSeconds,
         axisEndTimestamp - axisStartTimestamp
     );
-    let chartWidthCm = Math.max(18, axisRangeSeconds / 3600 / 1.2);
-
-    const projectTime = (timestamp: number) =>
-        ((timestamp - axisStartTimestamp) / axisRangeSeconds) * chartWidthCm;
-
-    const contentLines: string[] = [];
-    const leftLabelX = -0.4;
-    const largeCjkFont = '\\fontsize{13.5}{16.5}\\selectfont';
-    const trainLabelFont = '\\fontsize{10.8}{13.2}\\selectfont';
-    const largeTimeFont = '\\fontsize{10.8}{13.5}\\selectfont';
-    const headerFont = '\\fontsize{9.6}{11.8}\\selectfont';
-    const footerFont = '\\fontsize{8.1}{10.1}\\selectfont';
-    const stationLabelPlacements = stationAxisPoints.map((stationAxisPoint) => {
-        const y = stationYByTelecode.get(stationAxisPoint.stationTelecode) ?? 0;
-        const placement = createTextPlacement(
-            leftLabelX,
-            y,
-            stationAxisPoint.stationName,
-            'east',
-            'station'
-        );
-
-        return placement;
-    });
-    const stationLabelOccupiedBoxes = stationLabelPlacements.map((placement) =>
-        createProtectedStationLabelBox(leftLabelX, placement.y, placement.text)
-    );
-    let finalProjectTime = projectTime;
-    let midnightMarkerPlacements: TextPlacement[] = [];
-    let endpointTimePlacements: EndpointTimePlacement[] = [];
-    let occupiedBoxes: TextBox[] = [];
-
-    for (
-        let iteration = 0;
-        iteration < ENDPOINT_TIME_LAYOUT_MAX_ITERATIONS;
-        iteration += 1
-    ) {
-        const iterationProjectTime = (timestamp: number) =>
-            ((timestamp - axisStartTimestamp) / axisRangeSeconds) *
-            chartWidthCm;
-        const iterationOccupiedBoxes = [...stationLabelOccupiedBoxes];
-        const iterationMidnightMarkerPlacements = buildMidnightMarkerPlacements(
-            {
-                axisStartTimestamp,
-                axisEndTimestamp,
-                firstGridReferenceTimestamp,
-                chartBodyHeightCm,
-                projectTime: iterationProjectTime
-            }
-        );
-        for (const placement of iterationMidnightMarkerPlacements) {
-            iterationOccupiedBoxes.push(placement.box);
-        }
-
-        const endpointTimePlacementResult = placeEndpointTimeLabels(
-            buildEndpointTimeCandidates(
-                nodes,
-                stationYByTelecode,
-                iterationProjectTime
-            ),
-            iterationOccupiedBoxes
-        );
-        const nextChartWidthCm = Math.max(
-            chartWidthCm,
-            endpointTimePlacementResult.requiredChartWidthCm
-        );
-
-        if (nextChartWidthCm > chartWidthCm + 1e-6) {
-            chartWidthCm = nextChartWidthCm;
-            continue;
-        }
-
-        if (
-            endpointTimePlacementResult.hadOverlapFallback &&
-            iteration < ENDPOINT_TIME_LAYOUT_MAX_ITERATIONS - 1
-        ) {
-            chartWidthCm += ENDPOINT_TIME_RELAYOUT_GROWTH_CM;
-            continue;
-        }
-
-        finalProjectTime = iterationProjectTime;
-        midnightMarkerPlacements = iterationMidnightMarkerPlacements;
-        endpointTimePlacements = endpointTimePlacementResult.placements;
-        occupiedBoxes = [
-            ...iterationOccupiedBoxes,
-            ...endpointTimePlacements.map((placement) => placement.occupiedBox)
-        ];
-        break;
-    }
-
-    if (endpointTimePlacements.length === 0 && nodes.length > 0) {
-        finalProjectTime = (timestamp: number) =>
-            ((timestamp - axisStartTimestamp) / axisRangeSeconds) *
-            chartWidthCm;
-        midnightMarkerPlacements = buildMidnightMarkerPlacements({
-            axisStartTimestamp,
-            axisEndTimestamp,
-            firstGridReferenceTimestamp,
-            chartBodyHeightCm,
-            projectTime: finalProjectTime
-        });
-        occupiedBoxes = [
-            ...stationLabelOccupiedBoxes,
-            ...midnightMarkerPlacements.map((placement) => placement.box)
-        ];
-        endpointTimePlacements = placeEndpointTimeLabels(
-            buildEndpointTimeCandidates(
-                nodes,
-                stationYByTelecode,
-                finalProjectTime
-            ),
-            occupiedBoxes
-        ).placements;
-        occupiedBoxes.push(
-            ...endpointTimePlacements.map((placement) => placement.occupiedBox)
-        );
-    }
-
-    const trainLabelPlacements = placeTrainLabels(
-        nodes,
-        chartWidthCm,
-        stationYByTelecode,
-        finalProjectTime,
-        occupiedBoxes
-    );
-    const allTextBoxes = [
-        ...stationLabelPlacements.map((placement) => placement.box),
-        ...midnightMarkerPlacements.map((placement) => placement.box),
-        ...endpointTimePlacements.map((placement) => placement.box),
-        ...trainLabelPlacements.map((placement) => placement.box)
-    ];
-    const headerPlacement =
-        headerInfo === null
-            ? null
-            : createTopRightTextPlacement(
-                  chartWidthCm,
-                  chartBodyHeightCm + HEADER_INFO_OFFSET_Y_CM,
-                  headerInfo.text,
-                  'train'
-              );
-    if (headerPlacement) {
-        allTextBoxes.push(headerPlacement.box);
-    }
-    const minTextY = allTextBoxes.reduce(
-        (currentMinY, box) => Math.min(currentMinY, box.minY),
-        0
-    );
-    const maxTextY = allTextBoxes.reduce(
-        (currentMaxY, box) => Math.max(currentMaxY, box.maxY),
-        chartBodyHeightCm
-    );
-    const shiftYCm = Math.max(0, PLOT_BOTTOM_PADDING_CM - minTextY);
-    const chartBottomY = shiftYCm;
-    const chartTopY = shiftYCm + chartBodyHeightCm;
-    const chartHeightCm = shiftYCm + maxTextY + PLOT_TOP_PADDING_CM;
+    const ticks: TypstLiteral[] = [];
+    let midnightMarkerIndex = 1;
 
     for (
         let timestamp = axisStartTimestamp;
         timestamp <= axisEndTimestamp;
         timestamp += timeGridStepSeconds
     ) {
-        const x = finalProjectTime(timestamp);
-        const isMidnightGridLine =
+        const isMidnight =
             (timestamp - firstGridReferenceTimestamp) % (24 * 60 * 60) === 0;
-        contentLines.push(
-            `\\draw[line width=${isMidnightGridLine ? '0.04' : '0.01'}cm, ${isMidnightGridLine ? 'black' : 'gray!15'}] (${formatCoordinate(x)}, ${formatCoordinate(chartBottomY)}) -- (${formatCoordinate(x)}, ${formatCoordinate(chartTopY)});`
-        );
+        ticks.push({
+            timestamp,
+            isMidnight,
+            midnightIndex: isMidnight ? midnightMarkerIndex : null
+        });
+
+        if (isMidnight) {
+            midnightMarkerIndex += 1;
+        }
     }
 
-    for (const placement of midnightMarkerPlacements) {
-        contentLines.push(
-            `\\node[anchor=${placement.anchor},font=${largeTimeFont},text=black] at (${formatCoordinate(placement.x)}, ${formatCoordinate(placement.y + shiftYCm)}) ${quoteTikzText(placement.text)};`
-        );
-    }
+    const renderData: TypstLiteral = {
+        layout: {
+            documentBorderCm: DOCUMENT_BORDER_CM,
+            minStationGapCm: MIN_STATION_GAP_CM,
+            plotTopPaddingCm: PLOT_TOP_PADDING_CM,
+            plotBottomPaddingCm: PLOT_BOTTOM_PADDING_CM,
+            endpointTimeMinXGapCm: ENDPOINT_TIME_MIN_X_GAP_CM,
+            endpointTimeHorizontalStepCm: ENDPOINT_TIME_HORIZONTAL_STEP_CM,
+            endpointTimeMaxHorizontalSteps: ENDPOINT_TIME_MAX_HORIZONTAL_STEPS,
+            endpointTimeLayoutMaxIterations:
+                ENDPOINT_TIME_LAYOUT_MAX_ITERATIONS,
+            endpointTimeRelayoutGrowthCm: ENDPOINT_TIME_RELAYOUT_GROWTH_CM,
+            endpointTimeRightPaddingCm: ENDPOINT_TIME_RIGHT_PADDING_CM,
+            trainLabelSafeMinXCm: TRAIN_LABEL_SAFE_MIN_X_CM,
+            trainLabelSafeMaxXPaddingCm: TRAIN_LABEL_SAFE_MAX_X_PADDING_CM,
+            trainLabelCandidateProgress: [...TRAIN_LABEL_CANDIDATE_PROGRESS],
+            trainLabelOffsetXCm: TRAIN_LABEL_OFFSET_X_CM,
+            endpointTimeOffsetYCm: ENDPOINT_TIME_OFFSET_Y_CM,
+            midnightMarkerOffsetYCm: MIDNIGHT_MARKER_OFFSET_Y_CM,
+            headerInfoOffsetYCm: HEADER_INFO_OFFSET_Y_CM,
+            stationLabelRightProtectionXCm: STATION_LABEL_RIGHT_PROTECTION_X_CM
+        },
+        styles: {
+            leftLabelXCm: -0.4,
+            largeCjkFontPt: 13.5,
+            trainLabelFontPt: 10.8,
+            largeTimeFontPt: 10.8,
+            headerFontPt: 9.6,
+            footerFontPt: 8.1,
+            gridLineColor: '#e5e7eb',
+            midnightLineColor: '#000000',
+            stationLineColor: '#000000',
+            blueLineColor: '#0000b3',
+            tealLineColor: '#005a5a',
+            whiteColor: '#ffffff',
+            blackColor: '#000000'
+        },
+        timeAxis: {
+            axisStartTimestamp,
+            axisEndTimestamp,
+            axisRangeSeconds,
+            timeGridStepSeconds,
+            ticks
+        },
+        stations: stationAxisPoints.map((stationAxisPoint) => ({
+            stationTelecode: stationAxisPoint.stationTelecode,
+            stationName: stationAxisPoint.stationName,
+            lat: stationAxisPoint.lat,
+            lon: stationAxisPoint.lon,
+            cumulativeDistanceKm: stationAxisPoint.cumulativeDistanceKm
+        })),
+        nodes: nodes.map((node) => ({
+            routeNodeIndex: node.routeNodeIndex,
+            trainCodes: node.trainCodes,
+            trainCodeText: node.trainCodeText,
+            labelText: `${node.trainCodeText}  ${node.start.stationName} → ${node.end.stationName}`,
+            start: {
+                stationName: node.start.stationName,
+                stationTelecode: node.start.stationTelecode,
+                timestamp: node.start.timestamp,
+                timeText: formatShanghaiTimeLabel(node.start.timestamp)
+            },
+            end: {
+                stationName: node.end.stationName,
+                stationTelecode: node.end.stationTelecode,
+                timestamp: node.end.timestamp,
+                timeText: formatShanghaiTimeLabel(node.end.timestamp)
+            }
+        })),
+        headerText: headerInfo?.text ?? null,
+        footerText: '算法生成，仅供参考 | Open CRH Tracker'
+    };
 
-    for (const stationAxisPoint of stationAxisPoints) {
-        const y =
-            (stationYByTelecode.get(stationAxisPoint.stationTelecode) ?? 0) +
-            shiftYCm;
-        contentLines.push(
-            `\\draw[line width=0.02cm, black] (${formatCoordinate(0)}, ${formatCoordinate(y)}) -- (${formatCoordinate(chartWidthCm)}, ${formatCoordinate(y)});`
-        );
-    }
-
-    for (const placement of stationLabelPlacements) {
-        contentLines.push(
-            `\\node[anchor=east,font=${largeCjkFont},align=right] at (${formatCoordinate(placement.x)}, ${formatCoordinate(placement.y + shiftYCm)}) ${quoteTikzText(placement.text)};`
-        );
-    }
-
-    nodes.forEach((node, index) => {
-        const xStart = finalProjectTime(node.start.timestamp);
-        const xEnd = finalProjectTime(node.end.timestamp);
-        const yStart =
-            (stationYByTelecode.get(node.start.stationTelecode) ?? 0) +
-            shiftYCm;
-        const yEnd =
-            (stationYByTelecode.get(node.end.stationTelecode) ?? 0) + shiftYCm;
-        const drawColor = index % 2 === 0 ? 'blue!70!black' : 'teal!70!black';
-
-        contentLines.push(
-            `\\draw[line width=0.08cm, ${drawColor}] (${formatCoordinate(xStart)}, ${formatCoordinate(yStart)}) -- (${formatCoordinate(xEnd)}, ${formatCoordinate(yEnd)});`
-        );
-        contentLines.push(
-            `\\fill[${drawColor}] (${formatCoordinate(xStart)}, ${formatCoordinate(yStart)}) circle[radius=0.06cm];`
-        );
-        contentLines.push(
-            `\\fill[${drawColor}] (${formatCoordinate(xEnd)}, ${formatCoordinate(yEnd)}) circle[radius=0.06cm];`
-        );
-    });
-
-    for (const placement of endpointTimePlacements) {
-        contentLines.push(
-            `\\node[fill=white,inner sep=1.1pt,font=${largeTimeFont},anchor=${placement.anchor}] at (${formatCoordinate(placement.x)}, ${formatCoordinate(placement.y + shiftYCm)}) ${quoteTikzText(placement.text)};`
-        );
-    }
-
-    for (const placement of trainLabelPlacements) {
-        contentLines.push(
-            `\\node[fill=white,inner sep=2pt,font=${trainLabelFont},anchor=${placement.anchor}] at (${formatCoordinate(placement.x)}, ${formatCoordinate(placement.y + shiftYCm)}) ${quoteTikzText(placement.text)};`
-        );
-    }
-
-    if (headerPlacement) {
-        contentLines.push(
-            `\\node[fill=white,inner sep=2pt,font=${headerFont},anchor=south east,align=right] at (${formatCoordinate(chartWidthCm)}, ${formatCoordinate(headerPlacement.y + shiftYCm)}) ${quoteTikzText(headerPlacement.text)};`
-        );
-    }
-
-    contentLines.push(
-        `\\node[anchor=south east,font=${footerFont},text=black,align=right] at (${formatCoordinate(chartWidthCm)}, ${formatCoordinate(0)}) ${quoteTikzText('算法生成，仅供参考 | Open CRH Tracker')};`
+    return template.replace(
+        '__RENDER_DATA__',
+        serializeTypstLiteral(renderData)
     );
-
-    return template.replace('__CONTENT__', contentLines.join('\n'));
 }
 
 async function fetchWithTimeout(
@@ -1478,7 +1461,7 @@ async function fetchWithTimeout(
     }
 }
 
-function parseLatexCompileEnvelope(payload: unknown): LatexCompileResult {
+function parseTypstCompileEnvelope(payload: unknown): TypstCompileResult {
     const envelope = asRecord(payload);
     if (!envelope || typeof envelope.ok !== 'boolean') {
         throw new ApiRequestError(
@@ -1501,7 +1484,7 @@ function parseLatexCompileEnvelope(payload: unknown): LatexCompileResult {
 
     const compilePayload = asRecord(
         envelope.data
-    ) as LatexCompileSuccessPayload | null;
+    ) as TypstCompileSuccessPayload | null;
     const documentId = getNonEmptyString(compilePayload?.id);
     const pageCount = compilePayload?.pageNumber;
 
@@ -1533,19 +1516,19 @@ function parseLatexCompileEnvelope(payload: unknown): LatexCompileResult {
     };
 }
 
-async function compileLatexDocument(latexSource: string) {
+async function compileTypstDocument(typstSource: string) {
     const config = useConfig();
-    const baseUrl = config.services.simpleLatexContainer.baseUrl;
+    const baseUrl = config.services.typstCompiler.baseUrl;
     const response = await fetchWithTimeout(
-        `${baseUrl}/code`,
+        `${baseUrl}/code?engine=typst`,
         {
             method: 'POST',
             headers: {
-                Authorization: `Bearer ${config.services.simpleLatexContainer.apiKey}`,
+                Authorization: `Bearer ${config.services.typstCompiler.apiKey}`,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                payload: latexSource
+                payload: typstSource
             })
         },
         20_000
@@ -1559,7 +1542,7 @@ async function compileLatexDocument(latexSource: string) {
         );
     }
 
-    return parseLatexCompileEnvelope((await response.json()) as unknown);
+    return parseTypstCompileEnvelope((await response.json()) as unknown);
 }
 
 async function fetchBinaryContent(
@@ -1605,20 +1588,32 @@ function resolveCurrentCirculation(trainCode: string) {
     };
 }
 
-function resolvePublishedScheduleState() {
-    const scheduleFilePath = useConfig().data.assets.schedule.file;
-    const document = loadScheduleDocument(scheduleFilePath);
-    if (
-        !document?.published ||
-        document.published.date !== getCurrentDateString()
-    ) {
+function resolvePublishedScheduleProjection(circulation: TrainCirculation) {
+    if (!ensureScheduleDocumentMigrated()) {
         throw new ApiRequestError(404, 'not_found', '当前暂无时刻表');
     }
 
+    const currentDate = getCurrentDateString();
+    const publishedSummary =
+        loadScheduleStateSummaries().find(
+            (summary) => summary.kind === 'published'
+        ) ?? null;
+    if (!publishedSummary || publishedSummary.date !== currentDate) {
+        throw new ApiRequestError(404, 'not_found', '当前暂无时刻表');
+    }
+
+    const items = listScheduleCandidateItemsForCodes('published', {
+        internalCodes: circulation.nodes.map((node) => node.internalCode),
+        aliasCodes: circulation.nodes.flatMap((node) => node.allCodes)
+    });
+    const stations = loadScheduleStationsByTelecodes(
+        items.flatMap((item) => item.stops.map((stop) => stop.stationTelecode))
+    );
+
     return {
-        date: document.published.date,
-        items: document.published.items,
-        stations: document.stations
+        date: publishedSummary.date,
+        items,
+        stations
     };
 }
 
@@ -1629,7 +1624,8 @@ export async function renderTrainCirculationImage(
 ): Promise<TrainCirculationImageRenderResult> {
     const { timetable, circulation } =
         resolveCurrentCirculation(requestTrainCode);
-    const publishedScheduleState = resolvePublishedScheduleState();
+    const publishedScheduleState =
+        resolvePublishedScheduleProjection(circulation);
     const headerInfo = await buildTrainCirculationHeaderInfo({
         bureauCode: timetable.bureauCode,
         trainDepartment: timetable.trainDepartment,
@@ -1643,16 +1639,16 @@ export async function renderTrainCirculationImage(
         publishedScheduleState.stations
     );
     const stationAxisPoints = buildStationAxisPoints(resolvedNodes);
-    const latexSource = buildLatexSource(
+    const typstSource = buildTypstSource(
         requestTrainCode,
         resolvedNodes,
         stationAxisPoints,
         publishedScheduleState.date,
         headerInfo
     );
-    const compileResult = await compileLatexDocument(latexSource);
+    const compileResult = await compileTypstDocument(typstSource);
     const imageUrl = buildImageUrl(
-        useConfig().services.simpleLatexContainer.baseUrl,
+        useConfig().services.typstCompiler.baseUrl,
         compileResult.id,
         format,
         1
