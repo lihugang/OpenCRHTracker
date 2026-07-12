@@ -79,6 +79,7 @@ import {
     getNextExecutionTimeInShanghaiSeconds,
     getShanghaiDayStartUnixSeconds
 } from '~/server/utils/date/shanghaiDateTime';
+import { runIndexRebuild } from '~/server/services/indexRebuildWorker';
 
 const logger = getLogger('task-schedule-bootstrap');
 const STARTUP_EXECUTORS = [
@@ -287,6 +288,10 @@ export default defineNitroPlugin(async () => {
         registerRebuildTrainCirculationIndexTaskExecutor();
         registerDetectCoupledEmuGroupTaskExecutor();
         registerRefreshAssetFileTaskExecutors();
+        await Promise.all([
+            runIndexRebuild(REBUILD_REFERENCE_MODEL_INDEX_TASK_EXECUTOR),
+            runIndexRebuild(REBUILD_TRAIN_CIRCULATION_INDEX_TASK_EXECUTOR)
+        ]);
         await synchronizeQrcodeDetectionDispatchTasks();
 
         try {

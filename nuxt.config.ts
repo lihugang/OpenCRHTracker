@@ -79,25 +79,50 @@ export default defineNuxtConfig({
                   external: externalizedNativePackages
               }
             : undefined,
-        hooks: externalizeNativeDeps
-            ? {
-                  compiled(nitro) {
-                      for (const packageName of externalizedNativePackages) {
-                          const packageOutputPath = path.join(
-                              nitro.options.output.serverDir,
-                              'node_modules',
-                              packageName
-                          );
-                          if (fs.existsSync(packageOutputPath)) {
-                              fs.rmSync(packageOutputPath, {
-                                  recursive: true,
-                                  force: true
-                              });
+        hooks: {
+            'rollup:before'(_nitro, rollupConfig) {
+                const serverInput = rollupConfig.input;
+                if (typeof serverInput !== 'string') {
+                    throw new TypeError(
+                        'Expected Nitro server input to be a single entry path'
+                    );
+                }
+                rollupConfig.input = {
+                    server: serverInput,
+                    indexRebuildWorker: path.resolve(
+                        'server/workers/indexRebuildWorker.ts'
+                    )
+                };
+                if (
+                    rollupConfig.output &&
+                    !Array.isArray(rollupConfig.output)
+                ) {
+                    rollupConfig.output.entryFileNames = (chunkInfo) =>
+                        chunkInfo.name === 'indexRebuildWorker'
+                            ? 'workers/index-rebuild.mjs'
+                            : 'index.mjs';
+                }
+            },
+            ...(externalizeNativeDeps
+                ? {
+                      compiled(nitro) {
+                          for (const packageName of externalizedNativePackages) {
+                              const packageOutputPath = path.join(
+                                  nitro.options.output.serverDir,
+                                  'node_modules',
+                                  packageName
+                              );
+                              if (fs.existsSync(packageOutputPath)) {
+                                  fs.rmSync(packageOutputPath, {
+                                      recursive: true,
+                                      force: true
+                                  });
+                              }
                           }
                       }
                   }
-              }
-            : undefined,
+                : {})
+        },
         esbuild: {
             options: {
                 target: 'esnext'

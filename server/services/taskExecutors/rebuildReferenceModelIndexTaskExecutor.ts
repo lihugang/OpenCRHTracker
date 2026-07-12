@@ -1,6 +1,11 @@
 import getLogger from '~/server/libs/log4js';
 import useConfig from '~/server/config';
-import { rebuildReferenceModelIndex } from '~/server/services/referenceModelIndexStore';
+import { runIndexRebuild } from '~/server/services/indexRebuildWorker';
+import {
+    finishIndexRebuildExecution,
+    startIndexRebuildExecution
+} from '~/server/services/indexRebuildExecutionStore';
+import { getCurrentTaskExecutionContext } from '~/server/services/taskExecutionContext';
 import { registerTaskExecutor } from '~/server/services/taskExecutorRegistry';
 import { enqueueTask } from '~/server/services/taskQueue';
 import {
@@ -33,18 +38,22 @@ function enqueueNextDailyReferenceModelTask() {
 
 async function executeRebuildReferenceModelIndexTask() {
     let caughtError: unknown = null;
+    const executionRecordId = startIndexRebuildExecution(
+        REBUILD_REFERENCE_MODEL_INDEX_TASK_EXECUTOR,
+        getCurrentTaskExecutionContext()?.taskId ?? null
+    );
 
     try {
-        const cache = rebuildReferenceModelIndex();
-        logger.info(
-            `rebuild_succeeded currentDate=${cache.currentDate} windowDays=${cache.windowDays} trainCodes=${cache.runsByTrainCode.size}`
-        );
+        await runIndexRebuild(REBUILD_REFERENCE_MODEL_INDEX_TASK_EXECUTOR);
+        finishIndexRebuildExecution(executionRecordId, 'success');
+        logger.info('rebuild_succeeded worker=true');
     } catch (error) {
         caughtError = error;
         const message =
             error instanceof Error
                 ? `${error.name}: ${error.message}`
                 : String(error);
+        finishIndexRebuildExecution(executionRecordId, 'failed', message);
         logger.error(`rebuild_failed error=${message}`);
     } finally {
         try {
