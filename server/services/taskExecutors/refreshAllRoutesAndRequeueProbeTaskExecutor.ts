@@ -9,9 +9,10 @@ import {
 import { registerTaskExecutor } from '~/server/services/taskExecutorRegistry';
 import { removePendingTasksByExecutor } from '~/server/services/taskQueue';
 import {
-    loadPublishedScheduleState
-} from '~/server/utils/12306/scheduleProbe/stateStore';
-import { getScheduleDatabaseFilePath } from '~/server/utils/12306/scheduleProbe/sqliteStore';
+    getScheduleDatabaseFilePath,
+    listScheduleItemsByStateKind,
+    loadScheduleStateSummaryByKind
+} from '~/server/utils/12306/scheduleProbe/sqliteStore';
 import {
     getGroupKey,
     splitIntoBatches
@@ -43,32 +44,35 @@ function collectRouteRefreshTrainCodes(): {
     trainCodes: string[];
 } {
     const scheduleFilePath = getScheduleDatabaseFilePath();
-    const state = loadPublishedScheduleState();
-    if (!state) {
+    const published = loadScheduleStateSummaryByKind('published');
+    if (!published) {
         throw new Error(`published schedule not found: ${scheduleFilePath}`);
     }
 
     const currentDate = getCurrentDateString();
-    if (state.date !== currentDate) {
+    if (published.date !== currentDate) {
         throw new Error(
-            `published schedule is not current: scheduleDate=${state.date} currentDate=${currentDate}`
+            `published schedule is not current: scheduleDate=${published.date} currentDate=${currentDate}`
         );
     }
 
     const visitedGroups = new Set<string>();
     const trainCodes: string[] = [];
-    for (const item of state.items) {
-        const groupKey = getGroupKey(item);
+    for (const item of listScheduleItemsByStateKind('published')) {
+        const groupKey = getGroupKey({
+            code: item.itemCode,
+            internalCode: item.internalCode
+        });
         if (visitedGroups.has(groupKey)) {
             continue;
         }
 
         visitedGroups.add(groupKey);
-        trainCodes.push(item.code);
+        trainCodes.push(item.itemCode);
     }
 
     return {
-        date: state.date,
+        date: published.date,
         trainCodes
     };
 }

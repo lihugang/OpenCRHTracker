@@ -20,13 +20,15 @@ import {
     toScheduleStops
 } from '~/server/utils/12306/scheduleProbe/mapRouteStops';
 import uniqueNormalizedCodes from '~/server/utils/12306/uniqueNormalizedCodes';
-import {
-    appendRouteRefreshQueueTrainCodes,
-    loadPublishedScheduleState,
-    savePublishedScheduleState
-} from '~/server/utils/12306/scheduleProbe/stateStore';
+import { appendRouteRefreshQueueTrainCodes } from '~/server/utils/12306/scheduleProbe/stateStore';
 import { LEGACY_SCHEDULE_JSON_PATH } from '~/server/utils/12306/scheduleProbe/constants';
-import { getScheduleDatabaseFilePath } from '~/server/utils/12306/scheduleProbe/sqliteStore';
+import {
+    getScheduleDatabaseFilePath,
+    listScheduleCandidateItemRecordsForCodes,
+    loadScheduleStateSummaryByKind,
+    savePublishedScheduleItemsIncrementally,
+    type ScheduleItemRecord
+} from '~/server/utils/12306/scheduleProbe/sqliteStore';
 import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
 import {
@@ -183,10 +185,10 @@ function mergeStopMetadata(
 }
 
 function applyGroupUpdate(
-    state: ScheduleState,
+    items: ScheduleState['items'],
     update: RefreshRouteGroupUpdate
 ): boolean {
-    const codeIndex = buildCodeIndex(state.items);
+    const codeIndex = buildCodeIndex(items);
     let applied = false;
     for (const code of update.codes) {
         const itemIndex = codeIndex.get(code);
@@ -194,7 +196,7 @@ function applyGroupUpdate(
             continue;
         }
 
-        const item = state.items[itemIndex]!;
+        const item = items[itemIndex]!;
         item.allCodes = [...update.allCodes];
         item.bureauCode = update.bureauCode;
         item.trainStyle = update.trainStyle;
@@ -235,8 +237,8 @@ export async function refreshRouteBatchForCodes(
 
     const scheduleStorePath = LEGACY_SCHEDULE_JSON_PATH;
     const scheduleFilePath = getScheduleDatabaseFilePath();
-    const state = loadPublishedScheduleState();
-    if (!state) {
+    const published = loadScheduleStateSummaryByKind('published');
+    if (!published) {
         markCurrentTrainProvenanceTaskSkipped('schedule_not_found');
         logger.warn(`skip schedule_not_found file=${scheduleFilePath}`);
         return {
@@ -248,10 +250,10 @@ export async function refreshRouteBatchForCodes(
         };
     }
     const currentDate = getCurrentDateString();
-    if (state.date !== currentDate) {
+    if (published.date !== currentDate) {
         markCurrentTrainProvenanceTaskSkipped('schedule_not_current');
         logger.warn(
-            `skip_non_current_schedule scheduleDate=${state.date} currentDate=${currentDate} file=${scheduleFilePath}`
+            `skip_non_current_schedule scheduleDate=${published.date} currentDate=${currentDate} file=${scheduleFilePath}`
         );
         return {
             processed: 0,
@@ -262,8 +264,23 @@ export async function refreshRouteBatchForCodes(
         };
     }
 
-    const groupIndex = buildGroupIndex(state.items);
-    const codeIndex = buildCodeIndex(state.items);
+    const initialRecords = listScheduleCandidateItemRecordsForCodes(
+        'published',
+        { aliasCodes: requestedCodes }
+    );
+    const groupInternalCodes = uniqueNormalizedCodes(
+        initialRecords.map((record) => record.item.internalCode)
+    );
+    const targetRecords = listScheduleCandidateItemRecordsForCodes(
+        'published',
+        {
+            aliasCodes: requestedCodes,
+            internalCodes: groupInternalCodes
+        }
+    );
+    const targetItems = targetRecords.map((record) => record.item);
+    const groupIndex = buildGroupIndex(targetItems);
+    const codeIndex = buildCodeIndex(targetItems);
     const processedGroups = new Set<string>();
     const groupUpdates: RefreshRouteGroupUpdate[] = [];
     let processed = 0;
@@ -280,7 +297,7 @@ export async function refreshRouteBatchForCodes(
             continue;
         }
 
-        const item = state.items[itemIndex]!;
+        const item = targetItems[itemIndex]!;
         const groupKey = getGroupKey(item);
         if (processedGroups.has(groupKey)) {
             continue;
@@ -301,12 +318,12 @@ export async function refreshRouteBatchForCodes(
             recordCurrentTrainProvenanceEventsForTrainCodes(
                 [item.code, ...item.allCodes],
                 {
-                    serviceDate: state.date,
+                    serviceDate: published.date,
                     startAt:
                         item.startAt === null
                             ? null
                             : toUnixSecondsFromShanghaiDayOffset(
-                                  state.date,
+                                  published.date,
                                   item.startAt
                               ),
                     eventType: 'route_refresh_failed',
@@ -327,11 +344,11 @@ export async function refreshRouteBatchForCodes(
         }
 
         const nextStartAt = toShanghaiDayOffsetFromUnixSeconds(
-            state.date,
+            published.date,
             routeResult.data.route.startAt
         );
         const nextEndAt = toShanghaiDayOffsetFromUnixSeconds(
-            state.date,
+            published.date,
             routeResult.data.route.endAt
         );
         const nextStartStation = routeResult.data.route.startStation.trim();
@@ -347,7 +364,7 @@ export async function refreshRouteBatchForCodes(
         const nextPassengerDepartment =
             routeResult.data.route.passengerDepartment.trim();
         const nextStops = toScheduleStops(
-            state.date,
+            published.date,
             routeResult.data.route.stops
         );
         stationUpdates = {
@@ -357,7 +374,7 @@ export async function refreshRouteBatchForCodes(
         let groupChanged = false;
         const appliedGroupStops = new Map<number, ScheduleStop[]>();
         for (const index of groupItemIndexes) {
-            const groupItem = state.items[index]!;
+            const groupItem = targetItems[index]!;
             const mergedStops = mergeStopMetadata(nextStops, groupItem.stops);
             appliedGroupStops.set(index, mergedStops);
             if (
@@ -399,7 +416,7 @@ export async function refreshRouteBatchForCodes(
         mutated = true;
         groupUpdates.push({
             codes: groupItemIndexes.map((index) =>
-                normalizeCode(state.items[index]!.code)
+                normalizeCode(targetItems[index]!.code)
             ),
             allCodes: nextAllCodes,
             bureauCode: nextBureauCode,
@@ -423,7 +440,7 @@ export async function refreshRouteBatchForCodes(
         }
 
         recordCurrentTrainProvenanceEventsForTrainCodes(nextAllCodes, {
-            serviceDate: state.date,
+            serviceDate: published.date,
             startAt: routeResult.data.route.startAt,
             eventType: 'route_refresh_succeeded',
             result: groupChanged ? 'changed' : 'unchanged',
@@ -441,56 +458,77 @@ export async function refreshRouteBatchForCodes(
     }
 
     if (mutated) {
-        const latestState = loadPublishedScheduleState();
-        if (!latestState) {
-            logger.warn(
-                `skip_save schedule_not_found_after_refresh file=${scheduleFilePath}`
-            );
-        } else if (latestState.date !== state.date) {
-            logger.warn(
-                `skip_save schedule_date_changed oldDate=${state.date} newDate=${latestState.date} file=${scheduleFilePath}`
-            );
-        } else {
-            let appliedGroups = 0;
-            const appliedConfirmedTrainCodes: string[] = [];
-            for (const update of groupUpdates) {
-                if (applyGroupUpdate(latestState, update)) {
-                    appliedGroups += 1;
-                    appliedConfirmedTrainCodes.push(...update.codes);
-                }
+        const updatedCodes = uniqueNormalizedCodes(
+            groupUpdates.flatMap((update) => update.codes)
+        );
+        const latestRecords = listScheduleCandidateItemRecordsForCodes(
+            'published',
+            { aliasCodes: updatedCodes }
+        );
+        const latestItems = latestRecords.map((record) => record.item);
+        let appliedGroups = 0;
+        const appliedConfirmedTrainCodes: string[] = [];
+        for (const update of groupUpdates) {
+            if (applyGroupUpdate(latestItems, update)) {
+                appliedGroups += 1;
+                appliedConfirmedTrainCodes.push(...update.codes);
             }
-            if (appliedGroups > 0) {
-                savePublishedScheduleState(
-                    scheduleStorePath,
-                    latestState,
-                    stationUpdates
-                );
+        }
+        if (appliedGroups > 0) {
+            const itemIndexByCode = new Map(
+                latestRecords.map((record) => [
+                    normalizeCode(record.item.code),
+                    record.itemIndex
+                ])
+            );
+            const recordsToSave: ScheduleItemRecord[] = latestItems.map(
+                (item) => ({
+                    itemIndex: itemIndexByCode.get(normalizeCode(item.code))!,
+                    item
+                })
+            );
+            const persistStartedAtMs = Date.now();
+            const persistResult = savePublishedScheduleItemsIncrementally(
+                published.date,
+                recordsToSave,
+                stationUpdates
+            );
+            const persistDurationMs = Date.now() - persistStartedAtMs;
+            logger.info(
+                `incremental_save status=${persistResult.status} expectedDate=${published.date} currentDate=${persistResult.currentDate ?? 'null'} items=${persistResult.itemCount} aliases=${persistResult.aliasCount} stops=${persistResult.stopCount} stations=${persistResult.stationCount} durationMs=${persistDurationMs}`
+            );
+
+            if (persistResult.status === 'saved') {
                 const syncResult =
                     syncConfirmedTimetableHistoryForScheduleStateKind(
                         'published',
-                        latestState.date,
+                        published.date,
                         appliedConfirmedTrainCodes,
                         getNowSeconds()
                     );
                 logger.info(
-                    `history_sync date=${latestState.date} confirmedGroups=${syncResult.confirmedGroups} confirmedTrainCodes=${syncResult.confirmedTrainCodes} skippedGroups=${syncResult.skippedGroups} createdContents=${syncResult.createdContents} insertedCoverages=${syncResult.insertedCoverages} updatedCoverages=${syncResult.updatedCoverages} deletedCoverages=${syncResult.deletedCoverages} noopedCoverages=${syncResult.noopedCoverages}`
+                    `history_sync date=${published.date} confirmedGroups=${syncResult.confirmedGroups} confirmedTrainCodes=${syncResult.confirmedTrainCodes} skippedGroups=${syncResult.skippedGroups} createdContents=${syncResult.createdContents} insertedCoverages=${syncResult.insertedCoverages} updatedCoverages=${syncResult.updatedCoverages} deletedCoverages=${syncResult.deletedCoverages} noopedCoverages=${syncResult.noopedCoverages}`
                 );
                 const appendedQueueEntries = appendRouteRefreshQueueTrainCodes(
                     scheduleStorePath,
-                    latestState.date,
+                    published.date,
                     syncResult.routeRefreshTrainCodes,
                     getNowSeconds()
                 );
                 logger.info(
-                    `route_refresh_queue_sync date=${latestState.date} candidates=${syncResult.routeRefreshTrainCodes.length} appended=${appendedQueueEntries.length}`
+                    `route_refresh_queue_sync date=${published.date} candidates=${syncResult.routeRefreshTrainCodes.length} appended=${appendedQueueEntries.length}`
                 );
                 const timetableIdSyncResult =
                     syncCurrentDayTimetableIdsForTrainCodes(
-                        latestState.date,
+                        published.date,
                         appliedConfirmedTrainCodes
                     );
                 logger.info(
-                    `timetable_id_sync date=${latestState.date} scannedTrainCodes=${timetableIdSyncResult.scannedTrainCodes} changedTrainCodes=${timetableIdSyncResult.changedTrainCodes} updatedDailyRows=${timetableIdSyncResult.updatedDailyRows} deletedDailyRows=${timetableIdSyncResult.deletedDailyRows} updatedProbeRows=${timetableIdSyncResult.updatedProbeRows} deletedProbeRows=${timetableIdSyncResult.deletedProbeRows}`
+                    `timetable_id_sync date=${published.date} scannedTrainCodes=${timetableIdSyncResult.scannedTrainCodes} changedTrainCodes=${timetableIdSyncResult.changedTrainCodes} updatedDailyRows=${timetableIdSyncResult.updatedDailyRows} deletedDailyRows=${timetableIdSyncResult.deletedDailyRows} updatedProbeRows=${timetableIdSyncResult.updatedProbeRows} deletedProbeRows=${timetableIdSyncResult.deletedProbeRows}`
+                );
+            } else {
+                markCurrentTrainProvenanceTaskSkipped(
+                    `incremental_save_${persistResult.status}`
                 );
             }
         }

@@ -30,6 +30,7 @@ type ScheduleSqlKey =
     | 'deleteAllScheduleStations'
     | 'deleteScheduleCirculationByEntryKey'
     | 'deleteScheduleCirculationLookupsByEntryKey'
+    | 'deleteScheduleItemByStateKindAndCode'
     | 'deleteScheduleItemsByStateKind'
     | 'deleteScheduleRouteRefreshQueueEntry'
     | 'deleteScheduleStateByKind'
@@ -61,6 +62,7 @@ type ScheduleSqlKey =
     | 'selectScheduleStationByTelecode'
     | 'selectScheduleStopMetadataTargets'
     | 'selectScheduleStopStationCandidateRowsByStateKind'
+    | 'selectScheduleStopsByStateKind'
     | 'selectScheduleStopsByStateKindAndItemCode'
     | 'selectScheduleStopsByStateKindAndStationName'
     | 'selectScheduleStationLookupRowsByStateKind'
@@ -112,6 +114,24 @@ export interface ScheduleDbStopRow {
     platformNo: number | null;
     isStart: number;
     isEnd: number;
+}
+
+interface ScheduleDbItemStopRow extends ScheduleDbStopRow {
+    itemCode: string;
+}
+
+export interface ScheduleItemRecord {
+    itemIndex: number;
+    item: ScheduleItem;
+}
+
+export interface SavePublishedScheduleItemsResult {
+    status: 'saved' | 'date_mismatch' | 'published_not_found';
+    currentDate: string | null;
+    itemCount: number;
+    aliasCount: number;
+    stopCount: number;
+    stationCount: number;
 }
 
 export interface ScheduleDbStationStopRow
@@ -410,58 +430,72 @@ function saveScheduleStateRows(
     queries.run('deleteScheduleItemsByStateKind', kind);
 
     for (const [itemIndex, item] of state.items.entries()) {
-        const itemCode = normalizeItemCode(item);
-        if (itemCode.length === 0) {
-            continue;
-        }
+        insertScheduleItemRows(kind, itemIndex, item);
+    }
+}
 
+function insertScheduleItemRows(
+    kind: ScheduleStateKind,
+    itemIndex: number,
+    item: ScheduleItem
+): { aliasCount: number; stopCount: number } {
+    const itemCode = normalizeItemCode(item);
+    if (itemCode.length === 0) {
+        return { aliasCount: 0, stopCount: 0 };
+    }
+
+    queries.run(
+        'insertScheduleItem',
+        kind,
+        itemCode,
+        itemIndex,
+        normalizeCode(item.internalCode),
+        item.bureauCode.trim(),
+        item.trainStyle.trim(),
+        item.trainDepartment.trim(),
+        item.passengerDepartment.trim(),
+        item.startStation.trim(),
+        item.endStation.trim(),
+        toNullableInteger(item.startAt),
+        toNullableInteger(item.endAt),
+        toNullableInteger(item.lastRouteRefreshAt)
+    );
+
+    const aliases = listItemAliases(item);
+    for (const [aliasIndex, aliasCode] of aliases.entries()) {
         queries.run(
-            'insertScheduleItem',
+            'insertScheduleItemAlias',
             kind,
             itemCode,
-            itemIndex,
-            normalizeCode(item.internalCode),
-            item.bureauCode.trim(),
-            item.trainStyle.trim(),
-            item.trainDepartment.trim(),
-            item.passengerDepartment.trim(),
-            item.startStation.trim(),
-            item.endStation.trim(),
-            toNullableInteger(item.startAt),
-            toNullableInteger(item.endAt),
-            toNullableInteger(item.lastRouteRefreshAt)
+            aliasCode,
+            aliasIndex
         );
-
-        for (const [aliasIndex, aliasCode] of listItemAliases(item).entries()) {
-            queries.run(
-                'insertScheduleItemAlias',
-                kind,
-                itemCode,
-                aliasCode,
-                aliasIndex
-            );
-        }
-
-        for (const [stopIndex, stop] of item.stops.entries()) {
-            queries.run(
-                'insertScheduleStop',
-                kind,
-                itemCode,
-                stopIndex,
-                stop.stationNo,
-                stop.stationName.trim(),
-                normalizeCode(stop.stationTelecode),
-                toNullableInteger(stop.arriveAt),
-                toNullableInteger(stop.departAt),
-                stop.stationTrainCode.trim(),
-                stop.wicket.trim(),
-                toNullableInteger(stop.distance),
-                toNullableInteger(stop.platformNo),
-                toSqlBoolean(stop.isStart),
-                toSqlBoolean(stop.isEnd)
-            );
-        }
     }
+
+    for (const [stopIndex, stop] of item.stops.entries()) {
+        queries.run(
+            'insertScheduleStop',
+            kind,
+            itemCode,
+            stopIndex,
+            stop.stationNo,
+            stop.stationName.trim(),
+            normalizeCode(stop.stationTelecode),
+            toNullableInteger(stop.arriveAt),
+            toNullableInteger(stop.departAt),
+            stop.stationTrainCode.trim(),
+            stop.wicket.trim(),
+            toNullableInteger(stop.distance),
+            toNullableInteger(stop.platformNo),
+            toSqlBoolean(stop.isStart),
+            toSqlBoolean(stop.isEnd)
+        );
+    }
+
+    return {
+        aliasCount: aliases.length,
+        stopCount: item.stops.length
+    };
 }
 
 function saveScheduleStations(stations: ScheduleStationMap): void {
@@ -878,6 +912,30 @@ export function loadScheduleStateFromDatabase(
     return row ? loadScheduleStateFromRow(row) : null;
 }
 
+export function listScheduleItemRecordsByStateKind(
+    kind: ScheduleStateKind
+): ScheduleItemRecord[] {
+    const aliasesByItemCode = listScheduleAliasesByStateKind(kind);
+    const stopsByItemCode = new Map<string, ScheduleStop[]>();
+    for (const row of queries.all<ScheduleDbItemStopRow>(
+        'selectScheduleStopsByStateKind',
+        kind
+    )) {
+        const stops = stopsByItemCode.get(row.itemCode) ?? [];
+        stops.push(toScheduleStop(row));
+        stopsByItemCode.set(row.itemCode, stops);
+    }
+
+    return listScheduleItemsByStateKind(kind).map((row) => ({
+        itemIndex: row.itemIndex,
+        item: toScheduleItem(
+            row,
+            aliasesByItemCode.get(row.itemCode) ?? [],
+            stopsByItemCode.get(row.itemCode) ?? []
+        )
+    }));
+}
+
 export function loadScheduleStateSummaries(): ScheduleStateSummary[] {
     return queries.all<ScheduleStateSummary>('selectScheduleStateSummaries');
 }
@@ -1099,6 +1157,163 @@ export function listScheduleCandidateItemsForCodes(
             return left.itemCode.localeCompare(right.itemCode);
         })
         .map((row) => loadScheduleItemWithStopsFromRow(kind, row));
+}
+
+export function listScheduleCandidateItemRecordsForCodes(
+    kind: ScheduleStateKind,
+    input: ScheduleCandidateCodeInput
+): ScheduleItemRecord[] {
+    const rowsByItemCode = new Map<string, ScheduleDbItemRow>();
+
+    for (const internalCode of uniqueNormalizedCodes([
+        ...(input.internalCodes ?? [])
+    ])) {
+        for (const row of listScheduleItemsByStateKindAndInternalCode(
+            kind,
+            internalCode
+        )) {
+            rowsByItemCode.set(row.itemCode, row);
+        }
+    }
+
+    for (const aliasCode of uniqueNormalizedCodes([
+        ...(input.aliasCodes ?? [])
+    ])) {
+        for (const row of listScheduleItemsByStateKindAndAlias(
+            kind,
+            aliasCode
+        )) {
+            rowsByItemCode.set(row.itemCode, row);
+        }
+    }
+
+    return [...rowsByItemCode.values()]
+        .sort((left, right) => {
+            if (left.itemIndex !== right.itemIndex) {
+                return left.itemIndex - right.itemIndex;
+            }
+            return left.itemCode.localeCompare(right.itemCode);
+        })
+        .map((row) => ({
+            itemIndex: row.itemIndex,
+            item: loadScheduleItemWithStopsFromRow(kind, row)
+        }));
+}
+
+export function savePublishedScheduleItemsIncrementally(
+    expectedDate: string,
+    records: readonly ScheduleItemRecord[],
+    stations: ScheduleStationMap
+): SavePublishedScheduleItemsResult {
+    const db = useScheduleDatabase();
+    const transaction = db.transaction((): SavePublishedScheduleItemsResult => {
+        const summary = loadScheduleStateSummaryByKind('published');
+        if (!summary) {
+            return {
+                status: 'published_not_found',
+                currentDate: null,
+                itemCount: 0,
+                aliasCount: 0,
+                stopCount: 0,
+                stationCount: 0
+            };
+        }
+        if (summary.date !== expectedDate) {
+            return {
+                status: 'date_mismatch',
+                currentDate: summary.date,
+                itemCount: 0,
+                aliasCount: 0,
+                stopCount: 0,
+                stationCount: 0
+            };
+        }
+
+        let itemCount = 0;
+        let aliasCount = 0;
+        let stopCount = 0;
+        for (const record of records) {
+            const itemCode = normalizeItemCode(record.item);
+            if (itemCode.length === 0) {
+                continue;
+            }
+            queries.run(
+                'deleteScheduleItemByStateKindAndCode',
+                'published',
+                itemCode
+            );
+            const counts = insertScheduleItemRows(
+                'published',
+                record.itemIndex,
+                record.item
+            );
+            itemCount += 1;
+            aliasCount += counts.aliasCount;
+            stopCount += counts.stopCount;
+        }
+
+        let stationCount = 0;
+        for (const entry of Object.values(stations)) {
+            const stationTelecode = normalizeCode(entry.stationTelecode);
+            const stationName = entry.stationName.trim();
+            if (stationTelecode.length === 0 || stationName.length === 0) {
+                continue;
+            }
+            queries.run(
+                'insertScheduleStation',
+                stationTelecode,
+                stationName,
+                entry.lat,
+                entry.lon
+            );
+            stationCount += 1;
+        }
+
+        upsertMetaValue(DOCUMENT_UPDATED_AT_META_KEY, String(getNowSeconds()));
+        return {
+            status: 'saved',
+            currentDate: summary.date,
+            itemCount,
+            aliasCount,
+            stopCount,
+            stationCount
+        };
+    });
+
+    return transaction();
+}
+
+export function syncPublishedScheduleSnapshotFromItems(): ScheduleState | null {
+    const state = loadScheduleStateFromDatabase('published');
+    if (!state) {
+        return null;
+    }
+
+    state.items = listScheduleItemRecordsByStateKind('published').map(
+        (record) => record.item
+    );
+    state.stats.uniqueItems = state.items.length;
+
+    const db = useScheduleDatabase();
+    db.transaction(() => {
+        const updatedAt = getNowSeconds();
+        queries.run(
+            'upsertScheduleState',
+            'published',
+            state.date,
+            state.status,
+            getStatePhase(state),
+            state.generatedAt,
+            Math.floor(state.startedAtMs),
+            state.stats.uniqueItems,
+            countUsableTimetableItems(state),
+            serializeState(state),
+            updatedAt
+        );
+        upsertMetaValue(DOCUMENT_UPDATED_AT_META_KEY, String(updatedAt));
+    })();
+
+    return state;
 }
 
 export function loadScheduleItemCodeByStateKindAndAlias(

@@ -3,7 +3,10 @@ import getLogger from '~/server/libs/log4js';
 import { syncCurrentDayTimetableIdsForTrainCodes } from '~/server/services/currentDayTimetableIdSync';
 import { syncConfirmedTimetableHistoryForScheduleStateKind } from '~/server/services/timetableHistoryStore';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
-import { getScheduleDatabaseFilePath } from '~/server/utils/12306/scheduleProbe/sqliteStore';
+import {
+    getScheduleDatabaseFilePath,
+    syncPublishedScheduleSnapshotFromItems
+} from '~/server/utils/12306/scheduleProbe/sqliteStore';
 import runScheduleProbe from './scheduleProbe/runner';
 import { getGroupKey } from './scheduleProbe/taskHelpers';
 import { LEGACY_SCHEDULE_JSON_PATH } from './scheduleProbe/constants';
@@ -11,7 +14,6 @@ import {
     appendRouteRefreshQueueTrainCodes,
     ensureScheduleDocumentMigrated,
     loadOrInitBuildingScheduleState,
-    loadPublishedScheduleState,
     promoteBuildingScheduleState,
     saveBuildingScheduleState
 } from './scheduleProbe/stateStore';
@@ -121,7 +123,11 @@ export default async function buildTodaySchedule(): Promise<BuildScheduleResult>
     const scheduleFilePath = LEGACY_SCHEDULE_JSON_PATH;
     const scheduleDatabasePath = getScheduleDatabaseFilePath();
     ensureScheduleDocumentMigrated();
-    const publishedState = loadPublishedScheduleState();
+    const snapshotStartedAtMs = Date.now();
+    const publishedState = syncPublishedScheduleSnapshotFromItems();
+    logger.info(
+        `published_snapshot_sync date=${publishedState?.date ?? 'null'} items=${publishedState?.items.length ?? 0} durationMs=${Date.now() - snapshotStartedAtMs}`
+    );
 
     const { state, resumed, reason, publishPending } =
         loadOrInitBuildingScheduleState(scheduleFilePath, runtimeConfig);
@@ -168,7 +174,11 @@ export default async function buildTodaySchedule(): Promise<BuildScheduleResult>
         logger.info(
             `finish_pending_publish runId=${runId} status=${promotedState.status} date=${promotedState.date} durationMs=${promotedState.stats.durationMs} apiCalls=${promotedState.progress.counters.apiCalls} apiRetries=${promotedState.progress.counters.apiRetries} processedKeywords=${promotedState.progress.discoverProcessed.length} pendingKeywords=${promotedState.progress.discoverQueue.length} rawItems=${promotedState.stats.rawItems} uniqueItems=${promotedState.stats.uniqueItems} failedKeywords=${promotedState.progress.failedKeywords.length} failedEnrichCodes=${promotedState.progress.failedEnrichCodes.length}`
         );
-        return buildResultFromState(promotedState, resumed, scheduleDatabasePath);
+        return buildResultFromState(
+            promotedState,
+            resumed,
+            scheduleDatabasePath
+        );
     }
 
     saveBuildingScheduleState(scheduleFilePath, state);

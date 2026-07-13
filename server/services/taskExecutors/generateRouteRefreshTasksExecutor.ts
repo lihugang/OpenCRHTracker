@@ -7,8 +7,11 @@ import {
     enqueueTasks,
     type EnqueueTaskInput
 } from '~/server/services/taskQueue';
-import { loadPublishedScheduleState } from '~/server/utils/12306/scheduleProbe/stateStore';
-import { getScheduleDatabaseFilePath } from '~/server/utils/12306/scheduleProbe/sqliteStore';
+import {
+    getScheduleDatabaseFilePath,
+    listScheduleItemsByStateKind,
+    loadScheduleStateSummaryByKind
+} from '~/server/utils/12306/scheduleProbe/sqliteStore';
 import {
     getGroupKey,
     splitIntoBatches
@@ -54,14 +57,14 @@ function enqueueSelfTask(
 async function executeGenerateRouteRefreshTasks() {
     const config = useConfig();
     const scheduleFilePath = getScheduleDatabaseFilePath();
-    const state = loadPublishedScheduleState();
+    const published = loadScheduleStateSummaryByKind('published');
     const now = getNowSeconds();
     const selfExpectedDurationMs = estimateGenerateRouteRefreshTaskDurationMs();
     const generateIntervalSeconds =
         config.spider.scheduleProbe.refresh.generateIntervalHours * 60 * 60;
     const nextSelfExecutionTime = now + generateIntervalSeconds;
 
-    if (!state) {
+    if (!published) {
         const selfTaskId = enqueueSelfTask(
             nextSelfExecutionTime,
             selfExpectedDurationMs
@@ -75,13 +78,13 @@ async function executeGenerateRouteRefreshTasks() {
     }
 
     const currentDate = getCurrentDateString();
-    if (state.date !== currentDate) {
+    if (published.date !== currentDate) {
         const selfTaskId = enqueueSelfTask(
             nextSelfExecutionTime,
             selfExpectedDurationMs
         );
         logger.warn(
-            `skip_non_current_schedule scheduleDate=${state.date} currentDate=${currentDate} file=${scheduleFilePath} ` +
+            `skip_non_current_schedule scheduleDate=${published.date} currentDate=${currentDate} file=${scheduleFilePath} ` +
                 `selfTaskId=${selfTaskId} nextExecutionTime=${nextSelfExecutionTime}`
         );
         return;
@@ -92,8 +95,11 @@ async function executeGenerateRouteRefreshTasks() {
     const groupDeduplication = new Set<string>();
     const staleCodes: string[] = [];
 
-    for (const item of state.items) {
-        const groupKey = getGroupKey(item);
+    for (const item of listScheduleItemsByStateKind('published')) {
+        const groupKey = getGroupKey({
+            code: item.itemCode,
+            internalCode: item.internalCode
+        });
         if (groupDeduplication.has(groupKey)) {
             continue;
         }
@@ -107,7 +113,7 @@ async function executeGenerateRouteRefreshTasks() {
         }
 
         groupDeduplication.add(groupKey);
-        staleCodes.push(item.code);
+        staleCodes.push(item.itemCode);
     }
 
     let created = 0;
