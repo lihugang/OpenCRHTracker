@@ -1073,8 +1073,7 @@ export const developerDocsOpenApi = {
                     platformNo: {
                         type: 'integer',
                         nullable: true,
-                        description:
-                            '列车停靠站台',
+                        description: '列车停靠站台',
                         example: 2
                     },
                     isStart: {

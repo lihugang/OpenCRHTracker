@@ -99,7 +99,11 @@ export function mergeAdminTimetableHistoryCoverage(
     coverageId: number
 ): AdminTimetableHistoryCoverageMergeResponse {
     if (!Number.isInteger(coverageId) || coverageId <= 0) {
-        throw new ApiRequestError(400, 'invalid_param', 'coverageId 必须是正整数');
+        throw new ApiRequestError(
+            400,
+            'invalid_param',
+            'coverageId 必须是正整数'
+        );
     }
 
     const result = mergeTimetableHistoryCoverageByMiddleId(coverageId);

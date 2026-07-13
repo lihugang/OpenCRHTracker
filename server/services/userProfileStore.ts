@@ -517,9 +517,7 @@ export function mutateQqBindingData(
                     continue;
                 }
 
-                const otherProfile = parseUserProfileData(
-                    otherRow.data_json
-                );
+                const otherProfile = parseUserProfileData(otherRow.data_json);
                 if (otherProfile.qqBinding.qqNumber === qqBinding.qqNumber) {
                     throw new ApiRequestError(
                         409,
@@ -545,10 +543,7 @@ export function mutateQqBindingData(
     return transaction();
 }
 
-export function updateQqBindingData(
-    userId: string,
-    qqBinding: QqBindingData
-) {
+export function updateQqBindingData(userId: string, qqBinding: QqBindingData) {
     return mutateQqBindingData(userId, () => qqBinding);
 }
 

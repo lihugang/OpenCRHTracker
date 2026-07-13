@@ -211,10 +211,7 @@ function formatTypstNumber(value: number) {
         return String(value);
     }
 
-    return value
-        .toFixed(6)
-        .replace(/0+$/, '')
-        .replace(/\.$/, '');
+    return value.toFixed(6).replace(/0+$/, '').replace(/\.$/, '');
 }
 
 function serializeTypstLiteral(value: TypstLiteral): string {
@@ -235,7 +232,9 @@ function serializeTypstLiteral(value: TypstLiteral): string {
             return '()';
         }
 
-        const serializedItems = value.map((item) => serializeTypstLiteral(item));
+        const serializedItems = value.map((item) =>
+            serializeTypstLiteral(item)
+        );
         return `(${serializedItems.join(', ')}${value.length === 1 ? ',' : ''})`;
     }
 
