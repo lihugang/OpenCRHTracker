@@ -55,13 +55,16 @@ import {
     markCurrentTrainProvenanceTaskSkipped,
     recordCurrentTrainProvenanceEventsForTrainCodes
 } from '~/server/services/trainProvenanceRecorder';
+import { upsertGuangzhouDiningTrainMapping } from '~/server/services/trainProvenanceStore';
 import {
     getSafeTodayScheduleProbeTrainCodes,
     getTodayScheduleProbeGroupByTrainCode,
     type TodayScheduleProbeGroup
 } from '~/server/services/todayScheduleCache';
 import { getHistoricalRecentEmuCodesByTrainCode } from '~/server/services/historicalRecentTrainEmuIndexStore';
+import { getGuangzhouDiningMappedEmuCode } from '~/server/services/guangzhouDiningMappingStore';
 import fetchEMUInfoByRoute from '~/server/utils/12306/network/fetchEMUInfoByRoute';
+import fetchGuangzhouDiningTrain from '~/server/utils/12306/network/fetchGuangzhouDiningTrain';
 import fetchEMUInfoBySeatCode, {
     type FetchSeatCodeFailureResult
 } from '~/server/utils/12306/network/fetchEMUInfoBySeatCode';
@@ -182,6 +185,104 @@ function shouldRequeueUnavailableSeatVerification(
         reason === 'seat_code_request_failed_not_enabled' ||
         reason === 'seat_code_request_failed_other'
     );
+}
+
+async function tryResolveGuangzhouDiningTrainMapping(
+    args: ProbeTrainDepartureTaskArgs,
+    trainKey: string,
+    allTrainCodes: string[],
+    serviceDate: string,
+    trainCode: string,
+    nowSeconds: number
+): Promise<boolean> {
+    const scheduleGroup = getTodayScheduleProbeGroupByTrainCode(args.trainCode);
+    if (
+        scheduleGroup?.trainStyle.trim().toUpperCase() !== 'CR400BF-AS' ||
+        scheduleGroup.bureauCode.trim().toUpperCase() !== 'Q'
+    ) {
+        return false;
+    }
+
+    const result = await fetchGuangzhouDiningTrain(trainCode, serviceDate);
+    if (!result) {
+        recordCurrentTrainProvenanceEventsForTrainCodes([trainCode], {
+            serviceDate,
+            startAt: args.startAt,
+            eventType: 'guangzhou_dining_train_query_failed',
+            result: 'request_failed',
+            payload: {
+                trainStyle: scheduleGroup.trainStyle,
+                bureauCode: scheduleGroup.bureauCode
+            }
+        });
+        return false;
+    }
+
+    upsertGuangzhouDiningTrainMapping({
+        serviceDate,
+        trainCode,
+        trainUuid: result.trainUuid,
+        returnedTrainCode: result.returnedTrainCode
+    });
+    recordCurrentTrainProvenanceEventsForTrainCodes([trainCode], {
+        serviceDate,
+        startAt: args.startAt,
+        eventType: 'guangzhou_dining_train_query_succeeded',
+        result: 'recorded',
+        payload: {
+            trainStyle: scheduleGroup.trainStyle,
+            bureauCode: scheduleGroup.bureauCode,
+            trainUuid: result.trainUuid,
+            returnedTrainCode: result.returnedTrainCode
+        }
+    });
+
+    const mappedEmuCode = await getGuangzhouDiningMappedEmuCode(
+        result.trainUuid
+    );
+    if (!mappedEmuCode) {
+        logger.warn(
+            `guangzhou_dining_mapping_not_found serviceDate=${serviceDate} trainCode=${trainCode} trainUuid=${result.trainUuid}`
+        );
+        recordCurrentTrainProvenanceEventsForTrainCodes([trainCode], {
+            serviceDate,
+            startAt: args.startAt,
+            eventType: 'guangzhou_dining_mapping_not_found',
+            result: 'not_found',
+            payload: {
+                trainUuid: result.trainUuid,
+                returnedTrainCode: result.returnedTrainCode
+            }
+        });
+        return false;
+    }
+
+    const trackingMutations = await applyResolvedResult(
+        args,
+        trainKey,
+        allTrainCodes,
+        [mappedEmuCode],
+        ProbeStatusValue.SingleFormationResolved,
+        nowSeconds
+    );
+    recordCurrentTrainProvenanceEventsForTrainCodes(allTrainCodes, {
+        serviceDate,
+        startAt: args.startAt,
+        emuCode: mappedEmuCode,
+        relatedTrainCode: trainCode,
+        eventType: 'guangzhou_dining_mapping_resolved',
+        result: 'single',
+        payload: {
+            trainUuid: result.trainUuid,
+            returnedTrainCode: result.returnedTrainCode,
+            mappedEmuCode,
+            trackingMutations
+        }
+    });
+    logger.info(
+        `guangzhou_dining_mapping_resolved serviceDate=${serviceDate} trainCode=${trainCode} trainUuid=${result.trainUuid} mappedEmuCode=${mappedEmuCode}`
+    );
+    return true;
 }
 
 let registered = false;
@@ -1826,42 +1927,63 @@ async function executeProbeTrainDepartureTaskInternal(
                 logger.info(
                     `seat_verify_unavailable_continue trainCode=${args.trainCode} probedTrainCode=${probedTrainCode} mainEmuCode=${mainEmuCode} runningTrainCode=${todayTrainCodesValidation.runningTrainCode} reason=${seatCodeVerification.reason} historicalRecentMatchedTrainCodes=${historicalRecentMatchingTrainCodes.join(',')}`
                 );
-            } else if (args.retry > 0) {
-                const nextRetry = args.retry - 1;
-                const overlapRetryDelaySeconds =
-                    useConfig().spider.scheduleProbe.probe
-                        .overlapRetryDelaySeconds;
-                const nextTaskId = requeueCurrentProbeTaskWithOverlapDelay(
-                    args,
-                    nowSeconds,
-                    nextRetry
-                );
-                recordCurrentTrainProvenanceEventsForTrainCodes(allTrainCodes, {
-                    serviceDate,
-                    startAt: args.startAt,
-                    emuCode: mainEmuCode,
-                    relatedTrainCode:
-                        todayTrainCodesValidation.runningTrainCode,
-                    eventType: 'seat_verification_mismatch_requeued',
-                    result: seatCodeVerification.reason,
-                    linkedSchedulerTaskId: nextTaskId,
-                    payload: {
-                        retry: args.retry,
-                        nextRetry,
-                        matchedTrainCodes: historicalRecentMatchingTrainCodes,
-                        seatTrainCode: seatCodeVerification.seatTrainCode,
-                        seatInternalCode: seatCodeVerification.seatInternalCode,
-                        seatStartAt: seatCodeVerification.seatStartAt
-                    }
-                });
-                logger.debug(
-                    `seat_verify_mismatch_requeue trainCode=${args.trainCode} probedTrainCode=${probedTrainCode} mainEmuCode=${mainEmuCode} runningTrainCode=${todayTrainCodesValidation.runningTrainCode} retry=${args.retry} nextRetry=${nextRetry} nextTaskId=${nextTaskId} delaySeconds=${overlapRetryDelaySeconds} reason=${seatCodeVerification.reason} seatTrainCode=${seatCodeVerification.seatTrainCode} seatInternalCode=${seatCodeVerification.seatInternalCode} seatStartAt=${seatCodeVerification.seatStartAt} historicalRecentMatchedTrainCodes=${historicalRecentMatchingTrainCodes.join(',')}`
-                );
-                markCurrentTrainProvenanceTaskSkipped(
-                    'seat_verification_mismatch_requeued'
-                );
-                return;
             } else {
+                if (
+                    await tryResolveGuangzhouDiningTrainMapping(
+                        args,
+                        trainKey,
+                        allTrainCodes,
+                        serviceDate,
+                        todayTrainCodesValidation.runningTrainCode,
+                        nowSeconds
+                    )
+                ) {
+                    return;
+                }
+
+                if (args.retry > 0) {
+                    const nextRetry = args.retry - 1;
+                    const overlapRetryDelaySeconds =
+                        useConfig().spider.scheduleProbe.probe
+                            .overlapRetryDelaySeconds;
+                    const nextTaskId = requeueCurrentProbeTaskWithOverlapDelay(
+                        args,
+                        nowSeconds,
+                        nextRetry
+                    );
+                    recordCurrentTrainProvenanceEventsForTrainCodes(
+                        allTrainCodes,
+                        {
+                            serviceDate,
+                            startAt: args.startAt,
+                            emuCode: mainEmuCode,
+                            relatedTrainCode:
+                                todayTrainCodesValidation.runningTrainCode,
+                            eventType: 'seat_verification_mismatch_requeued',
+                            result: seatCodeVerification.reason,
+                            linkedSchedulerTaskId: nextTaskId,
+                            payload: {
+                                retry: args.retry,
+                                nextRetry,
+                                matchedTrainCodes:
+                                    historicalRecentMatchingTrainCodes,
+                                seatTrainCode:
+                                    seatCodeVerification.seatTrainCode,
+                                seatInternalCode:
+                                    seatCodeVerification.seatInternalCode,
+                                seatStartAt: seatCodeVerification.seatStartAt
+                            }
+                        }
+                    );
+                    logger.debug(
+                        `seat_verify_mismatch_requeue trainCode=${args.trainCode} probedTrainCode=${probedTrainCode} mainEmuCode=${mainEmuCode} runningTrainCode=${todayTrainCodesValidation.runningTrainCode} retry=${args.retry} nextRetry=${nextRetry} nextTaskId=${nextTaskId} delaySeconds=${overlapRetryDelaySeconds} reason=${seatCodeVerification.reason} seatTrainCode=${seatCodeVerification.seatTrainCode} seatInternalCode=${seatCodeVerification.seatInternalCode} seatStartAt=${seatCodeVerification.seatStartAt} historicalRecentMatchedTrainCodes=${historicalRecentMatchingTrainCodes.join(',')}`
+                    );
+                    markCurrentTrainProvenanceTaskSkipped(
+                        'seat_verification_mismatch_requeued'
+                    );
+                    return;
+                }
+
                 recordCurrentTrainProvenanceEventsForTrainCodes(allTrainCodes, {
                     serviceDate,
                     startAt: args.startAt,

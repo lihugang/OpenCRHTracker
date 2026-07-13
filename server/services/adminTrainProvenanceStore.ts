@@ -15,6 +15,7 @@ import {
     getTrainProvenanceRuntimeConfig,
     getTrainProvenanceTaskRunById,
     isTrainProvenanceEnabled,
+    listGuangzhouDiningTrainMappingsByDate,
     list12306RequestHourlyStatsInRange,
     listCouplingScanCandidatesByTaskRunId,
     listStationBoardDispatchResultsByDate,
@@ -67,6 +68,7 @@ import type {
     AdminTrainDataRequestSummary,
     AdminTrainDataRequestType,
     AdminTrainDataRequestTypeSummary,
+    AdminGuangzhouDiningTrainMappingsResponse,
     AdminTrainProvenanceCouplingScanDetail,
     AdminTrainProvenanceCoupledResolutionDetail,
     AdminTrainProvenanceConflictCurrentGroup,
@@ -337,9 +339,13 @@ function extractTrackingMutationSummary(
         : [];
     const mutations = rawMutations
         .map(toTrackingMutation)
-        .filter((mutation): mutation is AdminTrackingMutation => mutation !== null);
+        .filter(
+            (mutation): mutation is AdminTrackingMutation => mutation !== null
+        );
 
-    return mutations.length > 0 ? buildTrackingMutationSummary(mutations) : null;
+    return mutations.length > 0
+        ? buildTrackingMutationSummary(mutations)
+        : null;
 }
 
 interface StationBoardDispatchDetailPayload {
@@ -1850,9 +1856,24 @@ const ADMIN_TRAIN_DATA_REQUEST_TYPES: AdminTrainDataRequestType[] = [
     'fetch_route_info',
     'fetch_emu_by_route',
     'fetch_emu_by_seat_code',
+    'fetch_guangzhou_dining_train',
     'fetch_all_stations',
     'fetch_station_board'
 ];
+
+export function getAdminGuangzhouDiningTrainMappings(
+    date: string
+): AdminGuangzhouDiningTrainMappingsResponse {
+    const runtimeConfig = getTrainProvenanceRuntimeConfig();
+    return {
+        enabled: runtimeConfig.enabled,
+        retentionDays: runtimeConfig.retentionDays,
+        date,
+        items: runtimeConfig.enabled
+            ? listGuangzhouDiningTrainMappingsByDate(date)
+            : []
+    };
+}
 
 interface RequestMetricAccumulator {
     total: number;

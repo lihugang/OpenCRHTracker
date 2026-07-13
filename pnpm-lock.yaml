@@ -60,9 +60,9 @@ importers:
       '@types/better-sqlite3':
         specifier: ^7.6.13
         version: 7.6.13
-      '@types/workbox-precaching':
-        specifier: ^5.0.0
-        version: 5.0.0
+      '@types/crypto-js':
+        specifier: ^4.2.2
+        version: 4.2.2
       '@vite-pwa/nuxt':
         specifier: ^1.0.6
         version: 1.1.1(magicast@0.5.2)(vite@7.3.1(@types/node@25.3.1)(jiti@2.6.1)(lightningcss@1.31.1)(terser@5.46.0)(yaml@2.8.2))(workbox-build@7.4.0)(workbox-window@7.4.0)
@@ -1933,6 +1933,9 @@ packages:
   '@types/better-sqlite3@7.6.13':
     resolution: {integrity: sha512-NMv9ASNARoKksWtsq/SHakpYAYnhBrQgGD8zkLYk/jaK8jUGn08CfEdTRgYhMypUQAfzSP8W6gNLe0q19/t4VA==}
 
+  '@types/crypto-js@4.2.2':
+    resolution: {integrity: sha512-sDOLlVbHhXpAUAL0YHDUUwDZf3iN4Bwi4W6a0W0b+QcAezUbRtH4FVb+9J4h+XFPW7l/gQ9F8qC7P+Ec4k8QVQ==}
+
   '@types/estree@0.0.39':
     resolution: {integrity: sha512-EYNwp3bU+98cpU4lAWYYL7Zz+2gryWH1qbdDTidVd6hkiR6weksdbMadyXKXNPEkQFhXM+hVO9ZygomHXp+AIw==}
 
@@ -1950,10 +1953,6 @@ packages:
 
   '@types/trusted-types@2.0.7':
     resolution: {integrity: sha512-ScaPdn1dQczgbl0QFTeTOmVHFULt394XJgOQNoyVhZ6r2vLnMLJfBPd53SB52T/3G36VI1/g2MZaX0cwDuXsfw==}
-
-  '@types/workbox-precaching@5.0.0':
-    resolution: {integrity: sha512-Oytxs/I0nE6oM3p4vJsYyLcLldFb9tyG+WBk+UrL2aWizEdpTeVeV+CYG5/lWBhCyXaiEQPgYzWaf3kzLFZAiQ==}
-    deprecated: This is a stub types definition. workbox-precaching provides its own type definitions, so you do not need this installed.
 
   '@unhead/vue@2.1.7':
     resolution: {integrity: sha512-azD4x32BKBDMcKMcCeU+kCBowPFRFSSFJSHP+mr2P1TpPV/4b6UsmMPiTb+gSW8NZ6s0myJ/CaVMoeC5mGKhKg==}
@@ -6899,6 +6898,8 @@ snapshots:
     dependencies:
       '@types/node': 25.3.1
 
+  '@types/crypto-js@4.2.2': {}
+
   '@types/estree@0.0.39': {}
 
   '@types/estree@1.0.8': {}
@@ -6912,10 +6913,6 @@ snapshots:
   '@types/resolve@1.20.2': {}
 
   '@types/trusted-types@2.0.7': {}
-
-  '@types/workbox-precaching@5.0.0':
-    dependencies:
-      workbox-precaching: 7.4.1
 
   '@unhead/vue@2.1.7(vue@3.5.29(typescript@5.9.3))':
     dependencies:

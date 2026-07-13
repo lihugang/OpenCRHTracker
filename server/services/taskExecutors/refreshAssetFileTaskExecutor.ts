@@ -38,7 +38,7 @@ import {
 } from '~/server/utils/date/shanghaiDateTime';
 import {
     refreshAssetFileFromProvider,
-    type AssetKey
+    type RefreshableAssetKey as DataAssetRefreshableKey
 } from '~/server/utils/dataAssets/store';
 
 type RefreshableAssetKey =
@@ -252,8 +252,7 @@ async function executeRefreshAssetTask(
             null;
         if (definition.key === 'QRCode') {
             try {
-                previousQrcodeByModelAndTrainSetNo =
-                    readLocalProbeQrcodeMap();
+                previousQrcodeByModelAndTrainSetNo = readLocalProbeQrcodeMap();
             } catch (error) {
                 const message =
                     error instanceof Error
@@ -267,7 +266,7 @@ async function executeRefreshAssetTask(
         }
 
         const result = await refreshAssetFileFromProvider(
-            definition.key as AssetKey,
+            definition.key as DataAssetRefreshableKey,
             {
                 validateContent:
                     definition.key === 'EMUList'

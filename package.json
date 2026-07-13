@@ -21,7 +21,7 @@
         "@tailwindcss/container-queries": "^0.1.1",
         "@tailwindcss/vite": "^4.1.14",
         "@types/better-sqlite3": "^7.6.13",
-        "@types/workbox-precaching": "^5.0.0",
+        "@types/crypto-js": "^4.2.2",
         "@vite-pwa/nuxt": "^1.0.6",
         "baseline-browser-mapping": "^2.9.11",
         "nuxt-security": "^2.4.0",

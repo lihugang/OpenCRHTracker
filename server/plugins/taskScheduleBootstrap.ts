@@ -5,6 +5,7 @@ import { ensureScheduleDatabaseSchema } from '~/server/libs/database/schedule';
 import { ensureTaskDatabaseSchema } from '~/server/libs/database/task';
 import { ensureTrainProvenanceDatabaseSchema } from '~/server/libs/database/trainProvenance';
 import { estimateIdleTaskDurationMs } from '~/server/services/idleTaskEstimator';
+import { loadGuangzhouDiningMapping } from '~/server/services/guangzhouDiningMappingStore';
 import { listDailyRecordsAll } from '~/server/services/emuRoutesStore';
 import { clearProbeStatus } from '~/server/services/probeStatusStore';
 import { rehydrateProbeRuntimeState } from '~/server/services/probeRuntimeState';
@@ -248,6 +249,7 @@ export default defineNitroPlugin(async () => {
         ensureScheduleDatabaseSchema();
         cleanupExpiredTrainProvenance();
         await loadProbeAssets();
+        await loadGuangzhouDiningMapping();
         await loadStationCoordAssets();
         const qrcodeDetectionConfigResult = await reloadQrcodeDetectionConfig();
         const qrcodeDetectionWarning = formatQrcodeDetectionConfigWarnings(

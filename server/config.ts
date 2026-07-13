@@ -173,6 +173,10 @@ interface RefreshableAssetConfig {
     };
 }
 
+interface LocalAssetConfig {
+    file: string;
+}
+
 interface RuntimeAdminTrafficConfig {
     file: string;
     flushIntervalMinutes: number;
@@ -197,6 +201,8 @@ export interface Config {
             eKey: string;
             jsonpCallback: string;
             routeProbeCarCode: string;
+            guangzhouDiningSigningKey: string;
+            guangzhouDiningDesKey: string;
         };
         rateLimit: Record<
             'search' | 'query' | 'stationBoard',
@@ -219,6 +225,7 @@ export interface Config {
         assets: {
             EMUList: RefreshableAssetConfig;
             QRCode: RefreshableAssetConfig;
+            guangzhouDiningMapping: LocalAssetConfig;
             stationCoord: RefreshableAssetConfig;
             trainStyleMapping: RefreshableAssetConfig;
             qrcodeDetection: RefreshableAssetConfig;
@@ -598,6 +605,14 @@ function parseRefreshableAssetConfig(
                           `${name}.refresh.refreshAt`
                       )
         }
+    };
+}
+
+function parseLocalAssetConfig(value: unknown, name: string): LocalAssetConfig {
+    const asset = asObject(value, name);
+
+    return {
+        file: asString(asset.file, `${name}.file`)
     };
 }
 
@@ -1183,6 +1198,14 @@ function validateConfig(raw: unknown): Config {
                 routeProbeCarCode: asString(
                     spiderParams.routeProbeCarCode,
                     'spider.params.routeProbeCarCode'
+                ),
+                guangzhouDiningSigningKey: asString(
+                    spiderParams.guangzhouDiningSigningKey,
+                    'spider.params.guangzhouDiningSigningKey'
+                ),
+                guangzhouDiningDesKey: asString(
+                    spiderParams.guangzhouDiningDesKey,
+                    'spider.params.guangzhouDiningDesKey'
                 )
             },
             rateLimit: {
@@ -1330,6 +1353,10 @@ function validateConfig(raw: unknown): Config {
                 QRCode: parseRefreshableAssetConfig(
                     assets.QRCode,
                     'data.assets.QRCode'
+                ),
+                guangzhouDiningMapping: parseLocalAssetConfig(
+                    assets.guangzhouDiningMapping,
+                    'data.assets.guangzhouDiningMapping'
                 ),
                 stationCoord: parseRefreshableAssetConfig(
                     assets.stationCoord,

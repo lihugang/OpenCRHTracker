@@ -5,7 +5,9 @@
         "params": {
             "eKey": "OpenCRHTracker",
             "jsonpCallback": "OpenCRHTracker",
-            "routeProbeCarCode": "CR400AF-C-2214"
+            "routeProbeCarCode": "CR400AF-C-2214",
+            "guangzhouDiningSigningKey": "please_change_me",
+            "guangzhouDiningDesKey": "please_change_me"
         },
         "rateLimit": {
             "query": {
@@ -79,6 +81,9 @@
                     "enabled": true,
                     "refreshAt": ["0000"]
                 }
+            },
+            "guangzhouDiningMapping": {
+                "file": "data/guangzhou_dining_mapping.json"
             },
             "stationCoord": {
                 "file": "data/station_coord.jsonl",

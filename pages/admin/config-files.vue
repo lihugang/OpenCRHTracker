@@ -5,7 +5,7 @@
         :session="session"
         :show-date-input="false"
         title="配置文件"
-        description="从本地重载当前配置文件、动车组配属清单、畅行码映射和固定车组畅行码检测计划，或从远程服务器刷新资源文件。">
+        description="从本地重载运行配置和各类映射资产，或从远程服务器刷新支持更新的资源文件。">
         <template #toolbar>
             <UiButton
                 type="button"
@@ -331,6 +331,8 @@ function getItemEyebrow(target: AdminConfigFileTarget) {
             return '配属';
         case 'QRCode':
             return '畅行码';
+        case 'guangzhouDiningMapping':
+            return '广州点餐';
         case 'qrcodeDetection':
             return '畅行码检测';
         default:
@@ -418,7 +420,7 @@ async function runAction(
 useSiteSeo({
     title: '配置文件 | Open CRH Tracker',
     description:
-        '管理员配置文件页面，用于从本地重载 config.json、动车组配属清单、畅行码映射和固定车组畅行码检测计划，或从远程服务器刷新资源文件。',
+        '管理员配置文件页面，用于从本地重载运行配置和各类映射资产，或从远程服务器刷新支持更新的资源文件。',
     path: '/admin/config-files',
     noindex: true
 });

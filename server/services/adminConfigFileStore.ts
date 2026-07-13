@@ -7,6 +7,11 @@ import useConfig, {
 import getLogger from '~/server/libs/log4js';
 import { invalidateLookupIndexCache } from '~/server/services/lookupIndexStore';
 import {
+    getGuangzhouDiningMappingFilePath,
+    invalidateGuangzhouDiningMappingCache,
+    reloadGuangzhouDiningMappingFromLocalFile
+} from '~/server/services/guangzhouDiningMappingStore';
+import {
     invalidateProbeAssetsCache,
     preloadProbeAssetsFromLocalFiles,
     readLocalProbeQrcodeMap,
@@ -54,9 +59,15 @@ type AssetTarget = Extract<
     AdminConfigFileTarget,
     | 'EMUList'
     | 'QRCode'
+    | 'guangzhouDiningMapping'
     | 'stationCoord'
     | 'trainStyleMapping'
     | 'qrcodeDetection'
+>;
+
+type RefreshableAdminAssetTarget = Exclude<
+    AssetTarget,
+    'guangzhouDiningMapping'
 >;
 
 function toTimestampSeconds(value: number): number {
@@ -128,6 +139,22 @@ function buildConfigFileItem(
         };
     }
 
+    if (target === 'guangzhouDiningMapping') {
+        const filePath = getGuangzhouDiningMappingFilePath();
+        const status = getFileStatus(filePath);
+
+        return {
+            target,
+            title: '广州局点餐系统映射文件',
+            description: '重载广州局点餐系统 UUID 到具体车组号的本地映射。',
+            filePath,
+            provider: null,
+            exists: status.exists,
+            modifiedAt: status.modifiedAt,
+            supportedActions: ['reload_local']
+        };
+    }
+
     const assetConfig = useConfig().data.assets[target];
     const filePath = getAssetFilePath(target);
     const status = getFileStatus(filePath);
@@ -168,6 +195,7 @@ function buildConfigFileItem(
 
 function resetSafeRuntimeCaches(): void {
     invalidateProbeAssetsCache();
+    invalidateGuangzhouDiningMappingCache();
     invalidateStationCoordAssetsCache();
     invalidateLookupIndexCache();
 }
@@ -193,7 +221,7 @@ function assertActionSupported(
     target: AdminConfigFileTarget,
     action: AdminConfigFileAction
 ): void {
-    if (target === 'config') {
+    if (target === 'config' || target === 'guangzhouDiningMapping') {
         ensure(
             action === 'reload_local',
             400,
@@ -261,6 +289,21 @@ async function reloadAssetFromLocal(
         return await reloadQrcodeDetectionFromLocal();
     }
 
+    if (target === 'guangzhouDiningMapping') {
+        reloadGuangzhouDiningMappingFromLocalFile();
+        const item = buildConfigFileItem(target);
+        logger.info(
+            `admin_asset_reload_local target=${target} file=${item.filePath}`
+        );
+        return {
+            target,
+            action: 'reload_local',
+            summary:
+                '已重载本地广州局点餐系统映射，后续点餐 UUID 查询会使用新映射。',
+            item
+        };
+    }
+
     const filePath = getAssetFilePath(target);
     const text = readAssetText(target);
 
@@ -305,7 +348,7 @@ async function reloadAssetFromLocal(
 }
 
 async function refreshAssetFromRemote(
-    target: AssetTarget
+    target: RefreshableAdminAssetTarget
 ): Promise<AdminConfigFileActionResponse> {
     const item = buildConfigFileItem(target);
     ensure(
@@ -405,6 +448,7 @@ export function getAdminConfigFiles(): AdminConfigFilesResponse {
             buildConfigFileItem('config'),
             buildConfigFileItem('EMUList'),
             buildConfigFileItem('QRCode'),
+            buildConfigFileItem('guangzhouDiningMapping'),
             buildConfigFileItem('stationCoord'),
             buildConfigFileItem('trainStyleMapping'),
             buildConfigFileItem('qrcodeDetection')
@@ -420,6 +464,8 @@ export async function runAdminConfigFileAction(
     switch (request.target) {
         case 'config':
             return await reloadConfigFromLocal();
+        case 'guangzhouDiningMapping':
+            return await reloadAssetFromLocal(request.target);
         case 'EMUList':
         case 'QRCode':
         case 'stationCoord':
