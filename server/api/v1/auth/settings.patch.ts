@@ -1,5 +1,6 @@
 import { defineEventHandler, readBody } from 'h3';
 import { updateUserPreference } from '~/server/services/userProfileStore';
+import { getQqBindingStatus } from '~/server/services/qqBindingService';
 import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';
 import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
@@ -48,7 +49,8 @@ export default defineEventHandler(async (event) => {
                 identity.id,
                 updateUserPreference(identity.id, {
                     saveSearchHistory: body.userPreference.saveSearchHistory
-                })
+                }),
+                getQqBindingStatus(identity.id)
             );
         }
     );

@@ -165,6 +165,11 @@
             "vapidPublicKey": "",
             "vapidPrivateKey": "",
             "vapidEmail": ""
+        },
+        "qqBinding": {
+            "enabled": false,
+            "codeTtlSeconds": 1800,
+            "sendIntervalSeconds": 120
         }
     },
     "api": {
@@ -192,6 +197,10 @@
             "oauthToken": {
                 "maxRequests": 20,
                 "windowSeconds": 1200
+            },
+            "qqCode": {
+                "maxRequests": 5,
+                "windowSeconds": 3600
             }
         },
         "authCache": {
@@ -280,6 +289,9 @@
                 "api.auth.me.read",
                 "api.auth.logout",
                 "api.auth.password.update",
+                "api.auth.qq-binding.send",
+                "api.auth.qq-binding.verify",
+                "api.auth.qq-binding.unbind",
                 "api.auth.settings.read",
                 "api.auth.settings.write",
                 "api.auth.authorizations.read",
@@ -335,6 +347,17 @@
         "typstCompiler": {
             "baseUrl": "http://127.0.0.1:8080",
             "apiKey": "change-me"
+        },
+        "resend": {
+            "apiKey": "",
+            "emailApiUrl": "https://api.resend.com/emails",
+            "requestTimeoutMs": 30000,
+            "maxRecipients": 50,
+            "email": {
+                "fromName": "Open CRH Tracker",
+                "fromAddress": "",
+                "replyToAddress": ""
+            }
         }
     },
     "task": {
@@ -420,7 +443,10 @@
             "timetableTrainHistory": 1,
             "exportDailyIndex": 2,
             "exportDaily": 50,
-            "authChangePassword": 5
+            "authChangePassword": 5,
+            "authSendQqBindingCode": 5,
+            "authVerifyQqBinding": 5,
+            "authUnbindQqBinding": 5
         },
         "perRecord": {
             "historyEmu": {

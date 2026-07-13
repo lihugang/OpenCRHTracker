@@ -4,6 +4,7 @@ import useTrackedRequestFetch, {
 } from '~/composables/useTrackedRequestFetch';
 import type {
     AuthSession,
+    AuthQqBindingStatus,
     AuthSettingsResponse,
     AuthUserPreference
 } from '~/types/auth';
@@ -15,6 +16,14 @@ type UserSettingsState = 'idle' | 'loading' | 'success' | 'error';
 function createDefaultUserPreference(): AuthUserPreference {
     return {
         saveSearchHistory: true
+    };
+}
+
+function createDefaultQqBinding(): AuthQqBindingStatus {
+    return {
+        enabled: false,
+        bound: false,
+        qqNumber: null
     };
 }
 
@@ -44,6 +53,10 @@ export function useUserSettings() {
     const userPreference = useState<AuthUserPreference>(
         'user-settings-preference',
         createDefaultUserPreference
+    );
+    const qqBinding = useState<AuthQqBindingStatus>(
+        'user-settings-qq-binding',
+        createDefaultQqBinding
     );
     const state = useState<UserSettingsState>(
         'user-settings-state',
@@ -85,6 +98,7 @@ export function useUserSettings() {
 
     function reset() {
         userPreference.value = createDefaultUserPreference();
+        qqBinding.value = createDefaultQqBinding();
         state.value = 'idle';
         errorMessage.value = '';
         loadedUserId.value = '';
@@ -139,11 +153,14 @@ export function useUserSettings() {
             userPreference.value = normalizeUserPreference(
                 response.data.userPreference
             );
+            qqBinding.value =
+                response.data.qqBinding ?? createDefaultQqBinding();
             loadedUserId.value = response.data.userId;
             state.value = 'success';
             errorMessage.value = '';
         } catch (error) {
             userPreference.value = createDefaultUserPreference();
+            qqBinding.value = createDefaultQqBinding();
             loadedUserId.value = session.value.userId;
             state.value = 'error';
             errorMessage.value = getApiErrorMessage(error, '加载设置失败。');
@@ -195,6 +212,8 @@ export function useUserSettings() {
             userPreference.value = normalizeUserPreference(
                 response.data.userPreference
             );
+            qqBinding.value =
+                response.data.qqBinding ?? createDefaultQqBinding();
             loadedUserId.value = response.data.userId;
             state.value = 'success';
             errorMessage.value = '';
@@ -273,6 +292,7 @@ export function useUserSettings() {
 
     return {
         userPreference: computed(() => userPreference.value),
+        qqBinding: computed(() => qqBinding.value),
         state: computed(() => state.value),
         errorMessage: computed(() => errorMessage.value),
         canReadSettings,

@@ -54,6 +54,18 @@ interface UserProfileDataRaw extends Record<string, unknown> {
     subscriptions?: unknown;
     userPreference?: unknown;
     quotaOverride?: unknown;
+    qqBinding?: unknown;
+}
+
+interface QqBindingDataRaw extends Record<string, unknown> {
+    status?: unknown;
+    qqNumber?: unknown;
+    pendingQqNumber?: unknown;
+    codeDigest?: unknown;
+    codeExpiresAt?: unknown;
+    lastCodeSentAt?: unknown;
+    sendWindowStartedAt?: unknown;
+    sendCount?: unknown;
 }
 
 interface UserProfilePreferenceValue extends Record<string, unknown> {
@@ -68,6 +80,17 @@ interface UserProfileQuotaOverrideValue extends Record<string, unknown> {
 export interface UserQuotaOverride {
     tokenLimit: number | null;
     refillAmount: number | null;
+}
+
+export interface QqBindingData {
+    status: 'none' | 'pending' | 'bound';
+    qqNumber: string | null;
+    pendingQqNumber: string | null;
+    codeDigest: string | null;
+    codeExpiresAt: number | null;
+    lastCodeSentAt: number | null;
+    sendWindowStartedAt: number | null;
+    sendCount: number;
 }
 
 export interface UserProfileSubscriptionItem {
@@ -106,13 +129,17 @@ export interface UserProfileData {
     subscriptions: UserProfileSubscriptionItem[];
     userPreference: UserProfilePreference;
     quotaOverride: UserQuotaOverride;
+    qqBinding: QqBindingData;
 }
 
 export interface UserProfilePreference {
     saveSearchHistory: boolean;
 }
 
-type UserProfileSqlKey = 'selectUserProfileByUserId' | 'upsertUserProfile';
+type UserProfileSqlKey =
+    | 'selectUserProfileByUserId'
+    | 'selectAllUserProfiles'
+    | 'upsertUserProfile';
 
 const userProfileSql = importSqlBatch('users/queries') as Record<
     UserProfileSqlKey,
@@ -141,6 +168,16 @@ function createDefaultUserProfileData(): UserProfileData {
         quotaOverride: {
             tokenLimit: null,
             refillAmount: null
+        },
+        qqBinding: {
+            status: 'none',
+            qqNumber: null,
+            pendingQqNumber: null,
+            codeDigest: null,
+            codeExpiresAt: null,
+            lastCodeSentAt: null,
+            sendWindowStartedAt: null,
+            sendCount: 0
         }
     };
 }
@@ -184,6 +221,57 @@ function toUserQuotaOverride(value: unknown): UserQuotaOverride {
     return {
         tokenLimit: normalizePositiveInteger(raw.tokenLimit),
         refillAmount: normalizePositiveInteger(raw.refillAmount)
+    };
+}
+
+function toQqBindingData(value: unknown): QqBindingData {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+        return createDefaultUserProfileData().qqBinding;
+    }
+
+    const raw = value as QqBindingDataRaw;
+    const status =
+        raw.status === 'bound' || raw.status === 'pending'
+            ? raw.status
+            : 'none';
+    const positiveInteger = (candidate: unknown) =>
+        typeof candidate === 'number' &&
+        Number.isInteger(candidate) &&
+        candidate > 0 &&
+        Number.isFinite(candidate)
+            ? candidate
+            : null;
+    const nonEmptyString = (candidate: unknown) =>
+        typeof candidate === 'string' && candidate.trim().length > 0
+            ? candidate.trim()
+            : null;
+    const qqNumber = nonEmptyString(raw.qqNumber);
+    const pendingQqNumber = nonEmptyString(raw.pendingQqNumber);
+    const codeDigest = nonEmptyString(raw.codeDigest);
+    const codeExpiresAt = positiveInteger(raw.codeExpiresAt);
+    const lastCodeSentAt = positiveInteger(raw.lastCodeSentAt);
+    const sendWindowStartedAt = positiveInteger(raw.sendWindowStartedAt);
+    const sendCount =
+        typeof raw.sendCount === 'number' &&
+        Number.isInteger(raw.sendCount) &&
+        raw.sendCount >= 0
+            ? raw.sendCount
+            : 0;
+
+    return {
+        status:
+            qqNumber !== null
+                ? 'bound'
+                : pendingQqNumber !== null && codeDigest !== null
+                  ? 'pending'
+                  : 'none',
+        qqNumber,
+        pendingQqNumber,
+        codeDigest,
+        codeExpiresAt,
+        lastCodeSentAt,
+        sendWindowStartedAt,
+        sendCount
     };
 }
 
@@ -312,13 +400,13 @@ function normalizeUserProfileData(value: unknown): UserProfileData {
         : [];
     const userPreference = toUserProfilePreference(raw.userPreference);
     const quotaOverride = toUserQuotaOverride(raw.quotaOverride);
-
     return {
         version: 1,
         favorites,
         subscriptions,
         userPreference,
-        quotaOverride
+        quotaOverride,
+        qqBinding: toQqBindingData(raw.qqBinding)
     };
 }
 
@@ -339,6 +427,10 @@ function getStoredUserProfileRow(userId: string) {
         'selectUserProfileByUserId',
         userId
     );
+}
+
+function listStoredUserProfileRows() {
+    return userProfileStatements.all<UserProfileRow>('selectAllUserProfiles');
 }
 
 function getCurrentUserProfileData(userId: string) {
@@ -386,6 +478,80 @@ export function getUserQuotaOverride(userId: string) {
     return getCurrentUserProfileData(userId).quotaOverride;
 }
 
+export function getQqBindingData(userId: string) {
+    return getCurrentUserProfileData(userId).qqBinding;
+}
+
+export function findUserIdByBoundQqNumber(
+    qqNumber: string,
+    exceptUserId?: string
+) {
+    for (const row of listStoredUserProfileRows()) {
+        if (row.user_id === exceptUserId) {
+            continue;
+        }
+
+        const profile = parseUserProfileData(row.data_json);
+        if (profile.qqBinding.qqNumber === qqNumber) {
+            return row.user_id;
+        }
+    }
+
+    return null;
+}
+
+export function mutateQqBindingData(
+    userId: string,
+    mutate: (current: QqBindingData) => QqBindingData
+) {
+    const now = getNowSeconds();
+    const transaction = useUsersDatabase().transaction(() => {
+        const row = getStoredUserProfileRow(userId);
+        const profile = row
+            ? parseUserProfileData(row.data_json)
+            : createDefaultUserProfileData();
+        const qqBinding = mutate(profile.qqBinding);
+        if (qqBinding.qqNumber !== null) {
+            for (const otherRow of listStoredUserProfileRows()) {
+                if (otherRow.user_id === userId) {
+                    continue;
+                }
+
+                const otherProfile = parseUserProfileData(
+                    otherRow.data_json
+                );
+                if (otherProfile.qqBinding.qqNumber === qqBinding.qqNumber) {
+                    throw new ApiRequestError(
+                        409,
+                        'qq_already_bound',
+                        '该 QQ 号已绑定其他账户'
+                    );
+                }
+            }
+        }
+        const nextProfile: UserProfileData = {
+            version: 1,
+            favorites: profile.favorites,
+            subscriptions: profile.subscriptions,
+            userPreference: profile.userPreference,
+            quotaOverride: profile.quotaOverride,
+            qqBinding
+        };
+
+        writeUserProfileData(userId, nextProfile, now);
+        return qqBinding;
+    });
+
+    return transaction();
+}
+
+export function updateQqBindingData(
+    userId: string,
+    qqBinding: QqBindingData
+) {
+    return mutateQqBindingData(userId, () => qqBinding);
+}
+
 export function upsertUserFavoriteLookup(
     userId: string,
     item: FavoriteLookupInput
@@ -430,7 +596,8 @@ export function upsertUserFavoriteLookup(
             favorites: nextFavorites,
             subscriptions: profile.subscriptions,
             userPreference: profile.userPreference,
-            quotaOverride: profile.quotaOverride
+            quotaOverride: profile.quotaOverride,
+            qqBinding: profile.qqBinding
         };
 
         writeUserProfileData(userId, nextProfile, now);
@@ -475,7 +642,8 @@ export function removeUserFavoriteLookup(
             favorites: nextFavorites,
             subscriptions: profile.subscriptions,
             userPreference: profile.userPreference,
-            quotaOverride: profile.quotaOverride
+            quotaOverride: profile.quotaOverride,
+            qqBinding: profile.qqBinding
         };
 
         writeUserProfileData(userId, nextProfile, now);
@@ -534,7 +702,8 @@ export function upsertUserSubscription(
             favorites: profile.favorites,
             subscriptions: nextSubscriptions,
             userPreference: profile.userPreference,
-            quotaOverride: profile.quotaOverride
+            quotaOverride: profile.quotaOverride,
+            qqBinding: profile.qqBinding
         };
 
         writeUserProfileData(userId, nextProfile, now);
@@ -584,7 +753,8 @@ export function renameUserSubscription(
             favorites: profile.favorites,
             subscriptions: nextSubscriptions,
             userPreference: profile.userPreference,
-            quotaOverride: profile.quotaOverride
+            quotaOverride: profile.quotaOverride,
+            qqBinding: profile.qqBinding
         };
 
         writeUserProfileData(userId, nextProfile, now);
@@ -615,7 +785,8 @@ export function removeUserSubscription(userId: string, subscriptionId: string) {
             favorites: profile.favorites,
             subscriptions: nextSubscriptions,
             userPreference: profile.userPreference,
-            quotaOverride: profile.quotaOverride
+            quotaOverride: profile.quotaOverride,
+            qqBinding: profile.qqBinding
         };
 
         writeUserProfileData(userId, nextProfile, now);
@@ -661,7 +832,8 @@ export function removeUserSubscriptionsByEndpoints(
             favorites: profile.favorites,
             subscriptions: nextSubscriptions,
             userPreference: profile.userPreference,
-            quotaOverride: profile.quotaOverride
+            quotaOverride: profile.quotaOverride,
+            qqBinding: profile.qqBinding
         };
 
         writeUserProfileData(userId, nextProfile, now);
@@ -691,7 +863,8 @@ export function updateUserPreference(
             favorites: profile.favorites,
             subscriptions: profile.subscriptions,
             userPreference,
-            quotaOverride: profile.quotaOverride
+            quotaOverride: profile.quotaOverride,
+            qqBinding: profile.qqBinding
         };
 
         writeUserProfileData(userId, nextProfile, now);
@@ -727,7 +900,8 @@ export function updateUserQuotaOverride(
             favorites: profile.favorites,
             subscriptions: profile.subscriptions,
             userPreference: profile.userPreference,
-            quotaOverride
+            quotaOverride,
+            qqBinding: profile.qqBinding
         };
 
         writeUserProfileData(userId, nextProfile, now);

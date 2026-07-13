@@ -17,7 +17,8 @@
                         搜索并删除官方交路表
                     </h2>
                     <p class="text-sm leading-6 text-slate-600">
-                        输入任意车次号或 internalCode，系统会在时刻表数据库的官方交路表中做精确归一化匹配。
+                        输入任意车次号或
+                        internalCode，系统会在时刻表数据库的官方交路表中做精确归一化匹配。
                     </p>
                 </div>
 

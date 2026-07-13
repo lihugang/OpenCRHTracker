@@ -1,14 +1,16 @@
 import type { UserProfilePreference } from '~/server/services/userProfileStore';
-import type { AuthSettingsResponse } from '~/types/auth';
+import type { AuthQqBindingStatus, AuthSettingsResponse } from '~/types/auth';
 
 export function createAuthSettingsResponse(
     userId: string,
-    userPreference: UserProfilePreference
+    userPreference: UserProfilePreference,
+    qqBinding: AuthQqBindingStatus
 ): AuthSettingsResponse {
     return {
         userId,
         userPreference: {
             saveSearchHistory: userPreference.saveSearchHistory
-        }
+        },
+        qqBinding
     };
 }

@@ -2,10 +2,7 @@
     <Teleport to="body">
         <div
             v-if="isRendered"
-            :class="[
-                'fixed inset-0 p-4 sm:p-6',
-                layerClass
-            ]">
+            :class="['fixed inset-0 p-4 sm:p-6', layerClass]">
             <Transition
                 appear
                 enter-active-class="transition duration-200 ease-out"

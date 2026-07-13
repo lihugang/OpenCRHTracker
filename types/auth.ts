@@ -49,6 +49,12 @@ export interface AuthUserPreference {
     saveSearchHistory: boolean;
 }
 
+export interface AuthQqBindingStatus {
+    enabled: boolean;
+    bound: boolean;
+    qqNumber: string | null;
+}
+
 export interface AuthMeResponse {
     user: {
         userId: string;
@@ -271,6 +277,7 @@ export interface AuthFavoritesResponse {
 export interface AuthSettingsResponse {
     userId: string;
     userPreference: AuthUserPreference;
+    qqBinding: AuthQqBindingStatus;
 }
 
 export interface AuthAuthorizationItem {

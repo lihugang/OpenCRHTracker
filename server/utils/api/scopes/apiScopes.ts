@@ -9,6 +9,11 @@ export const API_SCOPES = {
         password: {
             update: 'api.auth.password.update'
         },
+        qqBinding: {
+            send: 'api.auth.qq-binding.send',
+            verify: 'api.auth.qq-binding.verify',
+            unbind: 'api.auth.qq-binding.unbind'
+        },
         settings: {
             read: 'api.auth.settings.read',
             write: 'api.auth.settings.write'

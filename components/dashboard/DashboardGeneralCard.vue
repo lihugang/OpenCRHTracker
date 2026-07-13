@@ -112,6 +112,82 @@
             </div>
         </UiCard>
 
+        <UiCard
+            v-if="qqBinding.enabled"
+            :show-accent-bar="false">
+            <div class="space-y-5">
+                <div class="flex items-start justify-between gap-4">
+                    <div class="space-y-2">
+                        <p
+                            class="text-xs font-medium uppercase tracking-[0.26em] text-crh-blue/80">
+                            Account Link
+                        </p>
+                        <h3 class="text-xl font-semibold text-slate-900">
+                            QQ 绑定
+                        </h3>
+                    </div>
+                    <span
+                        v-if="qqBinding.bound"
+                        class="rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
+                        已绑定
+                    </span>
+                </div>
+
+                <div class="motion-divider opacity-70" />
+
+                <div
+                    v-if="qqBinding.bound"
+                    class="flex flex-wrap items-center justify-between gap-4 rounded-[1rem] border border-slate-200 bg-white/80 px-4 py-4">
+                    <div class="space-y-1">
+                        <p class="text-xs text-slate-400">QQ 号</p>
+                        <p class="text-lg font-semibold text-slate-900">
+                            {{ qqBinding.qqNumber }}
+                        </p>
+                    </div>
+                    <UiButton
+                        variant="secondary"
+                        :disabled="!canUnbindQqBinding"
+                        @click="isUnbindModalOpen = true">
+                        解绑 QQ
+                    </UiButton>
+                </div>
+
+                <div
+                    v-else
+                    class="flex flex-wrap items-center justify-between gap-4 rounded-[1rem] border border-slate-200 bg-white/80 px-4 py-4">
+                    <p class="text-sm leading-6 text-slate-600">
+                        部分功能需绑定 QQ 后启用。
+                    </p>
+                    <UiButton
+                        :disabled="!canSendQqBinding"
+                        @click="openQqModal">
+                        绑定 QQ
+                    </UiButton>
+                </div>
+
+                <p
+                    v-if="
+                        !canSendQqBinding ||
+                        !canVerifyQqBinding ||
+                        !canUnbindQqBinding
+                    "
+                    class="rounded-[1rem] border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm leading-6 text-amber-800">
+                    当前会话没有完整的 QQ 绑定操作权限，请重新登录后重试。
+                </p>
+
+                <p
+                    v-if="qqBindingMessage"
+                    :class="qqBindingMessageClass">
+                    <span
+                        aria-hidden="true"
+                        class="font-semibold">
+                        {{ qqBindingTone === 'error' ? '[!]' : '[+]' }}
+                    </span>
+                    {{ qqBindingMessage }}
+                </p>
+            </div>
+        </UiCard>
+
         <UiCard :show-accent-bar="false">
             <div class="space-y-5">
                 <div class="space-y-2">
@@ -264,12 +340,138 @@
                 </p>
             </div>
         </UiCard>
+
+        <UiModal
+            v-model="isQqModalOpen"
+            eyebrow="QQ BINDING"
+            title="绑定 QQ"
+            description=""
+            :close-on-backdrop="!isQqBindingPending">
+            <form
+                class="space-y-4"
+                @submit.prevent="handleQqSubmit">
+                <div class="space-y-2">
+                    <label
+                        for="dashboard-qq-number"
+                        class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
+                        QQ 号
+                    </label>
+                    <input
+                        id="dashboard-qq-number"
+                        ref="qqNumberInputRef"
+                        v-model="qqNumberModelProxy"
+                        type="text"
+                        inputmode="numeric"
+                        autocomplete="off"
+                        maxlength="12"
+                        :disabled="isQqBindingPending || qqCodeSent"
+                        :class="inputClasses"
+                        placeholder="请输入 5-12 位 QQ 号"
+                        @keydown.enter.prevent="handleQqSubmit" />
+                </div>
+
+                <div
+                    v-if="qqCodeSent"
+                    class="space-y-2">
+                    <label
+                        for="dashboard-qq-code"
+                        class="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
+                        验证码
+                    </label>
+                    <input
+                        id="dashboard-qq-code"
+                        v-model="verificationCodeModelProxy"
+                        inputmode="numeric"
+                        autocomplete="one-time-code"
+                        maxlength="6"
+                        :disabled="isQqBindingPending"
+                        :class="inputClasses"
+                        placeholder="请输入 6 位验证码" />
+                    <div class="flex justify-end">
+                        <UiButton
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            :loading="isQqBindingPending"
+                            :disabled="
+                                !canSendQqBinding ||
+                                qqResendRemainingSeconds > 0
+                            "
+                            @click="emit('sendQqCode', qqNumberModel)">
+                            重新发送<span v-if="qqResendRemainingSeconds > 0">
+                                （{{ qqResendRemainingSeconds }} 秒）</span
+                            >
+                        </UiButton>
+                    </div>
+                </div>
+
+                <p
+                    v-if="qqBindingMessage"
+                    :class="qqBindingMessageClass">
+                    <span
+                        aria-hidden="true"
+                        class="font-semibold">
+                        {{ qqBindingTone === 'error' ? '[!]' : '[+]' }}
+                    </span>
+                    {{ qqBindingMessage }}
+                </p>
+
+                <UiButton
+                    type="submit"
+                    class="w-full justify-center"
+                    :loading="isQqBindingPending"
+                    :disabled="
+                        qqCodeSent ? !canVerifyQqBinding : !canSendQqBinding
+                    ">
+                    {{ qqCodeSent ? '确认绑定' : '发送验证码' }}
+                </UiButton>
+            </form>
+        </UiModal>
+
+        <UiModal
+            v-model="isUnbindModalOpen"
+            eyebrow="CONFIRM ACTION"
+            title="解绑 QQ"
+            description=""
+            :close-on-backdrop="!isQqBindingPending">
+            <div class="space-y-5">
+                <p class="text-sm leading-6 text-slate-600">
+                    确定要解绑 QQ 号 {{ qqBinding.qqNumber }} 吗？
+                </p>
+                <p
+                    v-if="qqBindingMessage"
+                    :class="qqBindingMessageClass">
+                    <span
+                        aria-hidden="true"
+                        class="font-semibold">
+                        {{ qqBindingTone === 'error' ? '[!]' : '[+]' }}
+                    </span>
+                    {{ qqBindingMessage }}
+                </p>
+            </div>
+            <template #footer>
+                <div class="flex justify-end gap-3">
+                    <UiButton
+                        variant="secondary"
+                        :disabled="isQqBindingPending"
+                        @click="isUnbindModalOpen = false">
+                        取消
+                    </UiButton>
+                    <UiButton
+                        :loading="isQqBindingPending"
+                        :disabled="!canUnbindQqBinding"
+                        @click="emit('unbindQq')">
+                        确认解绑
+                    </UiButton>
+                </div>
+            </template>
+        </UiModal>
     </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
-import type { AuthSession } from '~/types/auth';
+import { computed, nextTick, ref, watch } from 'vue';
+import type { AuthQqBindingStatus, AuthSession } from '~/types/auth';
 import safeFocus from '~/utils/safeFocus';
 
 const props = defineProps<{
@@ -281,6 +483,15 @@ const props = defineProps<{
     newPassword: string;
     confirmNewPassword: string;
     saveSearchHistory: boolean;
+    qqBinding: AuthQqBindingStatus;
+    qqCodeSent: boolean;
+    qqResendRemainingSeconds: number;
+    canSendQqBinding: boolean;
+    canVerifyQqBinding: boolean;
+    canUnbindQqBinding: boolean;
+    isQqBindingPending: boolean;
+    qqBindingMessage: string;
+    qqBindingTone: 'success' | 'error';
     isUpdatingUserPreference: boolean;
     userPreferenceMessage: string;
     userPreferenceTone: 'success' | 'error';
@@ -296,6 +507,9 @@ const emit = defineEmits<{
     'update:newPassword': [value: string];
     'update:confirmNewPassword': [value: string];
     toggleSaveSearchHistory: [];
+    sendQqCode: [qqNumber: string];
+    verifyQq: [qqNumber: string, code: string];
+    unbindQq: [];
     changePassword: [];
     logout: [];
 }>();
@@ -322,6 +536,68 @@ const userPreferenceMessageClass = computed(() =>
     props.userPreferenceTone === 'error'
         ? 'flex items-center gap-1.5 pl-1 text-xs leading-5 text-[#E53E3E]'
         : 'flex items-center gap-1.5 pl-1 text-xs leading-5 text-emerald-600'
+);
+
+const qqBindingMessageClass = computed(() =>
+    props.qqBindingTone === 'error'
+        ? 'flex items-center gap-1.5 pl-1 text-xs leading-5 text-[#E53E3E]'
+        : 'flex items-center gap-1.5 pl-1 text-xs leading-5 text-emerald-600'
+);
+
+const isQqModalOpen = ref(false);
+const isUnbindModalOpen = ref(false);
+const qqNumberInputRef = ref<HTMLInputElement | null>(null);
+const qqNumberModel = ref('');
+const verificationCodeModel = ref('');
+
+const qqNumberModelProxy = computed({
+    get: () => qqNumberModel.value,
+    set: (value: string) => {
+        qqNumberModel.value = value.replace(/\D/g, '').slice(0, 12);
+    }
+});
+
+const verificationCodeModelProxy = computed({
+    get: () => verificationCodeModel.value,
+    set: (value: string) => {
+        verificationCodeModel.value = value.replace(/\D/g, '').slice(0, 6);
+    }
+});
+
+function openQqModal() {
+    qqNumberModel.value = '';
+    verificationCodeModel.value = '';
+    isQqModalOpen.value = true;
+}
+
+watch(isQqModalOpen, async (isOpen) => {
+    if (!isOpen) {
+        return;
+    }
+
+    await nextTick();
+    safeFocus(qqNumberInputRef.value, {
+        preventScroll: true,
+        source: 'dialog-open',
+        selection: 'end'
+    });
+});
+
+function handleQqSubmit() {
+    if (props.qqCodeSent) {
+        emit('verifyQq', qqNumberModel.value, verificationCodeModel.value);
+        return;
+    }
+
+    emit('sendQqCode', qqNumberModel.value);
+}
+
+watch(
+    () => props.qqBinding.bound,
+    () => {
+        isQqModalOpen.value = false;
+        isUnbindModalOpen.value = false;
+    }
 );
 
 const currentPasswordModel = computed({

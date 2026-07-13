@@ -391,7 +391,8 @@
                     </h2>
                     <p class="text-sm leading-6 text-slate-600">
                         扫描同一车次连续三段历史时刻表覆盖。当前后两段
-                        timetable_id 相同且中间段不同时，可删除中间段并合并前后覆盖。
+                        timetable_id
+                        相同且中间段不同时，可删除中间段并合并前后覆盖。
                     </p>
                 </div>
 
@@ -456,8 +457,7 @@
                             class="text-xs uppercase tracking-[0.18em] text-slate-400">
                             可合并片段
                         </p>
-                        <p
-                            class="mt-2 text-3xl font-semibold text-slate-900">
+                        <p class="mt-2 text-3xl font-semibold text-slate-900">
                             {{ timetableMergeData?.total ?? 0 }}
                         </p>
                     </div>
@@ -510,12 +510,8 @@
                                             mergingCoverageId ===
                                             item.coverageId
                                         "
-                                        :disabled="
-                                            mergingCoverageId !== null
-                                        "
-                                        @click="
-                                            openTimetableMergeDialog(item)
-                                        ">
+                                        :disabled="mergingCoverageId !== null"
+                                        @click="openTimetableMergeDialog(item)">
                                         删除并合并
                                     </UiButton>
                                 </div>
@@ -558,9 +554,7 @@
                                         <p
                                             class="mt-2 font-mono text-xs leading-5 text-slate-700">
                                             {{
-                                                formatCoverageRange(
-                                                    item.middle
-                                                )
+                                                formatCoverageRange(item.middle)
                                             }}
                                         </p>
                                         <p
@@ -682,11 +676,11 @@
                     </p>
                     <p
                         class="mt-2 font-mono text-sm font-semibold text-slate-900">
-                        coverage #{{ pendingTimetableMergeCandidate.coverageId }}
-                        / timetable_id:
-                        {{
-                            pendingTimetableMergeCandidate.middle.timetableId
+                        coverage #{{
+                            pendingTimetableMergeCandidate.coverageId
                         }}
+                        / timetable_id:
+                        {{ pendingTimetableMergeCandidate.middle.timetableId }}
                     </p>
                     <p class="mt-2 text-sm leading-6 text-slate-700">
                         {{
@@ -823,7 +817,9 @@ const timetableMergeActionErrorMessage = ref('');
 const normalizedTrainCode = computed(() =>
     normalizeLookupCode(trainCodeInput.value)
 );
-const normalizedEmuCode = computed(() => normalizeLookupCode(emuCodeInput.value));
+const normalizedEmuCode = computed(() =>
+    normalizeLookupCode(emuCodeInput.value)
+);
 const deleteDateYmd = computed(() =>
     fromAdminDateInputValue(selectedDateInput.value)
 );

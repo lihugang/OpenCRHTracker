@@ -661,7 +661,8 @@
                                         class="mt-4 overflow-x-auto">
                                         <table
                                             class="min-w-full text-left text-sm">
-                                            <thead class="text-xs text-slate-400">
+                                            <thead
+                                                class="text-xs text-slate-400">
                                                 <tr>
                                                     <th class="px-3 py-2">
                                                         ID
@@ -700,9 +701,7 @@
                                                     </td>
                                                     <td
                                                         class="px-3 py-2 font-mono text-xs">
-                                                        {{
-                                                            row.serviceDate
-                                                        }}
+                                                        {{ row.serviceDate }}
                                                     </td>
                                                     <td
                                                         class="px-3 py-2 font-mono text-xs"
@@ -759,7 +758,8 @@
                                         class="mt-4 overflow-x-auto">
                                         <table
                                             class="min-w-full text-left text-sm">
-                                            <thead class="text-xs text-slate-400">
+                                            <thead
+                                                class="text-xs text-slate-400">
                                                 <tr>
                                                     <th class="px-3 py-2">
                                                         ID
@@ -798,9 +798,7 @@
                                                     </td>
                                                     <td
                                                         class="px-3 py-2 font-mono text-xs">
-                                                        {{
-                                                            row.serviceDate
-                                                        }}
+                                                        {{ row.serviceDate }}
                                                     </td>
                                                     <td
                                                         class="px-3 py-2 font-mono text-xs"
@@ -1047,8 +1045,8 @@
                                         <div
                                             v-if="
                                                 item.trackingMutations &&
-                                                item.trackingMutations
-                                                    .mutations.length > 0
+                                                item.trackingMutations.mutations
+                                                    .length > 0
                                             "
                                             class="rounded-[0.875rem] border border-emerald-200 bg-emerald-50/70 px-4 py-4">
                                             <div class="space-y-3">
@@ -1062,8 +1060,7 @@
                                                         class="text-xs leading-5 text-emerald-700">
                                                         {{
                                                             formatTrackingMutationSummary(
-                                                                item
-                                                                    .trackingMutations
+                                                                item.trackingMutations
                                                             )
                                                         }}
                                                     </p>
@@ -1080,9 +1077,7 @@
                                                         class="rounded-[0.75rem] border border-white/80 bg-white/90 px-3 py-3">
                                                         <p
                                                             class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
-                                                            {{
-                                                                mutation.table
-                                                            }}
+                                                            {{ mutation.table }}
                                                             /
                                                             {{
                                                                 getTrackingMutationActionLabel(
@@ -3432,8 +3427,9 @@ const activeStartAt = computed(
 );
 const activeDeparture = computed(
     () =>
-        departureItems.value.find((item) => item.startAt === activeStartAt.value) ??
-        null
+        departureItems.value.find(
+            (item) => item.startAt === activeStartAt.value
+        ) ?? null
 );
 const timelineItems = computed<AdminTrainProvenanceEvent[]>(
     () => provenanceData.value?.timeline ?? []

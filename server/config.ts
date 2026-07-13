@@ -120,6 +120,26 @@ interface TypstCompilerServiceConfig {
     apiKey: string;
 }
 
+interface ResendEmailConfig {
+    fromName: string;
+    fromAddress: string;
+    replyToAddress: string;
+}
+
+interface ResendServiceConfig {
+    apiKey: string;
+    emailApiUrl: string;
+    requestTimeoutMs: number;
+    maxRecipients: number;
+    email: ResendEmailConfig;
+}
+
+interface QqBindingConfig {
+    enabled: boolean;
+    codeTtlSeconds: number;
+    sendIntervalSeconds: number;
+}
+
 function normalizeEscapedPem(value: string) {
     return value.replace(/\\n/g, '\n');
 }
@@ -240,6 +260,7 @@ export interface Config {
             vapidPrivateKey: string;
             vapidEmail: string;
         };
+        qqBinding: QqBindingConfig;
         apiKeyBytes: number;
         apiKeyTtlSeconds: number;
         apiKeyMaxLifetimeSeconds: number;
@@ -271,6 +292,10 @@ export interface Config {
                 windowSeconds: number;
             };
             oauthToken: {
+                maxRequests: number;
+                windowSeconds: number;
+            };
+            qqCode: {
                 maxRequests: number;
                 windowSeconds: number;
             };
@@ -318,6 +343,7 @@ export interface Config {
     oauth: OAuthConfig;
     services: {
         typstCompiler: TypstCompilerServiceConfig;
+        resend: ResendServiceConfig;
     };
     task: {
         startup: {
@@ -352,6 +378,9 @@ export interface Config {
             authMe: number;
             authLogout: number;
             authChangePassword: number;
+            authSendQqBindingCode: number;
+            authVerifyQqBinding: number;
+            authUnbindQqBinding: number;
             debugEchoError: number;
             authIssueApiKey: number;
             authCreateOauthClient: number;
@@ -530,7 +559,7 @@ function parseEnvList(rawValue: string | undefined) {
     return normalizeUniqueStringList(rawValue.split(','));
 }
 
-function assertValidEmailAddress(value: string, name: string) {
+export function assertValidEmailAddress(value: string, name: string) {
     assert(
         !value.toLowerCase().startsWith('mailto:'),
         `${name} must be a plain email address without the mailto: prefix`
@@ -672,6 +701,14 @@ function validateConfig(raw: unknown): Config {
         user.pushSubscriptions,
         'user.pushSubscriptions'
     );
+    const userQqBinding =
+        user.qqBinding === undefined
+            ? {
+                  enabled: false,
+                  codeTtlSeconds: 1800,
+                  sendIntervalSeconds: 120
+              }
+            : asObject(user.qqBinding, 'user.qqBinding');
     const userApiKeyPrefixes = asOptionalObject(
         user.apiKeyPrefixes,
         'user.apiKeyPrefixes'
@@ -869,6 +906,10 @@ function validateConfig(raw: unknown): Config {
         apiAuthRateLimit.oauthToken,
         'api.authRateLimit.oauthToken'
     );
+    const apiAuthRateLimitQqCode =
+        apiAuthRateLimit.qqCode === undefined
+            ? { maxRequests: 5, windowSeconds: 3600 }
+            : asObject(apiAuthRateLimit.qqCode, 'api.authRateLimit.qqCode');
     const apiAuthCache = asObject(api.authCache, 'api.authCache');
     const apiAuthCacheUserRecord = asObject(
         apiAuthCache.userRecord,
@@ -932,6 +973,137 @@ function validateConfig(raw: unknown): Config {
     ) {
         console.warn(
             '[config] WARNING: Typst compiler API key was loaded from config instead of process.env.OCRH_TYPST_COMPILER_API_KEY'
+        );
+    }
+    const resend = asOptionalObject(services.resend, 'services.resend');
+    const resendEmail = asOptionalObject(
+        resend?.email,
+        'services.resend.email'
+    );
+    const envResendApiKey = process.env.OCRH_RESEND_API_KEY?.trim();
+    const configResendApiKey =
+        resend?.apiKey === undefined
+            ? ''
+            : asPlainString(resend.apiKey, 'services.resend.apiKey').trim();
+    const resendApiKey =
+        envResendApiKey && envResendApiKey.length > 0
+            ? envResendApiKey
+            : configResendApiKey;
+    if (resendApiKey.length > 0) {
+        assert(
+            /^\S+$/.test(resendApiKey) && !/^Bearer\s/i.test(resendApiKey),
+            'services.resend.apiKey must be a raw Resend API key without the Bearer prefix'
+        );
+    }
+    const resendEmailFromAddress =
+        resendEmail?.fromAddress === undefined
+            ? ''
+            : asPlainString(
+                  resendEmail.fromAddress,
+                  'services.resend.email.fromAddress'
+              ).trim();
+    const resendEmailReplyToAddress =
+        resendEmail?.replyToAddress === undefined
+            ? ''
+            : asPlainString(
+                  resendEmail.replyToAddress,
+                  'services.resend.email.replyToAddress'
+              ).trim();
+    if (resendEmailFromAddress.length > 0) {
+        assertValidEmailAddress(
+            resendEmailFromAddress,
+            'services.resend.email.fromAddress'
+        );
+    }
+    if (resendEmailReplyToAddress.length > 0) {
+        assertValidEmailAddress(
+            resendEmailReplyToAddress,
+            'services.resend.email.replyToAddress'
+        );
+    }
+    const resendEmailApiUrl =
+        resend?.emailApiUrl === undefined
+            ? ''
+            : asPlainString(resend.emailApiUrl, 'services.resend.emailApiUrl')
+                  .trim()
+                  .replace(/\/+$/, '');
+    const resendRequestTimeoutMs =
+        resend?.requestTimeoutMs === undefined
+            ? 0
+            : asInteger(
+                  resend.requestTimeoutMs,
+                  'services.resend.requestTimeoutMs',
+                  1
+              );
+    const resendMaxRecipients =
+        resend?.maxRecipients === undefined
+            ? 0
+            : asInteger(
+                  resend.maxRecipients,
+                  'services.resend.maxRecipients',
+                  1
+              );
+    assert(
+        resendMaxRecipients <= 50,
+        'services.resend.maxRecipients must be <= 50'
+    );
+    const qqBindingEnabled = asBoolean(
+        userQqBinding.enabled,
+        'user.qqBinding.enabled'
+    );
+    const qqBindingCodeTtlSeconds = asInteger(
+        userQqBinding.codeTtlSeconds,
+        'user.qqBinding.codeTtlSeconds',
+        1
+    );
+    const qqBindingSendIntervalSeconds = asInteger(
+        userQqBinding.sendIntervalSeconds,
+        'user.qqBinding.sendIntervalSeconds',
+        1
+    );
+    if (resendEmailApiUrl.length > 0) {
+        let parsedResendEmailApiUrl: URL;
+        try {
+            parsedResendEmailApiUrl = new URL(resendEmailApiUrl);
+        } catch {
+            throw new Error(
+                'Invalid config: services.resend.emailApiUrl must be a valid URL'
+            );
+        }
+        assert(
+            parsedResendEmailApiUrl.protocol === 'https:',
+            'services.resend.emailApiUrl must use https'
+        );
+    }
+    if (qqBindingEnabled) {
+        assert(
+            resendApiKey.length > 0,
+            'services.resend.apiKey is required when user.qqBinding.enabled is true'
+        );
+        assert(
+            resendEmailApiUrl.length > 0,
+            'services.resend.emailApiUrl is required when user.qqBinding.enabled is true'
+        );
+        assert(
+            resendRequestTimeoutMs > 0,
+            'services.resend.requestTimeoutMs is required when user.qqBinding.enabled is true'
+        );
+        assert(
+            resendMaxRecipients > 0,
+            'services.resend.maxRecipients is required when user.qqBinding.enabled is true'
+        );
+        assert(
+            resendEmailFromAddress.length > 0,
+            'services.resend.email.fromAddress is required when user.qqBinding.enabled is true'
+        );
+    }
+    if (
+        !import.meta.dev &&
+        (!envResendApiKey || envResendApiKey.length === 0) &&
+        configResendApiKey.length > 0
+    ) {
+        console.warn(
+            '[config] WARNING: Resend API key was loaded from config instead of process.env.OCRH_RESEND_API_KEY'
         );
     }
     const task = asObject(root.task, 'task');
@@ -1310,6 +1482,11 @@ function validateConfig(raw: unknown): Config {
                 vapidPrivateKey,
                 vapidEmail
             },
+            qqBinding: {
+                enabled: qqBindingEnabled,
+                codeTtlSeconds: qqBindingCodeTtlSeconds,
+                sendIntervalSeconds: qqBindingSendIntervalSeconds
+            },
             apiKeyBytes: asNumber(user.apiKeyBytes, 'user.apiKeyBytes', 16),
             apiKeyTtlSeconds: asNumber(
                 user.apiKeyTtlSeconds,
@@ -1407,6 +1584,18 @@ function validateConfig(raw: unknown): Config {
                     windowSeconds: asInteger(
                         apiAuthRateLimitOauthToken.windowSeconds,
                         'api.authRateLimit.oauthToken.windowSeconds',
+                        1
+                    )
+                },
+                qqCode: {
+                    maxRequests: asInteger(
+                        apiAuthRateLimitQqCode.maxRequests,
+                        'api.authRateLimit.qqCode.maxRequests',
+                        1
+                    ),
+                    windowSeconds: asInteger(
+                        apiAuthRateLimitQqCode.windowSeconds,
+                        'api.authRateLimit.qqCode.windowSeconds',
                         1
                     )
                 }
@@ -1645,6 +1834,23 @@ function validateConfig(raw: unknown): Config {
                     .trim()
                     .replace(/\/+$/, ''),
                 apiKey: typstCompilerApiKey
+            },
+            resend: {
+                apiKey: resendApiKey,
+                emailApiUrl: resendEmailApiUrl,
+                requestTimeoutMs: resendRequestTimeoutMs,
+                maxRecipients: resendMaxRecipients,
+                email: {
+                    fromName:
+                        resendEmail?.fromName === undefined
+                            ? ''
+                            : asPlainString(
+                                  resendEmail.fromName,
+                                  'services.resend.email.fromName'
+                              ).trim(),
+                    fromAddress: resendEmailFromAddress,
+                    replyToAddress: resendEmailReplyToAddress
+                }
             }
         },
         task: {
@@ -1815,6 +2021,27 @@ function validateConfig(raw: unknown): Config {
                 authChangePassword: asNumber(
                     costFixed.authChangePassword,
                     'cost.fixed.authChangePassword',
+                    0
+                ),
+                authSendQqBindingCode: asNumber(
+                    costFixed.authSendQqBindingCode === undefined
+                        ? 5
+                        : costFixed.authSendQqBindingCode,
+                    'cost.fixed.authSendQqBindingCode',
+                    0
+                ),
+                authVerifyQqBinding: asNumber(
+                    costFixed.authVerifyQqBinding === undefined
+                        ? 5
+                        : costFixed.authVerifyQqBinding,
+                    'cost.fixed.authVerifyQqBinding',
+                    0
+                ),
+                authUnbindQqBinding: asNumber(
+                    costFixed.authUnbindQqBinding === undefined
+                        ? 5
+                        : costFixed.authUnbindQqBinding,
+                    'cost.fixed.authUnbindQqBinding',
                     0
                 ),
                 debugEchoError: asNumber(

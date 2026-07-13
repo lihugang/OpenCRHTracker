@@ -30,6 +30,12 @@ export default defineEventHandler(async (event) => {
                     schedulerPollIntervalMinutes:
                         schedulerPollIntervalMs / 60_000
                 },
+                qqBinding: {
+                    enabled: config.user.qqBinding.enabled,
+                    codeTtlSeconds: config.user.qqBinding.codeTtlSeconds,
+                    sendIntervalSeconds:
+                        config.user.qqBinding.sendIntervalSeconds
+                },
                 api: {
                     versionPrefix: config.api.versionPrefix,
                     apiKeyHeader: config.api.apiKeyHeader,

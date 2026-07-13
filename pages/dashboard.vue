@@ -194,6 +194,17 @@
                                 :save-search-history="
                                     userPreference.saveSearchHistory
                                 "
+                                :qq-binding="qqBinding"
+                                :qq-code-sent="qqCodeSent"
+                                :qq-resend-remaining-seconds="
+                                    qqResendRemainingSeconds
+                                "
+                                :can-send-qq-binding="canSendQqBinding"
+                                :can-verify-qq-binding="canVerifyQqBinding"
+                                :can-unbind-qq-binding="canUnbindQqBinding"
+                                :is-qq-binding-pending="isQqBindingPending"
+                                :qq-binding-message="qqBindingMessage"
+                                :qq-binding-tone="qqBindingTone"
                                 :is-updating-user-preference="
                                     isUpdatingUserPreference
                                 "
@@ -211,6 +222,9 @@
                                 @toggle-save-search-history="
                                     toggleSaveSearchHistory
                                 "
+                                @send-qq-code="sendQqCode"
+                                @verify-qq="verifyQq"
+                                @unbind-qq="unbindQq"
                                 @change-password="changePassword"
                                 @logout="logout" />
                         </div>
@@ -703,6 +717,9 @@ definePageMeta({
 });
 
 const PASSWORD_SCOPE = 'api.auth.password.update';
+const QQ_SEND_SCOPE = 'api.auth.qq-binding.send';
+const QQ_VERIFY_SCOPE = 'api.auth.qq-binding.verify';
+const QQ_UNBIND_SCOPE = 'api.auth.qq-binding.unbind';
 const AUTHORIZATION_READ_SCOPE = 'api.auth.authorizations.read';
 const AUTHORIZATION_REVOKE_SCOPE = 'api.auth.authorizations.revoke';
 const ISSUE_SCOPE = 'api.auth.api-keys.create';
@@ -782,6 +799,10 @@ const scopeLabelMap: Record<string, string> = {
     'api.auth.me.read': '读取当前会话',
     'api.auth.password': '密码',
     'api.auth.password.update': '修改密码',
+    'api.auth.qq-binding': 'QQ 绑定',
+    'api.auth.qq-binding.send': '发送 QQ 验证码',
+    'api.auth.qq-binding.verify': '验证 QQ 绑定',
+    'api.auth.qq-binding.unbind': '解绑 QQ',
     'api.auth.settings': '设置',
     'api.auth.settings.read': '读取设置',
     'api.auth.settings.write': '修改设置',
@@ -851,10 +872,12 @@ const requestFetch: TrackedRequestFetch = import.meta.server
     : ($fetch as TrackedRequestFetch);
 const {
     userPreference,
+    qqBinding,
     state: userSettingsState,
     errorMessage: userSettingsErrorMessage,
     canReadSettings,
     canWriteSettings,
+    refresh: refreshUserSettings,
     updateUserPreference
 } = useUserSettings();
 const { clearRecentSearches } = useRecentLookupSearches();
@@ -923,6 +946,11 @@ const copyState = ref<'idle' | 'success' | 'error'>('idle');
 const nowSeconds = ref(Math.floor(Date.now() / 1000));
 const oauthMutationMessage = ref('');
 const oauthMutationTone = ref<'success' | 'error'>('success');
+const isQqBindingPending = ref(false);
+const qqBindingMessage = ref('');
+const qqBindingTone = ref<'success' | 'error'>('success');
+const qqCodeSent = ref(false);
+const qqNextSendAt = ref(0);
 
 const issueForm = reactive({
     name: '',
@@ -1239,6 +1267,18 @@ const currentKeyName = computed(() => {
 
 const canChangePassword = computed(() =>
     hasClientScope(session.value?.scopes ?? [], PASSWORD_SCOPE)
+);
+const canSendQqBinding = computed(() =>
+    hasClientScope(session.value?.scopes ?? [], QQ_SEND_SCOPE)
+);
+const canVerifyQqBinding = computed(() =>
+    hasClientScope(session.value?.scopes ?? [], QQ_VERIFY_SCOPE)
+);
+const canUnbindQqBinding = computed(() =>
+    hasClientScope(session.value?.scopes ?? [], QQ_UNBIND_SCOPE)
+);
+const qqResendRemainingSeconds = computed(() =>
+    Math.max(0, qqNextSendAt.value - nowSeconds.value)
 );
 const canReadAuthorizations = computed(() =>
     hasClientScope(session.value?.scopes ?? [], AUTHORIZATION_READ_SCOPE)
@@ -1846,6 +1886,94 @@ async function toggleSaveSearchHistory() {
     userPreferenceMessage.value = nextSaveSearchHistory
         ? '已开启保存搜索记录。'
         : '已关闭保存搜索记录，并清空当前设备上的最近搜索。';
+}
+
+function clearQqBindingMessage() {
+    qqBindingMessage.value = '';
+    qqBindingTone.value = 'success';
+}
+
+async function sendQqCode(qqNumber: string) {
+    if (isQqBindingPending.value) {
+        return;
+    }
+
+    isQqBindingPending.value = true;
+    clearQqBindingMessage();
+    try {
+        const response = await executeMutation<{
+            nextSendAt: number;
+        }>('/api/v1/auth/qq-binding/send-code', {
+            method: 'POST',
+            body: { qqNumber }
+        });
+        qqNextSendAt.value = response.nextSendAt;
+        qqCodeSent.value = true;
+        qqBindingTone.value = 'success';
+        qqBindingMessage.value =
+            '验证码已发送，请查收 QQ 邮箱。若未收到，请检查垃圾邮件。';
+    } catch (error) {
+        qqBindingTone.value = 'error';
+        qqBindingMessage.value = getApiErrorMessage(
+            error,
+            '验证码发送失败，请稍后重试。'
+        );
+    } finally {
+        isQqBindingPending.value = false;
+    }
+}
+
+async function verifyQq(qqNumber: string, code: string) {
+    if (isQqBindingPending.value) {
+        return;
+    }
+
+    isQqBindingPending.value = true;
+    clearQqBindingMessage();
+    try {
+        await executeMutation('/api/v1/auth/qq-binding/verify', {
+            method: 'POST',
+            body: { qqNumber, code }
+        });
+        await refreshUserSettings(true);
+        qqCodeSent.value = false;
+        qqNextSendAt.value = 0;
+        qqBindingTone.value = 'success';
+        qqBindingMessage.value = 'QQ 绑定成功。';
+    } catch (error) {
+        qqBindingTone.value = 'error';
+        qqBindingMessage.value = getApiErrorMessage(
+            error,
+            '验证码校验失败，请稍后重试。'
+        );
+    } finally {
+        isQqBindingPending.value = false;
+    }
+}
+
+async function unbindQq() {
+    if (isQqBindingPending.value) {
+        return;
+    }
+
+    isQqBindingPending.value = true;
+    clearQqBindingMessage();
+    try {
+        await executeMutation('/api/v1/auth/qq-binding/unbind', {
+            method: 'POST'
+        });
+        await refreshUserSettings(true);
+        qqBindingTone.value = 'success';
+        qqBindingMessage.value = 'QQ 已解绑。';
+    } catch (error) {
+        qqBindingTone.value = 'error';
+        qqBindingMessage.value = getApiErrorMessage(
+            error,
+            'QQ 解绑失败，请稍后重试。'
+        );
+    } finally {
+        isQqBindingPending.value = false;
+    }
 }
 
 async function confirmRevoke() {

@@ -891,8 +891,8 @@ export const deployDocsSections: DocsContentSection[] = [
             },
             {
                 type: 'field-cards',
-                title: 'services：外部微服务依赖',
-                text: '这一组声明本服务依赖的外部 Typst 编译微服务地址和鉴权参数。',
+                title: 'services：外部服务依赖',
+                text: '这一组声明本服务依赖的外部 Typst 编译微服务和 Resend 邮件服务。',
                 cards: [
                     {
                         path: 'services.typstCompiler.baseUrl',
@@ -909,11 +909,37 @@ export const deployDocsSections: DocsContentSection[] = [
                         path: 'services.typstCompiler.apiKey',
                         valueType: 'string',
                         required: true,
-                        description:
-                            '调用 Typst 编译服务的 Bearer API Key。',
+                        description: '调用 Typst 编译服务的 Bearer API Key。',
                         notes: [
                             '生产环境建议通过 OCRH_TYPST_COMPILER_API_KEY 覆盖，而不是把真实密钥直接写进配置文件。',
                             '如果未设置环境变量，生产环境启动时会输出警告。'
+                        ]
+                    },
+                    {
+                        path: 'services.resend.apiKey / services.resend.emailApiUrl / services.resend.requestTimeoutMs / services.resend.maxRecipients',
+                        valueType: 'string',
+                        required: false,
+                        description:
+                            'Resend API Key、发送端点、请求超时和单次收件人数限制，用于服务端发送 Email。',
+                        notes: [
+                            'apiKey 填写原始 Resend API Key，不要添加 Bearer 前缀；程序会在请求时自动构造 Authorization 头。',
+                            '生产环境建议通过 OCRH_RESEND_API_KEY 覆盖，而不是把真实 API Key 写进配置文件。',
+                            'emailApiUrl 必须使用 HTTPS；maxRecipients 必须在 1-50 之间，以符合 Resend 单次发送接口的限制。',
+                            '未启用 QQ 绑定时允许凭据留空；调用未配置的内部邮件服务会返回 resend_not_configured。',
+                            '官方文档：https://resend.com/docs/api-reference/emails/send-email 和 https://resend.com/docs/dashboard/emails/idempotency-keys。'
+                        ]
+                    },
+                    {
+                        path: 'services.resend.email.fromName / services.resend.email.fromAddress / services.resend.email.replyToAddress',
+                        valueType: 'string',
+                        required: false,
+                        description:
+                            'Resend 邮件的发件人名称、发件邮箱和可选回复邮箱。',
+                        notes: [
+                            '启用 QQ 绑定时 fromAddress 必填，并且必须属于已在 Resend 验证的发送域名。建议使用独立子域名隔离发送信誉。',
+                            'resend.dev 测试域名只能向 Resend 账户自己的邮箱发送测试邮件，不能用于向任意 QQ 邮箱发送验证码。',
+                            'fromAddress 和 replyToAddress 只能填写纯邮箱地址，不要带 mailto: 前缀。',
+                            '收件人、标题和 HTML 正文由内部服务调用方在运行时传入，不写入配置文件。'
                         ]
                     }
                 ]
@@ -1144,6 +1170,8 @@ export const deployDocsSections: DocsContentSection[] = [
                     '修改 user.signKey、api.apiKeyHeader、api.authCookieName 等身份相关字段后，应该视为一次完整重启变更并安排验证。',
                     '修改 user.adminUserIds 或 OCRH_ADMIN_USERS 后需要重启 Node 进程，新的登录会话才会按最新名单授予管理员权限。',
                     '修改 user.push 或 OCRH_VAPID_PUBLIC_KEY / OCRH_VAPID_PRIVATE_KEY / OCRH_VAPID_EMAIL 后需要重启 Node 进程，并建议立即用一台 Apple Safari PWA 设备验证推送是否正常。',
+                    '启用 Resend 邮件前，需要在 Resend Dashboard 添加发送域名并完成 SPF 和 DKIM DNS 验证；修改 services.resend 或 OCRH_RESEND_API_KEY 后需要重启 Node 进程。',
+                    '启用 QQ 绑定前，需要将 user.qqBinding.enabled 设为 true，并完整配置 services.resend 的 API Key、发送端点和发件邮箱；启动时会严格校验 Resend 配置，失败会中断启动。验证码默认有效 30 分钟，同一用户默认至少间隔 120 秒发送，独立限额默认是 5 次 / 1 小时。',
                     '修改 oauth.idTokenSigning 或 OCRH_OAUTH_ID_TOKEN_SIGNING_KID / OCRH_OAUTH_ID_TOKEN_SIGNING_PRIVATE_KEY 后需要重启 Node 进程，并建议立即验证 JWKS 输出与 id_token 签名是否正常。',
                     '升级到支持 OAuth 客户端删除的版本后，既有私有部署需要在 cost.fixed 中补充 authDeleteOauthClient，并按需在 api.permissions.issuedKeyDefaultScopes 中补充 api.auth.oauth-clients.delete。',
                     '提高 api.permissions.anonymousScopes、quota 或 cost 前，先确认你准备公开暴露的接口范围和限额策略。',
@@ -1202,6 +1230,15 @@ export const deployDocsSections: DocsContentSection[] = [
                 type: 'code',
                 language: 'bash',
                 code: 'export OCRH_TYPST_COMPILER_API_KEY=<typst-compiler-api-key>'
+            },
+            {
+                type: 'paragraph',
+                text: '如果需要启用内部 Resend 邮件发送工具，请设置原始 Resend API Key，并在配置文件的 services.resend.email.fromAddress 中填写已验证域名下的发件邮箱。该功能不会自动将邮箱绑定到本项目用户。'
+            },
+            {
+                type: 'code',
+                language: 'bash',
+                code: 'export OCRH_RESEND_API_KEY="re_xxxxxxxxxxxxxxxxx"'
             },
             {
                 type: 'paragraph',

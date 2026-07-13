@@ -20,5 +20,10 @@ export interface AboutExposedConfigData {
         schedulerPollIntervalMs: number;
         schedulerPollIntervalMinutes: number;
     };
+    qqBinding: {
+        enabled: boolean;
+        codeTtlSeconds: number;
+        sendIntervalSeconds: number;
+    };
     api: DocsApiRuntimeConfig;
 }
