@@ -10,8 +10,8 @@
             <UiButton
                 type="button"
                 variant="secondary"
-                :loading="usersStatus === 'pending'"
-                @click="refreshUsers()">
+                :loading="isRefreshingAll"
+                @click="refreshAllData">
                 刷新
             </UiButton>
         </template>
@@ -364,6 +364,357 @@
                     </div>
                 </div>
             </UiCard>
+
+            <UiCard :show-accent-bar="false">
+                <div class="space-y-6">
+                    <div
+                        class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                        <div class="space-y-2">
+                            <p
+                                class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                                Ban Audit
+                            </p>
+                            <h2 class="text-2xl font-semibold text-slate-900">
+                                封禁与解封记录
+                            </h2>
+                            <p class="text-sm leading-6 text-slate-600">
+                                记录功能上线后的手动与自动账户操作，包括触发来源、执行结果和关联客户端信息。
+                            </p>
+                        </div>
+                        <UiStatusBadge
+                            :label="`${formatNumber(banActionItems.length)} 条记录`"
+                            tone="neutral" />
+                    </div>
+
+                    <div
+                        v-if="securityStatus === 'pending' && !securityData"
+                        class="space-y-3">
+                        <div
+                            v-for="index in 4"
+                            :key="`admin-ban-actions-skeleton:${index}`"
+                            class="h-20 animate-pulse rounded-[1rem] bg-slate-100/90" />
+                    </div>
+
+                    <UiEmptyState
+                        v-else-if="securityErrorMessage"
+                        eyebrow="加载失败"
+                        title="封禁记录加载失败"
+                        :description="securityErrorMessage"
+                        tone="danger">
+                        <UiButton
+                            type="button"
+                            variant="secondary"
+                            @click="refreshSecurity()">
+                            重试
+                        </UiButton>
+                    </UiEmptyState>
+
+                    <UiEmptyState
+                        v-else-if="banActionItems.length === 0"
+                        eyebrow="No Audit Events"
+                        title="暂无封禁或解封记录"
+                        description="审计从本功能上线后开始，不会为既有封禁状态补造历史。" />
+
+                    <div
+                        v-else
+                        class="overflow-x-auto rounded-[1rem] border border-slate-200 bg-white/90">
+                        <table class="min-w-[92rem] divide-y divide-slate-200">
+                            <thead class="bg-slate-50/80">
+                                <tr>
+                                    <th
+                                        class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                        时间
+                                    </th>
+                                    <th
+                                        class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                        账户
+                                    </th>
+                                    <th
+                                        class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                        操作 / 状态
+                                    </th>
+                                    <th
+                                        class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                        来源与原因
+                                    </th>
+                                    <th
+                                        class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                        QQ
+                                    </th>
+                                    <th
+                                        class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                        IP
+                                    </th>
+                                    <th
+                                        class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                        User-Agent
+                                    </th>
+                                    <th
+                                        class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                        管理员
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                <tr
+                                    v-for="item in banActionItems"
+                                    :key="item.id"
+                                    class="align-top transition hover:bg-slate-50/70">
+                                    <td
+                                        class="whitespace-nowrap px-4 py-4 text-sm text-slate-700">
+                                        <p>
+                                            {{
+                                                formatTimestamp(
+                                                    item.requestedAt
+                                                )
+                                            }}
+                                        </p>
+                                        <p
+                                            v-if="item.completedAt"
+                                            class="mt-1 text-xs text-slate-400">
+                                            完成于
+                                            {{
+                                                formatTimestamp(
+                                                    item.completedAt
+                                                )
+                                            }}
+                                        </p>
+                                    </td>
+                                    <td
+                                        class="px-4 py-4 text-sm font-semibold text-slate-900">
+                                        {{ item.userId }}
+                                    </td>
+                                    <td class="px-4 py-4">
+                                        <div class="flex flex-wrap gap-2">
+                                            <UiStatusBadge
+                                                :label="
+                                                    getBanActionLabel(
+                                                        item.action
+                                                    )
+                                                "
+                                                :tone="
+                                                    getBanActionTone(
+                                                        item.action
+                                                    )
+                                                " />
+                                            <UiStatusBadge
+                                                :label="
+                                                    getBanActionStatusLabel(
+                                                        item.status
+                                                    )
+                                                "
+                                                :tone="
+                                                    getBanActionStatusTone(
+                                                        item.status
+                                                    )
+                                                " />
+                                        </div>
+                                        <p
+                                            v-if="
+                                                item.changed === false &&
+                                                item.status === 'succeeded'
+                                            "
+                                            class="mt-2 text-xs text-slate-500">
+                                            账户状态未发生变化
+                                        </p>
+                                    </td>
+                                    <td class="max-w-[18rem] px-4 py-4 text-sm">
+                                        <p class="font-semibold text-slate-800">
+                                            {{
+                                                getBanActionSourceLabel(
+                                                    item.source
+                                                )
+                                            }}
+                                        </p>
+                                        <p
+                                            class="mt-1 leading-6 text-slate-600">
+                                            {{ item.reason }}
+                                        </p>
+                                        <p
+                                            v-if="item.errorMessage"
+                                            class="mt-2 break-all text-xs leading-5 text-rose-700">
+                                            {{ item.errorMessage }}
+                                        </p>
+                                    </td>
+                                    <td
+                                        class="whitespace-nowrap px-4 py-4 font-mono text-xs text-slate-700">
+                                        {{ item.qqNumber ?? '--' }}
+                                    </td>
+                                    <td
+                                        class="max-w-[14rem] break-all px-4 py-4 font-mono text-xs leading-5 text-slate-700">
+                                        {{ item.ipAddress ?? '--' }}
+                                    </td>
+                                    <td
+                                        class="max-w-[24rem] break-all px-4 py-4 font-mono text-xs leading-5 text-slate-600"
+                                        :title="item.userAgent ?? undefined">
+                                        {{ item.userAgent ?? '--' }}
+                                    </td>
+                                    <td
+                                        class="whitespace-nowrap px-4 py-4 text-sm text-slate-700">
+                                        {{ item.actorUserId ?? '--' }}
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </UiCard>
+
+            <UiCard :show-accent-bar="false">
+                <div class="space-y-6">
+                    <div
+                        class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                        <div class="space-y-2">
+                            <p
+                                class="text-xs font-semibold uppercase tracking-[0.22em] text-rose-500">
+                                QQ Ban List
+                            </p>
+                            <h2 class="text-2xl font-semibold text-slate-900">
+                                QQ 封禁清单
+                            </h2>
+                            <p class="text-sm leading-6 text-slate-600">
+                                命中清单的验证码请求会返回发送成功，但不会实际发信，并异步封禁请求账户。
+                            </p>
+                        </div>
+                        <div class="flex flex-wrap gap-2">
+                            <UiStatusBadge
+                                :label="`${formatNumber(qqBanListItems.length)} 个 QQ`"
+                                tone="danger" />
+                            <UiStatusBadge
+                                :label="`关联窗口 ${formatWindowDuration(securityData?.banCorrelationWindowSeconds ?? 0)}`"
+                                tone="neutral" />
+                        </div>
+                    </div>
+
+                    <div class="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto]">
+                        <UiField
+                            label="QQ 号"
+                            help="输入 5–12 位数字；加入后仅拦截后续验证码发送请求。">
+                            <input
+                                v-model="qqBanForm.qqNumber"
+                                type="text"
+                                inputmode="numeric"
+                                autocomplete="off"
+                                maxlength="12"
+                                class="harmony-input w-full px-4 py-3 text-base text-crh-grey-dark"
+                                placeholder="例如 123456789"
+                                @keyup.enter="addQqBanEntry" />
+                        </UiField>
+                        <div class="flex items-end">
+                            <UiButton
+                                type="button"
+                                class="w-full md:w-auto"
+                                :loading="isAddingQqBanEntry"
+                                :disabled="isRemovingQqBanEntry"
+                                @click="addQqBanEntry">
+                                加入清单
+                            </UiButton>
+                        </div>
+                    </div>
+
+                    <p
+                        v-if="qqBanMutationErrorMessage"
+                        class="rounded-[1rem] border border-rose-200 bg-rose-50/80 px-4 py-4 text-sm leading-6 text-rose-700">
+                        {{ qqBanMutationErrorMessage }}
+                    </p>
+                    <p
+                        v-else-if="qqBanMutationSuccessMessage"
+                        class="rounded-[1rem] border border-emerald-200 bg-emerald-50/80 px-4 py-4 text-sm leading-6 text-emerald-800">
+                        {{ qqBanMutationSuccessMessage }}
+                    </p>
+
+                    <div
+                        v-if="securityStatus === 'pending' && !securityData"
+                        class="space-y-3">
+                        <div
+                            v-for="index in 3"
+                            :key="`admin-qq-ban-list-skeleton:${index}`"
+                            class="h-16 animate-pulse rounded-[1rem] bg-slate-100/90" />
+                    </div>
+
+                    <UiEmptyState
+                        v-else-if="securityErrorMessage"
+                        eyebrow="加载失败"
+                        title="QQ 封禁清单加载失败"
+                        :description="securityErrorMessage"
+                        tone="danger">
+                        <UiButton
+                            type="button"
+                            variant="secondary"
+                            @click="refreshSecurity()">
+                            重试
+                        </UiButton>
+                    </UiEmptyState>
+
+                    <UiEmptyState
+                        v-else-if="qqBanListItems.length === 0"
+                        eyebrow="Empty List"
+                        title="QQ 封禁清单为空"
+                        description="加入 QQ 后，新的验证码发送尝试才会触发异步封禁。" />
+
+                    <div
+                        v-else
+                        class="overflow-x-auto rounded-[1rem] border border-slate-200 bg-white/90">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-50/80">
+                                <tr>
+                                    <th
+                                        class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                        QQ 号
+                                    </th>
+                                    <th
+                                        class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                        添加时间
+                                    </th>
+                                    <th
+                                        class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                        添加管理员
+                                    </th>
+                                    <th
+                                        class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                        操作
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                <tr
+                                    v-for="item in qqBanListItems"
+                                    :key="item.qqNumber"
+                                    class="transition hover:bg-rose-50/30">
+                                    <td
+                                        class="px-4 py-4 font-mono text-sm font-semibold text-slate-900">
+                                        {{ item.qqNumber }}
+                                    </td>
+                                    <td
+                                        class="whitespace-nowrap px-4 py-4 text-sm text-slate-700">
+                                        {{ formatTimestamp(item.addedAt) }}
+                                    </td>
+                                    <td
+                                        class="px-4 py-4 text-sm text-slate-700">
+                                        {{ item.addedBy }}
+                                    </td>
+                                    <td class="px-4 py-4 text-right">
+                                        <UiButton
+                                            type="button"
+                                            variant="secondary"
+                                            size="sm"
+                                            class="border-rose-200 text-rose-700 hover:border-rose-300 hover:bg-rose-50"
+                                            :disabled="
+                                                isAddingQqBanEntry ||
+                                                isRemovingQqBanEntry
+                                            "
+                                            @click="
+                                                openRemoveQqBanDialog(item)
+                                            ">
+                                            移除
+                                        </UiButton>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </UiCard>
         </div>
 
         <UiModal
@@ -423,6 +774,41 @@
                 </div>
             </template>
         </UiModal>
+
+        <UiModal
+            :model-value="isRemoveQqBanDialogOpen"
+            eyebrow="清单操作"
+            title="移除封禁 QQ"
+            :description="`将 QQ ${pendingRemoveQqBanEntry?.qqNumber ?? '--'} 从封禁清单移除。`"
+            size="md"
+            :close-on-backdrop="!isRemovingQqBanEntry"
+            @update:model-value="handleRemoveQqBanDialogVisibilityChange">
+            <div
+                class="rounded-[1rem] border border-amber-200 bg-amber-50/80 px-4 py-4 text-sm leading-6 text-amber-900">
+                移除不会自动解封已经封禁的账户，也不会清除仍在有效期内的 IP 与
+                UA 关联指纹。
+            </div>
+
+            <template #footer>
+                <div
+                    class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                    <UiButton
+                        type="button"
+                        variant="secondary"
+                        :disabled="isRemovingQqBanEntry"
+                        @click="closeRemoveQqBanDialog">
+                        取消
+                    </UiButton>
+                    <UiButton
+                        type="button"
+                        :loading="isRemovingQqBanEntry"
+                        class="bg-[linear-gradient(180deg,#c53030_0%,#b91c1c_100%)] text-white hover:bg-[linear-gradient(180deg,#b91c1c_0%,#991b1b_100%)]"
+                        @click="confirmRemoveQqBanEntry">
+                        确认移除
+                    </UiButton>
+                </div>
+            </template>
+        </UiModal>
     </AdminShell>
 </template>
 
@@ -435,10 +821,17 @@ import useTrackedRequestFetch, {
 } from '~/composables/useTrackedRequestFetch';
 import { useAdminDateQuery } from '~/composables/useAdminDateQuery';
 import type {
+    AdminAddQqBanListResponse,
+    AdminQqBanListItem,
+    AdminRemoveQqBanListResponse,
     AdminResetUserQuotaResponse,
     AdminUpdateUserBanStateResponse,
     AdminUpdateUserQuotaResponse,
+    AdminUserBanAction,
+    AdminUserBanActionSource,
+    AdminUserBanActionStatus,
     AdminUserListItem,
+    AdminUserSecurityResponse,
     AdminUsersResponse
 } from '~/types/admin';
 import type { TrackerApiResponse } from '~/types/homepage';
@@ -479,12 +872,45 @@ const {
     refresh: refreshUsers
 } = await useAsyncData('admin-users', fetchUsers);
 
+async function fetchUserSecurity() {
+    const response = await requestFetch<
+        TrackerApiResponse<AdminUserSecurityResponse>
+    >('/api/v1/admin/users/security', {
+        retry: 0
+    });
+
+    if (!response.ok) {
+        throw {
+            data: response
+        };
+    }
+
+    return response.data;
+}
+
+const {
+    data: securityData,
+    status: securityStatus,
+    error: securityError,
+    refresh: refreshSecurity
+} = await useAsyncData('admin-user-security', fetchUserSecurity);
+
 const usersErrorMessage = computed(() =>
     usersError.value
         ? getApiErrorMessage(usersError.value, '加载用户列表失败。')
         : ''
 );
 const userItems = computed(() => usersData.value?.items ?? []);
+const securityErrorMessage = computed(() =>
+    securityError.value
+        ? getApiErrorMessage(securityError.value, '加载用户封禁安全数据失败。')
+        : ''
+);
+const banActionItems = computed(() => securityData.value?.banActions ?? []);
+const qqBanListItems = computed(() => securityData.value?.qqBanList ?? []);
+const isRefreshingAll = computed(
+    () => usersStatus.value === 'pending' || securityStatus.value === 'pending'
+);
 const quotaForm = reactive({
     userId: '',
     tokenLimit: '',
@@ -502,6 +928,15 @@ const isUpdatingBanStatus = ref(false);
 const updatingBanUserId = ref('');
 const banStatusErrorMessage = ref('');
 const banStatusSuccessMessage = ref('');
+const qqBanForm = reactive({
+    qqNumber: ''
+});
+const isAddingQqBanEntry = ref(false);
+const isRemovingQqBanEntry = ref(false);
+const qqBanMutationErrorMessage = ref('');
+const qqBanMutationSuccessMessage = ref('');
+const isRemoveQqBanDialogOpen = ref(false);
+const pendingRemoveQqBanEntry = ref<AdminQqBanListItem | null>(null);
 
 const pendingBanState = computed(() => !pendingBanUser.value?.isBanned);
 const banDialogDescription = computed(() => {
@@ -532,6 +967,67 @@ function formatNumber(value: number) {
 
 function formatOptionalNumber(value: number | null) {
     return typeof value === 'number' ? formatNumber(value) : '--';
+}
+
+function formatWindowDuration(seconds: number) {
+    if (!Number.isFinite(seconds) || seconds <= 0) {
+        return '--';
+    }
+
+    if (seconds % 3600 === 0) {
+        return `${formatNumber(seconds / 3600)} 小时`;
+    }
+
+    return `${formatNumber(seconds)} 秒`;
+}
+
+function getBanActionLabel(action: AdminUserBanAction) {
+    return action === 'ban' ? '封禁' : '解封';
+}
+
+function getBanActionTone(action: AdminUserBanAction) {
+    return action === 'ban' ? ('danger' as const) : ('success' as const);
+}
+
+function getBanActionStatusLabel(status: AdminUserBanActionStatus) {
+    switch (status) {
+        case 'pending':
+            return '等待执行';
+        case 'succeeded':
+            return '已完成';
+        case 'failed':
+            return '执行失败';
+        case 'skipped':
+            return '已跳过';
+    }
+}
+
+function getBanActionStatusTone(status: AdminUserBanActionStatus) {
+    switch (status) {
+        case 'pending':
+            return 'warning' as const;
+        case 'succeeded':
+            return 'success' as const;
+        case 'failed':
+            return 'danger' as const;
+        case 'skipped':
+            return 'neutral' as const;
+    }
+}
+
+function getBanActionSourceLabel(source: AdminUserBanActionSource) {
+    switch (source) {
+        case 'admin_manual':
+            return '管理员手动操作';
+        case 'qq_ban_list':
+            return 'QQ 封禁清单';
+        case 'fingerprint_match':
+            return 'IP 与 UA 关联';
+    }
+}
+
+async function refreshAllData() {
+    await Promise.all([refreshUsers(), refreshSecurity()]);
 }
 
 function getUserStatusLabel(item: AdminUserListItem) {
@@ -633,7 +1129,7 @@ async function confirmBanStatusChange() {
         }
         isBanDialogOpen.value = false;
         pendingBanUser.value = null;
-        await refreshUsers();
+        await Promise.all([refreshUsers(), refreshSecurity()]);
     } catch (error) {
         banStatusErrorMessage.value = getApiErrorMessage(
             error,
@@ -813,6 +1309,147 @@ async function resetUserQuota(userId: string) {
         );
     } finally {
         resettingQuotaUserId.value = '';
+    }
+}
+
+function clearQqBanMutationMessages() {
+    qqBanMutationErrorMessage.value = '';
+    qqBanMutationSuccessMessage.value = '';
+}
+
+async function addQqBanEntry() {
+    if (isAddingQqBanEntry.value || isRemovingQqBanEntry.value) {
+        return;
+    }
+
+    clearQqBanMutationMessages();
+    const qqNumber = qqBanForm.qqNumber.trim();
+    if (!/^\d{5,12}$/.test(qqNumber)) {
+        qqBanMutationErrorMessage.value = 'QQ 号必须是 5–12 位纯数字。';
+        return;
+    }
+
+    isAddingQqBanEntry.value = true;
+    try {
+        const { data, error } = await useCsrfFetch<
+            TrackerApiResponse<AdminAddQqBanListResponse>
+        >('/api/v1/admin/users/qq-ban-list', {
+            method: 'POST',
+            retry: 0,
+            body: {
+                qqNumber
+            },
+            key: `admin:users:qq-ban-list:add:${qqNumber}:${Date.now()}`,
+            watch: false,
+            server: false
+        });
+
+        if (error.value) {
+            throw error.value;
+        }
+
+        const response = data.value;
+        if (!response) {
+            throw new Error('Missing QQ ban list add response');
+        }
+        if (!response.ok) {
+            throw {
+                data: response
+            };
+        }
+
+        qqBanForm.qqNumber = '';
+        qqBanMutationSuccessMessage.value = response.data.created
+            ? `已将 QQ ${response.data.item.qqNumber} 加入封禁清单。`
+            : `QQ ${response.data.item.qqNumber} 已在封禁清单中。`;
+        await refreshSecurity();
+    } catch (error) {
+        qqBanMutationErrorMessage.value = getApiErrorMessage(
+            error,
+            '加入 QQ 封禁清单失败。'
+        );
+    } finally {
+        isAddingQqBanEntry.value = false;
+    }
+}
+
+function openRemoveQqBanDialog(item: AdminQqBanListItem) {
+    if (isAddingQqBanEntry.value || isRemovingQqBanEntry.value) {
+        return;
+    }
+
+    clearQqBanMutationMessages();
+    pendingRemoveQqBanEntry.value = item;
+    isRemoveQqBanDialogOpen.value = true;
+}
+
+function closeRemoveQqBanDialog() {
+    if (isRemovingQqBanEntry.value) {
+        return;
+    }
+
+    isRemoveQqBanDialogOpen.value = false;
+    pendingRemoveQqBanEntry.value = null;
+}
+
+function handleRemoveQqBanDialogVisibilityChange(nextValue: boolean) {
+    if (nextValue) {
+        isRemoveQqBanDialogOpen.value = true;
+        return;
+    }
+
+    closeRemoveQqBanDialog();
+}
+
+async function confirmRemoveQqBanEntry() {
+    const item = pendingRemoveQqBanEntry.value;
+    if (!item || isRemovingQqBanEntry.value) {
+        return;
+    }
+
+    isRemovingQqBanEntry.value = true;
+    clearQqBanMutationMessages();
+    try {
+        const { data, error } = await useCsrfFetch<
+            TrackerApiResponse<AdminRemoveQqBanListResponse>
+        >(
+            `/api/v1/admin/users/qq-ban-list/${encodeURIComponent(item.qqNumber)}`,
+            {
+                method: 'DELETE',
+                retry: 0,
+                key: `admin:users:qq-ban-list:remove:${item.qqNumber}:${Date.now()}`,
+                watch: false,
+                server: false
+            }
+        );
+
+        if (error.value) {
+            throw error.value;
+        }
+
+        const response = data.value;
+        if (!response) {
+            throw new Error('Missing QQ ban list remove response');
+        }
+        if (!response.ok) {
+            throw {
+                data: response
+            };
+        }
+
+        qqBanMutationSuccessMessage.value = response.data.removed
+            ? `已将 QQ ${response.data.qqNumber} 从封禁清单移除。`
+            : `QQ ${response.data.qqNumber} 已不在封禁清单中。`;
+        isRemoveQqBanDialogOpen.value = false;
+        pendingRemoveQqBanEntry.value = null;
+        await refreshSecurity();
+    } catch (error) {
+        qqBanMutationErrorMessage.value = getApiErrorMessage(
+            error,
+            '移除 QQ 封禁清单条目失败。'
+        );
+    } finally {
+        isRemovingQqBanEntry.value = false;
     }
 }
 </script>

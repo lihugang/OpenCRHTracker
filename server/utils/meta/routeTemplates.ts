@@ -18,6 +18,7 @@ export const adminServerMetricsRouteTemplates = {
         { template: '/api/v1/timetable/train/:trainCode/history/:historyId', segments: ['api', 'v1', 'timetable', 'train', ':trainCode', 'history', ':historyId'] },
         { template: '/api/v1/admin/oauth/clients/:clientId', segments: ['api', 'v1', 'admin', 'oauth', 'clients', ':clientId'] },
         { template: '/api/v1/admin/timetable-history/coverages/:coverageId', segments: ['api', 'v1', 'admin', 'timetable-history', 'coverages', ':coverageId'] },
+        { template: '/api/v1/admin/users/qq-ban-list/:qqNumber', segments: ['api', 'v1', 'admin', 'users', 'qq-ban-list', ':qqNumber'] },
         { template: '/api/v1/feedback/topics/:id/messages', segments: ['api', 'v1', 'feedback', 'topics', ':id', 'messages'] },
         { template: '/api/v1/timetable/train/:trainCode/current', segments: ['api', 'v1', 'timetable', 'train', ':trainCode', 'current'] },
         { template: '/api/v1/timetable/train/:trainCode/history', segments: ['api', 'v1', 'timetable', 'train', ':trainCode', 'history'] },

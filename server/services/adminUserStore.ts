@@ -1,9 +1,7 @@
 import useConfig from '~/server/config';
 import { createPreparedSqlStore } from '~/server/libs/database/prepared';
-import {
-    getUserByUsername,
-    updateUserBanState
-} from '~/server/services/authStore';
+import { getUserByUsername } from '~/server/services/authStore';
+import { updateManualUserBanState } from '~/server/services/userBanSecurityStore';
 import {
     getUserQuotaOverride,
     updateUserQuotaOverride,
@@ -94,7 +92,8 @@ function syncQuotaBucket(userId: string) {
 }
 
 export function updateAdminUserBanState(
-    input: AdminUpdateUserBanStateRequest
+    input: AdminUpdateUserBanStateRequest,
+    actorUserId: string
 ): AdminUpdateUserBanStateResponse {
     ensureUserExists(input.userId);
 
@@ -106,12 +105,7 @@ export function updateAdminUserBanState(
         );
     }
 
-    const result = updateUserBanState(input.userId, input.banned);
-    if (!result) {
-        throw new ApiRequestError(404, 'not_found', '用户不存在');
-    }
-
-    return result;
+    return updateManualUserBanState(input.userId, input.banned, actorUserId);
 }
 
 export function updateAdminUserQuotaOverride(

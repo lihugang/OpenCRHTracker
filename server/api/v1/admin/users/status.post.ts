@@ -19,7 +19,7 @@ export default defineEventHandler(async (event) => {
         {
             requiredScopes: [API_SCOPES.admin]
         },
-        async () => {
+        async ({ identity }) => {
             const body =
                 (await readBody<AdminUpdateUserBanStateBody | null>(event)) ??
                 {};
@@ -48,7 +48,7 @@ export default defineEventHandler(async (event) => {
                 banned: body.banned
             };
             const response: AdminUpdateUserBanStateResponse =
-                updateAdminUserBanState(request);
+                updateAdminUserBanState(request, identity.id);
 
             return response;
         }

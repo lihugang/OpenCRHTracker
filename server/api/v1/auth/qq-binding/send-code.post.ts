@@ -1,11 +1,20 @@
 import { defineEventHandler, readBody } from 'h3';
+import useConfig from '~/server/config';
 import getLogger from '~/server/libs/log4js';
-import { sendQqBindingCode } from '~/server/services/qqBindingService';
+import {
+    normalizeQqNumber,
+    sendQqBindingCode
+} from '~/server/services/qqBindingService';
+import {
+    isQqNumberInBanList,
+    queueQqBanListUserBan
+} from '~/server/services/userBanSecurityStore';
 import ApiRequestError from '~/server/utils/api/errors/ApiRequestError';
 import getFixedCost from '~/server/utils/api/cost/getFixedCost';
 import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';
 import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
+import getNowSeconds from '~/server/utils/time/getNowSeconds';
 
 interface SendQqBindingCodeBody {
     qqNumber?: unknown;
@@ -60,10 +69,22 @@ export default defineEventHandler(async (event) =>
             );
 
             try {
+                const qqNumber = normalizeQqNumber(body.qqNumber);
+                if (isQqNumberInBanList(qqNumber)) {
+                    queueQqBanListUserBan(identity.id, qqNumber, event);
+                    const now = getNowSeconds();
+                    return {
+                        expiresAt:
+                            now + useConfig().user.qqBinding.codeTtlSeconds,
+                        nextSendAt:
+                            now + useConfig().user.qqBinding.sendIntervalSeconds
+                    };
+                }
+
                 return await sendQqBindingCode(
                     identity.id,
                     identity.id,
-                    body.qqNumber
+                    qqNumber
                 );
             } catch (error) {
                 if (

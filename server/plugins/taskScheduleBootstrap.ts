@@ -81,6 +81,8 @@ import {
     getShanghaiDayStartUnixSeconds
 } from '~/server/utils/date/shanghaiDateTime';
 import { runIndexRebuild } from '~/server/services/indexRebuildWorker';
+import { registerBanUserAccountTaskExecutor } from '~/server/services/taskExecutors/banUserAccountTaskExecutor';
+import { initializeUserBanSecurityState } from '~/server/services/userBanSecurityStore';
 
 const logger = getLogger('task-schedule-bootstrap');
 const STARTUP_EXECUTORS = [
@@ -290,6 +292,8 @@ export default defineNitroPlugin(async () => {
         registerRebuildTrainCirculationIndexTaskExecutor();
         registerDetectCoupledEmuGroupTaskExecutor();
         registerRefreshAssetFileTaskExecutors();
+        registerBanUserAccountTaskExecutor();
+        initializeUserBanSecurityState();
         await Promise.all([
             runIndexRebuild(REBUILD_REFERENCE_MODEL_INDEX_TASK_EXECUTOR),
             runIndexRebuild(REBUILD_TRAIN_CIRCULATION_INDEX_TASK_EXECUTOR)

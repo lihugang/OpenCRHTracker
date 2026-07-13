@@ -174,7 +174,8 @@
         "qqBinding": {
             "enabled": false,
             "codeTtlSeconds": 1800,
-            "sendIntervalSeconds": 120
+            "sendIntervalSeconds": 120,
+            "banCorrelationWindowSeconds": 259200
         }
     },
     "api": {

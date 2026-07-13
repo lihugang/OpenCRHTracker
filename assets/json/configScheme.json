@@ -712,6 +712,10 @@
                         "sendIntervalSeconds": {
                             "type": "integer",
                             "minimum": 1
+                        },
+                        "banCorrelationWindowSeconds": {
+                            "type": "integer",
+                            "minimum": 1
                         }
                     },
                     "required": [

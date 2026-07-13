@@ -306,6 +306,60 @@ export interface AdminUpdateUserBanStateResponse {
     updatedAt: number;
 }
 
+export type AdminUserBanAction = 'ban' | 'unban';
+
+export type AdminUserBanActionStatus =
+    | 'pending'
+    | 'succeeded'
+    | 'failed'
+    | 'skipped';
+
+export type AdminUserBanActionSource =
+    | 'admin_manual'
+    | 'qq_ban_list'
+    | 'fingerprint_match';
+
+export interface AdminQqBanListItem {
+    qqNumber: string;
+    addedAt: number;
+    addedBy: string;
+}
+
+export interface AdminUserBanActionItem {
+    id: number;
+    userId: string;
+    action: AdminUserBanAction;
+    status: AdminUserBanActionStatus;
+    source: AdminUserBanActionSource;
+    reason: string;
+    actorUserId: string | null;
+    qqNumber: string | null;
+    ipAddress: string | null;
+    userAgent: string | null;
+    matchedActionId: number | null;
+    changed: boolean | null;
+    requestedAt: number;
+    completedAt: number | null;
+    errorMessage: string | null;
+}
+
+export interface AdminUserSecurityResponse {
+    asOf: number;
+    banCorrelationWindowSeconds: number;
+    qqBanList: AdminQqBanListItem[];
+    banActions: AdminUserBanActionItem[];
+}
+
+export interface AdminAddQqBanListResponse {
+    created: boolean;
+    item: AdminQqBanListItem;
+}
+
+export interface AdminRemoveQqBanListResponse {
+    qqNumber: string;
+    removed: boolean;
+}
+
 export interface AdminUserQuotaOverride {
     tokenLimit: number | null;
     refillAmount: number | null;

@@ -138,6 +138,7 @@ interface QqBindingConfig {
     enabled: boolean;
     codeTtlSeconds: number;
     sendIntervalSeconds: number;
+    banCorrelationWindowSeconds: number;
 }
 
 function normalizeEscapedPem(value: string) {
@@ -721,7 +722,8 @@ function validateConfig(raw: unknown): Config {
             ? {
                   enabled: false,
                   codeTtlSeconds: 1800,
-                  sendIntervalSeconds: 120
+                  sendIntervalSeconds: 120,
+                  banCorrelationWindowSeconds: 72 * 60 * 60
               }
             : asObject(user.qqBinding, 'user.qqBinding');
     const userApiKeyPrefixes = asOptionalObject(
@@ -1076,6 +1078,14 @@ function validateConfig(raw: unknown): Config {
         'user.qqBinding.sendIntervalSeconds',
         1
     );
+    const qqBindingBanCorrelationWindowSeconds =
+        userQqBinding.banCorrelationWindowSeconds === undefined
+            ? 72 * 60 * 60
+            : asInteger(
+                  userQqBinding.banCorrelationWindowSeconds,
+                  'user.qqBinding.banCorrelationWindowSeconds',
+                  1
+              );
     if (resendEmailApiUrl.length > 0) {
         let parsedResendEmailApiUrl: URL;
         try {
@@ -1512,7 +1522,9 @@ function validateConfig(raw: unknown): Config {
             qqBinding: {
                 enabled: qqBindingEnabled,
                 codeTtlSeconds: qqBindingCodeTtlSeconds,
-                sendIntervalSeconds: qqBindingSendIntervalSeconds
+                sendIntervalSeconds: qqBindingSendIntervalSeconds,
+                banCorrelationWindowSeconds:
+                    qqBindingBanCorrelationWindowSeconds
             },
             apiKeyBytes: asNumber(user.apiKeyBytes, 'user.apiKeyBytes', 16),
             apiKeyTtlSeconds: asNumber(

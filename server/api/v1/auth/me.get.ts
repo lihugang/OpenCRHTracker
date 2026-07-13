@@ -1,5 +1,6 @@
 import { defineEventHandler } from 'h3';
 import { maskApiKey } from '~/server/services/authStore';
+import { queueFingerprintMatchedUserBan } from '~/server/services/userBanSecurityStore';
 import getFixedCost from '~/server/utils/api/cost/getFixedCost';
 import executeApi from '~/server/utils/api/executor/executeApi';
 import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
@@ -15,6 +16,7 @@ export default defineEventHandler(async (event) => {
             fixedCost: getFixedCost('authMe')
         },
         async ({ identity }) => {
+            queueFingerprintMatchedUserBan(identity.id, event);
             const response: AuthMeResponse = {
                 user: {
                     userId: identity.id
