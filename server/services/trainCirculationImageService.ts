@@ -166,14 +166,13 @@ interface TrainCirculationHeaderInfo {
     text: string;
 }
 
-// Fundementally the same as a JSON value
 type TypstLiteral =
-    | string
-    | number
-    | boolean
     | null
-    | { [key: string]: TypstLiteral }
-    | TypstLiteral[];
+    | boolean
+    | number
+    | string
+    | TypstLiteral[]
+    | { [key: string]: TypstLiteral };
 
 function asRecord(value: unknown): Record<string, unknown> | null {
     if (typeof value !== 'object' || value === null || Array.isArray(value)) {
@@ -212,7 +211,48 @@ function formatTypstNumber(value: number) {
         return String(value);
     }
 
-    return value.toFixed(6).replace(/0+$/, '').replace(/\.$/, '');
+    return value
+        .toFixed(6)
+        .replace(/0+$/, '')
+        .replace(/\.$/, '');
+}
+
+function serializeTypstLiteral(value: TypstLiteral): string {
+    if (value === null) {
+        return 'none';
+    }
+    if (typeof value === 'boolean') {
+        return value ? 'true' : 'false';
+    }
+    if (typeof value === 'number') {
+        return formatTypstNumber(value);
+    }
+    if (typeof value === 'string') {
+        return JSON.stringify(value);
+    }
+    if (Array.isArray(value)) {
+        if (value.length === 0) {
+            return '()';
+        }
+
+        const serializedItems = value.map((item) => serializeTypstLiteral(item));
+        return `(${serializedItems.join(', ')}${value.length === 1 ? ',' : ''})`;
+    }
+
+    const entries = Object.entries(value);
+    if (entries.length === 0) {
+        throw new Error('Typst literal does not support empty objects');
+    }
+
+    return `(${entries
+        .map(([key, entryValue]) => {
+            if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) {
+                throw new Error(`Unsupported Typst literal key: ${key}`);
+            }
+
+            return `${key}: ${serializeTypstLiteral(entryValue)}`;
+        })
+        .join(', ')})`;
 }
 
 function formatShanghaiTimeLabel(timestampSeconds: number) {
@@ -651,7 +691,7 @@ async function buildTrainCirculationHeaderInfo(input: {
     }
 
     return {
-        text: parts.join('‧')
+        text: parts.join(', ')
     };
 }
 
@@ -1319,18 +1359,54 @@ function buildTypstSource(
     }
 
     const renderData: TypstLiteral = {
+        layout: {
+            documentBorderCm: DOCUMENT_BORDER_CM,
+            minStationGapCm: MIN_STATION_GAP_CM,
+            plotTopPaddingCm: PLOT_TOP_PADDING_CM,
+            plotBottomPaddingCm: PLOT_BOTTOM_PADDING_CM,
+            endpointTimeMinXGapCm: ENDPOINT_TIME_MIN_X_GAP_CM,
+            endpointTimeHorizontalStepCm: ENDPOINT_TIME_HORIZONTAL_STEP_CM,
+            endpointTimeMaxHorizontalSteps: ENDPOINT_TIME_MAX_HORIZONTAL_STEPS,
+            endpointTimeLayoutMaxIterations:
+                ENDPOINT_TIME_LAYOUT_MAX_ITERATIONS,
+            endpointTimeRelayoutGrowthCm: ENDPOINT_TIME_RELAYOUT_GROWTH_CM,
+            endpointTimeRightPaddingCm: ENDPOINT_TIME_RIGHT_PADDING_CM,
+            trainLabelSafeMinXCm: TRAIN_LABEL_SAFE_MIN_X_CM,
+            trainLabelSafeMaxXPaddingCm: TRAIN_LABEL_SAFE_MAX_X_PADDING_CM,
+            trainLabelCandidateProgress: [...TRAIN_LABEL_CANDIDATE_PROGRESS],
+            trainLabelOffsetXCm: TRAIN_LABEL_OFFSET_X_CM,
+            endpointTimeOffsetYCm: ENDPOINT_TIME_OFFSET_Y_CM,
+            midnightMarkerOffsetYCm: MIDNIGHT_MARKER_OFFSET_Y_CM,
+            headerInfoOffsetYCm: HEADER_INFO_OFFSET_Y_CM,
+            stationLabelRightProtectionXCm: STATION_LABEL_RIGHT_PROTECTION_X_CM
+        },
         styles: {
+            leftLabelXCm: -0.4,
+            largeCjkFontPt: 13.5,
+            trainLabelFontPt: 10.8,
+            largeTimeFontPt: 10.8,
+            headerFontPt: 9.6,
+            footerFontPt: 8.1,
+            gridLineColor: '#e5e7eb',
+            midnightLineColor: '#000000',
+            stationLineColor: '#000000',
             blueLineColor: '#0000b3',
-            tealLineColor: '#005a5a'
+            tealLineColor: '#005a5a',
+            whiteColor: '#ffffff',
+            blackColor: '#000000'
         },
         timeAxis: {
             axisStartTimestamp,
             axisEndTimestamp,
-            timeGridStepSeconds
+            axisRangeSeconds,
+            timeGridStepSeconds,
+            ticks
         },
         stations: stationAxisPoints.map((stationAxisPoint) => ({
             stationTelecode: stationAxisPoint.stationTelecode,
             stationName: stationAxisPoint.stationName,
+            lat: stationAxisPoint.lat,
+            lon: stationAxisPoint.lon,
             cumulativeDistanceKm: stationAxisPoint.cumulativeDistanceKm
         })),
         nodes: nodes.map((node) => ({
@@ -1341,19 +1417,24 @@ function buildTypstSource(
             start: {
                 stationName: node.start.stationName,
                 stationTelecode: node.start.stationTelecode,
-                timestamp: node.start.timestamp
+                timestamp: node.start.timestamp,
+                timeText: formatShanghaiTimeLabel(node.start.timestamp)
             },
             end: {
                 stationName: node.end.stationName,
                 stationTelecode: node.end.stationTelecode,
-                timestamp: node.end.timestamp
+                timestamp: node.end.timestamp,
+                timeText: formatShanghaiTimeLabel(node.end.timestamp)
             }
         })),
         headerText: headerInfo?.text ?? null,
         footerText: '算法生成，仅供参考 | Open CRH Tracker'
     };
 
-    return template.replace('__RENDER_DATA__', JSON.stringify(renderData));
+    return template.replace(
+        '__RENDER_DATA__',
+        serializeTypstLiteral(renderData)
+    );
 }
 
 async function fetchWithTimeout(
