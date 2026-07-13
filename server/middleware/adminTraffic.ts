@@ -1,6 +1,6 @@
 import { defineEventHandler, getHeader, getRequestURL, type H3Event } from 'h3';
 import useConfig from '~/server/config';
-import { getValidApiKey } from '~/server/services/authStore';
+import { getValidApiKey, isUserBanned } from '~/server/services/authStore';
 import { recordAdminServerMetricsRequestDuration } from '~/server/services/adminServerMetricsStore';
 import {
     recordAdminTrafficApiCall,
@@ -46,7 +46,7 @@ function resolveWebsiteTrafficIdentity(event: H3Event): WebsiteTrafficIdentity {
     const authCookie = readAuthCookie(event);
     if (authCookie) {
         const authSession = getValidApiKey(authCookie);
-        if (authSession) {
+        if (authSession && !isUserBanned(authSession.userId)) {
             return {
                 visitorId: `user:${authSession.userId}`,
                 activeUserId: authSession.userId

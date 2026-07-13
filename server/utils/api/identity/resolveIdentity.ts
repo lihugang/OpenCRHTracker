@@ -1,6 +1,6 @@
 import { getHeader, type H3Event } from 'h3';
 import useConfig from '~/server/config';
-import { getValidApiKey } from '~/server/services/authStore';
+import { getValidApiKey, isUserBanned } from '~/server/services/authStore';
 import ApiRequestError from '~/server/utils/api/errors/ApiRequestError';
 import getAnonymousIdentity from '~/server/utils/api/identity/getAnonymousIdentity';
 import type ApiIdentity from '~/server/utils/api/identity/ApiIdentity';
@@ -92,6 +92,14 @@ export default function resolveIdentity(event: H3Event): ApiIdentity {
             'invalid_api_key',
             'API Key 无效或已过期'
         );
+    }
+
+    if (isUserBanned(apiKeyRecord.userId)) {
+        if (resolvedApiKey.source === 'cookie') {
+            clearAuthCookie(event);
+        }
+
+        throw new ApiRequestError(403, 'account_banned', '账号已被封禁');
     }
 
     const quotaSubject = resolveUserQuotaSubject(apiKeyRecord.userId);

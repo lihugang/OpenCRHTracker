@@ -4,6 +4,7 @@ import {
     assertAuthRateLimit,
     recordAuthRateLimitHit
 } from '~/server/utils/api/authRateLimit/ensureAuthRateLimit';
+import ApiRequestError from '~/server/utils/api/errors/ApiRequestError';
 import { validateOauthTokenOrigin } from '~/server/utils/oauth/origin';
 
 interface OAuthTokenBody {
@@ -42,12 +43,30 @@ export default defineEventHandler(async (event) => {
         };
     }
 
-    const token = exchangeAuthorizationCode({
-        clientId: parsed.client_id,
-        code: parsed.code,
-        redirectUri: parsed.redirect_uri,
-        codeVerifier: parsed.code_verifier
-    });
+    let token: ReturnType<typeof exchangeAuthorizationCode>;
+    try {
+        token = exchangeAuthorizationCode({
+            clientId: parsed.client_id,
+            code: parsed.code,
+            redirectUri: parsed.redirect_uri,
+            codeVerifier: parsed.code_verifier
+        });
+    } catch (error) {
+        if (
+            error instanceof ApiRequestError &&
+            error.errorCode === 'account_banned'
+        ) {
+            recordAuthRateLimitHit(event, 'oauthToken');
+            setResponseStatus(event, 403);
+            return {
+                error: error.errorCode,
+                error_description: error.userMessage
+            };
+        }
+
+        throw error;
+    }
+
     if (!token) {
         recordAuthRateLimitHit(event, 'oauthToken');
         setResponseStatus(event, 400);

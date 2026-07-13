@@ -279,6 +279,8 @@ export interface AdminUserListItem {
     userId: string;
     createdAt: number;
     lastLoginAt: number | null;
+    isBanned: boolean;
+    isAdmin: boolean;
     apiRemainCost: number;
     customTokenLimit: number | null;
     customRefillAmount: number | null;
@@ -286,8 +288,22 @@ export interface AdminUserListItem {
 
 export interface AdminUsersResponse {
     totalUsers: number;
+    bannedUsers: number;
     asOf: number;
     items: AdminUserListItem[];
+}
+
+export interface AdminUpdateUserBanStateRequest {
+    userId: string;
+    banned: boolean;
+}
+
+export interface AdminUpdateUserBanStateResponse {
+    userId: string;
+    isBanned: boolean;
+    changed: boolean;
+    revokedWebappApiKeyCount: number;
+    updatedAt: number;
 }
 
 export interface AdminUserQuotaOverride {

@@ -12,8 +12,11 @@ import {
     needsConsent,
     validateAuthorizeRequest
 } from '~/server/services/oauthStore';
-import { getValidApiKey } from '~/server/services/authStore';
-import { readAuthCookie } from '~/server/utils/auth/authCookie';
+import { getValidApiKey, isUserBanned } from '~/server/services/authStore';
+import {
+    clearAuthCookie,
+    readAuthCookie
+} from '~/server/utils/auth/authCookie';
 import { setOauthContinuationCookie } from '~/server/utils/oauth/continuationCookie';
 
 export interface OAuthAuthorizeDecisionInput {
@@ -102,7 +105,13 @@ function canSessionAuthorizeRequest(
 
 function resolveAuthorizeSession(event: H3Event) {
     const authCookie = readAuthCookie(event);
-    return authCookie ? getValidApiKey(authCookie) : undefined;
+    const session = authCookie ? getValidApiKey(authCookie) : undefined;
+    if (session && isUserBanned(session.userId)) {
+        clearAuthCookie(event);
+        return undefined;
+    }
+
+    return session;
 }
 
 export function getAuthorizeContext(

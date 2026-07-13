@@ -3,6 +3,7 @@ import { LRUCache } from 'lru-cache';
 import useConfig from '~/server/config';
 import { useUsersDatabase } from '~/server/libs/database/users';
 import { createPreparedSqlStore } from '~/server/libs/database/prepared';
+import ApiRequestError from '~/server/utils/api/errors/ApiRequestError';
 import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
 import normalizeScopeList from '~/server/utils/api/scopes/normalizeScopeList';
 import importSqlBatch from '~/server/utils/sql/importSqlBatch';
@@ -41,6 +42,7 @@ export interface UserRecord {
     password_hash: string;
     created_at: number;
     last_login_at: number | null;
+    is_banned: number;
 }
 
 interface ApiKeyScopeRecord {
@@ -98,6 +100,7 @@ type AuthSqlKey =
     | 'selectApiKeyScopesByUser'
     | 'selectUserByUsername'
     | 'selectValidApiKey'
+    | 'updateUserBanState'
     | 'updateUserPassword'
     | 'updateUserLastLogin';
 
@@ -126,6 +129,12 @@ const apiKeyRecordCache = new LRUCache<
 >({
     max: useConfig().api.authCache.apiKeyRecord.maxEntries,
     ttl: useConfig().api.authCache.apiKeyRecord.defaultTtlSeconds * 1000,
+    updateAgeOnGet: true
+});
+
+const bannedUserCache = new LRUCache<string, boolean>({
+    max: useConfig().api.authCache.userRecord.maxEntries,
+    ttl: useConfig().api.authCache.userRecord.defaultTtlSeconds * 1000,
     updateAgeOnGet: true
 });
 
@@ -370,7 +379,26 @@ export function getUserByUsername(username: string) {
         username
     );
     userRecordCache.set(username, user ?? MISSING_USER_RECORD);
+    bannedUserCache.set(username, user?.is_banned === 1);
     return user;
+}
+
+export function isUserBanned(username: string) {
+    const cached = bannedUserCache.get(username);
+    if (cached !== undefined) {
+        return cached;
+    }
+
+    const user = getUserByUsername(username);
+    const isBanned = user?.is_banned === 1;
+    bannedUserCache.set(username, isBanned);
+    return isBanned;
+}
+
+export function assertUserNotBanned(username: string) {
+    if (isUserBanned(username)) {
+        throw new ApiRequestError(403, 'account_banned', '账号已被封禁');
+    }
 }
 
 export function verifyUserPassword(user: UserRecord, password: string) {
@@ -395,6 +423,8 @@ export function createApiKey(
     userId: string,
     options: CreateApiKeyOptions = {}
 ) {
+    assertUserNotBanned(userId);
+
     const issuer = options.issuer ?? 'webapp';
     const scopes =
         options.scopes ?? resolveDefaultSessionScopes(userId, issuer);
@@ -487,8 +517,10 @@ export function createUserWithApiKey(
         salt,
         password_hash: passwordHash,
         created_at: createdAt,
-        last_login_at: createdAt
+        last_login_at: createdAt,
+        is_banned: 0
     });
+    bannedUserCache.set(username, false);
     cacheIssuedApiKey(apiKey);
     return apiKey;
 }
@@ -661,6 +693,75 @@ export function revokeApiKeysByUserAndOauthClientId(
     return {
         revokedAt: now,
         revokedCount: result.changes
+    };
+}
+
+export function updateUserBanState(userId: string, isBanned: boolean) {
+    const now = getNowSeconds();
+    const nextValue = isBanned ? 1 : 0;
+    const update = useUsersDatabase().transaction(() => {
+        const user = authStatements.get<UserRecord>(
+            'selectUserByUsername',
+            userId
+        );
+        if (!user) {
+            return undefined;
+        }
+
+        if (user.is_banned === nextValue) {
+            const revokeResult = isBanned
+                ? authStatements.run(
+                      'revokeApiKeysByUserAndIssuer',
+                      now,
+                      userId,
+                      'webapp'
+                  )
+                : null;
+
+            return {
+                user,
+                changed: false,
+                revokedWebappApiKeyCount: revokeResult?.changes ?? 0
+            };
+        }
+
+        authStatements.run('updateUserBanState', nextValue, userId);
+        const revokeResult = isBanned
+            ? authStatements.run(
+                  'revokeApiKeysByUserAndIssuer',
+                  now,
+                  userId,
+                  'webapp'
+              )
+            : null;
+
+        return {
+            user: {
+                ...user,
+                is_banned: nextValue
+            },
+            changed: true,
+            revokedWebappApiKeyCount: revokeResult?.changes ?? 0
+        };
+    });
+
+    const result = update();
+    if (!result) {
+        return undefined;
+    }
+
+    userRecordCache.set(userId, result.user);
+    bannedUserCache.set(userId, isBanned);
+    if (result.revokedWebappApiKeyCount > 0) {
+        apiKeyRecordCache.clear();
+    }
+
+    return {
+        userId,
+        isBanned,
+        changed: result.changed,
+        revokedWebappApiKeyCount: result.revokedWebappApiKeyCount,
+        updatedAt: now
     };
 }
 

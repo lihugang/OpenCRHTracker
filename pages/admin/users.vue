@@ -5,7 +5,7 @@
         :session="session"
         :show-date-input="false"
         title="用户"
-        description="查看注册用户数量、登录情况与当前运行时 API 剩余额度。">
+        description="查看注册用户、登录情况、封禁状态与当前运行时 API 剩余额度。">
         <template #toolbar>
             <UiButton
                 type="button"
@@ -18,7 +18,7 @@
 
         <div class="space-y-6">
             <UiCard :show-accent-bar="false">
-                <div class="grid gap-4 md:grid-cols-2">
+                <div class="grid gap-4 md:grid-cols-3">
                     <div
                         class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-5 py-4">
                         <p
@@ -30,6 +30,20 @@
                         </p>
                         <p class="mt-2 text-sm leading-6 text-slate-500">
                             注册用户数量
+                        </p>
+                    </div>
+
+                    <div
+                        class="rounded-[1rem] border border-rose-200 bg-rose-50/70 px-5 py-4">
+                        <p
+                            class="text-xs font-semibold uppercase tracking-[0.22em] text-rose-500">
+                            Banned
+                        </p>
+                        <p class="mt-2 text-3xl font-semibold text-rose-800">
+                            {{ formatNumber(usersData?.bannedUsers ?? 0) }}
+                        </p>
+                        <p class="mt-2 text-sm leading-6 text-rose-700/80">
+                            当前封禁用户数量
                         </p>
                     </div>
 
@@ -105,6 +119,10 @@
                                     </th>
                                     <th
                                         class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                        状态
+                                    </th>
+                                    <th
+                                        class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                                         创建时间
                                     </th>
                                     <th
@@ -133,12 +151,20 @@
                                 <tr
                                     v-for="item in userItems"
                                     :key="item.userId"
-                                    class="transition hover:bg-slate-50/70">
+                                    class="transition hover:bg-slate-50/70"
+                                    :class="
+                                        item.isBanned ? 'bg-rose-50/35' : ''
+                                    ">
                                     <td
                                         class="px-4 py-3 text-sm text-slate-900">
                                         <span class="font-semibold">
                                             {{ item.userId }}
                                         </span>
+                                    </td>
+                                    <td class="px-4 py-3 text-sm">
+                                        <UiStatusBadge
+                                            :label="getUserStatusLabel(item)"
+                                            :tone="getUserStatusTone(item)" />
                                     </td>
                                     <td
                                         class="px-4 py-3 text-sm text-slate-700">
@@ -169,23 +195,61 @@
                                         }}
                                     </td>
                                     <td class="px-4 py-3 text-right">
-                                        <UiButton
-                                            type="button"
-                                            variant="secondary"
-                                            size="sm"
-                                            :loading="
-                                                resettingQuotaUserId ===
-                                                item.userId
-                                            "
-                                            :disabled="
-                                                usersStatus === 'pending' ||
-                                                resettingQuotaUserId.length > 0
-                                            "
-                                            @click="
-                                                resetUserQuota(item.userId)
-                                            ">
-                                            重置限额
-                                        </UiButton>
+                                        <div
+                                            class="flex min-w-[12rem] justify-end gap-2">
+                                            <UiButton
+                                                type="button"
+                                                variant="secondary"
+                                                size="sm"
+                                                :loading="
+                                                    resettingQuotaUserId ===
+                                                    item.userId
+                                                "
+                                                :disabled="
+                                                    usersStatus === 'pending' ||
+                                                    resettingQuotaUserId.length >
+                                                        0 ||
+                                                    updatingBanUserId.length > 0
+                                                "
+                                                @click="
+                                                    resetUserQuota(item.userId)
+                                                ">
+                                                重置限额
+                                            </UiButton>
+
+                                            <UiButton
+                                                v-if="!item.isAdmin"
+                                                type="button"
+                                                variant="secondary"
+                                                size="sm"
+                                                :disabled="
+                                                    usersStatus === 'pending' ||
+                                                    resettingQuotaUserId.length >
+                                                        0 ||
+                                                    updatingBanUserId.length > 0
+                                                "
+                                                :class="
+                                                    item.isBanned
+                                                        ? 'border-emerald-200 text-emerald-700 hover:border-emerald-300 hover:bg-emerald-50'
+                                                        : 'border-rose-200 text-rose-700 hover:border-rose-300 hover:bg-rose-50'
+                                                "
+                                                @click="openBanDialog(item)">
+                                                {{
+                                                    item.isBanned
+                                                        ? '解封'
+                                                        : '封禁'
+                                                }}
+                                            </UiButton>
+
+                                            <span
+                                                v-else
+                                                class="inline-flex items-center"
+                                                title="配置中的管理员账户不可封禁或解封">
+                                                <UiStatusBadge
+                                                    label="受保护"
+                                                    tone="neutral" />
+                                            </span>
+                                        </div>
                                     </td>
                                 </tr>
                             </tbody>
@@ -202,6 +266,18 @@
                         v-else-if="quotaResetSuccessMessage"
                         class="rounded-[1rem] border border-emerald-200 bg-emerald-50/80 px-4 py-4 text-sm leading-6 text-emerald-800">
                         {{ quotaResetSuccessMessage }}
+                    </div>
+
+                    <div
+                        v-if="banStatusErrorMessage"
+                        class="rounded-[1rem] border border-rose-200 bg-rose-50/80 px-4 py-4 text-sm leading-6 text-rose-700">
+                        {{ banStatusErrorMessage }}
+                    </div>
+
+                    <div
+                        v-else-if="banStatusSuccessMessage"
+                        class="rounded-[1rem] border border-emerald-200 bg-emerald-50/80 px-4 py-4 text-sm leading-6 text-emerald-800">
+                        {{ banStatusSuccessMessage }}
                     </div>
 
                     <div
@@ -289,18 +365,80 @@
                 </div>
             </UiCard>
         </div>
+
+        <UiModal
+            :model-value="isBanDialogOpen"
+            :eyebrow="pendingBanState ? '危险操作' : '账户操作'"
+            :title="pendingBanState ? '确认封禁用户' : '确认解封用户'"
+            :description="banDialogDescription"
+            size="md"
+            :close-on-backdrop="!isUpdatingBanStatus"
+            @update:model-value="handleBanDialogVisibilityChange">
+            <div class="space-y-4">
+                <div
+                    v-if="pendingBanState"
+                    class="rounded-[1rem] border border-rose-200 bg-rose-50/80 px-4 py-4 text-sm leading-6 text-rose-900">
+                    <p class="font-semibold">封禁后立即生效</p>
+                    <p class="mt-2">1. 用户将无法通过用户名和密码登录。</p>
+                    <p>2. 该用户全部 webapp 会话会被吊销。</p>
+                    <p>3. 现有 API 与 OAuth key 会保留记录，但无法调用接口。</p>
+                </div>
+
+                <div
+                    v-else
+                    class="rounded-[1rem] border border-emerald-200 bg-emerald-50/80 px-4 py-4 text-sm leading-6 text-emerald-900">
+                    <p class="font-semibold">解封后的行为</p>
+                    <p class="mt-2">用户可以重新登录并创建新的 webapp 会话。</p>
+                    <p>此前被吊销的 webapp key 不会恢复。</p>
+                </div>
+
+                <p
+                    v-if="banStatusErrorMessage"
+                    class="rounded-[1rem] border border-rose-200 bg-rose-50/80 px-4 py-4 text-sm leading-6 text-rose-700">
+                    {{ banStatusErrorMessage }}
+                </p>
+            </div>
+
+            <template #footer>
+                <div
+                    class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                    <UiButton
+                        type="button"
+                        variant="secondary"
+                        :disabled="isUpdatingBanStatus"
+                        @click="closeBanDialog">
+                        取消
+                    </UiButton>
+                    <UiButton
+                        type="button"
+                        :loading="isUpdatingBanStatus"
+                        :class="
+                            pendingBanState
+                                ? 'bg-[linear-gradient(180deg,#c53030_0%,#b91c1c_100%)] text-white hover:bg-[linear-gradient(180deg,#b91c1c_0%,#991b1b_100%)]'
+                                : 'bg-[linear-gradient(180deg,#15803d_0%,#166534_100%)] text-white hover:bg-[linear-gradient(180deg,#166534_0%,#14532d_100%)]'
+                        "
+                        @click="confirmBanStatusChange">
+                        {{ pendingBanState ? '确认封禁' : '确认解封' }}
+                    </UiButton>
+                </div>
+            </template>
+        </UiModal>
     </AdminShell>
 </template>
 
 <script setup lang="ts">
 import UiField from '~/components/ui/UiField.vue';
+import UiModal from '~/components/ui/UiModal.vue';
+import UiStatusBadge from '~/components/ui/UiStatusBadge.vue';
 import useTrackedRequestFetch, {
     type TrackedRequestFetch
 } from '~/composables/useTrackedRequestFetch';
 import { useAdminDateQuery } from '~/composables/useAdminDateQuery';
 import type {
     AdminResetUserQuotaResponse,
+    AdminUpdateUserBanStateResponse,
     AdminUpdateUserQuotaResponse,
+    AdminUserListItem,
     AdminUsersResponse
 } from '~/types/admin';
 import type { TrackerApiResponse } from '~/types/homepage';
@@ -358,6 +496,20 @@ const quotaSaveSuccessMessage = ref('');
 const resettingQuotaUserId = ref('');
 const quotaResetErrorMessage = ref('');
 const quotaResetSuccessMessage = ref('');
+const isBanDialogOpen = ref(false);
+const pendingBanUser = ref<AdminUserListItem | null>(null);
+const isUpdatingBanStatus = ref(false);
+const updatingBanUserId = ref('');
+const banStatusErrorMessage = ref('');
+const banStatusSuccessMessage = ref('');
+
+const pendingBanState = computed(() => !pendingBanUser.value?.isBanned);
+const banDialogDescription = computed(() => {
+    const userId = pendingBanUser.value?.userId ?? '--';
+    return pendingBanState.value
+        ? `将封禁用户 ${userId}，并立即终止其网页端登录状态。`
+        : `将解除用户 ${userId} 的封禁状态，旧网页会话不会恢复。`;
+});
 
 useSiteSeo({
     title: '用户 | Open CRH Tracker',
@@ -380,6 +532,117 @@ function formatNumber(value: number) {
 
 function formatOptionalNumber(value: number | null) {
     return typeof value === 'number' ? formatNumber(value) : '--';
+}
+
+function getUserStatusLabel(item: AdminUserListItem) {
+    if (item.isAdmin) {
+        return '管理员';
+    }
+
+    return item.isBanned ? '已封禁' : '正常';
+}
+
+function getUserStatusTone(item: AdminUserListItem) {
+    if (item.isAdmin) {
+        return 'info' as const;
+    }
+
+    return item.isBanned ? ('danger' as const) : ('success' as const);
+}
+
+function openBanDialog(item: AdminUserListItem) {
+    if (item.isAdmin || isUpdatingBanStatus.value) {
+        return;
+    }
+
+    pendingBanUser.value = item;
+    banStatusErrorMessage.value = '';
+    banStatusSuccessMessage.value = '';
+    isBanDialogOpen.value = true;
+}
+
+function closeBanDialog() {
+    if (isUpdatingBanStatus.value) {
+        return;
+    }
+
+    isBanDialogOpen.value = false;
+    pendingBanUser.value = null;
+    banStatusErrorMessage.value = '';
+}
+
+function handleBanDialogVisibilityChange(nextValue: boolean) {
+    if (nextValue) {
+        isBanDialogOpen.value = true;
+        return;
+    }
+
+    closeBanDialog();
+}
+
+async function confirmBanStatusChange() {
+    const user = pendingBanUser.value;
+    if (!user || isUpdatingBanStatus.value) {
+        return;
+    }
+
+    const banned = !user.isBanned;
+    isUpdatingBanStatus.value = true;
+    updatingBanUserId.value = user.userId;
+    banStatusErrorMessage.value = '';
+    banStatusSuccessMessage.value = '';
+
+    try {
+        const { data, error } = await useCsrfFetch<
+            TrackerApiResponse<AdminUpdateUserBanStateResponse>
+        >('/api/v1/admin/users/status', {
+            method: 'POST',
+            retry: 0,
+            body: {
+                userId: user.userId,
+                banned
+            },
+            key: `admin:users:status:${user.userId}:${Date.now()}`,
+            watch: false,
+            server: false
+        });
+
+        if (error.value) {
+            throw error.value;
+        }
+
+        const response = data.value;
+        if (!response) {
+            throw new Error('Missing admin user status update response');
+        }
+
+        if (!response.ok) {
+            throw {
+                data: response
+            };
+        }
+
+        if (response.data.isBanned) {
+            banStatusSuccessMessage.value = response.data.changed
+                ? `已封禁用户 ${response.data.userId}。吊销 webapp key ${formatNumber(response.data.revokedWebappApiKeyCount)} 个。`
+                : `用户 ${response.data.userId} 已处于封禁状态，并清理了 ${formatNumber(response.data.revokedWebappApiKeyCount)} 个残留 webapp key。`;
+        } else {
+            banStatusSuccessMessage.value = response.data.changed
+                ? `已解封用户 ${response.data.userId}，用户可以重新登录。`
+                : `用户 ${response.data.userId} 已处于正常状态，无需重复操作。`;
+        }
+        isBanDialogOpen.value = false;
+        pendingBanUser.value = null;
+        await refreshUsers();
+    } catch (error) {
+        banStatusErrorMessage.value = getApiErrorMessage(
+            error,
+            banned ? '封禁用户失败。' : '解封用户失败。'
+        );
+    } finally {
+        isUpdatingBanStatus.value = false;
+        updatingBanUserId.value = '';
+    }
 }
 
 function parseOptionalPositiveInteger(value: unknown) {

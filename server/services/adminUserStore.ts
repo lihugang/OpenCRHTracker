@@ -1,5 +1,9 @@
+import useConfig from '~/server/config';
 import { createPreparedSqlStore } from '~/server/libs/database/prepared';
-import { getUserByUsername } from '~/server/services/authStore';
+import {
+    getUserByUsername,
+    updateUserBanState
+} from '~/server/services/authStore';
 import {
     getUserQuotaOverride,
     updateUserQuotaOverride,
@@ -14,6 +18,8 @@ import getNowSeconds from '~/server/utils/time/getNowSeconds';
 import type {
     AdminResetUserQuotaRequest,
     AdminResetUserQuotaResponse,
+    AdminUpdateUserBanStateRequest,
+    AdminUpdateUserBanStateResponse,
     AdminUpdateUserQuotaRequest,
     AdminUpdateUserQuotaResponse,
     AdminUserListItem,
@@ -24,6 +30,7 @@ interface AdminUserRow {
     username: string;
     created_at: number;
     last_login_at: number | null;
+    is_banned: number;
 }
 
 type AdminUserSqlKey = 'selectAdminUsers';
@@ -49,6 +56,8 @@ function toAdminUserListItem(
         userId: row.username,
         createdAt: row.created_at,
         lastLoginAt: row.last_login_at,
+        isBanned: row.is_banned === 1,
+        isAdmin: useConfig().user.adminUserIds.includes(row.username),
         apiRemainCost: peekRemainTokens(quotaSubject, now),
         customTokenLimit: quotaOverride.tokenLimit,
         customRefillAmount: quotaOverride.refillAmount
@@ -62,6 +71,7 @@ export function getAdminUsersSnapshot(
 
     return {
         totalUsers: rows.length,
+        bannedUsers: rows.filter((row) => row.is_banned === 1).length,
         asOf: now,
         items: rows.map((row) => toAdminUserListItem(row, now))
     };
@@ -81,6 +91,27 @@ function syncQuotaBucket(userId: string) {
     }
 
     return subject;
+}
+
+export function updateAdminUserBanState(
+    input: AdminUpdateUserBanStateRequest
+): AdminUpdateUserBanStateResponse {
+    ensureUserExists(input.userId);
+
+    if (useConfig().user.adminUserIds.includes(input.userId)) {
+        throw new ApiRequestError(
+            403,
+            'admin_user_protected',
+            '管理员账户不可封禁或解封'
+        );
+    }
+
+    const result = updateUserBanState(input.userId, input.banned);
+    if (!result) {
+        throw new ApiRequestError(404, 'not_found', '用户不存在');
+    }
+
+    return result;
 }
 
 export function updateAdminUserQuotaOverride(

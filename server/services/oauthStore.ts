@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import { createPreparedSqlStore } from '~/server/libs/database/prepared';
 import { useUsersDatabase } from '~/server/libs/database/users';
 import {
+    assertUserNotBanned,
     createApiKey,
     getUserByUsername,
     revokeApiKeysByOauthClientId,
@@ -729,6 +730,8 @@ export function exchangeAuthorizationCode(input: {
     if (!client || client.status !== 'active') {
         return undefined;
     }
+
+    assertUserNotBanned(row.user_id);
 
     const consumeResult = oauthStatements.run(
         'consumeOauthAuthorizationCode',

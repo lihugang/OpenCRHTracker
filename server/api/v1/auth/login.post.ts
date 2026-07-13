@@ -1,5 +1,6 @@
 import { defineEventHandler, readBody } from 'h3';
 import {
+    assertUserNotBanned,
     createApiKey,
     getUserByUsername,
     updateLastLoginAt,
@@ -68,6 +69,7 @@ export default defineEventHandler(async (event) => {
                 );
             }
 
+            assertUserNotBanned(user.username);
             updateLastLoginAt(user.username);
             const session = createApiKey(user.username);
             setAuthCookie(event, session.apiKey);

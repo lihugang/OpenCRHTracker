@@ -34,6 +34,21 @@ function ensureUsersSchema(db: Database.Database) {
         db.exec(statement);
     }
 
+    const migrationSql = importSqlBatch('users/migrations') as Record<
+        'selectUsersColumns' | 'alterUsersAddIsBanned',
+        string
+    >;
+    const userColumns = db
+        .prepare(migrationSql.selectUsersColumns)
+        .all() as Array<{ name?: unknown }>;
+    const hasIsBannedColumn = userColumns.some(
+        (column) => column.name === 'is_banned'
+    );
+
+    if (!hasIsBannedColumn) {
+        db.exec(migrationSql.alterUsersAddIsBanned);
+    }
+
     const oauthSchemaSql = importSqlBatch('users/oauth');
     const orderedOauthKeys = [
         'createOauthClientsTable',
