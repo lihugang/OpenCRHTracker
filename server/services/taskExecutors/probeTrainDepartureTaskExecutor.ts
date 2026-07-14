@@ -197,7 +197,8 @@ async function tryResolveGuangzhouDiningTrainMapping(
 ): Promise<boolean> {
     const scheduleGroup = getTodayScheduleProbeGroupByTrainCode(args.trainCode);
     if (
-        scheduleGroup?.trainStyle.trim().toUpperCase() !== 'CR400BF-AS' ||
+        scheduleGroup?.trainStyle.trim().toUpperCase() !==
+        'CR400BF_AS_1261' ||
         scheduleGroup.bureauCode.trim().toUpperCase() !== 'Q'
     ) {
         return false;
