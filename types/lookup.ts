@@ -96,6 +96,8 @@ export interface EmuAllocationProfileResponse {
     trainsetManufacturer: string;
     trailerManufacturer: string;
     manufactureMonth: string;
+    designMaxSpeed: number;
+    operatingMaxSpeed: number;
     isPublic: boolean;
     railwayTravelCodeEnabled: boolean;
     firstClassPowerLegrest: boolean;

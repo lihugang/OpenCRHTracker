@@ -69,6 +69,8 @@ export default defineEventHandler(async (event) => {
                 trainsetManufacturer: record.trainsetManufacturer,
                 trailerManufacturer: record.trailerManufacturer,
                 manufactureMonth: record.manufactureMonth,
+                designMaxSpeed: record.designMaxSpeed,
+                operatingMaxSpeed: record.operatingMaxSpeed,
                 isPublic: record.isPublic,
                 railwayTravelCodeEnabled: record.railwayTravelCodeEnabled,
                 firstClassPowerLegrest: record.firstClassPowerLegrest,

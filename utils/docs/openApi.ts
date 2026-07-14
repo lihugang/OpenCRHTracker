@@ -853,6 +853,8 @@ export const developerDocsOpenApi = {
                             'trainsetManufacturer',
                             'trailerManufacturer',
                             'manufactureMonth',
+                            'designMaxSpeed',
+                            'operatingMaxSpeed',
                             'isPublic',
                             'railwayTravelCodeEnabled',
                             'firstClassPowerLegrest',
@@ -913,6 +915,14 @@ export const developerDocsOpenApi = {
                             manufactureMonth: {
                                 type: 'string',
                                 example: '2020-09'
+                            },
+                            designMaxSpeed: {
+                                type: 'number',
+                                example: 350
+                            },
+                            operatingMaxSpeed: {
+                                type: 'number',
+                                example: 350
                             },
                             isPublic: {
                                 type: 'boolean',
@@ -3773,6 +3783,8 @@ export const developerDocsOpenApi = {
                                         trainsetManufacturer: '中车青岛四方',
                                         trailerManufacturer: '中车青岛四方',
                                         manufactureMonth: '2020-09',
+                                        designMaxSpeed: 350,
+                                        operatingMaxSpeed: 350,
                                         isPublic: true,
                                         railwayTravelCodeEnabled: true,
                                         firstClassPowerLegrest: true,

@@ -42,6 +42,8 @@ interface RawTrainsetModelRecord extends RawAllocationIdRecord {
     model?: unknown;
     sub_model?: unknown;
     custom_type?: unknown;
+    design_max_speed?: unknown;
+    operating_max_speed?: unknown;
     remark?: unknown;
     first_class_power_legrest?: unknown;
     socket_location_id?: unknown;
@@ -117,6 +119,8 @@ export interface EmuListRecord {
     trainsetManufacturer: string;
     trailerManufacturer: string;
     manufactureMonth: string;
+    designMaxSpeed: number;
+    operatingMaxSpeed: number;
     isPublic: boolean;
     railwayTravelCodeEnabled: boolean;
     firstClassPowerLegrest: boolean;
@@ -181,6 +185,19 @@ function normalizeRequiredString(value: unknown, fieldName: string): string {
     }
 
     return normalizedValue;
+}
+
+function normalizeRequiredNonNegativeNumber(
+    value: unknown,
+    fieldName: string
+): number {
+    if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
+        throw new Error(
+            `EMUList field ${fieldName} must be a non-negative finite number`
+        );
+    }
+
+    return value;
 }
 
 function normalizeOptionalString(value: unknown): string {
@@ -646,6 +663,14 @@ export function parseEmuListAssetText(text: string): EmuListRecord[] {
                 row.trailer_manufacturer_id
             ),
             manufactureMonth: normalizeOptionalString(row.manufacture_month),
+            designMaxSpeed: normalizeRequiredNonNegativeNumber(
+                trainsetModel.design_max_speed,
+                'trainset_models.design_max_speed'
+            ),
+            operatingMaxSpeed: normalizeRequiredNonNegativeNumber(
+                trainsetModel.operating_max_speed,
+                'trainset_models.operating_max_speed'
+            ),
             isPublic: normalizeBoolean(row.is_public),
             railwayTravelCodeEnabled: isSeatCodeEnabled(
                 row.railway_travel_code_enabled

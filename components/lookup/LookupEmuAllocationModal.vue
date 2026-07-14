@@ -221,6 +221,14 @@ const detailItems = computed(() => {
             value: formatValue(item.manufactureMonth)
         },
         {
+            label: '设计时速',
+            value: formatSpeed(item.designMaxSpeed)
+        },
+        {
+            label: '运营时速',
+            value: formatSpeed(item.operatingMaxSpeed)
+        },
+        {
             label: '一等座电动腿托',
             value: item.firstClassPowerLegrest ? '有' : '无'
         },
@@ -259,6 +267,10 @@ function formatValue(value: string) {
 
 function hasDisplayValue(value: string) {
     return formatValue(value) !== '--';
+}
+
+function formatSpeed(value: number) {
+    return `${value} km/h`;
 }
 
 function formatManufacturer(item: EmuAllocationProfileResponse) {
