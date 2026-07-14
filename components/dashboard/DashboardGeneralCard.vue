@@ -398,9 +398,7 @@
                                 qqResendRemainingSeconds > 0
                             "
                             @click="emit('sendQqCode', qqNumberModel)">
-                            重新发送<span v-if="qqResendRemainingSeconds > 0">
-                                （{{ qqResendRemainingSeconds }} 秒）</span
-                            >
+                            {{ qqResendButtonLabel }}
                         </UiButton>
                     </div>
                 </div>
@@ -509,6 +507,7 @@ const emit = defineEmits<{
     toggleSaveSearchHistory: [];
     sendQqCode: [qqNumber: string];
     verifyQq: [qqNumber: string, code: string];
+    resetQqBinding: [];
     unbindQq: [];
     changePassword: [];
     logout: [];
@@ -544,6 +543,12 @@ const qqBindingMessageClass = computed(() =>
         : 'flex items-center gap-1.5 pl-1 text-xs leading-5 text-emerald-600'
 );
 
+const qqResendButtonLabel = computed(() =>
+    props.qqResendRemainingSeconds > 0
+        ? `重新发送（${props.qqResendRemainingSeconds} 秒）`
+        : '重新发送'
+);
+
 const isQqModalOpen = ref(false);
 const isUnbindModalOpen = ref(false);
 const qqNumberInputRef = ref<HTMLInputElement | null>(null);
@@ -564,14 +569,20 @@ const verificationCodeModelProxy = computed({
     }
 });
 
-function openQqModal() {
+function resetQqModalState() {
     qqNumberModel.value = '';
     verificationCodeModel.value = '';
+    emit('resetQqBinding');
+}
+
+function openQqModal() {
+    resetQqModalState();
     isQqModalOpen.value = true;
 }
 
 watch(isQqModalOpen, async (isOpen) => {
     if (!isOpen) {
+        resetQqModalState();
         return;
     }
 

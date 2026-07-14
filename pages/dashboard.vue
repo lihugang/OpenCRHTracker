@@ -224,6 +224,7 @@
                                 "
                                 @send-qq-code="sendQqCode"
                                 @verify-qq="verifyQq"
+                                @reset-qq-binding="resetQqBindingFlow"
                                 @unbind-qq="unbindQq"
                                 @change-password="changePassword"
                                 @logout="logout" />
@@ -951,6 +952,7 @@ const qqBindingMessage = ref('');
 const qqBindingTone = ref<'success' | 'error'>('success');
 const qqCodeSent = ref(false);
 const qqNextSendAt = ref(0);
+const qqBindingFlowRevision = ref(0);
 
 const issueForm = reactive({
     name: '',
@@ -1893,11 +1895,19 @@ function clearQqBindingMessage() {
     qqBindingTone.value = 'success';
 }
 
+function resetQqBindingFlow() {
+    qqBindingFlowRevision.value += 1;
+    qqCodeSent.value = false;
+    qqNextSendAt.value = 0;
+    clearQqBindingMessage();
+}
+
 async function sendQqCode(qqNumber: string) {
     if (isQqBindingPending.value) {
         return;
     }
 
+    const flowRevision = qqBindingFlowRevision.value;
     isQqBindingPending.value = true;
     clearQqBindingMessage();
     try {
@@ -1907,12 +1917,18 @@ async function sendQqCode(qqNumber: string) {
             method: 'POST',
             body: { qqNumber }
         });
+        if (flowRevision !== qqBindingFlowRevision.value) {
+            return;
+        }
         qqNextSendAt.value = response.nextSendAt;
         qqCodeSent.value = true;
         qqBindingTone.value = 'success';
         qqBindingMessage.value =
             '验证码已发送，请查收 QQ 邮箱。若未收到，请检查垃圾邮件。';
     } catch (error) {
+        if (flowRevision !== qqBindingFlowRevision.value) {
+            return;
+        }
         qqBindingTone.value = 'error';
         qqBindingMessage.value = getApiErrorMessage(
             error,
@@ -1928,6 +1944,7 @@ async function verifyQq(qqNumber: string, code: string) {
         return;
     }
 
+    const flowRevision = qqBindingFlowRevision.value;
     isQqBindingPending.value = true;
     clearQqBindingMessage();
     try {
@@ -1941,6 +1958,9 @@ async function verifyQq(qqNumber: string, code: string) {
         qqBindingTone.value = 'success';
         qqBindingMessage.value = 'QQ 绑定成功。';
     } catch (error) {
+        if (flowRevision !== qqBindingFlowRevision.value) {
+            return;
+        }
         qqBindingTone.value = 'error';
         qqBindingMessage.value = getApiErrorMessage(
             error,
