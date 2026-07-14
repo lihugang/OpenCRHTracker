@@ -8,11 +8,9 @@ import queryWithRetry from './queryWithRetry';
 import { saveBuildingScheduleState } from './stateStore';
 import { buildGroupIndex, getGroupKey } from './taskHelpers';
 import { toScheduleStationMap, toScheduleStops } from './mapRouteStops';
+import { normalizeRouteGroupDayOffsets } from './normalizeRouteDayOffsets';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
-import {
-    getShanghaiDayStartUnixSeconds,
-    toShanghaiDayOffsetFromUnixSeconds
-} from '~/server/utils/date/shanghaiDateTime';
+import { toShanghaiDayOffsetFromUnixSeconds } from '~/server/utils/date/shanghaiDateTime';
 import type {
     ScheduleState,
     ScheduleItem,
@@ -94,7 +92,6 @@ async function runScheduleProbeInternal(
 
     let newlyAddedCount = 0;
     let enrichedCount = 0;
-    let droppedPreviousServiceStartCount = 0;
     let reusedRouteInfoCount = 0;
     let stationUpdates: ScheduleStationMap = {};
     logger.info(
@@ -265,38 +262,6 @@ async function runScheduleProbeInternal(
             );
 
             if (routeResult.ok && routeResult.data.status === 'running') {
-                const dayStart = getShanghaiDayStartUnixSeconds(state.date);
-                if (routeResult.data.route.startAt < dayStart) {
-                    for (const groupItem of groupItems) {
-                        itemsByCode.delete(normalizeCode(groupItem.code));
-                        state.progress.failedEnrichCodes =
-                            state.progress.failedEnrichCodes.filter(
-                                (code) =>
-                                    normalizeCode(code) !==
-                                    normalizeCode(groupItem.code)
-                            );
-                    }
-                    droppedPreviousServiceStartCount += groupItems.length;
-                    logger.info(
-                        `drop_previous_service_start runId=${runId} trainCode=${item.code} scheduleDate=${state.date} routeStartAt=${routeResult.data.route.startAt} groupSize=${groupItems.length}`
-                    );
-                    processedGroupKeys.add(groupKey);
-                    state.progress.enrichCursor = index + 1;
-                    processedSinceFlush += 1;
-                    if (processedSinceFlush >= config.checkpointFlushEvery) {
-                        updateItemsFromMap(state, itemsByCode, config);
-                        saveBuildingScheduleState(
-                            scheduleFilePath,
-                            state,
-                            stationUpdates
-                        );
-                        logger.info(
-                            `enrich checkpoint runId=${runId} cursor=${state.progress.enrichCursor} totalItems=${state.items.length} failedEnrichCodes=${state.progress.failedEnrichCodes.length} enriched=${enrichedCount} droppedPreviousServiceStart=${droppedPreviousServiceStartCount} apiCalls=${state.progress.counters.apiCalls} apiRetries=${state.progress.counters.apiRetries}`
-                        );
-                        processedSinceFlush = 0;
-                    }
-                    continue;
-                }
                 const nextStartAt = toShanghaiDayOffsetFromUnixSeconds(
                     state.date,
                     routeResult.data.route.startAt
@@ -310,6 +275,20 @@ async function runScheduleProbeInternal(
                     state.date,
                     routeResult.data.route.stops
                 );
+                const normalizedRoute: ScheduleItem = {
+                    ...item,
+                    startAt: nextStartAt,
+                    endAt: nextEndAt,
+                    stops: nextStops.map((stop) => ({ ...stop }))
+                };
+                const shiftSeconds = normalizeRouteGroupDayOffsets([
+                    normalizedRoute
+                ]);
+                if (shiftSeconds > 0) {
+                    logger.info(
+                        `normalize_route_day_offsets runId=${runId} groupKey=${groupKey} trainCode=${item.code} shiftSeconds=${shiftSeconds} groupSize=${groupItems.length}`
+                    );
+                }
                 stationUpdates = {
                     ...stationUpdates,
                     ...(await toScheduleStationMap(
@@ -328,10 +307,10 @@ async function runScheduleProbeInternal(
                     groupItem.endStation =
                         routeResult.data.route.endStation.trim();
                     groupItem.allCodes = [...routeResult.data.route.allCodes];
-                    groupItem.startAt = nextStartAt;
-                    groupItem.endAt = nextEndAt;
+                    groupItem.startAt = normalizedRoute.startAt;
+                    groupItem.endAt = normalizedRoute.endAt;
                     groupItem.lastRouteRefreshAt = refreshedAt;
-                    groupItem.stops = nextStops.map((stop) => ({
+                    groupItem.stops = normalizedRoute.stops.map((stop) => ({
                         ...stop
                     }));
                 }
@@ -383,7 +362,7 @@ async function runScheduleProbeInternal(
 
     saveBuildingScheduleState(scheduleFilePath, state, stationUpdates);
     logger.info(
-        `done runId=${runId} status=${state.status} durationMs=${state.stats.durationMs} rawItems=${state.stats.rawItems} uniqueItems=${state.stats.uniqueItems} newlyAdded=${newlyAddedCount} reusedRouteInfo=${reusedRouteInfoCount} enriched=${enrichedCount} droppedPreviousServiceStart=${droppedPreviousServiceStartCount} failedKeywords=${state.progress.failedKeywords.length} failedEnrichCodes=${state.progress.failedEnrichCodes.length} apiCalls=${state.progress.counters.apiCalls} apiRetries=${state.progress.counters.apiRetries}`
+        `done runId=${runId} status=${state.status} durationMs=${state.stats.durationMs} rawItems=${state.stats.rawItems} uniqueItems=${state.stats.uniqueItems} newlyAdded=${newlyAddedCount} reusedRouteInfo=${reusedRouteInfoCount} enriched=${enrichedCount} failedKeywords=${state.progress.failedKeywords.length} failedEnrichCodes=${state.progress.failedEnrichCodes.length} apiCalls=${state.progress.counters.apiCalls} apiRetries=${state.progress.counters.apiRetries}`
     );
 }
 

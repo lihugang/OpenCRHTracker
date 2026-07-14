@@ -8,6 +8,7 @@ import {
 } from '~/server/utils/12306/scheduleProbe/stateStore';
 import {
     listScheduleAliasesByStateKind,
+    listScheduleItemRecordsByStateKind,
     loadScheduleItemCodeByStateKindAndAlias,
     loadScheduleItemByStateKindAndCode,
     listScheduleItemsByStateKind,
@@ -18,6 +19,8 @@ import {
     type ScheduleDbStationStopRow,
     type ScheduleStateKind
 } from '~/server/utils/12306/scheduleProbe/sqliteStore';
+import { getRouteGroupDayOffsetShift } from '~/server/utils/12306/scheduleProbe/normalizeRouteDayOffsets';
+import { getGroupKey } from '~/server/utils/12306/scheduleProbe/taskHelpers';
 import {
     toShanghaiDayOffsetFromUnixSeconds,
     toUnixSecondsFromShanghaiDayOffset
@@ -81,6 +84,7 @@ interface TodayScheduleCache {
     groupsByTrainKey: Map<string, TodayScheduleProbeGroup>;
     groupKeysByTrainCode: Map<string, string>;
     groupKeysByTrainInternalCode: Map<string, string>;
+    dayOffsetShiftByItemCode: Map<string, number>;
 }
 
 let cached: TodayScheduleCache | null = null;
@@ -92,6 +96,7 @@ function rebuildCache(): TodayScheduleCache {
     const groupsByTrainKey = new Map<string, TodayScheduleProbeGroup>();
     const groupKeysByTrainCode = new Map<string, string>();
     const groupKeysByTrainInternalCode = new Map<string, string>();
+    const dayOffsetShiftByItemCode = new Map<string, number>();
     let activeStateKind: ScheduleStateKind | null = null;
     let activeDate = currentDate;
 
@@ -103,6 +108,29 @@ function rebuildCache(): TodayScheduleCache {
 
     if (activeStateKind) {
         const items = listScheduleItemsByStateKind(activeStateKind);
+        const itemGroups = new Map<string, ScheduleItem[]>();
+        for (const record of listScheduleItemRecordsByStateKind(
+            activeStateKind
+        )) {
+            const groupKey = getGroupKey(record.item);
+            const groupItems = itemGroups.get(groupKey) ?? [];
+            groupItems.push(record.item);
+            itemGroups.set(groupKey, groupItems);
+        }
+        for (const [groupKey, groupItems] of itemGroups) {
+            const shiftSeconds = getRouteGroupDayOffsetShift(groupItems);
+            if (shiftSeconds > 0) {
+                logger.warn(
+                    `normalize_stored_route_day_offsets stateKind=${activeStateKind} groupKey=${groupKey} trainCode=${groupItems[0]?.code ?? 'unknown'} shiftSeconds=${shiftSeconds} groupSize=${groupItems.length}`
+                );
+            }
+            for (const groupItem of groupItems) {
+                dayOffsetShiftByItemCode.set(
+                    normalizeCode(groupItem.code),
+                    shiftSeconds
+                );
+            }
+        }
         const aliasesByItemCode =
             listScheduleAliasesByStateKind(activeStateKind);
         const scheduleItemIdentityIndex = buildScheduleItemIdentityIndex(items);
@@ -123,7 +151,8 @@ function rebuildCache(): TodayScheduleCache {
             const timetable = buildTimetableRouteFromItemRow(
                 activeDate,
                 item,
-                allCodes
+                allCodes,
+                dayOffsetShiftByItemCode.get(trainCode) ?? 0
             );
             if (!timetable) {
                 continue;
@@ -176,7 +205,8 @@ function rebuildCache(): TodayScheduleCache {
         routesByTrainCode,
         groupsByTrainKey,
         groupKeysByTrainCode,
-        groupKeysByTrainInternalCode
+        groupKeysByTrainInternalCode,
+        dayOffsetShiftByItemCode
     };
     return cached;
 }
@@ -232,7 +262,14 @@ export function getTodayScheduleTimetableByTrainCode(
             activeCache.activeStateKind,
             item.itemCode
         )
-    ).map((stop) => toTodayScheduleStop(activeCache.date, stop));
+    ).map((stop) =>
+        toTodayScheduleStop(
+            activeCache.date,
+            stop,
+            activeCache.dayOffsetShiftByItemCode.get(normalizeCode(itemCode)) ??
+                0
+        )
+    );
 
     return {
         ...route,
@@ -292,7 +329,13 @@ export function getTodayStationTimetableByStationName(
                 ...route,
                 stops: []
             },
-            toTodayScheduleStopFromStationRow(activeCache.date, row)
+            toTodayScheduleStopFromStationRow(
+                activeCache.date,
+                row,
+                activeCache.dayOffsetShiftByItemCode.get(
+                    normalizeCode(row.itemCode)
+                ) ?? 0
+            )
         );
     }
 
@@ -463,7 +506,8 @@ function normalizeAliasCodes(
 function buildTimetableRouteFromItemRow(
     date: string,
     item: ScheduleDbItemRow,
-    allCodes: string[]
+    allCodes: string[],
+    shiftSeconds: number
 ): TodayScheduleTimetable | null {
     if (item.startAt === null || item.endAt === null) {
         return null;
@@ -482,8 +526,14 @@ function buildTimetableRouteFromItemRow(
         trainStyle: item.trainStyle.trim(),
         trainDepartment: item.trainDepartment.trim(),
         passengerDepartment: item.passengerDepartment.trim(),
-        startAt: toUnixSecondsFromShanghaiDayOffset(date, item.startAt),
-        endAt: toUnixSecondsFromShanghaiDayOffset(date, item.endAt),
+        startAt: toUnixSecondsFromShanghaiDayOffset(
+            date,
+            item.startAt + shiftSeconds
+        ),
+        endAt: toUnixSecondsFromShanghaiDayOffset(
+            date,
+            item.endAt + shiftSeconds
+        ),
         updatedAt: item.lastRouteRefreshAt,
         startStation: item.startStation.trim(),
         endStation: item.endStation.trim(),
@@ -493,7 +543,8 @@ function buildTimetableRouteFromItemRow(
 
 function toTodayScheduleStop(
     date: string,
-    stop: ScheduleStop
+    stop: ScheduleStop,
+    shiftSeconds = 0
 ): TodayScheduleStop {
     return {
         stationNo: stop.stationNo,
@@ -501,11 +552,17 @@ function toTodayScheduleStop(
         arriveAt:
             stop.arriveAt === null
                 ? null
-                : toUnixSecondsFromShanghaiDayOffset(date, stop.arriveAt),
+                : toUnixSecondsFromShanghaiDayOffset(
+                      date,
+                      stop.arriveAt + shiftSeconds
+                  ),
         departAt:
             stop.departAt === null
                 ? null
-                : toUnixSecondsFromShanghaiDayOffset(date, stop.departAt),
+                : toUnixSecondsFromShanghaiDayOffset(
+                      date,
+                      stop.departAt + shiftSeconds
+                  ),
         stationTrainCode: stop.stationTrainCode.trim(),
         wicket: stop.wicket.trim(),
         distance: stop.distance ?? null,
@@ -517,7 +574,8 @@ function toTodayScheduleStop(
 
 function toTodayScheduleStopFromStationRow(
     date: string,
-    row: ScheduleDbStationStopRow
+    row: ScheduleDbStationStopRow,
+    shiftSeconds: number
 ): TodayScheduleStop {
     const isStart = row.isStart === 1;
     const isEnd = row.isEnd === 1;
@@ -528,11 +586,17 @@ function toTodayScheduleStopFromStationRow(
         arriveAt:
             isStart || row.arriveAt === null
                 ? null
-                : toUnixSecondsFromShanghaiDayOffset(date, row.arriveAt),
+                : toUnixSecondsFromShanghaiDayOffset(
+                      date,
+                      row.arriveAt + shiftSeconds
+                  ),
         departAt:
             isEnd || row.departAt === null
                 ? null
-                : toUnixSecondsFromShanghaiDayOffset(date, row.departAt),
+                : toUnixSecondsFromShanghaiDayOffset(
+                      date,
+                      row.departAt + shiftSeconds
+                  ),
         stationTrainCode: row.stationTrainCode.trim(),
         wicket: row.wicket.trim(),
         distance: row.distance ?? null,

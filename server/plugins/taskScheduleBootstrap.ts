@@ -82,6 +82,7 @@ import {
 } from '~/server/utils/date/shanghaiDateTime';
 import { runIndexRebuild } from '~/server/services/indexRebuildWorker';
 import { registerBanUserAccountTaskExecutor } from '~/server/services/taskExecutors/banUserAccountTaskExecutor';
+import { registerUserRiskCaseTaskExecutor } from '~/server/services/taskExecutors/userRiskCaseTaskExecutor';
 import { initializeUserBanSecurityState } from '~/server/services/userBanSecurityStore';
 
 const logger = getLogger('task-schedule-bootstrap');
@@ -293,6 +294,7 @@ export default defineNitroPlugin(async () => {
         registerDetectCoupledEmuGroupTaskExecutor();
         registerRefreshAssetFileTaskExecutors();
         registerBanUserAccountTaskExecutor();
+        registerUserRiskCaseTaskExecutor();
         initializeUserBanSecurityState();
         await Promise.all([
             runIndexRebuild(REBUILD_REFERENCE_MODEL_INDEX_TASK_EXECUTOR),

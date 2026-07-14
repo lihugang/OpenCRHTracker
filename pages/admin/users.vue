@@ -18,7 +18,7 @@
 
         <div class="space-y-6">
             <UiCard :show-accent-bar="false">
-                <div class="grid gap-4 md:grid-cols-3">
+                <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                     <div
                         class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-5 py-4">
                         <p
@@ -48,6 +48,20 @@
                     </div>
 
                     <div
+                        class="rounded-[1rem] border border-amber-200 bg-amber-50/70 px-5 py-4">
+                        <p
+                            class="text-xs font-semibold uppercase tracking-[0.22em] text-amber-600">
+                            Risk Control
+                        </p>
+                        <p class="mt-2 text-3xl font-semibold text-amber-900">
+                            {{ formatNumber(openRiskCaseItems.length) }}
+                        </p>
+                        <p class="mt-2 text-sm leading-6 text-amber-800/80">
+                            当前未解除风控数量
+                        </p>
+                    </div>
+
+                    <div
                         class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-5 py-4">
                         <p
                             class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
@@ -59,6 +73,196 @@
                         <p class="mt-2 text-sm leading-6 text-slate-500">
                             当前数据时间
                         </p>
+                    </div>
+                </div>
+            </UiCard>
+
+            <UiCard :show-accent-bar="false">
+                <div class="space-y-6">
+                    <div
+                        class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                        <div class="space-y-2">
+                            <p
+                                class="text-xs font-semibold uppercase tracking-[0.22em] text-amber-600">
+                                Risk Cases
+                            </p>
+                            <h2 class="text-2xl font-semibold text-slate-900">
+                                IP 与 UA 风控记录
+                            </h2>
+                            <p class="text-sm leading-6 text-slate-600">
+                                命中近期封禁指纹后仅标记风控；首次尝试绑定 QQ
+                                时，后台将号码加入封禁清单并封禁账户。
+                            </p>
+                        </div>
+                        <div class="flex flex-wrap gap-2">
+                            <UiStatusBadge
+                                :label="`${formatNumber(openRiskCaseItems.length)} 个未解除`"
+                                tone="warning" />
+                            <UiStatusBadge
+                                :label="`${formatNumber(riskCaseItems.length)} 条记录`"
+                                tone="neutral" />
+                        </div>
+                    </div>
+
+                    <div
+                        v-if="securityStatus === 'pending' && !securityData"
+                        class="space-y-3">
+                        <div
+                            v-for="index in 3"
+                            :key="`admin-risk-cases-skeleton:${index}`"
+                            class="h-20 animate-pulse rounded-[1rem] bg-slate-100/90" />
+                    </div>
+
+                    <UiEmptyState
+                        v-else-if="securityErrorMessage"
+                        eyebrow="加载失败"
+                        title="风控记录加载失败"
+                        :description="securityErrorMessage"
+                        tone="danger">
+                        <UiButton
+                            type="button"
+                            variant="secondary"
+                            @click="refreshSecurity()">
+                            重试
+                        </UiButton>
+                    </UiEmptyState>
+
+                    <UiEmptyState
+                        v-else-if="riskCaseItems.length === 0"
+                        eyebrow="No Risk Cases"
+                        title="暂无风控记录"
+                        description="新的 IP 与 UA 关联命中会在后台生成风控记录。" />
+
+                    <div
+                        v-else
+                        class="overflow-x-auto rounded-[1rem] border border-slate-200 bg-white/90">
+                        <table class="min-w-[92rem] divide-y divide-slate-200">
+                            <thead class="bg-slate-50/80">
+                                <tr>
+                                    <th
+                                        class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                        命中时间
+                                    </th>
+                                    <th
+                                        class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                        账户
+                                    </th>
+                                    <th
+                                        class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                        风控状态
+                                    </th>
+                                    <th
+                                        class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                        关联记录
+                                    </th>
+                                    <th
+                                        class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                        首个 QQ
+                                    </th>
+                                    <th
+                                        class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                        IP
+                                    </th>
+                                    <th
+                                        class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                        User-Agent
+                                    </th>
+                                    <th
+                                        class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                        处置结果
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                <tr
+                                    v-for="item in riskCaseItems"
+                                    :key="item.id"
+                                    class="align-top transition hover:bg-amber-50/30">
+                                    <td
+                                        class="whitespace-nowrap px-4 py-4 text-sm text-slate-700">
+                                        <p>
+                                            {{ formatTimestamp(item.detectedAt) }}
+                                        </p>
+                                        <p class="mt-1 text-xs text-slate-400">
+                                            更新于
+                                            {{ formatTimestamp(item.updatedAt) }}
+                                        </p>
+                                    </td>
+                                    <td
+                                        class="px-4 py-4 text-sm font-semibold text-slate-900">
+                                        {{ item.userId }}
+                                    </td>
+                                    <td class="px-4 py-4">
+                                        <UiStatusBadge
+                                            :label="
+                                                getRiskCaseStatusLabel(
+                                                    item.status
+                                                )
+                                            "
+                                            :tone="
+                                                getRiskCaseStatusTone(
+                                                    item.status
+                                                )
+                                            " />
+                                        <p
+                                            v-if="item.errorMessage"
+                                            class="mt-2 max-w-[18rem] break-all text-xs leading-5 text-rose-700">
+                                            {{ item.errorMessage }}
+                                        </p>
+                                    </td>
+                                    <td
+                                        class="whitespace-nowrap px-4 py-4 font-mono text-xs text-slate-700">
+                                        <p>封禁 #{{ item.matchedActionId }}</p>
+                                        <p class="mt-1 text-slate-400">
+                                            指纹 #{{ item.fingerprintId ?? '--' }}
+                                        </p>
+                                    </td>
+                                    <td
+                                        class="whitespace-nowrap px-4 py-4 font-mono text-xs text-slate-700">
+                                        {{ item.qqNumber ?? '--' }}
+                                    </td>
+                                    <td
+                                        class="max-w-[14rem] break-all px-4 py-4 font-mono text-xs leading-5 text-slate-700">
+                                        {{ item.ipAddress }}
+                                    </td>
+                                    <td
+                                        class="max-w-[24rem] break-all px-4 py-4 font-mono text-xs leading-5 text-slate-600"
+                                        :title="item.userAgent">
+                                        {{ item.userAgent }}
+                                    </td>
+                                    <td
+                                        class="max-w-[18rem] px-4 py-4 text-sm leading-6 text-slate-700">
+                                        <template v-if="item.clearedAt">
+                                            <p class="font-semibold text-slate-800">
+                                                已由
+                                                {{ item.clearedBy ?? 'unknown' }}
+                                                解除
+                                            </p>
+                                            <p class="mt-1 text-xs text-slate-500">
+                                                {{ formatTimestamp(item.clearedAt) }}
+                                            </p>
+                                        </template>
+                                        <template v-else-if="item.banActionId">
+                                            <p class="font-semibold text-rose-700">
+                                                封禁操作 #{{ item.banActionId }}
+                                            </p>
+                                            <p class="mt-1 text-xs text-slate-500">
+                                                {{
+                                                    item.escalatedAt
+                                                        ? formatTimestamp(
+                                                              item.escalatedAt
+                                                          )
+                                                        : '后台处理中'
+                                                }}
+                                            </p>
+                                        </template>
+                                        <span v-else class="text-slate-500">
+                                            等待 QQ 绑定尝试
+                                        </span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </UiCard>
@@ -153,7 +357,11 @@
                                     :key="item.userId"
                                     class="transition hover:bg-slate-50/70"
                                     :class="
-                                        item.isBanned ? 'bg-rose-50/35' : ''
+                                        item.isBanned
+                                            ? 'bg-rose-50/35'
+                                            : getOpenRiskCase(item.userId)
+                                              ? 'bg-amber-50/35'
+                                              : ''
                                     ">
                                     <td
                                         class="px-4 py-3 text-sm text-slate-900">
@@ -162,9 +370,29 @@
                                         </span>
                                     </td>
                                     <td class="px-4 py-3 text-sm">
-                                        <UiStatusBadge
-                                            :label="getUserStatusLabel(item)"
-                                            :tone="getUserStatusTone(item)" />
+                                        <div class="flex flex-wrap gap-2">
+                                            <UiStatusBadge
+                                                :label="
+                                                    getUserStatusLabel(item)
+                                                "
+                                                :tone="
+                                                    getUserStatusTone(item)
+                                                " />
+                                            <UiStatusBadge
+                                                v-if="
+                                                    getOpenRiskCase(item.userId)
+                                                "
+                                                :label="
+                                                    getUserRiskStatusLabel(
+                                                        item.userId
+                                                    )
+                                                "
+                                                :tone="
+                                                    getUserRiskStatusTone(
+                                                        item.userId
+                                                    )
+                                                " />
+                                        </div>
                                     </td>
                                     <td
                                         class="px-4 py-3 text-sm text-slate-700">
@@ -196,7 +424,7 @@
                                     </td>
                                     <td class="px-4 py-3 text-right">
                                         <div
-                                            class="flex min-w-[12rem] justify-end gap-2">
+                                            class="flex min-w-[18rem] flex-wrap justify-end gap-2">
                                             <UiButton
                                                 type="button"
                                                 variant="secondary"
@@ -218,6 +446,32 @@
                                             </UiButton>
 
                                             <UiButton
+                                                v-if="
+                                                    !item.isAdmin &&
+                                                    !item.isBanned &&
+                                                    getOpenRiskCase(item.userId)
+                                                "
+                                                type="button"
+                                                variant="secondary"
+                                                size="sm"
+                                                class="border-amber-200 text-amber-800 hover:border-amber-300 hover:bg-amber-50"
+                                                :loading="
+                                                    clearingRiskUserId ===
+                                                    item.userId
+                                                "
+                                                :disabled="
+                                                    resettingQuotaUserId.length >
+                                                        0 ||
+                                                    updatingBanUserId.length >
+                                                        0
+                                                "
+                                                @click="
+                                                    openClearRiskDialog(item)
+                                                ">
+                                                解除风控
+                                            </UiButton>
+
+                                            <UiButton
                                                 v-if="!item.isAdmin"
                                                 type="button"
                                                 variant="secondary"
@@ -226,7 +480,10 @@
                                                     usersStatus === 'pending' ||
                                                     resettingQuotaUserId.length >
                                                         0 ||
-                                                    updatingBanUserId.length > 0
+                                                    updatingBanUserId.length >
+                                                        0 ||
+                                                    clearingRiskUserId.length >
+                                                        0
                                                 "
                                                 :class="
                                                     item.isBanned
@@ -278,6 +535,12 @@
                         v-else-if="banStatusSuccessMessage"
                         class="rounded-[1rem] border border-emerald-200 bg-emerald-50/80 px-4 py-4 text-sm leading-6 text-emerald-800">
                         {{ banStatusSuccessMessage }}
+                    </div>
+
+                    <div
+                        v-if="riskClearSuccessMessage"
+                        class="rounded-[1rem] border border-emerald-200 bg-emerald-50/80 px-4 py-4 text-sm leading-6 text-emerald-800">
+                        {{ riskClearSuccessMessage }}
                     </div>
 
                     <div
@@ -776,6 +1039,54 @@
         </UiModal>
 
         <UiModal
+            :model-value="isClearRiskDialogOpen"
+            eyebrow="风控操作"
+            title="解除用户风控"
+            :description="`解除用户 ${pendingClearRiskCase?.userId ?? '--'} 的当前风控状态。`"
+            size="md"
+            :close-on-backdrop="clearingRiskUserId.length === 0"
+            @update:model-value="handleClearRiskDialogVisibilityChange">
+            <div class="space-y-4">
+                <div
+                    class="rounded-[1rem] border border-amber-200 bg-amber-50/80 px-4 py-4 text-sm leading-6 text-amber-950">
+                    <p class="font-semibold">解除后立即生效</p>
+                    <p class="mt-2">
+                        若原始 IP 与 UA 指纹仍在关联窗口内，将为该用户建立临时豁免，避免下一次请求立即重新进入风控。
+                    </p>
+                    <p>
+                        此操作不会解封账户，也不会移除已经加入 QQ 封禁清单的号码。
+                    </p>
+                </div>
+
+                <p
+                    v-if="riskClearErrorMessage"
+                    class="rounded-[1rem] border border-rose-200 bg-rose-50/80 px-4 py-4 text-sm leading-6 text-rose-700">
+                    {{ riskClearErrorMessage }}
+                </p>
+            </div>
+
+            <template #footer>
+                <div
+                    class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                    <UiButton
+                        type="button"
+                        variant="secondary"
+                        :disabled="clearingRiskUserId.length > 0"
+                        @click="closeClearRiskDialog">
+                        取消
+                    </UiButton>
+                    <UiButton
+                        type="button"
+                        :loading="clearingRiskUserId.length > 0"
+                        class="bg-[linear-gradient(180deg,#b45309_0%,#92400e_100%)] text-white hover:bg-[linear-gradient(180deg,#92400e_0%,#78350f_100%)]"
+                        @click="confirmClearRiskState">
+                        确认解除
+                    </UiButton>
+                </div>
+            </template>
+        </UiModal>
+
+        <UiModal
             :model-value="isRemoveQqBanDialogOpen"
             eyebrow="清单操作"
             title="移除封禁 QQ"
@@ -822,6 +1133,7 @@ import useTrackedRequestFetch, {
 import { useAdminDateQuery } from '~/composables/useAdminDateQuery';
 import type {
     AdminAddQqBanListResponse,
+    AdminClearUserRiskResponse,
     AdminQqBanListItem,
     AdminRemoveQqBanListResponse,
     AdminResetUserQuotaResponse,
@@ -831,6 +1143,8 @@ import type {
     AdminUserBanActionSource,
     AdminUserBanActionStatus,
     AdminUserListItem,
+    AdminUserRiskCaseItem,
+    AdminUserRiskCaseStatus,
     AdminUserSecurityResponse,
     AdminUsersResponse
 } from '~/types/admin';
@@ -908,6 +1222,19 @@ const securityErrorMessage = computed(() =>
 );
 const banActionItems = computed(() => securityData.value?.banActions ?? []);
 const qqBanListItems = computed(() => securityData.value?.qqBanList ?? []);
+const riskCaseItems = computed(() => securityData.value?.riskCases ?? []);
+const openRiskCaseItems = computed(() =>
+    riskCaseItems.value.filter((item) => item.status !== 'cleared')
+);
+const openRiskCaseByUser = computed(() => {
+    const items = new Map<string, AdminUserRiskCaseItem>();
+    for (const item of openRiskCaseItems.value) {
+        if (!items.has(item.userId)) {
+            items.set(item.userId, item);
+        }
+    }
+    return items;
+});
 const isRefreshingAll = computed(
     () => usersStatus.value === 'pending' || securityStatus.value === 'pending'
 );
@@ -928,6 +1255,11 @@ const isUpdatingBanStatus = ref(false);
 const updatingBanUserId = ref('');
 const banStatusErrorMessage = ref('');
 const banStatusSuccessMessage = ref('');
+const isClearRiskDialogOpen = ref(false);
+const pendingClearRiskCase = ref<AdminUserRiskCaseItem | null>(null);
+const clearingRiskUserId = ref('');
+const riskClearErrorMessage = ref('');
+const riskClearSuccessMessage = ref('');
 const qqBanForm = reactive({
     qqNumber: ''
 });
@@ -1026,6 +1358,51 @@ function getBanActionSourceLabel(source: AdminUserBanActionSource) {
     }
 }
 
+function getRiskCaseStatusLabel(status: AdminUserRiskCaseStatus) {
+    switch (status) {
+        case 'pending':
+            return '等待标记';
+        case 'active':
+            return '风控中';
+        case 'escalating':
+            return '处置中';
+        case 'escalated':
+            return '已触发封禁';
+        case 'failed':
+            return '执行失败';
+        case 'cleared':
+            return '已解除';
+    }
+}
+
+function getRiskCaseStatusTone(status: AdminUserRiskCaseStatus) {
+    switch (status) {
+        case 'pending':
+        case 'active':
+            return 'warning' as const;
+        case 'escalating':
+        case 'escalated':
+        case 'failed':
+            return 'danger' as const;
+        case 'cleared':
+            return 'neutral' as const;
+    }
+}
+
+function getOpenRiskCase(userId: string) {
+    return openRiskCaseByUser.value.get(userId) ?? null;
+}
+
+function getUserRiskStatusLabel(userId: string) {
+    const riskCase = getOpenRiskCase(userId);
+    return riskCase ? getRiskCaseStatusLabel(riskCase.status) : '';
+}
+
+function getUserRiskStatusTone(userId: string) {
+    const riskCase = getOpenRiskCase(userId);
+    return riskCase ? getRiskCaseStatusTone(riskCase.status) : 'neutral';
+}
+
 async function refreshAllData() {
     await Promise.all([refreshUsers(), refreshSecurity()]);
 }
@@ -1044,6 +1421,96 @@ function getUserStatusTone(item: AdminUserListItem) {
     }
 
     return item.isBanned ? ('danger' as const) : ('success' as const);
+}
+
+function openClearRiskDialog(item: AdminUserListItem) {
+    const riskCase = getOpenRiskCase(item.userId);
+    if (
+        item.isAdmin ||
+        item.isBanned ||
+        !riskCase ||
+        clearingRiskUserId.value.length > 0
+    ) {
+        return;
+    }
+
+    pendingClearRiskCase.value = riskCase;
+    riskClearErrorMessage.value = '';
+    riskClearSuccessMessage.value = '';
+    isClearRiskDialogOpen.value = true;
+}
+
+function closeClearRiskDialog() {
+    if (clearingRiskUserId.value.length > 0) {
+        return;
+    }
+
+    isClearRiskDialogOpen.value = false;
+    pendingClearRiskCase.value = null;
+    riskClearErrorMessage.value = '';
+}
+
+function handleClearRiskDialogVisibilityChange(nextValue: boolean) {
+    if (nextValue) {
+        isClearRiskDialogOpen.value = true;
+        return;
+    }
+
+    closeClearRiskDialog();
+}
+
+async function confirmClearRiskState() {
+    const riskCase = pendingClearRiskCase.value;
+    if (!riskCase || clearingRiskUserId.value.length > 0) {
+        return;
+    }
+
+    clearingRiskUserId.value = riskCase.userId;
+    riskClearErrorMessage.value = '';
+    riskClearSuccessMessage.value = '';
+
+    try {
+        const { data, error } = await useCsrfFetch<
+            TrackerApiResponse<AdminClearUserRiskResponse>
+        >('/api/v1/admin/users/risk/clear', {
+            method: 'POST',
+            retry: 0,
+            body: {
+                userId: riskCase.userId
+            },
+            key: `admin:users:risk:clear:${riskCase.userId}:${Date.now()}`,
+            watch: false,
+            server: false
+        });
+
+        if (error.value) {
+            throw error.value;
+        }
+
+        const response = data.value;
+        if (!response) {
+            throw new Error('Missing user risk clear response');
+        }
+        if (!response.ok) {
+            throw {
+                data: response
+            };
+        }
+
+        riskClearSuccessMessage.value = response.data.changed
+            ? `已解除用户 ${response.data.userId} 的风控状态。`
+            : `用户 ${response.data.userId} 当前没有待解除的风控状态。`;
+        isClearRiskDialogOpen.value = false;
+        pendingClearRiskCase.value = null;
+        await refreshSecurity();
+    } catch (error) {
+        riskClearErrorMessage.value = getApiErrorMessage(
+            error,
+            '解除用户风控状态失败。'
+        );
+    } finally {
+        clearingRiskUserId.value = '';
+    }
 }
 
 function openBanDialog(item: AdminUserListItem) {

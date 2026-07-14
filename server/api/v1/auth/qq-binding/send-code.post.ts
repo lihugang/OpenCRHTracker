@@ -7,7 +7,8 @@ import {
 } from '~/server/services/qqBindingService';
 import {
     isQqNumberInBanList,
-    queueQqBanListUserBan
+    queueQqBanListUserBan,
+    queueRiskQqBindingEscalation
 } from '~/server/services/userBanSecurityStore';
 import ApiRequestError from '~/server/utils/api/errors/ApiRequestError';
 import getFixedCost from '~/server/utils/api/cost/getFixedCost';
@@ -72,6 +73,21 @@ export default defineEventHandler(async (event) =>
                 const qqNumber = normalizeQqNumber(body.qqNumber);
                 if (isQqNumberInBanList(qqNumber)) {
                     queueQqBanListUserBan(identity.id, qqNumber, event);
+                    const now = getNowSeconds();
+                    return {
+                        expiresAt:
+                            now + useConfig().user.qqBinding.codeTtlSeconds,
+                        nextSendAt:
+                            now + useConfig().user.qqBinding.sendIntervalSeconds
+                    };
+                }
+                if (
+                    queueRiskQqBindingEscalation(
+                        identity.id,
+                        qqNumber,
+                        event
+                    )
+                ) {
                     const now = getNowSeconds();
                     return {
                         expiresAt:

@@ -10,6 +10,7 @@ import {
 import normalizeCode from '~/server/utils/12306/normalizeCode';
 import fetchRouteInfo from '~/server/utils/12306/network/fetchRouteInfo';
 import queryWithRetry from '~/server/utils/12306/scheduleProbe/queryWithRetry';
+import { normalizeRouteGroupDayOffsets } from '~/server/utils/12306/scheduleProbe/normalizeRouteDayOffsets';
 import {
     buildCodeIndex,
     buildGroupIndex,
@@ -36,6 +37,7 @@ import {
     toUnixSecondsFromShanghaiDayOffset
 } from '~/server/utils/date/shanghaiDateTime';
 import type {
+    ScheduleItem,
     ScheduleState,
     ScheduleStationMap
 } from '~/server/utils/12306/scheduleProbe/types';
@@ -367,6 +369,24 @@ export async function refreshRouteBatchForCodes(
             published.date,
             routeResult.data.route.stops
         );
+        const normalizedRoute: ScheduleItem = {
+            ...item,
+            startAt: nextStartAt,
+            endAt: nextEndAt,
+            stops: nextStops.map((stop) => ({ ...stop }))
+        };
+        const shiftSeconds = normalizeRouteGroupDayOffsets([normalizedRoute]);
+        if (shiftSeconds > 0) {
+            logger.info(
+                `normalize_route_day_offsets groupKey=${groupKey} trainCode=${item.code} shiftSeconds=${shiftSeconds} groupSize=${groupItemIndexes.length}`
+            );
+        }
+        const normalizedStartAt = normalizedRoute.startAt;
+        const normalizedEndAt = normalizedRoute.endAt;
+        const normalizedStops = normalizedRoute.stops;
+        if (normalizedStartAt === null || normalizedEndAt === null) {
+            throw new Error('refreshed route must have start and end times');
+        }
         stationUpdates = {
             ...stationUpdates,
             ...(await toScheduleStationMap(routeResult.data.route.stops))
@@ -375,7 +395,10 @@ export async function refreshRouteBatchForCodes(
         const appliedGroupStops = new Map<number, ScheduleStop[]>();
         for (const index of groupItemIndexes) {
             const groupItem = targetItems[index]!;
-            const mergedStops = mergeStopMetadata(nextStops, groupItem.stops);
+            const mergedStops = mergeStopMetadata(
+                normalizedStops,
+                groupItem.stops
+            );
             appliedGroupStops.set(index, mergedStops);
             if (
                 groupItem.allCodes.join('/') !== nextAllCodes.join('/') ||
@@ -385,8 +408,8 @@ export async function refreshRouteBatchForCodes(
                 groupItem.passengerDepartment !== nextPassengerDepartment ||
                 groupItem.startStation !== nextStartStation ||
                 groupItem.endStation !== nextEndStation ||
-                groupItem.startAt !== nextStartAt ||
-                groupItem.endAt !== nextEndAt ||
+                groupItem.startAt !== normalizedStartAt ||
+                groupItem.endAt !== normalizedEndAt ||
                 JSON.stringify(groupItem.stops) !== JSON.stringify(mergedStops)
             ) {
                 groupChanged = true;
@@ -398,8 +421,8 @@ export async function refreshRouteBatchForCodes(
             groupItem.passengerDepartment = nextPassengerDepartment;
             groupItem.startStation = nextStartStation;
             groupItem.endStation = nextEndStation;
-            groupItem.startAt = nextStartAt;
-            groupItem.endAt = nextEndAt;
+            groupItem.startAt = normalizedStartAt;
+            groupItem.endAt = normalizedEndAt;
             groupItem.lastRouteRefreshAt = refreshedAt;
             groupItem.stops = mergedStops.map((stop) => ({
                 ...stop
@@ -425,8 +448,8 @@ export async function refreshRouteBatchForCodes(
             passengerDepartment: nextPassengerDepartment,
             startStation: nextStartStation,
             endStation: nextEndStation,
-            startAt: nextStartAt,
-            endAt: nextEndAt,
+            startAt: normalizedStartAt,
+            endAt: normalizedEndAt,
             lastRouteRefreshAt: refreshedAt,
             internalCode: refreshedInternalCode,
             stops:

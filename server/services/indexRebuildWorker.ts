@@ -73,7 +73,7 @@ function getWorker() {
     }
 
     const nextWorker = new Worker(
-        new URL('./workers/index-rebuild.mjs', import.meta.url)
+        new URL('./index-rebuild.mjs', import.meta.url)
     );
     nextWorker.on('message', (response: IndexRebuildResponse) => {
         const pending = pendingRequests.get(response.requestId);

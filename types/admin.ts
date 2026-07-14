@@ -343,11 +343,46 @@ export interface AdminUserBanActionItem {
     errorMessage: string | null;
 }
 
+export type AdminUserRiskCaseStatus =
+    | 'pending'
+    | 'active'
+    | 'escalating'
+    | 'escalated'
+    | 'failed'
+    | 'cleared';
+
+export interface AdminUserRiskCaseItem {
+    id: number;
+    userId: string;
+    status: AdminUserRiskCaseStatus;
+    fingerprintId: number | null;
+    matchedActionId: number;
+    ipAddress: string;
+    userAgent: string;
+    qqNumber: string | null;
+    banActionId: number | null;
+    detectedAt: number;
+    updatedAt: number;
+    escalatedAt: number | null;
+    clearedAt: number | null;
+    clearedBy: string | null;
+    errorMessage: string | null;
+}
+
 export interface AdminUserSecurityResponse {
     asOf: number;
     banCorrelationWindowSeconds: number;
     qqBanList: AdminQqBanListItem[];
     banActions: AdminUserBanActionItem[];
+    riskCases: AdminUserRiskCaseItem[];
+}
+
+export interface AdminClearUserRiskResponse {
+    userId: string;
+    riskCaseId: number | null;
+    changed: boolean;
+    exemptionExpiresAt: number | null;
+    clearedAt: number;
 }
 
 export interface AdminAddQqBanListResponse {

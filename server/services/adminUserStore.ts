@@ -1,7 +1,10 @@
 import useConfig from '~/server/config';
 import { createPreparedSqlStore } from '~/server/libs/database/prepared';
 import { getUserByUsername } from '~/server/services/authStore';
-import { updateManualUserBanState } from '~/server/services/userBanSecurityStore';
+import {
+    clearUserRiskCase,
+    updateManualUserBanState
+} from '~/server/services/userBanSecurityStore';
 import {
     getUserQuotaOverride,
     updateUserQuotaOverride,
@@ -14,6 +17,7 @@ import resolveUserQuotaSubject from '~/server/utils/api/quota/resolveUserQuotaSu
 import importSqlBatch from '~/server/utils/sql/importSqlBatch';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
 import type {
+    AdminClearUserRiskResponse,
     AdminResetUserQuotaRequest,
     AdminResetUserQuotaResponse,
     AdminUpdateUserBanStateRequest,
@@ -106,6 +110,23 @@ export function updateAdminUserBanState(
     }
 
     return updateManualUserBanState(input.userId, input.banned, actorUserId);
+}
+
+export function clearAdminUserRiskState(
+    userId: string,
+    actorUserId: string
+): AdminClearUserRiskResponse {
+    ensureUserExists(userId);
+
+    if (useConfig().user.adminUserIds.includes(userId)) {
+        throw new ApiRequestError(
+            403,
+            'admin_user_protected',
+            '管理员账户没有可解除的自动风控状态'
+        );
+    }
+
+    return clearUserRiskCase(userId, actorUserId);
 }
 
 export function updateAdminUserQuotaOverride(
