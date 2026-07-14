@@ -113,115 +113,6 @@
                     <div class="space-y-2">
                         <p
                             class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
-                            Worker
-                        </p>
-                        <h2 class="text-2xl font-semibold text-slate-900">
-                            今日索引重建
-                        </h2>
-                        <p class="text-sm leading-6 text-slate-600">
-                            记录今天实际开始执行的索引重建任务。记录保存在当前服务进程内，服务重启后清空。
-                        </p>
-                    </div>
-
-                    <div class="grid gap-5 xl:grid-cols-2">
-                        <section
-                            v-for="summary in indexRebuildExecutionSummaries"
-                            :key="summary.executor"
-                            class="min-w-0 border-t border-slate-200 pt-5 first:border-t-0 first:pt-0 xl:border-t-0 xl:border-l xl:pl-6 xl:pt-0 xl:first:border-l-0 xl:first:pl-0">
-                            <div
-                                class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                                <div class="min-w-0">
-                                    <h3
-                                        class="text-lg font-semibold text-slate-900">
-                                        {{ summary.label }}
-                                    </h3>
-                                    <p
-                                        class="mt-1 text-sm leading-6 text-slate-500">
-                                        今日触发
-                                        <span
-                                            class="font-semibold text-slate-900">
-                                            {{
-                                                formatNumber(
-                                                    summary.triggerCount
-                                                )
-                                            }}
-                                        </span>
-                                        次
-                                    </p>
-                                </div>
-                                <UiStatusBadge
-                                    :label="
-                                        getLatestExecutionStatusLabel(summary)
-                                    "
-                                    :tone="
-                                        getLatestExecutionStatusTone(summary)
-                                    " />
-                            </div>
-
-                            <div
-                                v-if="summary.runs.length === 0"
-                                class="mt-5 border-t border-dashed border-slate-200 py-6 text-sm text-slate-500">
-                                今天尚未执行
-                            </div>
-
-                            <ol
-                                v-else
-                                class="mt-5 divide-y divide-slate-100">
-                                <li
-                                    v-for="run in summary.runs"
-                                    :key="run.id"
-                                    class="grid gap-2 py-4 first:pt-0 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
-                                    <div class="min-w-0">
-                                        <div
-                                            class="flex flex-wrap items-center gap-2">
-                                            <UiStatusBadge
-                                                :label="
-                                                    getExecutionStatusLabel(
-                                                        run.status
-                                                    )
-                                                "
-                                                :tone="
-                                                    getExecutionStatusTone(
-                                                        run.status
-                                                    )
-                                                " />
-                                            <span
-                                                v-if="run.taskId !== null"
-                                                class="text-xs font-medium text-slate-400">
-                                                任务 #{{ run.taskId }}
-                                            </span>
-                                        </div>
-                                        <p
-                                            v-if="run.error"
-                                            class="mt-2 break-words text-sm leading-6 text-rose-700">
-                                            {{ run.error }}
-                                        </p>
-                                    </div>
-                                    <div
-                                        class="text-left text-sm leading-6 text-slate-500 sm:text-right">
-                                        <p class="font-medium text-slate-700">
-                                            {{ formatTimestamp(run.startedAt) }}
-                                        </p>
-                                        <p>
-                                            {{
-                                                formatExecutionDuration(
-                                                    run.durationMs
-                                                )
-                                            }}
-                                        </p>
-                                    </div>
-                                </li>
-                            </ol>
-                        </section>
-                    </div>
-                </div>
-            </UiCard>
-
-            <UiCard :show-accent-bar="false">
-                <div class="space-y-6">
-                    <div class="space-y-2">
-                        <p
-                            class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
                             操作
                         </p>
                         <h2 class="text-2xl font-semibold text-slate-900">
@@ -798,8 +689,6 @@ import type {
     AdminCouplingScanOptionGroup,
     AdminDetectCoupledEmuGroupNowTaskRequest,
     AdminDispatchStationBoardTasksNowTaskRequest,
-    AdminIndexRebuildExecutionStatus,
-    AdminIndexRebuildExecutionSummary,
     AdminRefreshAllRoutesAndRequeueProbeNowTaskRequest,
     AdminRefreshTrainCirculationNowTaskRequest,
     AdminRunQrcodeDetectionNowTaskRequest,
@@ -1039,60 +928,6 @@ const overviewMetrics = computed(() => [
         value: taskOverviewData.value?.remainingWithin1Hour ?? 0
     }
 ]);
-const indexRebuildExecutionSummaries = computed<
-    AdminIndexRebuildExecutionSummary[]
->(() => taskOverviewData.value?.indexRebuildExecutions ?? []);
-
-function getExecutionStatusLabel(status: AdminIndexRebuildExecutionStatus) {
-    switch (status) {
-        case 'running':
-            return '运行中';
-        case 'success':
-            return '成功';
-        case 'failed':
-            return '失败';
-    }
-}
-
-function getExecutionStatusTone(status: AdminIndexRebuildExecutionStatus) {
-    switch (status) {
-        case 'running':
-            return 'info' as const;
-        case 'success':
-            return 'success' as const;
-        case 'failed':
-            return 'danger' as const;
-    }
-}
-
-function getLatestExecutionStatusLabel(
-    summary: AdminIndexRebuildExecutionSummary
-) {
-    const latest = summary.runs[0];
-    return latest ? getExecutionStatusLabel(latest.status) : '未执行';
-}
-
-function getLatestExecutionStatusTone(
-    summary: AdminIndexRebuildExecutionSummary
-) {
-    const latest = summary.runs[0];
-    return latest
-        ? getExecutionStatusTone(latest.status)
-        : ('neutral' as const);
-}
-
-function formatExecutionDuration(durationMs: number | null) {
-    if (durationMs === null) {
-        return '尚未完成';
-    }
-    if (durationMs < 1000) {
-        return `${durationMs} ms`;
-    }
-    if (durationMs < 60 * 1000) {
-        return `${(durationMs / 1000).toFixed(1)} 秒`;
-    }
-    return `${(durationMs / 60_000).toFixed(1)} 分钟`;
-}
 
 function syncCouplingScanSelections() {
     const groups = couplingScanOptions.value;

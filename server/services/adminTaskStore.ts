@@ -26,9 +26,6 @@ import ensure from '~/server/utils/api/executor/ensure';
 import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
 import { getTodayScheduleTimetableByTrainCode } from '~/server/services/todayScheduleCache';
-import { listTodayIndexRebuildExecutions } from '~/server/services/indexRebuildExecutionStore';
-import { REBUILD_REFERENCE_MODEL_INDEX_TASK_EXECUTOR } from '~/server/services/taskExecutors/rebuildReferenceModelIndexTaskExecutor';
-import { REBUILD_TRAIN_CIRCULATION_INDEX_TASK_EXECUTOR } from '~/server/services/taskExecutors/rebuildTrainCirculationIndexTaskExecutor';
 import type {
     AdminCreateTaskResponse,
     AdminCreateTaskRequest,
@@ -518,27 +515,6 @@ export async function getAdminTaskOverview(
         remainingWithin1Hour: 0
     };
     const couplingScanOptions = await listAdminCouplingScanOptions();
-    const indexRebuildDefinitions = [
-        {
-            executor: REBUILD_TRAIN_CIRCULATION_INDEX_TASK_EXECUTOR,
-            label: '列车交路索引重建'
-        },
-        {
-            executor: REBUILD_REFERENCE_MODEL_INDEX_TASK_EXECUTOR,
-            label: '参考车型索引重建'
-        }
-    ] as const;
-    const indexRebuildExecutions = indexRebuildDefinitions.map(
-        ({ executor, label }) => {
-            const runs = listTodayIndexRebuildExecutions(executor);
-            return {
-                executor,
-                label,
-                triggerCount: runs.length,
-                runs
-            };
-        }
-    );
 
     return {
         asOf,
@@ -547,7 +523,6 @@ export async function getAdminTaskOverview(
         remainingWithin10Minutes: counts.remainingWithin10Minutes,
         remainingWithin30Minutes: counts.remainingWithin30Minutes,
         remainingWithin1Hour: counts.remainingWithin1Hour,
-        couplingScanOptions,
-        indexRebuildExecutions
+        couplingScanOptions
     };
 }

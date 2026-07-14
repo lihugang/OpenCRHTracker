@@ -625,27 +625,6 @@ export interface AdminCouplingScanOptionGroup {
     models: string[];
 }
 
-export type AdminIndexRebuildExecutionStatus = 'running' | 'success' | 'failed';
-
-export interface AdminIndexRebuildExecutionRun {
-    id: number;
-    taskId: number | null;
-    startedAt: number;
-    finishedAt: number | null;
-    durationMs: number | null;
-    status: AdminIndexRebuildExecutionStatus;
-    error: string | null;
-}
-
-export interface AdminIndexRebuildExecutionSummary {
-    executor:
-        | 'rebuild_train_circulation_index'
-        | 'rebuild_reference_model_index';
-    label: string;
-    triggerCount: number;
-    runs: AdminIndexRebuildExecutionRun[];
-}
-
 export interface AdminTaskOverviewResponse {
     asOf: number;
     nextTaskId: number | null;
@@ -654,7 +633,6 @@ export interface AdminTaskOverviewResponse {
     remainingWithin30Minutes: number;
     remainingWithin1Hour: number;
     couplingScanOptions: AdminCouplingScanOptionGroup[];
-    indexRebuildExecutions: AdminIndexRebuildExecutionSummary[];
 }
 export interface AdminRevokeAllWebappTokensResponse {
     issuer: 'webapp';

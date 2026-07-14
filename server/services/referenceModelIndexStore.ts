@@ -252,13 +252,6 @@ export function rebuildReferenceModelIndex(): ReferenceModelIndexCache {
     return cached;
 }
 
-export function installReferenceModelIndexCache(
-    nextCache: ReferenceModelIndexCache
-): ReferenceModelIndexCache {
-    cached = nextCache;
-    return cached;
-}
-
 function getActiveCache() {
     if (cached) {
         return cached;

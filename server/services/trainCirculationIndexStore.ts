@@ -66,7 +66,7 @@ interface CirculationWindowStats {
     rebuiltAt: number;
 }
 
-export interface TrainCirculationIndexCache {
+interface TrainCirculationIndexCache {
     currentDate: string;
     scheduleStateVersion: number;
     windowDays: number;
@@ -1369,28 +1369,8 @@ export function rebuildTrainCirculationIndex(): TrainCirculationIndexCache {
     return cached;
 }
 
-export function installTrainCirculationIndexCache(
-    nextCache: TrainCirculationIndexCache
-): TrainCirculationIndexCache {
-    cached = nextCache;
-    return cached;
-}
-
 function getActiveCache() {
     if (cached && cached.scheduleStateVersion === getScheduleStateVersion()) {
-        return cached;
-    }
-
-    if (cached) {
-        void import('~/server/services/indexRebuildWorker')
-            .then(({ runIndexRebuild }) =>
-                runIndexRebuild('rebuild_train_circulation_index')
-            )
-            .catch((error) => {
-                logger.error(
-                    `background_rebuild_failed error=${error instanceof Error ? error.message : String(error)}`
-                );
-            });
         return cached;
     }
 

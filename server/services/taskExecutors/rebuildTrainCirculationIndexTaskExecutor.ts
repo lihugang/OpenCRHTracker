@@ -1,11 +1,6 @@
 import getLogger from '~/server/libs/log4js';
 import useConfig from '~/server/config';
-import { runIndexRebuild } from '~/server/services/indexRebuildWorker';
-import {
-    finishIndexRebuildExecution,
-    startIndexRebuildExecution
-} from '~/server/services/indexRebuildExecutionStore';
-import { getCurrentTaskExecutionContext } from '~/server/services/taskExecutionContext';
+import { rebuildTrainCirculationIndex } from '~/server/services/trainCirculationIndexStore';
 import { registerTaskExecutor } from '~/server/services/taskExecutorRegistry';
 import { enqueueTask } from '~/server/services/taskQueue';
 import {
@@ -38,22 +33,18 @@ function enqueueNextDailyCirculationTask() {
 
 async function executeRebuildTrainCirculationIndexTask() {
     let caughtError: unknown = null;
-    const executionRecordId = startIndexRebuildExecution(
-        REBUILD_TRAIN_CIRCULATION_INDEX_TASK_EXECUTOR,
-        getCurrentTaskExecutionContext()?.taskId ?? null
-    );
 
     try {
-        await runIndexRebuild(REBUILD_TRAIN_CIRCULATION_INDEX_TASK_EXECUTOR);
-        finishIndexRebuildExecution(executionRecordId, 'success');
-        logger.info('rebuild_succeeded worker=true');
+        const cache = rebuildTrainCirculationIndex();
+        logger.info(
+            `rebuild_succeeded currentDate=${cache.currentDate} windowDays=${cache.windowDays} rowsScanned=${cache.stats.rowsScanned} nodes=${cache.stats.nodeCount} edges=${cache.stats.edgeCount} circulations=${cache.stats.circulationCount}`
+        );
     } catch (error) {
         caughtError = error;
         const message =
             error instanceof Error
                 ? `${error.name}: ${error.message}`
                 : String(error);
-        finishIndexRebuildExecution(executionRecordId, 'failed', message);
         logger.error(`rebuild_failed error=${message}`);
     } finally {
         try {
