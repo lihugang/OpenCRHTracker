@@ -1,4 +1,6 @@
+import { existsSync } from 'node:fs';
 import { Worker } from 'node:worker_threads';
+import { fileURLToPath } from 'node:url';
 import getLogger from '~/server/libs/log4js';
 import {
     installReferenceModelIndexCache,
@@ -64,6 +66,28 @@ function handleWorkerExit(exitCode: number) {
     rejectPendingRequests(error);
 }
 
+function resolveWorkerUrl(): URL {
+    const candidates = [
+        new URL('./workers/index-rebuild.mjs', import.meta.url),
+        new URL('./index-rebuild.mjs', import.meta.url)
+    ];
+
+    for (const candidate of candidates) {
+        if (existsSync(fileURLToPath(candidate))) {
+            logger.debug(
+                `resolved_worker_path path=${fileURLToPath(candidate)}`
+            );
+            return candidate;
+        }
+    }
+
+    throw new Error(
+        `Cannot locate index rebuild worker from ${import.meta.url}; checked ${candidates
+            .map((candidate) => fileURLToPath(candidate))
+            .join(', ')}`
+    );
+}
+
 function getWorker() {
     if (worker) {
         return worker;
@@ -72,9 +96,7 @@ function getWorker() {
         throw new Error('Index rebuild worker is shutting down');
     }
 
-    const nextWorker = new Worker(
-        new URL('./index-rebuild.mjs', import.meta.url)
-    );
+    const nextWorker = new Worker(resolveWorkerUrl());
     nextWorker.on('message', (response: IndexRebuildResponse) => {
         const pending = pendingRequests.get(response.requestId);
         if (!pending || pending.kind !== response.kind) {
