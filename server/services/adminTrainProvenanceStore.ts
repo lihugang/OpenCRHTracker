@@ -1611,8 +1611,8 @@ function formatDirectHitEventSummary(
         scannedRoute?.code || event.relatedTrainCode || event.trainCode;
 
     return event.result === 'matched'
-        ? `其他车组重联扫描，包含当前车次`
-        : `其他车组重联扫描，未包含当前车次`;
+        ? `其他车组重联扫描，包含当前车次，当前车次已纳入追踪范围`
+        : `其他车组重联扫描，包含当前车次，当前车次未纳入追踪范围`;
 }
 
 function formatEventSummary(
