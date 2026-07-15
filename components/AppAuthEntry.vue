@@ -10,12 +10,6 @@
                         文档
                     </NuxtLink>
                     <NuxtLink
-                        v-if="isAuthenticated"
-                        to="/membership"
-                        class="inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-white/55 hover:text-slate-950">
-                        赞助权益
-                    </NuxtLink>
-                    <NuxtLink
                         v-if="isAuthenticated && session"
                         to="/dashboard"
                         class="inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-white/55 hover:text-slate-950">
@@ -45,12 +39,6 @@
                     to="/docs"
                     class="inline-flex items-center gap-2 rounded-full border border-slate-200/70 bg-white/80 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-white hover:text-slate-950">
                     文档
-                </NuxtLink>
-                <NuxtLink
-                    v-if="isAuthenticated"
-                    to="/membership"
-                    class="inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium text-slate-700 transition hover:text-slate-950 hover:underline hover:underline-offset-4">
-                    赞助权益
                 </NuxtLink>
                 <NuxtLink
                     v-if="isAuthenticated && session"
