@@ -23,6 +23,7 @@ export interface ScheduleStop {
     wicket: string;
     distance?: number | null;
     platformNo?: number | null;
+    stationPlatformInfoFetchedAt?: number | null;
     isStart: boolean;
     isEnd: boolean;
 }
@@ -112,7 +113,7 @@ export type ScheduleCirculationMap = Record<string, ScheduleCirculationEntry>;
 
 export interface ScheduleDocument {
     $schema: string;
-    version: 7;
+    version: 8;
     stations: ScheduleStationMap;
     circulation: ScheduleCirculationMap;
     routeRefreshQueue: ScheduleRouteRefreshQueueEntry[];

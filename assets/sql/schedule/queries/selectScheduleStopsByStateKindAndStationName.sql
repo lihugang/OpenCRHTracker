@@ -20,6 +20,7 @@ SELECT
     s.wicket,
     s.distance,
     s.platform_no AS platformNo,
+    s.station_platform_info_fetched_at AS stationPlatformInfoFetchedAt,
     s.is_start AS isStart,
     s.is_end AS isEnd
 FROM schedule_stops s

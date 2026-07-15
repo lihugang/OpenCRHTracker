@@ -38,6 +38,10 @@ import {
 } from '~/server/services/trainProvenanceRecorder';
 import { recordStationBoardFetchResult } from '~/server/services/trainProvenanceStore';
 import { getStationBoardIdleTaskOptions } from '~/server/services/stationBoardTaskScheduling';
+import {
+    createEmptyStationPlatformInfoRefreshResult,
+    refreshStationPlatformInfoForStation
+} from '~/server/services/stationPlatformInfoService';
 
 export const FETCH_STATION_BOARD_TASK_EXECUTOR = 'fetch_station_board';
 
@@ -724,6 +728,22 @@ async function executeFetchStationBoardTask(rawArgs: unknown) {
             platformNo: row.platformNo
         }))
     );
+    let stationPlatformResult = createEmptyStationPlatformInfoRefreshResult();
+    try {
+        stationPlatformResult = await refreshStationPlatformInfoForStation({
+            serviceDate: args.serviceDate,
+            stationName: args.stationName,
+            stationTelecode: args.stationTelecode
+        });
+    } catch (error) {
+        const message =
+            error instanceof Error
+                ? `${error.name}: ${error.message}`
+                : String(error);
+        logger.warn(
+            `station_platform_enrichment_failed serviceDate=${args.serviceDate} stationName=${args.stationName} stationTelecode=${args.stationTelecode} error=${message}`
+        );
+    }
     const parsedEntries = rows.map((row) => parseCirculationTrainToEntry(row));
     const chosenEntries = chooseCirculationEntries(parsedEntries);
     const persistedRows = parsedEntries.map((item) => item.row);
@@ -754,12 +774,30 @@ async function executeFetchStationBoardTask(rawArgs: unknown) {
                 parsedEntryCount,
                 savedEntryCount: 0,
                 updatedStopMetadataCount: stopMetadataResult.updatedStopCount,
+                stationPlatformLocalRowCount:
+                    stationPlatformResult.localRowCount,
+                stationPlatformCandidateCount:
+                    stationPlatformResult.candidateCount,
+                stationPlatformCacheHitCount:
+                    stationPlatformResult.cacheHitCount,
+                stationPlatformCacheFallbackCount:
+                    stationPlatformResult.cacheFallbackCount,
+                stationPlatformRequestCount: stationPlatformResult.requestCount,
+                stationPlatformDataCount: stationPlatformResult.dataCount,
+                stationPlatformFailedTrainCount:
+                    stationPlatformResult.failedTrainCount,
+                stationPlatformSkippedRowCount:
+                    stationPlatformResult.skippedRowCount,
+                updatedStationPlatformCacheEntryCount:
+                    stationPlatformResult.updatedCacheEntryCount,
+                updatedStationPlatformStopCount:
+                    stationPlatformResult.updatedStopCount,
                 consumedQueueEntryCount: 0,
                 parentSchedulerTaskId: args.parentSchedulerTaskId
             }
         });
         logger.info(
-            `done_no_official_entries serviceDate=${args.serviceDate} stationName=${args.stationName} stationTelecode=${args.stationTelecode} rows=${rows.length} updatedStopMetadata=${stopMetadataResult.updatedStopCount}`
+            `done_no_official_entries serviceDate=${args.serviceDate} stationName=${args.stationName} stationTelecode=${args.stationTelecode} rows=${rows.length} updatedStopMetadata=${stopMetadataResult.updatedStopCount} stationPlatformCandidates=${stationPlatformResult.candidateCount} stationPlatformCacheHits=${stationPlatformResult.cacheHitCount} stationPlatformRequests=${stationPlatformResult.requestCount} stationPlatformData=${stationPlatformResult.dataCount} updatedStationPlatformCacheEntries=${stationPlatformResult.updatedCacheEntryCount} updatedStationPlatformStops=${stationPlatformResult.updatedStopCount}`
         );
         return;
     }
@@ -797,6 +835,21 @@ async function executeFetchStationBoardTask(rawArgs: unknown) {
             parsedEntryCount,
             savedEntryCount: chosenEntries.length,
             updatedStopMetadataCount: stopMetadataResult.updatedStopCount,
+            stationPlatformLocalRowCount: stationPlatformResult.localRowCount,
+            stationPlatformCandidateCount: stationPlatformResult.candidateCount,
+            stationPlatformCacheHitCount: stationPlatformResult.cacheHitCount,
+            stationPlatformCacheFallbackCount:
+                stationPlatformResult.cacheFallbackCount,
+            stationPlatformRequestCount: stationPlatformResult.requestCount,
+            stationPlatformDataCount: stationPlatformResult.dataCount,
+            stationPlatformFailedTrainCount:
+                stationPlatformResult.failedTrainCount,
+            stationPlatformSkippedRowCount:
+                stationPlatformResult.skippedRowCount,
+            updatedStationPlatformCacheEntryCount:
+                stationPlatformResult.updatedCacheEntryCount,
+            updatedStationPlatformStopCount:
+                stationPlatformResult.updatedStopCount,
             consumedQueueEntryCount: removedQueueEntries.length,
             savedKeys,
             parentSchedulerTaskId: args.parentSchedulerTaskId
@@ -804,7 +857,7 @@ async function executeFetchStationBoardTask(rawArgs: unknown) {
     });
 
     logger.info(
-        `done serviceDate=${args.serviceDate} stationName=${args.stationName} stationTelecode=${args.stationTelecode} rows=${rows.length} parsedEntries=${parsedEntryCount} savedEntries=${chosenEntries.length} savedKeys=${savedKeys.length} updatedStopMetadata=${stopMetadataResult.updatedStopCount} consumedQueueEntries=${removedQueueEntries.length}`
+        `done serviceDate=${args.serviceDate} stationName=${args.stationName} stationTelecode=${args.stationTelecode} rows=${rows.length} parsedEntries=${parsedEntryCount} savedEntries=${chosenEntries.length} savedKeys=${savedKeys.length} updatedStopMetadata=${stopMetadataResult.updatedStopCount} stationPlatformCandidates=${stationPlatformResult.candidateCount} stationPlatformCacheHits=${stationPlatformResult.cacheHitCount} stationPlatformRequests=${stationPlatformResult.requestCount} stationPlatformData=${stationPlatformResult.dataCount} updatedStationPlatformCacheEntries=${stationPlatformResult.updatedCacheEntryCount} updatedStationPlatformStops=${stationPlatformResult.updatedStopCount} consumedQueueEntries=${removedQueueEntries.length}`
     );
 }
 

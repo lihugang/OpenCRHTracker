@@ -3,4 +3,4 @@ export const SCHEDULE_SCHEMA_RELATIVE_PATH =
 
 export const LEGACY_SCHEDULE_JSON_PATH = 'data/schedule.json';
 
-export const CURRENT_SCHEDULE_DOCUMENT_VERSION = 7;
+export const CURRENT_SCHEDULE_DOCUMENT_VERSION = 8;

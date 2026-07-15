@@ -1,0 +1,2 @@
+ALTER TABLE schedule_stops
+ADD COLUMN station_platform_info_fetched_at INTEGER;

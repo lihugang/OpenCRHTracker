@@ -32,6 +32,7 @@ import {
 } from '~/server/utils/12306/scheduleProbe/sqliteStore';
 import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
+import { forceRefreshStationPlatformInfoForTrainCodes } from '~/server/services/stationPlatformInfoService';
 import {
     toShanghaiDayOffsetFromUnixSeconds,
     toUnixSecondsFromShanghaiDayOffset
@@ -61,6 +62,7 @@ export interface RefreshRouteBatchResult {
 }
 
 interface RefreshRouteGroupUpdate {
+    changed: boolean;
     codes: string[];
     allCodes: string[];
     bureauCode: string;
@@ -177,11 +179,18 @@ function mergeStopMetadata(
         const existingStop = findExistingStopMetadata(indexes, stop);
         const distance = stop.distance ?? existingStop?.distance ?? null;
         const platformNo = stop.platformNo ?? existingStop?.platformNo ?? null;
+        const stationPlatformInfoFetchedAt =
+            stop.stationPlatformInfoFetchedAt ??
+            existingStop?.stationPlatformInfoFetchedAt ??
+            null;
 
         return {
             ...stop,
             ...(distance !== null ? { distance } : {}),
-            ...(platformNo !== null ? { platformNo } : {})
+            ...(platformNo !== null ? { platformNo } : {}),
+            ...(stationPlatformInfoFetchedAt !== null
+                ? { stationPlatformInfoFetchedAt }
+                : {})
         };
     });
 }
@@ -438,6 +447,7 @@ export async function refreshRouteBatchForCodes(
         success += 1;
         mutated = true;
         groupUpdates.push({
+            changed: groupChanged,
             codes: groupItemIndexes.map((index) =>
                 normalizeCode(targetItems[index]!.code)
             ),
@@ -491,10 +501,14 @@ export async function refreshRouteBatchForCodes(
         const latestItems = latestRecords.map((record) => record.item);
         let appliedGroups = 0;
         const appliedConfirmedTrainCodes: string[] = [];
+        const appliedChangedTrainCodes: string[] = [];
         for (const update of groupUpdates) {
             if (applyGroupUpdate(latestItems, update)) {
                 appliedGroups += 1;
                 appliedConfirmedTrainCodes.push(...update.codes);
+                if (update.changed) {
+                    appliedChangedTrainCodes.push(...update.codes);
+                }
             }
         }
         if (appliedGroups > 0) {
@@ -522,6 +536,30 @@ export async function refreshRouteBatchForCodes(
             );
 
             if (persistResult.status === 'saved') {
+                const changedTrainCodes = uniqueNormalizedCodes(
+                    appliedChangedTrainCodes
+                );
+                if (changedTrainCodes.length > 0) {
+                    try {
+                        const stationPlatformResult =
+                            await forceRefreshStationPlatformInfoForTrainCodes({
+                                serviceDate: published.date,
+                                trainCodes: changedTrainCodes
+                            });
+                        logger.info(
+                            `station_platform_info_refresh date=${published.date} changedTrainCodes=${changedTrainCodes.length} localRows=${stationPlatformResult.localRowCount} candidates=${stationPlatformResult.candidateCount} requests=${stationPlatformResult.requestCount} data=${stationPlatformResult.dataCount} failedTrains=${stationPlatformResult.failedTrainCount} cacheFallbacks=${stationPlatformResult.cacheFallbackCount} updatedCacheEntries=${stationPlatformResult.updatedCacheEntryCount} updatedStops=${stationPlatformResult.updatedStopCount}`
+                        );
+                    } catch (error) {
+                        const message =
+                            error instanceof Error
+                                ? `${error.name}: ${error.message}`
+                                : String(error);
+                        logger.warn(
+                            `station_platform_info_refresh_failed date=${published.date} changedTrainCodes=${changedTrainCodes.length} error=${message}`
+                        );
+                    }
+                }
+
                 const syncResult =
                     syncConfirmedTimetableHistoryForScheduleStateKind(
                         'published',

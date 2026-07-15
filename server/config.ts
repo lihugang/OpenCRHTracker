@@ -20,6 +20,10 @@ interface ScheduleProbeRefreshConfig {
     generateIntervalHours: number;
 }
 
+interface StationPlatformInfoConfig {
+    ttlDays: number;
+}
+
 interface ScheduleProbeProbeConfig {
     defaultRetry: number;
     overlapRetryDelaySeconds: number;
@@ -233,6 +237,7 @@ export interface Config {
                 minIntervalMs: number;
             }
         >;
+        stationPlatformInfo: StationPlatformInfoConfig;
         scheduleProbe: {
             dailyTimeHHmm: string;
             retryAttempts: number;
@@ -924,6 +929,12 @@ function validateConfig(raw: unknown): Config {
         spiderRateLimit.stationBoard,
         'spider.rateLimit.stationBoard'
     );
+    const spiderStationPlatformInfo = asObject(
+        spider.stationPlatformInfo === undefined
+            ? {}
+            : spider.stationPlatformInfo,
+        'spider.stationPlatformInfo'
+    );
     const spiderScheduleProbe = asObject(
         spider.scheduleProbe,
         'spider.scheduleProbe'
@@ -1512,6 +1523,15 @@ function validateConfig(raw: unknown): Config {
                         0
                     )
                 }
+            },
+            stationPlatformInfo: {
+                ttlDays: asInteger(
+                    spiderStationPlatformInfo.ttlDays === undefined
+                        ? 30
+                        : spiderStationPlatformInfo.ttlDays,
+                    'spider.stationPlatformInfo.ttlDays',
+                    1
+                )
             },
             scheduleProbe: {
                 dailyTimeHHmm: asString(

@@ -475,6 +475,9 @@ function normalizeScheduleStop(
             : null;
     const distance = normalizeOptionalNonNegativeInteger(stop.distance);
     const platformNo = normalizeOptionalNonNegativeInteger(stop.platformNo);
+    const stationPlatformInfoFetchedAt = normalizeOptionalNonNegativeInteger(
+        stop.stationPlatformInfoFetchedAt
+    );
 
     return {
         stationNo,
@@ -492,6 +495,9 @@ function normalizeScheduleStop(
         wicket: typeof stop.wicket === 'string' ? stop.wicket.trim() : '',
         ...(distance !== null ? { distance } : {}),
         ...(platformNo !== null ? { platformNo } : {}),
+        ...(stationPlatformInfoFetchedAt !== null
+            ? { stationPlatformInfoFetchedAt }
+            : {}),
         isStart: stop.isStart === true,
         isEnd: stop.isEnd === true
     };
@@ -757,6 +763,7 @@ function parseScheduleDocument(value: unknown): {
         version !== 4 &&
         version !== 5 &&
         version !== 6 &&
+        version !== 7 &&
         version !== CURRENT_SCHEDULE_DOCUMENT_VERSION
     ) {
         return {

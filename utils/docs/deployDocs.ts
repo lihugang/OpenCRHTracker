@@ -191,7 +191,7 @@ export const deployDocsSections: DocsContentSection[] = [
                         valueType: 'integer',
                         required: true,
                         description:
-                            '查询车次、车组号和畅行码接口的最小调用间隔，单位毫秒。',
+                            '查询车次、车组号、畅行码、站台和出站口信息以及车站交通接驳信息接口的最小调用间隔，单位毫秒。',
                         notes: []
                     },
                     {
@@ -207,6 +207,19 @@ export const deployDocsSections: DocsContentSection[] = [
                         required: true,
                         description:
                             '调用车站大屏和车站时刻相关 12306 接口的最小调用间隔，单位毫秒。'
+                    },
+                    {
+                        path: 'spider.stationPlatformInfo.ttlDays',
+                        valueType: 'integer',
+                        required: false,
+                        description:
+                            '站台信息正向缓存的跨日期有效期，单位天；省略时默认 30。',
+                        notes: [
+                            '始发站使用车站交通接驳接口的 arrivePlant；其余停站使用 getExit 的 platform 和非空 wicket。两类请求共享 query 限速。',
+                            '有效期内会直接复用按接口类型隔离的正向缓存；空响应和失败不会写缓存或续期。',
+                            '缓存过期后仍保留最后已知值，并在后续触发时继续尝试刷新。',
+                            'refresh_route_batch 确认路线变化后会绕过此 TTL，强制刷新该车次经过的所有停站。'
+                        ]
                     },
                     {
                         path: 'spider.scheduleProbe.dailyTimeHHmm',
@@ -1262,7 +1275,8 @@ export const deployDocsSections: DocsContentSection[] = [
                     '升级到支持 OAuth 客户端删除的版本后，既有私有部署需要在 cost.fixed 中补充 authDeleteOauthClient，并按需在 api.permissions.issuedKeyDefaultScopes 中补充 api.auth.oauth-clients.delete。',
                     '提高 api.permissions.anonymousScopes、quota 或 cost 前，先确认你准备公开暴露的接口范围和限额策略。',
                     '修改 spider.scheduleProbe.prefixRules、task.referenceModel.dailyTimesHHmm、task.circulation.dailyTimesHHmm 或 task.scheduler 参数后，重启后应观察首轮任务执行是否符合预期。',
-                    '修改 spider.rateLimit.stationBoard 或 task.circulation.stationBoard 后，重启后应关注车站大屏相关抓取、重试与交路推断任务是否按预期工作。'
+                    '修改 spider.rateLimit.stationBoard 或 task.circulation.stationBoard 后，重启后应关注车站大屏相关抓取、重试与交路推断任务是否按预期工作。',
+                    '修改 spider.stationPlatformInfo.ttlDays 后需要重启；应同时关注 fetch_station_exit_info 和 fetch_station_transport_info 的请求量与失败统计。'
                 ]
             }
         ]

@@ -18,6 +18,9 @@
                 "minIntervalMs": 8000
             }
         },
+        "stationPlatformInfo": {
+            "ttlDays": 30
+        },
         "scheduleProbe": {
             "dailyTimeHHmm": "0000",
             "retryAttempts": 3,

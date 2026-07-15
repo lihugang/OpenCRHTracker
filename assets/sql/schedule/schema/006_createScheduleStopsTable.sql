@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS schedule_stops (
     wicket TEXT NOT NULL,
     distance INTEGER,
     platform_no INTEGER,
+    station_platform_info_fetched_at INTEGER,
     is_start INTEGER NOT NULL,
     is_end INTEGER NOT NULL,
     PRIMARY KEY (state_kind, item_code, stop_index),

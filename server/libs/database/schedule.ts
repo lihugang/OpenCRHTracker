@@ -9,6 +9,21 @@ function ensureScheduleSchema(db: Database.Database) {
     for (const statement of Object.values(schemaSql)) {
         db.exec(statement);
     }
+
+    const migrationSql = importSqlBatch('schedule/migrations') as Record<
+        | 'selectScheduleStopsColumns'
+        | 'alterScheduleStopsAddStationPlatformInfoFetchedAt',
+        string
+    >;
+    const stopColumns = db
+        .prepare(migrationSql.selectScheduleStopsColumns)
+        .all() as Array<{ name?: unknown }>;
+    const hasStationPlatformInfoFetchedAt = stopColumns.some(
+        (column) => column.name === 'station_platform_info_fetched_at'
+    );
+    if (!hasStationPlatformInfoFetchedAt) {
+        db.exec(migrationSql.alterScheduleStopsAddStationPlatformInfoFetchedAt);
+    }
 }
 
 registerDatabaseInitializer('schedule', ensureScheduleSchema);

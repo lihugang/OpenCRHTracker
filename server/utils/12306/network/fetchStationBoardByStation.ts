@@ -2,6 +2,7 @@ import useConfig from '~/server/config';
 import getLogger from '~/server/libs/log4js';
 import { record12306RequestHourlyStat } from '~/server/services/trainProvenanceStore';
 import waitFor12306RequestSlot from '../requestLimiter';
+import parsePlatformNo from '../parsePlatformNo';
 import log12306RequestFailure from './log12306RequestFailure';
 
 interface StationBoardResponseRow {
@@ -44,16 +45,6 @@ function parseNonNegativeInteger(value: unknown): number | null {
 
     const parsed = Number.parseInt(text, 10);
     return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : null;
-}
-
-function parsePlatformNo(value: unknown): number | null {
-    const text = typeof value === 'string' ? value.trim() : '';
-    const match = text.match(/\d+/);
-    if (!match) {
-        return null;
-    }
-
-    return parseNonNegativeInteger(match[0]);
 }
 
 function normalizeStationBoardRow(value: unknown): StationBoardTrainRow | null {

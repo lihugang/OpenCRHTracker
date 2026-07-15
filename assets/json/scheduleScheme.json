@@ -144,6 +144,14 @@
                     ],
                     "minimum": 0
                 },
+                "stationPlatformInfoFetchedAt": {
+                    "description": "Unix timestamp when station platform data was fetched",
+                    "type": [
+                        "integer",
+                        "null"
+                    ],
+                    "minimum": 0
+                },
                 "isStart": {
                     "type": "boolean"
                 },

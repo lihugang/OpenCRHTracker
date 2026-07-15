@@ -165,7 +165,10 @@ export const crawlDocsSections: DocsContentSection[] = [
                     'generate_route_refresh_tasks 把待刷新列车信息拆成多批车次号，每批创建一个 refresh_route_batch。',
                     'refresh_route_batch 会再次调用 12306 查车次时刻表接口并把最新线路信息写回时刻表文件。',
                     '为了避免与其它更新竞争，refresh_route_batch 在保存前会重新读取最新时刻表信息，再按组应用更新。',
-                    '只有 refresh_route_batch 成功保存到 published 的车次组才会同步进入内部历史时刻表库；如果同日补刷后 hash 未变化，就只续写或保持已确认 coverage，不会重复创建内容。'
+                    '只有 refresh_route_batch 成功保存到 published 的车次组才会同步进入内部历史时刻表库；如果同日补刷后 hash 未变化，就只续写或保持已确认 coverage，不会重复创建内容。',
+                    '如果保存后的车次组确有变化，任务会绕过 spider.stationPlatformInfo.ttlDays，强制刷新该车次经过的所有车站：始发站使用当前停站车次调用车站交通接驳接口并读取 arrivePlant，其余车站使用前一停站车次调用 getExit。请求失败不会回滚已经保存的路线。',
+                    '常规车站大屏补全以本地数据库中的车次为准，只为缺少站台或缓存已过期的停站补全数据；始发站和其余车站分别使用上述两个接口。',
+                    '两类站台查询共享 query 限速和正向缓存有效期；有效缓存可跨日期复用，过期缓存保留最后已知值并触发刷新，空响应和失败不会写入缓存或续期。'
                 ]
             },
             {
@@ -176,6 +179,7 @@ export const crawlDocsSections: DocsContentSection[] = [
                     'spider.scheduleProbe.refresh.batchSize',
                     'spider.scheduleProbe.refresh.ttlHours',
                     'spider.scheduleProbe.refresh.generateIntervalHours',
+                    'spider.stationPlatformInfo.ttlDays',
                     'spider.scheduleProbe.retryAttempts'
                 ].join('\n')
             }

@@ -60,6 +60,8 @@ type ScheduleSqlKey =
     | 'selectScheduleStateByKind'
     | 'selectScheduleStateSummaries'
     | 'selectScheduleStationByTelecode'
+    | 'selectScheduleStationPlatformInfoCache'
+    | 'selectSchedulePlatformInfoCandidatesByStation'
     | 'selectScheduleStopMetadataTargets'
     | 'selectScheduleStopStationCandidateRowsByStateKind'
     | 'selectScheduleStopsByStateKind'
@@ -68,6 +70,8 @@ type ScheduleSqlKey =
     | 'selectScheduleStationLookupRowsByStateKind'
     | 'selectScheduleTrainLookupRowsByStateKind'
     | 'updateScheduleStopMetadata'
+    | 'updateScheduleStopStationPlatformInfo'
+    | 'upsertScheduleStationPlatformInfoCache'
     | 'upsertScheduleMetaValue'
     | 'upsertScheduleState';
 
@@ -112,6 +116,7 @@ export interface ScheduleDbStopRow {
     wicket: string;
     distance: number | null;
     platformNo: number | null;
+    stationPlatformInfoFetchedAt: number | null;
     isStart: number;
     isEnd: number;
 }
@@ -172,6 +177,45 @@ export interface ScheduleStopMetadataUpdateInput {
     platformNo: number | null;
 }
 
+export type SchedulePlatformInfoLookupType =
+    | 'origin_transport'
+    | 'arrival_exit';
+
+export interface SchedulePlatformInfoCandidateRow {
+    itemCode: string;
+    internalCode: string;
+    stopIndex: number;
+    stationNo: number;
+    stationTelecode: string;
+    arriveAt: number | null;
+    departAt: number | null;
+    currentStationTrainCode: string;
+    arrivalStationTrainCode: string | null;
+    isStart: number;
+}
+
+export interface ScheduleStationPlatformInfoCacheEntry {
+    lookupType: SchedulePlatformInfoLookupType;
+    internalCode: string;
+    stationTelecode: string;
+    stationTrainCode: string;
+    platformNo: number | null;
+    wicket: string | null;
+    trainDate: string;
+    fetchedAt: number;
+}
+
+export interface ScheduleStationPlatformInfoPersistInput extends ScheduleStationPlatformInfoCacheEntry {
+    stationNo: number;
+    overwritePlatform: boolean;
+    writeCache: boolean;
+}
+
+export interface ScheduleStationPlatformInfoPersistResult {
+    updatedCacheEntryCount: number;
+    updatedStopCount: number;
+}
+
 interface ScheduleAliasRow {
     itemCode?: string;
     aliasCode: string;
@@ -200,8 +244,12 @@ interface ScheduleCirculationRow {
 
 interface ScheduleStopMetadataTargetRow {
     stopIndex: number;
+    stationNo: number;
+    arriveAt: number | null;
+    wicket: string;
     distance: number | null;
     platformNo: number | null;
+    stationPlatformInfoFetchedAt: number | null;
 }
 
 const DOCUMENT_VERSION_META_KEY = 'document_version';
@@ -276,6 +324,7 @@ function toScheduleStop(row: ScheduleDbStopRow): ScheduleStop {
         wicket: row.wicket,
         distance: row.distance,
         platformNo: row.platformNo,
+        stationPlatformInfoFetchedAt: row.stationPlatformInfoFetchedAt,
         isStart: parseSqlBoolean(row.isStart),
         isEnd: parseSqlBoolean(row.isEnd)
     };
@@ -487,6 +536,7 @@ function insertScheduleItemRows(
             stop.wicket.trim(),
             toNullableInteger(stop.distance),
             toNullableInteger(stop.platformNo),
+            toNullableInteger(stop.stationPlatformInfoFetchedAt),
             toSqlBoolean(stop.isStart),
             toSqlBoolean(stop.isEnd)
         );
@@ -1366,6 +1416,52 @@ export function listScheduleStopsByStateKindAndStationName(
     );
 }
 
+export function listSchedulePlatformInfoCandidatesByStateKindAndStationName(
+    kind: ScheduleStateKind,
+    stationName: string,
+    expiresAt: number
+): SchedulePlatformInfoCandidateRow[] {
+    if (!Number.isInteger(expiresAt) || expiresAt < 0) {
+        return [];
+    }
+
+    return queries.all<SchedulePlatformInfoCandidateRow>(
+        'selectSchedulePlatformInfoCandidatesByStation',
+        kind,
+        stationName.trim(),
+        expiresAt
+    );
+}
+
+export function loadScheduleStationPlatformInfoCacheEntry(input: {
+    lookupType: SchedulePlatformInfoLookupType;
+    internalCode: string;
+    stationTelecode: string;
+    stationTrainCode: string;
+}): ScheduleStationPlatformInfoCacheEntry | null {
+    const lookupType = input.lookupType;
+    const internalCode = normalizeCode(input.internalCode);
+    const stationTelecode = normalizeCode(input.stationTelecode);
+    const stationTrainCode = normalizeCode(input.stationTrainCode);
+    if (
+        internalCode.length === 0 ||
+        stationTelecode.length === 0 ||
+        stationTrainCode.length === 0
+    ) {
+        return null;
+    }
+
+    return (
+        queries.get<ScheduleStationPlatformInfoCacheEntry>(
+            'selectScheduleStationPlatformInfoCache',
+            lookupType,
+            internalCode,
+            stationTelecode,
+            stationTrainCode
+        ) ?? null
+    );
+}
+
 export function listScheduleStopStationCandidateRowsByStateKind(
     kind: ScheduleStateKind
 ): ScheduleStopStationCandidateRow[] {
@@ -1412,9 +1508,13 @@ export function saveScheduleStopMetadataByStateKind(
                     update.platformNo !== null
                         ? update.platformNo
                         : target.platformNo;
+                const shouldClearStationPlatformInfoFetchedAt =
+                    update.platformNo !== null &&
+                    target.stationPlatformInfoFetchedAt !== null;
                 if (
                     nextDistance === target.distance &&
-                    nextPlatformNo === target.platformNo
+                    nextPlatformNo === target.platformNo &&
+                    !shouldClearStationPlatformInfoFetchedAt
                 ) {
                     continue;
                 }
@@ -1422,6 +1522,7 @@ export function saveScheduleStopMetadataByStateKind(
                 queries.run(
                     'updateScheduleStopMetadata',
                     update.distance,
+                    update.platformNo,
                     update.platformNo,
                     kind,
                     item.itemCode,
@@ -1435,6 +1536,148 @@ export function saveScheduleStopMetadataByStateKind(
     }
 
     return changedStopKeys.size;
+}
+
+export function persistScheduleStationPlatformInfoByStateKind(
+    kind: ScheduleStateKind,
+    updates: readonly ScheduleStationPlatformInfoPersistInput[]
+): ScheduleStationPlatformInfoPersistResult {
+    const normalizedUpdates: ScheduleStationPlatformInfoPersistInput[] = [];
+    for (const update of updates) {
+        const lookupType = update.lookupType;
+        const internalCode = normalizeCode(update.internalCode);
+        const stationTelecode = normalizeCode(update.stationTelecode);
+        const stationTrainCode = normalizeCode(update.stationTrainCode);
+        const stationNo =
+            Number.isInteger(update.stationNo) && update.stationNo > 0
+                ? update.stationNo
+                : null;
+        const platformNo =
+            update.platformNo !== null &&
+            Number.isInteger(update.platformNo) &&
+            update.platformNo >= 0
+                ? update.platformNo
+                : null;
+        const normalizedWicket = update.wicket?.trim() ?? '';
+        const wicket =
+            normalizedWicket.length > 0 && normalizedWicket !== '--'
+                ? normalizedWicket
+                : null;
+        const fetchedAt =
+            Number.isInteger(update.fetchedAt) && update.fetchedAt >= 0
+                ? update.fetchedAt
+                : null;
+        const trainDate = update.trainDate.trim();
+        if (
+            internalCode.length === 0 ||
+            stationTelecode.length === 0 ||
+            stationTrainCode.length === 0 ||
+            stationNo === null ||
+            fetchedAt === null ||
+            !/^\d{8}$/.test(trainDate) ||
+            (platformNo === null && wicket === null)
+        ) {
+            continue;
+        }
+
+        normalizedUpdates.push({
+            lookupType,
+            internalCode,
+            stationTelecode,
+            stationTrainCode,
+            stationNo,
+            platformNo,
+            wicket,
+            trainDate,
+            fetchedAt,
+            overwritePlatform: update.overwritePlatform,
+            writeCache: update.writeCache
+        });
+    }
+
+    const db = useScheduleDatabase();
+    const transaction = db.transaction(
+        (): ScheduleStationPlatformInfoPersistResult => {
+            const changedCacheKeys = new Set<string>();
+            const changedStopKeys = new Set<string>();
+
+            for (const update of normalizedUpdates) {
+                if (update.writeCache) {
+                    const result = queries.run(
+                        'upsertScheduleStationPlatformInfoCache',
+                        update.lookupType,
+                        update.internalCode,
+                        update.stationTelecode,
+                        update.stationTrainCode,
+                        update.platformNo,
+                        update.wicket,
+                        update.trainDate,
+                        update.fetchedAt
+                    );
+                    if (result.changes > 0) {
+                        changedCacheKeys.add(
+                            `${update.lookupType}:${update.internalCode}:${update.stationTelecode}:${update.stationTrainCode}`
+                        );
+                    }
+                }
+
+                for (const item of listScheduleItemsByStateKindAndInternalCode(
+                    kind,
+                    update.internalCode
+                )) {
+                    for (const target of queries.all<ScheduleStopMetadataTargetRow>(
+                        'selectScheduleStopMetadataTargets',
+                        kind,
+                        item.itemCode,
+                        update.stationTelecode
+                    )) {
+                        if (target.stationNo !== update.stationNo) {
+                            continue;
+                        }
+
+                        const canReplacePlatform =
+                            update.overwritePlatform ||
+                            target.stationPlatformInfoFetchedAt !== null;
+                        const nextPlatformNo =
+                            update.platformNo === null
+                                ? target.platformNo
+                                : canReplacePlatform
+                                  ? update.platformNo
+                                  : (target.platformNo ?? update.platformNo);
+                        const nextWicket = update.wicket ?? target.wicket;
+                        if (
+                            nextPlatformNo === target.platformNo &&
+                            nextWicket === target.wicket &&
+                            update.fetchedAt ===
+                                target.stationPlatformInfoFetchedAt
+                        ) {
+                            continue;
+                        }
+
+                        queries.run(
+                            'updateScheduleStopStationPlatformInfo',
+                            nextPlatformNo,
+                            nextWicket,
+                            update.fetchedAt,
+                            kind,
+                            item.itemCode,
+                            target.stopIndex
+                        );
+                        changedStopKeys.add(
+                            `${kind}:${item.itemCode}:${target.stopIndex}`
+                        );
+                    }
+                }
+            }
+
+            return {
+                updatedCacheEntryCount: changedCacheKeys.size,
+                updatedStopCount: changedStopKeys.size
+            };
+        }
+    );
+
+    return transaction();
 }
 
 export function loadScheduleStationsByTelecodes(

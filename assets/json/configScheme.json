@@ -89,6 +89,17 @@
                         "stationBoard"
                     ]
                 },
+                "stationPlatformInfo": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "ttlDays": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "default": 30
+                        }
+                    }
+                },
                 "scheduleProbe": {
                     "type": "object",
                     "additionalProperties": false,

@@ -4044,6 +4044,10 @@ function getRequestTypeLabel(type: AdminTrainDataRequestType) {
             return '下载车站清单';
         case 'fetch_station_board':
             return '获取车站大屏';
+        case 'fetch_station_exit_info':
+            return '获取站台和出站口信息';
+        case 'fetch_station_transport_info':
+            return '获取车站交通接驳信息';
         default:
             return type;
     }
@@ -4063,6 +4067,10 @@ function getRequestTypeEyebrow(type: AdminTrainDataRequestType) {
             return 'Stations';
         case 'fetch_station_board':
             return 'Station Board';
+        case 'fetch_station_exit_info':
+            return 'Platform & Exit';
+        case 'fetch_station_transport_info':
+            return 'Station Transport';
         default:
             return 'Type';
     }
@@ -4082,6 +4090,10 @@ function getRequestTypeAccentClass(type: AdminTrainDataRequestType) {
             return 'text-violet-700';
         case 'fetch_station_board':
             return 'text-cyan-700';
+        case 'fetch_station_exit_info':
+            return 'text-rose-700';
+        case 'fetch_station_transport_info':
+            return 'text-teal-700';
         default:
             return 'text-slate-700';
     }

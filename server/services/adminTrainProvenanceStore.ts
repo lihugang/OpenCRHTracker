@@ -1855,7 +1855,9 @@ const ADMIN_TRAIN_DATA_REQUEST_TYPES: AdminTrainDataRequestType[] = [
     'fetch_emu_by_route',
     'fetch_emu_by_seat_code',
     'fetch_all_stations',
-    'fetch_station_board'
+    'fetch_station_board',
+    'fetch_station_exit_info',
+    'fetch_station_transport_info'
 ];
 
 const ADMIN_TRAIN_DATA_REQUEST_TYPE_SET = new Set<string>(
