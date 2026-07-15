@@ -886,10 +886,16 @@ export function getProbeEmuMultipleStateFromCode(
         return 'unknown';
     }
 
-    const [model, trainSetNo] = normalizedEmuCode.split('-', 2);
-    if (!model || !trainSetNo) {
+    const canonicalEmuCode =
+        assets.canonicalEmuCodeByAnyCode.get(normalizedEmuCode) ??
+        normalizedEmuCode;
+    const separatorIndex = canonicalEmuCode.lastIndexOf('-');
+    if (separatorIndex <= 0 || separatorIndex >= canonicalEmuCode.length - 1) {
         return 'unknown';
     }
+
+    const model = canonicalEmuCode.slice(0, separatorIndex);
+    const trainSetNo = canonicalEmuCode.slice(separatorIndex + 1);
 
     return getProbeEmuMultipleStateFromRecord(
         assets.emuByModelAndTrainSetNo.get(

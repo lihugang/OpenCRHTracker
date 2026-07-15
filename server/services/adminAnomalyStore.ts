@@ -2,6 +2,10 @@ import {
     listDailyRecordsAll,
     type DailyEmuRouteRow
 } from '~/server/services/emuRoutesStore';
+import {
+    getProbeEmuMultipleStateFromCode,
+    loadProbeAssets
+} from '~/server/services/probeAssetStore';
 import parseEmuCode from '~/server/utils/12306/parseEmuCode';
 import getDayTimestampRange from '~/server/utils/date/getDayTimestampRange';
 import type {
@@ -54,7 +58,22 @@ function buildModelMismatchSummary(
     );
 }
 
-export function scanDailyAnomalies(date: string): AdminAnomalyScanResponse {
+function buildNonMultipleCoupledSummary(
+    trainCode: string,
+    date: string,
+    emuCodes: string[],
+    nonMultipleEmuCodes: string[]
+) {
+    return (
+        `车次 ${trainCode} 在 ${date} 关联了 ${emuCodes.length} 组车组，` +
+        `其中长编组为 ${nonMultipleEmuCodes.join(' / ')}，不应重联。`
+    );
+}
+
+export async function scanDailyAnomalies(
+    date: string
+): Promise<AdminAnomalyScanResponse> {
+    const assets = await loadProbeAssets();
     const dayRange = getDayTimestampRange(date);
     const rows = listDailyRecordsAll(dayRange.startAt, dayRange.endAt).sort(
         sortRoutesAscending
@@ -86,6 +105,29 @@ export function scanDailyAnomalies(date: string): AdminAnomalyScanResponse {
         ).sort();
 
         if (uniqueEmuCodes.length >= 2) {
+            const nonMultipleEmuCodes = uniqueEmuCodes.filter(
+                (emuCode) =>
+                    getProbeEmuMultipleStateFromCode(assets, emuCode) ===
+                    'non_multiple'
+            );
+            if (nonMultipleEmuCodes.length > 0) {
+                items.push({
+                    type: 'train_non_multiple_coupled',
+                    subjectCode: trainCode,
+                    title: '同日同车次存在长编组重联',
+                    summary: buildNonMultipleCoupledSummary(
+                        trainCode,
+                        date,
+                        uniqueEmuCodes,
+                        nonMultipleEmuCodes
+                    ),
+                    trainCodes: [trainCode],
+                    emuCodes: uniqueEmuCodes,
+                    durationSeconds: null,
+                    routes: trainRows.map(toAnomalyRouteRecord)
+                });
+            }
+
             const emuCodesByModel = new Map<string, string[]>();
             for (const emuCode of uniqueEmuCodes) {
                 const parsedEmuCode = parseEmuCode(emuCode);
@@ -185,6 +227,11 @@ export function scanDailyAnomalies(date: string): AdminAnomalyScanResponse {
                 type: 'train_coupled_model_mismatch',
                 label: '重联车型不一致',
                 count: countItemsByType(items, 'train_coupled_model_mismatch')
+            },
+            {
+                type: 'train_non_multiple_coupled',
+                label: '长编组重联',
+                count: countItemsByType(items, 'train_non_multiple_coupled')
             },
             {
                 type: 'emu_single_short_route',

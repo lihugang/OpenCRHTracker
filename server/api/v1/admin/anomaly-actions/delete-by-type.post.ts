@@ -40,7 +40,7 @@ export default defineEventHandler(async (event) => {
             );
             ensure(type.length > 0, 400, 'invalid_param', 'type 不能为空');
 
-            return deleteAnomalyRoutesByType(date, type);
+            return await deleteAnomalyRoutesByType(date, type);
         }
     );
 });

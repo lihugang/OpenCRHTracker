@@ -102,7 +102,7 @@
                                 </p>
                             </div>
                             <div
-                                class="grid gap-2 sm:grid-cols-3 lg:min-w-[34rem]">
+                                class="grid gap-2 sm:grid-cols-2 lg:min-w-[34rem]">
                                 <UiButton
                                     v-for="action in bulkDeleteActions"
                                     :key="action.type"
@@ -508,6 +508,10 @@ const bulkDeleteActions: BulkDeleteAction[] = [
         buttonLabel: '删除车型不一致'
     },
     {
+        type: 'train_non_multiple_coupled',
+        buttonLabel: '删除长编组重联'
+    },
+    {
         type: 'emu_single_short_route',
         buttonLabel: '删除短交路异常'
     }
@@ -524,6 +528,11 @@ const anomalyCounts = computed(
             {
                 type: 'train_coupled_model_mismatch' as const,
                 label: '重联车型不一致',
+                count: 0
+            },
+            {
+                type: 'train_non_multiple_coupled' as const,
+                label: '长编组重联',
                 count: 0
             },
             {
@@ -903,6 +912,8 @@ function getAnomalyTypeLabel(type: AdminAnomalyType) {
             return '车次重联异常';
         case 'train_coupled_model_mismatch':
             return '重联车型不一致';
+        case 'train_non_multiple_coupled':
+            return '长编组重联';
         case 'emu_single_short_route':
             return '车组短交路异常';
     }
@@ -914,6 +925,8 @@ function getAnomalyTypeBadgeClass(type: AdminAnomalyType) {
             return 'inline-flex items-center rounded-full bg-crh-blue/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-crh-blue';
         case 'train_coupled_model_mismatch':
             return 'inline-flex items-center rounded-full bg-rose-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-rose-700';
+        case 'train_non_multiple_coupled':
+            return 'inline-flex items-center rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-amber-800';
         case 'emu_single_short_route':
             return 'inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-emerald-800';
     }

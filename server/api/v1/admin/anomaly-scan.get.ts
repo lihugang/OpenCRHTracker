@@ -23,7 +23,7 @@ export default defineEventHandler(async (event) => {
                 'date 必须是 YYYYMMDD'
             );
 
-            return scanDailyAnomalies(date);
+            return await scanDailyAnomalies(date);
         }
     );
 });

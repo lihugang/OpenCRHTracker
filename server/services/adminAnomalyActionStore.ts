@@ -30,6 +30,7 @@ import parseEmuCode from '~/server/utils/12306/parseEmuCode';
 const ADMIN_ANOMALY_TYPES: readonly AdminAnomalyType[] = [
     'train_multi_emu',
     'train_coupled_model_mismatch',
+    'train_non_multiple_coupled',
     'emu_single_short_route'
 ];
 
@@ -232,10 +233,10 @@ export async function deleteAnomalyRoute(
     };
 }
 
-export function deleteAnomalyRoutesByType(
+export async function deleteAnomalyRoutesByType(
     date: string,
     type: string
-): AdminAnomalyBulkDeleteResponse {
+): Promise<AdminAnomalyBulkDeleteResponse> {
     ensureAdminAnomalyType(type);
 
     if (date === getCurrentDateString()) {
@@ -246,7 +247,7 @@ export function deleteAnomalyRoutesByType(
         );
     }
 
-    const scanResult = scanDailyAnomalies(date);
+    const scanResult = await scanDailyAnomalies(date);
     const matchedItems = scanResult.items.filter((item) => item.type === type);
     const routeIds = Array.from(
         new Set(
