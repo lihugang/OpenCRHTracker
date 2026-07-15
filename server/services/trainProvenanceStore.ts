@@ -19,16 +19,13 @@ export type TrainProvenanceRequestStatType =
     | 'fetch_route_info'
     | 'fetch_emu_by_route'
     | 'fetch_emu_by_seat_code'
-    | 'fetch_guangzhou_dining_train'
     | 'fetch_all_stations'
     | 'fetch_station_board';
 
 type TrainProvenanceSqlKey =
-    | 'cleanupExpiredGuangzhouDiningTrainMappings'
     | 'cleanupExpiredRequestHourlyStats'
     | 'cleanupExpiredTaskRuns'
     | 'incrementRequestHourlyStat'
-    | 'selectGuangzhouDiningTrainMappingsByDate'
     | 'insertCouplingScanCandidate'
     | 'insertProvenanceEvent'
     | 'insertStationBoardDispatchResult'
@@ -46,7 +43,6 @@ type TrainProvenanceSqlKey =
     | 'selectTaskRunsByDateAndExecutor'
     | 'selectTaskRunBySchedulerTaskId'
     | 'updateTaskRunFinished'
-    | 'upsertGuangzhouDiningTrainMapping'
     | 'upsertTaskRunStart';
 
 interface TrainProvenanceTaskRunRow {
@@ -108,28 +104,10 @@ interface CouplingScanCandidateRow {
 interface RequestHourlyStatRow {
     bucket_start: number;
     service_date: string;
-    request_type: TrainProvenanceRequestStatType;
+    request_type: string;
     is_success: number;
     request_count: number;
     updated_at: number;
-}
-
-interface GuangzhouDiningTrainMappingRow {
-    service_date: string;
-    train_code: string;
-    train_uuid: string;
-    returned_train_code: string;
-    created_at: number;
-    updated_at: number;
-}
-
-export interface GuangzhouDiningTrainMappingRecord {
-    serviceDate: string;
-    trainCode: string;
-    trainUuid: string;
-    returnedTrainCode: string;
-    createdAt: number;
-    updatedAt: number;
 }
 
 interface StationBoardDispatchResultRow {
@@ -220,7 +198,7 @@ export interface CouplingScanCandidateRecord {
 export interface TrainProvenanceRequestHourlyStatRecord {
     bucketStart: number;
     serviceDate: string;
-    requestType: TrainProvenanceRequestStatType;
+    requestType: string;
     isSuccess: boolean;
     requestCount: number;
     updatedAt: number;
@@ -539,16 +517,8 @@ export function cleanupExpiredTrainProvenance(
         'cleanupExpiredRequestHourlyStats',
         cutoffSeconds
     );
-    const diningMappingResult = trainProvenanceStatements.run(
-        'cleanupExpiredGuangzhouDiningTrainMappings',
-        cutoffSeconds
-    );
     lastCleanupAt = nowSeconds;
-    return (
-        taskRunResult.changes +
-        requestStatResult.changes +
-        diningMappingResult.changes
-    );
+    return taskRunResult.changes + requestStatResult.changes;
 }
 
 export function maybeCleanupExpiredTrainProvenance(
@@ -678,45 +648,6 @@ export function record12306RequestHourlyStat(
         input.isSuccess ? 1 : 0,
         timestamp
     );
-}
-
-export function upsertGuangzhouDiningTrainMapping(input: {
-    serviceDate: string;
-    trainCode: string;
-    trainUuid: string;
-    returnedTrainCode?: string;
-    timestamp?: number;
-}) {
-    const timestamp = input.timestamp ?? getNowSeconds();
-    maybeCleanupExpiredTrainProvenance(timestamp);
-    trainProvenanceStatements.run(
-        'upsertGuangzhouDiningTrainMapping',
-        normalizeServiceDate(input.serviceDate),
-        normalizeCode(input.trainCode),
-        input.trainUuid.trim(),
-        normalizeCode(input.returnedTrainCode ?? ''),
-        timestamp,
-        timestamp
-    );
-}
-
-export function listGuangzhouDiningTrainMappingsByDate(
-    serviceDate: string
-): GuangzhouDiningTrainMappingRecord[] {
-    maybeCleanupExpiredTrainProvenance();
-    return trainProvenanceStatements
-        .all<GuangzhouDiningTrainMappingRow>(
-            'selectGuangzhouDiningTrainMappingsByDate',
-            normalizeServiceDate(serviceDate)
-        )
-        .map((row) => ({
-            serviceDate: row.service_date,
-            trainCode: row.train_code,
-            trainUuid: row.train_uuid,
-            returnedTrainCode: row.returned_train_code,
-            createdAt: row.created_at,
-            updatedAt: row.updated_at
-        }));
 }
 
 export function recordStationBoardDispatchResult(

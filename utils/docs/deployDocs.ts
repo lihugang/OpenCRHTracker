@@ -183,10 +183,8 @@ export const deployDocsSections: DocsContentSection[] = [
                         valueType: 'object',
                         required: true,
                         description:
-                            '抓取接口固定参数，包含 eKey、jsonpCallback、routeProbeCarCode，以及广州局点餐查询的签名和 DES 密钥。',
-                        notes: [
-                            '生产环境必须替换 guangzhouDiningSigningKey 和 guangzhouDiningDesKey 的示例值。'
-                        ]
+                            '抓取接口固定参数，包含 eKey、jsonpCallback 和 routeProbeCarCode。',
+                        notes: []
                     },
                     {
                         path: 'spider.rateLimit.query.minIntervalMs',
@@ -295,18 +293,6 @@ export const deployDocsSections: DocsContentSection[] = [
                         notes: [
                             'refresh.enabled=true 时 provider 必填。',
                             'refresh.refreshAt 必须是非空 HHmm 字符串数组。'
-                        ]
-                    },
-                    {
-                        path: 'data.assets.guangzhouDiningMapping',
-                        valueType: 'object',
-                        required: true,
-                        description:
-                            '广州局点餐系统 UUID 到具体车组号的本地映射文件路径。',
-                        notes: [
-                            '默认文件建议为 data/guangzhou_dining_mapping.json。',
-                            '当前只支持管理员页面本地重载，不支持 provider、定时刷新或远程刷新。',
-                            '文件缺失或内容无效时服务会记录告警并以空映射继续运行。'
                         ]
                     },
                     {
@@ -1303,52 +1289,6 @@ export const deployDocsSections: DocsContentSection[] = [
                     '配属信息接口需要请求方具备 api.allocation.emu.read 访问域；如果需要匿名访问，应在 api.permissions.anonymousScopes 中开放该访问域。',
                     '该接口成本由 cost.fixed.allocationEmu 控制，默认成本为 1。',
                     '管理员页面“配置文件”支持对该文件执行本地重载和远程刷新，刷新后会立即影响配属信息查询，并同步固定车组畅行码检测依赖。'
-                ]
-            }
-        ]
-    },
-    {
-        id: 'guangzhou-dining-mapping',
-        title: 'guangzhou_dining_mapping.json',
-        summary:
-            '把广州局点餐系统返回的列车 UUID 映射为可写入探测结果的具体车组号。',
-        blocks: [
-            {
-                type: 'paragraph',
-                text: '广州局点餐系统映射文件默认建议放在 data/guangzhou_dining_mapping.json，实际路径由配置文件中的 data.assets.guangzhouDiningMapping.file 决定。当前仅在广州局 CR400BF-AS 车次的席位码校验不匹配时查询点餐接口，并使用返回的 UUID 查找本文件。'
-            },
-            {
-                type: 'code',
-                language: 'json',
-                code: '{\n    "550e8400-e29b-41d4-a716-446655440000": "CR400BF-AS-xxxx"\n}'
-            },
-            {
-                type: 'field-cards',
-                cards: [
-                    {
-                        path: '<trainUuid>',
-                        valueType: 'string',
-                        required: true,
-                        description:
-                            '键是广州局点餐系统返回的 UUID，匹配时忽略首尾空白和大小写。'
-                    },
-                    {
-                        path: '<emuCode>',
-                        valueType: 'string',
-                        required: true,
-                        description:
-                            '值是具体车组号；加载时会规范化为大写并校验基本车组号格式。'
-                    }
-                ]
-            },
-            {
-                type: 'list',
-                items: [
-                    '文件格式为单个 JSON 对象，允许使用 {} 表示暂时没有映射。',
-                    'UUID 命中后，系统会按单组 resolved 流程把映射车组写入 daily_emu_routes 和 probe_status，并结束本次探测任务。',
-                    'UUID 未命中时会输出 warning，并继续原有席位码不匹配重试或耗尽处理。',
-                    '文件缺失、无法读取或整体内容无效时，服务会输出 warning 并以空映射继续启动。',
-                    '管理员页面“配置文件”只支持本地重载；当前不支持远程刷新。'
                 ]
             }
         ]

@@ -15,7 +15,6 @@ import {
     getTrainProvenanceRuntimeConfig,
     getTrainProvenanceTaskRunById,
     isTrainProvenanceEnabled,
-    listGuangzhouDiningTrainMappingsByDate,
     list12306RequestHourlyStatsInRange,
     listCouplingScanCandidatesByTaskRunId,
     listStationBoardDispatchResultsByDate,
@@ -68,7 +67,6 @@ import type {
     AdminTrainDataRequestSummary,
     AdminTrainDataRequestType,
     AdminTrainDataRequestTypeSummary,
-    AdminGuangzhouDiningTrainMappingsResponse,
     AdminTrainProvenanceCouplingScanDetail,
     AdminTrainProvenanceCoupledResolutionDetail,
     AdminTrainProvenanceConflictCurrentGroup,
@@ -1856,23 +1854,18 @@ const ADMIN_TRAIN_DATA_REQUEST_TYPES: AdminTrainDataRequestType[] = [
     'fetch_route_info',
     'fetch_emu_by_route',
     'fetch_emu_by_seat_code',
-    'fetch_guangzhou_dining_train',
     'fetch_all_stations',
     'fetch_station_board'
 ];
 
-export function getAdminGuangzhouDiningTrainMappings(
-    date: string
-): AdminGuangzhouDiningTrainMappingsResponse {
-    const runtimeConfig = getTrainProvenanceRuntimeConfig();
-    return {
-        enabled: runtimeConfig.enabled,
-        retentionDays: runtimeConfig.retentionDays,
-        date,
-        items: runtimeConfig.enabled
-            ? listGuangzhouDiningTrainMappingsByDate(date)
-            : []
-    };
+const ADMIN_TRAIN_DATA_REQUEST_TYPE_SET = new Set<string>(
+    ADMIN_TRAIN_DATA_REQUEST_TYPES
+);
+
+function isAdminTrainDataRequestType(
+    value: string
+): value is AdminTrainDataRequestType {
+    return ADMIN_TRAIN_DATA_REQUEST_TYPE_SET.has(value);
 }
 
 interface RequestMetricAccumulator {
@@ -2047,6 +2040,10 @@ export function getAdminTrainRequestStats(
     const compareTotals = createRequestMetricsAccumulator();
 
     for (const row of rows) {
+        if (!isAdminTrainDataRequestType(row.requestType)) {
+            continue;
+        }
+
         const isCurrentDay = row.serviceDate === date;
         const isCompareDay = row.serviceDate === compareDate;
         if (!isCurrentDay && !isCompareDay) {

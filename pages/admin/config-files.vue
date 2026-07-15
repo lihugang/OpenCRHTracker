@@ -331,8 +331,6 @@ function getItemEyebrow(target: AdminConfigFileTarget) {
             return '配属';
         case 'QRCode':
             return '畅行码';
-        case 'guangzhouDiningMapping':
-            return '广州点餐';
         case 'qrcodeDetection':
             return '畅行码检测';
         default:

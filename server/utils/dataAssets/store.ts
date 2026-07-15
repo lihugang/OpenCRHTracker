@@ -6,7 +6,6 @@ import getLogger from '~/server/libs/log4js';
 const logger = getLogger('data-assets');
 
 export type AssetKey = keyof Config['data']['assets'];
-export type RefreshableAssetKey = Exclude<AssetKey, 'guangzhouDiningMapping'>;
 
 export interface EnsureAssetOptions {
     defaultContent: string;
@@ -89,7 +88,7 @@ export function writeAssetText(key: AssetKey, content: string): void {
 }
 
 export async function refreshAssetFileFromProvider(
-    key: RefreshableAssetKey,
+    key: AssetKey,
     options: RefreshAssetOptions = {}
 ): Promise<RefreshAssetResult> {
     const config = getAssetConfig(key);
@@ -159,7 +158,7 @@ export async function refreshAssetFileFromProvider(
 }
 
 export async function ensureAssetFile(
-    key: RefreshableAssetKey,
+    key: AssetKey,
     options: EnsureAssetOptions
 ): Promise<EnsureAssetResult> {
     assertStringContent(options.defaultContent, 'defaultContent');

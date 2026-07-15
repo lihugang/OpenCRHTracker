@@ -435,111 +435,6 @@
                     <div class="space-y-2">
                         <p
                             class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
-                            Guangzhou Dining
-                        </p>
-                        <h2 class="text-2xl font-semibold text-slate-900">
-                            广州局点餐查询记录
-                        </h2>
-                        <p class="text-sm leading-6 text-slate-600">
-                            展示所选日期内记录的全部车次与列车 UUID
-                            对应关系，不分页。
-                        </p>
-                    </div>
-
-                    <UiEmptyState
-                        v-if="diningMappingsData && !diningMappingsData.enabled"
-                        eyebrow="已禁用"
-                        title="12306 数据当前已关闭"
-                        description="可在 config.json 中重新启用 trainProvenance 记录。" />
-
-                    <div
-                        v-else-if="
-                            diningMappingsStatus === 'pending' &&
-                            !diningMappingsData
-                        "
-                        class="space-y-3">
-                        <div
-                            v-for="index in 3"
-                            :key="`dining-mapping-loading:${index}`"
-                            class="h-16 animate-pulse rounded-[1rem] bg-slate-100/90" />
-                    </div>
-
-                    <UiEmptyState
-                        v-else-if="diningMappingsErrorMessage"
-                        eyebrow="加载失败"
-                        title="广州局点餐查询记录加载失败"
-                        :description="diningMappingsErrorMessage"
-                        tone="danger">
-                        <UiButton
-                            type="button"
-                            variant="secondary"
-                            @click="refreshDiningMappings()">
-                            重试
-                        </UiButton>
-                    </UiEmptyState>
-
-                    <UiEmptyState
-                        v-else-if="diningMappingsData?.items.length === 0"
-                        eyebrow="暂无记录"
-                        title="当天没有列车 UUID 记录"
-                        description="仅当发车探测识别到列车、畅行码不匹配且时刻表为 CR400BF-AS / Q 时才会触发查询。" />
-
-                    <div
-                        v-else-if="diningMappingsData"
-                        class="overflow-x-auto rounded-[1rem] border border-slate-200">
-                        <table class="min-w-full divide-y divide-slate-200">
-                            <thead class="bg-slate-50">
-                                <tr>
-                                    <th
-                                        class="px-4 py-3 text-left text-xs font-semibold text-slate-500">
-                                        车次
-                                    </th>
-                                    <th
-                                        class="px-4 py-3 text-left text-xs font-semibold text-slate-500">
-                                        列车 UUID
-                                    </th>
-                                    <th
-                                        class="px-4 py-3 text-left text-xs font-semibold text-slate-500">
-                                        接口返回车次
-                                    </th>
-                                    <th
-                                        class="px-4 py-3 text-left text-xs font-semibold text-slate-500">
-                                        首次记录时间
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-slate-100 bg-white">
-                                <tr
-                                    v-for="item in diningMappingsData.items"
-                                    :key="`${item.trainCode}:${item.trainUuid}`">
-                                    <td
-                                        class="whitespace-nowrap px-4 py-3 text-sm font-semibold text-slate-900">
-                                        {{ item.trainCode }}
-                                    </td>
-                                    <td
-                                        class="whitespace-nowrap px-4 py-3 font-mono text-sm text-slate-700">
-                                        {{ item.trainUuid }}
-                                    </td>
-                                    <td
-                                        class="whitespace-nowrap px-4 py-3 text-sm text-slate-600">
-                                        {{ item.returnedTrainCode || '--' }}
-                                    </td>
-                                    <td
-                                        class="whitespace-nowrap px-4 py-3 text-sm text-slate-600">
-                                        {{ formatTimestamp(item.createdAt) }}
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </UiCard>
-
-            <UiCard :show-accent-bar="false">
-                <div class="space-y-6">
-                    <div class="space-y-2">
-                        <p
-                            class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
                             Provenance
                         </p>
                         <h2 class="text-2xl font-semibold text-slate-900">
@@ -3171,7 +3066,6 @@ import type {
     AdminCouplingScanDetailResponse,
     AdminCouplingScanTaskListItem,
     AdminCouplingScanTaskListResponse,
-    AdminGuangzhouDiningTrainMappingsResponse,
     AdminQrcodeScanDetailResponse,
     AdminQrcodeScanTaskListResponse,
     AdminQrcodeScanTimeSummaryItem,
@@ -3383,25 +3277,6 @@ async function fetchTrainRequestStats() {
     return response.data;
 }
 
-async function fetchGuangzhouDiningTrainMappings() {
-    const response = await requestFetch<
-        TrackerApiResponse<AdminGuangzhouDiningTrainMappingsResponse>
-    >('/api/v1/admin/train-provenance/guangzhou-dining-trains', {
-        retry: 0,
-        query: {
-            date: selectedDateYmd.value
-        }
-    });
-
-    if (!response.ok) {
-        throw {
-            data: response
-        };
-    }
-
-    return response.data;
-}
-
 async function fetchCouplingScanTaskList() {
     const response = await requestFetch<
         TrackerApiResponse<AdminCouplingScanTaskListResponse>
@@ -3482,19 +3357,6 @@ const {
 });
 
 const {
-    data: diningMappingsData,
-    status: diningMappingsStatus,
-    error: diningMappingsError,
-    refresh: refreshDiningMappings
-} = await useAsyncData(
-    'admin-train-provenance-guangzhou-dining-trains',
-    fetchGuangzhouDiningTrainMappings,
-    {
-        watch: [selectedDateYmd]
-    }
-);
-
-const {
     data: couplingScanTaskListData,
     status: couplingScanTaskListStatus,
     error: couplingScanTaskListError,
@@ -3512,14 +3374,6 @@ const requestStatsErrorMessage = computed(() =>
         ? getApiErrorMessage(
               requestStatsError.value,
               '12306 请求统计加载失败。'
-          )
-        : ''
-);
-const diningMappingsErrorMessage = computed(() =>
-    diningMappingsError.value
-        ? getApiErrorMessage(
-              diningMappingsError.value,
-              '广州局点餐查询记录加载失败。'
           )
         : ''
 );
@@ -3794,7 +3648,6 @@ onBeforeUnmount(() => {
 async function refreshAll() {
     const refreshTasks = [
         refreshRequestStats(),
-        refreshDiningMappings(),
         refreshProvenance(),
         refreshCouplingScanTaskList()
     ];
@@ -4187,8 +4040,6 @@ function getRequestTypeLabel(type: AdminTrainDataRequestType) {
             return '按车次取车组';
         case 'fetch_emu_by_seat_code':
             return '畅行码查车组';
-        case 'fetch_guangzhou_dining_train':
-            return '广州局点餐查询';
         case 'fetch_all_stations':
             return '下载车站清单';
         case 'fetch_station_board':
@@ -4208,8 +4059,6 @@ function getRequestTypeEyebrow(type: AdminTrainDataRequestType) {
             return 'Route EMU';
         case 'fetch_emu_by_seat_code':
             return 'Seat Code';
-        case 'fetch_guangzhou_dining_train':
-            return 'Dining';
         case 'fetch_all_stations':
             return 'Stations';
         case 'fetch_station_board':
@@ -4229,8 +4078,6 @@ function getRequestTypeAccentClass(type: AdminTrainDataRequestType) {
             return 'text-amber-700';
         case 'fetch_emu_by_seat_code':
             return 'text-emerald-700';
-        case 'fetch_guangzhou_dining_train':
-            return 'text-fuchsia-700';
         case 'fetch_all_stations':
             return 'text-violet-700';
         case 'fetch_station_board':

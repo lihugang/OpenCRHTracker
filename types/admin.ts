@@ -435,7 +435,6 @@ export type AdminConfigFileTarget =
     | 'config'
     | 'EMUList'
     | 'QRCode'
-    | 'guangzhouDiningMapping'
     | 'stationCoord'
     | 'trainStyleMapping'
     | 'qrcodeDetection';
@@ -821,7 +820,6 @@ export type AdminTrainDataRequestType =
     | 'fetch_route_info'
     | 'fetch_emu_by_route'
     | 'fetch_emu_by_seat_code'
-    | 'fetch_guangzhou_dining_train'
     | 'fetch_all_stations'
     | 'fetch_station_board';
 
@@ -867,22 +865,6 @@ export interface AdminTrainDataRequestStatsResponse {
     totals: AdminTrainDataRequestSummary;
     types: AdminTrainDataRequestTypeSummary[];
     hours: AdminTrainDataRequestHourBucket[];
-}
-
-export interface AdminGuangzhouDiningTrainMapping {
-    serviceDate: string;
-    trainCode: string;
-    trainUuid: string;
-    returnedTrainCode: string;
-    createdAt: number;
-    updatedAt: number;
-}
-
-export interface AdminGuangzhouDiningTrainMappingsResponse {
-    enabled: boolean;
-    retentionDays: number;
-    date: string;
-    items: AdminGuangzhouDiningTrainMapping[];
 }
 
 export interface AdminTrainProvenanceResponse {

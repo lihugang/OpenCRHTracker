@@ -38,7 +38,7 @@ import {
 } from '~/server/utils/date/shanghaiDateTime';
 import {
     refreshAssetFileFromProvider,
-    type RefreshableAssetKey as DataAssetRefreshableKey
+    type AssetKey
 } from '~/server/utils/dataAssets/store';
 
 type RefreshableAssetKey =
@@ -266,7 +266,7 @@ async function executeRefreshAssetTask(
         }
 
         const result = await refreshAssetFileFromProvider(
-            definition.key as DataAssetRefreshableKey,
+            definition.key as AssetKey,
             {
                 validateContent:
                     definition.key === 'EMUList'
