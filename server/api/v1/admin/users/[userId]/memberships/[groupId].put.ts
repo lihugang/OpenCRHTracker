@@ -50,13 +50,12 @@ export default defineEventHandler(async (event) => {
                 'startsAt 必须为正整数 Unix 秒时间戳'
             );
             ensure(
-                body.durationDays === null ||
-                    (typeof body.durationDays === 'number' &&
-                        Number.isSafeInteger(body.durationDays) &&
-                        body.durationDays > 0),
+                typeof body.durationDays === 'number' &&
+                    Number.isSafeInteger(body.durationDays) &&
+                    body.durationDays > 0,
                 400,
                 'invalid_param',
-                'durationDays 必须为正整数或 null'
+                'durationDays 必须为正整数'
             );
 
             const request: AdminUpsertUserMembershipRequest = {
@@ -64,14 +63,11 @@ export default defineEventHandler(async (event) => {
                 durationDays: body.durationDays
             };
             const expiresAt =
-                request.durationDays === null
-                    ? null
-                    : request.startsAt + request.durationDays * SECONDS_PER_DAY;
+                request.startsAt + request.durationDays * SECONDS_PER_DAY;
             ensure(
-                expiresAt === null ||
-                    (Number.isSafeInteger(expiresAt) &&
-                        expiresAt > request.startsAt &&
-                        expiresAt > getNowSeconds()),
+                Number.isSafeInteger(expiresAt) &&
+                    expiresAt > request.startsAt &&
+                    expiresAt > getNowSeconds(),
                 400,
                 'invalid_param',
                 '计算得到的赞助权益到期时间必须晚于当前时间'

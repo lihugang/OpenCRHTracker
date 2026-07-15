@@ -415,6 +415,7 @@ export interface Config {
         fixed: {
             health: number;
             authMe: number;
+            authRedeemMembership: number;
             authLogout: number;
             authChangePassword: number;
             authSendQqBindingCode: number;
@@ -2340,6 +2341,13 @@ function validateConfig(raw: unknown): Config {
             fixed: {
                 health: asNumber(costFixed.health, 'cost.fixed.health', 0),
                 authMe: asNumber(costFixed.authMe, 'cost.fixed.authMe', 0),
+                authRedeemMembership: asNumber(
+                    costFixed.authRedeemMembership === undefined
+                        ? 50
+                        : costFixed.authRedeemMembership,
+                    'cost.fixed.authRedeemMembership',
+                    0
+                ),
                 authLogout: asNumber(
                     costFixed.authLogout,
                     'cost.fixed.authLogout',

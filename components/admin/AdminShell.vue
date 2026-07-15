@@ -261,6 +261,10 @@ const navItems = [
         path: '/admin/users'
     },
     {
+        label: '兑换码',
+        path: '/admin/membership-codes'
+    },
+    {
         label: 'OAuth 客户端',
         path: '/admin/oauth-clients'
     },

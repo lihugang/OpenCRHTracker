@@ -11,6 +11,9 @@ function ensureUsersSchema(db: Database.Database) {
         'createUserProfilesTable',
         'createUserMembershipsTable',
         'createUserMembershipsIndexes',
+        'createMembershipCodeBatchesTable',
+        'createMembershipCodesTable',
+        'createMembershipCodeIndexes',
         'createApiKeysTable',
         'createApiKeyScopesTable',
         'createUserEventSubscriptionsTable',
@@ -36,8 +39,19 @@ function ensureUsersSchema(db: Database.Database) {
         db.exec(statement);
     }
 
+    type UsersMigrationSqlKey =
+        | 'selectUsersColumns'
+        | 'alterUsersAddIsBanned'
+        | 'selectUserMembershipsColumns'
+        | 'selectNullUserMembershipExpiryCount'
+        | 'dropRequiredExpiryUserMembershipsTable'
+        | 'createRequiredExpiryUserMembershipsTable'
+        | 'copyRequiredExpiryUserMemberships'
+        | 'dropLegacyUserMembershipsTable'
+        | 'renameRequiredExpiryUserMembershipsTable';
+
     const migrationSql = importSqlBatch('users/migrations') as Record<
-        'selectUsersColumns' | 'alterUsersAddIsBanned',
+        UsersMigrationSqlKey,
         string
     >;
     const userColumns = db
@@ -49,6 +63,34 @@ function ensureUsersSchema(db: Database.Database) {
 
     if (!hasIsBannedColumn) {
         db.exec(migrationSql.alterUsersAddIsBanned);
+    }
+
+    const membershipColumns = db
+        .prepare(migrationSql.selectUserMembershipsColumns)
+        .all() as Array<{ name?: unknown; notnull?: unknown }>;
+    const expiresAtColumn = membershipColumns.find(
+        (column) => column.name === 'expires_at'
+    );
+
+    if (expiresAtColumn?.notnull !== 1) {
+        const nullExpiryCount = db
+            .prepare(migrationSql.selectNullUserMembershipExpiryCount)
+            .get() as { count?: unknown } | undefined;
+        if (nullExpiryCount?.count !== 0) {
+            throw new Error(
+                'Cannot require user membership expiry while legacy permanent memberships exist'
+            );
+        }
+
+        const migrateMembershipExpiry = db.transaction(() => {
+            db.exec(migrationSql.dropRequiredExpiryUserMembershipsTable);
+            db.exec(migrationSql.createRequiredExpiryUserMembershipsTable);
+            db.exec(migrationSql.copyRequiredExpiryUserMemberships);
+            db.exec(migrationSql.dropLegacyUserMembershipsTable);
+            db.exec(migrationSql.renameRequiredExpiryUserMembershipsTable);
+            db.exec(schemaSql.createUserMembershipsIndexes ?? '');
+        });
+        migrateMembershipExpiry();
     }
 
     const oauthSchemaSql = importSqlBatch('users/oauth');

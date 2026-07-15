@@ -1,5 +1,6 @@
 import type {
     SponsorshipEffectiveQuota,
+    SponsorshipGroupCatalogItem,
     SponsorshipGroupSummary
 } from '~/types/membership';
 
@@ -299,6 +300,46 @@ export interface AdminUsersResponse {
     bannedUsers: number;
     asOf: number;
     items: AdminUserListItem[];
+}
+
+export type AdminMembershipCodeStatus = 'unused' | 'used';
+
+export interface AdminMembershipCodeBatchSummary {
+    batchId: string;
+    groupId: string;
+    groupName: string;
+    durationDays: number;
+    quantity: number;
+    createdBy: string;
+    createdAt: number;
+}
+
+export interface AdminMembershipCodeItem extends AdminMembershipCodeBatchSummary {
+    code: string;
+    status: AdminMembershipCodeStatus;
+    usedAt: number | null;
+    usedBy: string | null;
+}
+
+export interface AdminMembershipCodeListResponse {
+    asOf: number;
+    total: number;
+    usedCount: number;
+    unusedCount: number;
+    limit: number;
+    nextCursor: string;
+    catalog: SponsorshipGroupCatalogItem[];
+    items: AdminMembershipCodeItem[];
+}
+
+export interface AdminCreateMembershipCodeBatchRequest {
+    groupId: string;
+    quantity: number;
+    durationDays: number;
+}
+
+export interface AdminCreateMembershipCodeBatchResponse {
+    batch: AdminMembershipCodeBatchSummary;
 }
 
 export interface AdminUpdateUserBanStateRequest {

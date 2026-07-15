@@ -1,0 +1,1 @@
+ALTER TABLE user_memberships_required_expiry RENAME TO user_memberships;

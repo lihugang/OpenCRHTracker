@@ -25,7 +25,7 @@ interface UserMembershipRowData {
     user_id: string;
     group_id: string;
     starts_at: number;
-    expires_at: number | null;
+    expires_at: number;
     source: string;
     granted_by: string;
     revoked_at: number | null;
@@ -38,7 +38,7 @@ export interface UserMembershipRow {
     userId: string;
     groupId: string;
     startsAt: number;
-    expiresAt: number | null;
+    expiresAt: number;
     source: string;
     grantedBy: string;
     revokedAt: number | null;
@@ -58,9 +58,10 @@ export interface UpsertUserMembershipInput {
     userId: string;
     groupId: string;
     startsAt: number;
-    expiresAt: number | null;
+    expiresAt: number;
     actorUserId: string;
     source?: string;
+    allowUnassignable?: boolean;
 }
 
 type MembershipSqlKey =
@@ -207,7 +208,7 @@ export function resolveUserMembershipStatus(
     if (row.startsAt > now) {
         return 'scheduled';
     }
-    if (row.expiresAt !== null && now >= row.expiresAt) {
+    if (now >= row.expiresAt) {
         return 'expired';
     }
     return 'active';
@@ -401,6 +402,7 @@ export function upsertUserMembership(
         : null;
     if (
         !group.assignable &&
+        !input.allowUnassignable &&
         existingStatus !== 'active' &&
         existingStatus !== 'scheduled'
     ) {
@@ -418,10 +420,9 @@ export function upsertUserMembership(
         );
     }
     if (
-        input.expiresAt !== null &&
-        (!Number.isSafeInteger(input.expiresAt) ||
-            input.expiresAt <= input.startsAt ||
-            input.expiresAt <= now)
+        !Number.isSafeInteger(input.expiresAt) ||
+        input.expiresAt <= input.startsAt ||
+        input.expiresAt <= now
     ) {
         throw new ApiRequestError(
             400,

@@ -174,13 +174,7 @@
                                     </dt>
                                     <dd
                                         class="mt-1 font-semibold text-slate-800">
-                                        {{
-                                            item.expiresAt === null
-                                                ? '长期有效'
-                                                : formatTimestamp(
-                                                      item.expiresAt
-                                                  )
-                                        }}
+                                        {{ formatTimestamp(item.expiresAt) }}
                                     </dd>
                                 </div>
                                 <div>
@@ -286,7 +280,8 @@
                         </UiField>
                         <UiField
                             label="时长（天）"
-                            help="留空表示长期有效。">
+                            help="必须填写大于 0 的整数天。"
+                            required>
                             <input
                                 v-model="form.durationDays"
                                 type="number"
@@ -294,7 +289,7 @@
                                 min="1"
                                 step="1"
                                 class="harmony-input w-full px-4 py-3 text-base text-crh-grey-dark"
-                                placeholder="留空表示长期有效"
+                                placeholder="例如 30"
                                 :disabled="isMutating" />
                         </UiField>
                         <div
@@ -369,7 +364,7 @@ const pendingRevokeGroupId = ref('');
 const form = reactive({
     groupId: '',
     startsAt: '',
-    durationDays: ''
+    durationDays: '30'
 });
 
 const modalTitle = computed(
@@ -402,6 +397,7 @@ const canSubmit = computed(
         details.value !== null &&
         form.groupId.length > 0 &&
         form.startsAt.length > 0 &&
+        form.durationDays.trim().length > 0 &&
         !isMutating.value
 );
 const activeCount = computed(
@@ -434,7 +430,7 @@ function resetState() {
     pendingRevokeGroupId.value = '';
     form.groupId = '';
     form.startsAt = '';
-    form.durationDays = '';
+    form.durationDays = '30';
 }
 
 function close() {
@@ -494,7 +490,7 @@ function initializeForm(
         form.startsAt = toShanghaiDateTimeLocalValue(
             Math.floor(Date.now() / 1000)
         );
-        form.durationDays = '';
+        form.durationDays = '30';
         return;
     }
     resetFormForGroup(response, groupId);
@@ -530,15 +526,14 @@ function resetFormForGroup(
     form.startsAt = toShanghaiDateTimeLocalValue(
         record?.startsAt ?? Math.floor(Date.now() / 1000)
     );
-    form.durationDays =
-        record?.expiresAt === null || !record
-            ? ''
-            : String(
-                  Math.max(
-                      1,
-                      Math.round((record.expiresAt - record.startsAt) / 86400)
-                  )
-              );
+    form.durationDays = !record
+        ? '30'
+        : String(
+              Math.max(
+                  1,
+                  Math.round((record.expiresAt - record.startsAt) / 86400)
+              )
+          );
 }
 
 function handleGroupChange(groupId: string) {
@@ -562,7 +557,7 @@ async function save() {
         mutationError.value = '请输入有效的上海时间作为开始时间。';
         return;
     }
-    let durationDays: number | null;
+    let durationDays: number;
     try {
         durationDays = parseDurationDays(form.durationDays);
     } catch (error) {
@@ -570,10 +565,7 @@ async function save() {
             error instanceof Error ? error.message : '赞助时长无效。';
         return;
     }
-    if (
-        durationDays !== null &&
-        startsAt + durationDays * 86400 <= Math.floor(Date.now() / 1000)
-    ) {
+    if (startsAt + durationDays * 86400 <= Math.floor(Date.now() / 1000)) {
         mutationError.value =
             '按当前开始时间与时长计算的到期时间必须晚于当前时间。';
         return;
@@ -640,7 +632,7 @@ async function mutate(
     userId: string,
     groupId: string,
     method: 'PUT' | 'DELETE',
-    body?: { startsAt: number; durationDays: number | null }
+    body?: { startsAt: number; durationDays: number }
 ) {
     const { data, error } = await useCsrfFetch<
         TrackerApiResponse<AdminUserMembershipsResponse>
@@ -703,14 +695,14 @@ function parseShanghaiDateTimeLocalValue(value: string) {
 function parseDurationDays(value: string) {
     const normalized = value.trim();
     if (!normalized) {
-        return null;
+        throw new Error('时长必须是大于 0 的整数。');
     }
     if (!/^[0-9]+$/.test(normalized)) {
-        throw new Error('时长必须是大于 0 的整数，或留空表示长期有效。');
+        throw new Error('时长必须是大于 0 的整数。');
     }
     const duration = Number.parseInt(normalized, 10);
     if (!Number.isSafeInteger(duration) || duration <= 0) {
-        throw new Error('时长必须是大于 0 的整数，或留空表示长期有效。');
+        throw new Error('时长必须是大于 0 的整数。');
     }
     return duration;
 }
@@ -724,7 +716,13 @@ function formatTimestamp(timestamp: number) {
 }
 
 function getSourceLabel(source: string) {
-    return source === 'admin_manual' ? '管理员手工授予' : '来源 ' + source;
+    if (source === 'admin_manual') {
+        return '管理员手工授予';
+    }
+    if (source === 'redemption_code') {
+        return '兑换码开通';
+    }
+    return '来源 ' + source;
 }
 
 function getStatusLabel(status: UserMembershipStatus) {

@@ -442,6 +442,137 @@ export const developerDocsOpenApi = {
                     }
                 }
             },
+            AuthMembershipRedeemResponse: {
+                type: 'object',
+                required: ['ok', 'data', 'error'],
+                properties: {
+                    ok: {
+                        type: 'boolean',
+                        example: true
+                    },
+                    data: {
+                        type: 'object',
+                        required: [
+                            'code',
+                            'redeemedAt',
+                            'durationDays',
+                            'membership',
+                            'memberships'
+                        ],
+                        properties: {
+                            code: {
+                                type: 'string',
+                                example: 'CRH-7K3M-9Q2W-X8NP-4R6T'
+                            },
+                            redeemedAt: {
+                                type: 'integer',
+                                example: 1784131200
+                            },
+                            durationDays: {
+                                type: 'integer',
+                                example: 30
+                            },
+                            membership: {
+                                type: 'object',
+                                required: [
+                                    'groupId',
+                                    'status',
+                                    'startsAt',
+                                    'expiresAt',
+                                    'group'
+                                ],
+                                properties: {
+                                    groupId: {
+                                        type: 'string',
+                                        example: 'supporter'
+                                    },
+                                    status: {
+                                        type: 'string',
+                                        enum: ['active', 'scheduled'],
+                                        example: 'active'
+                                    },
+                                    startsAt: {
+                                        type: 'integer',
+                                        example: 1784131200
+                                    },
+                                    expiresAt: {
+                                        type: 'integer',
+                                        example: 1786723200
+                                    },
+                                    group: {
+                                        type: 'object',
+                                        required: ['id', 'name'],
+                                        properties: {
+                                            id: {
+                                                type: 'string',
+                                                example: 'supporter'
+                                            },
+                                            name: {
+                                                type: 'string',
+                                                example: 'Supporter'
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            memberships: {
+                                type: 'object',
+                                required: [
+                                    'userId',
+                                    'asOf',
+                                    'items',
+                                    'catalog',
+                                    'accountScopes',
+                                    'effectiveQuota',
+                                    'quotaBreakdown'
+                                ],
+                                properties: {
+                                    userId: {
+                                        type: 'string',
+                                        example: 'example-user'
+                                    },
+                                    asOf: {
+                                        type: 'integer',
+                                        example: 1784131200
+                                    },
+                                    items: {
+                                        type: 'array',
+                                        items: {
+                                            type: 'object'
+                                        }
+                                    },
+                                    catalog: {
+                                        type: 'array',
+                                        items: {
+                                            type: 'object'
+                                        }
+                                    },
+                                    accountScopes: {
+                                        type: 'array',
+                                        items: {
+                                            type: 'string'
+                                        },
+                                        example: [
+                                            'api.auth.me.read',
+                                            'api.auth.memberships.redeem'
+                                        ]
+                                    },
+                                    effectiveQuota: {
+                                        type: 'object'
+                                    },
+                                    quotaBreakdown: {
+                                        type: 'object'
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    error: {
+                        type: 'string',
+                        example: ''
+                    }
+                }
+            },
             AuthSubscriptionItem: {
                 type: 'object',
                 required: [
@@ -1849,6 +1980,146 @@ export const developerDocsOpenApi = {
                         label: 'cookie',
                         summary: '使用当前登录会话读取会话信息。',
                         authMode: 'cookie'
+                    }
+                ]
+            }
+        },
+        '/auth/memberships/redeem': {
+            post: {
+                operationId: 'authRedeemMembership',
+                tags: ['Auth'],
+                summary: '兑换会员权益',
+                description:
+                    '已绑定 QQ 的用户可使用一次性兑换码开通或顺延对应的会员组权益，并返回更新后的会员快照。',
+                requestBody: {
+                    required: true,
+                    content: {
+                        'application/json': {
+                            schema: {
+                                type: 'object',
+                                required: ['code'],
+                                properties: {
+                                    code: {
+                                        type: 'string',
+                                        minLength: 1,
+                                        example: 'CRH-7K3M-9Q2W-X8NP-4R6T'
+                                    }
+                                }
+                            },
+                            example: {
+                                code: 'CRH-7K3M-9Q2W-X8NP-4R6T'
+                            }
+                        }
+                    }
+                },
+                security: [
+                    {
+                        bearerAuth: []
+                    },
+                    {
+                        cookieAuth: []
+                    }
+                ],
+                responses: {
+                    '200': {
+                        description: '兑换成功并返回最新会员权益。',
+                        headers: {
+                            'x-api-remain': {
+                                $ref: '#/components/headers/ApiRemain'
+                            },
+                            'x-api-cost': {
+                                $ref: '#/components/headers/ApiCost'
+                            }
+                        },
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    $ref: '#/components/schemas/AuthMembershipRedeemResponse'
+                                }
+                            }
+                        }
+                    },
+                    '400': {
+                        description: '兑换码格式或请求体无效。',
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    $ref: '#/components/schemas/ApiFailureResponse'
+                                },
+                                example: {
+                                    ok: false,
+                                    data: '兑换码格式无效',
+                                    error: 'invalid_membership_code'
+                                }
+                            }
+                        }
+                    },
+                    '401': {
+                        description: '请求未携带有效认证信息。',
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    $ref: '#/components/schemas/ApiFailureResponse'
+                                }
+                            }
+                        }
+                    },
+                    '403': {
+                        description: '缺少兑换权限或额度上限不足。',
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    $ref: '#/components/schemas/ApiFailureResponse'
+                                }
+                            }
+                        }
+                    },
+                    '404': {
+                        description: '兑换码不存在。',
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    $ref: '#/components/schemas/ApiFailureResponse'
+                                },
+                                example: {
+                                    ok: false,
+                                    data: '兑换码不存在',
+                                    error: 'membership_code_not_found'
+                                }
+                            }
+                        }
+                    },
+                    '409': {
+                        description:
+                            '用户未绑定 QQ、兑换码已使用或对应会员组当前不可用。',
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    $ref: '#/components/schemas/ApiFailureResponse'
+                                },
+                                example: {
+                                    ok: false,
+                                    data: '兑换码已被使用',
+                                    error: 'membership_code_already_used'
+                                }
+                            }
+                        }
+                    }
+                },
+                'x-slug': 'auth-membership-redeem',
+                'x-group': '身份',
+                'x-sort-order': 11,
+                'x-auth-modes': ['cookie', 'apiKey'],
+                'x-required-scopes': ['api.auth.memberships.redeem'],
+                'x-examples': [
+                    {
+                        id: 'auth-membership-redeem-cookie',
+                        label: '兑换会员权益',
+                        summary: '使用当前登录会话提交一次性兑换码。',
+                        authMode: 'cookie',
+                        body: {
+                            code: 'CRH-7K3M-9Q2W-X8NP-4R6T'
+                        }
                     }
                 ]
             }

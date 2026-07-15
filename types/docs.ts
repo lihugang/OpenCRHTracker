@@ -189,6 +189,7 @@ export interface DocsApiCostRuntimeConfig {
     minimumRequestCost: number;
     fixed: {
         authMe: number;
+        authRedeemMembership: number;
         authCreateOauthClient: number;
         allocationEmu: number;
         timetableTrainCurrent: number;

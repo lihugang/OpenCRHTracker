@@ -295,6 +295,7 @@
                 "api.feedback.create",
                 "api.feedback.reply",
                 "api.auth.me.read",
+                "api.auth.memberships.redeem",
                 "api.auth.logout",
                 "api.auth.password.update",
                 "api.auth.qq-binding.send",
@@ -317,6 +318,7 @@
             ],
             "creatableKeyMaxScopes": [
                 "api.auth.me.read",
+                "api.auth.memberships.redeem",
                 "api.allocation.emu.read",
                 "api.records.daily.read",
                 "api.history.train.read",
@@ -497,6 +499,7 @@
         "fixed": {
             "health": 0,
             "authMe": 1,
+            "authRedeemMembership": 50,
             "authLogout": 1,
             "debugEchoError": 0,
             "authIssueApiKey": 5,

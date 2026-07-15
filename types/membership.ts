@@ -36,7 +36,7 @@ export interface UserMembershipItem {
     group: SponsorshipGroupCatalogItem | null;
     status: UserMembershipStatus;
     startsAt: number;
-    expiresAt: number | null;
+    expiresAt: number;
     source: string;
     grantedBy: string;
     revokedAt: number | null;
@@ -50,14 +50,14 @@ export interface AuthMembershipItem {
     group: SponsorshipGroupCatalogItem;
     status: 'active' | 'scheduled';
     startsAt: number;
-    expiresAt: number | null;
+    expiresAt: number;
 }
 
 export interface SponsorshipGroupSummary {
     groupId: string;
     name: string;
     startsAt: number;
-    expiresAt: number | null;
+    expiresAt: number;
 }
 
 export interface SponsorshipEffectiveQuota {
@@ -97,5 +97,13 @@ export interface AdminUserMembershipsResponse {
 
 export interface AdminUpsertUserMembershipRequest {
     startsAt: number;
-    durationDays: number | null;
+    durationDays: number;
+}
+
+export interface AuthMembershipRedeemResponse {
+    code: string;
+    redeemedAt: number;
+    durationDays: number;
+    membership: AuthMembershipItem;
+    memberships: AuthMembershipsResponse;
 }

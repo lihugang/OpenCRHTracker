@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS user_memberships (
+CREATE TABLE user_memberships_required_expiry (
     user_id TEXT NOT NULL,
     group_id TEXT NOT NULL,
     starts_at INTEGER NOT NULL CHECK (starts_at > 0),

@@ -61,6 +61,8 @@ export default defineEventHandler(async (event) => {
                         minimumRequestCost: 1,
                         fixed: {
                             authMe: config.cost.fixed.authMe,
+                            authRedeemMembership:
+                                config.cost.fixed.authRedeemMembership,
                             authCreateOauthClient:
                                 config.cost.fixed.authCreateOauthClient,
                             allocationEmu: config.cost.fixed.allocationEmu,

@@ -1726,6 +1726,11 @@
                             "type": "integer",
                             "minimum": 0
                         },
+                        "authRedeemMembership": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "default": 50
+                        },
                         "authLogout": {
                             "type": "integer",
                             "minimum": 0
@@ -1834,6 +1839,7 @@
                     "required": [
                         "health",
                         "authMe",
+                        "authRedeemMembership",
                         "authLogout",
                         "authChangePassword",
                         "authSendQqBindingCode",

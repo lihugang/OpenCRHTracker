@@ -298,13 +298,7 @@
                                     </dt>
                                     <dd
                                         class="mt-1 font-semibold text-slate-900">
-                                        {{
-                                            item.expiresAt === null
-                                                ? '长期有效'
-                                                : formatTimestamp(
-                                                      item.expiresAt
-                                                  )
-                                        }}
+                                        {{ formatTimestamp(item.expiresAt) }}
                                     </dd>
                                 </div>
                             </dl>

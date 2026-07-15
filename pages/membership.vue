@@ -45,8 +45,10 @@
                 </div>
             </header>
 
+            <DashboardMembershipRedeemPanel @redeemed="handleRedeemed" />
+
             <DashboardMembershipPanel
-                :data="membershipsData"
+                :data="membershipsData ?? null"
                 :state="membershipsStatus"
                 :error-message="membershipsErrorMessage"
                 @refresh="refreshMemberships" />
@@ -61,7 +63,10 @@ import useTrackedRequestFetch, {
     type TrackedRequestFetch
 } from '~/composables/useTrackedRequestFetch';
 import type { TrackerApiResponse } from '~/types/homepage';
-import type { AuthMembershipsResponse } from '~/types/membership';
+import type {
+    AuthMembershipRedeemResponse,
+    AuthMembershipsResponse
+} from '~/types/membership';
 import getApiErrorMessage from '~/utils/api/getApiErrorMessage';
 
 definePageMeta({
@@ -122,5 +127,16 @@ useSiteSeo({
 
 function goToDashboard() {
     return navigateTo('/dashboard');
+}
+
+function handleRedeemed(response: AuthMembershipRedeemResponse) {
+    membershipsData.value = response.memberships;
+    if (session.value) {
+        setSession({
+            ...session.value,
+            scopes: response.memberships.accountScopes,
+            dailyTokenLimit: response.memberships.effectiveQuota.tokenLimit
+        });
+    }
 }
 </script>
