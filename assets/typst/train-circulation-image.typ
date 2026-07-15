@@ -1,5 +1,43 @@
 #let data = __RENDER_DATA__
 
+#let layout = (
+    documentBorder: 10pt,
+    pageHeaderMargin: 1cm,
+    pageFooterMargin: 0.8cm,
+    minStationGap: 1cm,
+    plotTopPadding: 0.9cm,
+    plotBottomPadding: 0.9cm,
+    endpointTimeMinXGap: 0.26cm,
+    endpointTimeHorizontalStep: 0.32cm,
+    endpointTimeMaxHorizontalSteps: 96,
+    endpointTimeLayoutMaxIterations: 6,
+    endpointTimeRelayoutGrowth: 2.4cm,
+    endpointTimeRightPadding: 0.5cm,
+    trainLabelSafeMinX: 1.4cm,
+    trainLabelSafeMaxXPadding: 0.4cm,
+    trainLabelCandidateProgress: (0.25, 0.4, 0.55),
+    trainLabelOffsetX: 0.32cm,
+    endpointTimeOffsetY: 0.16cm,
+    midnightMarkerOffsetY: 0.2cm,
+    stationLabelRightProtectionX: 0.2cm,
+)
+
+#let styles = (
+    leftLabelX: -0.4cm,
+    largeCjkFont: 13.5pt,
+    trainLabelFont: 10.8pt,
+    largeTimeFont: 10.8pt,
+    headerFont: 9.6pt,
+    footerFont: 8.1pt,
+    gridLineColor: rgb("#e5e7eb"),
+    midnightLineColor: rgb("#000000"),
+    stationLineColor: rgb("#000000"),
+    downLineColor: rgb("#0000b3"),
+    upLineColor: rgb("#005a5a"),
+    whiteColor: rgb("#ffffff"),
+    blackColor: rgb("#000000"),
+)
+
 #set text(
     font: (
         "New Computer Modern",
@@ -12,10 +50,7 @@
     hyphenate: false,
 )
 
-#let cm(value) = value * 1cm
-#let pt(value) = value * 1pt
-#let paint(value) = rgb(value)
-#let border = cm(data.layout.documentBorderCm)
+#set document(author: "Open CRH Tracker")
 
 #let project-time(timestamp, chart-width) = {
     (
@@ -65,33 +100,10 @@
     )
 }
 
-#let top-right-text-placement(
-    x,
-    y,
-    body,
-    font-size,
-    fill: none,
-    inset: 0pt,
-    text-fill: black,
-) = {
-    let content = box(width: auto, inset: inset, fill: fill)[
-        #text(size: font-size, fill: text-fill, hyphenate: false, body)
-    ]
-    let measured = measure(content)
-
-    (
-        minX: x - measured.width,
-        maxX: x,
-        minY: y,
-        maxY: y + measured.height,
-        content: content,
-    )
-}
-
 #let protected-station-label-box(label) = {
     (
         minX: label.minX,
-        maxX: calc.max(label.maxX, cm(data.layout.stationLabelRightProtectionXCm)),
+        maxX: calc.max(label.maxX, layout.stationLabelRightProtectionX),
         minY: label.minY,
         maxY: label.maxY,
     )
@@ -138,10 +150,10 @@
     stations.find(station => station.stationTelecode == telecode).y
 }
 
-#let draw-text-placement(placement, shift-x, shift-y, chart-height) = {
+#let draw-text-placement(placement, origin-x, shift-y, chart-height) = {
     place(
-        dx: shift-x + placement.minX,
-        dy: border + chart-height - (placement.maxY + shift-y),
+        dx: origin-x + placement.minX,
+        dy: chart-height - (placement.maxY + shift-y),
         placement.content,
     )
 }
@@ -153,29 +165,26 @@
     y-end,
     stroke-color,
     stroke-width,
-    shift-x,
     chart-height,
 ) = {
-    let page-x-start = shift-x + x-start
-    let page-y-start = border + chart-height - y-start
-    let page-x-end = shift-x + x-end
-    let page-y-end = border + chart-height - y-end
+    let page-y-start = chart-height - y-start
+    let page-y-end = chart-height - y-end
 
     place(
         dx: 0cm,
         dy: 0cm,
         line(
-            start: (page-x-start, page-y-start),
-            end: (page-x-end, page-y-end),
+            start: (x-start, page-y-start),
+            end: (x-end, page-y-end),
             stroke: (paint: stroke-color, thickness: stroke-width),
         ),
     )
 }
 
-#let draw-circle(x, y, radius, fill-color, shift-x, chart-height) = {
+#let draw-circle(x, y, radius, fill-color, chart-height) = {
     place(
-        dx: shift-x + x - radius,
-        dy: border + chart-height - y - radius,
+        dx: x - radius,
+        dy: chart-height - y - radius,
         circle(radius: radius, fill: fill-color),
     )
 }
@@ -208,7 +217,7 @@
             )
             projected-distance += calc.max(
                 raw-gap-km * base-y-scale,
-                cm(data.layout.minStationGapCm),
+                layout.minStationGap,
             )
         }
 
@@ -239,11 +248,11 @@
         if tick.isMidnight {
             placements.push(text-placement(
                 project-time(tick.timestamp, chart-width),
-                chart-body-height + cm(data.layout.midnightMarkerOffsetYCm),
+                chart-body-height + layout.midnightMarkerOffsetY,
                 str(tick.midnightIndex),
                 "south",
-                pt(data.styles.largeTimeFontPt),
-                text-fill: paint(data.styles.blackColor),
+                styles.largeTimeFont,
+                text-fill: styles.blackColor,
             ))
         }
     }
@@ -266,9 +275,9 @@
             text: node.start.timeText,
             x: x-start,
             y: y-start + if start-above-line {
-                cm(data.layout.endpointTimeOffsetYCm)
+                layout.endpointTimeOffsetY
             } else {
-                -cm(data.layout.endpointTimeOffsetYCm)
+                -layout.endpointTimeOffsetY
             },
             anchor: if start-above-line { "south" } else { "north" },
             direction: "right",
@@ -277,9 +286,9 @@
             text: node.end.timeText,
             x: x-end,
             y: y-end + if end-above-line {
-                cm(data.layout.endpointTimeOffsetYCm)
+                layout.endpointTimeOffsetY
             } else {
-                -cm(data.layout.endpointTimeOffsetYCm)
+                -layout.endpointTimeOffsetY
             },
             anchor: if end-above-line { "south" } else { "north" },
             direction: "left",
@@ -302,18 +311,18 @@
         let fallback-overlap-area = huge-area
         let used-fallback = false
         let candidate-metrics = measure(box(width: auto, inset: 1.1pt)[
-            #text(size: pt(data.styles.largeTimeFontPt), candidate.text)
+            #text(size: styles.largeTimeFont, candidate.text)
         ])
         let half-width = candidate-metrics.width / 2
 
-        for step in range(data.layout.endpointTimeMaxHorizontalSteps + 1) {
+        for step in range(layout.endpointTimeMaxHorizontalSteps + 1) {
             let candidate-x = if candidate.direction == "right" {
                 (
-                    candidate.x + cm(data.layout.endpointTimeMinXGapCm) + half-width + step * cm(data.layout.endpointTimeHorizontalStepCm)
+                    candidate.x + layout.endpointTimeMinXGap + half-width + step * layout.endpointTimeHorizontalStep
                 )
             } else {
                 (
-                    candidate.x - cm(data.layout.endpointTimeMinXGapCm) - half-width - step * cm(data.layout.endpointTimeHorizontalStepCm)
+                    candidate.x - layout.endpointTimeMinXGap - half-width - step * layout.endpointTimeHorizontalStep
                 )
             }
             let placement = text-placement(
@@ -321,14 +330,14 @@
                 candidate.y,
                 candidate.text,
                 candidate.anchor,
-                pt(data.styles.largeTimeFontPt),
-                fill: paint(data.styles.whiteColor),
+                styles.largeTimeFont,
+                fill: styles.whiteColor,
                 inset: 1.1pt,
-                text-fill: paint(data.styles.blackColor),
+                text-fill: styles.blackColor,
             )
             let occupied-box = expand-box(
                 placement,
-                cm(data.layout.endpointTimeMinXGapCm) / 2,
+                layout.endpointTimeMinXGap / 2,
                 0cm,
             )
             let overlap-area = total-overlap-area(occupied-box, boxes)
@@ -358,7 +367,7 @@
             placed.push(selected)
             required-chart-width = calc.max(
                 required-chart-width,
-                selected.occupiedBox.maxX + cm(data.layout.endpointTimeRightPaddingCm),
+                selected.occupiedBox.maxX + layout.endpointTimeRightPadding,
             )
         }
     }
@@ -386,27 +395,27 @@
         let fallback = none
         let fallback-score = huge-area
 
-        for progress in data.layout.trainLabelCandidateProgress {
+        for progress in layout.trainLabelCandidateProgress {
             for direction in (default-direction, -default-direction) {
                 let base-x = x-start + (x-end - x-start) * progress
                 let base-y = y-start + (y-end - y-start) * progress
                 let placement = text-placement(
-                    base-x + direction * cm(data.layout.trainLabelOffsetXCm),
+                    base-x + direction * layout.trainLabelOffsetX,
                     base-y,
                     node.labelText,
                     if direction > 0 { "west" } else { "east" },
-                    pt(data.styles.trainLabelFontPt),
-                    fill: paint(data.styles.whiteColor),
+                    styles.trainLabelFont,
+                    fill: styles.whiteColor,
                     inset: 2pt,
-                    text-fill: paint(data.styles.blackColor),
+                    text-fill: styles.blackColor,
                 )
                 let boundary-violation = calc.max(
                     0cm,
-                    cm(data.layout.trainLabelSafeMinXCm) - placement.minX,
+                    layout.trainLabelSafeMinX - placement.minX,
                 ) + calc.max(
                     0cm,
                     (
-                        placement.maxX - (chart-width - cm(data.layout.trainLabelSafeMaxXPaddingCm))
+                        placement.maxX - (chart-width - layout.trainLabelSafeMaxXPadding)
                     ),
                 )
                 let overlap-area = total-overlap-area(placement, boxes)
@@ -447,12 +456,12 @@
 
     for station in stations {
         let placement = text-placement(
-            cm(data.styles.leftLabelXCm),
+            styles.leftLabelX,
             station.y,
             station.stationName,
             "east",
-            pt(data.styles.largeCjkFontPt),
-            text-fill: paint(data.styles.blackColor),
+            styles.largeCjkFont,
+            text-fill: styles.blackColor,
         )
         station-labels.push(placement)
         station-label-occupied-boxes.push(protected-station-label-box(placement))
@@ -466,7 +475,7 @@
     let endpoint-time-placements = ()
     let occupied-boxes = ()
 
-    for iteration in range(data.layout.endpointTimeLayoutMaxIterations) {
+    for iteration in range(layout.endpointTimeLayoutMaxIterations) {
         let current-midnight-marker-placements = build-midnight-marker-placements(
             chart-width,
             chart-body-height,
@@ -492,9 +501,9 @@
             chart-width = next-chart-width
         } else if (
             endpoint-result.hadOverlapFallback and
-                iteration < data.layout.endpointTimeLayoutMaxIterations - 1
+                iteration < layout.endpointTimeLayoutMaxIterations - 1
         ) {
-            chart-width += cm(data.layout.endpointTimeRelayoutGrowthCm)
+            chart-width += layout.endpointTimeRelayoutGrowth
         } else {
             midnight-marker-placements = current-midnight-marker-placements
             endpoint-time-placements = endpoint-result.placements
@@ -529,26 +538,6 @@
         occupied-boxes,
     )
     let train-label-placements = train-label-result.placements
-    let header-placement = if data.headerText == none {
-        none
-    } else {
-        top-right-text-placement(
-            chart-width,
-            chart-body-height + cm(data.layout.headerInfoOffsetYCm),
-            data.headerText,
-            pt(data.styles.headerFontPt),
-            fill: paint(data.styles.whiteColor),
-            inset: 2pt,
-            text-fill: paint(data.styles.blackColor),
-        )
-    }
-    let footer-placement = top-right-text-placement(
-        chart-width,
-        0cm,
-        data.footerText,
-        pt(data.styles.footerFontPt),
-        text-fill: paint(data.styles.blackColor),
-    )
     let all-boxes = ()
     for placement in station-labels {
         all-boxes.push(placement)
@@ -562,10 +551,6 @@
     for placement in train-label-placements {
         all-boxes.push(placement)
     }
-    if header-placement != none {
-        all-boxes.push(header-placement)
-    }
-    all-boxes.push(footer-placement)
 
     let min-text-x = 0cm
     let max-text-x = chart-width
@@ -578,94 +563,144 @@
         max-text-y = calc.max(max-text-y, box-data.maxY)
     }
 
-    let shift-y = calc.max(0cm, cm(data.layout.plotBottomPaddingCm) - min-text-y)
-    let shift-x = border - min-text-x
+    let shift-y = calc.max(0cm, layout.plotBottomPadding - min-text-y)
     let chart-bottom-y = shift-y
     let chart-top-y = shift-y + chart-body-height
-    let chart-height = shift-y + max-text-y + cm(data.layout.plotTopPaddingCm)
-    let page-width = shift-x + max-text-x + border
-    let page-height = chart-height + border * 2
+    let chart-height = shift-y + max-text-y + layout.plotTopPadding
+    let left-column-width = -min-text-x
+    let right-column-width = max-text-x
 
-    set page(width: page-width, height: page-height, margin: 0cm)
-
-    for tick in data.timeAxis.ticks {
-        let x = project-time(tick.timestamp, chart-width)
-        draw-line(
-            x,
-            chart-bottom-y,
-            x,
-            chart-top-y,
-            if tick.isMidnight {
-                paint(data.styles.midnightLineColor)
-            } else {
-                paint(data.styles.gridLineColor)
-            },
-            if tick.isMidnight { 0.04cm } else { 0.01cm },
-            shift-x,
-            chart-height,
-        )
-    }
-
-    for placement in midnight-marker-placements {
-        draw-text-placement(placement, shift-x, shift-y, chart-height)
-    }
-
-    for station in stations {
-        let y = station.y + shift-y
-        draw-line(
-            0cm,
-            y,
-            chart-width,
-            y,
-            paint(data.styles.stationLineColor),
-            0.02cm,
-            shift-x,
-            chart-height,
-        )
-    }
-
-    for placement in station-labels {
-        draw-text-placement(placement, shift-x, shift-y, chart-height)
-    }
-
-    for node in data.nodes {
-        let x-start = project-time(node.start.timestamp, chart-width)
-        let x-end = project-time(node.end.timestamp, chart-width)
-        let y-start = station-y(stations, node.start.stationTelecode) + shift-y
-        let y-end = station-y(stations, node.end.stationTelecode) + shift-y
-        let line-color = if calc.rem(node.routeNodeIndex, 2) == 0 {
-            paint(data.styles.blueLineColor)
+    set page(
+        width: auto,
+        height: auto,
+        margin: (
+            top: layout.pageHeaderMargin,
+            bottom: layout.pageFooterMargin,
+            left: layout.documentBorder,
+            right: layout.documentBorder,
+        ),
+        header: if data.headerText == none {
+            none
         } else {
-            paint(data.styles.tealLineColor)
-        }
+            align(right, text(size: styles.headerFont, data.headerText))
+        },
+        footer: align(
+            right,
+            text(size: styles.footerFont, data.footerText),
+        ),
+    )
 
-        draw-line(
-            x-start,
-            y-start,
-            x-end,
-            y-end,
-            line-color,
-            0.08cm,
-            shift-x,
-            chart-height,
-        )
-        draw-circle(x-start, y-start, 0.06cm, line-color, shift-x, chart-height)
-        draw-circle(x-end, y-end, 0.06cm, line-color, shift-x, chart-height)
-    }
+    let station-layer = box(
+        width: left-column-width,
+        height: chart-height,
+        {
+            for placement in station-labels {
+                draw-text-placement(
+                    placement,
+                    left-column-width,
+                    shift-y,
+                    chart-height,
+                )
+            }
+        },
+    )
+    let plot-layer = box(
+        width: right-column-width,
+        height: chart-height,
+        {
+            for tick in data.timeAxis.ticks {
+                let x = project-time(tick.timestamp, chart-width)
+                draw-line(
+                    x,
+                    chart-bottom-y,
+                    x,
+                    chart-top-y,
+                    if tick.isMidnight {
+                        styles.midnightLineColor
+                    } else {
+                        styles.gridLineColor
+                    },
+                    if tick.isMidnight { 0.04cm } else { 0.01cm },
+                    chart-height,
+                )
+            }
 
-    for placement in endpoint-time-placements {
-        draw-text-placement(placement, shift-x, shift-y, chart-height)
-    }
+            for placement in midnight-marker-placements {
+                draw-text-placement(placement, 0cm, shift-y, chart-height)
+            }
 
-    for placement in train-label-placements {
-        draw-text-placement(placement, shift-x, shift-y, chart-height)
-    }
+            for station in stations {
+                let y = station.y + shift-y
+                draw-line(
+                    0cm,
+                    y,
+                    chart-width,
+                    y,
+                    styles.stationLineColor,
+                    0.02cm,
+                    chart-height,
+                )
+            }
 
-    if header-placement != none {
-        draw-text-placement(header-placement, shift-x, shift-y, chart-height)
-    }
+            for node in data.nodes {
+                let x-start = project-time(node.start.timestamp, chart-width)
+                let x-end = project-time(node.end.timestamp, chart-width)
+                let y-start = station-y(
+                    stations,
+                    node.start.stationTelecode,
+                ) + shift-y
+                let y-end = station-y(
+                    stations,
+                    node.end.stationTelecode,
+                ) + shift-y
+                let line-color = if y-end < y-start {
+                    styles.downLineColor
+                } else {
+                    styles.upLineColor
+                }
 
-    draw-text-placement(footer-placement, shift-x, 0cm, chart-height)
+                draw-line(
+                    x-start,
+                    y-start,
+                    x-end,
+                    y-end,
+                    line-color,
+                    0.08cm,
+                    chart-height,
+                )
+                draw-circle(
+                    x-start,
+                    y-start,
+                    0.06cm,
+                    line-color,
+                    chart-height,
+                )
+                draw-circle(
+                    x-end,
+                    y-end,
+                    0.06cm,
+                    line-color,
+                    chart-height,
+                )
+            }
+
+            for placement in endpoint-time-placements {
+                draw-text-placement(placement, 0cm, shift-y, chart-height)
+            }
+
+            for placement in train-label-placements {
+                draw-text-placement(placement, 0cm, shift-y, chart-height)
+            }
+        },
+    )
+
+    grid(
+        columns: (left-column-width, right-column-width),
+        rows: (chart-height,),
+        column-gutter: 0pt,
+        grid.cell(x: 0, y: 0, station-layer),
+        grid.cell(x: 1, y: 0, plot-layer),
+    )
 }
 
 #render()

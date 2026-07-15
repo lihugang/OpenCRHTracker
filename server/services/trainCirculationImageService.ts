@@ -45,8 +45,6 @@ interface ResolvedScheduleTerminal {
 }
 
 interface ResolvedCirculationNode {
-    routeNodeIndex: number;
-    trainCodes: string[];
     trainCodeText: string;
     start: ResolvedScheduleTerminal;
     end: ResolvedScheduleTerminal;
@@ -65,9 +63,6 @@ interface TypstCompileResult {
     pageCount: number;
     cacheHit: boolean;
 }
-
-type TextAnchor = 'east' | 'west' | 'north' | 'south';
-type TextMetricKind = 'station' | 'train' | 'time' | 'marker';
 
 interface MergedScheduleItem {
     representativeItem: ScheduleItem;
@@ -91,70 +86,7 @@ export interface TrainCirculationImageRenderResult {
     binaryContentType: 'image/png' | 'application/pdf';
 }
 
-interface TextBox {
-    minX: number;
-    maxX: number;
-    minY: number;
-    maxY: number;
-}
-
-interface TextPlacement {
-    x: number;
-    y: number;
-    text: string;
-    anchor: TextAnchor;
-    box: TextBox;
-}
-
-interface TextMetrics {
-    widthCm: number;
-    heightCm: number;
-}
-
-interface TopRightTextPlacement {
-    x: number;
-    y: number;
-    text: string;
-    box: TextBox;
-}
-
-interface EndpointTimePlacement extends TextPlacement {
-    occupiedBox: TextBox;
-}
-
-interface EndpointTimeCandidate {
-    text: string;
-    x: number;
-    y: number;
-    anchor: Extract<TextAnchor, 'north' | 'south'>;
-    direction: 'left' | 'right';
-}
-
-interface EndpointTimePlacementResult {
-    placements: EndpointTimePlacement[];
-    requiredChartWidthCm: number;
-    hadOverlapFallback: boolean;
-}
-
 const TEMPLATE_PATH = path.resolve('assets/typst/train-circulation-image.typ');
-const DOCUMENT_BORDER_CM = 10 / 28.3464567;
-const MIN_STATION_GAP_CM = 1.0;
-const PLOT_TOP_PADDING_CM = 0.9;
-const PLOT_BOTTOM_PADDING_CM = 0.9;
-const ENDPOINT_TIME_MIN_X_GAP_CM = 0.26;
-const ENDPOINT_TIME_HORIZONTAL_STEP_CM = 0.32;
-const ENDPOINT_TIME_MAX_HORIZONTAL_STEPS = 96;
-const ENDPOINT_TIME_LAYOUT_MAX_ITERATIONS = 6;
-const ENDPOINT_TIME_RELAYOUT_GROWTH_CM = 2.4;
-const ENDPOINT_TIME_RIGHT_PADDING_CM = 0.5;
-const TRAIN_LABEL_SAFE_MIN_X_CM = 1.4;
-const TRAIN_LABEL_SAFE_MAX_X_PADDING_CM = 0.4;
-const TRAIN_LABEL_CANDIDATE_PROGRESS = [0.25, 0.4, 0.55] as const;
-const TRAIN_LABEL_OFFSET_X_CM = 0.32;
-const ENDPOINT_TIME_OFFSET_Y_CM = 0.16;
-const MIDNIGHT_MARKER_OFFSET_Y_CM = 0.2;
-const HEADER_INFO_OFFSET_Y_CM = 0.8;
-const STATION_LABEL_RIGHT_PROTECTION_X_CM = 0.2;
 const SHANGHAI_TIME_FORMATTER = new Intl.DateTimeFormat('zh-CN', {
     timeZone: 'Asia/Shanghai',
     hour: '2-digit',
@@ -188,14 +120,6 @@ function getNonEmptyString(value: unknown) {
     }
 
     return value.trim();
-}
-
-function quoteTypstText(value: string) {
-    return JSON.stringify(value);
-}
-
-function formatCoordinate(value: number) {
-    return value.toFixed(3);
 }
 
 function formatTypstNumber(value: number) {
@@ -480,8 +404,7 @@ function resolveCirculationNode(
     scheduleDate: string,
     stations: Record<string, ScheduleStationEntry>,
     item: MergedScheduleItem,
-    node: TrainCirculation['nodes'][number],
-    routeNodeIndex: number
+    node: TrainCirculation['nodes'][number]
 ): ResolvedCirculationNode {
     const resolvedTrainCodes = uniqueNormalizedCodes([
         ...node.allCodes,
@@ -510,8 +433,6 @@ function resolveCirculationNode(
     }
 
     return {
-        routeNodeIndex,
-        trainCodes: resolvedTrainCodes,
         trainCodeText: formatTrainCodeLabel(resolvedTrainCodes),
         start: {
             stationName: startStop.stationName.trim(),
@@ -543,7 +464,7 @@ function buildResolvedCirculationNodes(
     const indexes = buildScheduleIndexes(mergeScheduleItems(items));
     const resolvedNodes: ResolvedCirculationNode[] = [];
 
-    circulation.nodes.forEach((node, routeNodeIndex) => {
+    circulation.nodes.forEach((node) => {
         const internalCode = normalizeCode(node.internalCode);
         const candidateMap = new Map<MergedScheduleItem, MergedScheduleItem>();
 
@@ -574,13 +495,7 @@ function buildResolvedCirculationNodes(
         }
 
         resolvedNodes.push(
-            resolveCirculationNode(
-                scheduleDate,
-                stations,
-                matchedItem,
-                node,
-                routeNodeIndex
-            )
+            resolveCirculationNode(scheduleDate, stations, matchedItem, node)
         );
     });
 
@@ -690,619 +605,8 @@ async function buildTrainCirculationHeaderInfo(input: {
     }
 
     return {
-        text: parts.join(', ')
+        text: parts.join('‧')
     };
-}
-
-function getTextMetricsKindWidthCm(character: string, kind: TextMetricKind) {
-    if (character === ' ') {
-        return kind === 'time' || kind === 'marker' ? 0.08 : 0.12;
-    }
-
-    if (/[\u3400-\u9fff\uf900-\ufaff]/u.test(character)) {
-        switch (kind) {
-            case 'station':
-                return 0.49;
-            case 'train':
-                return 0.39;
-            case 'time':
-            case 'marker':
-                return 0.36;
-            default:
-                return 0.39;
-        }
-    }
-
-    if (/[A-Za-z0-9]/.test(character)) {
-        switch (kind) {
-            case 'station':
-                return 0.26;
-            case 'train':
-                return 0.2;
-            case 'time':
-            case 'marker':
-                return 0.18;
-            default:
-                return 0.2;
-        }
-    }
-
-    switch (kind) {
-        case 'station':
-            return 0.3;
-        case 'train':
-            return 0.16;
-        case 'time':
-        case 'marker':
-            return 0.14;
-        default:
-            return 0.16;
-    }
-}
-
-function getTextMetrics(text: string, kind: TextMetricKind): TextMetrics {
-    const baseHeightCm =
-        kind === 'station' ? 0.52 : kind === 'train' ? 0.44 : 0.34;
-    const paddingCm =
-        kind === 'station' ? 0.06 : kind === 'train' ? 0.08 : 0.04;
-    let textWidthCm = 0;
-
-    for (const character of text) {
-        textWidthCm += getTextMetricsKindWidthCm(character, kind);
-    }
-
-    return {
-        widthCm: textWidthCm + paddingCm * 2,
-        heightCm: baseHeightCm + paddingCm * 2
-    };
-}
-
-function createTextBox(
-    x: number,
-    y: number,
-    widthCm: number,
-    heightCm: number,
-    anchor: TextAnchor
-): TextBox {
-    const halfWidthCm = widthCm / 2;
-    const halfHeightCm = heightCm / 2;
-
-    switch (anchor) {
-        case 'east':
-            return {
-                minX: x - widthCm,
-                maxX: x,
-                minY: y - halfHeightCm,
-                maxY: y + halfHeightCm
-            };
-        case 'west':
-            return {
-                minX: x,
-                maxX: x + widthCm,
-                minY: y - halfHeightCm,
-                maxY: y + halfHeightCm
-            };
-        case 'north':
-            return {
-                minX: x - halfWidthCm,
-                maxX: x + halfWidthCm,
-                minY: y - heightCm,
-                maxY: y
-            };
-        case 'south':
-            return {
-                minX: x - halfWidthCm,
-                maxX: x + halfWidthCm,
-                minY: y,
-                maxY: y + heightCm
-            };
-        default:
-            return {
-                minX: x - halfWidthCm,
-                maxX: x + halfWidthCm,
-                minY: y - halfHeightCm,
-                maxY: y + halfHeightCm
-            };
-    }
-}
-
-function expandTextBox(
-    box: TextBox,
-    deltaXCm: number,
-    deltaYCm: number
-): TextBox {
-    return {
-        minX: box.minX - deltaXCm,
-        maxX: box.maxX + deltaXCm,
-        minY: box.minY - deltaYCm,
-        maxY: box.maxY + deltaYCm
-    };
-}
-
-function doTextBoxesOverlap(left: TextBox, right: TextBox) {
-    return !(
-        left.maxX <= right.minX ||
-        left.minX >= right.maxX ||
-        left.maxY <= right.minY ||
-        left.minY >= right.maxY
-    );
-}
-
-function getTextBoxOverlapArea(left: TextBox, right: TextBox) {
-    if (!doTextBoxesOverlap(left, right)) {
-        return 0;
-    }
-
-    return (
-        (Math.min(left.maxX, right.maxX) - Math.max(left.minX, right.minX)) *
-        (Math.min(left.maxY, right.maxY) - Math.max(left.minY, right.minY))
-    );
-}
-
-function getTotalTextBoxOverlapArea(box: TextBox, occupiedBoxes: TextBox[]) {
-    return occupiedBoxes.reduce(
-        (totalOverlapArea, occupiedBox) =>
-            totalOverlapArea + getTextBoxOverlapArea(box, occupiedBox),
-        0
-    );
-}
-
-function createProtectedStationLabelBox(x: number, y: number, text: string) {
-    const stationMetrics = getTextMetrics(text, 'station');
-    const stationLabelBox = createTextBox(
-        x,
-        y,
-        stationMetrics.widthCm,
-        stationMetrics.heightCm,
-        'east'
-    );
-
-    return {
-        ...stationLabelBox,
-        maxX: Math.max(
-            stationLabelBox.maxX,
-            STATION_LABEL_RIGHT_PROTECTION_X_CM
-        )
-    };
-}
-
-function createTextPlacement(
-    x: number,
-    y: number,
-    text: string,
-    anchor: TextAnchor,
-    kind: TextMetricKind
-): TextPlacement {
-    const textMetrics = getTextMetrics(text, kind);
-
-    return {
-        x,
-        y,
-        text,
-        anchor,
-        box: createTextBox(
-            x,
-            y,
-            textMetrics.widthCm,
-            textMetrics.heightCm,
-            anchor
-        )
-    };
-}
-
-function createTopRightTextPlacement(
-    x: number,
-    y: number,
-    text: string,
-    kind: TextMetricKind
-): TopRightTextPlacement {
-    const textMetrics = getTextMetrics(text, kind);
-
-    return {
-        x,
-        y,
-        text,
-        box: {
-            minX: x - textMetrics.widthCm,
-            maxX: x,
-            minY: y,
-            maxY: y + textMetrics.heightCm
-        }
-    };
-}
-
-function buildMidnightMarkerPlacements(input: {
-    axisStartTimestamp: number;
-    axisEndTimestamp: number;
-    firstGridReferenceTimestamp: number;
-    chartBodyHeightCm: number;
-    projectTime: (timestamp: number) => number;
-}): TextPlacement[] {
-    const placements: TextPlacement[] = [];
-    let midnightMarkerIndex = 1;
-
-    for (
-        let timestamp = input.axisStartTimestamp;
-        timestamp <= input.axisEndTimestamp;
-        timestamp += 6 * 60 * 60
-    ) {
-        const isMidnightGridLine =
-            (timestamp - input.firstGridReferenceTimestamp) % (24 * 60 * 60) ===
-            0;
-
-        if (!isMidnightGridLine) {
-            continue;
-        }
-
-        placements.push(
-            createTextPlacement(
-                input.projectTime(timestamp),
-                input.chartBodyHeightCm + MIDNIGHT_MARKER_OFFSET_Y_CM,
-                String(midnightMarkerIndex),
-                'south',
-                'marker'
-            )
-        );
-        midnightMarkerIndex += 1;
-    }
-
-    return placements;
-}
-
-function buildEndpointTimeCandidates(
-    nodes: ResolvedCirculationNode[],
-    stationYByTelecode: Map<string, number>,
-    projectTime: (timestamp: number) => number
-): EndpointTimeCandidate[] {
-    return nodes.flatMap((node) => {
-        const xStart = projectTime(node.start.timestamp);
-        const xEnd = projectTime(node.end.timestamp);
-        const yStart = stationYByTelecode.get(node.start.stationTelecode) ?? 0;
-        const yEnd = stationYByTelecode.get(node.end.stationTelecode) ?? 0;
-        const startTimeAboveLine = yEnd < yStart;
-        const endTimeAboveLine = yEnd >= yStart;
-
-        return [
-            {
-                text: formatShanghaiTimeLabel(node.start.timestamp),
-                x: xStart,
-                y:
-                    yStart +
-                    (startTimeAboveLine
-                        ? ENDPOINT_TIME_OFFSET_Y_CM
-                        : -ENDPOINT_TIME_OFFSET_Y_CM),
-                anchor: startTimeAboveLine ? 'south' : 'north',
-                direction: 'right'
-            },
-            {
-                text: formatShanghaiTimeLabel(node.end.timestamp),
-                x: xEnd,
-                y:
-                    yEnd +
-                    (endTimeAboveLine
-                        ? ENDPOINT_TIME_OFFSET_Y_CM
-                        : -ENDPOINT_TIME_OFFSET_Y_CM),
-                anchor: endTimeAboveLine ? 'south' : 'north',
-                direction: 'left'
-            }
-        ];
-    });
-}
-
-function placeEndpointTimeLabels(
-    candidates: EndpointTimeCandidate[],
-    occupiedBoxes: TextBox[]
-): EndpointTimePlacementResult {
-    const placedLabels: EndpointTimePlacement[] = [];
-    const sortedCandidates = [...candidates].sort((left, right) => {
-        if (left.anchor !== right.anchor) {
-            return left.anchor === 'south' ? -1 : 1;
-        }
-        if (left.anchor === 'south' && left.y !== right.y) {
-            return right.y - left.y;
-        }
-        if (left.anchor === 'north' && left.y !== right.y) {
-            return left.y - right.y;
-        }
-        return left.x - right.x;
-    });
-    let hadOverlapFallback = false;
-    let requiredChartWidthCm = 0;
-
-    for (const candidate of sortedCandidates) {
-        let selectedPlacement: EndpointTimePlacement | null = null;
-        let fallbackPlacement: EndpointTimePlacement | null = null;
-        let fallbackOverlapArea = Number.POSITIVE_INFINITY;
-        let usedFallbackPlacement = false;
-        const textMetrics = getTextMetrics(candidate.text, 'time');
-        const halfWidthCm = textMetrics.widthCm / 2;
-
-        for (
-            let step = 0;
-            step <= ENDPOINT_TIME_MAX_HORIZONTAL_STEPS;
-            step += 1
-        ) {
-            const candidateX =
-                candidate.direction === 'right'
-                    ? candidate.x +
-                      ENDPOINT_TIME_MIN_X_GAP_CM +
-                      halfWidthCm +
-                      step * ENDPOINT_TIME_HORIZONTAL_STEP_CM
-                    : candidate.x -
-                      ENDPOINT_TIME_MIN_X_GAP_CM -
-                      halfWidthCm -
-                      step * ENDPOINT_TIME_HORIZONTAL_STEP_CM;
-            const candidatePlacement = createTextPlacement(
-                candidateX,
-                candidate.y,
-                candidate.text,
-                candidate.anchor,
-                'time'
-            );
-            const occupiedBox = expandTextBox(
-                candidatePlacement.box,
-                ENDPOINT_TIME_MIN_X_GAP_CM / 2,
-                0
-            );
-            const overlapArea = getTotalTextBoxOverlapArea(
-                occupiedBox,
-                occupiedBoxes
-            );
-
-            if (overlapArea === 0) {
-                selectedPlacement = {
-                    ...candidatePlacement,
-                    occupiedBox
-                };
-                break;
-            }
-
-            if (overlapArea < fallbackOverlapArea) {
-                fallbackOverlapArea = overlapArea;
-                fallbackPlacement = {
-                    ...candidatePlacement,
-                    occupiedBox
-                };
-            }
-        }
-
-        if (!selectedPlacement) {
-            selectedPlacement = fallbackPlacement;
-            usedFallbackPlacement = selectedPlacement !== null;
-        }
-        if (!selectedPlacement) {
-            continue;
-        }
-
-        if (usedFallbackPlacement && fallbackOverlapArea > 0) {
-            hadOverlapFallback = true;
-        }
-
-        occupiedBoxes.push(selectedPlacement.occupiedBox);
-        placedLabels.push(selectedPlacement);
-        requiredChartWidthCm = Math.max(
-            requiredChartWidthCm,
-            selectedPlacement.occupiedBox.maxX + ENDPOINT_TIME_RIGHT_PADDING_CM
-        );
-    }
-
-    return {
-        placements: placedLabels,
-        requiredChartWidthCm,
-        hadOverlapFallback
-    };
-}
-
-function placeTrainLabels(
-    nodes: ResolvedCirculationNode[],
-    chartWidthCm: number,
-    stationYByTelecode: Map<string, number>,
-    projectTime: (timestamp: number) => number,
-    occupiedBoxes: TextBox[]
-) {
-    const placedLabels: TextPlacement[] = [];
-
-    for (const node of nodes) {
-        const xStart = projectTime(node.start.timestamp);
-        const xEnd = projectTime(node.end.timestamp);
-        const yStart = stationYByTelecode.get(node.start.stationTelecode) ?? 0;
-        const yEnd = stationYByTelecode.get(node.end.stationTelecode) ?? 0;
-        const labelText = `${node.trainCodeText}  ${node.start.stationName} → ${node.end.stationName}`;
-        const defaultDirection = yEnd > yStart ? 1 : -1;
-        let selectedPlacement: TextPlacement | null = null;
-        let fallbackPlacement: TextPlacement | null = null;
-        let fallbackScore = Number.POSITIVE_INFINITY;
-
-        for (const progress of TRAIN_LABEL_CANDIDATE_PROGRESS) {
-            for (const direction of [defaultDirection, -defaultDirection]) {
-                const baseX = xStart + (xEnd - xStart) * progress;
-                const baseY = yStart + (yEnd - yStart) * progress;
-                const placement = createTextPlacement(
-                    baseX + direction * TRAIN_LABEL_OFFSET_X_CM,
-                    baseY,
-                    labelText,
-                    direction > 0 ? 'west' : 'east',
-                    'train'
-                );
-                const boundaryViolationCm =
-                    Math.max(
-                        0,
-                        TRAIN_LABEL_SAFE_MIN_X_CM - placement.box.minX
-                    ) +
-                    Math.max(
-                        0,
-                        placement.box.maxX -
-                            (chartWidthCm - TRAIN_LABEL_SAFE_MAX_X_PADDING_CM)
-                    );
-                const overlapArea = getTotalTextBoxOverlapArea(
-                    placement.box,
-                    occupiedBoxes
-                );
-                const score = overlapArea + boundaryViolationCm * 1000;
-
-                if (boundaryViolationCm === 0 && overlapArea === 0) {
-                    selectedPlacement = placement;
-                    break;
-                }
-
-                if (score < fallbackScore) {
-                    fallbackScore = score;
-                    fallbackPlacement = placement;
-                }
-            }
-
-            if (selectedPlacement) {
-                break;
-            }
-        }
-
-        const finalPlacement = selectedPlacement ?? fallbackPlacement;
-        if (!finalPlacement) {
-            continue;
-        }
-
-        occupiedBoxes.push(finalPlacement.box);
-        placedLabels.push(finalPlacement);
-    }
-
-    return placedLabels;
-}
-
-function getTypstColor(value: string) {
-    return `rgb(${quoteTypstText(value)})`;
-}
-
-function buildTypstStroke(color: string, thicknessCm: number) {
-    return `(paint: ${getTypstColor(color)}, thickness: ${formatCoordinate(thicknessCm)}cm)`;
-}
-
-function toTypstX(shiftXCm: number, x: number) {
-    return shiftXCm + x;
-}
-
-function toTypstY(chartHeightCm: number, y: number) {
-    return DOCUMENT_BORDER_CM + chartHeightCm - y;
-}
-
-function pushTypstLine(
-    contentLines: string[],
-    input: {
-        chartHeightCm: number;
-        shiftXCm: number;
-        xStart: number;
-        yStart: number;
-        xEnd: number;
-        yEnd: number;
-        strokeColor: string;
-        strokeWidthCm: number;
-    }
-) {
-    const xStart = toTypstX(input.shiftXCm, input.xStart);
-    const yStart = toTypstY(input.chartHeightCm, input.yStart);
-    const xEnd = toTypstX(input.shiftXCm, input.xEnd);
-    const yEnd = toTypstY(input.chartHeightCm, input.yEnd);
-    const dx = xEnd - xStart;
-    const dy = yEnd - yStart;
-    const lengthCm = Math.hypot(dx, dy);
-    if (lengthCm <= 0) {
-        return;
-    }
-
-    const angleDeg = (Math.atan2(dy, dx) * 180) / Math.PI;
-    contentLines.push(
-        `#place(dx: ${formatCoordinate(xStart)}cm, dy: ${formatCoordinate(yStart)}cm, line(length: ${formatCoordinate(lengthCm)}cm, angle: ${formatCoordinate(angleDeg)}deg, stroke: ${buildTypstStroke(input.strokeColor, input.strokeWidthCm)}))`
-    );
-}
-
-function pushTypstCircle(
-    contentLines: string[],
-    input: {
-        chartHeightCm: number;
-        shiftXCm: number;
-        x: number;
-        y: number;
-        radiusCm: number;
-        fillColor: string;
-    }
-) {
-    contentLines.push(
-        `#place(dx: ${formatCoordinate(toTypstX(input.shiftXCm, input.x) - input.radiusCm)}cm, dy: ${formatCoordinate(toTypstY(input.chartHeightCm, input.y) - input.radiusCm)}cm, circle(radius: ${formatCoordinate(input.radiusCm)}cm, fill: ${getTypstColor(input.fillColor)}))`
-    );
-}
-
-function buildShiftedTextPlacement(
-    placement: TextPlacement,
-    shiftYCm: number
-): TextPlacement {
-    return {
-        ...placement,
-        y: placement.y + shiftYCm,
-        box: {
-            minX: placement.box.minX,
-            maxX: placement.box.maxX,
-            minY: placement.box.minY + shiftYCm,
-            maxY: placement.box.maxY + shiftYCm
-        }
-    };
-}
-
-function buildShiftedTopRightTextPlacement(
-    placement: TopRightTextPlacement,
-    shiftYCm: number
-): TopRightTextPlacement {
-    return {
-        ...placement,
-        y: placement.y + shiftYCm,
-        box: {
-            minX: placement.box.minX,
-            maxX: placement.box.maxX,
-            minY: placement.box.minY + shiftYCm,
-            maxY: placement.box.maxY + shiftYCm
-        }
-    };
-}
-
-function getTextAlign(anchor: TextAnchor): 'left' | 'right' | 'center' {
-    switch (anchor) {
-        case 'east':
-            return 'right';
-        case 'west':
-            return 'left';
-        case 'north':
-        case 'south':
-            return 'center';
-        default:
-            return 'center';
-    }
-}
-
-function pushTypstTextBox(
-    contentLines: string[],
-    input: {
-        chartHeightCm: number;
-        shiftXCm: number;
-        box: TextBox;
-        text: string;
-        fontSizePt: number;
-        align: 'left' | 'right' | 'center';
-        textColor?: string;
-        fillColor?: string;
-        insetPt?: number;
-        verticalAlign?: 'top' | 'middle';
-    }
-) {
-    const widthCm = Math.max(0.01, input.box.maxX - input.box.minX);
-    const verticalAlign = input.verticalAlign ?? 'top';
-    const yCm =
-        verticalAlign === 'middle'
-            ? DOCUMENT_BORDER_CM +
-              input.chartHeightCm -
-              (input.box.minY + input.box.maxY) / 2
-            : DOCUMENT_BORDER_CM + input.chartHeightCm - input.box.maxY;
-
-    contentLines.push(
-        `#opencrhTextBox(${formatCoordinate(toTypstX(input.shiftXCm, input.box.minX))}cm, ${formatCoordinate(yCm)}cm, ${formatCoordinate(widthCm)}cm, ${quoteTypstText(input.align)}, ${formatCoordinate(input.fontSizePt)}pt, ${getTypstColor(input.textColor ?? '#000000')}, ${input.fillColor ? getTypstColor(input.fillColor) : 'none'}, ${formatCoordinate(input.insetPt ?? 0)}pt, ${quoteTypstText(verticalAlign)}, ${quoteTypstText(input.text)})`
-    );
 }
 
 function buildTypstSource(
@@ -1358,42 +662,6 @@ function buildTypstSource(
     }
 
     const renderData: TypstLiteral = {
-        layout: {
-            documentBorderCm: DOCUMENT_BORDER_CM,
-            minStationGapCm: MIN_STATION_GAP_CM,
-            plotTopPaddingCm: PLOT_TOP_PADDING_CM,
-            plotBottomPaddingCm: PLOT_BOTTOM_PADDING_CM,
-            endpointTimeMinXGapCm: ENDPOINT_TIME_MIN_X_GAP_CM,
-            endpointTimeHorizontalStepCm: ENDPOINT_TIME_HORIZONTAL_STEP_CM,
-            endpointTimeMaxHorizontalSteps: ENDPOINT_TIME_MAX_HORIZONTAL_STEPS,
-            endpointTimeLayoutMaxIterations:
-                ENDPOINT_TIME_LAYOUT_MAX_ITERATIONS,
-            endpointTimeRelayoutGrowthCm: ENDPOINT_TIME_RELAYOUT_GROWTH_CM,
-            endpointTimeRightPaddingCm: ENDPOINT_TIME_RIGHT_PADDING_CM,
-            trainLabelSafeMinXCm: TRAIN_LABEL_SAFE_MIN_X_CM,
-            trainLabelSafeMaxXPaddingCm: TRAIN_LABEL_SAFE_MAX_X_PADDING_CM,
-            trainLabelCandidateProgress: [...TRAIN_LABEL_CANDIDATE_PROGRESS],
-            trainLabelOffsetXCm: TRAIN_LABEL_OFFSET_X_CM,
-            endpointTimeOffsetYCm: ENDPOINT_TIME_OFFSET_Y_CM,
-            midnightMarkerOffsetYCm: MIDNIGHT_MARKER_OFFSET_Y_CM,
-            headerInfoOffsetYCm: HEADER_INFO_OFFSET_Y_CM,
-            stationLabelRightProtectionXCm: STATION_LABEL_RIGHT_PROTECTION_X_CM
-        },
-        styles: {
-            leftLabelXCm: -0.4,
-            largeCjkFontPt: 13.5,
-            trainLabelFontPt: 10.8,
-            largeTimeFontPt: 10.8,
-            headerFontPt: 9.6,
-            footerFontPt: 8.1,
-            gridLineColor: '#e5e7eb',
-            midnightLineColor: '#000000',
-            stationLineColor: '#000000',
-            blueLineColor: '#0000b3',
-            tealLineColor: '#005a5a',
-            whiteColor: '#ffffff',
-            blackColor: '#000000'
-        },
         timeAxis: {
             axisStartTimestamp,
             axisEndTimestamp,
@@ -1404,23 +672,16 @@ function buildTypstSource(
         stations: stationAxisPoints.map((stationAxisPoint) => ({
             stationTelecode: stationAxisPoint.stationTelecode,
             stationName: stationAxisPoint.stationName,
-            lat: stationAxisPoint.lat,
-            lon: stationAxisPoint.lon,
             cumulativeDistanceKm: stationAxisPoint.cumulativeDistanceKm
         })),
         nodes: nodes.map((node) => ({
-            routeNodeIndex: node.routeNodeIndex,
-            trainCodes: node.trainCodes,
-            trainCodeText: node.trainCodeText,
             labelText: `${node.trainCodeText}  ${node.start.stationName} → ${node.end.stationName}`,
             start: {
-                stationName: node.start.stationName,
                 stationTelecode: node.start.stationTelecode,
                 timestamp: node.start.timestamp,
                 timeText: formatShanghaiTimeLabel(node.start.timestamp)
             },
             end: {
-                stationName: node.end.stationName,
                 stationTelecode: node.end.stationTelecode,
                 timestamp: node.end.timestamp,
                 timeText: formatShanghaiTimeLabel(node.end.timestamp)
