@@ -216,6 +216,10 @@
             "userProfile": {
                 "maxEntries": 256,
                 "defaultTtlSeconds": 21600
+            },
+            "membership": {
+                "maxEntries": 1024,
+                "defaultTtlSeconds": 300
             }
         },
         "payload": {
@@ -321,6 +325,74 @@
                 "api.timetable.station.read"
             ]
         }
+    },
+    "membership": {
+        "permissionGroups": [
+            {
+                "id": "history-read",
+                "name": "History Read",
+                "scopes": [
+                    "api.history.train.read",
+                    "api.history.emu.read",
+                    "api.timetable.train.history.read"
+                ]
+            },
+            {
+                "id": "daily-export",
+                "name": "Daily Export",
+                "scopes": [
+                    "api.records.daily.read",
+                    "api.exports.daily.read"
+                ]
+            }
+        ],
+        "groups": [
+            {
+                "id": "supporter",
+                "name": "Supporter",
+                "description": "Supports the project with expanded quota and history access.",
+                "enabled": true,
+                "visible": true,
+                "assignable": true,
+                "sortOrder": 100,
+                "quota": {
+                    "tokenLimit": 3000,
+                    "refillAmount": 10
+                },
+                "permissionGroupIds": [
+                    "history-read"
+                ],
+                "subscriptionUrl": "https://example.com/membership/supporter"
+            },
+            {
+                "id": "data-plus",
+                "name": "Data Plus",
+                "description": "Adds daily record and export access.",
+                "enabled": true,
+                "visible": true,
+                "assignable": true,
+                "sortOrder": 200,
+                "permissionGroupIds": [
+                    "daily-export"
+                ],
+                "subscriptionUrl": "https://example.com/membership/data-plus"
+            },
+            {
+                "id": "high-throughput",
+                "name": "High Throughput",
+                "description": "Provides a larger quota without additional permission groups.",
+                "enabled": true,
+                "visible": true,
+                "assignable": true,
+                "sortOrder": 300,
+                "quota": {
+                    "tokenLimit": 10000,
+                    "refillAmount": 50
+                },
+                "permissionGroupIds": [],
+                "subscriptionUrl": "https://example.com/membership/high-throughput"
+            }
+        ]
     },
     "oauth": {
         "issuer": "https://example.com",

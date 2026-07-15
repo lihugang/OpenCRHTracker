@@ -181,11 +181,15 @@
                                     <td
                                         class="whitespace-nowrap px-4 py-4 text-sm text-slate-700">
                                         <p>
-                                            {{ formatTimestamp(item.detectedAt) }}
+                                            {{
+                                                formatTimestamp(item.detectedAt)
+                                            }}
                                         </p>
                                         <p class="mt-1 text-xs text-slate-400">
                                             更新于
-                                            {{ formatTimestamp(item.updatedAt) }}
+                                            {{
+                                                formatTimestamp(item.updatedAt)
+                                            }}
                                         </p>
                                     </td>
                                     <td
@@ -214,7 +218,9 @@
                                         class="whitespace-nowrap px-4 py-4 font-mono text-xs text-slate-700">
                                         <p>封禁 #{{ item.matchedActionId }}</p>
                                         <p class="mt-1 text-slate-400">
-                                            指纹 #{{ item.fingerprintId ?? '--' }}
+                                            指纹 #{{
+                                                item.fingerprintId ?? '--'
+                                            }}
                                         </p>
                                     </td>
                                     <td
@@ -233,20 +239,30 @@
                                     <td
                                         class="max-w-[18rem] px-4 py-4 text-sm leading-6 text-slate-700">
                                         <template v-if="item.clearedAt">
-                                            <p class="font-semibold text-slate-800">
+                                            <p
+                                                class="font-semibold text-slate-800">
                                                 已由
-                                                {{ item.clearedBy ?? 'unknown' }}
+                                                {{
+                                                    item.clearedBy ?? 'unknown'
+                                                }}
                                                 解除
                                             </p>
-                                            <p class="mt-1 text-xs text-slate-500">
-                                                {{ formatTimestamp(item.clearedAt) }}
+                                            <p
+                                                class="mt-1 text-xs text-slate-500">
+                                                {{
+                                                    formatTimestamp(
+                                                        item.clearedAt
+                                                    )
+                                                }}
                                             </p>
                                         </template>
                                         <template v-else-if="item.banActionId">
-                                            <p class="font-semibold text-rose-700">
+                                            <p
+                                                class="font-semibold text-rose-700">
                                                 封禁操作 #{{ item.banActionId }}
                                             </p>
-                                            <p class="mt-1 text-xs text-slate-500">
+                                            <p
+                                                class="mt-1 text-xs text-slate-500">
                                                 {{
                                                     item.escalatedAt
                                                         ? formatTimestamp(
@@ -256,7 +272,9 @@
                                                 }}
                                             </p>
                                         </template>
-                                        <span v-else class="text-slate-500">
+                                        <span
+                                            v-else
+                                            class="text-slate-500">
                                             等待 QQ 绑定尝试
                                         </span>
                                     </td>
@@ -314,7 +332,7 @@
                     <div
                         v-else
                         class="overflow-x-auto rounded-[1rem] border border-slate-200 bg-white/90">
-                        <table class="min-w-full divide-y divide-slate-200">
+                        <table class="min-w-[108rem] divide-y divide-slate-200">
                             <thead class="bg-slate-50/80">
                                 <tr>
                                     <th
@@ -324,6 +342,10 @@
                                     <th
                                         class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                                         状态
+                                    </th>
+                                    <th
+                                        class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                        赞助权益
                                     </th>
                                     <th
                                         class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
@@ -394,6 +416,44 @@
                                                 " />
                                         </div>
                                     </td>
+                                    <td class="px-4 py-3 text-sm">
+                                        <div class="max-w-[20rem] space-y-2">
+                                            <div
+                                                v-if="
+                                                    item.sponsorshipGroups
+                                                        .length > 0
+                                                "
+                                                class="flex flex-wrap gap-1.5">
+                                                <UiStatusBadge
+                                                    v-for="group in item.sponsorshipGroups"
+                                                    :key="group.groupId"
+                                                    :label="group.name"
+                                                    tone="success" />
+                                            </div>
+                                            <span
+                                                v-else
+                                                class="text-slate-400">
+                                                无赞助组
+                                            </span>
+                                            <p
+                                                class="whitespace-nowrap text-xs text-slate-500">
+                                                上限
+                                                {{
+                                                    formatNumber(
+                                                        item.effectiveQuota
+                                                            .tokenLimit
+                                                    )
+                                                }}
+                                                / 恢复
+                                                {{
+                                                    formatNumber(
+                                                        item.effectiveQuota
+                                                            .refillAmount
+                                                    )
+                                                }}
+                                            </p>
+                                        </div>
+                                    </td>
                                     <td
                                         class="px-4 py-3 text-sm text-slate-700">
                                         {{ formatTimestamp(item.createdAt) }}
@@ -424,7 +484,20 @@
                                     </td>
                                     <td class="px-4 py-3 text-right">
                                         <div
-                                            class="flex min-w-[18rem] flex-wrap justify-end gap-2">
+                                            class="flex min-w-[26rem] flex-wrap justify-end gap-2">
+                                            <UiButton
+                                                type="button"
+                                                variant="secondary"
+                                                size="sm"
+                                                :disabled="
+                                                    usersStatus === 'pending'
+                                                "
+                                                @click="
+                                                    openSponsorshipDialog(item)
+                                                ">
+                                                管理赞助权益
+                                            </UiButton>
+
                                             <UiButton
                                                 type="button"
                                                 variant="secondary"
@@ -462,8 +535,7 @@
                                                 :disabled="
                                                     resettingQuotaUserId.length >
                                                         0 ||
-                                                    updatingBanUserId.length >
-                                                        0
+                                                    updatingBanUserId.length > 0
                                                 "
                                                 @click="
                                                     openClearRiskDialog(item)
@@ -980,6 +1052,12 @@
             </UiCard>
         </div>
 
+        <AdminMembershipModal
+            :model-value="isSponsorshipDialogOpen"
+            :user="sponsorshipTargetUser"
+            @update:model-value="handleSponsorshipDialogVisibilityChange"
+            @updated="refreshUsers" />
+
         <UiModal
             :model-value="isBanDialogOpen"
             :eyebrow="pendingBanState ? '危险操作' : '账户操作'"
@@ -1051,10 +1129,12 @@
                     class="rounded-[1rem] border border-amber-200 bg-amber-50/80 px-4 py-4 text-sm leading-6 text-amber-950">
                     <p class="font-semibold">解除后立即生效</p>
                     <p class="mt-2">
-                        若原始 IP 与 UA 指纹仍在关联窗口内，将为该用户建立临时豁免，避免下一次请求立即重新进入风控。
+                        若原始 IP 与 UA
+                        指纹仍在关联窗口内，将为该用户建立临时豁免，避免下一次请求立即重新进入风控。
                     </p>
                     <p>
-                        此操作不会解封账户，也不会移除已经加入 QQ 封禁清单的号码。
+                        此操作不会解封账户，也不会移除已经加入 QQ
+                        封禁清单的号码。
                     </p>
                 </div>
 
@@ -1269,6 +1349,8 @@ const qqBanMutationErrorMessage = ref('');
 const qqBanMutationSuccessMessage = ref('');
 const isRemoveQqBanDialogOpen = ref(false);
 const pendingRemoveQqBanEntry = ref<AdminQqBanListItem | null>(null);
+const isSponsorshipDialogOpen = ref(false);
+const sponsorshipTargetUser = ref<AdminUserListItem | null>(null);
 
 const pendingBanState = computed(() => !pendingBanUser.value?.isBanned);
 const banDialogDescription = computed(() => {
@@ -1421,6 +1503,18 @@ function getUserStatusTone(item: AdminUserListItem) {
     }
 
     return item.isBanned ? ('danger' as const) : ('success' as const);
+}
+
+function openSponsorshipDialog(item: AdminUserListItem) {
+    sponsorshipTargetUser.value = item;
+    isSponsorshipDialogOpen.value = true;
+}
+
+function handleSponsorshipDialogVisibilityChange(nextValue: boolean) {
+    isSponsorshipDialogOpen.value = nextValue;
+    if (!nextValue) {
+        sponsorshipTargetUser.value = null;
+    }
 }
 
 function openClearRiskDialog(item: AdminUserListItem) {

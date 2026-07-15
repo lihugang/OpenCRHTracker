@@ -15,9 +15,11 @@ export const adminServerMetricsRouteTemplates = {
     api: [
         { template: '/api/v1/admin/oauth/clients/:clientId/revoke-tokens', segments: ['api', 'v1', 'admin', 'oauth', 'clients', ':clientId', 'revoke-tokens'] },
         { template: '/api/v1/timetable/train/:trainCode/circulation/image', segments: ['api', 'v1', 'timetable', 'train', ':trainCode', 'circulation', 'image'] },
+        { template: '/api/v1/admin/users/:userId/memberships/:groupId', segments: ['api', 'v1', 'admin', 'users', ':userId', 'memberships', ':groupId'] },
         { template: '/api/v1/timetable/train/:trainCode/history/:historyId', segments: ['api', 'v1', 'timetable', 'train', ':trainCode', 'history', ':historyId'] },
         { template: '/api/v1/admin/oauth/clients/:clientId', segments: ['api', 'v1', 'admin', 'oauth', 'clients', ':clientId'] },
         { template: '/api/v1/admin/timetable-history/coverages/:coverageId', segments: ['api', 'v1', 'admin', 'timetable-history', 'coverages', ':coverageId'] },
+        { template: '/api/v1/admin/users/:userId/memberships', segments: ['api', 'v1', 'admin', 'users', ':userId', 'memberships'] },
         { template: '/api/v1/admin/users/qq-ban-list/:qqNumber', segments: ['api', 'v1', 'admin', 'users', 'qq-ban-list', ':qqNumber'] },
         { template: '/api/v1/feedback/topics/:id/messages', segments: ['api', 'v1', 'feedback', 'topics', ':id', 'messages'] },
         { template: '/api/v1/timetable/train/:trainCode/current', segments: ['api', 'v1', 'timetable', 'train', ':trainCode', 'current'] },

@@ -1,10 +1,18 @@
 import { getHeader, type H3Event } from 'h3';
 import useConfig from '~/server/config';
 import { getValidApiKey, isUserBanned } from '~/server/services/authStore';
+import {
+    resolveUserMembershipEntitlements,
+    type UserMembershipEntitlements
+} from '~/server/services/membershipStore';
 import ApiRequestError from '~/server/utils/api/errors/ApiRequestError';
 import getAnonymousIdentity from '~/server/utils/api/identity/getAnonymousIdentity';
 import type ApiIdentity from '~/server/utils/api/identity/ApiIdentity';
 import resolveUserQuotaSubject from '~/server/utils/api/quota/resolveUserQuotaSubject';
+import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
+import hasScope from '~/server/utils/api/scopes/hasScope';
+import intersectScopeLists from '~/server/utils/api/scopes/intersectScopeLists';
+import normalizeScopeList from '~/server/utils/api/scopes/normalizeScopeList';
 import {
     clearAuthCookie,
     readAuthCookie
@@ -74,6 +82,28 @@ function readApiKey(event: H3Event) {
     );
 }
 
+function resolveEffectiveScopes(
+    apiKeyRecord: NonNullable<ReturnType<typeof getValidApiKey>>,
+    entitlements: UserMembershipEntitlements
+) {
+    if (apiKeyRecord.issuer === 'webapp') {
+        return entitlements.accountScopes;
+    }
+
+    const effectiveScopes = intersectScopeLists(
+        apiKeyRecord.scopes,
+        entitlements.accountScopes
+    );
+    if (
+        apiKeyRecord.issuer === 'oauth' &&
+        hasScope(apiKeyRecord.scopes, API_SCOPES.notifications.send)
+    ) {
+        effectiveScopes.push(API_SCOPES.notifications.send);
+    }
+
+    return normalizeScopeList(effectiveScopes);
+}
+
 export default function resolveIdentity(event: H3Event): ApiIdentity {
     const resolvedApiKey = readApiKey(event);
     if (!resolvedApiKey) {
@@ -102,7 +132,11 @@ export default function resolveIdentity(event: H3Event): ApiIdentity {
         throw new ApiRequestError(403, 'account_banned', '账号已被封禁');
     }
 
-    const quotaSubject = resolveUserQuotaSubject(apiKeyRecord.userId);
+    const entitlements = resolveUserMembershipEntitlements(apiKeyRecord.userId);
+    const quotaSubject = resolveUserQuotaSubject(
+        apiKeyRecord.userId,
+        entitlements
+    );
 
     return {
         type: 'user',
@@ -116,7 +150,7 @@ export default function resolveIdentity(event: H3Event): ApiIdentity {
         tokenLimit: quotaSubject.tokenLimit,
         refillAmount: quotaSubject.refillAmount,
         refillIntervalSeconds: quotaSubject.refillIntervalSeconds,
-        scopes: apiKeyRecord.scopes,
+        scopes: resolveEffectiveScopes(apiKeyRecord, entitlements),
         activeFrom: apiKeyRecord.activeFrom,
         expiresAt: apiKeyRecord.expiresAt
     };

@@ -1,5 +1,6 @@
 import fs from 'fs';
 import normalizeScopeList from '~/server/utils/api/scopes/normalizeScopeList';
+import isScopeSubset from '~/server/utils/api/scopes/isScopeSubset';
 import { parseDailyTimeHHmm } from '~/server/utils/date/shanghaiDateTime';
 
 interface CostPerRecordRule {
@@ -35,6 +36,33 @@ interface ApiPermissionConfig {
     anonymousScopes: string[];
     issuedKeyDefaultScopes: string[];
     creatableKeyMaxScopes: string[];
+}
+
+export interface MembershipPermissionGroupConfig {
+    id: string;
+    name: string;
+    scopes: string[];
+}
+
+export interface MembershipGroupConfig {
+    id: string;
+    name: string;
+    description: string;
+    enabled: boolean;
+    visible: boolean;
+    assignable: boolean;
+    sortOrder: number;
+    quota?: {
+        tokenLimit?: number;
+        refillAmount?: number;
+    };
+    permissionGroupIds: string[];
+    subscriptionUrl?: string;
+}
+
+export interface MembershipConfig {
+    permissionGroups: MembershipPermissionGroupConfig[];
+    groups: MembershipGroupConfig[];
 }
 
 interface OAuthDiscoveryConfig {
@@ -314,6 +342,10 @@ export interface Config {
                 maxEntries: number;
                 defaultTtlSeconds: number;
             };
+            membership: {
+                maxEntries: number;
+                defaultTtlSeconds: number;
+            };
         };
         payload: {
             maxStringLength: number;
@@ -341,6 +373,7 @@ export interface Config {
         };
         permissions: ApiPermissionConfig;
     };
+    membership: MembershipConfig;
     oauth: OAuthConfig;
     services: {
         typstCompiler: TypstCompilerServiceConfig;
@@ -476,6 +509,11 @@ function asBoolean(value: unknown, name: string): boolean {
     return value;
 }
 
+function asSafeInteger(value: unknown, name: string): number {
+    assert(Number.isSafeInteger(value), `${name} must be a safe integer`);
+    return value as number;
+}
+
 function asRounding(value: unknown, name: string): 'ceil' {
     assert(value === 'ceil', `${name} must be 'ceil'`);
     return 'ceil';
@@ -608,6 +646,234 @@ function parseScopeList(value: unknown, name: string) {
     );
 
     return normalizeScopeList(rawScopes);
+}
+
+const MEMBERSHIP_ID_PATTERN = /^[a-z][a-z0-9_-]{0,63}$/;
+
+function assertOnlyKeys(
+    value: Record<string, unknown>,
+    name: string,
+    allowedKeys: readonly string[]
+) {
+    const allowed = new Set(allowedKeys);
+    for (const key of Object.keys(value)) {
+        assert(allowed.has(key), `${name}.${key} is not supported`);
+    }
+}
+
+function parseMembershipId(value: unknown, name: string) {
+    const id = asString(value, name);
+    assert(
+        MEMBERSHIP_ID_PATTERN.test(id),
+        `${name} must match ${MEMBERSHIP_ID_PATTERN.source}`
+    );
+    return id;
+}
+
+function parseMembershipText(value: unknown, name: string) {
+    const text = asString(value, name).trim();
+    assert(text.length > 0, `${name} must be a non-empty string`);
+    return text;
+}
+
+function parseMembershipScopeList(value: unknown, name: string) {
+    const rawScopes = asArray(value, name);
+    assert(rawScopes.length > 0, `${name} must not be empty`);
+    const scopes = rawScopes.map((scope, index) =>
+        asString(scope, `${name}[${index}]`)
+    );
+    const normalizedScopes = normalizeScopeList(scopes);
+    assert(
+        normalizedScopes.length === scopes.length,
+        `${name} must not contain duplicated scopes`
+    );
+    return normalizedScopes;
+}
+
+function parseMembershipIdList(value: unknown, name: string) {
+    const ids = asArray(value, name).map((id, index) =>
+        parseMembershipId(id, `${name}[${index}]`)
+    );
+    assert(
+        new Set(ids).size === ids.length,
+        `${name} must not contain duplicated IDs`
+    );
+    return ids;
+}
+
+function parseHttpsUrl(value: unknown, name: string) {
+    const urlText = parseMembershipText(value, name);
+    let parsedUrl: URL;
+    try {
+        parsedUrl = new URL(urlText);
+    } catch {
+        assert(false, `${name} must be an absolute HTTPS URL`);
+    }
+    assert(
+        urlText === urlText.trim() &&
+            parsedUrl.protocol === 'https:' &&
+            /^https:\/\//.test(urlText) &&
+            parsedUrl.hostname.length > 0,
+        `${name} must be an absolute HTTPS URL`
+    );
+    return urlText;
+}
+
+function parseMembershipConfig(
+    value: unknown,
+    creatableKeyMaxScopes: string[]
+): MembershipConfig {
+    if (value === undefined) {
+        return {
+            permissionGroups: [],
+            groups: []
+        };
+    }
+
+    const membership = asObject(value, 'membership');
+    assertOnlyKeys(membership, 'membership', ['permissionGroups', 'groups']);
+
+    const permissionGroupIds = new Set<string>();
+    const permissionGroups = asArray(
+        membership.permissionGroups,
+        'membership.permissionGroups'
+    ).map((item, index): MembershipPermissionGroupConfig => {
+        const name = `membership.permissionGroups[${index}]`;
+        const permissionGroup = asObject(item, name);
+        assertOnlyKeys(permissionGroup, name, ['id', 'name', 'scopes']);
+        const id = parseMembershipId(permissionGroup.id, `${name}.id`);
+        assert(
+            !permissionGroupIds.has(id),
+            `membership.permissionGroups has duplicated ID: ${id}`
+        );
+        permissionGroupIds.add(id);
+
+        const scopes = parseMembershipScopeList(
+            permissionGroup.scopes,
+            `${name}.scopes`
+        );
+        assert(
+            isScopeSubset(scopes, creatableKeyMaxScopes),
+            `${name}.scopes must be a subset of api.permissions.creatableKeyMaxScopes`
+        );
+
+        return {
+            id,
+            name: parseMembershipText(permissionGroup.name, `${name}.name`),
+            scopes
+        };
+    });
+
+    const groupIds = new Set<string>();
+    const groups = asArray(membership.groups, 'membership.groups').map(
+        (item, index): MembershipGroupConfig => {
+            const name = `membership.groups[${index}]`;
+            const group = asObject(item, name);
+            assertOnlyKeys(group, name, [
+                'id',
+                'name',
+                'description',
+                'enabled',
+                'visible',
+                'assignable',
+                'sortOrder',
+                'quota',
+                'permissionGroupIds',
+                'subscriptionUrl'
+            ]);
+
+            const id = parseMembershipId(group.id, `${name}.id`);
+            assert(
+                !groupIds.has(id),
+                `membership.groups has duplicated ID: ${id}`
+            );
+            groupIds.add(id);
+
+            const enabled = asBoolean(group.enabled, `${name}.enabled`);
+            const visible = asBoolean(group.visible, `${name}.visible`);
+            const assignable = asBoolean(
+                group.assignable,
+                `${name}.assignable`
+            );
+            assert(
+                !assignable || enabled,
+                `${name}.assignable cannot be true when enabled is false`
+            );
+
+            const quota = (() => {
+                if (group.quota === undefined) {
+                    return undefined;
+                }
+                const rawQuota = asObject(group.quota, `${name}.quota`);
+                assertOnlyKeys(rawQuota, `${name}.quota`, [
+                    'tokenLimit',
+                    'refillAmount'
+                ]);
+                return {
+                    tokenLimit:
+                        rawQuota.tokenLimit === undefined
+                            ? undefined
+                            : asInteger(
+                                  rawQuota.tokenLimit,
+                                  `${name}.quota.tokenLimit`,
+                                  1
+                              ),
+                    refillAmount:
+                        rawQuota.refillAmount === undefined
+                            ? undefined
+                            : asInteger(
+                                  rawQuota.refillAmount,
+                                  `${name}.quota.refillAmount`,
+                                  1
+                              )
+                };
+            })();
+
+            const referencedPermissionGroupIds = parseMembershipIdList(
+                group.permissionGroupIds,
+                `${name}.permissionGroupIds`
+            );
+            for (const permissionGroupId of referencedPermissionGroupIds) {
+                assert(
+                    permissionGroupIds.has(permissionGroupId),
+                    `${name}.permissionGroupIds references unknown permission group: ${permissionGroupId}`
+                );
+            }
+
+            const subscriptionUrl =
+                group.subscriptionUrl === undefined
+                    ? undefined
+                    : parseHttpsUrl(
+                          group.subscriptionUrl,
+                          `${name}.subscriptionUrl`
+                      );
+            assert(
+                !visible || subscriptionUrl !== undefined,
+                `${name}.subscriptionUrl is required when visible is true`
+            );
+
+            return {
+                id,
+                name: parseMembershipText(group.name, `${name}.name`),
+                description: parseMembershipText(
+                    group.description,
+                    `${name}.description`
+                ),
+                enabled,
+                visible,
+                assignable,
+                sortOrder: asSafeInteger(group.sortOrder, `${name}.sortOrder`),
+                quota,
+                permissionGroupIds: referencedPermissionGroupIds,
+                subscriptionUrl
+            };
+        }
+    );
+
+    return {
+        permissionGroups,
+        groups
+    };
 }
 
 function parseDailyTimesHHmm(value: unknown, name: string) {
@@ -925,6 +1191,17 @@ function validateConfig(raw: unknown): Config {
         apiAuthCache.userProfile,
         'api.authCache.userProfile'
     );
+    const apiAuthCacheMembership =
+        apiAuthCache.membership === undefined
+            ? {
+                  maxEntries: 1024,
+                  defaultTtlSeconds: 300
+              }
+            : asObject(apiAuthCache.membership, 'api.authCache.membership');
+    assertOnlyKeys(apiAuthCacheMembership, 'api.authCache.membership', [
+        'maxEntries',
+        'defaultTtlSeconds'
+    ]);
     const apiPayload = asObject(api.payload, 'api.payload');
     const apiFeedback = asObject(api.feedback, 'api.feedback');
     const apiFeedbackValidation = asObject(
@@ -948,6 +1225,24 @@ function validateConfig(raw: unknown): Config {
     const apiPagination = asObject(api.pagination, 'api.pagination');
     const apiDebug = asObject(api.debug, 'api.debug');
     const apiPermissions = asObject(api.permissions, 'api.permissions');
+    const apiPermissionConfig: ApiPermissionConfig = {
+        anonymousScopes: parseScopeList(
+            apiPermissions.anonymousScopes,
+            'api.permissions.anonymousScopes'
+        ),
+        issuedKeyDefaultScopes: parseScopeList(
+            apiPermissions.issuedKeyDefaultScopes,
+            'api.permissions.issuedKeyDefaultScopes'
+        ),
+        creatableKeyMaxScopes: parseScopeList(
+            apiPermissions.creatableKeyMaxScopes,
+            'api.permissions.creatableKeyMaxScopes'
+        )
+    };
+    const membershipConfig = parseMembershipConfig(
+        root.membership,
+        apiPermissionConfig.creatableKeyMaxScopes
+    );
     const oauthPkce = asObject(oauth.pkce, 'oauth.pkce');
     const oauthDiscovery = asObject(oauth.discovery, 'oauth.discovery');
     const services = asObject(root.services, 'services');
@@ -1648,6 +1943,18 @@ function validateConfig(raw: unknown): Config {
                         'api.authCache.userProfile.defaultTtlSeconds',
                         1
                     )
+                },
+                membership: {
+                    maxEntries: asInteger(
+                        apiAuthCacheMembership.maxEntries,
+                        'api.authCache.membership.maxEntries',
+                        1
+                    ),
+                    defaultTtlSeconds: asInteger(
+                        apiAuthCacheMembership.defaultTtlSeconds,
+                        'api.authCache.membership.defaultTtlSeconds',
+                        1
+                    )
                 }
             },
             payload: {
@@ -1758,21 +2065,9 @@ function validateConfig(raw: unknown): Config {
                     'api.debug.enableEchoError'
                 )
             },
-            permissions: {
-                anonymousScopes: parseScopeList(
-                    apiPermissions.anonymousScopes,
-                    'api.permissions.anonymousScopes'
-                ),
-                issuedKeyDefaultScopes: parseScopeList(
-                    apiPermissions.issuedKeyDefaultScopes,
-                    'api.permissions.issuedKeyDefaultScopes'
-                ),
-                creatableKeyMaxScopes: parseScopeList(
-                    apiPermissions.creatableKeyMaxScopes,
-                    'api.permissions.creatableKeyMaxScopes'
-                )
-            }
+            permissions: apiPermissionConfig
         },
+        membership: membershipConfig,
         oauth: {
             issuer: asString(oauth.issuer, 'oauth.issuer'),
             authorizationCodeTtlSeconds: asInteger(

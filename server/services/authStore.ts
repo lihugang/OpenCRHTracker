@@ -3,8 +3,8 @@ import { LRUCache } from 'lru-cache';
 import useConfig from '~/server/config';
 import { useUsersDatabase } from '~/server/libs/database/users';
 import { createPreparedSqlStore } from '~/server/libs/database/prepared';
+import { resolveUserMembershipEntitlements } from '~/server/services/membershipStore';
 import ApiRequestError from '~/server/utils/api/errors/ApiRequestError';
-import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
 import normalizeScopeList from '~/server/utils/api/scopes/normalizeScopeList';
 import importSqlBatch from '~/server/utils/sql/importSqlBatch';
 import {
@@ -24,7 +24,6 @@ interface ApiKeyPayload {
     keyId: string;
     issuer: ApiKeyIssuer;
     oauthClientId: string | null;
-    scopes: string[];
     activeFrom: number;
     expiresAt: number;
 }
@@ -34,6 +33,7 @@ export interface IssuedAuthSession extends ApiKeyPayload {
     revokeId: string;
     maskedApiKey: string;
     apiKey: string;
+    scopes: string[];
 }
 
 export interface UserRecord {
@@ -125,7 +125,7 @@ const userRecordCache = new LRUCache<
 
 const apiKeyRecordCache = new LRUCache<
     string,
-    StoredApiKeyRecord | typeof MISSING_API_KEY_RECORD
+    ApiKeyRecord | typeof MISSING_API_KEY_RECORD
 >({
     max: useConfig().api.authCache.apiKeyRecord.maxEntries,
     ttl: useConfig().api.authCache.apiKeyRecord.defaultTtlSeconds * 1000,
@@ -239,7 +239,6 @@ function buildApiKeySession(
         {
             kid: keyId,
             sub: userId,
-            scopes: normalizedScopes,
             nbf: resolvedWindow.activeFrom,
             exp: resolvedWindow.expiresAt
         },
@@ -286,7 +285,8 @@ function cacheIssuedApiKey(apiKey: IssuedAuthSession) {
         name: apiKey.name,
         active_from: apiKey.activeFrom,
         revoked_at: null,
-        expires_at: apiKey.expiresAt
+        expires_at: apiKey.expiresAt,
+        scopes: apiKey.scopes
     });
 }
 
@@ -302,21 +302,18 @@ function matchesPayload(record: StoredApiKeyRecord, payload: ApiKeyPayload) {
 }
 
 function resolveDefaultSessionScopes(userId: string, issuer: ApiKeyIssuer) {
-    const defaultScopes = [
-        ...useConfig().api.permissions.issuedKeyDefaultScopes
-    ];
-
-    if (issuer === 'webapp' && useConfig().user.adminUserIds.includes(userId)) {
-        defaultScopes.push(API_SCOPES.admin);
+    if (issuer === 'webapp') {
+        return resolveUserMembershipEntitlements(userId).accountScopes;
     }
 
-    return normalizeScopeList(defaultScopes);
+    return normalizeScopeList(
+        useConfig().api.permissions.issuedKeyDefaultScopes
+    );
 }
 
 function buildAuthSessionFromRecord(
     apiKey: string,
-    record: StoredApiKeyRecord,
-    scopes: string[]
+    record: ApiKeyRecord
 ): IssuedAuthSession {
     return {
         userId: record.user_id,
@@ -327,7 +324,7 @@ function buildAuthSessionFromRecord(
         name: record.name,
         apiKey,
         maskedApiKey: maskApiKey(apiKey),
-        scopes,
+        scopes: record.scopes,
         activeFrom: record.active_from,
         expiresAt: record.expires_at
     };
@@ -351,19 +348,28 @@ function getStoredApiKeyRecord(keyId: string, now: number) {
         return cached === MISSING_API_KEY_RECORD ? undefined : cached;
     }
 
-    const record = authStatements.get<StoredApiKeyRecord>(
+    const storedRecord = authStatements.get<StoredApiKeyRecord>(
         'selectValidApiKey',
         keyId,
         now,
         now
     );
-    if (!record) {
+    if (!storedRecord) {
         apiKeyRecordCache.set(keyId, MISSING_API_KEY_RECORD, {
             ttl: 5 * 1000
         });
         return undefined;
     }
 
+    const scopes = normalizeScopeList(
+        authStatements
+            .all<ApiKeyScopeRecord>('selectApiKeyScopesByKey', keyId)
+            .map((row) => row.scope)
+    );
+    const record: ApiKeyRecord = {
+        ...storedRecord,
+        scopes
+    };
     apiKeyRecordCache.set(keyId, record);
     return record;
 }
@@ -799,7 +805,6 @@ export function getValidApiKey(apiKey: string) {
         keyId: payload.kid,
         issuer: payload.issuer,
         oauthClientId: storedRecord.oauth_client_id,
-        scopes: payload.scopes,
         activeFrom: payload.nbf,
         expiresAt: payload.exp
     };
@@ -808,7 +813,7 @@ export function getValidApiKey(apiKey: string) {
         return undefined;
     }
 
-    return buildAuthSessionFromRecord(apiKey, storedRecord, payload.scopes);
+    return buildAuthSessionFromRecord(apiKey, storedRecord);
 }
 
 export function maskApiKey(key: string) {

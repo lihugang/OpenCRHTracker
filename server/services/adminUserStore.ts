@@ -1,6 +1,7 @@
 import useConfig from '~/server/config';
 import { createPreparedSqlStore } from '~/server/libs/database/prepared';
 import { getUserByUsername } from '~/server/services/authStore';
+import { resolveUserMembershipEntitlements } from '~/server/services/membershipStore';
 import {
     clearUserRiskCase,
     updateManualUserBanState
@@ -51,7 +52,8 @@ function toAdminUserListItem(
     row: AdminUserRow,
     now: number
 ): AdminUserListItem {
-    const quotaSubject = resolveUserQuotaSubject(row.username);
+    const sponsorship = resolveUserMembershipEntitlements(row.username, now);
+    const quotaSubject = resolveUserQuotaSubject(row.username, sponsorship);
     const quotaOverride = getUserQuotaOverride(row.username);
 
     return {
@@ -62,7 +64,18 @@ function toAdminUserListItem(
         isAdmin: useConfig().user.adminUserIds.includes(row.username),
         apiRemainCost: peekRemainTokens(quotaSubject, now),
         customTokenLimit: quotaOverride.tokenLimit,
-        customRefillAmount: quotaOverride.refillAmount
+        customRefillAmount: quotaOverride.refillAmount,
+        sponsorshipGroups: sponsorship.activeMemberships.map((membership) => ({
+            groupId: membership.groupId,
+            name: membership.group?.name ?? membership.groupId,
+            startsAt: membership.startsAt,
+            expiresAt: membership.expiresAt
+        })),
+        effectiveQuota: {
+            tokenLimit: quotaSubject.tokenLimit,
+            refillAmount: quotaSubject.refillAmount,
+            refillIntervalSeconds: quotaSubject.refillIntervalSeconds
+        }
     };
 }
 
@@ -163,7 +176,8 @@ export function resetAdminUserQuota(
     const effectiveQuota = resolveUserQuotaSubject(input.userId);
     getQuotaStore().buckets.set(effectiveQuota.bucketKey, {
         tokens: effectiveQuota.tokenLimit,
-        updatedAt: now
+        updatedAt: now,
+        tokenLimit: effectiveQuota.tokenLimit
     });
 
     return {

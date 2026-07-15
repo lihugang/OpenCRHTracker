@@ -1,3 +1,8 @@
+import type {
+    SponsorshipEffectiveQuota,
+    SponsorshipGroupSummary
+} from '~/types/membership';
+
 export type AdminAnomalyType =
     | 'train_multi_emu'
     | 'train_coupled_model_mismatch'
@@ -285,6 +290,8 @@ export interface AdminUserListItem {
     apiRemainCost: number;
     customTokenLimit: number | null;
     customRefillAmount: number | null;
+    sponsorshipGroups: SponsorshipGroupSummary[];
+    effectiveQuota: SponsorshipEffectiveQuota;
 }
 
 export interface AdminUsersResponse {

@@ -11,11 +11,20 @@ export default function hydrateBucket(subject: QuotaSubject, now: number) {
     if (!bucket) {
         bucket = {
             tokens: subject.tokenLimit,
-            updatedAt: now
+            updatedAt: now,
+            tokenLimit: subject.tokenLimit
         };
         buckets.set(subject.bucketKey, bucket);
         return bucket;
     }
+
+    const previousTokenLimit = bucket.tokenLimit ?? subject.tokenLimit;
+    if (subject.tokenLimit > previousTokenLimit) {
+        bucket.tokens = subject.tokenLimit;
+    } else if (subject.tokenLimit < previousTokenLimit) {
+        bucket.tokens = Math.min(bucket.tokens, subject.tokenLimit);
+    }
+    bucket.tokenLimit = subject.tokenLimit;
 
     const refillStep = subject.refillIntervalSeconds;
     const elapsed = now - bucket.updatedAt;
@@ -26,10 +35,6 @@ export default function hydrateBucket(subject: QuotaSubject, now: number) {
             bucket.tokens + refillCount * subject.refillAmount
         );
         bucket.updatedAt += refillCount * refillStep;
-    }
-
-    if (bucket.tokens > subject.tokenLimit) {
-        bucket.tokens = subject.tokenLimit;
     }
 
     return bucket as TokenBucket;

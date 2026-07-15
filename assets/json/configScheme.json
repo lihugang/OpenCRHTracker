@@ -897,6 +897,24 @@
                                 "maxEntries",
                                 "defaultTtlSeconds"
                             ]
+                        },
+                        "membership": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "maxEntries": {
+                                    "type": "integer",
+                                    "minimum": 1
+                                },
+                                "defaultTtlSeconds": {
+                                    "type": "integer",
+                                    "minimum": 1
+                                }
+                            },
+                            "required": [
+                                "maxEntries",
+                                "defaultTtlSeconds"
+                            ]
                         }
                     },
                     "required": [
@@ -1086,6 +1104,161 @@
                 "timestampUnit",
                 "debug",
                 "permissions"
+            ]
+        },
+        "membership": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "permissionGroups": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                            "id": {
+                                "type": "string",
+                                "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                            },
+                            "name": {
+                                "type": "string",
+                                "minLength": 1,
+                                "pattern": "\\S"
+                            },
+                            "scopes": {
+                                "type": "array",
+                                "minItems": 1,
+                                "uniqueItems": true,
+                                "items": {
+                                    "type": "string",
+                                    "minLength": 1
+                                }
+                            }
+                        },
+                        "required": [
+                            "id",
+                            "name",
+                            "scopes"
+                        ]
+                    }
+                },
+                "groups": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                            "id": {
+                                "type": "string",
+                                "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                            },
+                            "name": {
+                                "type": "string",
+                                "minLength": 1,
+                                "pattern": "\\S"
+                            },
+                            "description": {
+                                "type": "string",
+                                "minLength": 1,
+                                "pattern": "\\S"
+                            },
+                            "enabled": {
+                                "type": "boolean"
+                            },
+                            "visible": {
+                                "type": "boolean"
+                            },
+                            "assignable": {
+                                "type": "boolean"
+                            },
+                            "sortOrder": {
+                                "type": "integer"
+                            },
+                            "quota": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "properties": {
+                                    "tokenLimit": {
+                                        "type": "integer",
+                                        "minimum": 1
+                                    },
+                                    "refillAmount": {
+                                        "type": "integer",
+                                        "minimum": 1
+                                    }
+                                }
+                            },
+                            "permissionGroupIds": {
+                                "type": "array",
+                                "uniqueItems": true,
+                                "items": {
+                                    "type": "string",
+                                    "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+                                }
+                            },
+                            "subscriptionUrl": {
+                                "type": "string",
+                                "format": "uri",
+                                "pattern": "^https://"
+                            }
+                        },
+                        "required": [
+                            "id",
+                            "name",
+                            "description",
+                            "enabled",
+                            "visible",
+                            "assignable",
+                            "sortOrder",
+                            "permissionGroupIds"
+                        ],
+                        "allOf": [
+                            {
+                                "if": {
+                                    "properties": {
+                                        "visible": {
+                                            "const": true
+                                        }
+                                    },
+                                    "required": [
+                                        "visible"
+                                    ]
+                                },
+                                "then": {
+                                    "required": [
+                                        "subscriptionUrl"
+                                    ]
+                                }
+                            },
+                            {
+                                "if": {
+                                    "properties": {
+                                        "assignable": {
+                                            "const": true
+                                        }
+                                    },
+                                    "required": [
+                                        "assignable"
+                                    ]
+                                },
+                                "then": {
+                                    "properties": {
+                                        "enabled": {
+                                            "const": true
+                                        }
+                                    },
+                                    "required": [
+                                        "enabled"
+                                    ]
+                                }
+                            }
+                        ]
+                    }
+                }
+            },
+            "required": [
+                "permissionGroups",
+                "groups"
             ]
         },
         "oauth": {

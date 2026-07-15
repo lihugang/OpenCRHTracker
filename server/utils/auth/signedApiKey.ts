@@ -1,13 +1,11 @@
 import crypto from 'crypto';
 import useConfig from '~/server/config';
-import normalizeScopeList from '~/server/utils/api/scopes/normalizeScopeList';
 
 export type ApiKeyIssuer = 'webapp' | 'api' | 'oauth';
 
 export interface SignedApiKeyPayload {
     kid: string;
     sub: string;
-    scopes: string[];
     nbf: number;
     exp: number;
 }
@@ -59,12 +57,12 @@ export function createSignedApiKeyToken(
 ) {
     const encodedPayload = toBase64Url(
         JSON.stringify({
+            v: 2,
             kid: payload.kid,
             sub: payload.sub,
-            scopes: normalizeScopeList(payload.scopes),
             nbf: payload.nbf,
             exp: payload.exp
-        } satisfies SignedApiKeyPayload)
+        })
     );
 
     return `${getApiKeyPrefix(issuer)}${encodedPayload}.${signPayload(encodedPayload)}`;
@@ -105,27 +103,25 @@ export function parseSignedApiKeyToken(token: string) {
         return null;
     }
 
-    const candidate = parsedPayload as Partial<SignedApiKeyPayload>;
+    const candidate = parsedPayload as Partial<SignedApiKeyPayload> & {
+        v?: unknown;
+        scopes?: unknown;
+    };
     if (
+        (candidate.v !== undefined && candidate.v !== 2) ||
         typeof candidate.kid !== 'string' ||
         typeof candidate.sub !== 'string' ||
-        !Array.isArray(candidate.scopes) ||
         typeof candidate.nbf !== 'number' ||
         typeof candidate.exp !== 'number'
     ) {
         return null;
     }
 
-    try {
-        return {
-            issuer,
-            kid: candidate.kid,
-            sub: candidate.sub,
-            scopes: normalizeScopeList(candidate.scopes),
-            nbf: candidate.nbf,
-            exp: candidate.exp
-        } satisfies ParsedSignedApiKeyPayload;
-    } catch {
-        return null;
-    }
+    return {
+        issuer,
+        kid: candidate.kid,
+        sub: candidate.sub,
+        nbf: candidate.nbf,
+        exp: candidate.exp
+    } satisfies ParsedSignedApiKeyPayload;
 }

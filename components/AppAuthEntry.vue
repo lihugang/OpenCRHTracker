@@ -10,6 +10,12 @@
                         文档
                     </NuxtLink>
                     <NuxtLink
+                        v-if="isAuthenticated"
+                        to="/membership"
+                        class="inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-white/55 hover:text-slate-950">
+                        赞助权益
+                    </NuxtLink>
+                    <NuxtLink
                         v-if="isAuthenticated && session"
                         to="/dashboard"
                         class="inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-white/55 hover:text-slate-950">
@@ -41,6 +47,12 @@
                     文档
                 </NuxtLink>
                 <NuxtLink
+                    v-if="isAuthenticated"
+                    to="/membership"
+                    class="inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium text-slate-700 transition hover:text-slate-950 hover:underline hover:underline-offset-4">
+                    赞助权益
+                </NuxtLink>
+                <NuxtLink
                     v-if="isAuthenticated && session"
                     to="/dashboard"
                     class="inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium text-slate-700 transition hover:text-slate-950 hover:underline hover:underline-offset-4">
@@ -67,7 +79,13 @@
 import { computed } from 'vue';
 
 const route = useRoute();
-const hiddenPaths = new Set(['/auth', '/login', '/register', '/dashboard']);
+const hiddenPaths = new Set([
+    '/auth',
+    '/login',
+    '/register',
+    '/dashboard',
+    '/membership'
+]);
 const { session, isAuthenticated } = useAuthState();
 const shouldShowEntry = computed(
     () => !hiddenPaths.has(route.path) && !route.path.startsWith('/docs')

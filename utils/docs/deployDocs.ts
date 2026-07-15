@@ -779,7 +779,7 @@ export const deployDocsSections: DocsContentSection[] = [
                         valueType: 'object',
                         required: true,
                         description:
-                            '用户记录、用户资料和 API Key 记录缓存的容量与过期时长。'
+                            '用户记录、用户资料、API Key 记录和赞助权益记录缓存的容量与过期时长。'
                     },
                     {
                         path: 'api.authCache.userProfile',
@@ -790,6 +790,17 @@ export const deployDocsSections: DocsContentSection[] = [
                         notes: [
                             '收藏接口读写成功后会直接回写这一层缓存，而不是简单删除缓存。',
                             '本次推荐值为 maxEntries=256，defaultTtlSeconds=21600。'
+                        ]
+                    },
+                    {
+                        path: 'api.authCache.membership',
+                        valueType: 'object',
+                        required: false,
+                        description:
+                            '用户赞助权益原始记录的服务端缓存容量与过期时长。',
+                        notes: [
+                            '未配置时默认使用 maxEntries=1024、defaultTtlSeconds=300。',
+                            '赞助权益的开始、到期和配置启停状态仍会在每次解析时按当前时间重新判断。'
                         ]
                     },
                     {
@@ -864,14 +875,18 @@ export const deployDocsSections: DocsContentSection[] = [
                         path: 'api.permissions.issuedKeyDefaultScopes',
                         valueType: 'array<string>',
                         required: true,
-                        description: '新签发 API Key 的默认权限集合。',
+                        description:
+                            '登录账号的基础权限集合；账号当前权限为该集合与有效赞助权益权限的并集。',
                         notes: [
+                            '该集合也作为新签发凭据的默认委托权限来源。',
                             '如需默认允许动车组配属信息接口，请包含 api.allocation.emu.read。',
                             '如需默认允许当前车次时刻表接口，请包含 api.timetable.train.current.read；如需默认允许历史车次时刻表接口，请同时包含 api.timetable.train.history.read。',
                             '如需默认允许列车交路图图片接口，请包含 api.timetable.train.circulation.image.read。',
                             '如需默认允许车站时刻表接口，请包含 api.timetable.station.read。',
                             '如需让网页端收藏功能开箱即用，请包含 api.auth.favorites.read 和 api.auth.favorites.write。',
-                            '如需让网页端用户删除自己创建的 OAuth 客户端，请包含 api.auth.oauth-clients.delete；已有登录会话可能需要重新登录后才会拿到新增 scope。'
+                            '如需让网页端用户删除自己创建的 OAuth 客户端，请包含 api.auth.oauth-clients.delete。',
+                            '配置或赞助权益发生变化后，服务端会在下一次请求时使用最新权限；客户端权限展示会在刷新 /auth/me 后同步，无需重新登录。',
+                            '签名 Key 载荷中的 scope 不再作为授权来源；API Key 与 OAuth 凭据的委托 scope 保存在数据库中，并在每次授权时与账号当前权限取交集。'
                         ]
                     },
                     {
@@ -885,6 +900,77 @@ export const deployDocsSections: DocsContentSection[] = [
                             '若希望外部调用方可勾选当前车次时刻表接口，这里也要包含 api.timetable.train.current.read；若希望可勾选历史车次时刻表接口，这里也要包含 api.timetable.train.history.read。',
                             '若希望外部调用方可勾选列车交路图图片接口，这里也要包含 api.timetable.train.circulation.image.read。',
                             '若希望外部调用方可勾选车站时刻表接口，这里也要包含 api.timetable.station.read。'
+                        ]
+                    }
+                ]
+            },
+            {
+                type: 'field-cards',
+                title: 'membership：赞助权益分组',
+                text: '这一组定义可复用权限组和对外展示的赞助权益组；整个配置缺省时，两类分组均为空。',
+                cards: [
+                    {
+                        path: 'membership.permissionGroups',
+                        valueType: 'array<object>',
+                        required: false,
+                        description:
+                            '可由赞助权益组引用的权限集合。配置 membership 时必须提供该数组，允许为空。',
+                        notes: [
+                            '每项包含 id、name 和非空 scopes 数组。',
+                            'id 必须匹配 ^[a-z][a-z0-9_-]{0,63}$，且不能重复。',
+                            'scopes 不得重复，并且必须位于 api.permissions.creatableKeyMaxScopes 所允许的层级范围内。'
+                        ]
+                    },
+                    {
+                        path: 'membership.groups',
+                        valueType: 'array<object>',
+                        required: false,
+                        description:
+                            '赞助权益组目录。配置 membership 时必须提供该数组，允许为空。',
+                        notes: [
+                            '每项必须包含 id、name、description、enabled、visible、assignable、sortOrder 和 permissionGroupIds。',
+                            'id 使用与权限组相同的格式，并在赞助权益组内保持唯一；已有用户记录引用后不应修改。',
+                            'permissionGroupIds 不得重复，且每个 ID 都必须引用已声明的权限组。'
+                        ]
+                    },
+                    {
+                        path: 'membership.groups[].enabled / visible / assignable',
+                        valueType: 'boolean',
+                        required: true,
+                        description:
+                            '分别控制该组是否产生权益、是否出现在用户目录中，以及管理员能否新授予。',
+                        notes: [
+                            'assignable=true 时 enabled 也必须为 true。',
+                            'visible 只控制目录展示，不影响管理员已保存记录的显示。'
+                        ]
+                    },
+                    {
+                        path: 'membership.groups[].sortOrder',
+                        valueType: 'integer',
+                        required: true,
+                        description:
+                            '赞助权益组的稳定展示顺序，数值较小者优先。'
+                    },
+                    {
+                        path: 'membership.groups[].quota',
+                        valueType: 'object',
+                        required: false,
+                        description:
+                            '该组可选的额度提升，tokenLimit 与 refillAmount 可以分别缺省。',
+                        notes: [
+                            '两个字段一旦配置都必须是正整数。',
+                            '缺省字段不参与额度提升；恢复周期继续使用 quota.refillIntervalSeconds。',
+                            '用户同时拥有多组有效赞助权益时，各额度字段分别取有效组与全局基线中的最大值。'
+                        ]
+                    },
+                    {
+                        path: 'membership.groups[].subscriptionUrl',
+                        valueType: 'string(absolute HTTPS URL)',
+                        required: false,
+                        description: '跳转到外部订阅页面的链接。',
+                        notes: [
+                            'visible=true 时必须配置。',
+                            '只接受带主机名的绝对 HTTPS 地址；价格、币种和订阅周期由外部页面维护。'
                         ]
                     }
                 ]

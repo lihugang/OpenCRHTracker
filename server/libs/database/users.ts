@@ -9,6 +9,8 @@ function ensureUsersSchema(db: Database.Database) {
     const orderedKeys = [
         'createUsersTable',
         'createUserProfilesTable',
+        'createUserMembershipsTable',
+        'createUserMembershipsIndexes',
         'createApiKeysTable',
         'createApiKeyScopesTable',
         'createUserEventSubscriptionsTable',

@@ -16,6 +16,7 @@ export interface QuotaConsumeResult {
 export interface TokenBucket {
     tokens: number;
     updatedAt: number;
+    tokenLimit: number;
 }
 
 export interface QuotaStoreContainer {

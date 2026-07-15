@@ -11,16 +11,22 @@ export default function peekRemainTokens(
         return subject.tokenLimit;
     }
 
+    const previousTokenLimit = bucket.tokenLimit ?? subject.tokenLimit;
+    if (subject.tokenLimit > previousTokenLimit) {
+        return subject.tokenLimit;
+    }
+
+    const currentTokens = Math.min(subject.tokenLimit, bucket.tokens);
     const refillStep = subject.refillIntervalSeconds;
     const elapsed = now - bucket.updatedAt;
 
     if (elapsed < refillStep) {
-        return Math.min(subject.tokenLimit, bucket.tokens);
+        return currentTokens;
     }
 
     const refillCount = Math.floor(elapsed / refillStep);
     return Math.min(
         subject.tokenLimit,
-        bucket.tokens + refillCount * subject.refillAmount
+        currentTokens + refillCount * subject.refillAmount
     );
 }
