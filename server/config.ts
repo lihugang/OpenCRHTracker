@@ -2774,10 +2774,13 @@ export function invalidateConfigCache(): void {
     config = null;
 }
 
+export function parseConfigText(text: string): Config {
+    return validateConfig(JSON.parse(text) as unknown);
+}
+
 export function reloadConfig(): Config {
     const configPath = resolveConfigPath();
-    const raw = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-    const nextConfig = validateConfig(raw);
+    const nextConfig = parseConfigText(fs.readFileSync(configPath, 'utf8'));
     config = nextConfig;
     return nextConfig;
 }

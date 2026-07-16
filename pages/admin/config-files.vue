@@ -198,6 +198,14 @@
 
                         <div class="flex flex-wrap gap-3">
                             <UiButton
+                                v-if="item.target === 'config'"
+                                type="button"
+                                variant="secondary"
+                                @click="isRuntimeConfigModalOpen = true">
+                                查看并编辑 JSON
+                            </UiButton>
+
+                            <UiButton
                                 type="button"
                                 variant="secondary"
                                 :loading="
@@ -232,6 +240,10 @@
                 </UiCard>
             </div>
         </div>
+
+        <AdminRuntimeConfigModal
+            v-model="isRuntimeConfigModalOpen"
+            @updated="handleRuntimeConfigUpdated" />
     </AdminShell>
 </template>
 
@@ -246,7 +258,8 @@ import type {
     AdminConfigFileActionResponse,
     AdminConfigFileItem,
     AdminConfigFilesResponse,
-    AdminConfigFileTarget
+    AdminConfigFileTarget,
+    AdminRuntimeConfigUpdateResponse
 } from '~/types/admin';
 import type { TrackerApiResponse } from '~/types/homepage';
 import getApiErrorMessage from '~/utils/api/getApiErrorMessage';
@@ -265,6 +278,7 @@ const { session } = useAuthState();
 const { selectedDateInput, todayDateInputValue } = await useAdminDateQuery();
 
 const activeActionKey = ref('');
+const isRuntimeConfigModalOpen = ref(false);
 const actionMessages = ref<
     Partial<
         Record<
@@ -379,6 +393,22 @@ function patchConfigFileItem(nextItem: AdminConfigFileItem) {
             item.target === nextItem.target ? nextItem : item
         )
     };
+}
+
+async function handleRuntimeConfigUpdated(
+    response: AdminRuntimeConfigUpdateResponse
+) {
+    patchConfigFileItem(response.item);
+    actionMessages.value.config = {
+        tone: 'success',
+        text: response.summary
+    };
+
+    try {
+        await refreshConfigFiles();
+    } catch {
+        // Preserve the confirmed update state when the follow-up refresh fails.
+    }
 }
 
 async function runAction(

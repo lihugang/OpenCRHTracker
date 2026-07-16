@@ -494,6 +494,25 @@ export interface AdminConfigFileActionResponse {
     item: AdminConfigFileItem;
 }
 
+export interface AdminRuntimeConfigDocumentResponse {
+    content: string;
+    revision: string;
+    filePath: string;
+    modifiedAt: number;
+}
+
+export interface AdminRuntimeConfigUpdateRequest {
+    content: string;
+    expectedRevision: string;
+}
+
+export interface AdminRuntimeConfigUpdateResponse {
+    summary: string;
+    revision: string;
+    modifiedAt: number;
+    item: AdminConfigFileItem;
+}
+
 export type AdminServerMetricsWindow = '4h' | '24h';
 
 export interface AdminServerMetricsPeak {

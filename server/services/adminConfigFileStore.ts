@@ -1,7 +1,9 @@
+import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import useConfig, {
     getResolvedConfigPath,
+    parseConfigText,
     reloadConfig
 } from '~/server/config';
 import getLogger from '~/server/libs/log4js';
@@ -32,11 +34,13 @@ import {
 } from '~/server/services/trainStyleMappingStore';
 import { synchronizeQrcodeDetectionDispatchTasks } from '~/server/services/taskExecutors/dispatchQrcodeDetectionTasksExecutor';
 import { reloadQrcodeAssetAfterRefresh } from '~/server/services/taskExecutors/refreshAssetFileTaskExecutor';
+import ApiRequestError from '~/server/utils/api/errors/ApiRequestError';
 import ensure from '~/server/utils/api/executor/ensure';
 import {
     getAssetFilePath,
     readAssetText,
-    refreshAssetFileFromProvider
+    refreshAssetFileFromProvider,
+    writeTextFileAtomically
 } from '~/server/utils/dataAssets/store';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
 import type {
@@ -45,10 +49,14 @@ import type {
     AdminConfigFileActionResponse,
     AdminConfigFileItem,
     AdminConfigFilesResponse,
-    AdminConfigFileTarget
+    AdminConfigFileTarget,
+    AdminRuntimeConfigDocumentResponse,
+    AdminRuntimeConfigUpdateRequest,
+    AdminRuntimeConfigUpdateResponse
 } from '~/types/admin';
 
 const logger = getLogger('admin-config-file-store');
+let configOperationTail = Promise.resolve();
 
 type AssetTarget = Extract<
     AdminConfigFileTarget,
@@ -61,6 +69,32 @@ type AssetTarget = Extract<
 
 function toTimestampSeconds(value: number): number {
     return Math.floor(value / 1000);
+}
+
+async function runSerializedConfigOperation<T>(
+    operation: () => Promise<T> | T
+): Promise<T> {
+    const previousOperation = configOperationTail;
+    let releaseOperation: () => void = () => undefined;
+    configOperationTail = new Promise<void>((resolve) => {
+        releaseOperation = resolve;
+    });
+
+    await previousOperation;
+    try {
+        return await operation();
+    } finally {
+        releaseOperation();
+    }
+}
+
+function getContentRevision(content: string): string {
+    return crypto.createHash('sha256').update(content, 'utf8').digest('hex');
+}
+
+function formatErrorForLog(error: unknown): string {
+    const message = error instanceof Error ? error.message : String(error);
+    return message.replace(/[\r\n]+/g, ' ').slice(0, 1000);
 }
 
 function getFileStatus(filePath: string): {
@@ -211,13 +245,18 @@ function assertActionSupported(
     );
 }
 
-async function reloadConfigFromLocal(): Promise<AdminConfigFileActionResponse> {
+async function reloadConfigFromLocal(
+    actorUserId = '',
+    source: 'manual' | 'editor' | 'editor_rollback' = 'manual'
+): Promise<AdminConfigFileActionResponse> {
     reloadConfig();
     resetSafeRuntimeCaches();
     const qrcodeWarning = await reloadQrcodeDetectionAfterAssetChange();
 
     const item = buildConfigFileItem('config');
-    logger.info(`admin_config_reload_local file=${item.filePath}`);
+    logger.info(
+        `admin_config_reload_local actor=${actorUserId || 'unknown'} source=${source} file=${item.filePath}`
+    );
 
     return {
         target: 'config',
@@ -412,25 +451,137 @@ export function getAdminConfigFiles(): AdminConfigFilesResponse {
     };
 }
 
-export async function runAdminConfigFileAction(
-    request: AdminConfigFileActionRequest
-): Promise<AdminConfigFileActionResponse> {
-    assertActionSupported(request.target, request.action);
+function readAdminRuntimeConfigDocument(): AdminRuntimeConfigDocumentResponse {
+    const filePath = path.resolve(getResolvedConfigPath());
+    const content = fs.readFileSync(filePath, 'utf8');
+    const status = getFileStatus(filePath);
 
-    switch (request.target) {
-        case 'config':
-            return await reloadConfigFromLocal();
-        case 'EMUList':
-        case 'QRCode':
-        case 'stationCoord':
-        case 'trainStyleMapping':
-        case 'qrcodeDetection':
-            if (request.action === 'reload_local') {
-                return await reloadAssetFromLocal(request.target);
-            }
-            return await refreshAssetFromRemote(request.target);
-        default:
-            request.target satisfies never;
-            throw new Error('Unsupported config file target');
+    if (status.modifiedAt === null) {
+        throw new ApiRequestError(
+            404,
+            'config_not_found',
+            '当前运行配置文件不存在'
+        );
     }
+
+    return {
+        content,
+        revision: getContentRevision(content),
+        filePath,
+        modifiedAt: status.modifiedAt
+    };
+}
+
+export async function getAdminRuntimeConfigDocument(): Promise<AdminRuntimeConfigDocumentResponse> {
+    return await runSerializedConfigOperation(() =>
+        readAdminRuntimeConfigDocument()
+    );
+}
+
+export async function updateAdminRuntimeConfig(
+    request: AdminRuntimeConfigUpdateRequest,
+    actorUserId: string
+): Promise<AdminRuntimeConfigUpdateResponse> {
+    return await runSerializedConfigOperation(async () => {
+        const previousDocument = readAdminRuntimeConfigDocument();
+        ensure(
+            request.expectedRevision === previousDocument.revision,
+            409,
+            'config_conflict',
+            '运行配置文件已被其他操作修改，请重新读取最新版本后再提交'
+        );
+
+        try {
+            parseConfigText(request.content);
+        } catch (error) {
+            throw new ApiRequestError(
+                400,
+                'invalid_config',
+                `配置校验失败：${formatErrorForLog(error)}`
+            );
+        }
+
+        try {
+            writeTextFileAtomically(previousDocument.filePath, request.content);
+        } catch (error) {
+            logger.error(
+                `admin_config_write_failed actor=${actorUserId} file=${previousDocument.filePath} previousRevision=${previousDocument.revision} error=${formatErrorForLog(error)}`
+            );
+            throw new ApiRequestError(
+                500,
+                'config_write_failed',
+                '运行配置文件写入失败，请查看服务日志'
+            );
+        }
+
+        try {
+            const reloadResult = await reloadConfigFromLocal(
+                actorUserId,
+                'editor'
+            );
+            const nextDocument = readAdminRuntimeConfigDocument();
+            logger.info(
+                `admin_config_updated actor=${actorUserId} file=${nextDocument.filePath} previousRevision=${previousDocument.revision} revision=${nextDocument.revision}`
+            );
+
+            return {
+                summary: `已保存并尝试重载运行配置。${reloadResult.summary}`,
+                revision: nextDocument.revision,
+                modifiedAt: nextDocument.modifiedAt,
+                item: reloadResult.item
+            };
+        } catch (reloadError) {
+            try {
+                writeTextFileAtomically(
+                    previousDocument.filePath,
+                    previousDocument.content
+                );
+                await reloadConfigFromLocal(actorUserId, 'editor_rollback');
+                logger.warn(
+                    `admin_config_update_rolled_back actor=${actorUserId} file=${previousDocument.filePath} revision=${previousDocument.revision} error=${formatErrorForLog(reloadError)}`
+                );
+            } catch (rollbackError) {
+                logger.error(
+                    `admin_config_rollback_failed actor=${actorUserId} file=${previousDocument.filePath} revision=${previousDocument.revision} reloadError=${formatErrorForLog(reloadError)} rollbackError=${formatErrorForLog(rollbackError)}`
+                );
+                throw new ApiRequestError(
+                    500,
+                    'config_rollback_failed',
+                    '新配置重载失败，自动回滚也未能完整完成，请立即检查服务日志和配置文件'
+                );
+            }
+
+            throw new ApiRequestError(
+                500,
+                'config_reload_failed',
+                '新配置重载失败，已自动恢复原配置，请查看服务日志'
+            );
+        }
+    });
+}
+
+export async function runAdminConfigFileAction(
+    request: AdminConfigFileActionRequest,
+    actorUserId = ''
+): Promise<AdminConfigFileActionResponse> {
+    return await runSerializedConfigOperation(async () => {
+        assertActionSupported(request.target, request.action);
+
+        switch (request.target) {
+            case 'config':
+                return await reloadConfigFromLocal(actorUserId);
+            case 'EMUList':
+            case 'QRCode':
+            case 'stationCoord':
+            case 'trainStyleMapping':
+            case 'qrcodeDetection':
+                if (request.action === 'reload_local') {
+                    return await reloadAssetFromLocal(request.target);
+                }
+                return await refreshAssetFromRemote(request.target);
+            default:
+                request.target satisfies never;
+                throw new Error('Unsupported config file target');
+        }
+    });
 }

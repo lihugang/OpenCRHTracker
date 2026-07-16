@@ -54,7 +54,7 @@ export default defineEventHandler(async (event) => {
         {
             requiredScopes: [API_SCOPES.admin]
         },
-        async () => {
+        async ({ identity }) => {
             const body =
                 (await readBody<AdminConfigFileActionBody | null>(event)) ?? {};
             ensure(
@@ -64,7 +64,10 @@ export default defineEventHandler(async (event) => {
                 '请求体必须是 JSON 对象'
             );
 
-            return await runAdminConfigFileAction(parseRequestBody(body));
+            return await runAdminConfigFileAction(
+                parseRequestBody(body),
+                identity.id
+            );
         }
     );
 });
