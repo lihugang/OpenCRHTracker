@@ -289,8 +289,6 @@ export interface AdminUserListItem {
     isBanned: boolean;
     isAdmin: boolean;
     apiRemainCost: number;
-    customTokenLimit: number | null;
-    customRefillAmount: number | null;
     sponsorshipGroups: SponsorshipGroupSummary[];
     effectiveQuota: SponsorshipEffectiveQuota;
 }
@@ -442,27 +440,6 @@ export interface AdminAddQqBanListResponse {
 export interface AdminRemoveQqBanListResponse {
     qqNumber: string;
     removed: boolean;
-}
-
-export interface AdminUserQuotaOverride {
-    tokenLimit: number | null;
-    refillAmount: number | null;
-}
-
-export interface AdminUpdateUserQuotaRequest {
-    userId: string;
-    tokenLimit: number | null;
-    refillAmount: number | null;
-}
-
-export interface AdminUpdateUserQuotaResponse {
-    userId: string;
-    quotaOverride: AdminUserQuotaOverride;
-    effectiveQuota: {
-        tokenLimit: number;
-        refillAmount: number;
-        refillIntervalSeconds: number;
-    };
 }
 
 export interface AdminResetUserQuotaRequest {

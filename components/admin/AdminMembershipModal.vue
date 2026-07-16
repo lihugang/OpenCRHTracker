@@ -42,7 +42,7 @@
                                 合并结果
                             </h3>
                             <p class="text-sm leading-6 text-slate-600">
-                                最终结果已包含基础配额、赞助组贡献和手工覆盖。
+                                最终结果已包含基础配额和赞助组贡献。
                             </p>
                         </div>
                         <UiStatusBadge
@@ -283,7 +283,7 @@
                             help="必须填写大于 0 的整数天。"
                             required>
                             <input
-                                v-model="form.durationDays"
+                                v-model.number="form.durationDays"
                                 type="number"
                                 inputmode="numeric"
                                 min="1"
@@ -361,10 +361,14 @@ const mutationSuccess = ref('');
 const isSaving = ref(false);
 const isRevoking = ref(false);
 const pendingRevokeGroupId = ref('');
-const form = reactive({
+const form = reactive<{
+    groupId: string;
+    startsAt: string;
+    durationDays: number | '';
+}>({
     groupId: '',
     startsAt: '',
-    durationDays: '30'
+    durationDays: 30
 });
 
 const modalTitle = computed(
@@ -397,7 +401,9 @@ const canSubmit = computed(
         details.value !== null &&
         form.groupId.length > 0 &&
         form.startsAt.length > 0 &&
-        form.durationDays.trim().length > 0 &&
+        typeof form.durationDays === 'number' &&
+        Number.isSafeInteger(form.durationDays) &&
+        form.durationDays > 0 &&
         !isMutating.value
 );
 const activeCount = computed(
@@ -430,7 +436,7 @@ function resetState() {
     pendingRevokeGroupId.value = '';
     form.groupId = '';
     form.startsAt = '';
-    form.durationDays = '30';
+    form.durationDays = 30;
 }
 
 function close() {
@@ -490,7 +496,7 @@ function initializeForm(
         form.startsAt = toShanghaiDateTimeLocalValue(
             Math.floor(Date.now() / 1000)
         );
-        form.durationDays = '30';
+        form.durationDays = 30;
         return;
     }
     resetFormForGroup(response, groupId);
@@ -527,13 +533,8 @@ function resetFormForGroup(
         record?.startsAt ?? Math.floor(Date.now() / 1000)
     );
     form.durationDays = !record
-        ? '30'
-        : String(
-              Math.max(
-                  1,
-                  Math.round((record.expiresAt - record.startsAt) / 86400)
-              )
-          );
+        ? 30
+        : Math.max(1, Math.round((record.expiresAt - record.startsAt) / 86400));
 }
 
 function handleGroupChange(groupId: string) {
@@ -692,19 +693,15 @@ function parseShanghaiDateTimeLocalValue(value: string) {
     return toShanghaiDateTimeLocalValue(timestamp) === value ? timestamp : null;
 }
 
-function parseDurationDays(value: string) {
-    const normalized = value.trim();
-    if (!normalized) {
+function parseDurationDays(value: number | '') {
+    if (
+        typeof value !== 'number' ||
+        !Number.isSafeInteger(value) ||
+        value <= 0
+    ) {
         throw new Error('时长必须是大于 0 的整数。');
     }
-    if (!/^[0-9]+$/.test(normalized)) {
-        throw new Error('时长必须是大于 0 的整数。');
-    }
-    const duration = Number.parseInt(normalized, 10);
-    if (!Number.isSafeInteger(duration) || duration <= 0) {
-        throw new Error('时长必须是大于 0 的整数。');
-    }
-    return duration;
+    return value;
 }
 
 function formatNumber(value: number) {

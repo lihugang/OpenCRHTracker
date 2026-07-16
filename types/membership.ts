@@ -72,7 +72,6 @@ export interface SponsorshipQuotaBreakdown {
         refillAmount: number;
     };
     sponsorship: SponsorshipQuotaContribution;
-    manualOverride: SponsorshipQuotaContribution;
 }
 
 export interface AuthMembershipsResponse {

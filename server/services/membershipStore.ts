@@ -5,7 +5,6 @@ import useConfig, {
 } from '~/server/config';
 import '~/server/libs/database/users';
 import { createPreparedSqlStore } from '~/server/libs/database/prepared';
-import { getUserQuotaOverride } from '~/server/services/userProfileStore';
 import ApiRequestError from '~/server/utils/api/errors/ApiRequestError';
 import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
 import normalizeScopeList from '~/server/utils/api/scopes/normalizeScopeList';
@@ -267,15 +266,11 @@ export function resolveUserMembershipEntitlements(
     };
 }
 
-function resolveQuotaPresentation(
-    userId: string,
-    entitlements: UserMembershipEntitlements
-): {
+function resolveQuotaPresentation(entitlements: UserMembershipEntitlements): {
     effectiveQuota: SponsorshipEffectiveQuota;
     quotaBreakdown: SponsorshipQuotaBreakdown;
 } {
     const config = useConfig();
-    const quotaOverride = getUserQuotaOverride(userId);
     const sponsorshipTokenLimits = entitlements.activeMemberships.flatMap(
         (membership) => {
             const value = membership.group?.quota.tokenLimit;
@@ -291,9 +286,8 @@ function resolveQuotaPresentation(
 
     return {
         effectiveQuota: {
-            tokenLimit: quotaOverride.tokenLimit ?? entitlements.tokenLimit,
-            refillAmount:
-                quotaOverride.refillAmount ?? entitlements.refillAmount,
+            tokenLimit: entitlements.tokenLimit,
+            refillAmount: entitlements.refillAmount,
             refillIntervalSeconds: config.quota.refillIntervalSeconds
         },
         quotaBreakdown: {
@@ -310,8 +304,7 @@ function resolveQuotaPresentation(
                     sponsorshipRefillAmounts.length > 0
                         ? Math.max(...sponsorshipRefillAmounts)
                         : null
-            },
-            manualOverride: quotaOverride
+            }
         }
     };
 }
@@ -321,7 +314,7 @@ export function getUserMembershipSnapshot(
     now = getNowSeconds()
 ): AdminUserMembershipsResponse {
     const entitlements = resolveUserMembershipEntitlements(userId, now);
-    const quota = resolveQuotaPresentation(userId, entitlements);
+    const quota = resolveQuotaPresentation(entitlements);
 
     return {
         userId,

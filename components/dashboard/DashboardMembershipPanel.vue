@@ -123,7 +123,7 @@
                     </div>
 
                     <dl
-                        class="grid divide-y divide-slate-200 overflow-hidden rounded-[1rem] border border-slate-200 bg-slate-50/75 md:grid-cols-3 md:divide-x md:divide-y-0">
+                        class="grid divide-y divide-slate-200 overflow-hidden rounded-[1rem] border border-slate-200 bg-slate-50/75 md:grid-cols-2 md:divide-x md:divide-y-0">
                         <div class="min-h-28 px-5 py-4">
                             <dt
                                 class="text-xs font-medium uppercase tracking-[0.18em] text-slate-500">
@@ -149,21 +149,6 @@
                                     formatQuotaPair(
                                         data.quotaBreakdown.sponsorship,
                                         '当前无配额提升'
-                                    )
-                                }}
-                            </dd>
-                        </div>
-                        <div class="min-h-28 px-5 py-4">
-                            <dt
-                                class="text-xs font-medium uppercase tracking-[0.18em] text-amber-700">
-                                手工覆盖
-                            </dt>
-                            <dd
-                                class="mt-3 text-sm font-semibold leading-6 text-slate-900">
-                                {{
-                                    formatQuotaPair(
-                                        data.quotaBreakdown.manualOverride,
-                                        '当前未设置'
                                     )
                                 }}
                             </dd>

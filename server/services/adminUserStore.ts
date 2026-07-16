@@ -6,11 +6,6 @@ import {
     clearUserRiskCase,
     updateManualUserBanState
 } from '~/server/services/userBanSecurityStore';
-import {
-    getUserQuotaOverride,
-    updateUserQuotaOverride,
-    type UserQuotaOverride
-} from '~/server/services/userProfileStore';
 import ApiRequestError from '~/server/utils/api/errors/ApiRequestError';
 import getQuotaStore from '~/server/utils/api/quota/getQuotaStore';
 import peekRemainTokens from '~/server/utils/api/quota/peekRemainTokens';
@@ -23,8 +18,6 @@ import type {
     AdminResetUserQuotaResponse,
     AdminUpdateUserBanStateRequest,
     AdminUpdateUserBanStateResponse,
-    AdminUpdateUserQuotaRequest,
-    AdminUpdateUserQuotaResponse,
     AdminUserListItem,
     AdminUsersResponse
 } from '~/types/admin';
@@ -54,7 +47,6 @@ function toAdminUserListItem(
 ): AdminUserListItem {
     const sponsorship = resolveUserMembershipEntitlements(row.username, now);
     const quotaSubject = resolveUserQuotaSubject(row.username, sponsorship);
-    const quotaOverride = getUserQuotaOverride(row.username);
 
     return {
         userId: row.username,
@@ -63,8 +55,6 @@ function toAdminUserListItem(
         isBanned: row.is_banned === 1,
         isAdmin: useConfig().user.adminUserIds.includes(row.username),
         apiRemainCost: peekRemainTokens(quotaSubject, now),
-        customTokenLimit: quotaOverride.tokenLimit,
-        customRefillAmount: quotaOverride.refillAmount,
         sponsorshipGroups: sponsorship.activeMemberships.map((membership) => ({
             groupId: membership.groupId,
             name: membership.group?.name ?? membership.groupId,
@@ -96,16 +86,6 @@ function ensureUserExists(userId: string) {
     if (!getUserByUsername(userId)) {
         throw new ApiRequestError(404, 'not_found', '用户不存在');
     }
-}
-
-function syncQuotaBucket(userId: string) {
-    const subject = resolveUserQuotaSubject(userId);
-    const bucket = getQuotaStore().buckets.get(subject.bucketKey);
-    if (bucket && bucket.tokens > subject.tokenLimit) {
-        bucket.tokens = subject.tokenLimit;
-    }
-
-    return subject;
 }
 
 export function updateAdminUserBanState(
@@ -140,31 +120,6 @@ export function clearAdminUserRiskState(
     }
 
     return clearUserRiskCase(userId, actorUserId);
-}
-
-export function updateAdminUserQuotaOverride(
-    input: AdminUpdateUserQuotaRequest
-): AdminUpdateUserQuotaResponse {
-    ensureUserExists(input.userId);
-
-    const quotaOverride: UserQuotaOverride = updateUserQuotaOverride(
-        input.userId,
-        {
-            tokenLimit: input.tokenLimit,
-            refillAmount: input.refillAmount
-        }
-    );
-    const effectiveQuota = syncQuotaBucket(input.userId);
-
-    return {
-        userId: input.userId,
-        quotaOverride,
-        effectiveQuota: {
-            tokenLimit: effectiveQuota.tokenLimit,
-            refillAmount: effectiveQuota.refillAmount,
-            refillIntervalSeconds: effectiveQuota.refillIntervalSeconds
-        }
-    };
 }
 
 export function resetAdminUserQuota(
