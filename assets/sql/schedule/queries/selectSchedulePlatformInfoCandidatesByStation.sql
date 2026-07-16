@@ -1,6 +1,7 @@
 SELECT
     current_stop.item_code AS itemCode,
     item.internal_code AS internalCode,
+    item.start_at AS itemStartAt,
     current_stop.stop_index AS stopIndex,
     current_stop.station_no AS stationNo,
     current_stop.station_telecode AS stationTelecode,

@@ -870,11 +870,15 @@
                                                     class="flex flex-wrap items-center gap-2">
                                                     <span
                                                         :class="
-                                                            getTaskStatusBadgeClass(
-                                                                item.taskStatus
+                                                            getTimelineEventStatusBadgeClass(
+                                                                item
                                                             )
                                                         ">
-                                                        {{ item.taskStatus }}
+                                                        {{
+                                                            getTimelineEventStatusLabel(
+                                                                item
+                                                            )
+                                                        }}
                                                     </span>
                                                     <span
                                                         class="text-sm font-medium text-slate-500">
@@ -928,6 +932,22 @@
 
                                         <div
                                             class="flex flex-wrap items-center gap-3">
+                                            <UiButton
+                                                v-if="
+                                                    item.stationPlatformRefresh
+                                                "
+                                                type="button"
+                                                variant="secondary"
+                                                size="sm"
+                                                @click="
+                                                    openStationPlatformRefreshDetail(
+                                                        item
+                                                            .stationPlatformRefresh
+                                                            .resultId
+                                                    )
+                                                ">
+                                                查看站台明细
+                                            </UiButton>
                                             <UiButton
                                                 v-if="
                                                     hasScannedRoute(
@@ -3052,6 +3072,381 @@
                 </template>
             </div>
         </component>
+        <component
+            :is="isMobileActionSheet ? UiBottomSheet : UiModal"
+            :model-value="isStationPlatformRefreshDialogOpen"
+            eyebrow="站台信息"
+            title="逐站刷新明细"
+            description="查看本次更新中每个车站的数据来源、站台结果和失败原因。"
+            size="screen"
+            height="tall"
+            :close-on-backdrop="stationPlatformRefreshStatus !== 'pending'"
+            @update:model-value="
+                handleStationPlatformRefreshDialogVisibilityChange
+            ">
+            <div class="space-y-5">
+                <div
+                    v-if="stationPlatformRefreshStatus === 'pending'"
+                    class="space-y-3">
+                    <div
+                        v-for="index in 4"
+                        :key="index"
+                        class="h-20 animate-pulse rounded-[0.75rem] bg-slate-100/90" />
+                </div>
+
+                <p
+                    v-else-if="stationPlatformRefreshErrorMessage"
+                    class="rounded-[0.75rem] border border-rose-200 bg-rose-50/80 px-4 py-4 text-sm leading-6 text-rose-700">
+                    {{ stationPlatformRefreshErrorMessage }}
+                </p>
+
+                <UiEmptyState
+                    v-else-if="
+                        stationPlatformRefreshData &&
+                        !stationPlatformRefreshData.result
+                    "
+                    eyebrow="明细不可用"
+                    title="站台刷新记录不存在"
+                    description="该记录可能已经超过来源数据保留期限，或者来源追踪当前未启用。" />
+
+                <template v-else-if="stationPlatformRefreshData?.result">
+                    <section
+                        class="border-y border-slate-200 bg-slate-50/70 px-4 py-4">
+                        <div
+                            class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                            <div class="space-y-2">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <span
+                                        :class="
+                                            getOutcomeStatusBadgeClass(
+                                                stationPlatformRefreshData
+                                                    .result.status
+                                            )
+                                        ">
+                                        {{
+                                            getOutcomeStatusLabel(
+                                                stationPlatformRefreshData
+                                                    .result.status
+                                            )
+                                        }}
+                                    </span>
+                                    <span class="text-sm text-slate-500">
+                                        {{
+                                            getStationPlatformRefreshTriggerLabel(
+                                                stationPlatformRefreshData
+                                                    .result.trigger
+                                            )
+                                        }}
+                                    </span>
+                                </div>
+                                <p
+                                    class="text-base font-semibold text-slate-900">
+                                    {{
+                                        stationPlatformRefreshData.result.trainCodes.join(
+                                            ' / '
+                                        ) || '--'
+                                    }}
+                                </p>
+                                <p class="text-sm leading-6 text-slate-600">
+                                    {{
+                                        formatServiceDate(
+                                            stationPlatformRefreshData.result
+                                                .serviceDate
+                                        )
+                                    }}
+                                    <span
+                                        v-if="
+                                            stationPlatformRefreshData.result
+                                                .startAt !== null
+                                        ">
+                                        · 始发
+                                        {{
+                                            formatTimestamp(
+                                                stationPlatformRefreshData
+                                                    .result.startAt
+                                            )
+                                        }}
+                                    </span>
+                                    · 任务 #{{
+                                        stationPlatformRefreshData.result
+                                            .taskRunId
+                                    }}
+                                </p>
+                            </div>
+                            <p class="text-sm text-slate-500 lg:text-right">
+                                记录时间：{{
+                                    formatTimestamp(
+                                        stationPlatformRefreshData.result
+                                            .createdAt
+                                    )
+                                }}
+                            </p>
+                        </div>
+                    </section>
+
+                    <p
+                        v-if="stationPlatformRefreshData.result.errorMessage"
+                        class="rounded-[0.75rem] border border-rose-200 bg-rose-50/80 px-4 py-3 text-sm leading-6 text-rose-700">
+                        {{ stationPlatformRefreshData.result.errorMessage }}
+                    </p>
+
+                    <dl
+                        class="grid grid-cols-2 divide-x divide-y divide-slate-200 overflow-hidden border border-slate-200 bg-white sm:grid-cols-3 xl:grid-cols-6">
+                        <div class="px-4 py-3">
+                            <dt class="text-xs text-slate-400">候选站点</dt>
+                            <dd
+                                class="mt-1 text-lg font-semibold text-slate-900">
+                                {{
+                                    formatNumber(
+                                        stationPlatformRefreshData.result
+                                            .candidateCount
+                                    )
+                                }}
+                            </dd>
+                        </div>
+                        <div class="px-4 py-3">
+                            <dt class="text-xs text-slate-400">已更新</dt>
+                            <dd
+                                class="mt-1 text-lg font-semibold text-emerald-700">
+                                {{
+                                    formatNumber(
+                                        stationPlatformRefreshData.result
+                                            .updatedCount
+                                    )
+                                }}
+                            </dd>
+                        </div>
+                        <div class="px-4 py-3">
+                            <dt class="text-xs text-slate-400">缓存命中</dt>
+                            <dd
+                                class="mt-1 text-lg font-semibold text-slate-900">
+                                {{
+                                    formatNumber(
+                                        stationPlatformRefreshData.result
+                                            .cacheHitCount
+                                    )
+                                }}
+                            </dd>
+                        </div>
+                        <div class="px-4 py-3">
+                            <dt class="text-xs text-slate-400">缓存回退</dt>
+                            <dd
+                                class="mt-1 text-lg font-semibold text-amber-700">
+                                {{
+                                    formatNumber(
+                                        stationPlatformRefreshData.result
+                                            .cacheFallbackCount
+                                    )
+                                }}
+                            </dd>
+                        </div>
+                        <div class="px-4 py-3">
+                            <dt class="text-xs text-slate-400">无数据</dt>
+                            <dd
+                                class="mt-1 text-lg font-semibold text-amber-700">
+                                {{
+                                    formatNumber(
+                                        stationPlatformRefreshData.result
+                                            .noDataCount
+                                    )
+                                }}
+                            </dd>
+                        </div>
+                        <div class="px-4 py-3">
+                            <dt class="text-xs text-slate-400">失败</dt>
+                            <dd
+                                class="mt-1 text-lg font-semibold text-rose-700">
+                                {{
+                                    formatNumber(
+                                        stationPlatformRefreshData.result
+                                            .failedCount
+                                    )
+                                }}
+                            </dd>
+                        </div>
+                    </dl>
+
+                    <UiEmptyState
+                        v-if="stationPlatformRefreshData.entries.length === 0"
+                        eyebrow="无候选"
+                        title="本次没有可处理的站点"
+                        description="任务已记录，但没有找到能够关联到该班次的站台候选。" />
+
+                    <div
+                        v-else
+                        class="hidden overflow-x-auto border-y border-slate-200 md:block">
+                        <table class="min-w-[78rem] text-left text-sm">
+                            <thead class="bg-slate-50 text-xs text-slate-500">
+                                <tr>
+                                    <th class="px-4 py-3">结果</th>
+                                    <th class="px-4 py-3">站序 / 车站</th>
+                                    <th class="px-4 py-3">数据来源</th>
+                                    <th class="px-4 py-3">查询车次</th>
+                                    <th class="px-4 py-3">站台</th>
+                                    <th class="px-4 py-3">出站口</th>
+                                    <th class="px-4 py-3">数据时间</th>
+                                    <th class="px-4 py-3">说明</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100 bg-white">
+                                <tr
+                                    v-for="entry in stationPlatformRefreshData.entries"
+                                    :key="entry.id">
+                                    <td class="px-4 py-3 align-top">
+                                        <span
+                                            :class="
+                                                getStationPlatformEntryStatusBadgeClass(
+                                                    entry.status
+                                                )
+                                            ">
+                                            {{
+                                                getStationPlatformEntryStatusLabel(
+                                                    entry.status
+                                                )
+                                            }}
+                                        </span>
+                                    </td>
+                                    <td class="px-4 py-3 align-top">
+                                        <p class="font-medium text-slate-900">
+                                            {{ entry.stationOrder + 1 }}.
+                                            {{ entry.stationName || '--' }}
+                                        </p>
+                                        <p class="mt-1 text-xs text-slate-400">
+                                            {{ entry.stationTelecode || '--' }}
+                                            / #{{ entry.stationNo }}
+                                        </p>
+                                    </td>
+                                    <td
+                                        class="px-4 py-3 align-top text-slate-600">
+                                        {{
+                                            getStationPlatformLookupTypeLabel(
+                                                entry.lookupType
+                                            )
+                                        }}
+                                        <p class="mt-1 text-xs text-slate-400">
+                                            {{
+                                                formatServiceDate(
+                                                    entry.trainDate
+                                                )
+                                            }}
+                                        </p>
+                                    </td>
+                                    <td
+                                        class="px-4 py-3 align-top font-mono text-xs text-slate-600">
+                                        {{
+                                            getStationPlatformEntryTrainCode(
+                                                entry
+                                            )
+                                        }}
+                                    </td>
+                                    <td
+                                        class="px-4 py-3 align-top text-slate-900">
+                                        {{ entry.platformNo ?? '--' }}
+                                    </td>
+                                    <td
+                                        class="px-4 py-3 align-top text-slate-700">
+                                        {{ entry.wicket || '--' }}
+                                    </td>
+                                    <td
+                                        class="px-4 py-3 align-top text-slate-500">
+                                        {{
+                                            entry.fetchedAt === null
+                                                ? '--'
+                                                : formatTimestamp(
+                                                      entry.fetchedAt
+                                                  )
+                                        }}
+                                    </td>
+                                    <td
+                                        class="max-w-md px-4 py-3 align-top text-xs leading-5 text-slate-500">
+                                        {{ entry.errorMessage || '--' }}
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div
+                        v-if="stationPlatformRefreshData.entries.length > 0"
+                        class="divide-y divide-slate-200 border-y border-slate-200 md:hidden">
+                        <section
+                            v-for="entry in stationPlatformRefreshData.entries"
+                            :key="entry.id"
+                            class="space-y-3 py-4">
+                            <div class="flex items-start justify-between gap-3">
+                                <div>
+                                    <p class="font-semibold text-slate-900">
+                                        {{ entry.stationOrder + 1 }}.
+                                        {{ entry.stationName || '--' }}
+                                    </p>
+                                    <p class="mt-1 text-xs text-slate-400">
+                                        {{ entry.stationTelecode || '--' }} /
+                                        #{{ entry.stationNo }}
+                                    </p>
+                                </div>
+                                <span
+                                    :class="
+                                        getStationPlatformEntryStatusBadgeClass(
+                                            entry.status
+                                        )
+                                    ">
+                                    {{
+                                        getStationPlatformEntryStatusLabel(
+                                            entry.status
+                                        )
+                                    }}
+                                </span>
+                            </div>
+                            <dl
+                                class="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+                                <div>
+                                    <dt class="text-xs text-slate-400">来源</dt>
+                                    <dd class="mt-1 text-slate-700">
+                                        {{
+                                            getStationPlatformLookupTypeLabel(
+                                                entry.lookupType
+                                            )
+                                        }}
+                                    </dd>
+                                </div>
+                                <div>
+                                    <dt class="text-xs text-slate-400">
+                                        查询车次
+                                    </dt>
+                                    <dd
+                                        class="mt-1 break-all font-mono text-xs text-slate-700">
+                                        {{
+                                            getStationPlatformEntryTrainCode(
+                                                entry
+                                            )
+                                        }}
+                                    </dd>
+                                </div>
+                                <div>
+                                    <dt class="text-xs text-slate-400">站台</dt>
+                                    <dd class="mt-1 text-slate-700">
+                                        {{ entry.platformNo ?? '--' }}
+                                    </dd>
+                                </div>
+                                <div>
+                                    <dt class="text-xs text-slate-400">
+                                        出站口
+                                    </dt>
+                                    <dd class="mt-1 text-slate-700">
+                                        {{ entry.wicket || '--' }}
+                                    </dd>
+                                </div>
+                            </dl>
+                            <p
+                                v-if="entry.errorMessage"
+                                class="break-words text-xs leading-5 text-rose-700">
+                                {{ entry.errorMessage }}
+                            </p>
+                        </section>
+                    </div>
+                </template>
+            </div>
+        </component>
     </AdminShell>
 </template>
 
@@ -3074,6 +3469,8 @@ import type {
     AdminStationBoardRow,
     AdminStationBoardStationTaskItem,
     AdminStationBoardTaskListResponse,
+    AdminStationPlatformRefreshDetailResponse,
+    AdminStationPlatformRefreshEntry,
     AdminTrainDataRequestHourBucket,
     AdminTrainDataRequestStatsResponse,
     AdminTrainDataRequestType,
@@ -3083,6 +3480,7 @@ import type {
     AdminTrainProvenanceDeparture,
     AdminTrainProvenanceEvent,
     AdminTrainProvenanceLatestStatus,
+    AdminTrainProvenanceOutcomeStatus,
     AdminTrainProvenanceResponse,
     AdminTrackingMutation,
     AdminTrainRouteSnapshot,
@@ -3147,6 +3545,7 @@ const isSubmittingSearch = ref(false);
 const isCouplingDetailDialogOpen = ref(false);
 const isQrcodeScanDetailDialogOpen = ref(false);
 const isStationBoardDetailDialogOpen = ref(false);
+const isStationPlatformRefreshDialogOpen = ref(false);
 const expandedScannedRouteEventIds = ref<number[]>([]);
 const selectedCouplingTaskBureau = ref('');
 const selectedCouplingTaskModel = ref('');
@@ -3185,6 +3584,12 @@ const stationBoardDetailStatus = ref<'idle' | 'pending' | 'success' | 'error'>(
 const stationBoardDetailData =
     ref<AdminStationBoardDispatchDetailResponse | null>(null);
 const stationBoardDetailErrorMessage = ref('');
+const stationPlatformRefreshStatus = ref<
+    'idle' | 'pending' | 'success' | 'error'
+>('idle');
+const stationPlatformRefreshData =
+    ref<AdminStationPlatformRefreshDetailResponse | null>(null);
+const stationPlatformRefreshErrorMessage = ref('');
 const isMobileActionSheet = ref(false);
 const dialogMediaQuery = ref<MediaQueryList | null>(null);
 
@@ -3798,6 +4203,26 @@ function handleStationBoardDetailDialogVisibilityChange(nextValue: boolean) {
     closeStationBoardDetailDialog();
 }
 
+function closeStationPlatformRefreshDialog() {
+    if (stationPlatformRefreshStatus.value === 'pending') {
+        return;
+    }
+
+    isStationPlatformRefreshDialogOpen.value = false;
+    stationPlatformRefreshErrorMessage.value = '';
+}
+
+function handleStationPlatformRefreshDialogVisibilityChange(
+    nextValue: boolean
+) {
+    if (nextValue) {
+        isStationPlatformRefreshDialogOpen.value = true;
+        return;
+    }
+
+    closeStationPlatformRefreshDialog();
+}
+
 async function openCouplingScanDetail(taskRunId: number) {
     isCouplingDetailDialogOpen.value = true;
     couplingDetailStatus.value = 'pending';
@@ -3903,6 +4328,43 @@ async function openStationBoardDetail(taskRunId: number) {
             '交路数据刷新详情加载失败。'
         );
         stationBoardDetailStatus.value = 'error';
+    }
+}
+
+async function openStationPlatformRefreshDetail(resultId: number) {
+    if (!Number.isInteger(resultId) || resultId <= 0) {
+        return;
+    }
+
+    isStationPlatformRefreshDialogOpen.value = true;
+    stationPlatformRefreshStatus.value = 'pending';
+    stationPlatformRefreshErrorMessage.value = '';
+    stationPlatformRefreshData.value = null;
+
+    try {
+        const response = await requestFetch<
+            TrackerApiResponse<AdminStationPlatformRefreshDetailResponse>
+        >('/api/v1/admin/train-provenance/station-platform-refresh', {
+            retry: 0,
+            query: {
+                resultId
+            }
+        });
+
+        if (!response.ok) {
+            throw {
+                data: response
+            };
+        }
+
+        stationPlatformRefreshData.value = response.data;
+        stationPlatformRefreshStatus.value = 'success';
+    } catch (error) {
+        stationPlatformRefreshErrorMessage.value = getApiErrorMessage(
+            error,
+            '站台刷新明细加载失败。'
+        );
+        stationPlatformRefreshStatus.value = 'error';
     }
 }
 
@@ -4594,6 +5056,24 @@ function getEventResultLabel(result: string) {
             return '由单组升级为重联';
         case 'changed':
             return '已变化';
+        case 'unchanged':
+            return '无变化';
+        case 'success':
+            return '成功';
+        case 'partial':
+            return '部分成功';
+        case 'failed':
+            return '失败';
+        case 'skipped':
+            return '已跳过';
+        case 'schedule_target_missing':
+            return '时刻表目标已失效';
+        case 'persist_date_mismatch':
+            return '时刻表日期已切换';
+        case 'persist_published_not_found':
+            return '已发布时刻表不存在';
+        case 'persist_failed':
+            return '本地保存失败';
         case 'asset_missing':
             return '资产缺失';
         case 'network_error':
@@ -4615,6 +5095,97 @@ function getEventResultLabel(result: string) {
         default:
             return result || '--';
     }
+}
+
+function getOutcomeStatusLabel(status: AdminTrainProvenanceOutcomeStatus) {
+    switch (status) {
+        case 'success':
+            return '成功';
+        case 'partial':
+            return '部分成功';
+        case 'failed':
+            return '失败';
+        default:
+            return '已跳过';
+    }
+}
+
+function getOutcomeStatusBadgeClass(status: AdminTrainProvenanceOutcomeStatus) {
+    switch (status) {
+        case 'success':
+            return 'inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-emerald-800';
+        case 'partial':
+        case 'skipped':
+            return 'inline-flex items-center rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-amber-800';
+        case 'failed':
+            return 'inline-flex items-center rounded-full bg-rose-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-rose-800';
+    }
+}
+
+function getTimelineEventStatusLabel(item: AdminTrainProvenanceEvent) {
+    return item.outcomeStatus
+        ? getOutcomeStatusLabel(item.outcomeStatus)
+        : getTaskStatusLabel(item.taskStatus);
+}
+
+function getTimelineEventStatusBadgeClass(item: AdminTrainProvenanceEvent) {
+    return item.outcomeStatus
+        ? getOutcomeStatusBadgeClass(item.outcomeStatus)
+        : getTaskStatusBadgeClass(item.taskStatus);
+}
+
+function getStationPlatformRefreshTriggerLabel(trigger: string) {
+    return trigger === 'station_board' ? '车站大屏补充' : '线路刷新后更新';
+}
+
+function getStationPlatformLookupTypeLabel(lookupType: string) {
+    return lookupType === 'origin_transport'
+        ? '始发站交通信息'
+        : '到达站出站信息';
+}
+
+function getStationPlatformEntryStatusLabel(
+    status: AdminStationPlatformRefreshEntry['status']
+) {
+    switch (status) {
+        case 'updated':
+            return '已更新';
+        case 'cache_hit':
+            return '缓存命中';
+        case 'cache_fallback':
+            return '缓存回退';
+        case 'no_data':
+            return '无数据';
+        case 'request_failed':
+            return '请求失败';
+        case 'persist_failed':
+            return '保存失败';
+    }
+}
+
+function getStationPlatformEntryStatusBadgeClass(
+    status: AdminStationPlatformRefreshEntry['status']
+) {
+    switch (status) {
+        case 'updated':
+        case 'cache_hit':
+            return 'inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-semibold text-emerald-800';
+        case 'cache_fallback':
+        case 'no_data':
+            return 'inline-flex items-center rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-800';
+        default:
+            return 'inline-flex items-center rounded-full bg-rose-100 px-2.5 py-1 text-[11px] font-semibold text-rose-800';
+    }
+}
+
+function getStationPlatformEntryTrainCode(
+    entry: AdminStationPlatformRefreshEntry
+) {
+    const codes =
+        entry.attemptedTrainCodes.length > 0
+            ? entry.attemptedTrainCodes
+            : entry.stationTrainCodes;
+    return codes.join(' / ') || '--';
 }
 
 function getCandidateStatusLabel(status: string) {

@@ -5,6 +5,7 @@ import { registerTaskExecutor } from '~/server/services/taskExecutorRegistry';
 import { syncConfirmedTimetableHistoryForScheduleStateKind } from '~/server/services/timetableHistoryStore';
 import {
     markCurrentTrainProvenanceTaskSkipped,
+    recordCurrentStationPlatformRefreshResults,
     recordCurrentTrainProvenanceEventsForTrainCodes
 } from '~/server/services/trainProvenanceRecorder';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
@@ -32,7 +33,10 @@ import {
 } from '~/server/utils/12306/scheduleProbe/sqliteStore';
 import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
-import { forceRefreshStationPlatformInfoForTrainCodes } from '~/server/services/stationPlatformInfoService';
+import {
+    createEmptyStationPlatformInfoRefreshResult,
+    forceRefreshStationPlatformInfoForTrainCodes
+} from '~/server/services/stationPlatformInfoService';
 import {
     toShanghaiDayOffsetFromUnixSeconds,
     toUnixSecondsFromShanghaiDayOffset
@@ -63,6 +67,7 @@ export interface RefreshRouteBatchResult {
 
 interface RefreshRouteGroupUpdate {
     changed: boolean;
+    attempts: number;
     codes: string[];
     allCodes: string[];
     bureauCode: string;
@@ -226,6 +231,68 @@ function applyGroupUpdate(
     }
 
     return applied;
+}
+
+function getRefreshRouteGroupTrainCodes(update: RefreshRouteGroupUpdate) {
+    return uniqueNormalizedCodes([...update.codes, ...update.allCodes]);
+}
+
+function recordRefreshRouteGroupSucceeded(
+    serviceDate: string,
+    requestedCodes: string[],
+    update: RefreshRouteGroupUpdate
+) {
+    const trainCodes = getRefreshRouteGroupTrainCodes(update);
+    recordCurrentTrainProvenanceEventsForTrainCodes(trainCodes, {
+        serviceDate,
+        startAt: toUnixSecondsFromShanghaiDayOffset(
+            serviceDate,
+            update.startAt
+        ),
+        eventType: 'route_refresh_succeeded',
+        result: update.changed ? 'changed' : 'unchanged',
+        payload: {
+            requestedCodes,
+            attempts: update.attempts,
+            startStation: update.startStation,
+            endStation: update.endStation,
+            endAt: toUnixSecondsFromShanghaiDayOffset(
+                serviceDate,
+                update.endAt
+            ),
+            allTrainCodes: trainCodes,
+            bureauCode: update.bureauCode,
+            internalCode: update.internalCode
+        }
+    });
+}
+
+function recordRefreshRouteGroupFailed(
+    serviceDate: string,
+    requestedCodes: string[],
+    update: RefreshRouteGroupUpdate,
+    result: string,
+    errorMessage = ''
+) {
+    recordCurrentTrainProvenanceEventsForTrainCodes(
+        getRefreshRouteGroupTrainCodes(update),
+        {
+            serviceDate,
+            startAt: toUnixSecondsFromShanghaiDayOffset(
+                serviceDate,
+                update.startAt
+            ),
+            eventType: 'route_refresh_failed',
+            result,
+            payload: {
+                requestedCodes,
+                attempts: update.attempts,
+                allTrainCodes: getRefreshRouteGroupTrainCodes(update),
+                internalCode: update.internalCode,
+                errorMessage: errorMessage.trim().slice(0, 500)
+            }
+        }
+    );
 }
 
 export async function refreshRouteBatchForCodes(
@@ -448,6 +515,7 @@ export async function refreshRouteBatchForCodes(
         mutated = true;
         groupUpdates.push({
             changed: groupChanged,
+            attempts: routeResult.attempts,
             codes: groupItemIndexes.map((index) =>
                 normalizeCode(targetItems[index]!.code)
             ),
@@ -471,23 +539,6 @@ export async function refreshRouteBatchForCodes(
         if (groupChanged) {
             changed += 1;
         }
-
-        recordCurrentTrainProvenanceEventsForTrainCodes(nextAllCodes, {
-            serviceDate: published.date,
-            startAt: routeResult.data.route.startAt,
-            eventType: 'route_refresh_succeeded',
-            result: groupChanged ? 'changed' : 'unchanged',
-            payload: {
-                requestedCodes,
-                attempts: routeResult.attempts,
-                startStation: nextStartStation,
-                endStation: nextEndStation,
-                endAt: routeResult.data.route.endAt,
-                allTrainCodes: nextAllCodes,
-                bureauCode: nextBureauCode,
-                internalCode: refreshedInternalCode
-            }
-        });
     }
 
     if (mutated) {
@@ -499,19 +550,28 @@ export async function refreshRouteBatchForCodes(
             { aliasCodes: updatedCodes }
         );
         const latestItems = latestRecords.map((record) => record.item);
-        let appliedGroups = 0;
+        const appliedGroupUpdates: RefreshRouteGroupUpdate[] = [];
+        const appliedChangedGroupUpdates: RefreshRouteGroupUpdate[] = [];
         const appliedConfirmedTrainCodes: string[] = [];
         const appliedChangedTrainCodes: string[] = [];
         for (const update of groupUpdates) {
             if (applyGroupUpdate(latestItems, update)) {
-                appliedGroups += 1;
+                appliedGroupUpdates.push(update);
                 appliedConfirmedTrainCodes.push(...update.codes);
                 if (update.changed) {
+                    appliedChangedGroupUpdates.push(update);
                     appliedChangedTrainCodes.push(...update.codes);
                 }
+            } else {
+                recordRefreshRouteGroupFailed(
+                    published.date,
+                    requestedCodes,
+                    update,
+                    'schedule_target_missing'
+                );
             }
         }
-        if (appliedGroups > 0) {
+        if (appliedGroupUpdates.length > 0) {
             const itemIndexByCode = new Map(
                 latestRecords.map((record) => [
                     normalizeCode(record.item.code),
@@ -525,27 +585,66 @@ export async function refreshRouteBatchForCodes(
                 })
             );
             const persistStartedAtMs = Date.now();
-            const persistResult = savePublishedScheduleItemsIncrementally(
-                published.date,
-                recordsToSave,
-                stationUpdates
-            );
+            let persistResult;
+            try {
+                persistResult = savePublishedScheduleItemsIncrementally(
+                    published.date,
+                    recordsToSave,
+                    stationUpdates
+                );
+            } catch (error) {
+                const message =
+                    error instanceof Error
+                        ? `${error.name}: ${error.message}`
+                        : String(error);
+                for (const update of appliedGroupUpdates) {
+                    recordRefreshRouteGroupFailed(
+                        published.date,
+                        requestedCodes,
+                        update,
+                        'persist_failed',
+                        message
+                    );
+                }
+                throw error;
+            }
             const persistDurationMs = Date.now() - persistStartedAtMs;
             logger.info(
                 `incremental_save status=${persistResult.status} expectedDate=${published.date} currentDate=${persistResult.currentDate ?? 'null'} items=${persistResult.itemCount} aliases=${persistResult.aliasCount} stops=${persistResult.stopCount} stations=${persistResult.stationCount} durationMs=${persistDurationMs}`
             );
 
             if (persistResult.status === 'saved') {
+                for (const update of appliedGroupUpdates) {
+                    recordRefreshRouteGroupSucceeded(
+                        published.date,
+                        requestedCodes,
+                        update
+                    );
+                }
                 const changedTrainCodes = uniqueNormalizedCodes(
                     appliedChangedTrainCodes
                 );
                 if (changedTrainCodes.length > 0) {
+                    const fallbackRouteReferences =
+                        appliedChangedGroupUpdates.map((update) => ({
+                            trainCodes: getRefreshRouteGroupTrainCodes(update),
+                            startAt: toUnixSecondsFromShanghaiDayOffset(
+                                published.date,
+                                update.startAt
+                            )
+                        }));
                     try {
                         const stationPlatformResult =
                             await forceRefreshStationPlatformInfoForTrainCodes({
                                 serviceDate: published.date,
                                 trainCodes: changedTrainCodes
                             });
+                        recordCurrentStationPlatformRefreshResults({
+                            serviceDate: published.date,
+                            trigger: 'route_refresh',
+                            result: stationPlatformResult,
+                            fallbackRouteReferences
+                        });
                         logger.info(
                             `station_platform_info_refresh date=${published.date} changedTrainCodes=${changedTrainCodes.length} localRows=${stationPlatformResult.localRowCount} candidates=${stationPlatformResult.candidateCount} requests=${stationPlatformResult.requestCount} data=${stationPlatformResult.dataCount} failedTrains=${stationPlatformResult.failedTrainCount} cacheFallbacks=${stationPlatformResult.cacheFallbackCount} updatedCacheEntries=${stationPlatformResult.updatedCacheEntryCount} updatedStops=${stationPlatformResult.updatedStopCount}`
                         );
@@ -554,6 +653,13 @@ export async function refreshRouteBatchForCodes(
                             error instanceof Error
                                 ? `${error.name}: ${error.message}`
                                 : String(error);
+                        recordCurrentStationPlatformRefreshResults({
+                            serviceDate: published.date,
+                            trigger: 'route_refresh',
+                            result: createEmptyStationPlatformInfoRefreshResult(),
+                            fallbackRouteReferences,
+                            errorMessage: message
+                        });
                         logger.warn(
                             `station_platform_info_refresh_failed date=${published.date} changedTrainCodes=${changedTrainCodes.length} error=${message}`
                         );
@@ -588,6 +694,14 @@ export async function refreshRouteBatchForCodes(
                     `timetable_id_sync date=${published.date} scannedTrainCodes=${timetableIdSyncResult.scannedTrainCodes} changedTrainCodes=${timetableIdSyncResult.changedTrainCodes} updatedDailyRows=${timetableIdSyncResult.updatedDailyRows} deletedDailyRows=${timetableIdSyncResult.deletedDailyRows} updatedProbeRows=${timetableIdSyncResult.updatedProbeRows} deletedProbeRows=${timetableIdSyncResult.deletedProbeRows}`
                 );
             } else {
+                for (const update of appliedGroupUpdates) {
+                    recordRefreshRouteGroupFailed(
+                        published.date,
+                        requestedCodes,
+                        update,
+                        `persist_${persistResult.status}`
+                    );
+                }
                 markCurrentTrainProvenanceTaskSkipped(
                     `incremental_save_${persistResult.status}`
                 );

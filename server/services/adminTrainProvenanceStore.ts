@@ -12,6 +12,7 @@ import {
 import {
     getStationBoardDispatchResultByTaskRunId,
     getStationBoardFetchResultByTaskRunId,
+    getStationPlatformRefreshResultById,
     getTrainProvenanceRuntimeConfig,
     getTrainProvenanceTaskRunById,
     isTrainProvenanceEnabled,
@@ -56,6 +57,9 @@ import type {
     AdminStationBoardStationTaskAction,
     AdminStationBoardStationTaskItem,
     AdminStationBoardTaskListResponse,
+    AdminStationPlatformRefreshDetailResponse,
+    AdminStationPlatformRefreshSummary,
+    AdminTrainProvenanceOutcomeStatus,
     AdminDailyRouteTrackingRecord,
     AdminProbeStatusRecord,
     AdminTrackingMutation,
@@ -215,6 +219,73 @@ function getStringArray(value: unknown): string[] {
     return Array.isArray(value)
         ? value.filter((item): item is string => typeof item === 'string')
         : [];
+}
+
+function isStationPlatformRefreshTrigger(
+    value: unknown
+): value is AdminStationPlatformRefreshSummary['trigger'] {
+    return value === 'route_refresh' || value === 'station_board';
+}
+
+function isTrainProvenanceOutcomeStatus(
+    value: unknown
+): value is AdminTrainProvenanceOutcomeStatus {
+    return (
+        value === 'success' ||
+        value === 'partial' ||
+        value === 'failed' ||
+        value === 'skipped'
+    );
+}
+
+function extractStationPlatformRefreshSummary(
+    event: TrainProvenanceEventRecord
+): AdminStationPlatformRefreshSummary | null {
+    if (!event.eventType.startsWith('station_platform_refresh_')) {
+        return null;
+    }
+
+    const payload = getPayloadObject(event.payload);
+    const resultId = getOptionalInteger(payload?.resultId);
+    const trigger = payload?.trigger;
+    const status = event.result;
+    if (
+        resultId === null ||
+        resultId <= 0 ||
+        !isStationPlatformRefreshTrigger(trigger) ||
+        !isTrainProvenanceOutcomeStatus(status)
+    ) {
+        return null;
+    }
+
+    return {
+        resultId,
+        trigger,
+        status,
+        candidateCount: getOptionalInteger(payload?.candidateCount) ?? 0,
+        updatedCount: getOptionalInteger(payload?.updatedCount) ?? 0,
+        cacheHitCount: getOptionalInteger(payload?.cacheHitCount) ?? 0,
+        cacheFallbackCount:
+            getOptionalInteger(payload?.cacheFallbackCount) ?? 0,
+        noDataCount: getOptionalInteger(payload?.noDataCount) ?? 0,
+        failedCount: getOptionalInteger(payload?.failedCount) ?? 0
+    };
+}
+
+function resolveEventOutcomeStatus(
+    event: TrainProvenanceEventRecord,
+    stationPlatformRefresh: AdminStationPlatformRefreshSummary | null
+): AdminTrainProvenanceOutcomeStatus | null {
+    if (stationPlatformRefresh) {
+        return stationPlatformRefresh.status;
+    }
+    if (event.eventType === 'route_refresh_succeeded') {
+        return 'success';
+    }
+    if (event.eventType === 'route_refresh_failed') {
+        return 'failed';
+    }
+    return null;
 }
 
 function isTrackingMutationTable(
@@ -1613,6 +1684,53 @@ function formatDirectHitEventSummary(
         : `其他车组重联扫描，包含当前车次，当前车次未纳入追踪范围`;
 }
 
+function formatStationPlatformRefreshEventSummary(
+    event: TrainProvenanceEventRecord
+) {
+    const detail = extractStationPlatformRefreshSummary(event);
+    const sourceText =
+        detail?.trigger === 'station_board' ? '车站大屏补充' : '线路刷新后';
+    if (!detail) {
+        return `${sourceText}站台信息更新：${event.result || '未知结果'}`;
+    }
+
+    const resultText = [
+        `更新 ${detail.updatedCount + detail.cacheHitCount}`,
+        `缓存回退 ${detail.cacheFallbackCount}`,
+        `无数据 ${detail.noDataCount}`,
+        `失败 ${detail.failedCount}`
+    ].join('，');
+    switch (detail.status) {
+        case 'success':
+            return `${sourceText}站台信息更新成功，共 ${detail.candidateCount} 站`;
+        case 'partial':
+            return `${sourceText}站台信息部分更新：${resultText}`;
+        case 'failed':
+            return `${sourceText}站台信息更新失败：${resultText}`;
+        default:
+            return `${sourceText}没有可更新的站台候选`;
+    }
+}
+
+function formatRouteRefreshFailureResult(result: string) {
+    switch (result) {
+        case 'request_failed':
+            return '12306 请求失败';
+        case 'not_running':
+            return '列车当前不开行';
+        case 'schedule_target_missing':
+            return '待更新的时刻表记录已失效';
+        case 'persist_date_mismatch':
+            return '已发布时刻表日期已切换';
+        case 'persist_published_not_found':
+            return '已发布时刻表不存在';
+        case 'persist_failed':
+            return '本地时刻表保存失败';
+        default:
+            return result || '未知错误';
+    }
+}
+
 function formatEventSummary(
     event: TrainProvenanceEventRecord,
     conflictDetail: AdminTrainProvenanceConflictDetail | null,
@@ -1722,7 +1840,12 @@ function formatEventSummary(
                 ? '线路信息刷新成功并更新了时刻表'
                 : '线路信息刷新成功，无时刻表变化';
         case 'route_refresh_failed':
-            return `线路信息刷新失败：${event.result || 'request_failed'}`;
+            return `线路信息刷新失败：${formatRouteRefreshFailureResult(event.result)}`;
+        case 'station_platform_refresh_succeeded':
+        case 'station_platform_refresh_partial':
+        case 'station_platform_refresh_failed':
+        case 'station_platform_refresh_skipped':
+            return formatStationPlatformRefreshEventSummary(event);
         case 'coupling_scan_started':
             return `重联扫描开始`;
         case 'coupling_scan_completed':
@@ -1743,6 +1866,7 @@ function toTimelineEvent(
     const historicalReuse = extractHistoricalReuseDetail(event);
     const coupledResolution = extractCoupledResolutionDetail(event);
     const trackingMutations = extractTrackingMutationSummary(event);
+    const stationPlatformRefresh = extractStationPlatformRefreshSummary(event);
     const couplingScan =
         event.eventType === 'coupling_scan_candidate_direct_hit'
             ? {
@@ -1770,6 +1894,7 @@ function toTimelineEvent(
         schedulerTaskId: event.schedulerTaskId,
         executor: event.executor,
         taskStatus: event.taskStatus,
+        outcomeStatus: resolveEventOutcomeStatus(event, stationPlatformRefresh),
         createdAt: event.createdAt,
         trainCode: event.trainCode,
         startAt: event.startAt,
@@ -1787,6 +1912,7 @@ function toTimelineEvent(
         historicalReuse,
         coupledResolution,
         trackingMutations,
+        stationPlatformRefresh,
         payload: event.payload
     };
 }
@@ -2216,6 +2342,65 @@ export function getAdminTrainProvenance(
         selectedStartAt,
         departures,
         timeline
+    };
+}
+
+export function getAdminStationPlatformRefreshDetail(
+    resultId: number
+): AdminStationPlatformRefreshDetailResponse {
+    if (!isTrainProvenanceEnabled()) {
+        return {
+            enabled: false,
+            result: null,
+            entries: []
+        };
+    }
+
+    const record = getStationPlatformRefreshResultById(resultId);
+    if (!record) {
+        return {
+            enabled: true,
+            result: null,
+            entries: []
+        };
+    }
+
+    return {
+        enabled: true,
+        result: {
+            resultId: record.id,
+            taskRunId: record.taskRunId,
+            serviceDate: record.serviceDate,
+            startAt: record.startAt,
+            primaryTrainCode: record.primaryTrainCode,
+            trainCodes: record.trainCodes,
+            trigger: record.trigger,
+            status: record.status,
+            candidateCount: record.candidateCount,
+            updatedCount: record.updatedCount,
+            cacheHitCount: record.cacheHitCount,
+            cacheFallbackCount: record.cacheFallbackCount,
+            noDataCount: record.noDataCount,
+            failedCount: record.failedCount,
+            errorMessage: record.errorMessage,
+            createdAt: record.createdAt
+        },
+        entries: record.entries.map((entry) => ({
+            id: entry.id,
+            stationOrder: entry.stationOrder,
+            lookupType: entry.lookupType,
+            stationName: entry.stationName,
+            stationTelecode: entry.stationTelecode,
+            stationNo: entry.stationNo,
+            trainDate: entry.trainDate,
+            stationTrainCodes: entry.stationTrainCodes,
+            attemptedTrainCodes: entry.attemptedTrainCodes,
+            status: entry.status,
+            platformNo: entry.platformNo,
+            wicket: entry.wicket,
+            fetchedAt: entry.fetchedAt,
+            errorMessage: entry.errorMessage
+        }))
     };
 }
 

@@ -184,6 +184,7 @@ export type SchedulePlatformInfoLookupType =
 export interface SchedulePlatformInfoCandidateRow {
     itemCode: string;
     internalCode: string;
+    itemStartAt: number | null;
     stopIndex: number;
     stationNo: number;
     stationTelecode: string;

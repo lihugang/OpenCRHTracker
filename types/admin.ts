@@ -837,12 +837,63 @@ export interface AdminTrainProvenanceCoupledResolutionDetail {
     upgradedFromSingle: boolean;
 }
 
+export type AdminTrainProvenanceOutcomeStatus =
+    | 'success'
+    | 'partial'
+    | 'failed'
+    | 'skipped';
+
+export type AdminStationPlatformRefreshTrigger =
+    | 'route_refresh'
+    | 'station_board';
+
+export type AdminStationPlatformRefreshStatus =
+    AdminTrainProvenanceOutcomeStatus;
+
+export type AdminStationPlatformRefreshEntryStatus =
+    | 'updated'
+    | 'cache_hit'
+    | 'cache_fallback'
+    | 'no_data'
+    | 'request_failed'
+    | 'persist_failed';
+
+export interface AdminStationPlatformRefreshSummary {
+    resultId: number;
+    trigger: AdminStationPlatformRefreshTrigger;
+    status: AdminStationPlatformRefreshStatus;
+    candidateCount: number;
+    updatedCount: number;
+    cacheHitCount: number;
+    cacheFallbackCount: number;
+    noDataCount: number;
+    failedCount: number;
+}
+
+export interface AdminStationPlatformRefreshEntry {
+    id: number;
+    stationOrder: number;
+    lookupType: string;
+    stationName: string;
+    stationTelecode: string;
+    stationNo: number;
+    trainDate: string;
+    stationTrainCodes: string[];
+    attemptedTrainCodes: string[];
+    status: AdminStationPlatformRefreshEntryStatus;
+    platformNo: number | null;
+    wicket: string | null;
+    fetchedAt: number | null;
+    errorMessage: string;
+}
+
 export interface AdminTrainProvenanceEvent {
     id: number;
     taskRunId: number;
     schedulerTaskId: number;
     executor: string;
     taskStatus: AdminTrainProvenanceTaskRunStatus;
+    outcomeStatus: AdminTrainProvenanceOutcomeStatus | null;
     createdAt: number;
     trainCode: string;
     startAt: number | null;
@@ -860,6 +911,7 @@ export interface AdminTrainProvenanceEvent {
     historicalReuse: AdminTrainProvenanceHistoricalReuseDetail | null;
     coupledResolution: AdminTrainProvenanceCoupledResolutionDetail | null;
     trackingMutations: AdminTrackingMutationSummary | null;
+    stationPlatformRefresh: AdminStationPlatformRefreshSummary | null;
     payload: unknown;
 }
 
@@ -925,6 +977,22 @@ export interface AdminTrainProvenanceResponse {
     selectedStartAt: number | null;
     departures: AdminTrainProvenanceDeparture[];
     timeline: AdminTrainProvenanceEvent[];
+}
+
+export interface AdminStationPlatformRefreshDetailResponse {
+    enabled: boolean;
+    result:
+        | (AdminStationPlatformRefreshSummary & {
+              taskRunId: number;
+              serviceDate: string;
+              startAt: number | null;
+              primaryTrainCode: string;
+              trainCodes: string[];
+              errorMessage: string;
+              createdAt: number;
+          })
+        | null;
+    entries: AdminStationPlatformRefreshEntry[];
 }
 
 export interface AdminCouplingScanTaskRunSummary {

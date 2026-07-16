@@ -5,6 +5,7 @@ import fetchStationTransportInfo from '~/server/utils/12306/network/fetchStation
 import normalizeCode from '~/server/utils/12306/normalizeCode';
 import {
     listScheduleCandidateItemsForCodes,
+    listScheduleAliasesByStateKindAndItemCode,
     listSchedulePlatformInfoCandidatesByStateKindAndStationName,
     loadScheduleStateSummaryByKind,
     loadScheduleStationPlatformInfoCacheEntry,
@@ -22,6 +23,7 @@ import uniqueNormalizedCodes from '~/server/utils/12306/uniqueNormalizedCodes';
 import { formatShanghaiDateString } from '~/server/utils/date/getCurrentDateString';
 import { toUnixSecondsFromShanghaiDayOffset } from '~/server/utils/date/shanghaiDateTime';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
+import type { StationPlatformRefreshEntryStatus } from '~/server/services/trainProvenanceStore';
 
 const logger = getLogger('station-platform-info-service');
 const DAY_SECONDS = 24 * 60 * 60;
@@ -32,8 +34,10 @@ interface StationPlatformInfoCandidate {
     stationName: string;
     stationTelecode: string;
     stationNo: number;
+    stationOrder: number;
     trainDate: string;
     stationTrainCodes: string[];
+    routeReferences: StationPlatformInfoRouteReference[];
 }
 
 interface BuiltStationPlatformInfoCandidates {
@@ -47,6 +51,28 @@ interface FetchedStationPlatformInfo {
     wicket: string | null;
 }
 
+export interface StationPlatformInfoRouteReference {
+    trainCodes: string[];
+    startAt: number | null;
+}
+
+export interface StationPlatformInfoRefreshEntry {
+    lookupType: SchedulePlatformInfoLookupType;
+    stationName: string;
+    stationTelecode: string;
+    stationNo: number;
+    stationOrder: number;
+    trainDate: string;
+    stationTrainCodes: string[];
+    attemptedTrainCodes: string[];
+    status: StationPlatformRefreshEntryStatus;
+    platformNo: number | null;
+    wicket: string | null;
+    fetchedAt: number | null;
+    errorMessage: string;
+    routeReferences: StationPlatformInfoRouteReference[];
+}
+
 export interface StationPlatformInfoRefreshResult {
     localRowCount: number;
     candidateCount: number;
@@ -58,6 +84,8 @@ export interface StationPlatformInfoRefreshResult {
     skippedRowCount: number;
     updatedCacheEntryCount: number;
     updatedStopCount: number;
+    persistenceErrorMessage: string;
+    entries: StationPlatformInfoRefreshEntry[];
 }
 
 export interface RefreshStationPlatformInfoForStationInput {
@@ -82,7 +110,9 @@ export function createEmptyStationPlatformInfoRefreshResult(): StationPlatformIn
         failedTrainCount: 0,
         skippedRowCount: 0,
         updatedCacheEntryCount: 0,
-        updatedStopCount: 0
+        updatedStopCount: 0,
+        persistenceErrorMessage: '',
+        entries: []
     };
 }
 
@@ -98,6 +128,42 @@ function isValidStationNo(value: number) {
     return Number.isInteger(value) && value > 0;
 }
 
+function toRouteReference(
+    serviceDate: string,
+    item: Pick<ScheduleItem, 'code' | 'allCodes' | 'startAt'> | null
+): StationPlatformInfoRouteReference | null {
+    if (!item) {
+        return null;
+    }
+
+    return {
+        trainCodes: uniqueNormalizedCodes([item.code, ...item.allCodes]),
+        startAt: isValidDayOffset(item.startAt)
+            ? toUnixSecondsFromShanghaiDayOffset(serviceDate, item.startAt)
+            : null
+    };
+}
+
+function appendRouteReference(
+    target: StationPlatformInfoRouteReference[],
+    value: StationPlatformInfoRouteReference | null
+) {
+    if (!value || value.trainCodes.length === 0) {
+        return;
+    }
+
+    const key = `${value.startAt ?? 'null'}:${value.trainCodes.join('/')}`;
+    if (
+        target.some(
+            (item) =>
+                `${item.startAt ?? 'null'}:${item.trainCodes.join('/')}` === key
+        )
+    ) {
+        return;
+    }
+    target.push(value);
+}
+
 function appendCandidate(
     candidatesByKey: Map<string, StationPlatformInfoCandidate>,
     serviceDate: string,
@@ -107,8 +173,10 @@ function appendCandidate(
         stationName: string;
         stationTelecode: string;
         stationNo: number;
+        stationOrder: number;
         dateOffset: number | null;
         stationTrainCode: string;
+        routeReference: StationPlatformInfoRouteReference | null;
     }
 ): boolean {
     const internalCode = normalizeCode(input.internalCode);
@@ -133,6 +201,7 @@ function appendCandidate(
         if (!existing.stationTrainCodes.includes(stationTrainCode)) {
             existing.stationTrainCodes.push(stationTrainCode);
         }
+        appendRouteReference(existing.routeReferences, input.routeReference);
         return true;
     }
 
@@ -142,8 +211,10 @@ function appendCandidate(
         stationName: input.stationName.trim(),
         stationTelecode,
         stationNo: input.stationNo,
+        stationOrder: input.stationOrder,
         trainDate,
-        stationTrainCodes: [stationTrainCode]
+        stationTrainCodes: [stationTrainCode],
+        routeReferences: input.routeReference ? [input.routeReference] : []
     });
     return true;
 }
@@ -155,6 +226,10 @@ function buildCandidatesFromStationRows(
     rows: readonly SchedulePlatformInfoCandidateRow[]
 ): BuiltStationPlatformInfoCandidates {
     const candidatesByKey = new Map<string, StationPlatformInfoCandidate>();
+    const routeReferenceCache = new Map<
+        string,
+        StationPlatformInfoRouteReference
+    >();
     let skippedRowCount = 0;
 
     for (const row of rows) {
@@ -168,6 +243,18 @@ function buildCandidatesFromStationRows(
         const stationTrainCode = isOrigin
             ? row.currentStationTrainCode
             : (row.arrivalStationTrainCode ?? '');
+        let routeReference = routeReferenceCache.get(row.itemCode);
+        if (!routeReference) {
+            routeReference = toRouteReference(serviceDate, {
+                code: row.itemCode,
+                allCodes: listScheduleAliasesByStateKindAndItemCode(
+                    'published',
+                    row.itemCode
+                ),
+                startAt: row.itemStartAt
+            })!;
+            routeReferenceCache.set(row.itemCode, routeReference);
+        }
 
         if (
             !appendCandidate(candidatesByKey, serviceDate, {
@@ -176,8 +263,10 @@ function buildCandidatesFromStationRows(
                 stationName,
                 stationTelecode,
                 stationNo: row.stationNo,
+                stationOrder: row.stopIndex,
                 dateOffset,
-                stationTrainCode
+                stationTrainCode,
+                routeReference
             })
         ) {
             skippedRowCount += 1;
@@ -223,8 +312,10 @@ function appendRouteItemCandidates(
                 stationName: stop.stationName,
                 stationTelecode: stop.stationTelecode,
                 stationNo: stop.stationNo,
+                stationOrder: index,
                 dateOffset,
-                stationTrainCode
+                stationTrainCode,
+                routeReference: toRouteReference(serviceDate, item)
             })
         ) {
             skippedRowCount += 1;
@@ -331,12 +422,53 @@ async function fetchCandidatePlatformInfo(
     );
 }
 
+function toBoundedErrorMessage(error: unknown) {
+    const message =
+        error instanceof Error
+            ? `${error.name}: ${error.message}`
+            : String(error);
+    return message.trim().slice(0, 500);
+}
+
+function toRefreshEntry(
+    candidate: StationPlatformInfoCandidate,
+    input: {
+        attemptedTrainCodes: string[];
+        status: StationPlatformRefreshEntryStatus;
+        platformNo?: number | null;
+        wicket?: string | null;
+        fetchedAt?: number | null;
+        errorMessage?: string;
+    }
+): StationPlatformInfoRefreshEntry {
+    return {
+        lookupType: candidate.lookupType,
+        stationName: candidate.stationName,
+        stationTelecode: candidate.stationTelecode,
+        stationNo: candidate.stationNo,
+        stationOrder: candidate.stationOrder,
+        trainDate: candidate.trainDate,
+        stationTrainCodes: [...candidate.stationTrainCodes],
+        attemptedTrainCodes: uniqueNormalizedCodes(input.attemptedTrainCodes),
+        status: input.status,
+        platformNo: input.platformNo ?? null,
+        wicket: input.wicket?.trim() || null,
+        fetchedAt: input.fetchedAt ?? null,
+        errorMessage: input.errorMessage?.trim().slice(0, 500) ?? '',
+        routeReferences: candidate.routeReferences.map((item) => ({
+            trainCodes: [...item.trainCodes],
+            startAt: item.startAt
+        }))
+    };
+}
+
 async function refreshCandidates(
     built: BuiltStationPlatformInfoCandidates,
     expiresAt: number,
     forceRefresh: boolean
 ): Promise<StationPlatformInfoRefreshResult> {
     const updates: ScheduleStationPlatformInfoPersistInput[] = [];
+    const entries: StationPlatformInfoRefreshEntry[] = [];
     let cacheHitCount = 0;
     let cacheFallbackCount = 0;
     let requestCount = 0;
@@ -351,14 +483,26 @@ async function refreshCandidates(
         if (!forceRefresh && freshCache) {
             cacheHitCount += 1;
             updates.push(toCachedPersistInput(candidate, freshCache));
+            entries.push(
+                toRefreshEntry(candidate, {
+                    attemptedTrainCodes: [freshCache.stationTrainCode],
+                    status: 'cache_hit',
+                    platformNo: freshCache.platformNo,
+                    wicket: freshCache.wicket,
+                    fetchedAt: freshCache.fetchedAt
+                })
+            );
             continue;
         }
 
         const fallbackCache = cacheEntries[0] ?? null;
         let resolved = false;
         let failed = false;
+        let errorMessage = '';
+        const attemptedTrainCodes: string[] = [];
         for (const stationTrainCode of candidate.stationTrainCodes) {
             requestCount += 1;
+            attemptedTrainCodes.push(stationTrainCode);
 
             try {
                 const result = await fetchCandidatePlatformInfo(
@@ -385,15 +529,21 @@ async function refreshCandidates(
                     overwritePlatform: forceRefresh,
                     writeCache: true
                 });
+                entries.push(
+                    toRefreshEntry(candidate, {
+                        attemptedTrainCodes,
+                        status: 'updated',
+                        platformNo: result.platformNo,
+                        wicket: result.wicket,
+                        fetchedAt
+                    })
+                );
                 break;
             } catch (error) {
                 failed = true;
-                const message =
-                    error instanceof Error
-                        ? `${error.name}: ${error.message}`
-                        : String(error);
+                errorMessage = toBoundedErrorMessage(error);
                 logger.warn(
-                    `request_failed lookupType=${candidate.lookupType} trainDate=${candidate.trainDate} stationName=${candidate.stationName} stationTelecode=${candidate.stationTelecode} stationNo=${candidate.stationNo} internalCode=${candidate.internalCode} stationTrainCode=${stationTrainCode} forceRefresh=${forceRefresh} error=${message}`
+                    `request_failed lookupType=${candidate.lookupType} trainDate=${candidate.trainDate} stationName=${candidate.stationName} stationTelecode=${candidate.stationTelecode} stationNo=${candidate.stationNo} internalCode=${candidate.internalCode} stationTrainCode=${stationTrainCode} forceRefresh=${forceRefresh} error=${errorMessage}`
                 );
                 break;
             }
@@ -405,13 +555,52 @@ async function refreshCandidates(
         if (!resolved && fallbackCache) {
             cacheFallbackCount += 1;
             updates.push(toCachedPersistInput(candidate, fallbackCache));
+            entries.push(
+                toRefreshEntry(candidate, {
+                    attemptedTrainCodes,
+                    status: 'cache_fallback',
+                    platformNo: fallbackCache.platformNo,
+                    wicket: fallbackCache.wicket,
+                    fetchedAt: fallbackCache.fetchedAt,
+                    errorMessage:
+                        errorMessage || '12306 未返回可用的最新站台信息'
+                })
+            );
+        } else if (!resolved) {
+            entries.push(
+                toRefreshEntry(candidate, {
+                    attemptedTrainCodes,
+                    status: failed ? 'request_failed' : 'no_data',
+                    errorMessage: errorMessage || '12306 未返回可用的站台信息'
+                })
+            );
         }
     }
 
-    const persisted = persistScheduleStationPlatformInfoByStateKind(
-        'published',
-        updates
-    );
+    let updatedCacheEntryCount = 0;
+    let updatedStopCount = 0;
+    let persistenceErrorMessage = '';
+    try {
+        const persisted = persistScheduleStationPlatformInfoByStateKind(
+            'published',
+            updates
+        );
+        updatedCacheEntryCount = persisted.updatedCacheEntryCount;
+        updatedStopCount = persisted.updatedStopCount;
+    } catch (error) {
+        persistenceErrorMessage = toBoundedErrorMessage(error);
+        for (const entry of entries) {
+            if (
+                entry.status === 'updated' ||
+                entry.status === 'cache_hit' ||
+                entry.status === 'cache_fallback'
+            ) {
+                entry.status = 'persist_failed';
+                entry.errorMessage = persistenceErrorMessage;
+            }
+        }
+    }
+
     return {
         localRowCount: built.localRowCount,
         candidateCount: built.candidates.length,
@@ -421,8 +610,38 @@ async function refreshCandidates(
         dataCount,
         failedTrainCount,
         skippedRowCount: built.skippedRowCount,
-        updatedCacheEntryCount: persisted.updatedCacheEntryCount,
-        updatedStopCount: persisted.updatedStopCount
+        updatedCacheEntryCount,
+        updatedStopCount,
+        persistenceErrorMessage,
+        entries
+    };
+}
+
+function createFailedStationPlatformInfoRefreshResult(
+    built: BuiltStationPlatformInfoCandidates,
+    error: unknown
+): StationPlatformInfoRefreshResult {
+    const errorMessage = toBoundedErrorMessage(error);
+    logger.warn(`refresh_failed error=${errorMessage}`);
+    return {
+        localRowCount: built.localRowCount,
+        candidateCount: built.candidates.length,
+        cacheHitCount: 0,
+        cacheFallbackCount: 0,
+        requestCount: 0,
+        dataCount: 0,
+        failedTrainCount: built.candidates.length,
+        skippedRowCount: built.skippedRowCount,
+        updatedCacheEntryCount: 0,
+        updatedStopCount: 0,
+        persistenceErrorMessage: errorMessage,
+        entries: built.candidates.map((candidate) =>
+            toRefreshEntry(candidate, {
+                attemptedTrainCodes: [],
+                status: 'request_failed',
+                errorMessage
+            })
+        )
     };
 }
 
@@ -461,16 +680,17 @@ export async function refreshStationPlatformInfoForStation(
         stationName,
         expiresAt
     );
-    return refreshCandidates(
-        buildCandidatesFromStationRows(
-            serviceDate,
-            stationName,
-            stationTelecode,
-            rows
-        ),
-        expiresAt,
-        false
+    const built = buildCandidatesFromStationRows(
+        serviceDate,
+        stationName,
+        stationTelecode,
+        rows
     );
+    try {
+        return await refreshCandidates(built, expiresAt, false);
+    } catch (error) {
+        return createFailedStationPlatformInfoRefreshResult(built, error);
+    }
 }
 
 export async function forceRefreshStationPlatformInfoForTrainCodes(
@@ -481,9 +701,14 @@ export async function forceRefreshStationPlatformInfoForTrainCodes(
         return createEmptyStationPlatformInfoRefreshResult();
     }
 
-    return refreshCandidates(
-        buildCandidatesForTrainCodes(serviceDate, input.trainCodes),
-        getPlatformInfoExpiresAt(getNowSeconds()),
-        true
-    );
+    const built = buildCandidatesForTrainCodes(serviceDate, input.trainCodes);
+    try {
+        return await refreshCandidates(
+            built,
+            getPlatformInfoExpiresAt(getNowSeconds()),
+            true
+        );
+    } catch (error) {
+        return createFailedStationPlatformInfoRefreshResult(built, error);
+    }
 }

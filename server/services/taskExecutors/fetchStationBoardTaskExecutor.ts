@@ -34,6 +34,7 @@ import getNowSeconds from '~/server/utils/time/getNowSeconds';
 import { expandSequentialShanghaiDayOffsets } from '~/server/utils/date/shanghaiDateTime';
 import {
     getCurrentTrainProvenanceTaskRunId,
+    recordCurrentStationPlatformRefreshResults,
     recordCurrentTrainProvenanceEvent
 } from '~/server/services/trainProvenanceRecorder';
 import { recordStationBoardFetchResult } from '~/server/services/trainProvenanceStore';
@@ -744,6 +745,11 @@ async function executeFetchStationBoardTask(rawArgs: unknown) {
             `station_platform_enrichment_failed serviceDate=${args.serviceDate} stationName=${args.stationName} stationTelecode=${args.stationTelecode} error=${message}`
         );
     }
+    recordCurrentStationPlatformRefreshResults({
+        serviceDate: args.serviceDate,
+        trigger: 'station_board',
+        result: stationPlatformResult
+    });
     const parsedEntries = rows.map((row) => parseCirculationTrainToEntry(row));
     const chosenEntries = chooseCirculationEntries(parsedEntries);
     const persistedRows = parsedEntries.map((item) => item.row);

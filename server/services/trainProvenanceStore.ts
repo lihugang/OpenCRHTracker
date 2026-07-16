@@ -1,8 +1,9 @@
-import '~/server/libs/database/trainProvenance';
+import { useTrainProvenanceDatabase } from '~/server/libs/database/trainProvenance';
 import { createPreparedSqlStore } from '~/server/libs/database/prepared';
 import useConfig from '~/server/config';
 import importSqlBatch from '~/server/utils/sql/importSqlBatch';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
+import uniqueNormalizedCodes from '~/server/utils/12306/uniqueNormalizedCodes';
 import getCurrentDateString, {
     formatShanghaiDateString
 } from '~/server/utils/date/getCurrentDateString';
@@ -24,12 +25,30 @@ export type TrainProvenanceRequestStatType =
     | 'fetch_station_exit_info'
     | 'fetch_station_transport_info';
 
+export type StationPlatformRefreshTrigger = 'route_refresh' | 'station_board';
+
+export type StationPlatformRefreshStatus =
+    | 'success'
+    | 'partial'
+    | 'failed'
+    | 'skipped';
+
+export type StationPlatformRefreshEntryStatus =
+    | 'updated'
+    | 'cache_hit'
+    | 'cache_fallback'
+    | 'no_data'
+    | 'request_failed'
+    | 'persist_failed';
+
 type TrainProvenanceSqlKey =
     | 'cleanupExpiredRequestHourlyStats'
     | 'cleanupExpiredTaskRuns'
     | 'incrementRequestHourlyStat'
     | 'insertCouplingScanCandidate'
     | 'insertProvenanceEvent'
+    | 'insertStationPlatformRefreshEntry'
+    | 'insertStationPlatformRefreshResult'
     | 'insertStationBoardDispatchResult'
     | 'insertStationBoardFetchResult'
     | 'selectRequestHourlyStatsInRange'
@@ -41,6 +60,8 @@ type TrainProvenanceSqlKey =
     | 'selectStationBoardDispatchResultsByDate'
     | 'selectStationBoardFetchResultByTaskRunId'
     | 'selectStationBoardFetchResultsByParentSchedulerTaskId'
+    | 'selectStationPlatformRefreshEntriesByResultId'
+    | 'selectStationPlatformRefreshResultById'
     | 'selectTaskRunById'
     | 'selectTaskRunsByDateAndExecutor'
     | 'selectTaskRunBySchedulerTaskId'
@@ -141,6 +162,43 @@ interface StationBoardFetchResultRow {
     created_at: number;
 }
 
+interface StationPlatformRefreshResultRow {
+    id: number;
+    task_run_id: number;
+    service_date: string;
+    start_at: number | null;
+    primary_train_code: string;
+    train_codes_json: string;
+    trigger: StationPlatformRefreshTrigger;
+    status: StationPlatformRefreshStatus;
+    candidate_count: number;
+    updated_count: number;
+    cache_hit_count: number;
+    cache_fallback_count: number;
+    no_data_count: number;
+    failed_count: number;
+    error_message: string;
+    created_at: number;
+}
+
+interface StationPlatformRefreshEntryRow {
+    id: number;
+    refresh_result_id: number;
+    station_order: number;
+    lookup_type: string;
+    station_name: string;
+    station_telecode: string;
+    station_no: number;
+    train_date: string;
+    station_train_codes_json: string;
+    attempted_train_codes_json: string;
+    status: StationPlatformRefreshEntryStatus;
+    platform_no: number | null;
+    wicket: string | null;
+    fetched_at: number | null;
+    error_message: string;
+}
+
 export interface TrainProvenanceTaskRunRecord {
     id: number;
     schedulerTaskId: number;
@@ -235,6 +293,44 @@ export interface StationBoardFetchResultRecord {
     createdAt: number;
 }
 
+export interface StationPlatformRefreshEntryRecord {
+    id: number;
+    refreshResultId: number;
+    stationOrder: number;
+    lookupType: string;
+    stationName: string;
+    stationTelecode: string;
+    stationNo: number;
+    trainDate: string;
+    stationTrainCodes: string[];
+    attemptedTrainCodes: string[];
+    status: StationPlatformRefreshEntryStatus;
+    platformNo: number | null;
+    wicket: string | null;
+    fetchedAt: number | null;
+    errorMessage: string;
+}
+
+export interface StationPlatformRefreshResultRecord {
+    id: number;
+    taskRunId: number;
+    serviceDate: string;
+    startAt: number | null;
+    primaryTrainCode: string;
+    trainCodes: string[];
+    trigger: StationPlatformRefreshTrigger;
+    status: StationPlatformRefreshStatus;
+    candidateCount: number;
+    updatedCount: number;
+    cacheHitCount: number;
+    cacheFallbackCount: number;
+    noDataCount: number;
+    failedCount: number;
+    errorMessage: string;
+    createdAt: number;
+    entries: StationPlatformRefreshEntryRecord[];
+}
+
 export interface StartTrainProvenanceTaskRunInput {
     schedulerTaskId: number;
     executor: string;
@@ -316,6 +412,35 @@ export interface RecordStationBoardFetchResultInput {
     createdAt?: number;
 }
 
+export interface RecordStationPlatformRefreshEntryInput {
+    stationOrder: number;
+    lookupType: string;
+    stationName: string;
+    stationTelecode: string;
+    stationNo: number;
+    trainDate: string;
+    stationTrainCodes: string[];
+    attemptedTrainCodes: string[];
+    status: StationPlatformRefreshEntryStatus;
+    platformNo?: number | null;
+    wicket?: string | null;
+    fetchedAt?: number | null;
+    errorMessage?: string;
+}
+
+export interface RecordStationPlatformRefreshResultInput {
+    taskRunId: number;
+    serviceDate: string;
+    startAt?: number | null;
+    primaryTrainCode: string;
+    trainCodes: string[];
+    trigger: StationPlatformRefreshTrigger;
+    status: StationPlatformRefreshStatus;
+    entries: RecordStationPlatformRefreshEntryInput[];
+    errorMessage?: string;
+    createdAt?: number;
+}
+
 const CLEANUP_INTERVAL_SECONDS = 60 * 60;
 const REQUEST_STAT_BUCKET_SECONDS = 60 * 60;
 
@@ -339,6 +464,15 @@ function parseJson(text: string): unknown {
     } catch {
         return null;
     }
+}
+
+function parseNormalizedCodes(text: string): string[] {
+    const value = parseJson(text);
+    return Array.isArray(value)
+        ? uniqueNormalizedCodes(
+              value.filter((item): item is string => typeof item === 'string')
+          )
+        : [];
 }
 
 function stringifyJson(value: unknown): string {
@@ -495,6 +629,55 @@ function toStationBoardFetchResultRecord(
         consumedQueueEntryCount: row.consumed_queue_entry_count,
         rows: parseJson(row.rows_json),
         createdAt: row.created_at
+    };
+}
+
+function toStationPlatformRefreshEntryRecord(
+    row: StationPlatformRefreshEntryRow
+): StationPlatformRefreshEntryRecord {
+    return {
+        id: row.id,
+        refreshResultId: row.refresh_result_id,
+        stationOrder: row.station_order,
+        lookupType: row.lookup_type,
+        stationName: row.station_name,
+        stationTelecode: row.station_telecode,
+        stationNo: row.station_no,
+        trainDate: row.train_date,
+        stationTrainCodes: parseNormalizedCodes(row.station_train_codes_json),
+        attemptedTrainCodes: parseNormalizedCodes(
+            row.attempted_train_codes_json
+        ),
+        status: row.status,
+        platformNo: row.platform_no,
+        wicket: row.wicket,
+        fetchedAt: row.fetched_at,
+        errorMessage: row.error_message
+    };
+}
+
+function toStationPlatformRefreshResultRecord(
+    row: StationPlatformRefreshResultRow,
+    entries: StationPlatformRefreshEntryRecord[]
+): StationPlatformRefreshResultRecord {
+    return {
+        id: row.id,
+        taskRunId: row.task_run_id,
+        serviceDate: row.service_date,
+        startAt: row.start_at,
+        primaryTrainCode: row.primary_train_code,
+        trainCodes: parseNormalizedCodes(row.train_codes_json),
+        trigger: row.trigger,
+        status: row.status,
+        candidateCount: row.candidate_count,
+        updatedCount: row.updated_count,
+        cacheHitCount: row.cache_hit_count,
+        cacheFallbackCount: row.cache_fallback_count,
+        noDataCount: row.no_data_count,
+        failedCount: row.failed_count,
+        errorMessage: row.error_message,
+        createdAt: row.created_at,
+        entries
     };
 }
 
@@ -699,6 +882,86 @@ export function recordStationBoardFetchResult(
     );
 }
 
+export function recordStationPlatformRefreshResult(
+    input: RecordStationPlatformRefreshResultInput
+): number {
+    const createdAt = input.createdAt ?? getNowSeconds();
+    const trainCodes = uniqueNormalizedCodes([
+        input.primaryTrainCode,
+        ...input.trainCodes
+    ]);
+    const primaryTrainCode =
+        normalizeCode(input.primaryTrainCode) || trainCodes[0] || '';
+    const updatedCount = input.entries.filter(
+        (entry) => entry.status === 'updated'
+    ).length;
+    const cacheHitCount = input.entries.filter(
+        (entry) => entry.status === 'cache_hit'
+    ).length;
+    const cacheFallbackCount = input.entries.filter(
+        (entry) => entry.status === 'cache_fallback'
+    ).length;
+    const noDataCount = input.entries.filter(
+        (entry) => entry.status === 'no_data'
+    ).length;
+    const failedCount = input.entries.filter(
+        (entry) =>
+            entry.status === 'request_failed' ||
+            entry.status === 'persist_failed'
+    ).length;
+
+    maybeCleanupExpiredTrainProvenance(createdAt);
+    const transaction = useTrainProvenanceDatabase().transaction(() => {
+        const result = trainProvenanceStatements.run(
+            'insertStationPlatformRefreshResult',
+            input.taskRunId,
+            normalizeServiceDate(input.serviceDate, input.startAt ?? null),
+            normalizeOptionalInteger(input.startAt),
+            primaryTrainCode,
+            stringifyJson(trainCodes),
+            input.trigger,
+            input.status,
+            input.entries.length,
+            updatedCount,
+            cacheHitCount,
+            cacheFallbackCount,
+            noDataCount,
+            failedCount,
+            input.errorMessage?.trim() ?? '',
+            createdAt
+        );
+        const refreshResultId = Number(result.lastInsertRowid);
+
+        for (const entry of input.entries) {
+            trainProvenanceStatements.run(
+                'insertStationPlatformRefreshEntry',
+                refreshResultId,
+                Number.isInteger(entry.stationOrder)
+                    ? Math.max(0, entry.stationOrder)
+                    : 0,
+                entry.lookupType.trim(),
+                entry.stationName.trim(),
+                normalizeCode(entry.stationTelecode),
+                Number.isInteger(entry.stationNo)
+                    ? Math.max(0, entry.stationNo)
+                    : 0,
+                entry.trainDate.trim(),
+                stringifyJson(uniqueNormalizedCodes(entry.stationTrainCodes)),
+                stringifyJson(uniqueNormalizedCodes(entry.attemptedTrainCodes)),
+                entry.status,
+                normalizeOptionalInteger(entry.platformNo),
+                entry.wicket?.trim() || null,
+                normalizeOptionalInteger(entry.fetchedAt),
+                entry.errorMessage?.trim() ?? ''
+            );
+        }
+
+        return refreshResultId;
+    });
+
+    return transaction();
+}
+
 export function getTrainProvenanceTaskRunById(taskRunId: number) {
     maybeCleanupExpiredTrainProvenance();
     if (!Number.isInteger(taskRunId) || taskRunId <= 0) {
@@ -793,6 +1056,29 @@ export function getStationBoardFetchResultByTaskRunId(taskRunId: number) {
         taskRunId
     );
     return row ? toStationBoardFetchResultRecord(row) : null;
+}
+
+export function getStationPlatformRefreshResultById(resultId: number) {
+    maybeCleanupExpiredTrainProvenance();
+    if (!Number.isInteger(resultId) || resultId <= 0) {
+        return null;
+    }
+
+    const row = trainProvenanceStatements.get<StationPlatformRefreshResultRow>(
+        'selectStationPlatformRefreshResultById',
+        resultId
+    );
+    if (!row) {
+        return null;
+    }
+
+    const entries = trainProvenanceStatements
+        .all<StationPlatformRefreshEntryRow>(
+            'selectStationPlatformRefreshEntriesByResultId',
+            resultId
+        )
+        .map(toStationPlatformRefreshEntryRecord);
+    return toStationPlatformRefreshResultRecord(row, entries);
 }
 
 export function listTrainProvenanceDepartureStartAts(
