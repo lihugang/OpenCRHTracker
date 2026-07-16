@@ -81,6 +81,13 @@
         background: var(--color-crh-slate);
         font-family: var(--font-sans);
         font-synthesis: none;
+        text-autospace: normal;
+    }
+
+    @supports (text-autospace: replace) {
+        html {
+            text-autospace: replace;
+        }
     }
 
     body {
