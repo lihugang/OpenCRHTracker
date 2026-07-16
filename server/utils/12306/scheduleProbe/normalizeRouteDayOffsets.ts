@@ -37,8 +37,7 @@ export function getRouteGroupDayOffsetShift(
     }
 
     return (
-        Math.ceil(-minimumOffset / SHANGHAI_DAY_SECONDS) *
-        SHANGHAI_DAY_SECONDS
+        Math.ceil(-minimumOffset / SHANGHAI_DAY_SECONDS) * SHANGHAI_DAY_SECONDS
     );
 }
 

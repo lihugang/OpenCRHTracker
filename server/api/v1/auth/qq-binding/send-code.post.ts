@@ -82,11 +82,7 @@ export default defineEventHandler(async (event) =>
                     };
                 }
                 if (
-                    queueRiskQqBindingEscalation(
-                        identity.id,
-                        qqNumber,
-                        event
-                    )
+                    queueRiskQqBindingEscalation(identity.id, qqNumber, event)
                 ) {
                     const now = getNowSeconds();
                     return {

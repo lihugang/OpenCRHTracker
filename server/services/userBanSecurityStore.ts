@@ -241,9 +241,7 @@ function toAdminUserBanActionItem(
     };
 }
 
-function toAdminUserRiskCaseItem(
-    row: UserRiskCaseRow
-): AdminUserRiskCaseItem {
+function toAdminUserRiskCaseItem(row: UserRiskCaseRow): AdminUserRiskCaseItem {
     return {
         id: row.id,
         userId: row.user_id,
@@ -421,18 +419,11 @@ function ensureRiskCaseTaskQueued(riskCaseId: number) {
         return false;
     }
 
-    enqueueTask(
-        USER_RISK_TASK_EXECUTOR,
-        { riskCaseId },
-        getNowSeconds()
-    );
+    enqueueTask(USER_RISK_TASK_EXECUTOR, { riskCaseId }, getNowSeconds());
     return true;
 }
 
-function createOrGetUserRiskCase(
-    userId: string,
-    match: FingerprintMatch
-) {
+function createOrGetUserRiskCase(userId: string, match: FingerprintMatch) {
     const existing = getOpenUserRiskCase(userId);
     if (existing) {
         if (existing.status === 'failed' && existing.qq_number === null) {
@@ -736,7 +727,9 @@ function getOrCreateRiskCaseBanAction(riskCase: UserRiskCaseRow) {
             action.id
         );
         if (!action) {
-            throw new Error(`Reset risk case ban action not found: ${actionId}`);
+            throw new Error(
+                `Reset risk case ban action not found: ${actionId}`
+            );
         }
     }
 
