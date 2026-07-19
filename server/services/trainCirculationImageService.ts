@@ -605,7 +605,7 @@ async function buildTrainCirculationHeaderInfo(input: {
     }
 
     return {
-        text: parts.join('‧')
+        text: parts.join(' ‧ ')
     };
 }
 
