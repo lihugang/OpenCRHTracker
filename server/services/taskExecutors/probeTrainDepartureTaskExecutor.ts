@@ -1649,9 +1649,6 @@ async function executeProbeTrainDepartureTaskInternal(
             }
         });
         markCurrentTrainProvenanceTaskSkipped('route_probe_exhausted');
-        logger.warn(
-            `route_probe_failed_exhausted trainCode=${args.trainCode} retry=${args.retry} attemptedTrainCodes=${allTrainCodes.join(',')}`
-        );
         return;
     }
 
@@ -1880,9 +1877,6 @@ async function executeProbeTrainDepartureTaskInternal(
                 });
                 markCurrentTrainProvenanceTaskSkipped(
                     'seat_verification_mismatch_exhausted'
-                );
-                logger.warn(
-                    `seat_verify_mismatch_exhausted trainCode=${args.trainCode} probedTrainCode=${probedTrainCode} mainEmuCode=${mainEmuCode} runningTrainCode=${todayTrainCodesValidation.runningTrainCode} retry=${args.retry} reason=${seatCodeVerification.reason} seatTrainCode=${seatCodeVerification.seatTrainCode} seatInternalCode=${seatCodeVerification.seatInternalCode} seatStartAt=${seatCodeVerification.seatStartAt} historicalRecentMatchedTrainCodes=${historicalRecentMatchingTrainCodes.join(',')}`
                 );
                 return;
             }

@@ -57,11 +57,13 @@ type TaskExecutedObserver = (task: TaskRecord, result: RunTaskResult) => void;
 
 interface PlannedIdleTask {
     task: TaskRecord;
+    forceRunOverCycle: boolean;
 }
 
 interface IdleTaskPlanResult {
     tasks: PlannedIdleTask[];
     skippedBudget: number;
+    forcedOverCycle: number;
 }
 
 async function runSingleTask(task: TaskRecord): Promise<RunTaskResult> {
@@ -142,7 +144,20 @@ async function runPlannedIdleTaskGroupSequentially(
             plannedTask.task.executor,
             plannedTask.task.expectedDurationMs
         );
-        if (estimatedDurationMs >= remainingMs) {
+        if (
+            !plannedTask.forceRunOverCycle &&
+            estimatedDurationMs >= remainingMs
+        ) {
+            const hasForcedTaskRemaining = tasks
+                .slice(index + 1)
+                .some((candidate) => candidate.forceRunOverCycle);
+            if (hasForcedTaskRemaining) {
+                skippedPrestart += 1;
+                logger.info(
+                    `idle_task_skip_prestart id=${plannedTask.task.id} executor=${plannedTask.task.executor} estimatedDurationMs=${estimatedDurationMs} remainingMs=${remainingMs}`
+                );
+                continue;
+            }
             skippedPrestart += tasks.length - index;
             logger.info(
                 `idle_task_skip_prestart id=${plannedTask.task.id} executor=${plannedTask.task.executor} estimatedDurationMs=${estimatedDurationMs} remainingMs=${remainingMs}`
@@ -151,7 +166,7 @@ async function runPlannedIdleTaskGroupSequentially(
         }
 
         logger.info(
-            `idle_task_run_prestart id=${plannedTask.task.id} executor=${plannedTask.task.executor} estimatedDurationMs=${estimatedDurationMs} remainingMs=${remainingMs}`
+            `idle_task_run_prestart id=${plannedTask.task.id} executor=${plannedTask.task.executor} estimatedDurationMs=${estimatedDurationMs} remainingMs=${remainingMs} forceRunOverCycle=${plannedTask.forceRunOverCycle}`
         );
         const result = await runSingleTask(plannedTask.task);
         if (onTaskExecuted) {
@@ -193,15 +208,31 @@ function estimateTaskDurationMs(task: TaskRecord): number {
 
 function planRunnableIdleTasks(
     dueIdleTasks: TaskRecord[],
-    nextTickAtMs: number
+    nextTickAtMs: number,
+    pollIntervalMs: number
 ): IdleTaskPlanResult {
     const plannedTasks: PlannedIdleTask[] = [];
     const plannedDurationByExecutor = new Map<string, number>();
     const blockedExecutors = new Set<string>();
     let skippedBudget = 0;
+    let forcedOverCycle = 0;
 
     for (const task of dueIdleTasks) {
         const remainingMs = Math.max(0, nextTickAtMs - Date.now());
+        const estimatedDurationMs = estimateTaskDurationMs(task);
+        if (estimatedDurationMs > pollIntervalMs && forcedOverCycle === 0) {
+            plannedTasks.push({
+                task,
+                forceRunOverCycle: true
+            });
+            blockedExecutors.add(task.executor);
+            forcedOverCycle += 1;
+            logger.warn(
+                `idle_task_force_run_over_cycle id=${task.id} executor=${task.executor} estimatedDurationMs=${estimatedDurationMs} pollIntervalMs=${pollIntervalMs} remainingMs=${remainingMs}`
+            );
+            continue;
+        }
+
         if (blockedExecutors.has(task.executor)) {
             skippedBudget += 1;
             logger.info(
@@ -210,7 +241,6 @@ function planRunnableIdleTasks(
             continue;
         }
 
-        const estimatedDurationMs = estimateTaskDurationMs(task);
         const currentExecutorDurationMs =
             plannedDurationByExecutor.get(task.executor) ?? 0;
         const nextExecutorDurationMs =
@@ -234,7 +264,8 @@ function planRunnableIdleTasks(
 
         plannedDurationByExecutor.set(task.executor, nextExecutorDurationMs);
         plannedTasks.push({
-            task
+            task,
+            forceRunOverCycle: false
         });
         logger.info(
             `idle_task_plan id=${task.id} executor=${task.executor} estimatedDurationMs=${estimatedDurationMs} executorPlannedDurationMs=${currentExecutorDurationMs} nextExecutorDurationMs=${nextExecutorDurationMs} criticalPathMs=${nextCriticalPathMs} remainingMs=${remainingMs}`
@@ -243,7 +274,8 @@ function planRunnableIdleTasks(
 
     return {
         tasks: plannedTasks,
-        skippedBudget
+        skippedBudget,
+        forcedOverCycle
     };
 }
 
@@ -313,7 +345,11 @@ async function tick(): Promise<void> {
         let idleExecuted = 0;
         let idleSkippedBudget = 0;
         let idleSkippedPrestart = 0;
-        const idlePlan = planRunnableIdleTasks(dueIdleTasks, nextTickAtMs);
+        const idlePlan = planRunnableIdleTasks(
+            dueIdleTasks,
+            nextTickAtMs,
+            config.task.scheduler.pollIntervalMs
+        );
         idleSkippedBudget = idlePlan.skippedBudget;
 
         idleSkippedPrestart = await runPlannedIdleTasksByExecutor(
@@ -328,7 +364,7 @@ async function tick(): Promise<void> {
         );
 
         logger.info(
-            `tick_finish dueNormalTasks=${dueNormalTasks.length} dueIdleTasks=${dueIdleTasks.length} runnableIdleTasks=${idlePlan.tasks.length} idleExecuted=${idleExecuted} idleSkippedBudget=${idleSkippedBudget} idleSkippedPrestart=${idleSkippedPrestart} maxTasksPerQuery=${maxTasksPerQuery} maxIdleTasksPerTick=${maxIdleTasksPerTick} durationMs=${Date.now() - startedAt}`
+            `tick_finish dueNormalTasks=${dueNormalTasks.length} dueIdleTasks=${dueIdleTasks.length} runnableIdleTasks=${idlePlan.tasks.length} idleExecuted=${idleExecuted} idleSkippedBudget=${idleSkippedBudget} idleSkippedPrestart=${idleSkippedPrestart} idleForcedOverCycle=${idlePlan.forcedOverCycle} maxTasksPerQuery=${maxTasksPerQuery} maxIdleTasksPerTick=${maxIdleTasksPerTick} durationMs=${Date.now() - startedAt}`
         );
     } catch (error) {
         const message =

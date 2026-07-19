@@ -456,10 +456,5 @@ export function recordCurrentCouplingScanCandidate(
             ...input,
             taskRunId: context.taskRunId
         });
-    } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        logger.warn(
-            `record_coupling_candidate_failed taskRunId=${context.taskRunId} candidateEmuCode=${normalizeCode(input.candidateEmuCode)} error=${message}`
-        );
-    }
+    } catch {}
 }
