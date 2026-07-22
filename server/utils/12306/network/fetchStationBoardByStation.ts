@@ -2,7 +2,6 @@ import useConfig from '~/server/config';
 import getLogger from '~/server/libs/log4js';
 import { record12306RequestHourlyStat } from '~/server/services/trainProvenanceStore';
 import waitFor12306RequestSlot from '../requestLimiter';
-import parsePlatformNo from '../parsePlatformNo';
 import log12306RequestFailure from './log12306RequestFailure';
 
 interface StationBoardResponseRow {
@@ -12,7 +11,6 @@ interface StationBoardResponseRow {
     start_station_name?: unknown;
     end_station_name?: unknown;
     distance?: unknown;
-    platform_no?: unknown;
 }
 
 interface StationBoardResponse {
@@ -29,7 +27,6 @@ export interface StationBoardTrainRow {
     startStationName: string;
     endStationName: string;
     distance: number | null;
-    platformNo: number | null;
 }
 
 const logger = getLogger('12306-network:fetch-station-board');
@@ -72,8 +69,7 @@ function normalizeStationBoardRow(value: unknown): StationBoardTrainRow | null {
             typeof row.end_station_name === 'string'
                 ? row.end_station_name.trim()
                 : '',
-        distance: parseNonNegativeInteger(row.distance),
-        platformNo: parsePlatformNo(row.platform_no)
+        distance: parseNonNegativeInteger(row.distance)
     };
 }
 

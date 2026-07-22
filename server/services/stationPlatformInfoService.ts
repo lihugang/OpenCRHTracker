@@ -712,3 +712,23 @@ export async function forceRefreshStationPlatformInfoForTrainCodes(
         return createFailedStationPlatformInfoRefreshResult(built, error);
     }
 }
+
+export async function refreshStationPlatformInfoForTrainCodes(
+    input: ForceRefreshStationPlatformInfoForTrainCodesInput
+): Promise<StationPlatformInfoRefreshResult> {
+    const serviceDate = input.serviceDate.trim();
+    if (!hasMatchingPublishedSchedule(serviceDate)) {
+        return createEmptyStationPlatformInfoRefreshResult();
+    }
+
+    const built = buildCandidatesForTrainCodes(serviceDate, input.trainCodes);
+    try {
+        return await refreshCandidates(
+            built,
+            getPlatformInfoExpiresAt(getNowSeconds()),
+            false
+        );
+    } catch (error) {
+        return createFailedStationPlatformInfoRefreshResult(built, error);
+    }
+}
