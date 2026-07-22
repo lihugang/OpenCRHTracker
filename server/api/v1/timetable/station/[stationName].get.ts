@@ -72,6 +72,7 @@ export default defineEventHandler(async (event) => {
                     allCodes: [...row.allCodes],
                     arriveAt: row.arriveAt,
                     departAt: row.departAt,
+                    platformNo: row.platformNo,
                     startStation: row.startStation,
                     endStation: row.endStation,
                     updatedAt: row.updatedAt,

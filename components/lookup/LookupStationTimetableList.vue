@@ -168,6 +168,12 @@
                                         " />
                                 </td>
                                 <td
+                                    class="border-b border-slate-100 px-4 py-4 text-sm text-slate-500 last:border-b-0">
+                                    {{
+                                        formatReferencePlatform(item.platformNo)
+                                    }}
+                                </td>
+                                <td
                                     class="border-b border-slate-100 px-4 py-4 text-sm last:border-b-0">
                                     <span
                                         v-if="hasReferenceModels(item)"
@@ -256,24 +262,40 @@
                                         </p>
                                     </div>
 
-                                    <button
-                                        type="button"
-                                        class="shrink-0 flex min-w-[4.75rem] items-center gap-[0.35rem] text-slate-400 transition enabled:cursor-pointer enabled:hover:text-crh-blue disabled:cursor-default"
-                                        :disabled="!canOpenTimetable(item)"
-                                        aria-label="查看当前时刻表"
-                                        @click="openTimetable(item)">
+                                    <div
+                                        class="shrink-0 flex min-w-[4.75rem] flex-col items-center gap-1 text-slate-400">
+                                        <button
+                                            type="button"
+                                            class="flex w-full items-center gap-[0.35rem] transition enabled:cursor-pointer enabled:hover:text-crh-blue disabled:cursor-default"
+                                            :disabled="!canOpenTimetable(item)"
+                                            aria-label="查看当前时刻表"
+                                            @click="openTimetable(item)">
+                                            <span
+                                                class="h-px flex-1 bg-[linear-gradient(90deg,rgb(203_213_225),rgb(148_163_184))]"
+                                                aria-hidden="true" />
+                                            <span
+                                                class="text-[0.8rem] leading-none"
+                                                aria-hidden="true">
+                                                ->
+                                            </span>
+                                            <span
+                                                class="h-px flex-1 bg-[linear-gradient(90deg,rgb(203_213_225),rgb(148_163_184))]"
+                                                aria-hidden="true" />
+                                        </button>
                                         <span
-                                            class="h-px flex-1 bg-[linear-gradient(90deg,rgb(203_213_225),rgb(148_163_184))]"
-                                            aria-hidden="true" />
-                                        <span
-                                            class="text-[0.8rem] leading-none"
-                                            aria-hidden="true">
-                                            ->
+                                            v-if="
+                                                hasReferencePlatform(
+                                                    item.platformNo
+                                                )
+                                            "
+                                            class="text-[11px] leading-none text-slate-400">
+                                            {{
+                                                formatReferencePlatform(
+                                                    item.platformNo
+                                                )
+                                            }}
                                         </span>
-                                        <span
-                                            class="h-px flex-1 bg-[linear-gradient(90deg,rgb(203_213_225),rgb(148_163_184))]"
-                                            aria-hidden="true" />
-                                    </button>
+                                    </div>
 
                                     <div class="min-w-0 flex-1 text-right">
                                         <p
@@ -419,6 +441,7 @@ const columns = [
     '出发时间',
     '始发站',
     '终到站',
+    '参考站台',
     '参考车型'
 ];
 
@@ -706,6 +729,14 @@ function formatStation(value: string) {
 function formatTrainCode(value: string) {
     const normalized = value.trim().toUpperCase();
     return normalized.length > 0 ? normalized : '--';
+}
+
+function hasReferencePlatform(platformNo: number | null) {
+    return Number.isInteger(platformNo) && platformNo > 0;
+}
+
+function formatReferencePlatform(platformNo: number | null) {
+    return hasReferencePlatform(platformNo) ? `${platformNo} 站台` : '--';
 }
 
 function getReferenceModelLabels(item: StationTimetableRecord) {

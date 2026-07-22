@@ -1694,6 +1694,7 @@ export const developerDocsOpenApi = {
                     'allCodes',
                     'arriveAt',
                     'departAt',
+                    'platformNo',
                     'startStation',
                     'endStation',
                     'updatedAt',
@@ -1720,6 +1721,13 @@ export const developerDocsOpenApi = {
                         type: 'integer',
                         nullable: true,
                         example: 1777673640
+                    },
+                    platformNo: {
+                        type: 'integer',
+                        nullable: true,
+                        description:
+                            '该车次在本站的参考停靠站台，非实时现场信息。',
+                        example: 2
                     },
                     startStation: {
                         type: 'string',
@@ -3652,6 +3660,7 @@ export const developerDocsOpenApi = {
                                                 allCodes: ['C2001'],
                                                 arriveAt: 1777673640,
                                                 departAt: 1777673640,
+                                                platformNo: 2,
                                                 startStation: '北京南',
                                                 endStation: '天津',
                                                 updatedAt: 1776492498,

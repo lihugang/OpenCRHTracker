@@ -54,6 +54,7 @@ export interface StationTimetableRecord {
     allCodes: string[];
     arriveAt: number | null;
     departAt: number | null;
+    platformNo: number | null;
     startStation: string;
     endStation: string;
     updatedAt: number | null;
