@@ -136,6 +136,7 @@ interface CirculationTaskConfig {
     stationBoard: {
         maxAttempts: number;
         retryDelaySeconds: number;
+        fullSweepIntervalDays: number;
     };
 }
 
@@ -2270,6 +2271,14 @@ function validateConfig(raw: unknown): Config {
                             : taskCirculationStationBoard.retryDelaySeconds,
                         'task.circulation.stationBoard.retryDelaySeconds',
                         0
+                    ),
+                    fullSweepIntervalDays: asInteger(
+                        taskCirculationStationBoard.fullSweepIntervalDays ===
+                            undefined
+                            ? 7
+                            : taskCirculationStationBoard.fullSweepIntervalDays,
+                        'task.circulation.stationBoard.fullSweepIntervalDays',
+                        1
                     )
                 }
             },

@@ -47,6 +47,7 @@ import type {
     ScheduleState,
     ScheduleStationMap
 } from '~/server/utils/12306/scheduleProbe/types';
+import { enqueueStationBoardDispatchTask } from './dispatchStationBoardTasksExecutor';
 
 export const REFRESH_ROUTE_BATCH_TASK_EXECUTOR = 'refresh_route_batch';
 
@@ -64,6 +65,7 @@ export interface RefreshRouteBatchResult {
     failed: number;
     changed: number;
     totalAttempts: number;
+    stationBoardQueueAppendedCount: number;
 }
 
 interface RefreshRouteGroupUpdate {
@@ -310,7 +312,8 @@ export async function refreshRouteBatchForCodes(
             success: 0,
             failed: 0,
             changed: 0,
-            totalAttempts: 0
+            totalAttempts: 0,
+            stationBoardQueueAppendedCount: 0
         };
     }
 
@@ -325,7 +328,8 @@ export async function refreshRouteBatchForCodes(
             success: 0,
             failed: 0,
             changed: 0,
-            totalAttempts: 0
+            totalAttempts: 0,
+            stationBoardQueueAppendedCount: 0
         };
     }
     const currentDate = getCurrentDateString();
@@ -339,7 +343,8 @@ export async function refreshRouteBatchForCodes(
             success: 0,
             failed: 0,
             changed: 0,
-            totalAttempts: 0
+            totalAttempts: 0,
+            stationBoardQueueAppendedCount: 0
         };
     }
 
@@ -367,6 +372,7 @@ export async function refreshRouteBatchForCodes(
     let failed = 0;
     let changed = 0;
     let totalAttempts = 0;
+    let stationBoardQueueAppendedCount = 0;
     let mutated = false;
     let stationUpdates: ScheduleStationMap = {};
 
@@ -699,6 +705,7 @@ export async function refreshRouteBatchForCodes(
                     syncResult.routeRefreshTrainCodes,
                     getNowSeconds()
                 );
+                stationBoardQueueAppendedCount += appendedQueueEntries.length;
                 logger.info(
                     `route_refresh_queue_sync date=${published.date} candidates=${syncResult.routeRefreshTrainCodes.length} appended=${appendedQueueEntries.length}`
                 );
@@ -726,21 +733,28 @@ export async function refreshRouteBatchForCodes(
         }
     }
     logger.info(
-        `done processed=${processed} success=${success} failed=${failed} changed=${changed} apiCalls=${totalAttempts} file=${scheduleFilePath}`
+        `done processed=${processed} success=${success} failed=${failed} changed=${changed} apiCalls=${totalAttempts} stationBoardQueueAppended=${stationBoardQueueAppendedCount} file=${scheduleFilePath}`
     );
     return {
         processed,
         success,
         failed,
         changed,
-        totalAttempts
+        totalAttempts,
+        stationBoardQueueAppendedCount
     };
 }
 
 async function executeRefreshRouteBatchTaskInternal(rawArgs: unknown) {
     const batchSize = useConfig().spider.scheduleProbe.refresh.batchSize;
     const args = parseTaskArgs(rawArgs, batchSize);
-    await refreshRouteBatchForCodes(args.codes);
+    const result = await refreshRouteBatchForCodes(args.codes);
+    if (result.stationBoardQueueAppendedCount > 0) {
+        const taskId = enqueueStationBoardDispatchTask('auto');
+        logger.info(
+            `enqueued_dispatch_station_board_task id=${taskId} mode=auto appendedQueueEntries=${result.stationBoardQueueAppendedCount}`
+        );
+    }
 }
 
 async function executeRefreshRouteBatchTask(rawArgs: unknown) {

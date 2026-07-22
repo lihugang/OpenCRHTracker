@@ -255,6 +255,8 @@ interface ScheduleStopMetadataTargetRow {
 
 const DOCUMENT_VERSION_META_KEY = 'document_version';
 const DOCUMENT_UPDATED_AT_META_KEY = 'document_updated_at';
+const STATION_BOARD_LAST_FULL_SWEEP_DATE_META_KEY =
+    'station_board_last_full_sweep_date';
 const MIGRATED_FROM_JSON_PATH_META_KEY = 'migrated_from_json_path';
 const MIGRATED_FROM_JSON_MTIME_MS_META_KEY = 'migrated_from_json_mtime_ms';
 const queries = createPreparedSqlStore<ScheduleSqlKey>({
@@ -878,6 +880,18 @@ function loadScheduleStateFromRow(row: ScheduleStateRow): ScheduleState | null {
 
 export function getScheduleDatabaseFilePath(): string {
     return path.resolve(useConfig().data.databases.schedule);
+}
+
+export function loadStationBoardLastFullSweepDate(): string | null {
+    const value = loadMetaValue(STATION_BOARD_LAST_FULL_SWEEP_DATE_META_KEY);
+    return value && /^\d{8}$/.test(value) ? value : null;
+}
+
+export function saveStationBoardLastFullSweepDate(serviceDate: string): void {
+    if (!/^\d{8}$/.test(serviceDate)) {
+        throw new Error('serviceDate must be in YYYYMMDD format');
+    }
+    upsertMetaValue(STATION_BOARD_LAST_FULL_SWEEP_DATE_META_KEY, serviceDate);
 }
 
 export function getScheduleDatabaseModifiedAtMs(): number {

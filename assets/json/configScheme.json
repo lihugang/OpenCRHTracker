@@ -1589,6 +1589,11 @@
                                 "retryDelaySeconds": {
                                     "type": "integer",
                                     "minimum": 0
+                                },
+                                "fullSweepIntervalDays": {
+                                    "type": "integer",
+                                    "minimum": 1,
+                                    "default": 7
                                 }
                             }
                         }

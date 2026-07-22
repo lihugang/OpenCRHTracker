@@ -1099,7 +1099,7 @@ export const deployDocsSections: DocsContentSection[] = [
                             'batchSize 用于流式扫描每日担当记录时的分页批大小，当前默认值为 2000。',
                             'threshold 是归一化边权重的阈值，必须大于 0 且小于等于 1，当前默认值为 0.8。',
                             'dailyTimesHHmm 用于配置生成推断交路的每日重建时刻，默认值为 ["0200"]，结果会并入列车时刻表接口的 circulation 字段。',
-                            'stationBoard 可选；省略时默认使用 maxAttempts=5、retryDelaySeconds=1800。'
+                            'stationBoard 可选；省略时默认使用 maxAttempts=5、retryDelaySeconds=1800、fullSweepIntervalDays=7。'
                         ]
                     },
                     {
@@ -1107,10 +1107,11 @@ export const deployDocsSections: DocsContentSection[] = [
                         valueType: 'object',
                         required: false,
                         description:
-                            '列车交路推断在补查车站大屏数据时使用的重试参数。',
+                            '列车交路推断在补查车站大屏数据时使用的增量派发、全量兜底和重试参数。',
                         notes: [
                             'maxAttempts 是最大尝试次数，最小值为 1，默认值为 5。',
-                            'retryDelaySeconds 是重试前等待秒数，最小值为 0，默认值为 1800。'
+                            'retryDelaySeconds 是重试前等待秒数，最小值为 0，默认值为 1800。',
+                            'fullSweepIntervalDays 是自动全量派发的间隔天数，最小值为 1，默认值为 7。日常自动任务只选择新车次和时刻表发生变化车次的全部经停站；首次运行和达到间隔时选择当天时刻表的全部经停站。管理员手动执行当日交路数据刷新时始终强制全量。'
                         ]
                     },
                     {

@@ -18,6 +18,7 @@ import {
     splitIntoBatches
 } from '~/server/utils/12306/scheduleProbe/taskHelpers';
 import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
+import { enqueueStationBoardDispatchTask } from './dispatchStationBoardTasksExecutor';
 
 export const REFRESH_ALL_ROUTES_AND_REQUEUE_PROBE_TASK_EXECUTOR =
     'refresh_routes_requeue_probe';
@@ -35,7 +36,10 @@ function mergeBatchResult(
         success: total.success + next.success,
         failed: total.failed + next.failed,
         changed: total.changed + next.changed,
-        totalAttempts: total.totalAttempts + next.totalAttempts
+        totalAttempts: total.totalAttempts + next.totalAttempts,
+        stationBoardQueueAppendedCount:
+            total.stationBoardQueueAppendedCount +
+            next.stationBoardQueueAppendedCount
     };
 }
 
@@ -86,7 +90,8 @@ async function executeRefreshAllRoutesAndRequeueProbeTask(): Promise<void> {
         success: 0,
         failed: 0,
         changed: 0,
-        totalAttempts: 0
+        totalAttempts: 0,
+        stationBoardQueueAppendedCount: 0
     };
 
     logger.info(
@@ -101,13 +106,18 @@ async function executeRefreshAllRoutesAndRequeueProbeTask(): Promise<void> {
         );
     }
 
+    const stationBoardTaskId =
+        total.stationBoardQueueAppendedCount > 0
+            ? enqueueStationBoardDispatchTask('auto')
+            : null;
+
     const removed = removePendingTasksByExecutor(
         PROBE_TRAIN_DEPARTURE_TASK_EXECUTOR
     );
     const dispatchResult = await dispatchDailyProbeTasks();
 
     logger.info(
-        `done date=${date} routeGroups=${trainCodes.length} batches=${batches.length} processed=${total.processed} success=${total.success} failed=${total.failed} changed=${total.changed} apiCalls=${total.totalAttempts} removedProbeTasks=${removed.removedTaskIds.length} createdProbeTasks=${dispatchResult.createdTaskIds.length} dispatchDate=${dispatchResult.date ?? 'null'} dispatchGroups=${dispatchResult.groupCount}`
+        `done date=${date} routeGroups=${trainCodes.length} batches=${batches.length} processed=${total.processed} success=${total.success} failed=${total.failed} changed=${total.changed} apiCalls=${total.totalAttempts} stationBoardQueueAppended=${total.stationBoardQueueAppendedCount} stationBoardTaskId=${stationBoardTaskId ?? 'null'} removedProbeTasks=${removed.removedTaskIds.length} createdProbeTasks=${dispatchResult.createdTaskIds.length} dispatchDate=${dispatchResult.date ?? 'null'} dispatchGroups=${dispatchResult.groupCount}`
     );
 }
 

@@ -15,7 +15,10 @@ import { loadProbeAssets } from '~/server/services/probeAssetStore';
 import { PROBE_QRCODE_DETECTION_EMU_TASK_EXECUTOR } from '~/server/services/taskExecutors/probeQrcodeDetectionEmuTaskExecutor';
 import { REFRESH_ROUTE_BATCH_TASK_EXECUTOR } from '~/server/services/taskExecutors/refreshRouteBatchTaskExecutor';
 import { REFRESH_ALL_ROUTES_AND_REQUEUE_PROBE_TASK_EXECUTOR } from '~/server/services/taskExecutors/refreshAllRoutesAndRequeueProbeTaskExecutor';
-import { DISPATCH_STATION_BOARD_TASKS_EXECUTOR } from '~/server/services/taskExecutors/dispatchStationBoardTasksExecutor';
+import {
+    DISPATCH_STATION_BOARD_TASKS_EXECUTOR,
+    enqueueStationBoardDispatchTask
+} from '~/server/services/taskExecutors/dispatchStationBoardTasksExecutor';
 import { REFRESH_TRAIN_CIRCULATION_TASK_EXECUTOR } from '~/server/services/taskExecutors/refreshTrainCirculationTaskExecutor';
 import { getStationBoardIdleTaskOptions } from '~/server/services/stationBoardTaskScheduling';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
@@ -449,12 +452,7 @@ function createDispatchStationBoardTasksNowTask(
     assertPublishedScheduleReadyForRefresh();
 
     const executionTime = getNowSeconds();
-    const taskId = enqueueTask(
-        DISPATCH_STATION_BOARD_TASKS_EXECUTOR,
-        {},
-        executionTime,
-        getStationBoardIdleTaskOptions(DISPATCH_STATION_BOARD_TASKS_EXECUTOR)
-    );
+    const taskId = enqueueStationBoardDispatchTask('full', executionTime);
 
     logger.info(
         `admin_task_created type=${request.type} executor=${DISPATCH_STATION_BOARD_TASKS_EXECUTOR} taskId=${taskId}`
@@ -469,7 +467,7 @@ function createDispatchStationBoardTasksNowTask(
             executionTime
         ),
         summary:
-            '已创建 1 条当日交路数据刷新任务，将按列车始发站去重后继续派发车站板抓取任务。'
+            '已创建 1 条当日交路数据全量刷新任务，将按当天时刻表全部经停站去重后派发车站板抓取任务。'
     };
 }
 

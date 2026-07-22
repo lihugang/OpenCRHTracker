@@ -9,15 +9,26 @@ import {
     resolveStationTelecodeFromLookup
 } from '~/server/services/stationBoardTaskDispatch';
 import { registerTaskExecutor } from '~/server/services/taskExecutorRegistry';
+import { enqueueTask } from '~/server/services/taskQueue';
+import { getStationBoardIdleTaskOptions } from '~/server/services/stationBoardTaskScheduling';
 import { loadPublishedScheduleStateSummary } from '~/server/utils/12306/scheduleProbe/stateStore';
 import {
     getScheduleDatabaseFilePath,
+    listScheduleCandidateItemsForCodes,
+    listScheduleRouteRefreshQueueEntries,
     listScheduleStopStationCandidateRowsByStateKind,
+    loadStationBoardLastFullSweepDate,
+    saveStationBoardLastFullSweepDate,
     type ScheduleStopStationCandidateRow
 } from '~/server/utils/12306/scheduleProbe/sqliteStore';
 import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
+import {
+    getShanghaiDayStartUnixSeconds,
+    SHANGHAI_DAY_SECONDS
+} from '~/server/utils/date/shanghaiDateTime';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
+import uniqueNormalizedCodes from '~/server/utils/12306/uniqueNormalizedCodes';
 import fetchAllStations from '~/server/utils/12306/network/fetchAllStations';
 import {
     getCurrentTrainProvenanceTaskRunId,
@@ -27,6 +38,12 @@ import { recordStationBoardDispatchResult } from '~/server/services/trainProvena
 
 export const DISPATCH_STATION_BOARD_TASKS_EXECUTOR =
     'dispatch_station_board_tasks';
+
+export type StationBoardDispatchMode = 'auto' | 'full';
+
+interface StationBoardDispatchTaskArgs {
+    mode: StationBoardDispatchMode;
+}
 
 interface StationBoardStationCandidate {
     stationName: string;
@@ -49,8 +66,26 @@ const logger = getLogger('task-executor:dispatch-station-board-tasks');
 
 let registered = false;
 
-function collectScheduleStationCandidates(
-    rows: readonly ScheduleStopStationCandidateRow[]
+function parseTaskArgs(raw: unknown): StationBoardDispatchTaskArgs {
+    if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+        throw new Error('task arguments must be an object');
+    }
+
+    const mode = (raw as { mode?: unknown }).mode;
+    if (mode === undefined || mode === 'auto') {
+        return { mode: 'auto' };
+    }
+    if (mode === 'full') {
+        return { mode: 'full' };
+    }
+    throw new Error('task arguments mode must be auto or full');
+}
+
+function collectStationCandidates(
+    rows: readonly Pick<
+        ScheduleStopStationCandidateRow,
+        'stationName' | 'stationTelecode'
+    >[]
 ): StationBoardStationCandidate[] {
     const candidatesByKey = new Map<string, StationBoardStationCandidate>();
 
@@ -65,14 +100,12 @@ function collectScheduleStationCandidates(
             stationTelecode.length > 0
                 ? `telecode:${stationTelecode}`
                 : `name:${stationName}`;
-        if (candidatesByKey.has(candidateKey)) {
-            continue;
+        if (!candidatesByKey.has(candidateKey)) {
+            candidatesByKey.set(candidateKey, {
+                stationName,
+                stationTelecode
+            });
         }
-
-        candidatesByKey.set(candidateKey, {
-            stationName,
-            stationTelecode
-        });
     }
 
     return [...candidatesByKey.values()].sort((left, right) =>
@@ -83,30 +116,64 @@ function collectScheduleStationCandidates(
     );
 }
 
+function collectIncrementalStationCandidates(serviceDate: string) {
+    const queueEntries = listScheduleRouteRefreshQueueEntries(serviceDate);
+    const targetTrainCodes = uniqueNormalizedCodes(
+        queueEntries.map((entry) => entry.trainCode)
+    );
+    const initialItems = listScheduleCandidateItemsForCodes('published', {
+        aliasCodes: targetTrainCodes
+    });
+    const items = listScheduleCandidateItemsForCodes('published', {
+        aliasCodes: targetTrainCodes,
+        internalCodes: uniqueNormalizedCodes(
+            initialItems.map((item) => item.internalCode)
+        )
+    });
+
+    return {
+        targetTrainCodes,
+        matchedItemCount: items.length,
+        candidates: collectStationCandidates(
+            items.flatMap((item) =>
+                item.stops.map((stop) => ({
+                    stationName: stop.stationName,
+                    stationTelecode: stop.stationTelecode
+                }))
+            )
+        )
+    };
+}
+
+function isFullSweepDue(serviceDate: string, intervalDays: number) {
+    const lastFullSweepDate = loadStationBoardLastFullSweepDate();
+    if (!lastFullSweepDate) {
+        return {
+            due: true,
+            lastFullSweepDate: null,
+            reason: 'initial_full_sweep'
+        } as const;
+    }
+
+    const elapsedDays = Math.floor(
+        (getShanghaiDayStartUnixSeconds(serviceDate) -
+            getShanghaiDayStartUnixSeconds(lastFullSweepDate)) /
+            SHANGHAI_DAY_SECONDS
+    );
+    return {
+        due: elapsedDays >= intervalDays,
+        lastFullSweepDate,
+        reason:
+            elapsedDays >= intervalDays ? 'periodic_full_sweep' : 'incremental'
+    } as const;
+}
+
 function buildSelectedStationNames(
     candidates: StationBoardStationCandidate[]
 ): string[] {
-    const stationNamesByKey = new Map<string, string>();
-
-    for (const candidate of candidates) {
-        const stationName = normalizeStationName(candidate.stationName);
-        const stationTelecode = normalizeCode(candidate.stationTelecode);
-        if (stationName.length === 0 && stationTelecode.length === 0) {
-            continue;
-        }
-
-        const key =
-            stationTelecode.length > 0
-                ? `telecode:${stationTelecode}`
-                : `name:${stationName}`;
-        if (stationNamesByKey.has(key)) {
-            continue;
-        }
-
-        stationNamesByKey.set(key, stationName || stationTelecode);
-    }
-
-    return [...stationNamesByKey.values()];
+    return candidates.map(
+        (candidate) => candidate.stationName || candidate.stationTelecode
+    );
 }
 
 function buildResolvedStationCandidateKey(
@@ -114,11 +181,9 @@ function buildResolvedStationCandidateKey(
     stationTelecode: string
 ) {
     const normalizedStationTelecode = normalizeCode(stationTelecode);
-    if (normalizedStationTelecode.length > 0) {
-        return `telecode:${normalizedStationTelecode}`;
-    }
-
-    return `name:${normalizeStationName(stationName)}`;
+    return normalizedStationTelecode.length > 0
+        ? `telecode:${normalizedStationTelecode}`
+        : `name:${normalizeStationName(stationName)}`;
 }
 
 function maybeRecordDispatchResult(input: {
@@ -149,7 +214,20 @@ function maybeRecordDispatchResult(input: {
     });
 }
 
-async function executeDispatchStationBoardTasks() {
+export function enqueueStationBoardDispatchTask(
+    mode: StationBoardDispatchMode = 'auto',
+    executionTime = getNowSeconds()
+) {
+    return enqueueTask(
+        DISPATCH_STATION_BOARD_TASKS_EXECUTOR,
+        { mode },
+        executionTime,
+        getStationBoardIdleTaskOptions(DISPATCH_STATION_BOARD_TASKS_EXECUTOR)
+    );
+}
+
+async function executeDispatchStationBoardTasks(rawArgs: unknown) {
+    const args = parseTaskArgs(rawArgs);
     const config = useConfig();
     const scheduleFilePath = getScheduleDatabaseFilePath();
     const published = loadPublishedScheduleStateSummary();
@@ -166,12 +244,55 @@ async function executeDispatchStationBoardTasks() {
         return;
     }
 
-    const stationCandidates = collectScheduleStationCandidates(
-        listScheduleStopStationCandidateRowsByStateKind('published')
+    const fullSweepState = isFullSweepDue(
+        published.date,
+        config.task.circulation.stationBoard.fullSweepIntervalDays
     );
+    const isFullSweep = args.mode === 'full' || fullSweepState.due;
+    const dispatchReason =
+        args.mode === 'full' ? 'manual_full_sweep' : fullSweepState.reason;
+    const incremental = isFullSweep
+        ? { targetTrainCodes: [], matchedItemCount: 0, candidates: [] }
+        : collectIncrementalStationCandidates(published.date);
+    const stationCandidates = isFullSweep
+        ? collectStationCandidates(
+              listScheduleStopStationCandidateRowsByStateKind('published')
+          )
+        : incremental.candidates;
+    const selectedStations = buildSelectedStationNames(stationCandidates);
+
+    recordCurrentTrainProvenanceEvent({
+        serviceDate: published.date,
+        eventType: 'station_board_schedule_stations_collected',
+        result: stationCandidates.length > 0 ? 'selected' : 'empty',
+        payload: {
+            requestedMode: args.mode,
+            effectiveMode: isFullSweep ? 'full' : 'incremental',
+            dispatchReason,
+            fullSweepIntervalDays:
+                config.task.circulation.stationBoard.fullSweepIntervalDays,
+            lastFullSweepDate: fullSweepState.lastFullSweepDate,
+            targetTrainCodeCount: incremental.targetTrainCodes.length,
+            targetTrainCodes: incremental.targetTrainCodes,
+            matchedItemCount: incremental.matchedItemCount,
+            candidateGroupCount: stationCandidates.length,
+            selectedStations
+        }
+    });
+
     if (stationCandidates.length === 0) {
+        maybeRecordDispatchResult({
+            serviceDate: published.date,
+            candidateGroupCount: 0,
+            selectedStations: [],
+            createdTaskCount: 0,
+            reusedTaskCount: 0,
+            skippedNotFoundCount: 0,
+            skippedAmbiguousCount: 0,
+            detail: []
+        });
         logger.info(
-            `done stationCandidates=0 scheduleItems=${published.uniqueItems} currentDate=${published.date}`
+            `done mode=${args.mode} effectiveMode=${isFullSweep ? 'full' : 'incremental'} reason=${dispatchReason} stationCandidates=0 targetTrainCodes=${incremental.targetTrainCodes.length} scheduleItems=${published.uniqueItems} currentDate=${published.date}`
         );
         return;
     }
@@ -181,8 +302,6 @@ async function executeDispatchStationBoardTasks() {
     )
         ? buildStationTelecodeLookup(await fetchAllStations())
         : new Map();
-    const selectedStations = buildSelectedStationNames(stationCandidates);
-
     const executionTime = getNowSeconds();
     const pendingTasks = listPendingStationBoardTasks();
     const retryRemaining = Math.max(
@@ -195,16 +314,6 @@ async function executeDispatchStationBoardTasks() {
     let skippedAmbiguous = 0;
     const dispatchDetail: StationBoardDispatchTaskDetail[] = [];
     const dispatchedStationKeys = new Set<string>();
-
-    recordCurrentTrainProvenanceEvent({
-        serviceDate: published.date,
-        eventType: 'station_board_schedule_stations_collected',
-        result: 'selected',
-        payload: {
-            candidateGroupCount: stationCandidates.length,
-            selectedStations
-        }
-    });
 
     for (const candidate of stationCandidates) {
         const stationName = candidate.stationName;
@@ -323,8 +432,12 @@ async function executeDispatchStationBoardTasks() {
         detail: dispatchDetail
     });
 
+    if (isFullSweep) {
+        saveStationBoardLastFullSweepDate(published.date);
+    }
+
     logger.info(
-        `done stationCandidates=${stationCandidates.length} selectedStations=${selectedStations.length} createdTasks=${createdTasks} reusedTasks=${reusedTasks} skippedNotFound=${skippedNotFound} skippedAmbiguous=${skippedAmbiguous} retryRemaining=${retryRemaining} currentDate=${published.date}`
+        `done mode=${args.mode} effectiveMode=${isFullSweep ? 'full' : 'incremental'} reason=${dispatchReason} targetTrainCodes=${incremental.targetTrainCodes.length} stationCandidates=${stationCandidates.length} selectedStations=${selectedStations.length} createdTasks=${createdTasks} reusedTasks=${reusedTasks} skippedNotFound=${skippedNotFound} skippedAmbiguous=${skippedAmbiguous} retryRemaining=${retryRemaining} currentDate=${published.date}`
     );
 }
 
@@ -333,9 +446,10 @@ export function registerDispatchStationBoardTasksExecutor() {
         return;
     }
 
-    registerTaskExecutor(DISPATCH_STATION_BOARD_TASKS_EXECUTOR, async () => {
-        await executeDispatchStationBoardTasks();
-    });
+    registerTaskExecutor(
+        DISPATCH_STATION_BOARD_TASKS_EXECUTOR,
+        executeDispatchStationBoardTasks
+    );
     registered = true;
     logger.info(`registered executor=${DISPATCH_STATION_BOARD_TASKS_EXECUTOR}`);
 }
