@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import '~/server/libs/database/timetableHistory';
 import { createPreparedSqlStore } from '~/server/libs/database/prepared';
 import { useTimetableHistoryDatabase } from '~/server/libs/database/timetableHistory';
@@ -9,8 +8,7 @@ import {
 } from '~/server/utils/12306/scheduleProbe/taskHelpers';
 import type {
     ScheduleItem,
-    ScheduleState,
-    ScheduleStop
+    ScheduleState
 } from '~/server/utils/12306/scheduleProbe/types';
 import {
     listScheduleItemsWithStopsByStateKindAndInternalCode,
@@ -20,7 +18,7 @@ import {
 } from '~/server/utils/12306/scheduleProbe/sqliteStore';
 import uniqueNormalizedCodes from '~/server/utils/12306/uniqueNormalizedCodes';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
-import normalizeTimetableBoundaryStopTimes from '~/server/utils/12306/normalizeTimetableBoundaryStopTimes';
+import getCanonicalTimetableContent from '~/server/utils/12306/getCanonicalTimetableContent';
 import { formatShanghaiDateString } from '~/server/utils/date/getCurrentDateString';
 import { getShanghaiDayStartUnixSeconds } from '~/server/utils/date/shanghaiDateTime';
 import importSqlBatch from '~/server/utils/sql/importSqlBatch';
@@ -49,18 +47,6 @@ export interface TimetableHistoryCursorPoint {
     id: number;
 }
 
-interface CanonicalTimetableStop {
-    stationNo: number;
-    stationName: string;
-    arriveAt: number | null;
-    departAt: number | null;
-    stationTrainCode: string;
-}
-
-interface CanonicalTimetablePayload {
-    stops: CanonicalTimetableStop[];
-}
-
 type TimetableHistorySqlKey =
     | 'deleteCoverageById'
     | 'insertContent'
@@ -85,7 +71,7 @@ export interface TimetableHistorySyncResult {
     updatedCoverages: number;
     deletedCoverages: number;
     noopedCoverages: number;
-    routeRefreshTrainCodes: string[];
+    timetableChangedTrainCodes: string[];
 }
 
 interface SyncCoverageStats {
@@ -94,6 +80,11 @@ interface SyncCoverageStats {
     updatedCoverages: number;
     deletedCoverages: number;
     noopedCoverages: number;
+}
+
+interface CoverageSyncResult {
+    isFirstObservation: boolean;
+    timetableChanged: boolean;
 }
 
 const timetableHistorySql = importSqlBatch(
@@ -356,66 +347,6 @@ function getNextServiceDateInteger(serviceDate: number): number {
     return normalizeServiceDateInteger(nextDate);
 }
 
-function buildCanonicalTimetablePayload(
-    stops: ScheduleStop[]
-): CanonicalTimetablePayload {
-    const boundaryNormalizedStops = normalizeTimetableBoundaryStopTimes(stops);
-    const normalizedStops = boundaryNormalizedStops
-        .map((stop, index) => ({
-            stationNo: stop.stationNo,
-            stationName: stop.stationName.trim(),
-            arriveAt: stop.arriveAt,
-            departAt: stop.departAt,
-            stationTrainCode: stop.stationTrainCode.trim().toUpperCase(),
-            inputIndex: index
-        }))
-        .sort((left, right) => {
-            if (left.stationNo !== right.stationNo) {
-                return left.stationNo - right.stationNo;
-            }
-            const stationNameDiff = left.stationName.localeCompare(
-                right.stationName,
-                'zh-Hans-CN'
-            );
-            if (stationNameDiff !== 0) {
-                return stationNameDiff;
-            }
-            const leftArriveAt = left.arriveAt ?? Number.MIN_SAFE_INTEGER;
-            const rightArriveAt = right.arriveAt ?? Number.MIN_SAFE_INTEGER;
-            if (leftArriveAt !== rightArriveAt) {
-                return leftArriveAt - rightArriveAt;
-            }
-            const leftDepartAt = left.departAt ?? Number.MIN_SAFE_INTEGER;
-            const rightDepartAt = right.departAt ?? Number.MIN_SAFE_INTEGER;
-            if (leftDepartAt !== rightDepartAt) {
-                return leftDepartAt - rightDepartAt;
-            }
-            const codeDiff = left.stationTrainCode.localeCompare(
-                right.stationTrainCode,
-                'zh-Hans-CN'
-            );
-            if (codeDiff !== 0) {
-                return codeDiff;
-            }
-            return left.inputIndex - right.inputIndex;
-        })
-        .map(({ inputIndex: _inputIndex, ...stop }) => stop);
-
-    return {
-        stops: normalizedStops
-    };
-}
-
-function stringifyCanonicalTimetablePayload(
-    payload: CanonicalTimetablePayload
-) {
-    return JSON.stringify(payload);
-}
-
-function hashCanonicalTimetableJson(canonicalJson: string) {
-    return createHash('sha256').update(canonicalJson, 'utf8').digest('hex');
-}
-
 function ensureContentRow(
     hash: string,
     timetableJson: string,
@@ -576,7 +507,7 @@ function syncCoverageForTrainCode(
     contentId: number,
     nowSeconds: number,
     stats: SyncCoverageStats
-): boolean {
+): CoverageSyncResult {
     const currentRow =
         timetableHistoryStatements.get<TimetableHistoryCoverageRow>(
             'selectLatestCoverageByTrainCodeAtOrBeforeDate',
@@ -594,7 +525,7 @@ function syncCoverageForTrainCode(
             stats
         );
         normalizeAdjacentCoverages(trainCode, nowSeconds, stats);
-        return true;
+        return { isFirstObservation: true, timetableChanged: false };
     }
 
     if (
@@ -603,13 +534,13 @@ function syncCoverageForTrainCode(
     ) {
         if (currentRow.content_id === contentId) {
             stats.noopedCoverages += 1;
-            return false;
+            return { isFirstObservation: false, timetableChanged: false };
         }
 
         if (currentRow.service_date_start === serviceDate) {
             updateCoverageContent(currentRow.id, contentId, nowSeconds, stats);
             normalizeAdjacentCoverages(trainCode, nowSeconds, stats);
-            return true;
+            return { isFirstObservation: false, timetableChanged: true };
         }
 
         updateCoverageEnd(currentRow.id, serviceDate, nowSeconds, stats);
@@ -622,7 +553,7 @@ function syncCoverageForTrainCode(
             stats
         );
         normalizeAdjacentCoverages(trainCode, nowSeconds, stats);
-        return true;
+        return { isFirstObservation: false, timetableChanged: true };
     }
 
     if (currentRow.content_id === contentId) {
@@ -636,7 +567,7 @@ function syncCoverageForTrainCode(
             stats
         );
         normalizeAdjacentCoverages(trainCode, nowSeconds, stats);
-        return false;
+        return { isFirstObservation: false, timetableChanged: false };
     }
 
     insertCoverage(
@@ -648,7 +579,7 @@ function syncCoverageForTrainCode(
         stats
     );
     normalizeAdjacentCoverages(trainCode, nowSeconds, stats);
-    return true;
+    return { isFirstObservation: false, timetableChanged: true };
 }
 
 export function syncConfirmedTimetableHistoryForPublishedState(
@@ -756,7 +687,7 @@ function createTimetableHistorySyncResult(
         updatedCoverages: 0,
         deletedCoverages: 0,
         noopedCoverages: 0,
-        routeRefreshTrainCodes: []
+        timetableChangedTrainCodes: []
     };
 }
 
@@ -800,24 +731,24 @@ function syncConfirmedTimetableHistoryGroups(
                 continue;
             }
 
-            const payload = buildCanonicalTimetablePayload(
+            const content = getCanonicalTimetableContent(
                 representativeItem.stops
             );
-            if (payload.stops.length === 0) {
+            if (content.stopCount === 0) {
                 result.skippedGroups += 1;
                 continue;
             }
 
-            const canonicalJson = stringifyCanonicalTimetablePayload(payload);
-            const hash = hashCanonicalTimetableJson(canonicalJson);
             const contentRow = ensureContentRow(
-                hash,
-                canonicalJson,
-                payload.stops.length,
+                content.hash,
+                content.timetableJson,
+                content.stopCount,
                 nowSeconds,
                 result
             );
-            let groupContentChanged = false;
+            let groupHasComparableContent = false;
+            let groupHasFirstObservation = false;
+            let groupTimetableChanged = false;
 
             for (const aliasCode of aliasCodes) {
                 const normalizedAliasCode = normalizeCode(aliasCode);
@@ -825,22 +756,29 @@ function syncConfirmedTimetableHistoryGroups(
                     continue;
                 }
 
-                if (
-                    syncCoverageForTrainCode(
-                        normalizedAliasCode,
-                        serviceDate,
-                        nextServiceDate,
-                        contentRow.id,
-                        nowSeconds,
-                        result
-                    )
-                ) {
-                    groupContentChanged = true;
+                const coverageSyncResult = syncCoverageForTrainCode(
+                    normalizedAliasCode,
+                    serviceDate,
+                    nextServiceDate,
+                    contentRow.id,
+                    nowSeconds,
+                    result
+                );
+                if (coverageSyncResult.isFirstObservation) {
+                    groupHasFirstObservation = true;
+                } else {
+                    groupHasComparableContent = true;
+                }
+                if (coverageSyncResult.timetableChanged) {
+                    groupTimetableChanged = true;
                 }
             }
 
-            if (groupContentChanged) {
-                result.routeRefreshTrainCodes.push(
+            if (
+                groupTimetableChanged ||
+                (!groupHasComparableContent && groupHasFirstObservation)
+            ) {
+                result.timetableChangedTrainCodes.push(
                     normalizeCode(representativeItem.code)
                 );
             }

@@ -474,7 +474,6 @@ export async function refreshRouteBatchForCodes(
             ...stationUpdates,
             ...(await toScheduleStationMap(routeResult.data.route.stops))
         };
-        let groupChanged = false;
         const appliedGroupStops = new Map<number, ScheduleStop[]>();
         for (const index of groupItemIndexes) {
             const groupItem = targetItems[index]!;
@@ -483,20 +482,6 @@ export async function refreshRouteBatchForCodes(
                 groupItem.stops
             );
             appliedGroupStops.set(index, mergedStops);
-            if (
-                groupItem.allCodes.join('/') !== nextAllCodes.join('/') ||
-                groupItem.bureauCode !== nextBureauCode ||
-                groupItem.trainStyle !== nextTrainStyle ||
-                groupItem.trainDepartment !== nextTrainDepartment ||
-                groupItem.passengerDepartment !== nextPassengerDepartment ||
-                groupItem.startStation !== nextStartStation ||
-                groupItem.endStation !== nextEndStation ||
-                groupItem.startAt !== normalizedStartAt ||
-                groupItem.endAt !== normalizedEndAt ||
-                JSON.stringify(groupItem.stops) !== JSON.stringify(mergedStops)
-            ) {
-                groupChanged = true;
-            }
             groupItem.allCodes = [...nextAllCodes];
             groupItem.bureauCode = nextBureauCode;
             groupItem.trainStyle = nextTrainStyle;
@@ -521,7 +506,7 @@ export async function refreshRouteBatchForCodes(
         success += 1;
         mutated = true;
         groupUpdates.push({
-            changed: groupChanged,
+            changed: false,
             attempts: routeResult.attempts,
             codes: groupItemIndexes.map((index) =>
                 normalizeCode(targetItems[index]!.code)
@@ -543,9 +528,6 @@ export async function refreshRouteBatchForCodes(
                     ...stop
                 }))
         });
-        if (groupChanged) {
-            changed += 1;
-        }
     }
 
     if (mutated) {
@@ -558,15 +540,11 @@ export async function refreshRouteBatchForCodes(
         );
         const latestItems = latestRecords.map((record) => record.item);
         const appliedGroupUpdates: RefreshRouteGroupUpdate[] = [];
-        const appliedChangedGroupUpdates: RefreshRouteGroupUpdate[] = [];
         const appliedConfirmedTrainCodes: string[] = [];
         for (const update of groupUpdates) {
             if (applyGroupUpdate(latestItems, update)) {
                 appliedGroupUpdates.push(update);
                 appliedConfirmedTrainCodes.push(...update.codes);
-                if (update.changed) {
-                    appliedChangedGroupUpdates.push(update);
-                }
             } else {
                 recordRefreshRouteGroupFailed(
                     published.date,
@@ -619,6 +597,49 @@ export async function refreshRouteBatchForCodes(
             );
 
             if (persistResult.status === 'saved') {
+                const syncResult =
+                    syncConfirmedTimetableHistoryForScheduleStateKind(
+                        'published',
+                        published.date,
+                        appliedConfirmedTrainCodes,
+                        getNowSeconds()
+                    );
+                logger.info(
+                    `history_sync date=${published.date} confirmedGroups=${syncResult.confirmedGroups} confirmedTrainCodes=${syncResult.confirmedTrainCodes} skippedGroups=${syncResult.skippedGroups} createdContents=${syncResult.createdContents} insertedCoverages=${syncResult.insertedCoverages} updatedCoverages=${syncResult.updatedCoverages} deletedCoverages=${syncResult.deletedCoverages} noopedCoverages=${syncResult.noopedCoverages}`
+                );
+                const timetableChangedTrainCodes = new Set(
+                    syncResult.timetableChangedTrainCodes
+                );
+                const appliedChangedGroupUpdates = appliedGroupUpdates.filter(
+                    (update) =>
+                        update.codes.some((code) =>
+                            timetableChangedTrainCodes.has(code)
+                        )
+                );
+                for (const update of appliedChangedGroupUpdates) {
+                    update.changed = true;
+                }
+                changed += appliedChangedGroupUpdates.length;
+
+                const appendedQueueEntries = appendRouteRefreshQueueTrainCodes(
+                    scheduleStorePath,
+                    published.date,
+                    syncResult.timetableChangedTrainCodes,
+                    getNowSeconds()
+                );
+                stationBoardQueueAppendedCount += appendedQueueEntries.length;
+                logger.info(
+                    `route_refresh_queue_sync date=${published.date} candidates=${syncResult.timetableChangedTrainCodes.length} appended=${appendedQueueEntries.length}`
+                );
+                const timetableIdSyncResult =
+                    syncCurrentDayTimetableIdsForTrainCodes(
+                        published.date,
+                        appliedConfirmedTrainCodes
+                    );
+                logger.info(
+                    `timetable_id_sync date=${published.date} scannedTrainCodes=${timetableIdSyncResult.scannedTrainCodes} changedTrainCodes=${timetableIdSyncResult.changedTrainCodes} updatedDailyRows=${timetableIdSyncResult.updatedDailyRows} deletedDailyRows=${timetableIdSyncResult.deletedDailyRows} updatedProbeRows=${timetableIdSyncResult.updatedProbeRows} deletedProbeRows=${timetableIdSyncResult.deletedProbeRows}`
+                );
+
                 for (const update of appliedGroupUpdates) {
                     recordRefreshRouteGroupSucceeded(
                         published.date,
@@ -688,35 +709,6 @@ export async function refreshRouteBatchForCodes(
                         );
                     }
                 }
-
-                const syncResult =
-                    syncConfirmedTimetableHistoryForScheduleStateKind(
-                        'published',
-                        published.date,
-                        appliedConfirmedTrainCodes,
-                        getNowSeconds()
-                    );
-                logger.info(
-                    `history_sync date=${published.date} confirmedGroups=${syncResult.confirmedGroups} confirmedTrainCodes=${syncResult.confirmedTrainCodes} skippedGroups=${syncResult.skippedGroups} createdContents=${syncResult.createdContents} insertedCoverages=${syncResult.insertedCoverages} updatedCoverages=${syncResult.updatedCoverages} deletedCoverages=${syncResult.deletedCoverages} noopedCoverages=${syncResult.noopedCoverages}`
-                );
-                const appendedQueueEntries = appendRouteRefreshQueueTrainCodes(
-                    scheduleStorePath,
-                    published.date,
-                    syncResult.routeRefreshTrainCodes,
-                    getNowSeconds()
-                );
-                stationBoardQueueAppendedCount += appendedQueueEntries.length;
-                logger.info(
-                    `route_refresh_queue_sync date=${published.date} candidates=${syncResult.routeRefreshTrainCodes.length} appended=${appendedQueueEntries.length}`
-                );
-                const timetableIdSyncResult =
-                    syncCurrentDayTimetableIdsForTrainCodes(
-                        published.date,
-                        appliedConfirmedTrainCodes
-                    );
-                logger.info(
-                    `timetable_id_sync date=${published.date} scannedTrainCodes=${timetableIdSyncResult.scannedTrainCodes} changedTrainCodes=${timetableIdSyncResult.changedTrainCodes} updatedDailyRows=${timetableIdSyncResult.updatedDailyRows} deletedDailyRows=${timetableIdSyncResult.deletedDailyRows} updatedProbeRows=${timetableIdSyncResult.updatedProbeRows} deletedProbeRows=${timetableIdSyncResult.deletedProbeRows}`
-                );
             } else {
                 for (const update of appliedGroupUpdates) {
                     recordRefreshRouteGroupFailed(

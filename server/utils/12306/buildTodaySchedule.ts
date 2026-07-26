@@ -95,11 +95,11 @@ function syncBuildConfirmedTimetableHistory(
     const appendedQueueEntries = appendRouteRefreshQueueTrainCodes(
         scheduleFilePath,
         promotedState.date,
-        syncResult.routeRefreshTrainCodes,
+        syncResult.timetableChangedTrainCodes,
         promotedState.generatedAt
     );
     logger.info(
-        `route_refresh_queue_sync date=${promotedState.date} candidates=${syncResult.routeRefreshTrainCodes.length} appended=${appendedQueueEntries.length}`
+        `route_refresh_queue_sync date=${promotedState.date} candidates=${syncResult.timetableChangedTrainCodes.length} appended=${appendedQueueEntries.length}`
     );
 
     const timetableIdSyncResult = syncCurrentDayTimetableIdsForTrainCodes(
