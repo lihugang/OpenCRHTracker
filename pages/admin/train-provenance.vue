@@ -919,13 +919,61 @@
                                                         item.schedulerTaskId
                                                     }}
                                                 </p>
-                                                <p v-if="item.emuCode">
+                                                <p
+                                                    v-if="
+                                                        item.emuCode &&
+                                                        !isCouplingScanDirectHit(
+                                                            item
+                                                        )
+                                                    ">
                                                     车组：{{ item.emuCode }}
                                                 </p>
                                                 <p v-if="item.relatedTrainCode">
                                                     关联车次：{{
                                                         item.relatedTrainCode
                                                     }}
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <div
+                                            v-if="isCouplingScanDirectHit(item)"
+                                            class="grid gap-3 rounded-[0.875rem] border border-blue-200 bg-blue-50/70 px-4 py-4 sm:grid-cols-3">
+                                            <div>
+                                                <p
+                                                    class="text-xs font-semibold uppercase tracking-[0.16em] text-blue-700">
+                                                    当前车次
+                                                </p>
+                                                <p
+                                                    class="mt-1 text-sm font-semibold text-slate-900">
+                                                    {{
+                                                        getCouplingScanTrackingScopeLabel(
+                                                            item
+                                                        )
+                                                    }}
+                                                </p>
+                                            </div>
+                                            <div>
+                                                <p
+                                                    class="text-xs font-semibold uppercase tracking-[0.16em] text-blue-700">
+                                                    扫描候选车组
+                                                </p>
+                                                <p
+                                                    class="mt-1 break-all text-sm font-semibold text-slate-900">
+                                                    {{
+                                                        item.relatedEmuCode ||
+                                                        '--'
+                                                    }}
+                                                </p>
+                                            </div>
+                                            <div>
+                                                <p
+                                                    class="text-xs font-semibold uppercase tracking-[0.16em] text-blue-700">
+                                                    12306 返回车组
+                                                </p>
+                                                <p
+                                                    class="mt-1 break-all text-sm font-semibold text-slate-900">
+                                                    {{ item.emuCode || '--' }}
                                                 </p>
                                             </div>
                                         </div>
@@ -1691,10 +1739,14 @@
                                                     )
                                                 }}
                                             </span>
-                                            <span
+                                            <p
                                                 class="text-sm font-semibold text-slate-900">
-                                                {{ item.candidateEmuCode }}
-                                            </span>
+                                                扫描候选车组：
+                                                {{
+                                                    item.candidateEmuCode ||
+                                                    '--'
+                                                }}
+                                            </p>
                                         </div>
                                         <p
                                             class="text-sm leading-6 text-slate-600">
@@ -2116,8 +2168,12 @@
                                                 }}
                                             </span>
                                         </div>
+                                        <p
+                                            class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+                                            检测配置车组
+                                        </p>
                                         <h3
-                                            class="text-lg font-semibold text-slate-900">
+                                            class="break-all text-lg font-semibold text-slate-900">
                                             {{ item.taskRun.emuCode || '--' }}
                                         </h3>
                                         <p
@@ -2219,7 +2275,7 @@
                                                         }}
                                                     </p>
                                                     <p v-if="event.emuCode">
-                                                        车组：{{
+                                                        12306 返回车组：{{
                                                             event.emuCode
                                                         }}
                                                     </p>
@@ -4867,6 +4923,22 @@ function formatRouteSnapshotStations(route: AdminTrainRouteSnapshot | null) {
     }
 
     return `${route.startStation || '--'} 至 ${route.endStation || '--'}`;
+}
+
+function isCouplingScanDirectHit(item: AdminTrainProvenanceEvent) {
+    return item.eventType === 'coupling_scan_candidate_direct_hit';
+}
+
+function getCouplingScanTrackingScopeLabel(item: AdminTrainProvenanceEvent) {
+    if (item.result === 'matched') {
+        return '已纳入追踪范围';
+    }
+
+    if (item.result === 'unmatched') {
+        return '未纳入追踪范围';
+    }
+
+    return '追踪范围未知';
 }
 
 function hasScannedRoute(route: AdminTrainRouteSnapshot | null) {
