@@ -3,7 +3,8 @@ import useConfig from '~/server/config';
 import { registerTaskExecutor } from '~/server/services/taskExecutorRegistry';
 import {
     getSafeTodayScheduleProbeTrainCodes,
-    getTodayScheduleProbeGroups
+    getTodayScheduleProbeGroups,
+    type TodayScheduleProbeGroup
 } from '~/server/services/todayScheduleCache';
 import {
     enqueueTasks,
@@ -13,6 +14,7 @@ import {
     markCurrentTrainProvenanceTaskSkipped,
     recordCurrentTrainProvenanceEventsForTrainCodes
 } from '~/server/services/trainProvenanceRecorder';
+import { isScheduleProbeTrackingEnabled } from '~/server/utils/12306/scheduleProbe/rules';
 import { loadPublishedScheduleStateSummary } from '~/server/utils/12306/scheduleProbe/stateStore';
 import { getScheduleDatabaseFilePath } from '~/server/utils/12306/scheduleProbe/sqliteStore';
 import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
@@ -32,6 +34,11 @@ export interface DispatchDailyProbeTasksResult {
     date: string | null;
     groupCount: number;
     createdTaskIds: number[];
+}
+
+interface TrackableProbeGroup {
+    trainCodes: string[];
+    group: TodayScheduleProbeGroup;
 }
 
 function resolveProbeTaskExecutionTime(
@@ -89,8 +96,21 @@ export async function dispatchDailyProbeTasks(): Promise<DispatchDailyProbeTasks
         config.spider.scheduleProbe.probe.latestExecutionTimeHHmm;
     const tasksToEnqueue: EnqueueTaskInput[] = [];
     const probeGroups = Array.from(getTodayScheduleProbeGroups().values());
+    const trackableProbeGroups: TrackableProbeGroup[] = [];
     for (const group of probeGroups) {
         const trainCodes = getSafeTodayScheduleProbeTrainCodes(group);
+        if (
+            !trainCodes.some((trainCode) =>
+                isScheduleProbeTrackingEnabled(
+                    trainCode,
+                    config.spider.scheduleProbe.prefixRules
+                )
+            )
+        ) {
+            continue;
+        }
+
+        trackableProbeGroups.push({ group, trainCodes });
         const args = {
             trainCode: group.trainCode,
             trainInternalCode: group.trainInternalCode,
@@ -115,37 +135,34 @@ export async function dispatchDailyProbeTasks(): Promise<DispatchDailyProbeTasks
     }
 
     const taskIds = enqueueTasks(tasksToEnqueue);
-    for (const [index, group] of probeGroups.entries()) {
+    for (const [index, entry] of trackableProbeGroups.entries()) {
         const createdTaskId = taskIds[index];
         if (!createdTaskId) {
             continue;
         }
 
-        recordCurrentTrainProvenanceEventsForTrainCodes(
-            getSafeTodayScheduleProbeTrainCodes(group),
-            {
-                serviceDate: scheduleState.date,
-                startAt: group.startAt,
-                eventType: 'probe_task_dispatched',
-                result: 'queued',
-                linkedSchedulerTaskId: createdTaskId,
-                payload: {
-                    executor: PROBE_TRAIN_DEPARTURE_TASK_EXECUTOR,
-                    executionTime: tasksToEnqueue[index]?.executionTime ?? now,
-                    allTrainCodes: getSafeTodayScheduleProbeTrainCodes(group),
-                    startStation: group.startStation,
-                    endStation: group.endStation,
-                    retry: defaultRetry
-                }
+        recordCurrentTrainProvenanceEventsForTrainCodes(entry.trainCodes, {
+            serviceDate: scheduleState.date,
+            startAt: entry.group.startAt,
+            eventType: 'probe_task_dispatched',
+            result: 'queued',
+            linkedSchedulerTaskId: createdTaskId,
+            payload: {
+                executor: PROBE_TRAIN_DEPARTURE_TASK_EXECUTOR,
+                executionTime: tasksToEnqueue[index]?.executionTime ?? now,
+                allTrainCodes: entry.trainCodes,
+                startStation: entry.group.startStation,
+                endStation: entry.group.endStation,
+                retry: defaultRetry
             }
-        );
+        });
     }
     logger.info(
-        `done date=${scheduleState.date} groups=${probeGroups.length} createdTasks=${tasksToEnqueue.length} defaultRetry=${defaultRetry} latestExecutionTimeHHmm=${latestExecutionTimeHHmm} firstTaskId=${taskIds[0] ?? 'null'}`
+        `done date=${scheduleState.date} candidateGroups=${probeGroups.length} trackedGroups=${trackableProbeGroups.length} skippedGroups=${probeGroups.length - trackableProbeGroups.length} createdTasks=${tasksToEnqueue.length} defaultRetry=${defaultRetry} latestExecutionTimeHHmm=${latestExecutionTimeHHmm} firstTaskId=${taskIds[0] ?? 'null'}`
     );
     return {
         date: scheduleState.date,
-        groupCount: probeGroups.length,
+        groupCount: trackableProbeGroups.length,
         createdTaskIds: taskIds
     };
 }

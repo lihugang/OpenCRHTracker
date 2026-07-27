@@ -12,6 +12,7 @@ interface ScheduleProbePrefixRule {
     prefix: string;
     minNo: number;
     maxNo: number;
+    track: boolean;
 }
 
 interface ScheduleProbeRefreshConfig {
@@ -1634,6 +1635,13 @@ function validateConfig(raw: unknown): Config {
                             `spider.scheduleProbe.prefixRules[${index}].maxNo`,
                             1
                         );
+                        const track =
+                            rule.track === undefined
+                                ? true
+                                : asBoolean(
+                                      rule.track,
+                                      `spider.scheduleProbe.prefixRules[${index}].track`
+                                  );
                         assert(
                             maxNo >= minNo,
                             `spider.scheduleProbe.prefixRules[${index}].maxNo must be >= minNo`
@@ -1642,7 +1650,8 @@ function validateConfig(raw: unknown): Config {
                         return {
                             prefix,
                             minNo,
-                            maxNo
+                            maxNo,
+                            track
                         };
                     }
                 )

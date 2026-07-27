@@ -45,22 +45,26 @@
                 {
                     "prefix": "G",
                     "minNo": 1,
-                    "maxNo": 9999
+                    "maxNo": 9999,
+                    "track": true
                 },
                 {
                     "prefix": "D",
                     "minNo": 1,
-                    "maxNo": 9999
+                    "maxNo": 9999,
+                    "track": true
                 },
                 {
                     "prefix": "C",
                     "minNo": 1,
-                    "maxNo": 9999
+                    "maxNo": 9999,
+                    "track": true
                 },
                 {
                     "prefix": "S",
                     "minNo": 5500,
-                    "maxNo": 5600
+                    "maxNo": 5600,
+                    "track": true
                 }
             ]
         }

@@ -576,6 +576,27 @@ function asScheduleState(value: unknown): ScheduleState | null {
         return null;
     }
 
+    const prefixRules = (state.scope as { prefixRules?: unknown }).prefixRules;
+    if (!Array.isArray(prefixRules)) {
+        return null;
+    }
+    for (const prefixRule of prefixRules) {
+        if (
+            typeof prefixRule !== 'object' ||
+            prefixRule === null ||
+            Array.isArray(prefixRule)
+        ) {
+            return null;
+        }
+
+        const rule = prefixRule as { track?: unknown };
+        if (rule.track === undefined) {
+            rule.track = true;
+        } else if (typeof rule.track !== 'boolean') {
+            return null;
+        }
+    }
+
     if (typeof state.lastBuildDate !== 'string') {
         state.lastBuildDate = state.date;
     }
@@ -860,7 +881,8 @@ function isSameScopeAndStrategy(
         if (
             left.prefix !== right.prefix ||
             left.minNo !== right.minNo ||
-            left.maxNo !== right.maxNo
+            left.maxNo !== right.maxNo ||
+            left.track !== right.track
         ) {
             return false;
         }

@@ -207,6 +207,10 @@
                                     "maxNo": {
                                         "type": "integer",
                                         "minimum": 1
+                                    },
+                                    "track": {
+                                        "type": "boolean",
+                                        "default": true
                                     }
                                 },
                                 "required": [

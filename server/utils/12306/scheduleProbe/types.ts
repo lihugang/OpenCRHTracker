@@ -4,6 +4,7 @@ export interface ScheduleProbePrefixRule {
     prefix: string;
     minNo: number;
     maxNo: number;
+    track: boolean;
 }
 
 export interface ScheduleProbeRuntimeConfig {

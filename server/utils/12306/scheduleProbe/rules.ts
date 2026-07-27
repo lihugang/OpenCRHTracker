@@ -72,6 +72,13 @@ export function getRuleByCode(
     return null;
 }
 
+export function isScheduleProbeTrackingEnabled(
+    code: string,
+    rules: ScheduleProbePrefixRule[]
+): boolean {
+    return getRuleByCode(code, rules)?.rule.track === true;
+}
+
 export function getMaxDigits(rule: ScheduleProbePrefixRule): number {
     return String(rule.maxNo).length;
 }
