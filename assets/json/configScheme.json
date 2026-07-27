@@ -197,8 +197,7 @@
                                 "additionalProperties": false,
                                 "properties": {
                                     "prefix": {
-                                        "type": "string",
-                                        "minLength": 1
+                                        "type": "string"
                                     },
                                     "minNo": {
                                         "type": "integer",

@@ -5,6 +5,18 @@ export function getInitialKeywords(rules: ScheduleProbePrefixRule[]): string[] {
     const keywords = new Set<string>();
     for (const rule of rules) {
         for (let firstDigit = 1; firstDigit <= 9; firstDigit += 1) {
+            if (rule.prefix.length === 0) {
+                for (let secondDigit = 0; secondDigit <= 9; secondDigit += 1) {
+                    const digitPrefix = `${firstDigit}${secondDigit}`;
+                    if (!hasOverlapWithRule(digitPrefix, rule)) {
+                        continue;
+                    }
+
+                    keywords.add(digitPrefix);
+                }
+                continue;
+            }
+
             const digitPrefix = String(firstDigit);
             if (!hasOverlapWithRule(digitPrefix, rule)) {
                 continue;

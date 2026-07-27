@@ -1614,15 +1614,15 @@ function validateConfig(raw: unknown): Config {
                             ruleRaw,
                             `spider.scheduleProbe.prefixRules[${index}]`
                         );
-                        const prefix = asString(
+                        const prefix = asPlainString(
                             rule.prefix,
                             `spider.scheduleProbe.prefixRules[${index}].prefix`
                         )
                             .trim()
                             .toUpperCase();
                         assert(
-                            /^[A-Z]+$/.test(prefix),
-                            `spider.scheduleProbe.prefixRules[${index}].prefix must contain only uppercase letters`
+                            prefix.length === 0 || /^[A-Z]+$/.test(prefix),
+                            `spider.scheduleProbe.prefixRules[${index}].prefix must be empty or contain only uppercase letters`
                         );
 
                         const minNo = asInteger(
