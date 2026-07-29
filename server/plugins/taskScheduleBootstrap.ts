@@ -80,6 +80,10 @@ import {
     getShanghaiDayStartUnixSeconds
 } from '~/server/utils/date/shanghaiDateTime';
 import { registerBanUserAccountTaskExecutor } from '~/server/services/taskExecutors/banUserAccountTaskExecutor';
+import {
+    registerBackupDatabaseTaskExecutor,
+    synchronizeDatabaseBackupTasks
+} from '~/server/services/taskExecutors/backupDatabaseTaskExecutor';
 import { registerUserRiskCaseTaskExecutor } from '~/server/services/taskExecutors/userRiskCaseTaskExecutor';
 import { initializeUserBanSecurityState } from '~/server/services/userBanSecurityStore';
 
@@ -292,6 +296,7 @@ export default defineNitroPlugin(async () => {
         registerRefreshAssetFileTaskExecutors();
         registerBanUserAccountTaskExecutor();
         registerUserRiskCaseTaskExecutor();
+        registerBackupDatabaseTaskExecutor();
         initializeUserBanSecurityState();
         await synchronizeQrcodeDetectionDispatchTasks();
 
@@ -423,6 +428,7 @@ export default defineNitroPlugin(async () => {
         }
 
         enqueuedStartupTasks.push(...reconcileRefreshAssetTasks());
+        enqueuedStartupTasks.push(...synchronizeDatabaseBackupTasks());
 
         logger.info(
             `enqueued_startup_tasks executionTime=${executionTime} enqueued=${JSON.stringify(enqueuedStartupTasks)}`

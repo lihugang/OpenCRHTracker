@@ -153,15 +153,15 @@ export const deployDocsSections: DocsContentSection[] = [
             },
             {
                 type: 'code',
-                title: '增量示例：来源追踪与历史时刻表积累配置',
+                title: '数据库配置结构：来源追踪与历史时刻表积累',
                 language: 'json',
-                code: '{\n    "data": {\n        "databases": {\n            "trainProvenance": "data/train-provenance.db",\n            "timetableHistory": "data/timetable-history.db"\n        },\n        "runtime": {\n            "trainProvenance": {\n                "enabled": true,\n                "retentionDays": 7\n            }\n        }\n    }\n}'
+                code: '{\n    "data": {\n        "databases": {\n            "trainProvenance": {\n                "path": "data/train-provenance.db",\n                "backup": {\n                    "enabled": true,\n                    "path": "./data/backup/train-provenance.db",\n                    "executesAt": ["0600", "1330", "2355"]\n                }\n            },\n            "timetableHistory": {\n                "path": "data/timetable-history.db",\n                "backup": {\n                    "enabled": true,\n                    "path": "./data/backup/timetable-history.db",\n                    "executesAt": ["0600", "1330", "2355"]\n                }\n            }\n        }\n    }\n}'
             },
             {
                 type: 'list',
                 items: [
-                    '`data.databases.trainProvenance`：来源事件数据库文件路径，用于管理端“来源时间线”和“重联扫描结果”查询。',
-                    '`data.databases.timetableHistory`：内部历史时刻表积累数据库文件路径，用于保存规范化停站内容、停站数据哈希值和按日期压缩后的时刻表覆盖时间段。',
+                    '`data.databases.<名称>.path`：数据库文件路径；全部七个数据库都必须显式配置。',
+                    '`data.databases.<名称>.backup`：SQLite 备份开关、固定覆盖目标和每日 HHmm 执行时间；重载配置后会立即同步未来任务。',
                     '`data.runtime.trainProvenance.enabled`：是否启用来源事件记录，默认值为 true；关闭后不再为任务写入新的来源事件，相关管理端查询会返回禁用状态。',
                     '`data.runtime.trainProvenance.retentionDays`：来源事件保留天数，默认值为 7，最小值为 1；服务启动时会按该值清理过期记录。'
                 ]
@@ -348,43 +348,42 @@ export const deployDocsSections: DocsContentSection[] = [
                         ]
                     },
                     {
-                        path: 'data.databases.schedule',
+                        path: 'data.databases.schedule.path',
                         valueType: 'string',
-                        required: false,
-                        description:
-                            '时刻表 SQLite 数据库路径，默认 data/schedule.db。',
+                        required: true,
+                        description: '时刻表 SQLite 数据库路径。',
                         notes: [
                             '数据库内保存时刻表更新状态、车次别名、经停站、车站索引、官方交路和线路刷新队列。',
                             '运行时代码以该数据库为时刻表权威数据源，新部署建议显式配置并放在持久化数据目录内。'
                         ]
                     },
                     {
-                        path: 'data.databases.task',
+                        path: 'data.databases.task.path',
                         valueType: 'string',
                         required: true,
                         description: '任务调度数据库路径。'
                     },
                     {
-                        path: 'data.databases.EMUTracked',
+                        path: 'data.databases.EMUTracked.path',
                         valueType: 'string',
                         required: true,
                         description: '担当历史与日记录数据库路径。'
                     },
                     {
-                        path: 'data.databases.users',
+                        path: 'data.databases.users.path',
                         valueType: 'string',
                         required: true,
                         description: '用户、登录态和 API Key 数据库路径。'
                     },
                     {
-                        path: 'data.databases.feedback',
+                        path: 'data.databases.feedback.path',
                         valueType: 'string',
                         required: true,
                         description: '反馈与回复数据数据库路径。',
                         notes: ['所有数据库路径都建议指向持久化磁盘。']
                     },
                     {
-                        path: 'data.databases.timetableHistory',
+                        path: 'data.databases.timetableHistory.path',
                         valueType: 'string',
                         required: true,
                         description: '内部历史时刻表积累数据库路径。',
@@ -392,6 +391,17 @@ export const deployDocsSections: DocsContentSection[] = [
                             '数据库会保存规范化后的停站 JSON 内容、时刻表哈希和按日期压缩的时刻表覆盖时间段。',
                             '只有今日时刻表更新成功或者批量车次刷新任务成功后，才会把确认过的车次组写入这个库。',
                             '仅从昨天复用的路线信息不会计为新的历史确认。'
+                        ]
+                    },
+                    {
+                        path: 'data.databases.<名称>.backup',
+                        valueType: 'object',
+                        required: true,
+                        description: '每个 SQLite 数据库的定时备份配置。',
+                        notes: [
+                            'enabled 为 true 时按 executesAt 中的上海时区 HHmm 时刻执行。',
+                            'path 是固定覆盖的目标文件；其目录不存在时服务会自动创建。',
+                            '目标路径不能与任一源数据库路径或其他备份路径重复。'
                         ]
                     }
                 ]

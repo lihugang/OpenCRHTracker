@@ -112,16 +112,16 @@ function loadConfigDatabasePaths(configPath) {
     const parsed = JSON.parse(readUtf8File(configPath));
     const databases = parsed?.data?.databases;
     const sourceEmuDbPath =
-        typeof databases?.EMUTracked === 'string' ? databases.EMUTracked : '';
+        typeof databases?.EMUTracked?.path === 'string'
+            ? databases.EMUTracked.path
+            : '';
     const timetableDbPath =
-        typeof databases?.timetableHistory === 'string'
-            ? databases.timetableHistory
-            : 'data/timetable-history.db';
+        typeof databases?.timetableHistory?.path === 'string'
+            ? databases.timetableHistory.path
+            : '';
 
-    if (sourceEmuDbPath.length === 0) {
-        throw new Error(
-            `Config file is missing database paths: ${configPath}`
-        );
+    if (sourceEmuDbPath.length === 0 || timetableDbPath.length === 0) {
+        throw new Error(`Config file is missing database paths: ${configPath}`);
     }
 
     return {
@@ -234,7 +234,9 @@ function createTimetableStartOffsetResolver(timetableDb) {
 
             let startOffset;
             try {
-                startOffset = parseStartOffsetFromTimetableJson(row.timetable_json);
+                startOffset = parseStartOffsetFromTimetableJson(
+                    row.timetable_json
+                );
             } catch {
                 const invalidResult = {
                     ok: false,
@@ -264,7 +266,9 @@ function createTimetableStartOffsetResolver(timetableDb) {
 }
 
 function createOutputSchema(outputDb) {
-    outputDb.exec(loadSql('assets/sql/emu/schema/createDailyEmuRoutesTable.sql'));
+    outputDb.exec(
+        loadSql('assets/sql/emu/schema/createDailyEmuRoutesTable.sql')
+    );
     outputDb.exec(loadSql('assets/sql/emu/schema/createProbeStatusTable.sql'));
     outputDb.exec(`CREATE TABLE daily_emu_routes_sorted_stage (
         original_id INTEGER NOT NULL,
@@ -307,13 +311,15 @@ function createStatements(sourceDb, outputDb) {
             WHERE id > ?
             ORDER BY id ASC
             LIMIT ?`),
-        insertUnresolvedDailyRoute: outputDb.prepare(`INSERT INTO daily_emu_routes (
+        insertUnresolvedDailyRoute:
+            outputDb.prepare(`INSERT INTO daily_emu_routes (
                 train_code,
                 emu_code,
                 service_date,
                 timetable_id
             ) VALUES (?, ?, ?, ?)`),
-        insertStageDailyRoute: outputDb.prepare(`INSERT INTO daily_emu_routes_sorted_stage (
+        insertStageDailyRoute:
+            outputDb.prepare(`INSERT INTO daily_emu_routes_sorted_stage (
                 original_id,
                 train_code,
                 emu_code,
@@ -321,7 +327,8 @@ function createStatements(sourceDb, outputDb) {
                 timetable_id,
                 start_at
             ) VALUES (?, ?, ?, ?, ?, ?)`),
-        insertResolvedDailyRoutes: outputDb.prepare(`INSERT INTO daily_emu_routes (
+        insertResolvedDailyRoutes:
+            outputDb.prepare(`INSERT INTO daily_emu_routes (
                 train_code,
                 emu_code,
                 service_date,
@@ -436,7 +443,10 @@ function reorderDailyRoutes(sourceDb, outputDb, resolver, statements, stats) {
     });
 
     while (true) {
-        const rows = statements.selectDailyRoutesBatch.all(lastId, stats.batchSize);
+        const rows = statements.selectDailyRoutesBatch.all(
+            lastId,
+            stats.batchSize
+        );
         if (rows.length === 0) {
             break;
         }
@@ -472,7 +482,10 @@ function copyProbeStatus(outputDb, statements, stats) {
     });
 
     while (true) {
-        const rows = statements.selectProbeStatusBatch.all(lastId, stats.batchSize);
+        const rows = statements.selectProbeStatusBatch.all(
+            lastId,
+            stats.batchSize
+        );
         if (rows.length === 0) {
             break;
         }
@@ -496,7 +509,9 @@ function printSummary(stats, sourceCounts, outputCounts) {
     console.log(`Source probe_status rows: ${sourceCounts.probeStatus}`);
     console.log(`Scanned daily_emu_routes rows: ${stats.scannedDailyRoutes}`);
     console.log(`Resolved daily_emu_routes rows: ${stats.resolvedDailyRoutes}`);
-    console.log(`Unresolved daily_emu_routes rows: ${stats.unresolvedDailyRoutes}`);
+    console.log(
+        `Unresolved daily_emu_routes rows: ${stats.unresolvedDailyRoutes}`
+    );
     console.log(`Written daily_emu_routes rows: ${stats.writtenDailyRoutes}`);
     console.log(`Copied probe_status rows: ${stats.copiedProbeStatus}`);
     console.log(`Output daily_emu_routes rows: ${outputCounts.dailyRoutes}`);
@@ -509,9 +524,9 @@ function printSummary(stats, sourceCounts, outputCounts) {
     }
 
     console.log('Unresolved reasons:');
-    for (const [reason, count] of Array.from(stats.unresolvedReasons.entries()).sort(
-        (left, right) => left[0].localeCompare(right[0], 'en')
-    )) {
+    for (const [reason, count] of Array.from(
+        stats.unresolvedReasons.entries()
+    ).sort((left, right) => left[0].localeCompare(right[0], 'en'))) {
         console.log(`  ${reason}: ${count}`);
     }
 }
@@ -567,10 +582,8 @@ function main() {
         const statements = createStatements(sourceDb, outputDb);
         const resolver = createTimetableStartOffsetResolver(timetableDb);
         const sourceCounts = {
-            dailyRoutes:
-                statements.selectDailyRoutesCount.get()?.count ?? 0,
-            probeStatus:
-                statements.selectProbeStatusCount.get()?.count ?? 0
+            dailyRoutes: statements.selectDailyRoutesCount.get()?.count ?? 0,
+            probeStatus: statements.selectProbeStatusCount.get()?.count ?? 0
         };
 
         reorderDailyRoutes(sourceDb, outputDb, resolver, statements, stats);

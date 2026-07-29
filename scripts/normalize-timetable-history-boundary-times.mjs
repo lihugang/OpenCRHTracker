@@ -77,7 +77,7 @@ function loadConfigDatabasePath(configPath) {
     }
 
     const parsed = JSON.parse(readUtf8File(configPath));
-    const dbPath = parsed?.data?.databases?.timetableHistory;
+    const dbPath = parsed?.data?.databases?.timetableHistory?.path;
     if (typeof dbPath !== 'string' || dbPath.trim().length === 0) {
         throw new Error(
             `Config file is missing data.databases.timetableHistory: ${configPath}`
@@ -209,9 +209,7 @@ function buildContentPlan(contentRows) {
                 row,
                 ...normalized,
                 boundaryChanged,
-                changed:
-                    row.hash !== normalized.hash ||
-                    boundaryChanged
+                changed: row.hash !== normalized.hash || boundaryChanged
             };
             entries.push(entry);
 
@@ -349,8 +347,7 @@ function buildCoverageMergePlan(rows) {
         const removedRows = run.rows.filter((row) => row.id !== keeper.id);
         const keeperRangeChanged =
             keeper.service_date_start !== run.serviceDateStart ||
-            keeper.service_date_end_exclusive !==
-                run.serviceDateEndExclusive;
+            keeper.service_date_end_exclusive !== run.serviceDateEndExclusive;
 
         if (keeperRangeChanged) {
             updatedRows += 1;

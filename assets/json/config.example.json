@@ -114,13 +114,62 @@
             }
         },
         "databases": {
-            "task": "data/task.db",
-            "EMUTracked": "data/emu.db",
-            "users": "data/users.db",
-            "feedback": "data/feedback.db",
-            "trainProvenance": "data/train-provenance.db",
-            "timetableHistory": "data/timetable-history.db",
-            "schedule": "data/schedule.db"
+            "task": {
+                "path": "data/task.db",
+                "backup": {
+                    "enabled": true,
+                    "path": "./data/backup/task.db",
+                    "executesAt": ["0600", "1330", "2355"]
+                }
+            },
+            "EMUTracked": {
+                "path": "data/emu.db",
+                "backup": {
+                    "enabled": true,
+                    "path": "./data/backup/emu.db",
+                    "executesAt": ["0600", "1330", "2355"]
+                }
+            },
+            "users": {
+                "path": "data/users.db",
+                "backup": {
+                    "enabled": true,
+                    "path": "./data/backup/users.db",
+                    "executesAt": ["0600", "1330", "2355"]
+                }
+            },
+            "feedback": {
+                "path": "data/feedback.db",
+                "backup": {
+                    "enabled": true,
+                    "path": "./data/backup/feedback.db",
+                    "executesAt": ["0600", "1330", "2355"]
+                }
+            },
+            "trainProvenance": {
+                "path": "data/train-provenance.db",
+                "backup": {
+                    "enabled": true,
+                    "path": "./data/backup/train-provenance.db",
+                    "executesAt": ["0600", "1330", "2355"]
+                }
+            },
+            "timetableHistory": {
+                "path": "data/timetable-history.db",
+                "backup": {
+                    "enabled": true,
+                    "path": "./data/backup/timetable-history.db",
+                    "executesAt": ["0600", "1330", "2355"]
+                }
+            },
+            "schedule": {
+                "path": "data/schedule.db",
+                "backup": {
+                    "enabled": true,
+                    "path": "./data/backup/schedule.db",
+                    "executesAt": ["0600", "1330", "2355"]
+                }
+            }
         },
         "runtime": {
             "adminTraffic": {

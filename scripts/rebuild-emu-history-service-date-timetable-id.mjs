@@ -93,16 +93,16 @@ function loadConfigDatabasePaths(configPath) {
     const parsed = JSON.parse(readUtf8File(configPath));
     const databases = parsed?.data?.databases;
     const emuDbPath =
-        typeof databases?.EMUTracked === 'string' ? databases.EMUTracked : '';
+        typeof databases?.EMUTracked?.path === 'string'
+            ? databases.EMUTracked.path
+            : '';
     const timetableDbPath =
-        typeof databases?.timetableHistory === 'string'
-            ? databases.timetableHistory
+        typeof databases?.timetableHistory?.path === 'string'
+            ? databases.timetableHistory.path
             : '';
 
     if (emuDbPath.length === 0 || timetableDbPath.length === 0) {
-        throw new Error(
-            `Config file is missing database paths: ${configPath}`
-        );
+        throw new Error(`Config file is missing database paths: ${configPath}`);
     }
 
     return {
@@ -226,7 +226,10 @@ function createTimetableResolver(timetableDb) {
     }
 
     function getLatestCoverage(trainCode) {
-        return selectLatestCoverageByTrainCode.get(normalizeCode(trainCode)) ?? null;
+        return (
+            selectLatestCoverageByTrainCode.get(normalizeCode(trainCode)) ??
+            null
+        );
     }
 
     function getContentSummary(contentId) {
@@ -250,7 +253,11 @@ function createTimetableResolver(timetableDb) {
         return summary;
     }
 
-    function doesLatestCoverageMatchLegacyDailyRow(serviceDate, contentId, row) {
+    function doesLatestCoverageMatchLegacyDailyRow(
+        serviceDate,
+        contentId,
+        row
+    ) {
         const summary = getContentSummary(contentId);
         if (!summary) {
             return false;
@@ -263,12 +270,15 @@ function createTimetableResolver(timetableDb) {
                 normalizeOptionalText(row.end_station_name) &&
             buildAbsoluteTimestamp(serviceDate, summary.startOffset) ===
                 row.start_at &&
-            buildAbsoluteTimestamp(serviceDate, summary.endOffset) === row.end_at
+            buildAbsoluteTimestamp(serviceDate, summary.endOffset) ===
+                row.end_at
         );
     }
 
     function resolveDailyRowTimetable(row) {
-        const serviceDate = formatShanghaiDateStringFromUnixSeconds(row.start_at);
+        const serviceDate = formatShanghaiDateStringFromUnixSeconds(
+            row.start_at
+        );
         const exactCoverage = getExactCoverage(row.train_code, serviceDate);
         if (exactCoverage) {
             return {
@@ -302,7 +312,9 @@ function createTimetableResolver(timetableDb) {
     }
 
     function resolveProbeRowTimetable(row) {
-        const serviceDate = formatShanghaiDateStringFromUnixSeconds(row.start_at);
+        const serviceDate = formatShanghaiDateStringFromUnixSeconds(
+            row.start_at
+        );
         const exactCoverage = getExactCoverage(row.train_code, serviceDate);
         return {
             serviceDate,
@@ -318,8 +330,12 @@ function createTimetableResolver(timetableDb) {
 }
 
 function detectSchema(columnNames, currentColumns, legacyColumns) {
-    const hasCurrentColumns = currentColumns.every((name) => columnNames.has(name));
-    const hasLegacyColumns = legacyColumns.every((name) => columnNames.has(name));
+    const hasCurrentColumns = currentColumns.every((name) =>
+        columnNames.has(name)
+    );
+    const hasLegacyColumns = legacyColumns.every((name) =>
+        columnNames.has(name)
+    );
 
     if (hasLegacyColumns) {
         return 'legacy';
@@ -359,9 +375,11 @@ function buildRowKey(row) {
 }
 
 function buildLegacyStartAtKey(trainCode, emuCode, startAt) {
-    return [normalizeCode(trainCode), normalizeCode(emuCode), String(startAt)].join(
-        '|'
-    );
+    return [
+        normalizeCode(trainCode),
+        normalizeCode(emuCode),
+        String(startAt)
+    ].join('|');
 }
 
 function migrateLegacyDailyRows(legacyRows, resolver) {
@@ -400,13 +418,9 @@ function migrateLegacyDailyRows(legacyRows, resolver) {
                 row.emu_code,
                 row.start_at
             );
-            const existingResolved = timetableIdByLegacyStartAtKey.get(
-                legacyStartAtKey
-            );
-            if (
-                !existingResolved ||
-                row.id >= existingResolved.sourceRowId
-            ) {
+            const existingResolved =
+                timetableIdByLegacyStartAtKey.get(legacyStartAtKey);
+            if (!existingResolved || row.id >= existingResolved.sourceRowId) {
                 timetableIdByLegacyStartAtKey.set(legacyStartAtKey, {
                     sourceRowId: row.id,
                     timetableId: resolved.timetableId
@@ -418,7 +432,9 @@ function migrateLegacyDailyRows(legacyRows, resolver) {
     summary.rebuiltRows = rowByBusinessKey.size;
     summary.deduplicatedRows = summary.scannedRows - summary.rebuiltRows;
     return {
-        rows: [...rowByBusinessKey.values()].sort((left, right) => left.id - right.id),
+        rows: [...rowByBusinessKey.values()].sort(
+            (left, right) => left.id - right.id
+        ),
         summary,
         timetableIdByLegacyStartAtKey: new Map(
             [...timetableIdByLegacyStartAtKey.entries()].map(([key, value]) => [
@@ -444,7 +460,11 @@ function migrateLegacyProbeRows(
         if (resolved.resolution === 'unresolved') {
             const fallbackTimetableId =
                 dailyFallbackTimetableIdByLegacyStartAtKey.get(
-                    buildLegacyStartAtKey(row.train_code, row.emu_code, row.start_at)
+                    buildLegacyStartAtKey(
+                        row.train_code,
+                        row.emu_code,
+                        row.start_at
+                    )
                 ) ?? null;
             if (fallbackTimetableId !== null) {
                 resolved = {
@@ -481,7 +501,9 @@ function migrateLegacyProbeRows(
     summary.rebuiltRows = rowByBusinessKey.size;
     summary.deduplicatedRows = summary.scannedRows - summary.rebuiltRows;
     return {
-        rows: [...rowByBusinessKey.values()].sort((left, right) => left.id - right.id),
+        rows: [...rowByBusinessKey.values()].sort(
+            (left, right) => left.id - right.id
+        ),
         summary
     };
 }
@@ -496,7 +518,9 @@ function main() {
     const options = parseArgs(process.argv.slice(2));
     const configDbPaths = loadConfigDatabasePaths(options.configPath);
     const emuDbPath =
-        options.emuDbPath.length > 0 ? options.emuDbPath : configDbPaths.emuDbPath;
+        options.emuDbPath.length > 0
+            ? options.emuDbPath
+            : configDbPaths.emuDbPath;
     const timetableDbPath =
         options.timetableDbPath.length > 0
             ? options.timetableDbPath
@@ -695,8 +719,6 @@ try {
     main();
 } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.error(
-        `Historical timetable link rebuild failed: ${message}`
-    );
+    console.error(`Historical timetable link rebuild failed: ${message}`);
     process.exit(1);
 }

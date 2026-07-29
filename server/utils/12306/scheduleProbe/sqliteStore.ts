@@ -879,7 +879,7 @@ function loadScheduleStateFromRow(row: ScheduleStateRow): ScheduleState | null {
 }
 
 export function getScheduleDatabaseFilePath(): string {
-    return path.resolve(useConfig().data.databases.schedule);
+    return path.resolve(useConfig().data.databases.schedule.path);
 }
 
 export function loadStationBoardLastFullSweepDate(): string | null {

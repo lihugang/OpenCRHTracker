@@ -8,41 +8,44 @@ import Database from 'better-sqlite3';
 
 const execFileAsync = promisify(execFile);
 
-const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const rootDir = path.resolve(
+    path.dirname(fileURLToPath(import.meta.url)),
+    '..'
+);
 const timezone = 'Asia/Shanghai';
 
 const sourceDir = path.join(
     rootDir,
     'assets',
     'fonts',
-    'source-han-sans-sc-source',
+    'source-han-sans-sc-source'
 );
 const outputDir = path.join(
     rootDir,
     'public',
     'fonts',
     'curated',
-    'source-han-sans-sc',
+    'source-han-sans-sc'
 );
 const generatedCssPath = path.join(
     rootDir,
     'assets',
     'css',
     'generated',
-    'source-han-sans-sc-fonts.css',
+    'source-han-sans-sc-fonts.css'
 );
 const charsetPath = path.join(outputDir, 'charset.txt');
 const reportPath = path.join(outputDir, 'report.json');
 const configCandidatePaths = [
     path.join(rootDir, 'data', 'config.dev.json'),
-    path.join(rootDir, 'data', 'config.json'),
+    path.join(rootDir, 'data', 'config.json')
 ];
 const legacyScheduleJsonPath = path.join(rootDir, 'data', 'schedule.json');
 const conservativeCharsPath = path.join(
     rootDir,
     'scripts',
     'font-data',
-    'source-han-conservative-chars.txt',
+    'source-han-conservative-chars.txt'
 );
 
 const sourceFonts = [
@@ -50,20 +53,20 @@ const sourceFonts = [
         key: 'regular',
         legacyName: 'SourceHanSansSC-Regular.woff2',
         sourceName: 'SourceHanSansSC-Full-Regular.woff2',
-        subsetBaseName: 'SourceHanSansSC-Subset-Regular',
+        subsetBaseName: 'SourceHanSansSC-Subset-Regular'
     },
     {
         key: 'medium',
         legacyName: 'SourceHanSansSC-Medium.woff2',
         sourceName: 'SourceHanSansSC-Full-Medium.woff2',
-        subsetBaseName: 'SourceHanSansSC-Subset-Medium',
+        subsetBaseName: 'SourceHanSansSC-Subset-Medium'
     },
     {
         key: 'bold',
         legacyName: 'SourceHanSansSC-Bold.woff2',
         sourceName: 'SourceHanSansSC-Full-Bold.woff2',
-        subsetBaseName: 'SourceHanSansSC-Subset-Bold',
-    },
+        subsetBaseName: 'SourceHanSansSC-Subset-Bold'
+    }
 ];
 
 const fallbackName = 'SourceHanSansSC-Fallback-Regular.woff2';
@@ -78,7 +81,7 @@ const scanEntries = [
     'server',
     'utils',
     'assets',
-    'ui.md',
+    'ui.md'
 ];
 const textExtensions = new Set([
     '.css',
@@ -92,7 +95,7 @@ const textExtensions = new Set([
     '.txt',
     '.vue',
     '.yaml',
-    '.yml',
+    '.yml'
 ]);
 const ignoredPathParts = new Set([
     '.git',
@@ -100,7 +103,7 @@ const ignoredPathParts = new Set([
     '.output',
     'coverage',
     'dist',
-    'node_modules',
+    'node_modules'
 ]);
 
 function logStep(message) {
@@ -133,13 +136,13 @@ function getSubsetHashedName(font, hash) {
 
 function isSubsetOutputFile(fileName) {
     return /^SourceHanSansSC-Subset-(Regular|Medium|Bold)(?:\.[0-9a-f]+)?(?:\.tmp)?\.woff2$/u.test(
-        fileName,
+        fileName
     );
 }
 
 function buildAsciiChars() {
     return Array.from({ length: 95 }, (_, index) =>
-        String.fromCharCode(32 + index),
+        String.fromCharCode(32 + index)
     ).join('');
 }
 
@@ -196,7 +199,7 @@ async function resolveRuntimeConfigPath() {
     throw new Error(
         `runtime config file not found; tried ${configCandidatePaths
             .map(relativeFromRoot)
-            .join(', ')}`,
+            .join(', ')}`
     );
 }
 
@@ -205,24 +208,36 @@ async function readRuntimeAssetPaths(runtimeConfigPath) {
     const raw = await fs.readFile(runtimeConfigPath, 'utf8');
     const parsed = ensureObjectRecord(JSON.parse(raw), configLabel);
     const data = ensureObjectRecord(parsed.data, `${configLabel} data`);
-    const assets = ensureObjectRecord(data.assets, `${configLabel} data.assets`);
+    const assets = ensureObjectRecord(
+        data.assets,
+        `${configLabel} data.assets`
+    );
     const databases = ensureObjectRecord(
         data.databases,
-        `${configLabel} data.databases`,
+        `${configLabel} data.databases`
     );
     const emuList = ensureObjectRecord(
         assets.EMUList,
-        `${configLabel} data.assets.EMUList`,
+        `${configLabel} data.assets.EMUList`
+    );
+    const scheduleDatabase = ensureObjectRecord(
+        databases.schedule,
+        `${configLabel} data.databases.schedule`
     );
     const scheduleDatabasePath =
-        typeof databases.schedule === 'string' && databases.schedule.trim().length > 0
-            ? databases.schedule
-            : 'data/schedule.db';
+        typeof scheduleDatabase.path === 'string' &&
+        scheduleDatabase.path.trim().length > 0
+            ? scheduleDatabase.path
+            : (() => {
+                  throw new Error(
+                      `${configLabel} data.databases.schedule.path must be a non-empty string`
+                  );
+              })();
 
     return {
         scheduleDatabasePath: resolveConfigFilePath(scheduleDatabasePath),
         legacyScheduleJsonPath,
-        emuListPath: resolveConfigFilePath(emuList.file),
+        emuListPath: resolveConfigFilePath(emuList.file)
     };
 }
 
@@ -237,7 +252,10 @@ async function walkTextFiles(entryPath, collectedFiles) {
                 continue;
             }
 
-            await walkTextFiles(path.join(entryPath, entry.name), collectedFiles);
+            await walkTextFiles(
+                path.join(entryPath, entry.name),
+                collectedFiles
+            );
         }
 
         return;
@@ -270,7 +288,9 @@ async function collectStaticText() {
     const relativeFiles = [];
 
     for (const filePath of uniqueFiles) {
-        const relativePath = path.relative(rootDir, filePath).replaceAll('\\', '/');
+        const relativePath = path
+            .relative(rootDir, filePath)
+            .replaceAll('\\', '/');
 
         if (
             relativePath.startsWith('assets/fonts/') ||
@@ -287,7 +307,7 @@ async function collectStaticText() {
 
     return {
         charSet,
-        files: relativeFiles,
+        files: relativeFiles
     };
 }
 
@@ -345,7 +365,9 @@ function parseJsonText(value, label) {
 
 function tableExists(db, tableName) {
     const row = db
-        .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?")
+        .prepare(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?"
+        )
         .get(tableName);
     return row !== undefined;
 }
@@ -353,7 +375,7 @@ function tableExists(db, tableName) {
 function collectScheduleDatabaseChars(scheduleDatabasePath) {
     const db = new Database(scheduleDatabasePath, {
         readonly: true,
-        fileMustExist: true,
+        fileMustExist: true
     });
     const charSet = new Set();
     let scheduleItemCount = 0;
@@ -366,14 +388,14 @@ function collectScheduleDatabaseChars(scheduleDatabasePath) {
             for (const row of rows) {
                 const state = parseJsonText(
                     row.state_json,
-                    `schedule state ${row.kind}`,
+                    `schedule state ${row.kind}`
                 );
                 collectJsonChars(
                     {
                         kind: row.kind,
-                        state,
+                        state
                     },
-                    charSet,
+                    charSet
                 );
                 if (row.kind === 'published' && Array.isArray(state?.items)) {
                     scheduleItemCount = state.items.length;
@@ -384,7 +406,7 @@ function collectScheduleDatabaseChars(scheduleDatabasePath) {
         if (tableExists(db, 'schedule_circulations')) {
             const rows = db
                 .prepare(
-                    'SELECT entry_key, refreshed_at, entry_json FROM schedule_circulations',
+                    'SELECT entry_key, refreshed_at, entry_json FROM schedule_circulations'
                 )
                 .all();
             for (const row of rows) {
@@ -394,10 +416,10 @@ function collectScheduleDatabaseChars(scheduleDatabasePath) {
                         refreshedAt: row.refreshed_at,
                         entry: parseJsonText(
                             row.entry_json,
-                            `schedule circulation ${row.entry_key}`,
-                        ),
+                            `schedule circulation ${row.entry_key}`
+                        )
                     },
-                    charSet,
+                    charSet
                 );
             }
         }
@@ -405,14 +427,14 @@ function collectScheduleDatabaseChars(scheduleDatabasePath) {
         if (tableExists(db, 'schedule_stations')) {
             collectJsonChars(
                 db.prepare('SELECT * FROM schedule_stations').all(),
-                charSet,
+                charSet
             );
         }
 
         if (tableExists(db, 'schedule_route_refresh_queue')) {
             collectJsonChars(
                 db.prepare('SELECT * FROM schedule_route_refresh_queue').all(),
-                charSet,
+                charSet
             );
         }
     } finally {
@@ -422,7 +444,7 @@ function collectScheduleDatabaseChars(scheduleDatabasePath) {
     return {
         source: 'database',
         scheduleItemCount,
-        charSet,
+        charSet
     };
 }
 
@@ -441,13 +463,13 @@ async function collectLegacyScheduleJsonChars(legacySchedulePath) {
     return {
         source: 'legacy-json',
         scheduleItemCount: items.length,
-        charSet,
+        charSet
     };
 }
 
 async function collectScheduleDataChars({
     scheduleDatabasePath,
-    legacyScheduleJsonPath,
+    legacyScheduleJsonPath
 }) {
     if (await fileExists(scheduleDatabasePath)) {
         return collectScheduleDatabaseChars(scheduleDatabasePath);
@@ -460,7 +482,7 @@ async function collectScheduleDataChars({
     return {
         source: 'empty',
         scheduleItemCount: 0,
-        charSet: new Set(),
+        charSet: new Set()
     };
 }
 
@@ -478,14 +500,14 @@ async function collectEmuListJsonChars(emuListPath) {
 
     return {
         emuRecordCount: rows.length,
-        charSet,
+        charSet
     };
 }
 
 function buildUnicodeRange(chars) {
-    const codePoints = [...new Set(chars.map((char) => char.codePointAt(0)))].sort(
-        (left, right) => left - right,
-    );
+    const codePoints = [
+        ...new Set(chars.map((char) => char.codePointAt(0)))
+    ].sort((left, right) => left - right);
     const ranges = [];
     let rangeStart = codePoints[0];
     let previous = codePoints[0];
@@ -511,7 +533,7 @@ function buildUnicodeRange(chars) {
                 ? `U+${start.toString(16).toUpperCase()}`
                 : `U+${start.toString(16).toUpperCase()}-${end
                       .toString(16)
-                      .toUpperCase()}`,
+                      .toUpperCase()}`
         )
         .join(', ');
 }
@@ -531,7 +553,7 @@ async function ensureSourceFonts() {
             await fs.access(legacyPath);
             await fs.copyFile(legacyPath, sourcePath);
             logStep(
-                `restored missing source font from legacy public copy: ${relativeFromRoot(sourcePath)}`,
+                `restored missing source font from legacy public copy: ${relativeFromRoot(sourcePath)}`
             );
         }
     }
@@ -552,7 +574,7 @@ async function runPyftSubset(inputPath, outputPath) {
         '--recommended-glyphs',
         '--name-IDs=*',
         '--name-legacy',
-        '--name-languages=*',
+        '--name-languages=*'
     ]);
 }
 
@@ -629,7 +651,7 @@ async function finalizeSubsetFont(font) {
     const stats = await fs.stat(finalPath);
 
     logStep(
-        `finalized ${font.key} subset as ${finalName} (${formatBytes(stats.size)})`,
+        `finalized ${font.key} subset as ${finalName} (${formatBytes(stats.size)})`
     );
 
     return {
@@ -637,13 +659,13 @@ async function finalizeSubsetFont(font) {
         hash,
         subsetName: finalName,
         subsetPath: finalPath,
-        subsetBytes: stats.size,
+        subsetBytes: stats.size
     };
 }
 
 async function writeGeneratedCss(unicodeRange, generatedFonts) {
     const fontsByKey = Object.fromEntries(
-        generatedFonts.map((font) => [font.key, font]),
+        generatedFonts.map((font) => [font.key, font])
     );
     const css = `/* Generated by scripts/build-source-han-sans-sc-subset.mjs. Do not edit manually. */
 
@@ -712,7 +734,7 @@ async function buildReport({
     totalChars,
     unicodeRange,
     generatedFonts,
-    removedSubsetFiles,
+    removedSubsetFiles
 }) {
     const fontFiles = {};
 
@@ -727,7 +749,7 @@ async function buildReport({
             hash: font.hash,
             fullSourceBytes: fullSourceStats.size,
             subsetBytes: font.subsetBytes,
-            savedBytes: fullSourceStats.size - font.subsetBytes,
+            savedBytes: fullSourceStats.size - font.subsetBytes
         };
     }
 
@@ -750,7 +772,7 @@ async function buildReport({
             scheduleItemCount,
             scheduleDataCharCount: scheduleChars.size,
             emuRecordCount,
-            emuListJsonCharCount: emuListChars.size,
+            emuListJsonCharCount: emuListChars.size
         },
         outputs: {
             charsetPath: relativeFromRoot(charsetPath),
@@ -760,8 +782,8 @@ async function buildReport({
             fallbackPath: relativeFromRoot(fallbackPath),
             fallbackBytes: fallbackStats.size,
             removedSubsetFiles,
-            fonts: fontFiles,
-        },
+            fonts: fontFiles
+        }
     };
 }
 
@@ -803,7 +825,7 @@ for (const char of emuListResult.charSet) {
 }
 
 const totalChars = [...mergedChars].sort(
-    (left, right) => left.codePointAt(0) - right.codePointAt(0),
+    (left, right) => left.codePointAt(0) - right.codePointAt(0)
 );
 const unicodeRange = buildUnicodeRange(totalChars);
 
@@ -811,7 +833,7 @@ await fs.writeFile(charsetPath, totalChars.join(''), 'utf8');
 logStep(
     `collected ${totalChars.length} total chars from ${staticResult.files.length} static files, ` +
         `${scheduleResult.charSet.size} schedule data chars, ` +
-        `${emuListResult.charSet.size} emu list JSON chars`,
+        `${emuListResult.charSet.size} emu list JSON chars`
 );
 logStep(`wrote charset file: ${relativeFromRoot(charsetPath)}`);
 
@@ -822,7 +844,7 @@ for (const font of sourceFonts) {
     const tempPath = path.join(outputDir, getSubsetTempName(font));
 
     logStep(
-        `generating ${font.key} subset from ${relativeFromRoot(inputPath)} to ${path.basename(tempPath)}`,
+        `generating ${font.key} subset from ${relativeFromRoot(inputPath)} to ${path.basename(tempPath)}`
     );
     await runPyftSubset(inputPath, tempPath);
     generatedFonts.push(await finalizeSubsetFont(font));
@@ -830,13 +852,15 @@ for (const font of sourceFonts) {
 
 await fs.copyFile(
     path.join(sourceDir, sourceFonts[0].sourceName),
-    path.join(outputDir, fallbackName),
+    path.join(outputDir, fallbackName)
 );
-logStep(`refreshed fallback font: ${relativeFromRoot(path.join(outputDir, fallbackName))}`);
+logStep(
+    `refreshed fallback font: ${relativeFromRoot(path.join(outputDir, fallbackName))}`
+);
 await writeGeneratedCss(unicodeRange, generatedFonts);
 await removeLegacyPublicFonts();
 const removedSubsetFiles = await cleanupOldSubsetOutputs(
-    new Set(generatedFonts.map((font) => font.subsetName)),
+    new Set(generatedFonts.map((font) => font.subsetName))
 );
 
 const report = await buildReport({
@@ -855,7 +879,7 @@ const report = await buildReport({
     totalChars,
     unicodeRange,
     generatedFonts,
-    removedSubsetFiles,
+    removedSubsetFiles
 });
 
 await fs.writeFile(reportPath, JSON.stringify(report, null, 4), 'utf8');
@@ -863,7 +887,7 @@ logStep(`wrote report: ${relativeFromRoot(reportPath)}`);
 logStep(
     `current subset outputs: ${generatedFonts
         .map((font) => `${font.key}=${font.subsetName}`)
-        .join(', ')}`,
+        .join(', ')}`
 );
 
 console.log(
@@ -876,9 +900,9 @@ console.log(
             totalChars: totalChars.length,
             scheduleDataCharCount: scheduleResult.charSet.size,
             emuListJsonCharCount: emuListResult.charSet.size,
-            subsetFiles: generatedFonts.map((font) => font.subsetName),
+            subsetFiles: generatedFonts.map((font) => font.subsetName)
         },
         null,
-        2,
-    ),
+        2
+    )
 );

@@ -72,7 +72,7 @@ function loadConfigDatabasePath(configPath) {
     }
 
     const parsed = JSON.parse(readUtf8File(configPath));
-    const dbPath = parsed?.data?.databases?.timetableHistory;
+    const dbPath = parsed?.data?.databases?.timetableHistory?.path;
     if (typeof dbPath !== 'string' || dbPath.trim().length === 0) {
         throw new Error(
             `Config file is missing data.databases.timetableHistory: ${configPath}`
@@ -195,21 +195,23 @@ function buildSummary(dbPath, rows, mergePlan) {
         affectedTrainCodes: affectedTrainCodes.size,
         updatedRows: mergePlan.updatedRows,
         deletedRows: mergePlan.deletedRows,
-        samples: mergePlan.mergeGroups.slice(0, EXAMPLE_SAMPLE_LIMIT).map((group) => ({
-            trainCode: group.trainCode,
-            contentId: group.contentId,
-            rowCount: group.rows.length,
-            keeperId: group.keeperId,
-            mergedRange: [
-                group.serviceDateStart,
-                group.serviceDateEndExclusive
-            ],
-            sourceRanges: group.rows.map((row) => ({
-                id: row.id,
-                start: row.service_date_start,
-                endExclusive: row.service_date_end_exclusive
+        samples: mergePlan.mergeGroups
+            .slice(0, EXAMPLE_SAMPLE_LIMIT)
+            .map((group) => ({
+                trainCode: group.trainCode,
+                contentId: group.contentId,
+                rowCount: group.rows.length,
+                keeperId: group.keeperId,
+                mergedRange: [
+                    group.serviceDateStart,
+                    group.serviceDateEndExclusive
+                ],
+                sourceRanges: group.rows.map((row) => ({
+                    id: row.id,
+                    start: row.service_date_start,
+                    endExclusive: row.service_date_end_exclusive
+                }))
             }))
-        }))
     };
 }
 
@@ -263,11 +265,17 @@ function main() {
         const mergePlan = buildMergePlan(mergeRuns);
         const summary = buildSummary(dbPath, rows, mergePlan);
 
-        console.log(JSON.stringify({
-            mode: options.apply ? 'apply' : 'dry-run',
-            note: 'Merging only adjacent same-content runs keeps gaps uncovered and never merges across intervening coverage rows.',
-            ...summary
-        }, null, 2));
+        console.log(
+            JSON.stringify(
+                {
+                    mode: options.apply ? 'apply' : 'dry-run',
+                    note: 'Merging only adjacent same-content runs keeps gaps uncovered and never merges across intervening coverage rows.',
+                    ...summary
+                },
+                null,
+                2
+            )
+        );
 
         if (!options.apply || mergePlan.mergeGroups.length === 0) {
             return;
@@ -282,8 +290,6 @@ function main() {
 try {
     main();
 } catch (error) {
-    console.error(
-        error instanceof Error ? error.message : String(error)
-    );
+    console.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;
 }

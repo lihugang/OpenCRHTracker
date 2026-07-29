@@ -1,11 +1,10 @@
 import Database from 'better-sqlite3';
 import fs from 'fs';
 import path from 'path';
-import type { Config } from '~/server/config';
-import useConfig from '~/server/config';
+import useConfig, { type DatabaseKey } from '~/server/config';
 import { measureServerTimingPhase } from '~/server/utils/timing/serverTiming';
 
-export type DatabaseKey = keyof Config['data']['databases'];
+export type { DatabaseKey } from '~/server/config';
 type DatabaseInitializer = (db: Database.Database) => void;
 
 const databases = new Map<DatabaseKey, Database.Database>();
@@ -16,7 +15,7 @@ const INSTRUMENTED_STATEMENT = Symbol('instrumentedStatement');
 
 function getDatabaseFilePath(name: DatabaseKey) {
     const config = useConfig();
-    return config.data.databases[name];
+    return config.data.databases[name].path;
 }
 
 function ensureDbDirectory(filePath: string) {

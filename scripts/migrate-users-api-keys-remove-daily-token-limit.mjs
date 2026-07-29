@@ -81,7 +81,7 @@ function loadUsersDbPath(configPath) {
     }
 
     const parsed = JSON.parse(readUtf8File(configPath));
-    const usersDbPath = parsed?.data?.databases?.users;
+    const usersDbPath = parsed?.data?.databases?.users?.path;
     if (typeof usersDbPath !== 'string' || usersDbPath.length === 0) {
         throw new Error(`Config file is missing users DB path: ${configPath}`);
     }
@@ -151,12 +151,16 @@ function main() {
     console.log(`active keys: ${formatCount(activeCount)}`);
 
     if (!needsMigration) {
-        console.log('Migration not needed: api_keys.daily_token_limit is absent.');
+        console.log(
+            'Migration not needed: api_keys.daily_token_limit is absent.'
+        );
         return;
     }
 
     console.log('Dry-run summary:');
-    console.log(`- Would revoke ${formatCount(activeCount)} active key records.`);
+    console.log(
+        `- Would revoke ${formatCount(activeCount)} active key records.`
+    );
     console.log('- Would rebuild api_keys without daily_token_limit.');
     console.log('- Would rebuild api_key_scopes and preserve all scope rows.');
 
@@ -207,7 +211,9 @@ function main() {
             db.exec(createApiKeysTable);
             db.exec(createApiKeyScopesTable);
 
-            const selectLegacyApiKeysRows = db.prepare(selectLegacyApiKeysRowsSql);
+            const selectLegacyApiKeysRows = db.prepare(
+                selectLegacyApiKeysRowsSql
+            );
             const selectLegacyApiKeyScopesRows = db.prepare(
                 selectLegacyApiKeyScopesRowsSql
             );
@@ -249,14 +255,15 @@ function main() {
         const result = migrate();
         db.pragma('foreign_keys = ON');
         const foreignKeyCheckRows = db.pragma('foreign_key_check');
-        if (Array.isArray(foreignKeyCheckRows) && foreignKeyCheckRows.length > 0) {
+        if (
+            Array.isArray(foreignKeyCheckRows) &&
+            foreignKeyCheckRows.length > 0
+        ) {
             throw new Error('foreign_key_check failed after migration');
         }
 
         console.log('Migration applied successfully.');
-        console.log(
-            `- Revoked legacy keys at: ${revokedAt}`
-        );
+        console.log(`- Revoked legacy keys at: ${revokedAt}`);
         console.log(
             `- Migrated api_keys rows: ${formatCount(result.migratedKeyCount)}`
         );

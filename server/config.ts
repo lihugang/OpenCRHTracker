@@ -1,4 +1,5 @@
 import fs from 'fs';
+import path from 'path';
 import normalizeScopeList from '~/server/utils/api/scopes/normalizeScopeList';
 import isScopeSubset from '~/server/utils/api/scopes/isScopeSubset';
 import { parseDailyTimeHHmm } from '~/server/utils/date/shanghaiDateTime';
@@ -224,6 +225,29 @@ interface RuntimeTrainProvenanceConfig {
     retentionDays: number;
 }
 
+export const DATABASE_KEYS = [
+    'task',
+    'EMUTracked',
+    'users',
+    'feedback',
+    'trainProvenance',
+    'timetableHistory',
+    'schedule'
+] as const;
+
+export type DatabaseKey = (typeof DATABASE_KEYS)[number];
+
+export interface DatabaseBackupConfig {
+    enabled: boolean;
+    path: string;
+    executesAt: string[];
+}
+
+export interface DatabaseConfig {
+    path: string;
+    backup: DatabaseBackupConfig;
+}
+
 export interface Config {
     spider: {
         userAgent: string;
@@ -259,16 +283,7 @@ export interface Config {
             trainStyleMapping: RefreshableAssetConfig;
             qrcodeDetection: RefreshableAssetConfig;
         };
-        databases: Record<
-            | 'task'
-            | 'EMUTracked'
-            | 'users'
-            | 'feedback'
-            | 'trainProvenance'
-            | 'timetableHistory'
-            | 'schedule',
-            string
-        >;
+        databases: Record<DatabaseKey, DatabaseConfig>;
         runtime: {
             adminTraffic: RuntimeAdminTrafficConfig;
             adminServerMetrics: RuntimeAdminServerMetricsConfig;
@@ -914,6 +929,25 @@ function parseDailyTimesHHmm(value: unknown, name: string) {
     return dailyTimesHHmm;
 }
 
+function parseDatabaseConfig(value: unknown, name: string): DatabaseConfig {
+    const database = asObject(value, name);
+    assertOnlyKeys(database, name, ['path', 'backup']);
+    const backup = asObject(database.backup, `${name}.backup`);
+    assertOnlyKeys(backup, `${name}.backup`, ['enabled', 'path', 'executesAt']);
+
+    return {
+        path: asString(database.path, `${name}.path`),
+        backup: {
+            enabled: asBoolean(backup.enabled, `${name}.backup.enabled`),
+            path: asString(backup.path, `${name}.backup.path`),
+            executesAt: parseDailyTimesHHmm(
+                backup.executesAt,
+                `${name}.backup.executesAt`
+            )
+        }
+    };
+}
+
 function validateConfig(raw: unknown): Config {
     const root = asObject(raw, 'root');
 
@@ -962,6 +996,7 @@ function validateConfig(raw: unknown): Config {
     const data = asObject(root.data, 'data');
     const assets = asObject(data.assets, 'data.assets');
     const databases = asObject(data.databases, 'data.databases');
+    assertOnlyKeys(databases, 'data.databases', [...DATABASE_KEYS]);
     const runtime = asObject(data.runtime, 'data.runtime');
     const runtimeAdminTraffic = asObject(
         runtime.adminTraffic,
@@ -1681,37 +1716,34 @@ function validateConfig(raw: unknown): Config {
                 )
             },
             databases: {
-                task: asString(databases.task, 'data.databases.task'),
-                EMUTracked: asString(
+                task: parseDatabaseConfig(
+                    databases.task,
+                    'data.databases.task'
+                ),
+                EMUTracked: parseDatabaseConfig(
                     databases.EMUTracked,
                     'data.databases.EMUTracked'
                 ),
-                users: asString(databases.users, 'data.databases.users'),
-                feedback: asString(
+                users: parseDatabaseConfig(
+                    databases.users,
+                    'data.databases.users'
+                ),
+                feedback: parseDatabaseConfig(
                     databases.feedback,
                     'data.databases.feedback'
                 ),
-                trainProvenance:
-                    databases.trainProvenance === undefined
-                        ? 'data/train-provenance.db'
-                        : asString(
-                              databases.trainProvenance,
-                              'data.databases.trainProvenance'
-                          ),
-                timetableHistory:
-                    databases.timetableHistory === undefined
-                        ? 'data/timetable-history.db'
-                        : asString(
-                              databases.timetableHistory,
-                              'data.databases.timetableHistory'
-                          ),
-                schedule:
-                    databases.schedule === undefined
-                        ? 'data/schedule.db'
-                        : asString(
-                              databases.schedule,
-                              'data.databases.schedule'
-                          )
+                trainProvenance: parseDatabaseConfig(
+                    databases.trainProvenance,
+                    'data.databases.trainProvenance'
+                ),
+                timetableHistory: parseDatabaseConfig(
+                    databases.timetableHistory,
+                    'data.databases.timetableHistory'
+                ),
+                schedule: parseDatabaseConfig(
+                    databases.schedule,
+                    'data.databases.schedule'
+                )
             },
             runtime: {
                 adminTraffic: {
@@ -2693,6 +2725,26 @@ function validateConfig(raw: unknown): Config {
                 `data.assets.${key}.provider must be configured when refresh.enabled is true`
             );
         }
+    }
+    const databaseSourcePaths = new Set(
+        DATABASE_KEYS.map((key) =>
+            path.resolve(configResult.data.databases[key].path)
+        )
+    );
+    const databaseBackupPaths = new Set<string>();
+    for (const key of DATABASE_KEYS) {
+        const backupPath = path.resolve(
+            configResult.data.databases[key].backup.path
+        );
+        assert(
+            !databaseSourcePaths.has(backupPath),
+            `data.databases.${key}.backup.path must not match a database source path`
+        );
+        assert(
+            !databaseBackupPaths.has(backupPath),
+            `data.databases.${key}.backup.path must not duplicate another backup path`
+        );
+        databaseBackupPaths.add(backupPath);
     }
     const groupedPrefixRules = new Map<string, ScheduleProbePrefixRule[]>();
     for (const rule of configResult.spider.scheduleProbe.prefixRules) {

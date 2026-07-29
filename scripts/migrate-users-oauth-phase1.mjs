@@ -78,7 +78,7 @@ function loadUsersDbPath(configPath) {
     }
 
     const parsed = JSON.parse(readUtf8File(configPath));
-    const usersDbPath = parsed?.data?.databases?.users;
+    const usersDbPath = parsed?.data?.databases?.users?.path;
     if (typeof usersDbPath !== 'string' || usersDbPath.length === 0) {
         throw new Error(`Config file is missing users DB path: ${configPath}`);
     }
@@ -131,7 +131,9 @@ function main() {
 
     const missingSteps = [];
     if (!hasOauthClientId) {
-        missingSteps.push('ALTER TABLE api_keys ADD COLUMN oauth_client_id TEXT');
+        missingSteps.push(
+            'ALTER TABLE api_keys ADD COLUMN oauth_client_id TEXT'
+        );
     }
     for (const tableName of oauthTables) {
         if (!existingOauthTables.includes(tableName)) {
@@ -159,9 +161,15 @@ function main() {
             ? 'ALTER TABLE api_keys ADD COLUMN oauth_client_id TEXT;'
             : null,
         loadSql('assets/sql/users/oauth/createOauthClientsTable.sql'),
-        loadSql('assets/sql/users/oauth/createOauthClientRedirectUrisTable.sql'),
-        loadSql('assets/sql/users/oauth/createOauthClientScopeRequestsTable.sql'),
-        loadSql('assets/sql/users/oauth/createOauthAuthorizationCodesTable.sql'),
+        loadSql(
+            'assets/sql/users/oauth/createOauthClientRedirectUrisTable.sql'
+        ),
+        loadSql(
+            'assets/sql/users/oauth/createOauthClientScopeRequestsTable.sql'
+        ),
+        loadSql(
+            'assets/sql/users/oauth/createOauthAuthorizationCodesTable.sql'
+        ),
         loadSql('assets/sql/users/oauth/createOauthConsentsTable.sql'),
         loadSql('assets/sql/users/oauth/createOauthLoginContinuationsTable.sql')
     ].filter(Boolean);

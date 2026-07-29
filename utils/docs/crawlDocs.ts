@@ -331,19 +331,19 @@ export const crawlDocsSections: DocsContentSection[] = [
                 title: '抓取链路关键配置',
                 cards: [
                     {
-                        path: 'data.databases.schedule',
+                        path: 'data.databases.schedule.path',
                         valueType: 'string',
-                        required: false,
-                        description:
-                            'schedule.db 的 SQLite 文件路径，默认 data/schedule.db。',
+                        required: true,
+                        description: 'schedule.db 的 SQLite 文件路径。',
                         notes: [
                             '库内索引覆盖车次别名、内部车号、车站时刻和官方交路查询。',
                             'published schedule、building schedule 和 todayScheduleCache 都以该数据库为权威来源。',
+                            '同级 backup 配置决定该库的定时 SQLite 备份目标和执行时间。',
                             '内部历史时刻表不会直接把整份 schedule.db 当作快照归档，而是在确认过的车次组落盘后提取规范化 stops 内容写入独立数据库。'
                         ]
                     },
                     {
-                        path: 'data.databases.timetableHistory',
+                        path: 'data.databases.timetableHistory.path',
                         valueType: 'string',
                         required: true,
                         description:
