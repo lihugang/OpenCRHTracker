@@ -20,6 +20,8 @@
     endpointTimeOffsetY: 0.16cm,
     midnightMarkerOffsetY: 0.2cm,
     stationLabelRightProtectionX: 0.2cm,
+    maxLineSlope: 10,
+    minimumSegmentDurationSeconds: 60,
 )
 
 #let styles = (
@@ -447,6 +449,32 @@
     (placements: placed, occupiedBoxes: boxes)
 }
 
+#let required-chart-width-for-line-slope(stations) = {
+    let required-width = 0cm
+
+    for node in data.nodes {
+        let y-start = station-y(stations, node.start.stationTelecode)
+        let y-end = station-y(stations, node.end.stationTelecode)
+        let vertical-distance = if y-end >= y-start {
+            y-end - y-start
+        } else {
+            y-start - y-end
+        }
+        let effective-duration-seconds = calc.max(
+            node.end.timestamp - node.start.timestamp,
+            layout.minimumSegmentDurationSeconds,
+        )
+        let node-required-width = (
+            vertical-distance * data.timeAxis.axisRangeSeconds /
+            (layout.maxLineSlope * effective-duration-seconds)
+        )
+
+        required-width = calc.max(required-width, node-required-width)
+    }
+
+    required-width
+}
+
 #let render() = context {
     let axis = build-station-axis()
     let stations = axis.stations
@@ -467,9 +495,13 @@
         station-label-occupied-boxes.push(protected-station-label-box(placement))
     }
 
-    let chart-width = calc.max(
+    let base-chart-width = calc.max(
         18cm,
         data.timeAxis.axisRangeSeconds / 3600 / 1.2 * 1cm,
+    )
+    let chart-width = calc.max(
+        base-chart-width,
+        required-chart-width-for-line-slope(stations),
     )
     let midnight-marker-placements = ()
     let endpoint-time-placements = ()
