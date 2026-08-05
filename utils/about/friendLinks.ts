@@ -7,7 +7,7 @@ export const aboutFriendLinks: AboutFriendLinkDefinition[] = [
     },
     {
         name: '现代化的专业铁路信息查询客户端',
-        url: 'https://railgo.dev'
+        url: 'https://docs.railgo.dev'
     },
     {
         name: '列车运行可视化',
@@ -18,15 +18,15 @@ export const aboutFriendLinks: AboutFriendLinkDefinition[] = [
         url: 'https://crmapdata.lihugang.top'
     },
     {
-        name: '动车组配属查询',
-        url: 'https://allocation.crhdata.top'
-    },
-    {
         name: '铁路乘车提示',
         url: 'https://p.crhdata.top'
     },
     {
         name: '列车运行图在线查看',
         url: 'https://paiagram.com/demo'
+    },
+    {
+        name: '铁路应用导航站',
+        url: 'https://nav.asia'
     }
 ];
