@@ -791,7 +791,11 @@ function mergeStationRow(
 }
 
 function normalizePlatformNo(platformNo: number | null): number | null {
-    if (!Number.isInteger(platformNo) || platformNo <= 0) {
+    if (
+        typeof platformNo !== 'number' ||
+        !Number.isInteger(platformNo) ||
+        platformNo <= 0
+    ) {
         return null;
     }
 

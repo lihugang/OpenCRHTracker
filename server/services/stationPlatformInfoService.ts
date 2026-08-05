@@ -1,5 +1,12 @@
 import useConfig from '~/server/config';
 import getLogger from '~/server/libs/log4js';
+import { getPreferredTrainCirculation } from '~/server/services/trainCirculationIndexStore';
+import {
+    getTodayStationTimetableByStationName,
+    getTodayScheduleTimetableByTrainCode,
+    type TodayScheduleStationIndexRow,
+    type TodayScheduleTimetable
+} from '~/server/services/todayScheduleCache';
 import fetchStationExitInfo from '~/server/utils/12306/network/fetchStationExitInfo';
 import fetchStationTransportInfo from '~/server/utils/12306/network/fetchStationTransportInfo';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
@@ -27,6 +34,7 @@ import type { StationPlatformRefreshEntryStatus } from '~/server/services/trainP
 
 const logger = getLogger('station-platform-info-service');
 const DAY_SECONDS = 24 * 60 * 60;
+const PLATFORM_FALLBACK_WINDOW_SECONDS = 4 * 60 * 60;
 
 interface StationPlatformInfoCandidate {
     lookupType: SchedulePlatformInfoLookupType;
@@ -422,6 +430,278 @@ async function fetchCandidatePlatformInfo(
     );
 }
 
+interface TrainCodeNumber {
+    prefix: string;
+    number: number;
+}
+
+function parseTrainCodeNumber(trainCode: string): TrainCodeNumber | null {
+    const match = normalizeCode(trainCode).match(/^([A-Z]+)(\d+)$/);
+    if (!match) {
+        return null;
+    }
+
+    const number = Number(match[2]);
+    return Number.isSafeInteger(number) ? { prefix: match[1]!, number } : null;
+}
+
+function getCandidateTrainCodes(candidate: StationPlatformInfoCandidate) {
+    return uniqueNormalizedCodes([
+        ...candidate.stationTrainCodes,
+        ...candidate.routeReferences.flatMap(
+            (reference) => reference.trainCodes
+        )
+    ]);
+}
+
+function getCandidateStartAt(candidate: StationPlatformInfoCandidate) {
+    return (
+        candidate.routeReferences.find(
+            (reference) => reference.startAt !== null
+        )?.startAt ?? null
+    );
+}
+
+function findTerminalStop(
+    timetable: TodayScheduleTimetable,
+    stationName: string
+) {
+    for (let index = timetable.stops.length - 1; index >= 0; index -= 1) {
+        const stop = timetable.stops[index]!;
+        if (!stop.isEnd || stop.stationName.trim() !== stationName.trim()) {
+            continue;
+        }
+
+        return { index, stop };
+    }
+
+    return null;
+}
+
+function getArrivalStationTrainCode(
+    timetable: TodayScheduleTimetable,
+    stopIndex: number
+) {
+    return normalizeCode(
+        stopIndex > 0
+            ? (timetable.stops[stopIndex - 1]?.stationTrainCode ?? '')
+            : (timetable.stops[stopIndex]?.stationTrainCode ?? '')
+    );
+}
+
+function getReusableArrivalPlatform(
+    timetable: TodayScheduleTimetable,
+    stationName: string,
+    stationTelecode: string
+): number | null {
+    const terminal = findTerminalStop(timetable, stationName);
+    if (!terminal) {
+        return null;
+    }
+
+    const stopPlatformNo = terminal.stop.platformNo;
+    if (
+        typeof stopPlatformNo === 'number' &&
+        Number.isInteger(stopPlatformNo) &&
+        stopPlatformNo > 0
+    ) {
+        return stopPlatformNo;
+    }
+
+    const stationTrainCode = getArrivalStationTrainCode(
+        timetable,
+        terminal.index
+    );
+    const internalCode = normalizeCode(timetable.trainInternalCode);
+    if (internalCode.length === 0 || stationTrainCode.length === 0) {
+        return null;
+    }
+
+    const cached = loadScheduleStationPlatformInfoCacheEntry({
+        lookupType: 'arrival_exit',
+        internalCode,
+        stationTelecode,
+        stationTrainCode
+    });
+    return cached &&
+        typeof cached.platformNo === 'number' &&
+        Number.isInteger(cached.platformNo) &&
+        cached.platformNo > 0
+        ? cached.platformNo
+        : null;
+}
+
+function findCurrentCirculationNodeIndex(
+    candidate: StationPlatformInfoCandidate,
+    circulation: ReturnType<typeof getPreferredTrainCirculation>
+) {
+    if (!circulation) {
+        return -1;
+    }
+
+    const candidateCodes = new Set(getCandidateTrainCodes(candidate));
+    return circulation.nodes.findIndex(
+        (node) =>
+            normalizeCode(node.internalCode) === candidate.internalCode ||
+            node.allCodes.some((code) =>
+                candidateCodes.has(normalizeCode(code))
+            )
+    );
+}
+
+function resolvePlatformFromCirculation(
+    candidate: StationPlatformInfoCandidate,
+    circulation: ReturnType<typeof getPreferredTrainCirculation>
+): number | null {
+    if (!circulation || circulation.nodes.length === 0) {
+        return null;
+    }
+
+    const currentIndex = findCurrentCirculationNodeIndex(
+        candidate,
+        circulation
+    );
+    if (currentIndex <= 0) {
+        return null;
+    }
+
+    const currentNode = circulation.nodes[currentIndex]!;
+    const previousNode = circulation.nodes[currentIndex - 1]!;
+    const timeGap = currentNode.startAt - previousNode.endAt;
+    if (
+        previousNode.endStation.trim() !== candidate.stationName.trim() ||
+        timeGap < 0 ||
+        timeGap > PLATFORM_FALLBACK_WINDOW_SECONDS
+    ) {
+        return null;
+    }
+
+    for (const trainCode of uniqueNormalizedCodes(previousNode.allCodes)) {
+        const timetable = getTodayScheduleTimetableByTrainCode(trainCode);
+        if (!timetable) {
+            continue;
+        }
+
+        const platformNo = getReusableArrivalPlatform(
+            timetable,
+            candidate.stationName,
+            candidate.stationTelecode
+        );
+        if (platformNo !== null) {
+            logger.info(
+                `platform_fallback circulation current=${candidate.stationTrainCodes[0] ?? candidate.internalCode} previous=${trainCode} station=${candidate.stationName} gapSeconds=${timeGap}`
+            );
+            return platformNo;
+        }
+    }
+
+    return null;
+}
+
+function resolvePlatformFromStationArrivals(
+    candidate: StationPlatformInfoCandidate
+): number | null {
+    const startAt = getCandidateStartAt(candidate);
+    const currentTrainNumbers = getCandidateTrainCodes(candidate)
+        .map(parseTrainCodeNumber)
+        .filter((value): value is TrainCodeNumber => value !== null);
+    if (startAt === null || currentTrainNumbers.length === 0) {
+        return null;
+    }
+
+    const currentInternalCode = candidate.internalCode;
+    const rows = getTodayStationTimetableByStationName(candidate.stationName);
+    const matches: Array<{
+        row: TodayScheduleStationIndexRow;
+        platformNo: number;
+    }> = [];
+    for (const row of rows) {
+        if (
+            normalizeCode(row.trainInternalCode) === currentInternalCode ||
+            normalizeCode(row.endStation) !==
+                normalizeCode(candidate.stationName) ||
+            row.arriveAt === null ||
+            row.arriveAt > startAt ||
+            startAt - row.arriveAt > PLATFORM_FALLBACK_WINDOW_SECONDS
+        ) {
+            continue;
+        }
+
+        const rowPlatformNo = row.platformNo;
+        if (
+            typeof rowPlatformNo !== 'number' ||
+            !Number.isInteger(rowPlatformNo) ||
+            rowPlatformNo <= 0
+        ) {
+            continue;
+        }
+
+        const rowTrainNumbers = uniqueNormalizedCodes([
+            row.trainCode,
+            ...row.allCodes
+        ])
+            .map(parseTrainCodeNumber)
+            .filter((value): value is TrainCodeNumber => value !== null);
+        if (
+            !rowTrainNumbers.some((rowNumber) =>
+                currentTrainNumbers.some(
+                    (currentNumber) =>
+                        currentNumber.prefix === rowNumber.prefix &&
+                        Math.abs(currentNumber.number - rowNumber.number) <= 4
+                )
+            )
+        ) {
+            continue;
+        }
+
+        matches.push({ row, platformNo: rowPlatformNo });
+    }
+
+    matches.sort(
+        (left, right) => (right.row.arriveAt ?? 0) - (left.row.arriveAt ?? 0)
+    );
+    const match = matches[0];
+    if (!match) {
+        return null;
+    }
+
+    logger.info(
+        `platform_fallback station_arrival current=${candidate.stationTrainCodes[0] ?? candidate.internalCode} previous=${match.row.trainCode} station=${candidate.stationName} gapSeconds=${startAt - (match.row.arriveAt ?? startAt)}`
+    );
+    return match.platformNo;
+}
+
+function resolveOriginPlatformFallback(
+    candidate: StationPlatformInfoCandidate
+): number | null {
+    try {
+        const circulation = getPreferredTrainCirculation({
+            trainInternalCode: candidate.internalCode,
+            allCodes: getCandidateTrainCodes(candidate)
+        });
+        const circulationPlatformNo = resolvePlatformFromCirculation(
+            candidate,
+            circulation
+        );
+        if (circulationPlatformNo !== null) {
+            return circulationPlatformNo;
+        }
+
+        const currentIndex = findCurrentCirculationNodeIndex(
+            candidate,
+            circulation
+        );
+        return circulation === null || currentIndex === 0
+            ? resolvePlatformFromStationArrivals(candidate)
+            : null;
+    } catch (error) {
+        logger.warn(
+            `platform_fallback_failed current=${candidate.stationTrainCodes[0] ?? candidate.internalCode} station=${candidate.stationName} error=${toBoundedErrorMessage(error)}`
+        );
+        return null;
+    }
+}
+
 function toBoundedErrorMessage(error: unknown) {
     const message =
         error instanceof Error
@@ -481,6 +761,35 @@ async function refreshCandidates(
             (entry) => entry.fetchedAt > expiresAt
         );
         if (!forceRefresh && freshCache) {
+            if (
+                candidate.lookupType === 'origin_transport' &&
+                freshCache.platformNo === 1
+            ) {
+                const fallbackPlatformNo =
+                    resolveOriginPlatformFallback(candidate);
+                if (fallbackPlatformNo !== null) {
+                    const fetchedAt = getNowSeconds();
+                    updates.push({
+                        ...freshCache,
+                        stationNo: candidate.stationNo,
+                        platformNo: fallbackPlatformNo,
+                        wicket: null,
+                        fetchedAt,
+                        overwritePlatform: false,
+                        writeCache: true
+                    });
+                    entries.push(
+                        toRefreshEntry(candidate, {
+                            attemptedTrainCodes: [freshCache.stationTrainCode],
+                            status: 'updated',
+                            platformNo: fallbackPlatformNo,
+                            fetchedAt
+                        })
+                    );
+                    continue;
+                }
+            }
+
             cacheHitCount += 1;
             updates.push(toCachedPersistInput(candidate, freshCache));
             entries.push(
@@ -513,6 +822,22 @@ async function refreshCandidates(
                     continue;
                 }
 
+                let resolvedResult = result;
+                if (
+                    candidate.lookupType === 'origin_transport' &&
+                    result.platformNo === 1
+                ) {
+                    // 12306 returns platform 1 when this endpoint has no platform information.
+                    const fallbackPlatformNo =
+                        resolveOriginPlatformFallback(candidate);
+                    if (fallbackPlatformNo !== null) {
+                        resolvedResult = {
+                            platformNo: fallbackPlatformNo,
+                            wicket: null
+                        };
+                    }
+                }
+
                 const fetchedAt = getNowSeconds();
                 dataCount += 1;
                 resolved = true;
@@ -522,8 +847,8 @@ async function refreshCandidates(
                     stationTelecode: candidate.stationTelecode,
                     stationTrainCode,
                     stationNo: candidate.stationNo,
-                    platformNo: result.platformNo,
-                    wicket: result.wicket,
+                    platformNo: resolvedResult.platformNo,
+                    wicket: resolvedResult.wicket,
                     trainDate: candidate.trainDate,
                     fetchedAt,
                     overwritePlatform: forceRefresh,
@@ -533,8 +858,8 @@ async function refreshCandidates(
                     toRefreshEntry(candidate, {
                         attemptedTrainCodes,
                         status: 'updated',
-                        platformNo: result.platformNo,
-                        wicket: result.wicket,
+                        platformNo: resolvedResult.platformNo,
+                        wicket: resolvedResult.wicket,
                         fetchedAt
                     })
                 );
