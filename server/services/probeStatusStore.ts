@@ -7,6 +7,11 @@ import {
 import normalizeCode from '~/server/utils/12306/normalizeCode';
 import { formatShanghaiDateString } from '~/server/utils/date/getCurrentDateString';
 import importSqlBatch from '~/server/utils/sql/importSqlBatch';
+import {
+    clearProbeUntrustedRecords,
+    deleteProbeUntrustedRecordsByTrainCodeAndEmuCodeAtServiceDate,
+    deleteProbeUntrustedRecordsByTrainCodeInRange
+} from '~/server/services/probeUntrustedRecordStore';
 
 export enum ProbeStatusValue {
     PendingCouplingDetection = 1,
@@ -456,6 +461,7 @@ export function updateProbeStatusByTrainCodeAndEmuCode(
 
 export function clearProbeStatus(): number {
     const result = probeStatusStatements.run('clearProbeStatus');
+    clearProbeUntrustedRecords();
     return result.changes;
 }
 
@@ -481,6 +487,11 @@ export function deleteProbeStatusByTrainCodeInRange(
         normalizedTrainCode,
         startServiceDate,
         endServiceDate
+    );
+    deleteProbeUntrustedRecordsByTrainCodeInRange(
+        normalizedTrainCode,
+        startAt,
+        endAtExclusive
     );
     return result.changes;
 }
@@ -508,6 +519,11 @@ export function deleteProbeStatusByTrainCodeAndEmuCodeAtStartAt(
         normalizedEmuCode,
         serviceDate
     );
+    deleteProbeUntrustedRecordsByTrainCodeAndEmuCodeAtServiceDate(
+        normalizedTrainCode,
+        normalizedEmuCode,
+        serviceDate
+    );
     return result.changes;
 }
 
@@ -528,6 +544,11 @@ export function deleteProbeStatusByTrainCodeAndEmuCodeAtServiceDate(
 
     const result = probeStatusStatements.run(
         'deleteProbeStatusByTrainCodeAndEmuCodeAtStartAt',
+        normalizedTrainCode,
+        normalizedEmuCode,
+        serviceDate
+    );
+    deleteProbeUntrustedRecordsByTrainCodeAndEmuCodeAtServiceDate(
         normalizedTrainCode,
         normalizedEmuCode,
         serviceDate

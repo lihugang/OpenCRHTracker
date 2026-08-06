@@ -34,6 +34,11 @@ import {
     type ProbeStatusRow
 } from '~/server/services/probeStatusStore';
 import {
+    deleteProbeUntrustedRecordsByTrainCodeAndEmuCodeAtServiceDate,
+    isProbeUntrustedRecord,
+    markProbeUntrustedRecord
+} from '~/server/services/probeUntrustedRecordStore';
+import {
     deleteDailyRoutesByTrainCodeInRange,
     insertDailyEmuRoute,
     listDailyRoutesByEmuCodeInRange,
@@ -172,6 +177,33 @@ interface SeatCodeVerificationResult {
     seatInternalCode: string;
     seatStartAt: number;
     seatCodeFailureDetail?: FetchSeatCodeFailureResult | null;
+}
+
+type SeatCodeRouteUnavailableReason =
+    | 'main_emu_code_invalid'
+    | 'seat_code_missing'
+    | 'seat_code_request_failed_network_error'
+    | 'seat_code_request_failed_not_enabled'
+    | 'seat_code_request_failed_other'
+    | 'seat_route_not_current_day';
+
+interface SeatCodeRouteFetchResult {
+    state: 'available' | 'unavailable';
+    reason?: SeatCodeRouteUnavailableReason;
+    seatTrainCode: string;
+    seatInternalCode: string;
+    seatStartAt: number;
+    seatEndAt: number;
+}
+
+type SeatCodeArbitrationOutcome = 'handled' | 'winner' | 'unavailable';
+
+interface ProbeEmuByTrainCodesResult {
+    probe: SuccessfulRouteProbe | null;
+    untrustedSkippedPairs: Array<{
+        trainCode: string;
+        emuCode: string;
+    }>;
 }
 
 function shouldRequeueUnavailableSeatVerification(
@@ -980,8 +1012,23 @@ async function tryAutoMergeResolvedInternalGroup(
 }
 
 async function validateConflictGroupRunningState(
-    group: TodayScheduleProbeGroup
+    group: TodayScheduleProbeGroup,
+    mainEmuCode: string
 ): Promise<ConflictGroupValidationResult> {
+    const serviceDate = getCurrentDateString();
+    const untrustedTrainCodes = getGroupTrainCodes(group).filter((trainCode) =>
+        isProbeUntrustedRecord(trainCode, mainEmuCode, serviceDate)
+    );
+    if (untrustedTrainCodes.length > 0) {
+        return {
+            group,
+            state: 'not_running',
+            runningTrainCode: '',
+            requestFailedTrainCodes: [],
+            notRunningTrainCodes: uniqueNormalizedCodes(untrustedTrainCodes)
+        };
+    }
+
     const todayValidation = await validateTodayRunningForTrainCodes(
         getGroupTrainCodes(group)
     );
@@ -1158,6 +1205,292 @@ async function verifySeatCodeAgainstCurrentTask(
     };
 }
 
+async function fetchSeatCodeRouteForEmu(
+    assets: Awaited<ReturnType<typeof loadProbeAssets>>,
+    mainEmuCode: string
+): Promise<SeatCodeRouteFetchResult> {
+    const parsedMainEmuCode = parseEmuCode(mainEmuCode);
+    if (!parsedMainEmuCode?.trainSetNo) {
+        return {
+            state: 'unavailable',
+            reason: 'main_emu_code_invalid',
+            seatTrainCode: '',
+            seatInternalCode: '',
+            seatStartAt: 0,
+            seatEndAt: 0
+        };
+    }
+
+    const seatCode = assets.qrcodeByModelAndTrainSetNo.get(
+        buildProbeAssetKey(
+            parsedMainEmuCode.model,
+            parsedMainEmuCode.trainSetNo
+        )
+    );
+    if (!seatCode) {
+        return {
+            state: 'unavailable',
+            reason: 'seat_code_missing',
+            seatTrainCode: '',
+            seatInternalCode: '',
+            seatStartAt: 0,
+            seatEndAt: 0
+        };
+    }
+
+    const seatCodeResult = await fetchEMUInfoBySeatCode(seatCode);
+    if (seatCodeResult.status !== 'success') {
+        return {
+            state: 'unavailable',
+            reason: toSeatCodeRequestFailedReason(seatCodeResult),
+            seatTrainCode: '',
+            seatInternalCode: '',
+            seatStartAt: 0,
+            seatEndAt: 0
+        };
+    }
+
+    const route = seatCodeResult.route;
+    if (!isCurrentScheduleTask(route.startAt)) {
+        return {
+            state: 'unavailable',
+            reason: 'seat_route_not_current_day',
+            seatTrainCode: normalizeCode(route.code),
+            seatInternalCode: normalizeCode(route.internalCode),
+            seatStartAt: route.startAt,
+            seatEndAt: route.endAt
+        };
+    }
+
+    return {
+        state: 'available',
+        seatTrainCode: normalizeCode(route.code),
+        seatInternalCode: normalizeCode(route.internalCode),
+        seatStartAt: route.startAt,
+        seatEndAt: route.endAt
+    };
+}
+
+function resolveSeatCodeWinnerGroup(
+    groups: TodayScheduleProbeGroup[],
+    seatTrainCode: string,
+    seatInternalCode: string,
+    seatStartAt: number,
+    seatEndAt: number
+): TodayScheduleProbeGroup | null {
+    const normalizedSeatInternalCode = normalizeCode(seatInternalCode);
+    if (normalizedSeatInternalCode.length > 0) {
+        const matched = groups.filter(
+            (group) =>
+                normalizeCode(group.trainInternalCode) ===
+                normalizedSeatInternalCode
+        );
+        if (matched.length === 1) {
+            return matched[0] ?? null;
+        }
+        if (matched.length > 1) {
+            return null;
+        }
+    }
+
+    const normalizedSeatTrainCode = normalizeCode(seatTrainCode);
+    if (normalizedSeatTrainCode.length > 0) {
+        const matched = groups.filter((group) =>
+            uniqueNormalizedCodes(group.allCodes).includes(
+                normalizedSeatTrainCode
+            )
+        );
+        if (matched.length === 1) {
+            return matched[0] ?? null;
+        }
+        if (matched.length > 1) {
+            return null;
+        }
+    }
+
+    if (seatStartAt > 0 && seatEndAt > 0) {
+        const matched = groups.filter((group) =>
+            isRouteTimeOverlapping(
+                group.startAt,
+                group.endAt,
+                seatStartAt,
+                seatEndAt
+            )
+        );
+        if (matched.length === 1) {
+            return matched[0] ?? null;
+        }
+    }
+
+    return null;
+}
+
+async function tryArbitrateOverlappingRoutesWithSeatCode(
+    args: ProbeTrainDepartureTaskArgs,
+    mainEmuCode: string,
+    currentGroup: TodayScheduleProbeGroup,
+    overlappingGroups: TodayScheduleProbeGroup[],
+    assets: Awaited<ReturnType<typeof loadProbeAssets>>,
+    nowSeconds: number,
+    validationResults: ConflictGroupValidationResult[]
+): Promise<SeatCodeArbitrationOutcome> {
+    const conflictGroups = [currentGroup, ...overlappingGroups];
+    const conflictStateByTrainKey =
+        buildConflictStateByTrainKey(validationResults);
+
+    const seatRoute = await fetchSeatCodeRouteForEmu(assets, mainEmuCode);
+    if (seatRoute.state === 'unavailable') {
+        const reason = seatRoute.reason ?? 'seat_code_unavailable';
+        recordTrainProvenanceForEachGroup(conflictGroups, (group) => ({
+            serviceDate: getCurrentDateString(),
+            emuCode: mainEmuCode,
+            eventType: 'seat_conflict_unavailable',
+            result: reason,
+            payload: {
+                currentGroup:
+                    buildTrainProvenanceConflictCurrentGroupPayload(group),
+                conflictGroups: conflictGroups
+                    .filter(
+                        (candidate) => candidate.trainKey !== group.trainKey
+                    )
+                    .map((candidate) =>
+                        buildTrainProvenanceConflictGroupPayload(
+                            group,
+                            candidate,
+                            conflictStateByTrainKey.get(candidate.trainKey) ??
+                                'running'
+                        )
+                    ),
+                reason
+            }
+        }));
+        logger.warn(
+            `seat_conflict_unavailable conflictEmuCode=${mainEmuCode} conflictGroups=${formatTrainCodeGroups(conflictGroups)} reason=${reason}`
+        );
+        return 'unavailable';
+    }
+
+    const winnerGroup = resolveSeatCodeWinnerGroup(
+        conflictGroups,
+        seatRoute.seatTrainCode,
+        seatRoute.seatInternalCode,
+        seatRoute.seatStartAt,
+        seatRoute.seatEndAt
+    );
+    if (!winnerGroup) {
+        recordTrainProvenanceForEachGroup(conflictGroups, (group) => ({
+            serviceDate: getCurrentDateString(),
+            emuCode: mainEmuCode,
+            eventType: 'seat_conflict_unavailable',
+            result: 'ambiguous',
+            payload: {
+                currentGroup:
+                    buildTrainProvenanceConflictCurrentGroupPayload(group),
+                conflictGroups: conflictGroups
+                    .filter(
+                        (candidate) => candidate.trainKey !== group.trainKey
+                    )
+                    .map((candidate) =>
+                        buildTrainProvenanceConflictGroupPayload(
+                            group,
+                            candidate,
+                            conflictStateByTrainKey.get(candidate.trainKey) ??
+                                'running'
+                        )
+                    ),
+                reason: 'ambiguous',
+                seatTrainCode: seatRoute.seatTrainCode,
+                seatInternalCode: seatRoute.seatInternalCode,
+                seatStartAt: seatRoute.seatStartAt,
+                seatEndAt: seatRoute.seatEndAt
+            }
+        }));
+        logger.warn(
+            `seat_conflict_ambiguous conflictEmuCode=${mainEmuCode} conflictGroups=${formatTrainCodeGroups(conflictGroups)} seatTrainCode=${seatRoute.seatTrainCode} seatInternalCode=${seatRoute.seatInternalCode}`
+        );
+        return 'unavailable';
+    }
+
+    const loserGroups = conflictGroups.filter(
+        (group) => group.trainKey !== winnerGroup.trainKey
+    );
+    const serviceDate = getCurrentDateString();
+    const seatDetail = `seatTrainCode=${seatRoute.seatTrainCode} seatInternalCode=${seatRoute.seatInternalCode} winnerTrainKey=${winnerGroup.trainKey}`;
+
+    for (const loserGroup of loserGroups) {
+        clearQueriedTrainKey(loserGroup.trainKey);
+        clearRunningEmuStateByTrainKey(loserGroup.trainKey);
+        for (const trainCode of getGroupTrainCodes(loserGroup)) {
+            markProbeUntrustedRecord(
+                trainCode,
+                mainEmuCode,
+                serviceDate,
+                'seat_code_conflict_disproved',
+                seatDetail
+            );
+        }
+    }
+
+    for (const trainCode of getGroupTrainCodes(winnerGroup)) {
+        deleteProbeUntrustedRecordsByTrainCodeAndEmuCodeAtServiceDate(
+            trainCode,
+            mainEmuCode,
+            serviceDate
+        );
+    }
+
+    const requeuedTaskIds =
+        loserGroups.length > 0
+            ? requeueOverlappingGroups(
+                  loserGroups,
+                  nowSeconds,
+                  useConfig().spider.scheduleProbe.probe.defaultRetry
+              )
+            : [];
+
+    recordTrainProvenanceForEachGroup(conflictGroups, (group) => ({
+        serviceDate,
+        emuCode: mainEmuCode,
+        eventType: 'seat_conflict_resolved',
+        result: group.trainKey === winnerGroup.trainKey ? 'winner' : 'loser',
+        payload: {
+            currentGroup:
+                buildTrainProvenanceConflictCurrentGroupPayload(group),
+            conflictGroups: conflictGroups
+                .filter((candidate) => candidate.trainKey !== group.trainKey)
+                .map((candidate) =>
+                    buildTrainProvenanceConflictGroupPayload(
+                        group,
+                        candidate,
+                        conflictStateByTrainKey.get(candidate.trainKey) ??
+                            'running'
+                    )
+                ),
+            winnerTrainKey: winnerGroup.trainKey,
+            loserTrainKeys: loserGroups.map((candidate) => candidate.trainKey),
+            seatTrainCode: seatRoute.seatTrainCode,
+            seatInternalCode: seatRoute.seatInternalCode,
+            seatStartAt: seatRoute.seatStartAt,
+            seatEndAt: seatRoute.seatEndAt,
+            requeuedTrainKeys: loserGroups.map(
+                (candidate) => candidate.trainKey
+            ),
+            requeuedTaskIds
+        }
+    }));
+
+    logger.info(
+        `seat_conflict_resolved conflictEmuCode=${mainEmuCode} winnerGroup=${formatTrainCodeGroup(winnerGroup)} loserGroups=${formatTrainCodeGroups(loserGroups)} seatTrainCode=${seatRoute.seatTrainCode} seatInternalCode=${seatRoute.seatInternalCode} requeuedTaskIds=${requeuedTaskIds.join(',')}`
+    );
+
+    if (currentGroup.trainKey !== winnerGroup.trainKey) {
+        markCurrentTrainProvenanceTaskSkipped('overlap_requeued_untrusted');
+        return 'handled';
+    }
+
+    return 'winner';
+}
+
 async function tryResolveOverlappingRoutes(
     args: ProbeTrainDepartureTaskArgs,
     mainEmuCode: string,
@@ -1180,7 +1513,9 @@ async function tryResolveOverlappingRoutes(
 
     const validationResults: ConflictGroupValidationResult[] = [];
     for (const group of [currentGroup, ...overlappingGroups]) {
-        validationResults.push(await validateConflictGroupRunningState(group));
+        validationResults.push(
+            await validateConflictGroupRunningState(group, mainEmuCode)
+        );
     }
 
     const notRunningGroups = validationResults
@@ -1264,6 +1599,30 @@ async function tryResolveOverlappingRoutes(
             nextDayStart
         );
         if (overlappingGroups.length === 0) {
+            return false;
+        }
+    }
+
+    if (
+        areAllGroupsRunning(
+            [currentGroup, ...overlappingGroups],
+            validationResults
+        )
+    ) {
+        const arbitrationOutcome =
+            await tryArbitrateOverlappingRoutesWithSeatCode(
+                args,
+                mainEmuCode,
+                currentGroup,
+                overlappingGroups,
+                assets,
+                nowSeconds,
+                validationResults
+            );
+        if (arbitrationOutcome === 'handled') {
+            return true;
+        }
+        if (arbitrationOutcome === 'winner') {
             return false;
         }
     }
@@ -1498,7 +1857,11 @@ async function tryReuseHistoricalProbeStatus(
 
 async function probeEmuByTrainCodes(
     candidateTrainCodes: string[]
-): Promise<SuccessfulRouteProbe | null> {
+): Promise<ProbeEmuByTrainCodesResult> {
+    const serviceDate = getCurrentDateString();
+    const untrustedSkippedPairs: ProbeEmuByTrainCodesResult['untrustedSkippedPairs'] =
+        [];
+
     for (const candidateTrainCode of candidateTrainCodes) {
         const routeProbeResult = await fetchEMUInfoByRoute(candidateTrainCode);
         if (!routeProbeResult) {
@@ -1521,13 +1884,32 @@ async function probeEmuByTrainCodes(
             continue;
         }
 
+        if (
+            isProbeUntrustedRecord(candidateTrainCode, mainEmuCode, serviceDate)
+        ) {
+            logger.info(
+                `route_probe_untrusted_skipped trainCode=${candidateTrainCode} emuCode=${mainEmuCode} serviceDate=${serviceDate}`
+            );
+            untrustedSkippedPairs.push({
+                trainCode: candidateTrainCode,
+                emuCode: mainEmuCode
+            });
+            continue;
+        }
+
         return {
-            probedTrainCode: candidateTrainCode,
-            routeProbeResult
+            probe: {
+                probedTrainCode: candidateTrainCode,
+                routeProbeResult
+            },
+            untrustedSkippedPairs
         };
     }
 
-    return null;
+    return {
+        probe: null,
+        untrustedSkippedPairs
+    };
 }
 
 async function executeProbeTrainDepartureTaskInternal(
@@ -1610,7 +1992,22 @@ async function executeProbeTrainDepartureTaskInternal(
     }
 
     const allTrainCodes = filterSafeProbeTaskTrainCodes(args);
-    const successfulRouteProbe = await probeEmuByTrainCodes(allTrainCodes);
+    const routeProbeOutcome = await probeEmuByTrainCodes(allTrainCodes);
+    const successfulRouteProbe = routeProbeOutcome.probe;
+    if (routeProbeOutcome.untrustedSkippedPairs.length > 0) {
+        for (const pair of routeProbeOutcome.untrustedSkippedPairs) {
+            recordCurrentTrainProvenanceEventsForTrainCodes([pair.trainCode], {
+                serviceDate,
+                startAt: args.startAt,
+                emuCode: pair.emuCode,
+                eventType: 'route_probe_untrusted_skipped',
+                result: 'untrusted',
+                payload: {
+                    untrustedEmuCode: pair.emuCode
+                }
+            });
+        }
+    }
     if (!successfulRouteProbe) {
         if (args.retry > 0) {
             const nextRetry = args.retry - 1;
