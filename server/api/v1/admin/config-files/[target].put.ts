@@ -1,11 +1,11 @@
-import { defineEventHandler, readBody, setHeader } from 'h3';
-import { updateAdminRuntimeConfig } from '~/server/services/adminConfigFileStore';
+import { defineEventHandler, getRouterParam, readBody, setHeader } from 'h3';
+import { updateAdminConfigFileDocument } from '~/server/services/adminConfigFileStore';
 import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';
 import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
 import type { AdminRuntimeConfigUpdateRequest } from '~/types/admin';
 
-interface AdminRuntimeConfigUpdateBody {
+interface AdminConfigFileUpdateBody {
     content?: unknown;
     expectedRevision?: unknown;
 }
@@ -20,9 +20,9 @@ export default defineEventHandler(async (event) => {
             requiredScopes: [API_SCOPES.admin]
         },
         async ({ identity }) => {
+            const target = getRouterParam(event, 'target') ?? '';
             const body =
-                (await readBody<AdminRuntimeConfigUpdateBody | null>(event)) ??
-                {};
+                (await readBody<AdminConfigFileUpdateBody | null>(event)) ?? {};
             ensure(
                 typeof body === 'object' &&
                     body !== null &&
@@ -49,7 +49,11 @@ export default defineEventHandler(async (event) => {
                 content: body.content,
                 expectedRevision: body.expectedRevision
             };
-            return await updateAdminRuntimeConfig(request, identity.id);
+            return await updateAdminConfigFileDocument(
+                target,
+                request,
+                identity.id
+            );
         }
     );
 });

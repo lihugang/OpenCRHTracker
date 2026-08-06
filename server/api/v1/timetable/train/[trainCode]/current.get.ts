@@ -3,6 +3,7 @@ import useConfig from '~/server/config';
 import { getReferenceModelsByTrainCodes } from '~/server/services/referenceModelIndexStore';
 import { getPreferredTrainCirculation } from '~/server/services/trainCirculationIndexStore';
 import { getTodayScheduleTimetableByTrainCode } from '~/server/services/todayScheduleCache';
+import { getSupplementTrainTimetableByTrainCode } from '~/server/services/supplementTrainRegistryStore';
 import getFixedCost from '~/server/utils/api/cost/getFixedCost';
 import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';
@@ -33,7 +34,12 @@ export default defineEventHandler(async (event) => {
                 'trainCode 不能为空'
             );
 
-            const timetable = getTodayScheduleTimetableByTrainCode(trainCode);
+            const scheduleTimetable =
+                getTodayScheduleTimetableByTrainCode(trainCode);
+            const supplementTimetable = scheduleTimetable
+                ? null
+                : getSupplementTrainTimetableByTrainCode(trainCode);
+            const timetable = scheduleTimetable ?? supplementTimetable;
             ensure(
                 timetable && timetable.stops.length > 0,
                 404,
@@ -58,10 +64,13 @@ export default defineEventHandler(async (event) => {
                 endStation: timetable.endStation,
                 startAt: timetable.startAt,
                 endAt: timetable.endAt,
-                circulation: getPreferredTrainCirculation({
-                    trainInternalCode: timetable.trainInternalCode,
-                    allCodes: timetable.allCodes
-                }),
+                circulation:
+                    supplementTimetable !== null
+                        ? null
+                        : getPreferredTrainCirculation({
+                              trainInternalCode: timetable.trainInternalCode,
+                              allCodes: timetable.allCodes
+                          }),
                 stops: timetable.stops.map((stop) => ({
                     ...stop
                 }))

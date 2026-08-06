@@ -32,6 +32,11 @@ import {
     preloadTrainStyleMappingFromLocalFile,
     validateTrainStyleMappingText
 } from '~/server/services/trainStyleMappingStore';
+import {
+    invalidateSupplementTrainRegistryCache,
+    preloadSupplementTrainRegistryFromLocalFile,
+    validateSupplementTrainsText
+} from '~/server/services/supplementTrainRegistryStore';
 import { synchronizeQrcodeDetectionDispatchTasks } from '~/server/services/taskExecutors/dispatchQrcodeDetectionTasksExecutor';
 import { reloadQrcodeAssetAfterRefresh } from '~/server/services/taskExecutors/refreshAssetFileTaskExecutor';
 import { synchronizeDatabaseBackupTasks } from '~/server/services/taskExecutors/backupDatabaseTaskExecutor';
@@ -66,7 +71,29 @@ type AssetTarget = Extract<
     | 'stationCoord'
     | 'trainStyleMapping'
     | 'qrcodeDetection'
+    | 'supplementTrains'
 >;
+
+const CONFIG_FILE_TARGETS: readonly AdminConfigFileTarget[] = [
+    'config',
+    'EMUList',
+    'QRCode',
+    'stationCoord',
+    'trainStyleMapping',
+    'qrcodeDetection',
+    'supplementTrains'
+];
+
+function assertConfigFileTarget(
+    value: string
+): asserts value is AdminConfigFileTarget {
+    ensure(
+        (CONFIG_FILE_TARGETS as readonly string[]).includes(value),
+        400,
+        'invalid_param',
+        '不支持的配置文件目标'
+    );
+}
 
 function toTimestampSeconds(value: number): number {
     return Math.floor(value / 1000);
@@ -133,6 +160,7 @@ function buildConfigFileItem(
             provider: null,
             exists: status.exists,
             modifiedAt: status.modifiedAt,
+            editable: true,
             supportedActions: ['reload_local']
         };
     }
@@ -159,6 +187,7 @@ function buildConfigFileItem(
             provider: assetConfig.provider ?? null,
             exists: status.exists,
             modifiedAt: status.modifiedAt,
+            editable: true,
             supportedActions
         };
     }
@@ -184,7 +213,9 @@ function buildConfigFileItem(
                   ? '畅行码映射'
                   : target === 'trainStyleMapping'
                     ? '车型映射表'
-                    : '车站坐标文件',
+                    : target === 'supplementTrains'
+                      ? '补充车次'
+                      : '车站坐标文件',
         description:
             target === 'EMUList'
                 ? '重载或刷新探测流程与管理流程使用的动车组配属清单。'
@@ -192,11 +223,15 @@ function buildConfigFileItem(
                   ? '重载或刷新席位码识别使用的畅行码映射数据。'
                   : target === 'trainStyleMapping'
                     ? '重载或刷新参考车型回退使用的 trainStyle 到车型名映射表。'
-                    : '重载或刷新线路时刻表下载使用的外部车站坐标回退文件。',
+                    : target === 'supplementTrains'
+                      ? '重载或刷新 12306 未收录车次的补充时刻表数据，读取时合并进搜索与时刻表查询。'
+                      : '重载或刷新线路时刻表下载使用的外部车站坐标回退文件。',
         filePath,
         provider: assetConfig.provider ?? null,
         exists: status.exists,
         modifiedAt: status.modifiedAt,
+        editable:
+            target === 'trainStyleMapping' || target === 'supplementTrains',
         supportedActions
     };
 }
@@ -222,6 +257,12 @@ function reloadStationCoordAssetFromLocal(): void {
 function reloadTrainStyleMappingAssetFromLocal(): void {
     invalidateTrainStyleMappingCache();
     preloadTrainStyleMappingFromLocalFile();
+}
+
+function reloadSupplementTrainAssetFromLocal(): void {
+    invalidateSupplementTrainRegistryCache();
+    preloadSupplementTrainRegistryFromLocalFile();
+    invalidateLookupIndexCache();
 }
 
 function assertActionSupported(
@@ -311,6 +352,8 @@ async function reloadAssetFromLocal(
         validateDownloadedQrCodeAssetText(text);
     } else if (target === 'trainStyleMapping') {
         validateTrainStyleMappingText(text);
+    } else if (target === 'supplementTrains') {
+        validateSupplementTrainsText(text);
     } else {
         validateDownloadedStationCoordAssetText(text);
     }
@@ -320,6 +363,8 @@ async function reloadAssetFromLocal(
         reloadStationCoordAssetFromLocal();
     } else if (target === 'trainStyleMapping') {
         reloadTrainStyleMappingAssetFromLocal();
+    } else if (target === 'supplementTrains') {
+        reloadSupplementTrainAssetFromLocal();
     } else {
         invalidateProbeAssetsCache();
         preloadProbeAssetsFromLocalFiles();
@@ -340,7 +385,9 @@ async function reloadAssetFromLocal(
                   ? `已重载本地畅行码映射，并刷新固定车组畅行码检测依赖。${qrcodeWarning}`
                   : target === 'trainStyleMapping'
                     ? '已重载本地车型映射表，后续参考车型回退会使用新的映射规则。'
-                    : '已重载本地车站坐标文件，后续线路时刻表下载任务会使用新的坐标回退规则。',
+                    : target === 'supplementTrains'
+                      ? '已重载本地补充车次，后续搜索与时刻表查询会使用新的补充数据。'
+                      : '已重载本地车站坐标文件，后续线路时刻表下载任务会使用新的坐标回退规则。',
         item
     };
 }
@@ -378,8 +425,10 @@ async function refreshAssetFromRemote(
                   ? validateDownloadedQrCodeAssetText
                   : target === 'stationCoord'
                     ? validateDownloadedStationCoordAssetText
-                    : target === 'trainStyleMapping'
-                      ? validateTrainStyleMappingText
+                  : target === 'trainStyleMapping'
+                    ? validateTrainStyleMappingText
+                    : target === 'supplementTrains'
+                      ? validateSupplementTrainsText
                       : async (content) => {
                             await validateQrcodeDetectionConfigText(content);
                         }
@@ -405,6 +454,8 @@ async function refreshAssetFromRemote(
         reloadStationCoordAssetFromLocal();
     } else if (target === 'trainStyleMapping') {
         reloadTrainStyleMappingAssetFromLocal();
+    } else if (target === 'supplementTrains') {
+        reloadSupplementTrainAssetFromLocal();
     } else if (target === 'QRCode') {
         await reloadQrcodeAssetAfterRefresh(
             previousQrcodeByModelAndTrainSetNo ?? new Map()
@@ -432,7 +483,9 @@ async function refreshAssetFromRemote(
                   ? `已从远程来源刷新畅行码映射，并同步固定车组畅行码检测任务。${qrcodeWarning}`
                   : target === 'trainStyleMapping'
                     ? '已从远程来源刷新车型映射表，后续参考车型回退会使用新的映射规则。'
-                    : target === 'stationCoord'
+                    : target === 'supplementTrains'
+                      ? '已从远程来源刷新补充车次，后续搜索与时刻表查询会使用新的补充数据。'
+                      : target === 'stationCoord'
                       ? '已从远程来源刷新车站坐标文件，后续线路时刻表下载任务会使用新的坐标回退规则。'
                       : `已从远程来源刷新固定车组畅行码检测计划，并同步未来派发任务。${qrcodeWarning}`,
         item: nextItem
@@ -442,19 +495,17 @@ async function refreshAssetFromRemote(
 export function getAdminConfigFiles(): AdminConfigFilesResponse {
     return {
         asOf: getNowSeconds(),
-        items: [
-            buildConfigFileItem('config'),
-            buildConfigFileItem('EMUList'),
-            buildConfigFileItem('QRCode'),
-            buildConfigFileItem('stationCoord'),
-            buildConfigFileItem('trainStyleMapping'),
-            buildConfigFileItem('qrcodeDetection')
-        ]
+        items: CONFIG_FILE_TARGETS.map((target) => buildConfigFileItem(target))
     };
 }
 
-function readAdminRuntimeConfigDocument(): AdminRuntimeConfigDocumentResponse {
-    const filePath = path.resolve(getResolvedConfigPath());
+function readAdminConfigFileDocument(
+    target: AdminConfigFileTarget
+): AdminRuntimeConfigDocumentResponse {
+    const filePath =
+        target === 'config'
+            ? path.resolve(getResolvedConfigPath())
+            : path.resolve(getAssetFilePath(target));
     const content = fs.readFileSync(filePath, 'utf8');
     const status = getFileStatus(filePath);
 
@@ -462,7 +513,9 @@ function readAdminRuntimeConfigDocument(): AdminRuntimeConfigDocumentResponse {
         throw new ApiRequestError(
             404,
             'config_not_found',
-            '当前运行配置文件不存在'
+            target === 'config'
+                ? '当前运行配置文件不存在'
+                : '配置文件不存在'
         );
     }
 
@@ -474,27 +527,22 @@ function readAdminRuntimeConfigDocument(): AdminRuntimeConfigDocumentResponse {
     };
 }
 
-export async function getAdminRuntimeConfigDocument(): Promise<AdminRuntimeConfigDocumentResponse> {
-    return await runSerializedConfigOperation(() =>
-        readAdminRuntimeConfigDocument()
-    );
+export async function getAdminConfigFileDocument(
+    target: string
+): Promise<AdminRuntimeConfigDocumentResponse> {
+    return await runSerializedConfigOperation(async () => {
+        assertConfigFileTarget(target);
+        return readAdminConfigFileDocument(target);
+    });
 }
 
-export async function updateAdminRuntimeConfig(
-    request: AdminRuntimeConfigUpdateRequest,
-    actorUserId: string
-): Promise<AdminRuntimeConfigUpdateResponse> {
-    return await runSerializedConfigOperation(async () => {
-        const previousDocument = readAdminRuntimeConfigDocument();
-        ensure(
-            request.expectedRevision === previousDocument.revision,
-            409,
-            'config_conflict',
-            '运行配置文件已被其他操作修改，请重新读取最新版本后再提交'
-        );
-
+async function validateConfigFileContent(
+    target: AdminConfigFileTarget,
+    content: string
+): Promise<void> {
+    if (target === 'config') {
         try {
-            parseConfigText(request.content);
+            parseConfigText(content);
         } catch (error) {
             throw new ApiRequestError(
                 400,
@@ -502,32 +550,74 @@ export async function updateAdminRuntimeConfig(
                 `配置校验失败：${formatErrorForLog(error)}`
             );
         }
+        return;
+    }
+
+    try {
+        if (target === 'EMUList') {
+            validateDownloadedEmuListAssetText(content);
+        } else if (target === 'QRCode') {
+            validateDownloadedQrCodeAssetText(content);
+        } else if (target === 'stationCoord') {
+            validateDownloadedStationCoordAssetText(content);
+        } else if (target === 'trainStyleMapping') {
+            validateTrainStyleMappingText(content);
+        } else if (target === 'supplementTrains') {
+            validateSupplementTrainsText(content);
+        } else {
+            await validateQrcodeDetectionConfigText(content);
+        }
+    } catch (error) {
+        throw new ApiRequestError(
+            400,
+            'invalid_config',
+            `配置文件校验失败：${formatErrorForLog(error)}`
+        );
+    }
+}
+
+export async function updateAdminConfigFileDocument(
+    target: string,
+    request: AdminRuntimeConfigUpdateRequest,
+    actorUserId: string
+): Promise<AdminRuntimeConfigUpdateResponse> {
+    return await runSerializedConfigOperation(async () => {
+        assertConfigFileTarget(target);
+        const previousDocument = readAdminConfigFileDocument(target);
+        ensure(
+            request.expectedRevision === previousDocument.revision,
+            409,
+            'config_conflict',
+            '配置文件已被其他操作修改，请重新读取最新版本后再提交'
+        );
+
+        await validateConfigFileContent(target, request.content);
 
         try {
             writeTextFileAtomically(previousDocument.filePath, request.content);
         } catch (error) {
             logger.error(
-                `admin_config_write_failed actor=${actorUserId} file=${previousDocument.filePath} previousRevision=${previousDocument.revision} error=${formatErrorForLog(error)}`
+                `admin_config_write_failed actor=${actorUserId} target=${target} file=${previousDocument.filePath} previousRevision=${previousDocument.revision} error=${formatErrorForLog(error)}`
             );
             throw new ApiRequestError(
                 500,
                 'config_write_failed',
-                '运行配置文件写入失败，请查看服务日志'
+                '配置文件写入失败，请查看服务日志'
             );
         }
 
         try {
-            const reloadResult = await reloadConfigFromLocal(
-                actorUserId,
-                'editor'
-            );
-            const nextDocument = readAdminRuntimeConfigDocument();
+            const reloadResult =
+                target === 'config'
+                    ? await reloadConfigFromLocal(actorUserId, 'editor')
+                    : await reloadAssetFromLocal(target);
+            const nextDocument = readAdminConfigFileDocument(target);
             logger.info(
-                `admin_config_updated actor=${actorUserId} file=${nextDocument.filePath} previousRevision=${previousDocument.revision} revision=${nextDocument.revision}`
+                `admin_config_updated actor=${actorUserId} target=${target} file=${nextDocument.filePath} previousRevision=${previousDocument.revision} revision=${nextDocument.revision}`
             );
 
             return {
-                summary: `已保存并尝试重载运行配置。${reloadResult.summary}`,
+                summary: `已保存并尝试重载${target === 'config' ? '运行配置' : '配置文件'}。${reloadResult.summary}`,
                 revision: nextDocument.revision,
                 modifiedAt: nextDocument.modifiedAt,
                 item: reloadResult.item
@@ -538,13 +628,20 @@ export async function updateAdminRuntimeConfig(
                     previousDocument.filePath,
                     previousDocument.content
                 );
-                await reloadConfigFromLocal(actorUserId, 'editor_rollback');
+                if (target === 'config') {
+                    await reloadConfigFromLocal(
+                        actorUserId,
+                        'editor_rollback'
+                    );
+                } else {
+                    await reloadAssetFromLocal(target);
+                }
                 logger.warn(
-                    `admin_config_update_rolled_back actor=${actorUserId} file=${previousDocument.filePath} revision=${previousDocument.revision} error=${formatErrorForLog(reloadError)}`
+                    `admin_config_update_rolled_back actor=${actorUserId} target=${target} file=${previousDocument.filePath} revision=${previousDocument.revision} error=${formatErrorForLog(reloadError)}`
                 );
             } catch (rollbackError) {
                 logger.error(
-                    `admin_config_rollback_failed actor=${actorUserId} file=${previousDocument.filePath} revision=${previousDocument.revision} reloadError=${formatErrorForLog(reloadError)} rollbackError=${formatErrorForLog(rollbackError)}`
+                    `admin_config_rollback_failed actor=${actorUserId} target=${target} file=${previousDocument.filePath} revision=${previousDocument.revision} reloadError=${formatErrorForLog(reloadError)} rollbackError=${formatErrorForLog(rollbackError)}`
                 );
                 throw new ApiRequestError(
                     500,
@@ -577,6 +674,7 @@ export async function runAdminConfigFileAction(
             case 'stationCoord':
             case 'trainStyleMapping':
             case 'qrcodeDetection':
+            case 'supplementTrains':
                 if (request.action === 'reload_local') {
                     return await reloadAssetFromLocal(request.target);
                 }

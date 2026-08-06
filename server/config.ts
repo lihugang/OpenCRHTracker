@@ -282,6 +282,7 @@ export interface Config {
             stationCoord: RefreshableAssetConfig;
             trainStyleMapping: RefreshableAssetConfig;
             qrcodeDetection: RefreshableAssetConfig;
+            supplementTrains: RefreshableAssetConfig;
         };
         databases: Record<DatabaseKey, DatabaseConfig>;
         runtime: {
@@ -1713,6 +1714,10 @@ function validateConfig(raw: unknown): Config {
                 qrcodeDetection: parseRefreshableAssetConfig(
                     assets.qrcodeDetection,
                     'data.assets.qrcodeDetection'
+                ),
+                supplementTrains: parseRefreshableAssetConfig(
+                    assets.supplementTrains,
+                    'data.assets.supplementTrains'
                 )
             },
             databases: {
@@ -2694,7 +2699,8 @@ function validateConfig(raw: unknown): Config {
         'QRCode',
         'stationCoord',
         'trainStyleMapping',
-        'qrcodeDetection'
+        'qrcodeDetection',
+        'supplementTrains'
     ] as const) {
         const asset = configResult.data.assets[key];
         assert(

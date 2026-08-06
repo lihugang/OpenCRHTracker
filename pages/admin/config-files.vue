@@ -198,10 +198,10 @@
 
                         <div class="flex flex-wrap gap-3">
                             <UiButton
-                                v-if="item.target === 'config'"
+                                v-if="item.editable"
                                 type="button"
                                 variant="secondary"
-                                @click="isRuntimeConfigModalOpen = true">
+                                @click="openEditor(item.target)">
                                 查看并编辑 JSON
                             </UiButton>
 
@@ -241,9 +241,10 @@
             </div>
         </div>
 
-        <AdminRuntimeConfigModal
-            v-model="isRuntimeConfigModalOpen"
-            @updated="handleRuntimeConfigUpdated" />
+        <AdminConfigFileEditorModal
+            v-model="isConfigFileEditorOpen"
+            :target="configFileEditorTarget ?? 'config'"
+            @updated="handleConfigFileUpdated" />
     </AdminShell>
 </template>
 
@@ -278,7 +279,8 @@ const { session } = useAuthState();
 const { selectedDateInput, todayDateInputValue } = await useAdminDateQuery();
 
 const activeActionKey = ref('');
-const isRuntimeConfigModalOpen = ref(false);
+const isConfigFileEditorOpen = ref(false);
+const configFileEditorTarget = ref<AdminConfigFileTarget | null>(null);
 const actionMessages = ref<
     Partial<
         Record<
@@ -347,9 +349,16 @@ function getItemEyebrow(target: AdminConfigFileTarget) {
             return '畅行码';
         case 'qrcodeDetection':
             return '畅行码检测';
+        case 'supplementTrains':
+            return '补充车次';
         default:
             return '文件';
     }
+}
+
+function openEditor(target: AdminConfigFileTarget) {
+    configFileEditorTarget.value = target;
+    isConfigFileEditorOpen.value = true;
 }
 
 async function postConfigFileAction(body: AdminConfigFileActionRequest) {
@@ -395,7 +404,7 @@ function patchConfigFileItem(nextItem: AdminConfigFileItem) {
     };
 }
 
-async function handleRuntimeConfigUpdated(
+async function handleConfigFileUpdated(
     response: AdminRuntimeConfigUpdateResponse
 ) {
     patchConfigFileItem(response.item);

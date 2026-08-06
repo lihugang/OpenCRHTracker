@@ -462,7 +462,8 @@ export type AdminConfigFileTarget =
     | 'QRCode'
     | 'stationCoord'
     | 'trainStyleMapping'
-    | 'qrcodeDetection';
+    | 'qrcodeDetection'
+    | 'supplementTrains';
 
 export type AdminConfigFileAction = 'reload_local' | 'refresh_remote';
 
@@ -474,6 +475,7 @@ export interface AdminConfigFileItem {
     provider: string | null;
     exists: boolean;
     modifiedAt: number | null;
+    editable: boolean;
     supportedActions: AdminConfigFileAction[];
 }
 

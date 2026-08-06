@@ -25,12 +25,13 @@ function parseRequestBody(
     const action = typeof body.action === 'string' ? body.action.trim() : '';
 
     ensure(
-        target === 'config' ||
+            target === 'config' ||
             target === 'EMUList' ||
             target === 'QRCode' ||
             target === 'stationCoord' ||
             target === 'trainStyleMapping' ||
-            target === 'qrcodeDetection',
+            target === 'qrcodeDetection' ||
+            target === 'supplementTrains',
         400,
         'invalid_param',
         '不支持的配置文件目标'

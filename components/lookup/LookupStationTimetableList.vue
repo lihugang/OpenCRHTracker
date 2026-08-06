@@ -732,7 +732,7 @@ function formatTrainCode(value: string) {
 }
 
 function hasReferencePlatform(platformNo: number | null) {
-    return Number.isInteger(platformNo) && platformNo > 0;
+    return typeof platformNo === 'number' && platformNo > 0;
 }
 
 function formatReferencePlatform(platformNo: number | null) {

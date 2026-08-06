@@ -1,0 +1,105 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Supplement Trains Scheme",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+        "$schema": {
+            "type": "string",
+            "minLength": 1
+        },
+        "updatedAt": {
+            "type": "string",
+            "minLength": 1
+        },
+        "items": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                    "trainCode",
+                    "stops"
+                ],
+                "properties": {
+                    "trainCode": {
+                        "type": "string",
+                        "minLength": 1
+                    },
+                    "aliases": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "minLength": 1
+                        }
+                    },
+                    "bureauCode": {
+                        "type": "string"
+                    },
+                    "trainStyle": {
+                        "type": "string"
+                    },
+                    "trainDepartment": {
+                        "type": "string"
+                    },
+                    "passengerDepartment": {
+                        "type": "string"
+                    },
+                    "stops": {
+                        "type": "array",
+                        "minItems": 1,
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                                "stationNo",
+                                "stationName",
+                                "arriveAt",
+                                "departAt"
+                            ],
+                            "properties": {
+                                "stationNo": {
+                                    "type": "integer",
+                                    "minimum": 1
+                                },
+                                "stationName": {
+                                    "type": "string",
+                                    "minLength": 1
+                                },
+                                "arriveAt": {
+                                    "type": "string",
+                                    "pattern": "^([01]\\d|2[0-3])[0-5]\\d$"
+                                },
+                                "departAt": {
+                                    "type": "string",
+                                    "pattern": "^([01]\\d|2[0-3])[0-5]\\d$"
+                                },
+                                "platformNo": {
+                                    "type": [
+                                        "integer",
+                                        "null"
+                                    ]
+                                },
+                                "distance": {
+                                    "type": [
+                                        "number",
+                                        "null"
+                                    ]
+                                },
+                                "wicket": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "required": [
+        "items"
+    ]
+}

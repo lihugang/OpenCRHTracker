@@ -1,15 +1,16 @@
 <template>
     <UiModal
         :model-value="modelValue"
-        eyebrow="APP CONFIG"
-        title="运行配置原始 JSON"
-        description="查看并编辑当前环境实际加载的配置文件。"
+        :eyebrow="modalEyebrow"
+        :title="modalTitle"
+        :description="modalDescription"
         size="screen"
         height="screen"
         :close-on-backdrop="!isSaving"
         @update:model-value="handleVisibilityChange">
         <div class="space-y-5">
             <div
+                v-if="target === 'config'"
                 class="border-y border-amber-200 bg-amber-50/80 px-4 py-3 text-sm leading-6 text-amber-950 sm:px-5">
                 <p class="font-semibold">该文件可能包含私钥和 API Key</p>
                 <p class="mt-1 text-amber-900/80">
@@ -29,7 +30,7 @@
                 v-else-if="loadStatus === 'error' && !hasDocument"
                 class="border-y border-rose-200 bg-rose-50/80 px-5 py-6">
                 <p class="text-base font-semibold text-rose-900">
-                    原始配置加载失败
+                    原始文件加载失败
                 </p>
                 <p class="mt-2 text-sm leading-6 text-rose-700">
                     {{ loadErrorMessage }}
@@ -38,7 +39,7 @@
                     type="button"
                     variant="secondary"
                     class="mt-4"
-                    @click="loadRuntimeConfig">
+                    @click="loadConfigFileDocument">
                     重试
                 </UiButton>
             </div>
@@ -91,12 +92,12 @@
 
                 <div class="space-y-2">
                     <label
-                        for="runtime-config-json"
+                        for="admin-config-file-json"
                         class="block text-sm font-semibold text-slate-900">
                         原始 JSON
                     </label>
                     <textarea
-                        id="runtime-config-json"
+                        id="admin-config-file-json"
                         v-model="draftContent"
                         class="harmony-input harmony-scrollbar block min-h-[min(58vh,38rem)] w-full resize-y overflow-auto whitespace-pre px-4 py-4 font-mono text-[13px] leading-6 text-slate-800 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:opacity-70"
                         wrap="off"
@@ -104,7 +105,7 @@
                         :aria-invalid="syntaxErrorMessage.length > 0"
                         :aria-describedby="
                             syntaxErrorMessage
-                                ? 'runtime-config-syntax-error'
+                                ? 'admin-config-file-syntax-error'
                                 : undefined
                         "
                         autocomplete="off"
@@ -112,7 +113,7 @@
                         spellcheck="false" />
                     <p
                         v-if="syntaxErrorMessage"
-                        id="runtime-config-syntax-error"
+                        id="admin-config-file-syntax-error"
                         class="text-sm leading-6 text-rose-700"
                         role="alert">
                         {{ syntaxErrorMessage }}
@@ -120,7 +121,11 @@
                     <p
                         v-else
                         class="text-sm leading-6 text-slate-500">
-                        服务端会在写入前继续执行完整运行配置校验。
+                        {{
+                            target === 'config'
+                                ? '服务端会在写入前继续执行完整运行配置校验。'
+                                : '服务端会在写入前继续执行完整文件校验。'
+                        }}
                     </p>
                 </div>
 
@@ -182,7 +187,7 @@
         @update:model-value="isDiscardConfirmOpen = $event">
         <div
             class="border-y border-amber-200 bg-amber-50/80 px-5 py-4 text-sm leading-6 text-amber-950">
-            磁盘文件和当前运行配置不会受到这些未保存内容的影响。
+            磁盘文件和当前加载的配置不会受到这些未保存内容的影响。
         </div>
 
         <template #footer>
@@ -206,6 +211,7 @@
 
 <script setup lang="ts">
 import type {
+    AdminConfigFileTarget,
     AdminRuntimeConfigDocumentResponse,
     AdminRuntimeConfigUpdateResponse
 } from '~/types/admin';
@@ -219,6 +225,7 @@ type PendingDiscardAction = 'close' | 'reload';
 
 const props = defineProps<{
     modelValue: boolean;
+    target: AdminConfigFileTarget;
 }>();
 
 const emit = defineEmits<{
@@ -240,6 +247,16 @@ const feedbackMessage = ref('');
 const isDiscardConfirmOpen = ref(false);
 const pendingDiscardAction = ref<PendingDiscardAction | null>(null);
 
+const apiPath = computed(
+    () =>
+        '/api/v1/admin/config-files/' +
+        encodeURIComponent(props.target)
+);
+const modalEyebrow = computed(() => 'CONFIG FILE');
+const modalTitle = computed(() => '文件原始 JSON');
+const modalDescription = computed(
+    () => '查看并编辑当前环境实际加载的配置文件原文。'
+);
 const hasDocument = computed(() => revision.value.length > 0);
 const isDirty = computed(
     () => hasDocument.value && draftContent.value !== originalContent.value
@@ -317,10 +334,10 @@ function applyDocument(document: AdminRuntimeConfigDocumentResponse) {
     loadStatus.value = 'success';
 }
 
-async function fetchRuntimeConfigDocument() {
+async function fetchConfigFileDocument() {
     const response = await $fetch<
         TrackerApiResponse<AdminRuntimeConfigDocumentResponse>
-    >('/api/v1/admin/config-files/config', {
+    >(apiPath.value, {
         retry: 0,
         cache: 'no-store'
     });
@@ -334,7 +351,7 @@ async function fetchRuntimeConfigDocument() {
     return response.data;
 }
 
-async function loadRuntimeConfig() {
+async function loadConfigFileDocument() {
     const isInitialLoad = !hasDocument.value;
     if (isInitialLoad) {
         loadStatus.value = 'pending';
@@ -344,9 +361,9 @@ async function loadRuntimeConfig() {
     }
 
     try {
-        applyDocument(await fetchRuntimeConfigDocument());
+        applyDocument(await fetchConfigFileDocument());
     } catch (error) {
-        const message = getApiErrorMessage(error, '加载原始运行配置失败。');
+        const message = getApiErrorMessage(error, '加载原始文件失败。');
         if (isInitialLoad) {
             loadStatus.value = 'error';
             loadErrorMessage.value = message;
@@ -372,14 +389,14 @@ async function saveAndReload() {
         const submittedContent = draftContent.value;
         const { data, error } = await useCsrfFetch<
             TrackerApiResponse<AdminRuntimeConfigUpdateResponse>
-        >('/api/v1/admin/config-files/config', {
+        >(apiPath.value, {
             method: 'PUT',
             retry: 0,
             body: {
                 content: submittedContent,
                 expectedRevision: revision.value
             },
-            key: `admin:runtime-config:update:${Date.now()}`,
+            key: `admin:config-files:update:${props.target}:${Date.now()}`,
             watch: false,
             server: false
         });
@@ -390,7 +407,7 @@ async function saveAndReload() {
 
         const response = data.value;
         if (!response) {
-            throw new Error('Missing runtime config update response');
+            throw new Error('Missing config file update response');
         }
         if (!response.ok) {
             throw {
@@ -409,7 +426,7 @@ async function saveAndReload() {
             getApiErrorCode(error) === 'config_conflict' ? 'conflict' : 'error';
         feedbackMessage.value = getApiErrorMessage(
             error,
-            '保存并重载运行配置失败。'
+            '保存并重载配置文件失败。'
         );
     } finally {
         isSaving.value = false;
@@ -437,7 +454,7 @@ function requestReloadFromDisk() {
         requestDiscard('reload');
         return;
     }
-    void loadRuntimeConfig();
+    void loadConfigFileDocument();
 }
 
 function handleVisibilityChange(nextValue: boolean) {
@@ -459,7 +476,7 @@ function confirmDiscard() {
     pendingDiscardAction.value = null;
 
     if (action === 'reload') {
-        void loadRuntimeConfig();
+        void loadConfigFileDocument();
         return;
     }
     if (action === 'close') {
@@ -491,13 +508,23 @@ watch(
     () => props.modelValue,
     (isOpen) => {
         if (isOpen) {
-            void loadRuntimeConfig();
+            void loadConfigFileDocument();
             return;
         }
         resetState();
     },
     {
         immediate: true
+    }
+);
+
+watch(
+    () => props.target,
+    () => {
+        if (props.modelValue) {
+            resetState();
+            void loadConfigFileDocument();
+        }
     }
 );
 </script>
