@@ -412,7 +412,20 @@ function resolveRouteMetadata(
             ).slice(0, 1);
         }
         if (metadata.trainStyle.length === 0) {
-            metadata.trainStyle = normalizeOptionalField(stop.train_style);
+            const trainStyle = normalizeOptionalField(stop.train_style);
+            if (trainStyle.length > 0) {
+                metadata.trainStyle = trainStyle;
+            } else {
+                const jiaoluTrainStyle = normalizeOptionalField(
+                    stop.jiaolu_train_style
+                );
+                if (jiaoluTrainStyle.length > 0) {
+                    metadata.trainStyle = jiaoluTrainStyle;
+                    logger.debug(
+                        `train_style_fallback_to_jiaolu_train_style stationName=${stop.stationName} trainStyle=${stop.train_style} jiaoluTrainStyle=${jiaoluTrainStyle}`
+                    );
+                }
+            }
         }
         if (metadata.trainDepartment.length === 0) {
             metadata.trainDepartment = normalizeOptionalField(
