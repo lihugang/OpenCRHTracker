@@ -348,6 +348,19 @@ export const deployDocsSections: DocsContentSection[] = [
                         ]
                     },
                     {
+                        path: 'data.assets.supplementTrains',
+                        valueType: 'object',
+                        required: true,
+                        description:
+                            '12306 未收录车次的补充时刻表文件路径、下载地址与刷新时间。',
+                        notes: [
+                            '默认文件建议为 data/supplement_trains.json。',
+                            'refresh.enabled=true 时 provider 必填。',
+                            'refresh.refreshAt 必须是非空 HHmm 字符串数组。',
+                            '管理员页面支持本地重载、远程刷新和在线编辑，刷新后会立即影响搜索建议与当前时刻表查询。'
+                        ]
+                    },
+                    {
                         path: 'data.databases.schedule.path',
                         valueType: 'string',
                         required: true,
@@ -1500,6 +1513,137 @@ export const deployDocsSections: DocsContentSection[] = [
                     '管理员页面“配置文件”支持对该文件执行本地重载和远程刷新。',
                     '重载或刷新该文件后，会重新校验内容并同步未来的固定车组探测派发任务。',
                     '重载或刷新动车组清单、畅行码映射资产后，也会重新校验本文件并同步这些未来派发任务。'
+                ]
+            }
+        ]
+    },
+    {
+        id: 'supplement-trains',
+        title: 'supplement_trains.json',
+        summary:
+            '为 12306 未收录车次提供补充时刻表，读取时合并进搜索建议与当前时刻表查询。',
+        blocks: [
+            {
+                type: 'paragraph',
+                text: '补充车次文件默认建议放在 data/supplement_trains.json，实际路径由配置文件中的 data.assets.supplementTrains.file 决定。仅当当前时刻表中查不到某车次时，系统才会读取本文件，按车次号或别名生成当日补充时刻表用于回退；当前时刻表命中时仍以数据库数据为准。'
+            },
+            {
+                type: 'code',
+                language: 'json',
+                code: '{\n    "$schema": "../assets/json/supplementTrainsScheme.json",\n    "updatedAt": "2026-01-01T00:00:00+08:00",\n    "items": [\n        {\n            "trainCode": "G8001",\n            "aliases": ["G8002"],\n            "bureauCode": "BJ",\n            "trainStyle": "CR400AF",\n            "trainDepartment": "北京局",\n            "passengerDepartment": "北京客运段",\n            "stops": [\n                {\n                    "stationNo": 1,\n                    "stationName": "北京南",\n                    "arriveAt": "0800",\n                    "departAt": "0800",\n                    "platformNo": 3,\n                    "distance": 0,\n                    "wicket": "A1"\n                },\n                {\n                    "stationNo": 2,\n                    "stationName": "济南西",\n                    "arriveAt": "0930",\n                    "departAt": "0932",\n                    "platformNo": 2,\n                    "distance": 406,\n                    "wicket": "B2"\n                }\n            ]\n        }\n    ]\n}'
+            },
+            {
+                type: 'field-cards',
+                cards: [
+                    {
+                        path: '$schema',
+                        valueType: 'string',
+                        required: false,
+                        description:
+                            '可选的范式引用，建议填写 ../assets/json/supplementTrainsScheme.json。'
+                    },
+                    {
+                        path: 'updatedAt',
+                        valueType: 'string',
+                        required: false,
+                        description: '文件更新时间，仅作信息记录，不会被校验。'
+                    },
+                    {
+                        path: 'items[].trainCode',
+                        valueType: 'string',
+                        required: true,
+                        description:
+                            '车次号，加载时会做规范化处理；重复车次取第一条记录并在日志中输出告警。'
+                    },
+                    {
+                        path: 'items[].aliases',
+                        valueType: 'array<string>',
+                        required: false,
+                        description:
+                            '可选的别名列表，会参与搜索建议和时刻表查询回退，加载时自动去重。'
+                    },
+                    {
+                        path: 'items[].bureauCode',
+                        valueType: 'string',
+                        required: false,
+                        description: '路局编码，可选；省略时返回空字符串。'
+                    },
+                    {
+                        path: 'items[].trainStyle',
+                        valueType: 'string',
+                        required: false,
+                        description: '车型样式，可选；省略时返回空字符串。'
+                    },
+                    {
+                        path: 'items[].trainDepartment',
+                        valueType: 'string',
+                        required: false,
+                        description: '担当部门信息，可选；省略时返回空字符串。'
+                    },
+                    {
+                        path: 'items[].passengerDepartment',
+                        valueType: 'string',
+                        required: false,
+                        description: '客运部门信息，可选；省略时返回空字符串。'
+                    },
+                    {
+                        path: 'items[].stops',
+                        valueType: 'array<object>',
+                        required: true,
+                        description:
+                            '经停站列表，至少一项；加载后按 stationNo 升序排列，第一项作为始发站，最后一项作为终到站。'
+                    },
+                    {
+                        path: 'items[].stops[].stationNo',
+                        valueType: 'integer',
+                        required: true,
+                        description: '站序，必须是不小于 1 的整数。'
+                    },
+                    {
+                        path: 'items[].stops[].stationName',
+                        valueType: 'string',
+                        required: true,
+                        description: '站名，不能为空字符串。'
+                    },
+                    {
+                        path: 'items[].stops[].arriveAt',
+                        valueType: 'string(HHmm)',
+                        required: true,
+                        description: '到达时刻，格式为 HHmm。'
+                    },
+                    {
+                        path: 'items[].stops[].departAt',
+                        valueType: 'string(HHmm)',
+                        required: true,
+                        description: '出发时刻，格式为 HHmm。'
+                    },
+                    {
+                        path: 'items[].stops[].platformNo',
+                        valueType: 'integer | null',
+                        required: false,
+                        description: '站台号，可选；省略或为 null 时返回 null。'
+                    },
+                    {
+                        path: 'items[].stops[].distance',
+                        valueType: 'number | null',
+                        required: false,
+                        description: '里程，可选；省略或为 null 时返回 null。'
+                    },
+                    {
+                        path: 'items[].stops[].wicket',
+                        valueType: 'string | null',
+                        required: false,
+                        description: '出站口，可选；省略或为 null 时返回 null。'
+                    }
+                ]
+            },
+            {
+                type: 'list',
+                items: [
+                    '文件缺失时服务会自动写入默认空列表内容并记录警告；文件解析失败时本次加载按空数据源处理，不阻断服务启动。',
+                    '管理员页面“配置文件”支持对该文件执行本地重载、远程刷新和在线编辑，操作后会重建搜索索引并立即生效。',
+                    '补充车次只作为当前时刻表查询的回退数据源，不会写入时刻表数据库，也不会参与历史记录或列车交路查询。',
+                    '使用补充时刻表时，接口返回的 internalCode 为 supplement_trains_<车次号>，updatedAt 为 null，circulation 为 null。'
                 ]
             }
         ]
