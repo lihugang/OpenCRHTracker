@@ -6,6 +6,7 @@ import {
     listDailyRecordsPaged,
     type DailyEmuRouteRow
 } from '~/server/services/emuRoutesStore';
+import { getSupplementTrainTimetableByTrainCode } from '~/server/services/supplementTrainRegistryStore';
 import { loadTrainStyleMapping } from '~/server/services/trainStyleMappingStore';
 import {
     formatShanghaiDateString,
@@ -97,7 +98,7 @@ function roundWeightedShare(value: number) {
     return Number(value.toFixed(4));
 }
 
-async function getFallbackReferenceModelFromSchedule(
+async function getFallbackReferenceModelFromTimetableSources(
     trainCodes: string[]
 ): Promise<ReferenceModelItem | null> {
     const scheduleRoutesByTrainCode = getTodayScheduleCache();
@@ -105,7 +106,18 @@ async function getFallbackReferenceModelFromSchedule(
 
     for (const trainCode of trainCodes) {
         const route = scheduleRoutesByTrainCode.get(trainCode) ?? null;
-        const trainStyle = route?.trainStyle.trim() ?? '';
+        let trainStyle = route?.trainStyle.trim() ?? '';
+        let allCodes = route?.allCodes ?? [];
+
+        if (!route) {
+            const supplementTimetable =
+                getSupplementTrainTimetableByTrainCode(trainCode);
+            if (supplementTimetable) {
+                trainStyle = supplementTimetable.trainStyle.trim();
+                allCodes = supplementTimetable.allCodes;
+            }
+        }
+
         if (trainStyle.length === 0) {
             continue;
         }
@@ -114,7 +126,7 @@ async function getFallbackReferenceModelFromSchedule(
             trainStyleMappingAssets.mappings.get(trainStyle) ?? trainStyle;
         if (mappedModel === trainStyle) {
             logger.warn(
-                `train_style_mapping_miss trainCode=${trainCode} trainStyle=${trainStyle} allCodes=${route?.allCodes.join('/') ?? ''} strategy=keep_raw_train_style`
+                `train_style_mapping_miss trainCode=${trainCode} trainStyle=${trainStyle} allCodes=${allCodes.join('/') ?? ''} strategy=keep_raw_train_style`
             );
         }
 
@@ -288,8 +300,9 @@ export async function getReferenceModelsByTrainCodes(
     }
 
     if (dedupedRuns.size === 0) {
-        const fallbackModel =
-            await getFallbackReferenceModelFromSchedule(normalizedTrainCodes);
+        const fallbackModel = await getFallbackReferenceModelFromTimetableSources(
+            normalizedTrainCodes
+        );
         return fallbackModel ? [fallbackModel] : [];
     }
 
