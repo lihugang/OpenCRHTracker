@@ -25,7 +25,7 @@ function parseRequestBody(
     const action = typeof body.action === 'string' ? body.action.trim() : '';
 
     ensure(
-            target === 'config' ||
+        target === 'config' ||
             target === 'EMUList' ||
             target === 'QRCode' ||
             target === 'stationCoord' ||

@@ -183,7 +183,10 @@ function parseSupplementTrainsText(text: string): SupplementTrainEntry[] {
         }
         seenTrainCodes.add(trainCode);
 
-        assert(Array.isArray(item.stops), `items[${trainCode}].stops must be an array`);
+        assert(
+            Array.isArray(item.stops),
+            `items[${trainCode}].stops must be an array`
+        );
         assert(
             item.stops.length > 0,
             `items[${trainCode}].stops must not be empty`
@@ -198,8 +201,7 @@ function parseSupplementTrainsText(text: string): SupplementTrainEntry[] {
             const seenAliases = new Set<string>();
             for (const [aliasIndex, rawAlias] of item.aliases.entries()) {
                 assert(
-                    typeof rawAlias === 'string' &&
-                        rawAlias.trim().length > 0,
+                    typeof rawAlias === 'string' && rawAlias.trim().length > 0,
                     `items[${trainCode}].aliases[${aliasIndex}] must be a non-empty string`
                 );
                 const alias = normalizeCode(rawAlias);
@@ -291,8 +293,7 @@ function getActiveRegistry(): SupplementTrainRegistry {
     try {
         cached = buildRegistry(filePath);
     } catch (error) {
-        const message =
-            error instanceof Error ? error.message : String(error);
+        const message = error instanceof Error ? error.message : String(error);
         logger.warn(
             `supplement_trains_asset_unavailable file=${filePath} error=${message}`
         );

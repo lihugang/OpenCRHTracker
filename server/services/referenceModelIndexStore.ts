@@ -300,9 +300,10 @@ export async function getReferenceModelsByTrainCodes(
     }
 
     if (dedupedRuns.size === 0) {
-        const fallbackModel = await getFallbackReferenceModelFromTimetableSources(
-            normalizedTrainCodes
-        );
+        const fallbackModel =
+            await getFallbackReferenceModelFromTimetableSources(
+                normalizedTrainCodes
+            );
         return fallbackModel ? [fallbackModel] : [];
     }
 

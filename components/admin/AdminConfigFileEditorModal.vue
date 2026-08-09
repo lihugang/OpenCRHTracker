@@ -248,9 +248,7 @@ const isDiscardConfirmOpen = ref(false);
 const pendingDiscardAction = ref<PendingDiscardAction | null>(null);
 
 const apiPath = computed(
-    () =>
-        '/api/v1/admin/config-files/' +
-        encodeURIComponent(props.target)
+    () => '/api/v1/admin/config-files/' + encodeURIComponent(props.target)
 );
 const modalEyebrow = computed(() => 'CONFIG FILE');
 const modalTitle = computed(() => '文件原始 JSON');

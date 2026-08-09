@@ -425,13 +425,13 @@ async function refreshAssetFromRemote(
                   ? validateDownloadedQrCodeAssetText
                   : target === 'stationCoord'
                     ? validateDownloadedStationCoordAssetText
-                  : target === 'trainStyleMapping'
-                    ? validateTrainStyleMappingText
-                    : target === 'supplementTrains'
-                      ? validateSupplementTrainsText
-                      : async (content) => {
-                            await validateQrcodeDetectionConfigText(content);
-                        }
+                    : target === 'trainStyleMapping'
+                      ? validateTrainStyleMappingText
+                      : target === 'supplementTrains'
+                        ? validateSupplementTrainsText
+                        : async (content) => {
+                              await validateQrcodeDetectionConfigText(content);
+                          }
     });
 
     ensure(
@@ -486,8 +486,8 @@ async function refreshAssetFromRemote(
                     : target === 'supplementTrains'
                       ? '已从远程来源刷新补充车次，后续搜索与时刻表查询会使用新的补充数据。'
                       : target === 'stationCoord'
-                      ? '已从远程来源刷新车站坐标文件，后续线路时刻表下载任务会使用新的坐标回退规则。'
-                      : `已从远程来源刷新固定车组畅行码检测计划，并同步未来派发任务。${qrcodeWarning}`,
+                        ? '已从远程来源刷新车站坐标文件，后续线路时刻表下载任务会使用新的坐标回退规则。'
+                        : `已从远程来源刷新固定车组畅行码检测计划，并同步未来派发任务。${qrcodeWarning}`,
         item: nextItem
     };
 }
@@ -513,9 +513,7 @@ function readAdminConfigFileDocument(
         throw new ApiRequestError(
             404,
             'config_not_found',
-            target === 'config'
-                ? '当前运行配置文件不存在'
-                : '配置文件不存在'
+            target === 'config' ? '当前运行配置文件不存在' : '配置文件不存在'
         );
     }
 
@@ -629,10 +627,7 @@ export async function updateAdminConfigFileDocument(
                     previousDocument.content
                 );
                 if (target === 'config') {
-                    await reloadConfigFromLocal(
-                        actorUserId,
-                        'editor_rollback'
-                    );
+                    await reloadConfigFromLocal(actorUserId, 'editor_rollback');
                 } else {
                     await reloadAssetFromLocal(target);
                 }
