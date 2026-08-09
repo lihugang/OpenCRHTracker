@@ -88,176 +88,187 @@
 
                     <div class="grid gap-3">
                         <div
-                            v-for="item in group.items"
+                            v-for="(item, index) in group.items"
                             :key="item.revokeId"
-                            class="dashboard-glass-card rounded-[1.15rem] border px-5 py-4">
+                            class="space-y-3">
                             <div
-                                class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                                <div class="min-w-0 space-y-4">
-                                    <div
-                                        class="flex flex-wrap items-center gap-2">
-                                        <span
-                                            :class="getStatusBadgeClass(item)">
-                                            {{ getStatusLabel(item) }}
-                                        </span>
-                                        <span
-                                            v-if="item.isCurrent"
-                                            class="inline-flex shrink-0 whitespace-nowrap items-center rounded-full bg-slate-900 px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.1em] text-white">
-                                            当前会话
-                                        </span>
-                                    </div>
-
-                                    <div class="min-w-0 space-y-3">
-                                        <div class="space-y-1">
-                                            <p
-                                                class="text-xs font-medium uppercase tracking-[0.16em] text-slate-400">
-                                                密钥名称
-                                            </p>
-                                            <p
-                                                class="truncate text-sm font-medium text-slate-900">
-                                                {{ item.name }}
-                                            </p>
-                                        </div>
-                                        <div class="space-y-1">
-                                            <p
-                                                class="text-xs font-medium uppercase tracking-[0.16em] text-slate-400">
-                                                密钥标识
-                                            </p>
-                                            <p
-                                                class="font-mono text-sm font-semibold text-crh-blue">
-                                                {{ item.maskedKeyId }}
-                                            </p>
-                                        </div>
-                                    </div>
-
-                                    <dl
-                                        class="grid gap-3 text-sm text-slate-600 sm:grid-cols-2">
-                                        <div class="space-y-1">
-                                            <dt
-                                                class="text-xs uppercase tracking-[0.18em] text-slate-400">
-                                                生效时间
-                                            </dt>
-                                            <dd
-                                                class="text-base font-semibold text-slate-900">
-                                                {{
-                                                    formatTimestamp(
-                                                        item.activeFrom
-                                                    )
-                                                }}
-                                            </dd>
-                                        </div>
-                                        <div class="space-y-1">
-                                            <dt
-                                                class="text-xs uppercase tracking-[0.18em] text-slate-400">
-                                                失效时间
-                                            </dt>
-                                            <dd
-                                                class="text-base font-semibold text-slate-900">
-                                                {{
-                                                    formatTimestamp(
-                                                        item.expiresAt
-                                                    )
-                                                }}
-                                            </dd>
-                                        </div>
+                                v-if="index > 0"
+                                class="motion-divider" />
+                            <div
+                                class="dashboard-glass-card rounded-[1.15rem] border px-5 py-4">
+                                <div
+                                    class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                                    <div class="min-w-0 space-y-4">
                                         <div
-                                            v-if="item.revokedAt !== null"
-                                            class="space-y-1">
-                                            <dt
-                                                class="text-xs uppercase tracking-[0.18em] text-slate-400">
-                                                吊销时间
-                                            </dt>
-                                            <dd
-                                                class="text-base font-semibold text-slate-900">
-                                                {{
-                                                    formatTimestamp(
-                                                        item.revokedAt
-                                                    )
-                                                }}
-                                            </dd>
+                                            class="flex flex-wrap items-center gap-2">
+                                            <span
+                                                :class="
+                                                    getStatusBadgeClass(item)
+                                                ">
+                                                {{ getStatusLabel(item) }}
+                                            </span>
+                                            <span
+                                                v-if="item.isCurrent"
+                                                class="inline-flex shrink-0 whitespace-nowrap items-center rounded-full bg-slate-900 px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.1em] text-white">
+                                                当前会话
+                                            </span>
                                         </div>
-                                    </dl>
 
-                                    <div
-                                        v-if="item.usage"
-                                        class="space-y-3">
-                                        <p
-                                            class="text-xs font-medium uppercase tracking-[0.16em] text-slate-400">
-                                            最近消耗
-                                        </p>
+                                        <div class="min-w-0 space-y-3">
+                                            <div class="space-y-1">
+                                                <p
+                                                    class="text-xs font-medium uppercase tracking-[0.16em] text-slate-400">
+                                                    密钥名称
+                                                </p>
+                                                <p
+                                                    class="truncate text-sm font-medium text-slate-900">
+                                                    {{ item.name }}
+                                                </p>
+                                            </div>
+                                            <div class="space-y-1">
+                                                <p
+                                                    class="text-xs font-medium uppercase tracking-[0.16em] text-slate-400">
+                                                    密钥标识
+                                                </p>
+                                                <p
+                                                    class="font-mono text-sm font-semibold text-crh-blue">
+                                                    {{ item.maskedKeyId }}
+                                                </p>
+                                            </div>
+                                        </div>
 
-                                        <dl class="grid gap-3 sm:grid-cols-3">
-                                            <div
-                                                class="dashboard-soft-surface rounded-[1rem] border px-4 py-3">
+                                        <dl
+                                            class="grid gap-3 text-sm text-slate-600 sm:grid-cols-2">
+                                            <div class="space-y-1">
                                                 <dt
                                                     class="text-xs uppercase tracking-[0.18em] text-slate-400">
-                                                    1 小时
+                                                    生效时间
                                                 </dt>
                                                 <dd
-                                                    class="mt-1 text-lg font-semibold text-slate-900">
+                                                    class="text-base font-semibold text-slate-900">
                                                     {{
-                                                        formatTokenCount(
-                                                            item.usage.last1Hour
+                                                        formatTimestamp(
+                                                            item.activeFrom
+                                                        )
+                                                    }}
+                                                </dd>
+                                            </div>
+                                            <div class="space-y-1">
+                                                <dt
+                                                    class="text-xs uppercase tracking-[0.18em] text-slate-400">
+                                                    失效时间
+                                                </dt>
+                                                <dd
+                                                    class="text-base font-semibold text-slate-900">
+                                                    {{
+                                                        formatTimestamp(
+                                                            item.expiresAt
                                                         )
                                                     }}
                                                 </dd>
                                             </div>
                                             <div
-                                                class="dashboard-soft-surface rounded-[1rem] border px-4 py-3">
+                                                v-if="item.revokedAt !== null"
+                                                class="space-y-1">
                                                 <dt
                                                     class="text-xs uppercase tracking-[0.18em] text-slate-400">
-                                                    8 小时
+                                                    吊销时间
                                                 </dt>
                                                 <dd
-                                                    class="mt-1 text-lg font-semibold text-slate-900">
+                                                    class="text-base font-semibold text-slate-900">
                                                     {{
-                                                        formatTokenCount(
-                                                            item.usage
-                                                                .last8Hours
-                                                        )
-                                                    }}
-                                                </dd>
-                                            </div>
-                                            <div
-                                                class="dashboard-soft-surface rounded-[1rem] border px-4 py-3">
-                                                <dt
-                                                    class="text-xs uppercase tracking-[0.18em] text-slate-400">
-                                                    1 天
-                                                </dt>
-                                                <dd
-                                                    class="mt-1 text-lg font-semibold text-slate-900">
-                                                    {{
-                                                        formatTokenCount(
-                                                            item.usage.last1Day
+                                                        formatTimestamp(
+                                                            item.revokedAt
                                                         )
                                                     }}
                                                 </dd>
                                             </div>
                                         </dl>
+
+                                        <div
+                                            v-if="item.usage"
+                                            class="space-y-3">
+                                            <p
+                                                class="text-xs font-medium uppercase tracking-[0.16em] text-slate-400">
+                                                最近消耗
+                                            </p>
+
+                                            <dl
+                                                class="grid gap-3 sm:grid-cols-3">
+                                                <div
+                                                    class="dashboard-soft-surface rounded-[1rem] border px-4 py-3">
+                                                    <dt
+                                                        class="text-xs uppercase tracking-[0.18em] text-slate-400">
+                                                        1 小时
+                                                    </dt>
+                                                    <dd
+                                                        class="mt-1 text-lg font-semibold text-slate-900">
+                                                        {{
+                                                            formatTokenCount(
+                                                                item.usage
+                                                                    .last1Hour
+                                                            )
+                                                        }}
+                                                    </dd>
+                                                </div>
+                                                <div
+                                                    class="dashboard-soft-surface rounded-[1rem] border px-4 py-3">
+                                                    <dt
+                                                        class="text-xs uppercase tracking-[0.18em] text-slate-400">
+                                                        8 小时
+                                                    </dt>
+                                                    <dd
+                                                        class="mt-1 text-lg font-semibold text-slate-900">
+                                                        {{
+                                                            formatTokenCount(
+                                                                item.usage
+                                                                    .last8Hours
+                                                            )
+                                                        }}
+                                                    </dd>
+                                                </div>
+                                                <div
+                                                    class="dashboard-soft-surface rounded-[1rem] border px-4 py-3">
+                                                    <dt
+                                                        class="text-xs uppercase tracking-[0.18em] text-slate-400">
+                                                        1 天
+                                                    </dt>
+                                                    <dd
+                                                        class="mt-1 text-lg font-semibold text-slate-900">
+                                                        {{
+                                                            formatTokenCount(
+                                                                item.usage
+                                                                    .last1Day
+                                                            )
+                                                        }}
+                                                    </dd>
+                                                </div>
+                                            </dl>
+                                        </div>
+
+                                        <div class="space-y-3">
+                                            <p
+                                                class="text-xs font-medium uppercase tracking-[0.16em] text-slate-400">
+                                                权限
+                                            </p>
+                                            <DashboardScopeDisclosure
+                                                :scopes="item.scopes" />
+                                        </div>
                                     </div>
 
-                                    <div class="space-y-3">
-                                        <p
-                                            class="text-xs font-medium uppercase tracking-[0.16em] text-slate-400">
-                                            权限
-                                        </p>
-                                        <DashboardScopeDisclosure
-                                            :scopes="item.scopes" />
+                                    <div class="flex shrink-0">
+                                        <UiButton
+                                            type="button"
+                                            variant="secondary"
+                                            class="border-rose-200 bg-white text-rose-700 hover:border-rose-300 hover:bg-rose-50 hover:text-rose-800"
+                                            :disabled="
+                                                !canRevoke ||
+                                                item.revokedAt !== null
+                                            "
+                                            @click="emit('revoke', item)">
+                                            吊销
+                                        </UiButton>
                                     </div>
-                                </div>
-
-                                <div class="flex shrink-0">
-                                    <UiButton
-                                        type="button"
-                                        variant="secondary"
-                                        class="border-rose-200 bg-white text-rose-700 hover:border-rose-300 hover:bg-rose-50 hover:text-rose-800"
-                                        :disabled="
-                                            !canRevoke ||
-                                            item.revokedAt !== null
-                                        "
-                                        @click="emit('revoke', item)">
-                                        吊销
-                                    </UiButton>
                                 </div>
                             </div>
                         </div>
