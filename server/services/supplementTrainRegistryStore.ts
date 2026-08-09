@@ -354,6 +354,20 @@ export function listSupplementTrainLookupRows(): SupplementTrainLookupRow[] {
     return rows;
 }
 
+export function listSupplementTrainEntries(): SupplementTrainEntry[] {
+    const registry = getActiveRegistry();
+    const entries: SupplementTrainEntry[] = [];
+
+    for (const trainCode of registry.trainCodes) {
+        const entry = registry.entriesByTrainCode.get(trainCode);
+        if (entry) {
+            entries.push(entry);
+        }
+    }
+
+    return entries;
+}
+
 export function getSupplementTrainTimetableByTrainCode(
     trainCode: string
 ): TodayScheduleTimetable | null {

@@ -2,7 +2,7 @@ import { defineEventHandler, getQuery, getRouterParam } from 'h3';
 import useConfig from '~/server/config';
 import { getReferenceModelsByTrainCodes } from '~/server/services/referenceModelIndexStore';
 import {
-    getTodayStationTimetableByStationName,
+    getTodayStationTimetableByStationNameWithSupplement,
     type TodayScheduleStationIndexRow
 } from '~/server/services/todayScheduleCache';
 import getPerRecordCost from '~/server/utils/api/cost/getPerRecordCost';
@@ -49,7 +49,10 @@ export default defineEventHandler(async (event) => {
             const query = getQuery(event);
             const cursor = parseStationTimetableCursor(query.cursor, 'cursor');
             const limit = parseLimit(event);
-            const rows = getTodayStationTimetableByStationName(stationName);
+            const rows =
+                getTodayStationTimetableByStationNameWithSupplement(
+                    stationName
+                );
 
             ensure(rows.length > 0, 404, 'not_found', '当前暂无该车站的时刻表');
 
