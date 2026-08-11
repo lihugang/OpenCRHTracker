@@ -71,16 +71,25 @@ import fetchEMUInfoBySeatCode, {
     type FetchSeatCodeFailureResult
 } from '~/server/utils/12306/network/fetchEMUInfoBySeatCode';
 import fetchRouteInfo from '~/server/utils/12306/network/fetchRouteInfo';
-import normalizeCode from '~/server/utils/12306/normalizeCode';
 import parseEmuCode from '~/server/utils/12306/parseEmuCode';
-import uniqueNormalizedCodes from '~/server/utils/12306/uniqueNormalizedCodes';
-import getCurrentDateString, {
-    formatShanghaiDateString
-} from '~/server/utils/date/getCurrentDateString';
+import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
+import { formatShanghaiDateTime } from '~/server/utils/date/shanghaiDateTime';
 import {
-    formatShanghaiDateTime,
-    getShanghaiDayStartUnixSeconds
-} from '~/server/utils/date/shanghaiDateTime';
+    serviceDateToDay,
+    unixSecondsToServiceDay,
+    type ServiceDay
+} from '~/server/utils/date/serviceDay';
+import {
+    trainCodeKey,
+    formatTrainCode,
+    type TrainCodeParts
+} from '~/server/utils/12306/trainCode';
+import type { EmuId } from '~/server/libs/database/emu';
+import {
+    ensureExternalEmuId,
+    formatExternalEmuCode,
+    parseExternalTrainCodeOrThrow
+} from '~/server/utils/internal/boundaries';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
 
 export const PROBE_TRAIN_DEPARTURE_TASK_EXECUTOR = 'probe_train_departure';
@@ -89,9 +98,9 @@ const logger = getLogger('task-executor:probe-train-departure');
 const MAX_REQUEUE_TRAIN_CODES = 8;
 
 interface ProbeTrainDepartureTaskArgs {
-    trainCode: string;
-    trainInternalCode: string;
-    allCodes: string[];
+    trainCode: TrainCodeParts;
+    trainInternalCode: string | null;
+    allCodes: TrainCodeParts[];
     startStation: string;
     endStation: string;
     startAt: number;
@@ -105,7 +114,7 @@ interface CoupledDetectionTaskArgs {
 }
 
 interface KnownStatusGroup {
-    emuCodes: string[];
+    emuIds: EmuId[];
     finalStatus: ProbeStatusValue;
 }
 
@@ -113,7 +122,7 @@ interface ClearedOverlapState {
     deletedDailyRouteRows: number;
     deletedProbeStatusRows: number;
     clearedTrainKeys: string[];
-    affectedEmuCodes: string[];
+    affectedEmuIds: EmuId[];
 }
 
 type RouteProbeResult = NonNullable<
@@ -121,7 +130,7 @@ type RouteProbeResult = NonNullable<
 >;
 
 interface SuccessfulRouteProbe {
-    probedTrainCode: string;
+    probedTrainCode: TrainCodeParts;
     routeProbeResult: RouteProbeResult;
 }
 
@@ -130,13 +139,13 @@ type ConflictGroupRouteState = 'running' | 'not_running' | 'request_failed';
 interface ConflictGroupValidationResult {
     group: TodayScheduleProbeGroup;
     state: ConflictGroupRouteState;
-    runningTrainCode: string;
-    requestFailedTrainCodes: string[];
-    notRunningTrainCodes: string[];
+    runningTrainCode: TrainCodeParts | null;
+    requestFailedTrainCodes: TrainCodeParts[];
+    notRunningTrainCodes: TrainCodeParts[];
 }
 
 interface TrainProvenanceConflictCurrentGroupPayload {
-    trainCodes: string[];
+    trainCodes: TrainCodeParts[];
     startAt: number;
     endAt: number;
     startStation: string;
@@ -155,9 +164,9 @@ interface ClearedNotRunningState extends ClearedOverlapState {
 
 interface TodayTrainCodesValidationResult {
     state: 'running' | 'not_running' | 'request_failed';
-    runningTrainCode: string;
-    requestFailedTrainCodes: string[];
-    notRunningTrainCodes: string[];
+    runningTrainCode: TrainCodeParts | null;
+    requestFailedTrainCodes: TrainCodeParts[];
+    notRunningTrainCodes: TrainCodeParts[];
 }
 
 interface SeatCodeVerificationResult {
@@ -173,8 +182,8 @@ interface SeatCodeVerificationResult {
         | 'seat_route_not_current_day'
         | 'seat_internal_code_mismatch'
         | 'seat_train_code_mismatch';
-    seatTrainCode: string;
-    seatInternalCode: string;
+    seatTrainCode: TrainCodeParts | null;
+    seatInternalCode: string | null;
     seatStartAt: number;
     seatCodeFailureDetail?: FetchSeatCodeFailureResult | null;
 }
@@ -190,8 +199,8 @@ type SeatCodeRouteUnavailableReason =
 interface SeatCodeRouteFetchResult {
     state: 'available' | 'unavailable';
     reason?: SeatCodeRouteUnavailableReason;
-    seatTrainCode: string;
-    seatInternalCode: string;
+    seatTrainCode: TrainCodeParts | null;
+    seatInternalCode: string | null;
     seatStartAt: number;
     seatEndAt: number;
 }
@@ -201,8 +210,8 @@ type SeatCodeArbitrationOutcome = 'handled' | 'winner' | 'unavailable';
 interface ProbeEmuByTrainCodesResult {
     probe: SuccessfulRouteProbe | null;
     untrustedSkippedPairs: Array<{
-        trainCode: string;
-        emuCode: string;
+        trainCode: TrainCodeParts;
+        emuId: EmuId;
     }>;
 }
 
@@ -238,21 +247,28 @@ function parseTaskArgs(raw: unknown): ProbeTrainDepartureTaskArgs {
     };
 
     const trainCode =
-        typeof body.trainCode === 'string' ? normalizeCode(body.trainCode) : '';
-    if (trainCode.length === 0) {
-        throw new Error('task arguments trainCode must be a non-empty string');
+        typeof body.trainCode === 'object' &&
+        body.trainCode !== null &&
+        typeof (body.trainCode as { prefix?: unknown }).prefix === 'string' &&
+        typeof (body.trainCode as { number?: unknown }).number === 'number'
+            ? (body.trainCode as TrainCodeParts)
+            : null;
+    if (trainCode === null) {
+        throw new Error('task arguments trainCode must be a train code object');
     }
 
     const trainInternalCode =
-        typeof body.trainInternalCode === 'string'
-            ? normalizeCode(body.trainInternalCode)
-            : '';
+        body.trainInternalCode === null || body.trainInternalCode === undefined
+            ? null
+            : String(body.trainInternalCode).trim();
 
     const allCodes = Array.isArray(body.allCodes)
-        ? uniqueNormalizedCodes(
-              body.allCodes.filter(
-                  (item): item is string => typeof item === 'string'
-              )
+        ? body.allCodes.filter(
+              (item): item is TrainCodeParts =>
+                  typeof item === 'object' &&
+                  item !== null &&
+                  typeof (item as { prefix?: unknown }).prefix === 'string' &&
+                  typeof (item as { number?: unknown }).number === 'number'
           )
         : [];
     const startStation =
@@ -304,18 +320,18 @@ function isCurrentScheduleTask(startAt: number): boolean {
 }
 
 function persistDailyRoutes(
-    trainCodes: string[],
-    emuCodes: string[],
+    trainCodes: TrainCodeParts[],
+    emuIds: EmuId[],
     startStation: string,
     endStation: string,
     startAt: number,
     endAt: number
 ): void {
     for (const trainCode of trainCodes) {
-        for (const emuCode of emuCodes) {
+        for (const emuId of emuIds) {
             insertDailyEmuRoute(
                 trainCode,
-                emuCode,
+                emuId,
                 startStation,
                 endStation,
                 startAt,
@@ -340,7 +356,16 @@ function getCurrentDayWindow(): {
 function buildFallbackGroupFromArgs(
     args: ProbeTrainDepartureTaskArgs
 ): TodayScheduleProbeGroup {
-    const allCodes = uniqueNormalizedCodes([args.trainCode, ...args.allCodes]);
+    const seenAllCodes = new Set<string>([trainCodeKey(args.trainCode)]);
+    const allCodes: TrainCodeParts[] = [args.trainCode];
+    for (const trainCode of args.allCodes) {
+        const key = trainCodeKey(trainCode);
+        if (seenAllCodes.has(key)) {
+            continue;
+        }
+        seenAllCodes.add(key);
+        allCodes.push(trainCode);
+    }
     return {
         trainKey: buildTrainKey(
             args.trainCode,
@@ -348,7 +373,7 @@ function buildFallbackGroupFromArgs(
             args.startAt
         ),
         trainCode: args.trainCode,
-        trainInternalCode: args.trainInternalCode,
+        trainInternalCode: args.trainInternalCode ?? '',
         allCodes,
         bureauCode: '',
         trainStyle: '',
@@ -366,7 +391,7 @@ function buildFallbackGroupFromRouteRow(
     row: DailyEmuRouteRow
 ): TodayScheduleProbeGroup {
     return {
-        trainKey: buildTrainKey(row.train_code, '', row.start_at),
+        trainKey: buildTrainKey(row.train_code, null, row.start_at),
         trainCode: row.train_code,
         trainInternalCode: '',
         allCodes: [row.train_code],
@@ -382,24 +407,32 @@ function buildFallbackGroupFromRouteRow(
     };
 }
 
-function getGroupTrainCodes(group: TodayScheduleProbeGroup): string[] {
+function getGroupTrainCodes(group: TodayScheduleProbeGroup): TrainCodeParts[] {
     return getSafeTodayScheduleProbeTrainCodes(group);
 }
 
 function filterSafeProbeTaskTrainCodes(
     args: ProbeTrainDepartureTaskArgs
-): string[] {
+): TrainCodeParts[] {
     const scheduleGroup = getTodayScheduleProbeGroupByTrainCode(args.trainCode);
     if (!scheduleGroup) {
-        return uniqueNormalizedCodes([args.trainCode]);
+        return [args.trainCode];
     }
 
     const allowedCodes = new Set(
-        getSafeTodayScheduleProbeTrainCodes(scheduleGroup)
+        getSafeTodayScheduleProbeTrainCodes(scheduleGroup).map(trainCodeKey)
     );
-    return uniqueNormalizedCodes([args.trainCode, ...args.allCodes]).filter(
-        (trainCode) => allowedCodes.has(trainCode)
-    );
+    const seen = new Set<string>();
+    const result: TrainCodeParts[] = [];
+    for (const trainCode of [args.trainCode, ...args.allCodes]) {
+        const key = trainCodeKey(trainCode);
+        if (seen.has(key) || !allowedCodes.has(key)) {
+            continue;
+        }
+        seen.add(key);
+        result.push(trainCode);
+    }
+    return result;
 }
 
 function isRouteTimeOverlapping(
@@ -428,7 +461,17 @@ function buildRequeueTaskArgs(
 }
 
 function formatTrainCodeGroup(group: TodayScheduleProbeGroup): string {
-    return uniqueNormalizedCodes(group.allCodes).join(' / ');
+    const seen = new Set<string>();
+    const codes: string[] = [];
+    for (const trainCode of group.allCodes) {
+        const key = trainCodeKey(trainCode);
+        if (seen.has(key)) {
+            continue;
+        }
+        seen.add(key);
+        codes.push(formatTrainCode(trainCode));
+    }
+    return codes.join(' / ');
 }
 
 function formatTrainCodeGroups(groups: TodayScheduleProbeGroup[]): string {
@@ -507,7 +550,7 @@ function areAllGroupsRunning(
 }
 
 function collectAffectedDetectionGroups(
-    emuCodes: string[],
+    emuIds: EmuId[],
     assets: Awaited<ReturnType<typeof loadProbeAssets>>
 ): Array<{ bureau: string; model: string }> {
     const detectionGroups = new Map<
@@ -515,7 +558,8 @@ function collectAffectedDetectionGroups(
         { bureau: string; model: string }
     >();
 
-    for (const emuCode of emuCodes) {
+    for (const emuId of emuIds) {
+        const emuCode = formatExternalEmuCode(emuId);
         const parsedEmuCode = parseEmuCode(emuCode);
         if (!parsedEmuCode?.trainSetNo) {
             continue;
@@ -541,14 +585,14 @@ function collectAffectedDetectionGroups(
 }
 
 function collectOverlappingGroups(
-    mainEmuCode: string,
+    mainEmuId: EmuId,
     currentGroup: TodayScheduleProbeGroup,
     dayStart: number,
     nextDayStart: number
 ): TodayScheduleProbeGroup[] {
     const overlappingGroups = new Map<string, TodayScheduleProbeGroup>();
     const existingRows = listDailyRoutesByEmuCodeInRange(
-        mainEmuCode,
+        mainEmuId,
         dayStart,
         nextDayStart
     );
@@ -579,21 +623,27 @@ function collectOverlappingGroups(
 }
 
 function downgradeAffectedProbeStatuses(
-    emuCodes: string[],
+    emuIds: EmuId[],
     deletedTrainCodes: Set<string>,
     dayStart: number,
     nextDayStart: number
 ): number {
     let downgradedProbeStatusRows = 0;
 
-    for (const emuCode of uniqueNormalizedCodes(emuCodes)) {
+    const seenEmuIds = new Set<number>();
+    for (const emuId of emuIds) {
+        const emuIdNumber = Number(emuId);
+        if (seenEmuIds.has(emuIdNumber)) {
+            continue;
+        }
+        seenEmuIds.add(emuIdNumber);
         const startAts = new Set<number>();
         for (const row of listProbeStatusByEmuCodeInRange(
-            emuCode,
+            emuId,
             dayStart,
             nextDayStart
         )) {
-            if (deletedTrainCodes.has(normalizeCode(row.train_code))) {
+            if (deletedTrainCodes.has(trainCodeKey(row.train_code))) {
                 continue;
             }
 
@@ -602,7 +652,7 @@ function downgradeAffectedProbeStatuses(
 
         for (const startAt of startAts) {
             downgradedProbeStatusRows += updateProbeStatusByEmuCode(
-                emuCode,
+                emuId,
                 startAt,
                 ProbeStatusValue.PendingCouplingDetection
             );
@@ -618,29 +668,38 @@ function clearOverlappingGroups(
     nextDayStart: number,
     assets: Awaited<ReturnType<typeof loadProbeAssets>>
 ): ClearedOverlapState {
-    const affectedEmuCodes = new Set<string>();
+    const affectedEmuIds = new Set<number>();
     const clearedTrainKeys: string[] = [];
     let deletedDailyRouteRows = 0;
     let deletedProbeStatusRows = 0;
 
     for (const group of groups) {
         clearQueriedTrainKey(group.trainKey);
-        clearRunningEmuStateByTrainKey(group.trainKey).forEach((emuCode) =>
-            affectedEmuCodes.add(emuCode)
+        clearRunningEmuStateByTrainKey(group.trainKey).forEach((emuId) =>
+            affectedEmuIds.add(Number(emuId))
         );
         clearedTrainKeys.push(group.trainKey);
 
-        for (const trainCode of uniqueNormalizedCodes(group.allCodes)) {
+        const seenTrainCodes = new Set<string>();
+        const groupTrainCodes = group.allCodes.filter((trainCode) => {
+            const key = trainCodeKey(trainCode);
+            if (seenTrainCodes.has(key)) {
+                return false;
+            }
+            seenTrainCodes.add(key);
+            return true;
+        });
+        for (const trainCode of groupTrainCodes) {
             listDailyRoutesByTrainCodeInRange(
                 trainCode,
                 dayStart,
                 nextDayStart
-            ).forEach((row) => affectedEmuCodes.add(row.emu_code));
+            ).forEach((row) => affectedEmuIds.add(Number(row.emu_id)));
             listProbeStatusByTrainCodeInRange(
                 trainCode,
                 dayStart,
                 nextDayStart
-            ).forEach((row) => affectedEmuCodes.add(row.emu_code));
+            ).forEach((row) => affectedEmuIds.add(Number(row.emu_id)));
 
             deletedDailyRouteRows += deleteDailyRoutesByTrainCodeInRange(
                 trainCode,
@@ -656,7 +715,7 @@ function clearOverlappingGroups(
     }
 
     for (const detectionGroup of collectAffectedDetectionGroups(
-        Array.from(affectedEmuCodes),
+        Array.from(affectedEmuIds, (emuId) => emuId as EmuId),
         assets
     )) {
         clearRecentCoupledGroupDetection(
@@ -669,7 +728,7 @@ function clearOverlappingGroups(
         deletedDailyRouteRows,
         deletedProbeStatusRows,
         clearedTrainKeys,
-        affectedEmuCodes: Array.from(affectedEmuCodes)
+        affectedEmuIds: Array.from(affectedEmuIds, (emuId) => emuId as EmuId)
     };
 }
 
@@ -678,9 +737,9 @@ function clearNotRunningGroups(
     dayStart: number,
     nextDayStart: number,
     assets: Awaited<ReturnType<typeof loadProbeAssets>>,
-    extraAffectedEmuCodesByTrainKey: Map<string, string[]> = new Map()
+    extraAffectedEmuCodesByTrainKey: Map<string, EmuId[]> = new Map()
 ): ClearedNotRunningState {
-    const affectedEmuCodes = new Set<string>();
+    const affectedEmuIds = new Set<number>();
     const deletedTrainCodes = new Set<string>();
     const clearedTrainKeys: string[] = [];
     let deletedDailyRouteRows = 0;
@@ -688,32 +747,29 @@ function clearNotRunningGroups(
 
     for (const group of groups) {
         clearQueriedTrainKey(group.trainKey);
-        clearRunningEmuStateByTrainKey(group.trainKey).forEach((emuCode) =>
-            affectedEmuCodes.add(emuCode)
+        clearRunningEmuStateByTrainKey(group.trainKey).forEach((emuId) =>
+            affectedEmuIds.add(Number(emuId))
         );
         clearedTrainKeys.push(group.trainKey);
 
-        for (const extraEmuCode of extraAffectedEmuCodesByTrainKey.get(
+        for (const extraEmuId of extraAffectedEmuCodesByTrainKey.get(
             group.trainKey
         ) ?? []) {
-            const normalizedEmuCode = normalizeCode(extraEmuCode);
-            if (normalizedEmuCode.length > 0) {
-                affectedEmuCodes.add(normalizedEmuCode);
-            }
+            affectedEmuIds.add(Number(extraEmuId));
         }
 
         for (const trainCode of getGroupTrainCodes(group)) {
-            deletedTrainCodes.add(trainCode);
+            deletedTrainCodes.add(trainCodeKey(trainCode));
             listDailyRoutesByTrainCodeInRange(
                 trainCode,
                 dayStart,
                 nextDayStart
-            ).forEach((row) => affectedEmuCodes.add(row.emu_code));
+            ).forEach((row) => affectedEmuIds.add(Number(row.emu_id)));
             listProbeStatusByTrainCodeInRange(
                 trainCode,
                 dayStart,
                 nextDayStart
-            ).forEach((row) => affectedEmuCodes.add(row.emu_code));
+            ).forEach((row) => affectedEmuIds.add(Number(row.emu_id)));
 
             deletedDailyRouteRows += deleteDailyRoutesByTrainCodeInRange(
                 trainCode,
@@ -728,16 +784,19 @@ function clearNotRunningGroups(
         }
     }
 
-    const normalizedAffectedEmuCodes = Array.from(affectedEmuCodes);
+    const normalizedAffectedEmuIds = Array.from(
+        affectedEmuIds,
+        (emuId) => emuId as EmuId
+    );
     const downgradedProbeStatusRows = downgradeAffectedProbeStatuses(
-        normalizedAffectedEmuCodes,
+        normalizedAffectedEmuIds,
         deletedTrainCodes,
         dayStart,
         nextDayStart
     );
 
     for (const detectionGroup of collectAffectedDetectionGroups(
-        normalizedAffectedEmuCodes,
+        normalizedAffectedEmuIds,
         assets
     )) {
         clearRecentCoupledGroupDetection(
@@ -750,7 +809,7 @@ function clearNotRunningGroups(
         deletedDailyRouteRows,
         deletedProbeStatusRows,
         clearedTrainKeys,
-        affectedEmuCodes: normalizedAffectedEmuCodes,
+        affectedEmuIds: normalizedAffectedEmuIds,
         downgradedProbeStatusRows
     };
 }
@@ -788,10 +847,10 @@ function requeueCurrentProbeTaskWithOverlapDelay(
 
 function collectKnownStatusGroup(
     rows: ProbeStatusRow[],
-    currentEmuCode: string,
+    currentEmuId: EmuId,
     startAt: number
 ): KnownStatusGroup {
-    const emuCodes = new Set<string>([currentEmuCode]);
+    const emuIds = new Set<number>([Number(currentEmuId)]);
     let finalStatus: ProbeStatusValue = rows.some(
         (row) => row.status === ProbeStatusValue.CoupledFormationResolved
     )
@@ -799,7 +858,7 @@ function collectKnownStatusGroup(
         : ProbeStatusValue.SingleFormationResolved;
 
     for (const row of rows) {
-        emuCodes.add(row.emu_code);
+        emuIds.add(Number(row.emu_id));
     }
 
     if (finalStatus === ProbeStatusValue.CoupledFormationResolved) {
@@ -809,25 +868,25 @@ function collectKnownStatusGroup(
                 startAt
             );
             for (const relatedRow of relatedRows) {
-                emuCodes.add(relatedRow.emu_code);
+                emuIds.add(Number(relatedRow.emu_id));
             }
         }
     }
 
     return {
-        emuCodes: Array.from(emuCodes),
+        emuIds: Array.from(emuIds, (emuId) => emuId as EmuId),
         finalStatus
     };
 }
 
 function collectKnownStatusGroupForServiceDate(
     rows: ProbeStatusRow[],
-    currentEmuCode: string,
+    currentEmuId: EmuId,
     startAt: number,
-    serviceDate: string
+    serviceDate: ServiceDay
 ): KnownStatusGroup {
     const { dayStart, nextDayStart } = getCurrentDayWindow();
-    const emuCodes = new Set<string>([currentEmuCode]);
+    const emuIds = new Set<number>([Number(currentEmuId)]);
     let finalStatus: ProbeStatusValue = rows.some(
         (row) => row.status === ProbeStatusValue.CoupledFormationResolved
     )
@@ -835,7 +894,7 @@ function collectKnownStatusGroupForServiceDate(
         : ProbeStatusValue.SingleFormationResolved;
 
     for (const row of rows) {
-        emuCodes.add(row.emu_code);
+        emuIds.add(Number(row.emu_id));
     }
 
     if (finalStatus === ProbeStatusValue.CoupledFormationResolved) {
@@ -851,22 +910,22 @@ function collectKnownStatusGroupForServiceDate(
                         candidate.service_date === serviceDate)
             );
             for (const relatedRow of relatedRows) {
-                emuCodes.add(relatedRow.emu_code);
+                emuIds.add(Number(relatedRow.emu_id));
             }
         }
     }
 
     return {
-        emuCodes: Array.from(emuCodes),
+        emuIds: Array.from(emuIds, (emuId) => emuId as EmuId),
         finalStatus
     };
 }
 
 function getResolvedCurrentStatusRows(
-    mainEmuCode: string,
+    mainEmuId: EmuId,
     startAt: number
 ): ProbeStatusRow[] {
-    const directRows = listProbeStatusByEmuCode(mainEmuCode, startAt);
+    const directRows = listProbeStatusByEmuCode(mainEmuId, startAt);
     if (
         directRows.some(
             (row) =>
@@ -877,15 +936,15 @@ function getResolvedCurrentStatusRows(
         return directRows;
     }
 
-    const assignedState = getAssignedEmuState(mainEmuCode);
+    const assignedState = getAssignedEmuState(mainEmuId);
     if (!assignedState || assignedState.startAt !== startAt) {
         return [];
     }
 
     const { dayStart, nextDayStart } = getCurrentDayWindow();
-    const serviceDate = formatShanghaiDateString(startAt * 1000);
+    const serviceDate = unixSecondsToServiceDay(startAt);
     return listProbeStatusByEmuCodeInRange(
-        mainEmuCode,
+        mainEmuId,
         dayStart,
         nextDayStart
     ).filter(
@@ -898,15 +957,21 @@ function getResolvedCurrentStatusRows(
 }
 
 function collectResolvedRowsForAssignedEmuCodes(
-    emuCodes: string[],
+    emuIds: EmuId[],
     dayStart: number,
     nextDayStart: number
 ): ProbeStatusRow[] {
     const rowsByKey = new Map<string, ProbeStatusRow>();
 
-    for (const emuCode of uniqueNormalizedCodes(emuCodes)) {
+    const seenEmuIds = new Set<number>();
+    for (const emuId of emuIds) {
+        const emuIdNumber = Number(emuId);
+        if (seenEmuIds.has(emuIdNumber)) {
+            continue;
+        }
+        seenEmuIds.add(emuIdNumber);
         for (const row of listProbeStatusByEmuCodeInRange(
-            emuCode,
+            emuId,
             dayStart,
             nextDayStart
         )) {
@@ -918,8 +983,8 @@ function collectResolvedRowsForAssignedEmuCodes(
             }
 
             const rowKey = [
-                row.train_code,
-                row.emu_code,
+                trainCodeKey(row.train_code),
+                Number(row.emu_id),
                 row.service_date,
                 row.timetable_id ?? 'null'
             ].join('#');
@@ -935,16 +1000,16 @@ function collectResolvedRowsForAssignedEmuCodes(
 async function tryAutoMergeResolvedInternalGroup(
     args: ProbeTrainDepartureTaskArgs,
     trainKey: string,
-    allTrainCodes: string[],
-    mainEmuCode: string,
+    allTrainCodes: TrainCodeParts[],
+    mainEmuId: EmuId,
     nowSeconds: number
 ): Promise<boolean> {
-    if (args.trainInternalCode.length === 0) {
+    if (!args.trainInternalCode) {
         return false;
     }
 
     const assignedEmuCodes = listAssignedEmuCodesByTrainKey(trainKey).filter(
-        (emuCode) => emuCode !== mainEmuCode
+        (emuId) => Number(emuId) !== Number(mainEmuId)
     );
     if (assignedEmuCodes.length === 0) {
         return false;
@@ -960,72 +1025,90 @@ async function tryAutoMergeResolvedInternalGroup(
         return false;
     }
 
-    const mergedFromEmuCodes = uniqueNormalizedCodes(
-        resolvedRows.map((row) => row.emu_code)
-    ).filter((emuCode) => emuCode !== mainEmuCode);
-    if (mergedFromEmuCodes.length === 0) {
+    const seenMergedEmuIds = new Set<number>();
+    const mergedFromEmuIds: EmuId[] = [];
+    for (const row of resolvedRows) {
+        const emuId = row.emu_id;
+        if (Number(emuId) === Number(mainEmuId)) {
+            continue;
+        }
+        if (seenMergedEmuIds.has(Number(emuId))) {
+            continue;
+        }
+        seenMergedEmuIds.add(Number(emuId));
+        mergedFromEmuIds.push(emuId);
+    }
+    if (mergedFromEmuIds.length === 0) {
         return false;
     }
 
-    const mergedEmuCodes = uniqueNormalizedCodes([
-        mainEmuCode,
-        ...mergedFromEmuCodes
-    ]);
-    if (mergedEmuCodes.length <= 1) {
+    const mergedEmuIds = [mainEmuId, ...mergedFromEmuIds];
+    if (mergedEmuIds.length <= 1) {
         return false;
     }
 
-    const mergedFromTrainCodes = uniqueNormalizedCodes(
-        resolvedRows.map((row) => row.train_code)
-    );
-    const mergedTrainCodes = uniqueNormalizedCodes([
-        ...allTrainCodes,
-        ...mergedFromTrainCodes
-    ]);
+    const seenMergedTrainKeys = new Set<string>();
+    const mergedFromTrainCodes: TrainCodeParts[] = [];
+    for (const row of resolvedRows) {
+        const key = trainCodeKey(row.train_code);
+        if (seenMergedTrainKeys.has(key)) {
+            continue;
+        }
+        seenMergedTrainKeys.add(key);
+        mergedFromTrainCodes.push(row.train_code);
+    }
+    const mergedTrainCodes: TrainCodeParts[] = [...allTrainCodes];
+    for (const trainCode of mergedFromTrainCodes) {
+        const key = trainCodeKey(trainCode);
+        if (mergedTrainCodes.some((item) => trainCodeKey(item) === key)) {
+            continue;
+        }
+        mergedTrainCodes.push(trainCode);
+    }
 
     const trackingMutations = await applyResolvedResult(
         args,
         trainKey,
         mergedTrainCodes,
-        mergedEmuCodes,
+        mergedEmuIds,
         ProbeStatusValue.CoupledFormationResolved,
         nowSeconds
     );
     recordCurrentTrainProvenanceEventsForTrainCodes(mergedTrainCodes, {
-        serviceDate: formatShanghaiDateString(args.startAt * 1000),
+        serviceDate: unixSecondsToServiceDay(args.startAt),
         startAt: args.startAt,
-        emuCode: mainEmuCode,
+        emuId: mainEmuId,
         eventType: 'resolved_from_status',
         result: 'coupled',
         payload: {
             source: 'internal_code_auto_merge',
-            emuCodes: mergedEmuCodes,
-            mergedFromEmuCodes,
+            emuIds: mergedEmuIds,
+            mergedFromEmuIds: mergedFromEmuIds,
             mergedFromTrainCodes,
             trackingMutations
         }
     });
     logger.info(
-        `resolved_internal_code_auto_merge trainCode=${args.trainCode} trainInternalCode=${args.trainInternalCode} mainEmuCode=${mainEmuCode} mergedEmuCodes=${mergedEmuCodes.join('/')} mergedTrainCodes=${mergedTrainCodes.join('/')} assignedEmuCodes=${assignedEmuCodes.join('/')}`
+        `resolved_internal_code_auto_merge trainCode=${formatTrainCode(args.trainCode)} trainInternalCode=${args.trainInternalCode ?? ''} mainEmuCode=${formatExternalEmuCode(mainEmuId)} mergedEmuCodes=${mergedEmuIds.map(formatExternalEmuCode).join('/')} mergedTrainCodes=${mergedTrainCodes.join('/')} assignedEmuCodes=${assignedEmuCodes.map(formatExternalEmuCode).join('/')}`
     );
     return true;
 }
 
 async function validateConflictGroupRunningState(
     group: TodayScheduleProbeGroup,
-    mainEmuCode: string
+    mainEmuId: EmuId
 ): Promise<ConflictGroupValidationResult> {
-    const serviceDate = getCurrentDateString();
+    const serviceDate = serviceDateToDay(getCurrentDateString());
     const untrustedTrainCodes = getGroupTrainCodes(group).filter((trainCode) =>
-        isProbeUntrustedRecord(trainCode, mainEmuCode, serviceDate)
+        isProbeUntrustedRecord(trainCode, mainEmuId, serviceDate)
     );
     if (untrustedTrainCodes.length > 0) {
         return {
             group,
             state: 'not_running',
-            runningTrainCode: '',
+            runningTrainCode: null,
             requestFailedTrainCodes: [],
-            notRunningTrainCodes: uniqueNormalizedCodes(untrustedTrainCodes)
+            notRunningTrainCodes: untrustedTrainCodes
         };
     }
 
@@ -1042,19 +1125,20 @@ async function validateConflictGroupRunningState(
 }
 
 function collectHistoricalRecentMatchingTrainCodes(
-    trainCodes: string[],
-    mainEmuCode: string
-): string[] {
-    const normalizedMainEmuCode = normalizeCode(mainEmuCode);
-    if (normalizedMainEmuCode.length === 0) {
-        return [];
-    }
-
-    const matchedTrainCodes: string[] = [];
-    for (const trainCode of uniqueNormalizedCodes(trainCodes)) {
+    trainCodes: TrainCodeParts[],
+    mainEmuId: EmuId
+): TrainCodeParts[] {
+    const matchedTrainCodes: TrainCodeParts[] = [];
+    const seen = new Set<string>();
+    for (const trainCode of trainCodes) {
+        const key = trainCodeKey(trainCode);
+        if (seen.has(key)) {
+            continue;
+        }
+        seen.add(key);
         if (
-            getHistoricalRecentEmuCodesByTrainCode(trainCode).includes(
-                normalizedMainEmuCode
+            getHistoricalRecentEmuCodesByTrainCode(trainCode).some(
+                (emuId) => Number(emuId) === Number(mainEmuId)
             )
         ) {
             matchedTrainCodes.push(trainCode);
@@ -1081,12 +1165,18 @@ function toSeatCodeRequestFailedReason(
 }
 
 async function validateTodayRunningForTrainCodes(
-    trainCodes: string[]
+    trainCodes: TrainCodeParts[]
 ): Promise<TodayTrainCodesValidationResult> {
-    const requestFailedTrainCodes: string[] = [];
-    const notRunningTrainCodes: string[] = [];
+    const requestFailedTrainCodes: TrainCodeParts[] = [];
+    const notRunningTrainCodes: TrainCodeParts[] = [];
 
-    for (const trainCode of uniqueNormalizedCodes(trainCodes)) {
+    const seen = new Set<string>();
+    for (const trainCode of trainCodes) {
+        const key = trainCodeKey(trainCode);
+        if (seen.has(key)) {
+            continue;
+        }
+        seen.add(key);
         const routeResult = await fetchRouteInfo(trainCode);
         if (routeResult.status === 'running') {
             return {
@@ -1110,7 +1200,7 @@ async function validateTodayRunningForTrainCodes(
             requestFailedTrainCodes.length > 0
                 ? 'request_failed'
                 : 'not_running',
-        runningTrainCode: '',
+        runningTrainCode: null,
         requestFailedTrainCodes,
         notRunningTrainCodes
     };
@@ -1118,17 +1208,18 @@ async function validateTodayRunningForTrainCodes(
 
 async function verifySeatCodeAgainstCurrentTask(
     assets: Awaited<ReturnType<typeof loadProbeAssets>>,
-    trainInternalCode: string,
-    trainCodes: string[],
-    mainEmuCode: string
+    trainInternalCode: string | null,
+    trainCodes: TrainCodeParts[],
+    mainEmuId: EmuId
 ): Promise<SeatCodeVerificationResult> {
+    const mainEmuCode = formatExternalEmuCode(mainEmuId);
     const parsedMainEmuCode = parseEmuCode(mainEmuCode);
     if (!parsedMainEmuCode?.trainSetNo) {
         return {
             state: 'unavailable',
             reason: 'main_emu_code_invalid',
-            seatTrainCode: '',
-            seatInternalCode: '',
+            seatTrainCode: null,
+            seatInternalCode: null,
             seatStartAt: 0
         };
     }
@@ -1143,8 +1234,8 @@ async function verifySeatCodeAgainstCurrentTask(
         return {
             state: 'unavailable',
             reason: 'seat_code_missing',
-            seatTrainCode: '',
-            seatInternalCode: '',
+            seatTrainCode: null,
+            seatInternalCode: null,
             seatStartAt: 0
         };
     }
@@ -1154,15 +1245,15 @@ async function verifySeatCodeAgainstCurrentTask(
         return {
             state: 'unavailable',
             reason: toSeatCodeRequestFailedReason(seatCodeResult),
-            seatTrainCode: '',
-            seatInternalCode: '',
+            seatTrainCode: null,
+            seatInternalCode: null,
             seatStartAt: 0,
             seatCodeFailureDetail: seatCodeResult
         };
     }
 
-    const seatTrainCode = normalizeCode(seatCodeResult.route.code);
-    const seatInternalCode = normalizeCode(seatCodeResult.route.internalCode);
+    const seatTrainCode = seatCodeResult.route.code;
+    const seatInternalCode = seatCodeResult.route.internalCode;
     const seatStartAt = seatCodeResult.route.startAt;
     if (!isCurrentScheduleTask(seatStartAt)) {
         return {
@@ -1174,15 +1265,20 @@ async function verifySeatCodeAgainstCurrentTask(
         };
     }
 
-    const normalizedTrainInternalCode = normalizeCode(trainInternalCode);
-    if (normalizedTrainInternalCode.length > 0) {
+    const trainInternalCodeKey = trainInternalCode
+        ? normalizeCode(trainInternalCode)
+        : null;
+    const seatInternalCodeKey = seatInternalCode
+        ? normalizeCode(seatInternalCode)
+        : null;
+    if (trainInternalCodeKey) {
         return {
             state:
-                seatInternalCode === normalizedTrainInternalCode
+                seatInternalCodeKey === trainInternalCodeKey
                     ? 'matched'
                     : 'mismatch',
             reason:
-                seatInternalCode === normalizedTrainInternalCode
+                seatInternalCodeKey === trainInternalCodeKey
                     ? 'matched_internal_code'
                     : 'seat_internal_code_mismatch',
             seatTrainCode,
@@ -1191,12 +1287,13 @@ async function verifySeatCodeAgainstCurrentTask(
         };
     }
 
-    const normalizedTrainCodes = uniqueNormalizedCodes(trainCodes);
+    const normalizedTrainCodeKeys = new Set(trainCodes.map(trainCodeKey));
+    const seatTrainCodeKey = trainCodeKey(seatTrainCode);
     return {
-        state: normalizedTrainCodes.includes(seatTrainCode)
+        state: normalizedTrainCodeKeys.has(seatTrainCodeKey)
             ? 'matched'
             : 'mismatch',
-        reason: normalizedTrainCodes.includes(seatTrainCode)
+        reason: normalizedTrainCodeKeys.has(seatTrainCodeKey)
             ? 'matched_train_code'
             : 'seat_train_code_mismatch',
         seatTrainCode,
@@ -1207,15 +1304,16 @@ async function verifySeatCodeAgainstCurrentTask(
 
 async function fetchSeatCodeRouteForEmu(
     assets: Awaited<ReturnType<typeof loadProbeAssets>>,
-    mainEmuCode: string
+    mainEmuId: EmuId
 ): Promise<SeatCodeRouteFetchResult> {
+    const mainEmuCode = formatExternalEmuCode(mainEmuId);
     const parsedMainEmuCode = parseEmuCode(mainEmuCode);
     if (!parsedMainEmuCode?.trainSetNo) {
         return {
             state: 'unavailable',
             reason: 'main_emu_code_invalid',
-            seatTrainCode: '',
-            seatInternalCode: '',
+            seatTrainCode: null,
+            seatInternalCode: null,
             seatStartAt: 0,
             seatEndAt: 0
         };
@@ -1231,8 +1329,8 @@ async function fetchSeatCodeRouteForEmu(
         return {
             state: 'unavailable',
             reason: 'seat_code_missing',
-            seatTrainCode: '',
-            seatInternalCode: '',
+            seatTrainCode: null,
+            seatInternalCode: null,
             seatStartAt: 0,
             seatEndAt: 0
         };
@@ -1243,8 +1341,8 @@ async function fetchSeatCodeRouteForEmu(
         return {
             state: 'unavailable',
             reason: toSeatCodeRequestFailedReason(seatCodeResult),
-            seatTrainCode: '',
-            seatInternalCode: '',
+            seatTrainCode: null,
+            seatInternalCode: null,
             seatStartAt: 0,
             seatEndAt: 0
         };
@@ -1255,8 +1353,8 @@ async function fetchSeatCodeRouteForEmu(
         return {
             state: 'unavailable',
             reason: 'seat_route_not_current_day',
-            seatTrainCode: normalizeCode(route.code),
-            seatInternalCode: normalizeCode(route.internalCode),
+            seatTrainCode: route.code,
+            seatInternalCode: route.internalCode,
             seatStartAt: route.startAt,
             seatEndAt: route.endAt
         };
@@ -1264,8 +1362,8 @@ async function fetchSeatCodeRouteForEmu(
 
     return {
         state: 'available',
-        seatTrainCode: normalizeCode(route.code),
-        seatInternalCode: normalizeCode(route.internalCode),
+        seatTrainCode: route.code,
+        seatInternalCode: route.internalCode,
         seatStartAt: route.startAt,
         seatEndAt: route.endAt
     };
@@ -1273,17 +1371,19 @@ async function fetchSeatCodeRouteForEmu(
 
 function resolveSeatCodeWinnerGroup(
     groups: TodayScheduleProbeGroup[],
-    seatTrainCode: string,
-    seatInternalCode: string,
+    seatTrainCode: TrainCodeParts,
+    seatInternalCode: string | null,
     seatStartAt: number,
     seatEndAt: number
 ): TodayScheduleProbeGroup | null {
-    const normalizedSeatInternalCode = normalizeCode(seatInternalCode);
-    if (normalizedSeatInternalCode.length > 0) {
+    const seatInternalCodeKey = seatInternalCode
+        ? normalizeCode(seatInternalCode)
+        : '';
+    if (seatInternalCodeKey.length > 0) {
         const matched = groups.filter(
             (group) =>
-                normalizeCode(group.trainInternalCode) ===
-                normalizedSeatInternalCode
+                group.trainInternalCode !== null &&
+                normalizeCode(group.trainInternalCode) === seatInternalCodeKey
         );
         if (matched.length === 1) {
             return matched[0] ?? null;
@@ -1293,11 +1393,11 @@ function resolveSeatCodeWinnerGroup(
         }
     }
 
-    const normalizedSeatTrainCode = normalizeCode(seatTrainCode);
-    if (normalizedSeatTrainCode.length > 0) {
+    const seatTrainCodeKey = trainCodeKey(seatTrainCode);
+    if (seatTrainCodeKey.length > 0) {
         const matched = groups.filter((group) =>
-            uniqueNormalizedCodes(group.allCodes).includes(
-                normalizedSeatTrainCode
+            group.allCodes.some(
+                (trainCode) => trainCodeKey(trainCode) === seatTrainCodeKey
             )
         );
         if (matched.length === 1) {
@@ -1327,7 +1427,7 @@ function resolveSeatCodeWinnerGroup(
 
 async function tryArbitrateOverlappingRoutesWithSeatCode(
     args: ProbeTrainDepartureTaskArgs,
-    mainEmuCode: string,
+    mainEmuId: EmuId,
     currentGroup: TodayScheduleProbeGroup,
     overlappingGroups: TodayScheduleProbeGroup[],
     assets: Awaited<ReturnType<typeof loadProbeAssets>>,
@@ -1338,12 +1438,12 @@ async function tryArbitrateOverlappingRoutesWithSeatCode(
     const conflictStateByTrainKey =
         buildConflictStateByTrainKey(validationResults);
 
-    const seatRoute = await fetchSeatCodeRouteForEmu(assets, mainEmuCode);
+    const seatRoute = await fetchSeatCodeRouteForEmu(assets, mainEmuId);
     if (seatRoute.state === 'unavailable') {
         const reason = seatRoute.reason ?? 'seat_code_unavailable';
         recordTrainProvenanceForEachGroup(conflictGroups, (group) => ({
-            serviceDate: getCurrentDateString(),
-            emuCode: mainEmuCode,
+            serviceDate: serviceDateToDay(getCurrentDateString()),
+            emuId: mainEmuId,
             eventType: 'seat_conflict_unavailable',
             result: reason,
             payload: {
@@ -1365,11 +1465,14 @@ async function tryArbitrateOverlappingRoutesWithSeatCode(
             }
         }));
         logger.warn(
-            `seat_conflict_unavailable conflictEmuCode=${mainEmuCode} conflictGroups=${formatTrainCodeGroups(conflictGroups)} reason=${reason}`
+            `seat_conflict_unavailable conflictEmuCode=${formatExternalEmuCode(mainEmuId)} conflictGroups=${formatTrainCodeGroups(conflictGroups)} reason=${reason}`
         );
         return 'unavailable';
     }
 
+    if (!seatRoute.seatTrainCode) {
+        return 'unavailable';
+    }
     const winnerGroup = resolveSeatCodeWinnerGroup(
         conflictGroups,
         seatRoute.seatTrainCode,
@@ -1379,8 +1482,8 @@ async function tryArbitrateOverlappingRoutesWithSeatCode(
     );
     if (!winnerGroup) {
         recordTrainProvenanceForEachGroup(conflictGroups, (group) => ({
-            serviceDate: getCurrentDateString(),
-            emuCode: mainEmuCode,
+            serviceDate: serviceDateToDay(getCurrentDateString()),
+            emuId: mainEmuId,
             eventType: 'seat_conflict_unavailable',
             result: 'ambiguous',
             payload: {
@@ -1406,7 +1509,7 @@ async function tryArbitrateOverlappingRoutesWithSeatCode(
             }
         }));
         logger.warn(
-            `seat_conflict_ambiguous conflictEmuCode=${mainEmuCode} conflictGroups=${formatTrainCodeGroups(conflictGroups)} seatTrainCode=${seatRoute.seatTrainCode} seatInternalCode=${seatRoute.seatInternalCode}`
+            `seat_conflict_ambiguous conflictEmuCode=${formatExternalEmuCode(mainEmuId)} conflictGroups=${formatTrainCodeGroups(conflictGroups)} seatTrainCode=${seatRoute.seatTrainCode ? formatTrainCode(seatRoute.seatTrainCode) : ''} seatInternalCode=${seatRoute.seatInternalCode ?? ''}`
         );
         return 'unavailable';
     }
@@ -1414,8 +1517,8 @@ async function tryArbitrateOverlappingRoutesWithSeatCode(
     const loserGroups = conflictGroups.filter(
         (group) => group.trainKey !== winnerGroup.trainKey
     );
-    const serviceDate = getCurrentDateString();
-    const seatDetail = `seatTrainCode=${seatRoute.seatTrainCode} seatInternalCode=${seatRoute.seatInternalCode} winnerTrainKey=${winnerGroup.trainKey}`;
+    const serviceDate = serviceDateToDay(getCurrentDateString());
+    const seatDetail = `seatTrainCode=${seatRoute.seatTrainCode ? formatTrainCode(seatRoute.seatTrainCode) : ''} seatInternalCode=${seatRoute.seatInternalCode ?? ''} winnerTrainKey=${winnerGroup.trainKey}`;
 
     for (const loserGroup of loserGroups) {
         clearQueriedTrainKey(loserGroup.trainKey);
@@ -1423,7 +1526,7 @@ async function tryArbitrateOverlappingRoutesWithSeatCode(
         for (const trainCode of getGroupTrainCodes(loserGroup)) {
             markProbeUntrustedRecord(
                 trainCode,
-                mainEmuCode,
+                mainEmuId,
                 serviceDate,
                 'seat_code_conflict_disproved',
                 seatDetail
@@ -1434,7 +1537,7 @@ async function tryArbitrateOverlappingRoutesWithSeatCode(
     for (const trainCode of getGroupTrainCodes(winnerGroup)) {
         deleteProbeUntrustedRecordsByTrainCodeAndEmuCodeAtServiceDate(
             trainCode,
-            mainEmuCode,
+            mainEmuId,
             serviceDate
         );
     }
@@ -1450,7 +1553,7 @@ async function tryArbitrateOverlappingRoutesWithSeatCode(
 
     recordTrainProvenanceForEachGroup(conflictGroups, (group) => ({
         serviceDate,
-        emuCode: mainEmuCode,
+        emuId: mainEmuId,
         eventType: 'seat_conflict_resolved',
         result: group.trainKey === winnerGroup.trainKey ? 'winner' : 'loser',
         payload: {
@@ -1480,7 +1583,7 @@ async function tryArbitrateOverlappingRoutesWithSeatCode(
     }));
 
     logger.info(
-        `seat_conflict_resolved conflictEmuCode=${mainEmuCode} winnerGroup=${formatTrainCodeGroup(winnerGroup)} loserGroups=${formatTrainCodeGroups(loserGroups)} seatTrainCode=${seatRoute.seatTrainCode} seatInternalCode=${seatRoute.seatInternalCode} requeuedTaskIds=${requeuedTaskIds.join(',')}`
+        `seat_conflict_resolved conflictEmuCode=${formatExternalEmuCode(mainEmuId)} winnerGroup=${formatTrainCodeGroup(winnerGroup)} loserGroups=${formatTrainCodeGroups(loserGroups)} seatTrainCode=${seatRoute.seatTrainCode ? formatTrainCode(seatRoute.seatTrainCode) : ''} seatInternalCode=${seatRoute.seatInternalCode ?? ''} requeuedTaskIds=${requeuedTaskIds.join(',')}`
     );
 
     if (currentGroup.trainKey !== winnerGroup.trainKey) {
@@ -1493,7 +1596,7 @@ async function tryArbitrateOverlappingRoutesWithSeatCode(
 
 async function tryResolveOverlappingRoutes(
     args: ProbeTrainDepartureTaskArgs,
-    mainEmuCode: string,
+    mainEmuId: EmuId,
     assets: Awaited<ReturnType<typeof loadProbeAssets>>,
     nowSeconds: number
 ): Promise<boolean> {
@@ -1502,7 +1605,7 @@ async function tryResolveOverlappingRoutes(
         getTodayScheduleProbeGroupByTrainCode(args.trainCode) ??
         buildFallbackGroupFromArgs(args);
     let overlappingGroups = collectOverlappingGroups(
-        mainEmuCode,
+        mainEmuId,
         currentGroup,
         dayStart,
         nextDayStart
@@ -1514,7 +1617,7 @@ async function tryResolveOverlappingRoutes(
     const validationResults: ConflictGroupValidationResult[] = [];
     for (const group of [currentGroup, ...overlappingGroups]) {
         validationResults.push(
-            await validateConflictGroupRunningState(group, mainEmuCode)
+            await validateConflictGroupRunningState(group, mainEmuId)
         );
     }
 
@@ -1531,10 +1634,10 @@ async function tryResolveOverlappingRoutes(
         buildConflictStateByTrainKey(validationResults);
 
     if (notRunningGroups.length > 0) {
-        const extraAffectedEmuCodesByTrainKey = new Map<string, string[]>();
+        const extraAffectedEmuCodesByTrainKey = new Map<string, EmuId[]>();
         if (hasGroupTrainKey(notRunningGroups, currentGroup.trainKey)) {
             extraAffectedEmuCodesByTrainKey.set(currentGroup.trainKey, [
-                mainEmuCode
+                mainEmuId
             ]);
         }
 
@@ -1546,12 +1649,12 @@ async function tryResolveOverlappingRoutes(
             extraAffectedEmuCodesByTrainKey
         );
         logger.info(
-            `overlap_drop_not_running conflictEmuCode=${mainEmuCode} droppedGroups=${formatTrainCodeGroups(notRunningGroups)} notRunningTrainCodes=${uniqueNormalizedCodes(notRunningTrainCodes).join(',')} requestFailedTrainCodes=${uniqueNormalizedCodes(requestFailedTrainCodes).join(',')} affectedEmuCodes=${clearedNotRunningState.affectedEmuCodes.join(',')} deletedDailyRouteRows=${clearedNotRunningState.deletedDailyRouteRows} deletedProbeStatusRows=${clearedNotRunningState.deletedProbeStatusRows} downgradedProbeStatusRows=${clearedNotRunningState.downgradedProbeStatusRows}`
+            `overlap_drop_not_running conflictEmuCode=${formatExternalEmuCode(mainEmuId)} droppedGroups=${formatTrainCodeGroups(notRunningGroups)} notRunningTrainCodes=${notRunningTrainCodes.map(formatTrainCode).join(',')} requestFailedTrainCodes=${requestFailedTrainCodes.map(formatTrainCode).join(',')} affectedEmuCodes=${clearedNotRunningState.affectedEmuIds.map(formatExternalEmuCode).join(',')} deletedDailyRouteRows=${clearedNotRunningState.deletedDailyRouteRows} deletedProbeStatusRows=${clearedNotRunningState.deletedProbeStatusRows} downgradedProbeStatusRows=${clearedNotRunningState.downgradedProbeStatusRows}`
         );
         const allConflictGroups = [currentGroup, ...overlappingGroups];
         recordTrainProvenanceForEachGroup(notRunningGroups, (group) => ({
-            serviceDate: getCurrentDateString(),
-            emuCode: mainEmuCode,
+            serviceDate: serviceDateToDay(getCurrentDateString()),
+            emuId: mainEmuId,
             eventType: 'overlap_dropped',
             result: 'not_running',
             payload: {
@@ -1572,12 +1675,9 @@ async function tryResolveOverlappingRoutes(
                 droppedTrainKeys: notRunningGroups.map(
                     (candidate) => candidate.trainKey
                 ),
-                notRunningTrainCodes:
-                    uniqueNormalizedCodes(notRunningTrainCodes),
-                requestFailedTrainCodes: uniqueNormalizedCodes(
-                    requestFailedTrainCodes
-                ),
-                affectedEmuCodes: clearedNotRunningState.affectedEmuCodes,
+                notRunningTrainCodes: notRunningTrainCodes,
+                requestFailedTrainCodes,
+                affectedEmuIds: clearedNotRunningState.affectedEmuIds,
                 deletedDailyRouteRows:
                     clearedNotRunningState.deletedDailyRouteRows,
                 deletedProbeStatusRows:
@@ -1593,7 +1693,7 @@ async function tryResolveOverlappingRoutes(
         }
 
         overlappingGroups = collectOverlappingGroups(
-            mainEmuCode,
+            mainEmuId,
             currentGroup,
             dayStart,
             nextDayStart
@@ -1612,7 +1712,7 @@ async function tryResolveOverlappingRoutes(
         const arbitrationOutcome =
             await tryArbitrateOverlappingRoutesWithSeatCode(
                 args,
-                mainEmuCode,
+                mainEmuId,
                 currentGroup,
                 overlappingGroups,
                 assets,
@@ -1653,12 +1753,12 @@ async function tryResolveOverlappingRoutes(
         ? logger.error.bind(logger)
         : logger.info.bind(logger);
     overlapRequeueLog(
-        `overlap_requeue conflictEmuCode=${mainEmuCode} conflictGroups=${formatTrainCodeGroups(overlappingGroups)} conflictTimeRanges=${formatOverlapTimeRanges(currentGroup, overlappingGroups)} notRunningTrainCodes=${uniqueNormalizedCodes(notRunningTrainCodes).join(',')} requestFailedTrainCodes=${uniqueNormalizedCodes(requestFailedTrainCodes).join(',')} requeuedGroups=${formatTrainCodeGroups(Array.from(impactedGroups.values()))} requeuedEmuCodes=${clearedState.affectedEmuCodes.join(',')} deletedDailyRouteRows=${clearedState.deletedDailyRouteRows} deletedProbeStatusRows=${clearedState.deletedProbeStatusRows} requeueTaskIds=${taskIds.join(',')}`
+        `overlap_requeue conflictEmuCode=${formatExternalEmuCode(mainEmuId)} conflictGroups=${formatTrainCodeGroups(overlappingGroups)} conflictTimeRanges=${formatOverlapTimeRanges(currentGroup, overlappingGroups)} notRunningTrainCodes=${notRunningTrainCodes.map(formatTrainCode).join(',')} requestFailedTrainCodes=${requestFailedTrainCodes.map(formatTrainCode).join(',')} requeuedGroups=${formatTrainCodeGroups(Array.from(impactedGroups.values()))} requeuedEmuCodes=${clearedState.affectedEmuIds.map(formatExternalEmuCode).join(',')} deletedDailyRouteRows=${clearedState.deletedDailyRouteRows} deletedProbeStatusRows=${clearedState.deletedProbeStatusRows} requeueTaskIds=${taskIds.join(',')}`
     );
     const impactedGroupItems = Array.from(impactedGroups.values());
     recordTrainProvenanceForEachGroup(impactedGroupItems, (group) => ({
-        serviceDate: getCurrentDateString(),
-        emuCode: mainEmuCode,
+        serviceDate: serviceDateToDay(getCurrentDateString()),
+        emuId: mainEmuId,
         eventType: 'overlap_requeued',
         result: 'requeued',
         payload: {
@@ -1681,15 +1781,13 @@ async function tryResolveOverlappingRoutes(
                 currentGroup,
                 overlappingGroups
             ),
-            notRunningTrainCodes: uniqueNormalizedCodes(notRunningTrainCodes),
-            requestFailedTrainCodes: uniqueNormalizedCodes(
-                requestFailedTrainCodes
-            ),
+            notRunningTrainCodes,
+            requestFailedTrainCodes,
             requeuedTrainKeys: impactedGroupItems.map(
                 (candidate) => candidate.trainKey
             ),
             requeuedTaskIds: taskIds,
-            affectedEmuCodes: clearedState.affectedEmuCodes,
+            affectedEmuIds: clearedState.affectedEmuIds,
             deletedDailyRouteRows: clearedState.deletedDailyRouteRows,
             deletedProbeStatusRows: clearedState.deletedProbeStatusRows
         }
@@ -1699,20 +1797,38 @@ async function tryResolveOverlappingRoutes(
 }
 
 function collectLookupStatusNotificationCandidates(
-    allTrainCodes: string[],
-    allEmuCodes: string[],
+    allTrainCodes: TrainCodeParts[],
+    allEmuCodes: EmuId[],
     startAt: number,
     status: ProbeStatusValue
 ) {
+    const seenTrainKeys = new Set<string>();
+    const uniqueTrainCodes = allTrainCodes.filter((trainCode) => {
+        const key = trainCodeKey(trainCode);
+        if (seenTrainKeys.has(key)) {
+            return false;
+        }
+        seenTrainKeys.add(key);
+        return true;
+    });
+    const seenEmuIds = new Set<number>();
+    const uniqueEmuIds = allEmuCodes.filter((emuId) => {
+        const key = Number(emuId);
+        if (seenEmuIds.has(key)) {
+            return false;
+        }
+        seenEmuIds.add(key);
+        return true;
+    });
     return [
-        ...uniqueNormalizedCodes(allTrainCodes).map((targetId) => ({
+        ...uniqueTrainCodes.map((targetId) => ({
             targetType: 'train' as const,
             targetId,
             startAt,
             previousStatus: getProbeStatusByTrainCodeValue(targetId, startAt),
             nextStatus: status
         })),
-        ...uniqueNormalizedCodes(allEmuCodes).map((targetId) => ({
+        ...uniqueEmuIds.map((targetId) => ({
             targetType: 'emu' as const,
             targetId,
             startAt,
@@ -1745,8 +1861,8 @@ function recordTrainProvenanceForEachGroup(
 async function applyResolvedResult(
     args: ProbeTrainDepartureTaskArgs,
     trainKey: string,
-    allTrainCodes: string[],
-    allEmuCodes: string[],
+    allTrainCodes: TrainCodeParts[],
+    allEmuCodes: EmuId[],
     status: ProbeStatusValue,
     nowSeconds: number
 ): Promise<ProbeTrackingMutation[]> {
@@ -1768,12 +1884,12 @@ async function applyResolvedResult(
 async function tryReuseHistoricalProbeStatus(
     args: ProbeTrainDepartureTaskArgs,
     trainKey: string,
-    mainEmuCode: string,
-    allTrainCodes: string[],
+    mainEmuId: EmuId,
+    allTrainCodes: TrainCodeParts[],
     nowSeconds: number
 ): Promise<boolean> {
     const latestResolvedRow = getLatestResolvedProbeStatusByEmuCodeBefore(
-        mainEmuCode,
+        mainEmuId,
         args.startAt
     );
     if (!latestResolvedRow) {
@@ -1781,7 +1897,7 @@ async function tryReuseHistoricalProbeStatus(
     }
 
     const historicalRows = listProbeStatusByEmuCode(
-        mainEmuCode,
+        mainEmuId,
         latestResolvedRow.start_at
     );
     if (historicalRows.length === 0) {
@@ -1790,14 +1906,21 @@ async function tryReuseHistoricalProbeStatus(
 
     const knownGroup = collectKnownStatusGroup(
         historicalRows,
-        mainEmuCode,
+        mainEmuId,
         latestResolvedRow.start_at
     );
-    const historicalTrainCodes = uniqueNormalizedCodes(
-        historicalRows.map((row) => row.train_code)
-    );
+    const seenHistoricalTrainKeys = new Set<string>();
+    const historicalTrainCodes: TrainCodeParts[] = [];
+    for (const row of historicalRows) {
+        const key = trainCodeKey(row.train_code);
+        if (seenHistoricalTrainKeys.has(key)) {
+            continue;
+        }
+        seenHistoricalTrainKeys.add(key);
+        historicalTrainCodes.push(row.train_code);
+    }
     const allEmuCodes =
-        knownGroup.emuCodes.length > 0 ? knownGroup.emuCodes : [mainEmuCode];
+        knownGroup.emuIds.length > 0 ? knownGroup.emuIds : [mainEmuId];
     if (
         latestResolvedRow.status ===
             ProbeStatusValue.CoupledFormationResolved &&
@@ -1805,9 +1928,9 @@ async function tryReuseHistoricalProbeStatus(
             allEmuCodes.length <= 1)
     ) {
         recordCurrentTrainProvenanceEventsForTrainCodes(allTrainCodes, {
-            serviceDate: formatShanghaiDateString(args.startAt * 1000),
+            serviceDate: unixSecondsToServiceDay(args.startAt),
             startAt: args.startAt,
-            emuCode: mainEmuCode,
+            emuId: mainEmuId,
             eventType: 'historical_reuse_rejected',
             result: 'incomplete_group',
             payload: {
@@ -1815,11 +1938,11 @@ async function tryReuseHistoricalProbeStatus(
                 historicalStatus: latestResolvedRow.status,
                 knownFinalStatus: knownGroup.finalStatus,
                 historicalTrainCodes,
-                emuCodes: allEmuCodes
+                emuIds: allEmuCodes
             }
         });
         logger.warn(
-            `reuse_historical_status_incomplete trainCode=${args.trainCode} mainEmuCode=${mainEmuCode} historicalStartAt=${latestResolvedRow.start_at}`
+            `reuse_historical_status_incomplete trainCode=${formatTrainCode(args.trainCode)} mainEmuCode=${formatExternalEmuCode(mainEmuId)} historicalStartAt=${latestResolvedRow.start_at}`
         );
         return false;
     }
@@ -1833,12 +1956,12 @@ async function tryReuseHistoricalProbeStatus(
         nowSeconds
     );
     logger.info(
-        `reuse_historical_status trainCode=${args.trainCode} mainEmuCode=${mainEmuCode} historicalStartAt=${latestResolvedRow.start_at} status=${knownGroup.finalStatus} emuCodes=${allEmuCodes.length}`
+        `reuse_historical_status trainCode=${formatTrainCode(args.trainCode)} mainEmuCode=${formatExternalEmuCode(mainEmuId)} historicalStartAt=${latestResolvedRow.start_at} status=${knownGroup.finalStatus} emuCodes=${allEmuCodes.length}`
     );
     recordCurrentTrainProvenanceEventsForTrainCodes(allTrainCodes, {
-        serviceDate: formatShanghaiDateString(args.startAt * 1000),
+        serviceDate: unixSecondsToServiceDay(args.startAt),
         startAt: args.startAt,
-        emuCode: mainEmuCode,
+        emuId: mainEmuId,
         eventType: 'historical_reuse_selected',
         result:
             knownGroup.finalStatus === ProbeStatusValue.CoupledFormationResolved
@@ -1848,7 +1971,7 @@ async function tryReuseHistoricalProbeStatus(
             historicalStartAt: latestResolvedRow.start_at,
             historicalStatus: latestResolvedRow.status,
             historicalTrainCodes,
-            emuCodes: allEmuCodes,
+            emuIds: allEmuCodes,
             trackingMutations
         }
     });
@@ -1856,9 +1979,9 @@ async function tryReuseHistoricalProbeStatus(
 }
 
 async function probeEmuByTrainCodes(
-    candidateTrainCodes: string[]
+    candidateTrainCodes: TrainCodeParts[]
 ): Promise<ProbeEmuByTrainCodesResult> {
-    const serviceDate = getCurrentDateString();
+    const serviceDate = serviceDateToDay(getCurrentDateString());
     const untrustedSkippedPairs: ProbeEmuByTrainCodesResult['untrustedSkippedPairs'] =
         [];
 
@@ -1868,10 +1991,11 @@ async function probeEmuByTrainCodes(
             continue;
         }
 
-        const mainEmuCode = normalizeCode(routeProbeResult.emu.code);
+        const mainEmuId = routeProbeResult.emu.code;
+        const mainEmuCode = formatExternalEmuCode(mainEmuId);
         if (mainEmuCode.length === 0) {
             logger.warn(
-                `route_probe_empty_emu_code trainCode=${candidateTrainCode}`
+                `route_probe_empty_emu_code trainCode=${formatTrainCode(candidateTrainCode)}`
             );
             continue;
         }
@@ -1879,20 +2003,20 @@ async function probeEmuByTrainCodes(
         const parsedMainEmuCode = parseEmuCode(mainEmuCode);
         if (!parsedMainEmuCode?.trainSetNo) {
             logger.warn(
-                `route_probe_invalid_emu_code trainCode=${candidateTrainCode} mainEmuCode=${mainEmuCode}`
+                `route_probe_invalid_emu_code trainCode=${formatTrainCode(candidateTrainCode)} mainEmuCode=${mainEmuCode}`
             );
             continue;
         }
 
         if (
-            isProbeUntrustedRecord(candidateTrainCode, mainEmuCode, serviceDate)
+            isProbeUntrustedRecord(candidateTrainCode, mainEmuId, serviceDate)
         ) {
             logger.info(
-                `route_probe_untrusted_skipped trainCode=${candidateTrainCode} emuCode=${mainEmuCode} serviceDate=${serviceDate}`
+                `route_probe_untrusted_skipped trainCode=${formatTrainCode(candidateTrainCode)} emuCode=${mainEmuCode} serviceDate=${serviceDate}`
             );
             untrustedSkippedPairs.push({
                 trainCode: candidateTrainCode,
-                emuCode: mainEmuCode
+                emuId: mainEmuId
             });
             continue;
         }
@@ -1913,12 +2037,11 @@ async function probeEmuByTrainCodes(
 }
 
 async function executeProbeTrainDepartureTaskInternal(
-    rawArgs: unknown
+    args: ProbeTrainDepartureTaskArgs
 ): Promise<void> {
     ensureProbeStateForToday();
-    const args = parseTaskArgs(rawArgs);
     const nowSeconds = getNowSeconds();
-    const serviceDate = formatShanghaiDateString(args.startAt * 1000);
+    const serviceDate = unixSecondsToServiceDay(args.startAt);
 
     const readiness = rescheduleTaskUntilScheduleReady(
         PROBE_TRAIN_DEPARTURE_TASK_EXECUTOR,
@@ -1944,7 +2067,7 @@ async function executeProbeTrainDepartureTaskInternal(
             }
         );
         logger.info(
-            `schedule_refresh_pending_reschedule executor=${PROBE_TRAIN_DEPARTURE_TASK_EXECUTOR} trainCode=${args.trainCode} reason=${readiness.state.reason} nextExecutionTime=${readiness.nextExecutionTime ?? 'null'} taskId=${readiness.rescheduledTaskId ?? 'null'} action=${readiness.action ?? 'null'}`
+            `schedule_refresh_pending_reschedule executor=${PROBE_TRAIN_DEPARTURE_TASK_EXECUTOR} trainCode=${formatTrainCode(args.trainCode)} reason=${readiness.state.reason} nextExecutionTime=${readiness.nextExecutionTime ?? 'null'} taskId=${readiness.rescheduledTaskId ?? 'null'} action=${readiness.action ?? 'null'}`
         );
         return;
     }
@@ -1969,7 +2092,7 @@ async function executeProbeTrainDepartureTaskInternal(
             }
         );
         logger.info(
-            `skip already_queried trainCode=${args.trainCode} trainInternalCode=${args.trainInternalCode} startAt=${args.startAt}`
+            `skip already_queried trainCode=${formatTrainCode(args.trainCode)} trainInternalCode=${args.trainInternalCode ?? ''} startAt=${args.startAt}`
         );
         return;
     }
@@ -1986,7 +2109,7 @@ async function executeProbeTrainDepartureTaskInternal(
             }
         );
         logger.info(
-            `skip_non_current_schedule trainCode=${args.trainCode} startAt=${args.startAt}`
+            `skip_non_current_schedule trainCode=${formatTrainCode(args.trainCode)} startAt=${args.startAt}`
         );
         return;
     }
@@ -1999,11 +2122,11 @@ async function executeProbeTrainDepartureTaskInternal(
             recordCurrentTrainProvenanceEventsForTrainCodes([pair.trainCode], {
                 serviceDate,
                 startAt: args.startAt,
-                emuCode: pair.emuCode,
+                emuId: pair.emuId,
                 eventType: 'route_probe_untrusted_skipped',
                 result: 'untrusted',
                 payload: {
-                    untrustedEmuCode: pair.emuCode
+                    untrustedEmuCode: formatExternalEmuCode(pair.emuId)
                 }
             });
         }
@@ -2030,7 +2153,7 @@ async function executeProbeTrainDepartureTaskInternal(
             });
             markCurrentTrainProvenanceTaskSkipped('route_probe_requeued');
             logger.debug(
-                `route_probe_failed_requeue trainCode=${args.trainCode} retry=${args.retry} nextRetry=${nextRetry} nextTaskId=${nextTaskId} attemptedTrainCodes=${allTrainCodes.join(',')}`
+                `route_probe_failed_requeue trainCode=${formatTrainCode(args.trainCode)} retry=${args.retry} nextRetry=${nextRetry} nextTaskId=${nextTaskId} attemptedTrainCodes=${allTrainCodes.join(',')}`
             );
             return;
         }
@@ -2050,11 +2173,12 @@ async function executeProbeTrainDepartureTaskInternal(
     }
 
     const { probedTrainCode, routeProbeResult } = successfulRouteProbe;
-    const mainEmuCode = normalizeCode(routeProbeResult.emu.code);
+    const mainEmuId = routeProbeResult.emu.code;
+    const mainEmuCode = formatExternalEmuCode(mainEmuId);
     recordCurrentTrainProvenanceEventsForTrainCodes(allTrainCodes, {
         serviceDate,
         startAt: args.startAt,
-        emuCode: mainEmuCode,
+        emuId: mainEmuId,
         relatedTrainCode: probedTrainCode,
         eventType: 'route_probe_succeeded',
         result: 'running',
@@ -2070,7 +2194,7 @@ async function executeProbeTrainDepartureTaskInternal(
         buildProbeAssetKey(parsedMainEmuCode!.model, currentTrainSetNo)
     );
     const historicalRecentMatchingTrainCodes =
-        collectHistoricalRecentMatchingTrainCodes(allTrainCodes, mainEmuCode);
+        collectHistoricalRecentMatchingTrainCodes(allTrainCodes, mainEmuId);
 
     if (historicalRecentMatchingTrainCodes.length > 0) {
         const todayTrainCodesValidation =
@@ -2079,7 +2203,7 @@ async function executeProbeTrainDepartureTaskInternal(
             recordCurrentTrainProvenanceEventsForTrainCodes(allTrainCodes, {
                 serviceDate,
                 startAt: args.startAt,
-                emuCode: mainEmuCode,
+                emuId: mainEmuId,
                 eventType: 'historical_recent_assignment_skipped',
                 result: 'not_running',
                 payload: {
@@ -2093,7 +2217,7 @@ async function executeProbeTrainDepartureTaskInternal(
                 'historical_recent_not_running'
             );
             logger.info(
-                `skip_historical_recent_same_assignment_not_running trainCode=${args.trainCode} probedTrainCode=${probedTrainCode} mainEmuCode=${mainEmuCode} historicalRecentMatchedTrainCodes=${historicalRecentMatchingTrainCodes.join(',')} checkedTrainCodes=${allTrainCodes.join(',')} notRunningTrainCodes=${todayTrainCodesValidation.notRunningTrainCodes.join(',')}`
+                `skip_historical_recent_same_assignment_not_running trainCode=${formatTrainCode(args.trainCode)} probedTrainCode=${formatTrainCode(probedTrainCode)} mainEmuCode=${mainEmuCode} historicalRecentMatchedTrainCodes=${historicalRecentMatchingTrainCodes.map(formatTrainCode).join(',')} checkedTrainCodes=${allTrainCodes.join(',')} notRunningTrainCodes=${todayTrainCodesValidation.notRunningTrainCodes.map(formatTrainCode).join(',')}`
             );
             return;
         }
@@ -2103,13 +2227,13 @@ async function executeProbeTrainDepartureTaskInternal(
                 assets,
                 args.trainInternalCode,
                 allTrainCodes,
-                mainEmuCode
+                mainEmuId
             );
             if (seatCodeVerification.state === 'matched') {
                 recordCurrentTrainProvenanceEventsForTrainCodes(allTrainCodes, {
                     serviceDate,
                     startAt: args.startAt,
-                    emuCode: mainEmuCode,
+                    emuId: mainEmuId,
                     relatedTrainCode:
                         todayTrainCodesValidation.runningTrainCode,
                     eventType: 'seat_verification_passed',
@@ -2122,7 +2246,7 @@ async function executeProbeTrainDepartureTaskInternal(
                     }
                 });
                 logger.info(
-                    `seat_verify_pass trainCode=${args.trainCode} probedTrainCode=${probedTrainCode} mainEmuCode=${mainEmuCode} runningTrainCode=${todayTrainCodesValidation.runningTrainCode} reason=${seatCodeVerification.reason} seatTrainCode=${seatCodeVerification.seatTrainCode} seatInternalCode=${seatCodeVerification.seatInternalCode} seatStartAt=${seatCodeVerification.seatStartAt} historicalRecentMatchedTrainCodes=${historicalRecentMatchingTrainCodes.join(',')}`
+                    `seat_verify_pass trainCode=${formatTrainCode(args.trainCode)} probedTrainCode=${formatTrainCode(probedTrainCode)} mainEmuCode=${mainEmuCode} runningTrainCode=${todayTrainCodesValidation.runningTrainCode ? formatTrainCode(todayTrainCodesValidation.runningTrainCode) : ''} reason=${seatCodeVerification.reason} seatTrainCode=${seatCodeVerification.seatTrainCode ? formatTrainCode(seatCodeVerification.seatTrainCode) : ''} seatInternalCode=${seatCodeVerification.seatInternalCode ?? ''} seatStartAt=${seatCodeVerification.seatStartAt} historicalRecentMatchedTrainCodes=${historicalRecentMatchingTrainCodes.map(formatTrainCode).join(',')}`
                 );
             } else if (seatCodeVerification.state === 'unavailable') {
                 if (
@@ -2146,7 +2270,7 @@ async function executeProbeTrainDepartureTaskInternal(
                             {
                                 serviceDate,
                                 startAt: args.startAt,
-                                emuCode: mainEmuCode,
+                                emuId: mainEmuId,
                                 relatedTrainCode:
                                     todayTrainCodesValidation.runningTrainCode,
                                 eventType:
@@ -2165,7 +2289,7 @@ async function executeProbeTrainDepartureTaskInternal(
                             }
                         );
                         logger.info(
-                            `seat_verify_unavailable_requeue trainCode=${args.trainCode} probedTrainCode=${probedTrainCode} mainEmuCode=${mainEmuCode} runningTrainCode=${todayTrainCodesValidation.runningTrainCode} retry=${args.retry} nextRetry=${nextRetry} nextTaskId=${nextTaskId} delaySeconds=${overlapRetryDelaySeconds} reason=${seatCodeVerification.reason} historicalRecentMatchedTrainCodes=${historicalRecentMatchingTrainCodes.join(',')}`
+                            `seat_verify_unavailable_requeue trainCode=${formatTrainCode(args.trainCode)} probedTrainCode=${formatTrainCode(probedTrainCode)} mainEmuCode=${mainEmuCode} runningTrainCode=${todayTrainCodesValidation.runningTrainCode ? formatTrainCode(todayTrainCodesValidation.runningTrainCode) : ''} retry=${args.retry} nextRetry=${nextRetry} nextTaskId=${nextTaskId} delaySeconds=${overlapRetryDelaySeconds} reason=${seatCodeVerification.reason} historicalRecentMatchedTrainCodes=${historicalRecentMatchingTrainCodes.map(formatTrainCode).join(',')}`
                         );
                         markCurrentTrainProvenanceTaskSkipped(
                             'seat_verification_unavailable_requeued'
@@ -2178,7 +2302,7 @@ async function executeProbeTrainDepartureTaskInternal(
                         {
                             serviceDate,
                             startAt: args.startAt,
-                            emuCode: mainEmuCode,
+                            emuId: mainEmuId,
                             relatedTrainCode:
                                 todayTrainCodesValidation.runningTrainCode,
                             eventType:
@@ -2198,7 +2322,7 @@ async function executeProbeTrainDepartureTaskInternal(
                         'seat_verification_unavailable_exhausted'
                     );
                     logger.warn(
-                        `seat_verify_unavailable_exhausted trainCode=${args.trainCode} probedTrainCode=${probedTrainCode} mainEmuCode=${mainEmuCode} runningTrainCode=${todayTrainCodesValidation.runningTrainCode} retry=${args.retry} reason=${seatCodeVerification.reason} historicalRecentMatchedTrainCodes=${historicalRecentMatchingTrainCodes.join(',')}`
+                        `seat_verify_unavailable_exhausted trainCode=${formatTrainCode(args.trainCode)} probedTrainCode=${formatTrainCode(probedTrainCode)} mainEmuCode=${mainEmuCode} runningTrainCode=${todayTrainCodesValidation.runningTrainCode ? formatTrainCode(todayTrainCodesValidation.runningTrainCode) : ''} retry=${args.retry} reason=${seatCodeVerification.reason} historicalRecentMatchedTrainCodes=${historicalRecentMatchingTrainCodes.map(formatTrainCode).join(',')}`
                     );
                     return;
                 }
@@ -2206,7 +2330,7 @@ async function executeProbeTrainDepartureTaskInternal(
                 recordCurrentTrainProvenanceEventsForTrainCodes(allTrainCodes, {
                     serviceDate,
                     startAt: args.startAt,
-                    emuCode: mainEmuCode,
+                    emuId: mainEmuId,
                     relatedTrainCode:
                         todayTrainCodesValidation.runningTrainCode,
                     eventType: 'seat_verification_unavailable',
@@ -2218,7 +2342,7 @@ async function executeProbeTrainDepartureTaskInternal(
                     }
                 });
                 logger.info(
-                    `seat_verify_unavailable_continue trainCode=${args.trainCode} probedTrainCode=${probedTrainCode} mainEmuCode=${mainEmuCode} runningTrainCode=${todayTrainCodesValidation.runningTrainCode} reason=${seatCodeVerification.reason} historicalRecentMatchedTrainCodes=${historicalRecentMatchingTrainCodes.join(',')}`
+                    `seat_verify_unavailable_continue trainCode=${formatTrainCode(args.trainCode)} probedTrainCode=${formatTrainCode(probedTrainCode)} mainEmuCode=${mainEmuCode} runningTrainCode=${todayTrainCodesValidation.runningTrainCode ? formatTrainCode(todayTrainCodesValidation.runningTrainCode) : ''} reason=${seatCodeVerification.reason} historicalRecentMatchedTrainCodes=${historicalRecentMatchingTrainCodes.map(formatTrainCode).join(',')}`
                 );
             } else if (args.retry > 0) {
                 const nextRetry = args.retry - 1;
@@ -2233,7 +2357,7 @@ async function executeProbeTrainDepartureTaskInternal(
                 recordCurrentTrainProvenanceEventsForTrainCodes(allTrainCodes, {
                     serviceDate,
                     startAt: args.startAt,
-                    emuCode: mainEmuCode,
+                    emuId: mainEmuId,
                     relatedTrainCode:
                         todayTrainCodesValidation.runningTrainCode,
                     eventType: 'seat_verification_mismatch_requeued',
@@ -2249,7 +2373,7 @@ async function executeProbeTrainDepartureTaskInternal(
                     }
                 });
                 logger.debug(
-                    `seat_verify_mismatch_requeue trainCode=${args.trainCode} probedTrainCode=${probedTrainCode} mainEmuCode=${mainEmuCode} runningTrainCode=${todayTrainCodesValidation.runningTrainCode} retry=${args.retry} nextRetry=${nextRetry} nextTaskId=${nextTaskId} delaySeconds=${overlapRetryDelaySeconds} reason=${seatCodeVerification.reason} seatTrainCode=${seatCodeVerification.seatTrainCode} seatInternalCode=${seatCodeVerification.seatInternalCode} seatStartAt=${seatCodeVerification.seatStartAt} historicalRecentMatchedTrainCodes=${historicalRecentMatchingTrainCodes.join(',')}`
+                    `seat_verify_mismatch_requeue trainCode=${formatTrainCode(args.trainCode)} probedTrainCode=${formatTrainCode(probedTrainCode)} mainEmuCode=${mainEmuCode} runningTrainCode=${todayTrainCodesValidation.runningTrainCode ? formatTrainCode(todayTrainCodesValidation.runningTrainCode) : ''} retry=${args.retry} nextRetry=${nextRetry} nextTaskId=${nextTaskId} delaySeconds=${overlapRetryDelaySeconds} reason=${seatCodeVerification.reason} seatTrainCode=${seatCodeVerification.seatTrainCode ? formatTrainCode(seatCodeVerification.seatTrainCode) : ''} seatInternalCode=${seatCodeVerification.seatInternalCode ?? ''} seatStartAt=${seatCodeVerification.seatStartAt} historicalRecentMatchedTrainCodes=${historicalRecentMatchingTrainCodes.map(formatTrainCode).join(',')}`
                 );
                 markCurrentTrainProvenanceTaskSkipped(
                     'seat_verification_mismatch_requeued'
@@ -2259,7 +2383,7 @@ async function executeProbeTrainDepartureTaskInternal(
                 recordCurrentTrainProvenanceEventsForTrainCodes(allTrainCodes, {
                     serviceDate,
                     startAt: args.startAt,
-                    emuCode: mainEmuCode,
+                    emuId: mainEmuId,
                     relatedTrainCode:
                         todayTrainCodesValidation.runningTrainCode,
                     eventType: 'seat_verification_mismatch_exhausted',
@@ -2281,13 +2405,13 @@ async function executeProbeTrainDepartureTaskInternal(
 
         if (todayTrainCodesValidation.state === 'request_failed') {
             logger.info(
-                `continue_historical_recent_same_assignment_request_failed trainCode=${args.trainCode} probedTrainCode=${probedTrainCode} mainEmuCode=${mainEmuCode} historicalRecentMatchedTrainCodes=${historicalRecentMatchingTrainCodes.join(',')} checkedTrainCodes=${allTrainCodes.join(',')} requestFailedTrainCodes=${todayTrainCodesValidation.requestFailedTrainCodes.join(',')} notRunningTrainCodes=${todayTrainCodesValidation.notRunningTrainCodes.join(',')}`
+                `continue_historical_recent_same_assignment_request_failed trainCode=${formatTrainCode(args.trainCode)} probedTrainCode=${formatTrainCode(probedTrainCode)} mainEmuCode=${mainEmuCode} historicalRecentMatchedTrainCodes=${historicalRecentMatchingTrainCodes.map(formatTrainCode).join(',')} checkedTrainCodes=${allTrainCodes.join(',')} requestFailedTrainCodes=${todayTrainCodesValidation.requestFailedTrainCodes.map(formatTrainCode).join(',')} notRunningTrainCodes=${todayTrainCodesValidation.notRunningTrainCodes.map(formatTrainCode).join(',')}`
             );
         }
     }
 
     if (
-        await tryResolveOverlappingRoutes(args, mainEmuCode, assets, nowSeconds)
+        await tryResolveOverlappingRoutes(args, mainEmuId, assets, nowSeconds)
     ) {
         return;
     }
@@ -2297,7 +2421,7 @@ async function executeProbeTrainDepartureTaskInternal(
             args,
             trainKey,
             allTrainCodes,
-            mainEmuCode,
+            mainEmuId,
             nowSeconds
         )
     ) {
@@ -2306,20 +2430,20 @@ async function executeProbeTrainDepartureTaskInternal(
 
     if (!mainRecord) {
         logger.warn(
-            `main_emu_asset_not_found trainCode=${args.trainCode} mainEmuCode=${mainEmuCode}`
+            `main_emu_asset_not_found trainCode=${formatTrainCode(args.trainCode)} mainEmuCode=${mainEmuCode}`
         );
         const trackingMutations = await applyResolvedResult(
             args,
             trainKey,
             allTrainCodes,
-            [mainEmuCode],
+            [mainEmuId],
             ProbeStatusValue.SingleFormationResolved,
             nowSeconds
         );
         recordCurrentTrainProvenanceEventsForTrainCodes(allTrainCodes, {
             serviceDate,
             startAt: args.startAt,
-            emuCode: mainEmuCode,
+            emuId: mainEmuId,
             eventType: 'resolved_single',
             result: 'asset_missing',
             payload: {
@@ -2335,14 +2459,14 @@ async function executeProbeTrainDepartureTaskInternal(
             args,
             trainKey,
             allTrainCodes,
-            [mainEmuCode],
+            [mainEmuId],
             ProbeStatusValue.SingleFormationResolved,
             nowSeconds
         );
         recordCurrentTrainProvenanceEventsForTrainCodes(allTrainCodes, {
             serviceDate,
             startAt: args.startAt,
-            emuCode: mainEmuCode,
+            emuId: mainEmuId,
             eventType: 'resolved_single',
             result: 'non_multiple',
             payload: {
@@ -2351,19 +2475,16 @@ async function executeProbeTrainDepartureTaskInternal(
             }
         });
         logger.info(
-            `resolved_single_non_multiple trainCode=${args.trainCode} probedTrainCode=${probedTrainCode} mainEmuCode=${mainEmuCode} attemptedTrainCodes=${allTrainCodes.length}`
+            `resolved_single_non_multiple trainCode=${formatTrainCode(args.trainCode)} probedTrainCode=${formatTrainCode(probedTrainCode)} mainEmuCode=${mainEmuCode} attemptedTrainCodes=${allTrainCodes.length}`
         );
         return;
     }
 
-    const existingRows = getResolvedCurrentStatusRows(
-        mainEmuCode,
-        args.startAt
-    );
+    const existingRows = getResolvedCurrentStatusRows(mainEmuId, args.startAt);
     if (existingRows.length > 0) {
         const knownGroup = collectKnownStatusGroup(
             existingRows,
-            mainEmuCode,
+            mainEmuId,
             args.startAt
         );
         const effectiveKnownGroup = existingRows.every(
@@ -2372,11 +2493,11 @@ async function executeProbeTrainDepartureTaskInternal(
             ? knownGroup
             : collectKnownStatusGroupForServiceDate(
                   existingRows,
-                  mainEmuCode,
+                  mainEmuId,
                   args.startAt,
                   serviceDate
               );
-        for (const emuCode of effectiveKnownGroup.emuCodes) {
+        for (const emuCode of effectiveKnownGroup.emuIds) {
             updateProbeStatusByEmuCode(
                 emuCode,
                 args.startAt,
@@ -2387,16 +2508,16 @@ async function executeProbeTrainDepartureTaskInternal(
             args,
             trainKey,
             allTrainCodes,
-            effectiveKnownGroup.emuCodes.length > 0
-                ? effectiveKnownGroup.emuCodes
-                : [mainEmuCode],
+            effectiveKnownGroup.emuIds.length > 0
+                ? effectiveKnownGroup.emuIds
+                : [mainEmuId],
             effectiveKnownGroup.finalStatus,
             nowSeconds
         );
         recordCurrentTrainProvenanceEventsForTrainCodes(allTrainCodes, {
             serviceDate,
             startAt: args.startAt,
-            emuCode: mainEmuCode,
+            emuId: mainEmuId,
             eventType: 'resolved_from_status',
             result:
                 effectiveKnownGroup.finalStatus ===
@@ -2404,12 +2525,12 @@ async function executeProbeTrainDepartureTaskInternal(
                     ? 'coupled'
                     : 'single',
             payload: {
-                emuCodes: effectiveKnownGroup.emuCodes,
+                emuIds: effectiveKnownGroup.emuIds,
                 trackingMutations
             }
         });
         logger.info(
-            `resolved_from_status trainCode=${args.trainCode} probedTrainCode=${probedTrainCode} mainEmuCode=${mainEmuCode} status=${effectiveKnownGroup.finalStatus} emuCodes=${effectiveKnownGroup.emuCodes.length} attemptedTrainCodes=${allTrainCodes.length}`
+            `resolved_from_status trainCode=${formatTrainCode(args.trainCode)} probedTrainCode=${formatTrainCode(probedTrainCode)} mainEmuCode=${mainEmuCode} status=${effectiveKnownGroup.finalStatus} emuCodes=${effectiveKnownGroup.emuIds.length} attemptedTrainCodes=${allTrainCodes.length}`
         );
         return;
     }
@@ -2418,7 +2539,7 @@ async function executeProbeTrainDepartureTaskInternal(
         await tryReuseHistoricalProbeStatus(
             args,
             trainKey,
-            mainEmuCode,
+            mainEmuId,
             allTrainCodes,
             nowSeconds
         )
@@ -2428,7 +2549,7 @@ async function executeProbeTrainDepartureTaskInternal(
 
     const trackingMutations = persistProbeTrackingRows({
         trainCodes: allTrainCodes,
-        emuCodes: [mainEmuCode],
+        emuIds: [mainEmuId],
         startStation: args.startStation,
         endStation: args.endStation,
         startAt: args.startAt,
@@ -2436,7 +2557,7 @@ async function executeProbeTrainDepartureTaskInternal(
         status: ProbeStatusValue.PendingCouplingDetection
     });
     markEmuCodesAssignedToday(
-        [mainEmuCode],
+        [mainEmuId],
         trainKey,
         buildRunningEmuGroupKey(
             args.trainCode,
@@ -2452,7 +2573,7 @@ async function executeProbeTrainDepartureTaskInternal(
     recordCurrentTrainProvenanceEventsForTrainCodes(allTrainCodes, {
         serviceDate,
         startAt: args.startAt,
-        emuCode: mainEmuCode,
+        emuId: mainEmuId,
         eventType: 'pending_coupling_detection',
         result: 'queued',
         linkedSchedulerTaskId: detectionTaskId,
@@ -2464,13 +2585,8 @@ async function executeProbeTrainDepartureTaskInternal(
         }
     });
     logger.info(
-        `pending_coupling_detection trainCode=${args.trainCode} probedTrainCode=${probedTrainCode} mainEmuCode=${mainEmuCode} detectionTaskId=${detectionTaskId} attemptedTrainCodes=${allTrainCodes.length}`
+        `pending_coupling_detection trainCode=${formatTrainCode(args.trainCode)} probedTrainCode=${formatTrainCode(probedTrainCode)} mainEmuCode=${mainEmuCode} detectionTaskId=${detectionTaskId} attemptedTrainCodes=${allTrainCodes.length}`
     );
-}
-
-async function executeProbeTrainDepartureTask(rawArgs: unknown): Promise<void> {
-    const parsedArgs = parseTaskArgs(rawArgs);
-    await executeProbeTrainDepartureTaskInternal(parsedArgs);
 }
 
 export function registerProbeTrainDepartureTaskExecutor(): void {
@@ -2478,8 +2594,9 @@ export function registerProbeTrainDepartureTaskExecutor(): void {
         return;
     }
 
-    registerTaskExecutor(PROBE_TRAIN_DEPARTURE_TASK_EXECUTOR, async (args) => {
-        await executeProbeTrainDepartureTask(args);
+    registerTaskExecutor(PROBE_TRAIN_DEPARTURE_TASK_EXECUTOR, {
+        parse: parseTaskArgs,
+        execute: executeProbeTrainDepartureTaskInternal
     });
     registered = true;
     logger.info(`registered executor=${PROBE_TRAIN_DEPARTURE_TASK_EXECUTOR}`);

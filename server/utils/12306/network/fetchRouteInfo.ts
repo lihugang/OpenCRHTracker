@@ -1,11 +1,19 @@
 import useConfig from '~/server/config';
 import getLogger from '~/server/libs/log4js';
 import { record12306RequestHourlyStat } from '~/server/services/trainProvenanceStore';
-import uniqueNormalizedCodes from '~/server/utils/12306/uniqueNormalizedCodes';
 import getCurrentDateString from '../../date/getCurrentDateString';
 import { getShanghaiUnixSecondsFromDateAndTime } from '../../date/shanghaiDateTime';
 import log12306RequestFailure from './log12306RequestFailure';
 import waitFor12306RequestSlot from '../requestLimiter';
+import {
+    formatTrainCode,
+    trainCodeKey,
+    type TrainCodeParts
+} from '~/server/utils/12306/trainCode';
+import {
+    parseExternalTrainCodeOrThrow,
+    parseExternalTrainCodes
+} from '~/server/utils/internal/boundaries';
 
 interface RouteInfoResponse {
     noLogin: string;
@@ -85,8 +93,8 @@ const config = useConfig();
 const logger = getLogger('12306-network:fetch-route-info');
 
 export interface RouteInfoData {
-    code: string;
-    allCodes: string[];
+    code: TrainCodeParts;
+    allCodes: TrainCodeParts[];
     internalCode: string;
     bureauCode: string;
     trainStyle: string;
@@ -105,7 +113,7 @@ export interface RouteStopData {
     stationTelecode: string;
     arriveAt: number | null;
     departAt: number | null;
-    stationTrainCode: string;
+    stationTrainCode: TrainCodeParts;
     lat: number | null;
     lon: number | null;
     distance: number | null;
@@ -135,8 +143,9 @@ export type FetchRouteInfoResult =
     | RequestFailedRouteInfoResult;
 
 export default async function fetchRouteInfo(
-    route: string
+    route: TrainCodeParts
 ): Promise<FetchRouteInfoResult> {
+    const routeCode = formatTrainCode(route);
     const url =
         'https://mobile.12306.cn/wxxcx/wechat/main/travelServiceQrcodeTrainInfo';
 
@@ -147,7 +156,7 @@ export default async function fetchRouteInfo(
                 'content-type': 'application/x-www-form-urlencoded',
                 'user-agent': config.spider.userAgent
             },
-            body: `trainCode=${route}&startDay=${getCurrentDateString()}&startTime=&endDay=&endTime=`,
+            body: `trainCode=${routeCode}&startDay=${getCurrentDateString()}&startTime=&endDay=&endTime=`,
             method: 'POST'
         });
         if (!response.ok) {
@@ -160,7 +169,7 @@ export default async function fetchRouteInfo(
                 operation: 'http_failed',
                 url,
                 context: {
-                    trainCode: route
+                    trainCode: routeCode
                 },
                 responseStatus: response.status,
                 responseOk: response.ok
@@ -181,7 +190,7 @@ export default async function fetchRouteInfo(
                 operation: 'business_failed',
                 url,
                 context: {
-                    trainCode: route
+                    trainCode: routeCode
                 },
                 responseStatus: response.status,
                 responseOk: response.ok,
@@ -209,6 +218,10 @@ export default async function fetchRouteInfo(
                     stop.arraiveDate,
                     stop.startTime
                 );
+                const stationTrainCode = parseExternalTrainCodeOrThrow(
+                    stop.stationTrainCode,
+                    `stopTime[${index}].stationTrainCode`
+                );
 
                 return {
                     stationNo: Number.isInteger(stationNo)
@@ -218,9 +231,7 @@ export default async function fetchRouteInfo(
                     stationTelecode: stop.stationTelecode.trim().toUpperCase(),
                     arriveAt,
                     departAt,
-                    stationTrainCode: stop.stationTrainCode
-                        .trim()
-                        .toUpperCase(),
+                    stationTrainCode,
                     lat: parseOptionalCoordinate(stop.lat),
                     lon: parseOptionalCoordinate(stop.lon),
                     distance: parseOptionalNonNegativeInteger(stop.distance),
@@ -243,7 +254,7 @@ export default async function fetchRouteInfo(
                 operation: 'invalid_response',
                 url,
                 context: {
-                    trainCode: route
+                    trainCode: routeCode
                 },
                 responseStatus: response.status,
                 responseOk: response.ok,
@@ -271,7 +282,7 @@ export default async function fetchRouteInfo(
                 operation: 'invalid_response',
                 url,
                 context: {
-                    trainCode: route
+                    trainCode: routeCode
                 },
                 responseStatus: response.status,
                 responseOk: response.ok,
@@ -295,10 +306,18 @@ export default async function fetchRouteInfo(
             status: 'running',
             route: {
                 code: route,
-                allCodes: uniqueNormalizedCodes([
+                allCodes: [
                     route,
-                    ...json.data.trainDetail.stationTrainCodeAll.split('/')
-                ]),
+                    ...parseExternalTrainCodes(
+                        json.data.trainDetail.stationTrainCodeAll.split('/')
+                    )
+                ].filter(
+                    (code, index, codes) =>
+                        codes.findIndex(
+                            (candidate) =>
+                                trainCodeKey(candidate) === trainCodeKey(code)
+                        ) === index
+                ),
                 internalCode: json.data.trainNo,
                 bureauCode: routeMetadata.bureauCode,
                 trainStyle: routeMetadata.trainStyle,
@@ -321,7 +340,7 @@ export default async function fetchRouteInfo(
             operation: 'request_exception',
             url,
             context: {
-                trainCode: route
+                trainCode: routeCode
             },
             error
         });

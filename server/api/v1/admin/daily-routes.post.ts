@@ -3,6 +3,11 @@ import { createAdminDailyRoute } from '~/server/services/adminDailyRouteMaintena
 import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';
 import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
+import {
+    ensureExternalEmuId,
+    parseExternalServiceDate,
+    parseExternalTrainCodeOrThrow
+} from '~/server/utils/internal/boundaries';
 
 interface CreateDailyRouteBody {
     date?: unknown;
@@ -79,7 +84,12 @@ export default defineEventHandler(async (event) => {
                 'timetableId 必须是正整数或 null'
             );
 
-            return createAdminDailyRoute(date, trainCode, emuCode, timetableId);
+            return createAdminDailyRoute(
+                parseExternalServiceDate(date),
+                parseExternalTrainCodeOrThrow(trainCode, 'trainCode'),
+                ensureExternalEmuId(emuCode),
+                timetableId
+            );
         }
     );
 });

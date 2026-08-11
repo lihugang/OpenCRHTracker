@@ -29,10 +29,23 @@ import {
 import fetchEMUInfoBySeatCode from '~/server/utils/12306/network/fetchEMUInfoBySeatCode';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
 import parseEmuCode from '~/server/utils/12306/parseEmuCode';
-import uniqueNormalizedCodes from '~/server/utils/12306/uniqueNormalizedCodes';
-import { formatShanghaiDateString } from '~/server/utils/date/getCurrentDateString';
+import {
+    formatTrainCode,
+    trainCodeKey,
+    type TrainCodeParts
+} from '~/server/utils/12306/trainCode';
+import {
+    unixSecondsToServiceDay,
+    type ServiceDay
+} from '~/server/utils/date/serviceDay';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
 import { ProbeStatusValue } from '~/server/services/probeStatusStore';
+import type { EmuId } from '~/server/libs/database/emu';
+import {
+    ensureExternalEmuId,
+    formatExternalEmuCode,
+    parseExternalTrainCodeOrThrow
+} from '~/server/utils/internal/boundaries';
 
 export const PROBE_QRCODE_DETECTION_EMU_TASK_EXECUTOR =
     'probe_qrcode_detection_emu';
@@ -41,7 +54,7 @@ const logger = getLogger('task-executor:probe-qrcode-detection-emu');
 
 interface ProbeQrcodeDetectionEmuTaskArgs {
     detectedAt: string;
-    emuCode: string;
+    emuId: EmuId;
     manualNow: boolean;
     temporary: boolean;
 }
@@ -55,25 +68,29 @@ function parseTaskArgs(raw: unknown): ProbeQrcodeDetectionEmuTaskArgs {
 
     const body = raw as {
         detectedAt?: unknown;
-        emuCode?: unknown;
+        emuId?: unknown;
         manualNow?: unknown;
         temporary?: unknown;
     };
     const detectedAt =
         typeof body.detectedAt === 'string' ? body.detectedAt.trim() : '';
-    const emuCode =
-        typeof body.emuCode === 'string' ? normalizeCode(body.emuCode) : '';
+    const emuId =
+        typeof body.emuId === 'number' &&
+        Number.isInteger(body.emuId) &&
+        body.emuId > 0
+            ? (body.emuId as EmuId)
+            : null;
 
     if (!/^\d{4}$/.test(detectedAt)) {
         throw new Error('task arguments detectedAt must be a valid HHmm');
     }
-    if (emuCode.length === 0) {
-        throw new Error('task arguments emuCode must be a non-empty string');
+    if (emuId === null) {
+        throw new Error('task arguments emuId must be a positive integer id');
     }
 
     return {
         detectedAt,
-        emuCode,
+        emuId,
         manualNow: body.manualNow === true,
         temporary: body.temporary === true
     };
@@ -95,33 +112,35 @@ function resolveEmuRecord(
     );
 }
 
-async function executeProbeQrcodeDetectionEmuTask(rawArgs: unknown) {
+async function executeProbeQrcodeDetectionEmuTask(
+    args: ProbeQrcodeDetectionEmuTaskArgs
+) {
     ensureProbeStateForToday();
-    const args = parseTaskArgs(rawArgs);
     const config = await loadQrcodeDetectionConfig();
     const bypassFixedConfig = args.manualNow || args.temporary;
+    const configuredEmuCode = formatExternalEmuCode(args.emuId);
     if (
         (!bypassFixedConfig && !config.detectedAt.includes(args.detectedAt)) ||
-        (!bypassFixedConfig && !config.emu.includes(args.emuCode))
+        (!bypassFixedConfig && !config.emu.includes(configuredEmuCode))
     ) {
         markCurrentTrainProvenanceTaskSkipped(
             'qrcode_detection_target_removed'
         );
         logger.info(
-            `skip_target_removed detectedAt=${args.detectedAt} emuCode=${args.emuCode}`
+            `skip_target_removed detectedAt=${args.detectedAt} emuCode=${configuredEmuCode}`
         );
         return;
     }
 
     const assets = await loadProbeAssets();
-    const configuredRecord = resolveEmuRecord(assets, args.emuCode);
+    const configuredRecord = resolveEmuRecord(assets, configuredEmuCode);
     if (!configuredRecord) {
         markCurrentTrainProvenanceTaskSkipped('qrcode_detection_emu_missing');
-        logger.warn(`emu_not_found emuCode=${args.emuCode}`);
+        logger.warn(`emu_not_found emuCode=${configuredEmuCode}`);
         return;
     }
 
-    const parsedConfiguredEmuCode = parseEmuCode(args.emuCode)!;
+    const parsedConfiguredEmuCode = parseEmuCode(configuredEmuCode)!;
     const seatCode = assets.qrcodeByModelAndTrainSetNo.get(
         buildProbeAssetKey(
             parsedConfiguredEmuCode.model,
@@ -133,17 +152,17 @@ async function executeProbeQrcodeDetectionEmuTask(rawArgs: unknown) {
             'qrcode_detection_seat_code_missing'
         );
         recordCurrentTrainProvenanceEvent({
-            serviceDate: formatShanghaiDateString(Date.now()),
-            emuCode: args.emuCode,
+            serviceDate: unixSecondsToServiceDay(Math.floor(Date.now() / 1000)),
+            emuId: args.emuId,
             eventType: 'qrcode_detection_skipped',
             result: 'seat_code_missing',
             payload: {
                 detectedAt: args.detectedAt,
-                emuCode: args.emuCode,
+                configuredEmuId: args.emuId,
                 temporary: args.temporary
             }
         });
-        logger.warn(`seat_code_missing emuCode=${args.emuCode}`);
+        logger.warn(`seat_code_missing emuCode=${configuredEmuCode}`);
         return;
     }
 
@@ -153,42 +172,47 @@ async function executeProbeQrcodeDetectionEmuTask(rawArgs: unknown) {
             'qrcode_detection_seat_code_request_failed'
         );
         recordCurrentTrainProvenanceEvent({
-            serviceDate: formatShanghaiDateString(Date.now()),
-            emuCode: args.emuCode,
+            serviceDate: unixSecondsToServiceDay(Math.floor(Date.now() / 1000)),
+            emuId: args.emuId,
             eventType: 'qrcode_detection_request_failed',
             result: seatCodeResult.reason,
             payload: {
                 detectedAt: args.detectedAt,
-                emuCode: args.emuCode,
+                configuredEmuId: args.emuId,
                 temporary: args.temporary,
                 seatCodeFailure: seatCodeResult
             }
         });
         logger.warn(
-            `seat_code_request_failed detectedAt=${args.detectedAt} emuCode=${args.emuCode} reason=${seatCodeResult.reason}`
+            `seat_code_request_failed detectedAt=${args.detectedAt} emuCode=${configuredEmuCode} reason=${seatCodeResult.reason}`
         );
         return;
     }
 
-    const scannedEmuCode = normalizeCode(seatCodeResult.emu.code);
+    const scannedEmuId = seatCodeResult.emu.code;
+    const scannedEmuCode = formatExternalEmuCode(scannedEmuId);
     const resolvedRecord =
         resolveEmuRecord(assets, scannedEmuCode) ?? configuredRecord;
+    const routeInternalCode = seatCodeResult.route.internalCode;
+    const routeCode = seatCodeResult.route.code;
     const matchedScheduleGroup =
-        getTodayScheduleProbeGroupByTrainInternalCode(
-            seatCodeResult.route.internalCode
-        ) ?? getTodayScheduleProbeGroupByTrainCode(seatCodeResult.route.code);
-    const allTrainCodes = matchedScheduleGroup
-        ? uniqueNormalizedCodes([
-              matchedScheduleGroup.trainCode,
-              ...matchedScheduleGroup.allCodes
-          ])
-        : [normalizeCode(seatCodeResult.route.code)];
-    const routeTrainCode =
-        matchedScheduleGroup?.trainCode ??
-        normalizeCode(seatCodeResult.route.code);
+        getTodayScheduleProbeGroupByTrainInternalCode(routeInternalCode) ??
+        getTodayScheduleProbeGroupByTrainCode(routeCode);
+    const seenTrainCodes = new Set<string>();
+    const allTrainCodes: TrainCodeParts[] = [];
+    for (const trainCode of matchedScheduleGroup
+        ? [matchedScheduleGroup.trainCode, ...matchedScheduleGroup.allCodes]
+        : [routeCode]) {
+        const key = trainCodeKey(trainCode);
+        if (seenTrainCodes.has(key)) {
+            continue;
+        }
+        seenTrainCodes.add(key);
+        allTrainCodes.push(trainCode);
+    }
+    const routeTrainCode = matchedScheduleGroup?.trainCode ?? routeCode;
     const routeTrainInternalCode =
-        matchedScheduleGroup?.trainInternalCode ??
-        normalizeCode(seatCodeResult.route.internalCode);
+        matchedScheduleGroup?.trainInternalCode ?? routeInternalCode;
     const routeStartAt =
         matchedScheduleGroup?.startAt ?? seatCodeResult.route.startAt;
     const routeEndAt =
@@ -198,20 +222,20 @@ async function executeProbeQrcodeDetectionEmuTask(rawArgs: unknown) {
         buildTrainKey(routeTrainCode, routeTrainInternalCode, routeStartAt);
     const startStation = matchedScheduleGroup?.startStation ?? '';
     const endStation = matchedScheduleGroup?.endStation ?? '';
-    const serviceDate = formatShanghaiDateString(routeStartAt * 1000);
+    const serviceDate: ServiceDay = unixSecondsToServiceDay(routeStartAt);
     const nowSeconds = getNowSeconds();
 
     recordCurrentTrainProvenanceEventsForTrainCodes(allTrainCodes, {
         serviceDate,
         startAt: routeStartAt,
-        emuCode: scannedEmuCode,
-        relatedTrainCode: normalizeCode(seatCodeResult.route.code),
+        emuId: scannedEmuId,
+        relatedTrainCode: routeCode,
         eventType: 'qrcode_detection_succeeded',
         result: matchedScheduleGroup ? 'tracked_route' : 'untracked_route',
         payload: {
             detectedAt: args.detectedAt,
-            configuredEmuCode: args.emuCode,
-            scannedEmuCode,
+            configuredEmuId: args.emuId,
+            scannedEmuId,
             temporary: args.temporary,
             trainInternalCode: seatCodeResult.route.internalCode,
             trainRepeat: seatCodeResult.route.trainRepeat
@@ -223,7 +247,7 @@ async function executeProbeQrcodeDetectionEmuTask(rawArgs: unknown) {
             trainCode: routeTrainCode,
             trainInternalCode: routeTrainInternalCode,
             allTrainCodes,
-            allEmuCodes: [scannedEmuCode],
+            allEmuCodes: [scannedEmuId],
             startStation,
             endStation,
             startAt: routeStartAt,
@@ -235,7 +259,7 @@ async function executeProbeQrcodeDetectionEmuTask(rawArgs: unknown) {
         recordCurrentTrainProvenanceEventsForTrainCodes(allTrainCodes, {
             serviceDate,
             startAt: routeStartAt,
-            emuCode: scannedEmuCode,
+            emuId: scannedEmuId,
             eventType: 'resolved_single',
             result: 'qrcode_detection',
             payload: {
@@ -252,7 +276,7 @@ async function executeProbeQrcodeDetectionEmuTask(rawArgs: unknown) {
         trainCode: routeTrainCode,
         trainInternalCode: routeTrainInternalCode,
         allTrainCodes,
-        allEmuCodes: [scannedEmuCode],
+        allEmuCodes: [scannedEmuId],
         startStation,
         endStation,
         startAt: routeStartAt,
@@ -264,7 +288,7 @@ async function executeProbeQrcodeDetectionEmuTask(rawArgs: unknown) {
     recordCurrentTrainProvenanceEventsForTrainCodes(allTrainCodes, {
         serviceDate,
         startAt: routeStartAt,
-        emuCode: scannedEmuCode,
+        emuId: scannedEmuId,
         eventType: 'pending_coupling_detection',
         result: 'queued',
         linkedSchedulerTaskId: detectionTaskId,
@@ -284,12 +308,10 @@ export function registerProbeQrcodeDetectionEmuTaskExecutor(): void {
         return;
     }
 
-    registerTaskExecutor(
-        PROBE_QRCODE_DETECTION_EMU_TASK_EXECUTOR,
-        async (args) => {
-            await executeProbeQrcodeDetectionEmuTask(args);
-        }
-    );
+    registerTaskExecutor(PROBE_QRCODE_DETECTION_EMU_TASK_EXECUTOR, {
+        parse: parseTaskArgs,
+        execute: executeProbeQrcodeDetectionEmuTask
+    });
     registered = true;
     logger.info(
         `registered executor=${PROBE_QRCODE_DETECTION_EMU_TASK_EXECUTOR}`

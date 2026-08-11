@@ -1,4 +1,5 @@
-import type { TrainCirculationNode } from '~/types/lookup';
+import type { TrainCodeParts } from '~/server/utils/12306/trainCode';
+import type { ServiceDay } from '~/server/utils/date/serviceDay';
 
 export interface ScheduleProbePrefixRule {
     prefix: string;
@@ -20,7 +21,7 @@ export interface ScheduleStop {
     stationTelecode: string;
     arriveAt: number | null;
     departAt: number | null;
-    stationTrainCode: string;
+    stationTrainCode: TrainCodeParts;
     wicket: string;
     distance?: number | null;
     platformNo?: number | null;
@@ -39,9 +40,9 @@ export interface ScheduleStationEntry {
 export type ScheduleStationMap = Record<string, ScheduleStationEntry>;
 
 export interface ScheduleItem {
-    code: string;
+    code: TrainCodeParts;
     internalCode: string;
-    allCodes: string[];
+    allCodes: TrainCodeParts[];
     bureauCode: string;
     trainStyle: string;
     trainDepartment: string;
@@ -67,7 +68,7 @@ export interface ScheduleProgress {
     discoverProcessed: string[];
     enrichCursor: number;
     failedKeywords: string[];
-    failedEnrichCodes: string[];
+    failedEnrichCodes: TrainCodeParts[];
     counters: {
         apiCalls: number;
         apiRetries: number;
@@ -81,8 +82,8 @@ export interface ScheduleStats {
 }
 
 export interface ScheduleState {
-    date: string;
-    lastBuildDate: string;
+    date: ServiceDay;
+    lastBuildDate: ServiceDay;
     status: ScheduleStatus;
     strategy: {
         retryAttempts: number;
@@ -100,14 +101,23 @@ export interface ScheduleState {
 }
 
 export interface ScheduleRouteRefreshQueueEntry {
-    trainCode: string;
-    serviceDate: string;
+    trainCode: TrainCodeParts;
+    serviceDate: ServiceDay;
     enqueuedAt: number;
 }
 
 export interface ScheduleCirculationEntry {
     refreshedAt: number;
-    nodes: TrainCirculationNode[];
+    nodes: ScheduleCirculationNode[];
+}
+
+export interface ScheduleCirculationNode {
+    internalCode: string;
+    allCodes: TrainCodeParts[];
+    startStation: string;
+    endStation: string;
+    startAt: number;
+    endAt: number;
 }
 
 export type ScheduleCirculationMap = Record<string, ScheduleCirculationEntry>;

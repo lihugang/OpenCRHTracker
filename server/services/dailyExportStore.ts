@@ -3,6 +3,10 @@ import path from 'path';
 import type { DailyEmuRouteRow } from '~/server/services/emuRoutesStore';
 import { writeTextFileAtomically } from '~/server/utils/dataAssets/store';
 import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
+import {
+    formatExternalEmuCode,
+    formatExternalTrainCode
+} from '~/server/utils/internal/boundaries';
 
 export const DAILY_EXPORT_FORMATS = ['csv', 'jsonl'] as const;
 const UTF8_BOM = '\uFEFF';
@@ -39,8 +43,8 @@ export interface DailyExportIndex {
 
 function toDailyExportRecord(row: DailyEmuRouteRow): DailyExportRecord {
     return {
-        trainCode: row.train_code,
-        emuCode: row.emu_code,
+        trainCode: formatExternalTrainCode(row.train_code),
+        emuCode: formatExternalEmuCode(row.emu_id),
         startStation: row.start_station_name,
         endStation: row.end_station_name,
         startAt: row.start_at,

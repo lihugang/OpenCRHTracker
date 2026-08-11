@@ -1,6 +1,7 @@
 SELECT
     id,
-    train_code,
+    train_prefix,
+    train_number,
     service_date_start,
     service_date_end_exclusive,
     content_id,

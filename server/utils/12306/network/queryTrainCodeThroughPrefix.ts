@@ -2,6 +2,8 @@ import useConfig from '~/server/config';
 import { record12306RequestHourlyStat } from '~/server/services/trainProvenanceStore';
 import waitFor12306RequestSlot from '../requestLimiter';
 import parseJsonpToJson from '../../json/parseJsonpToJson';
+import { parseExternalTrainCodeOrThrow } from '~/server/utils/internal/boundaries';
+import type { TrainCodeParts } from '~/server/utils/12306/trainCode';
 
 interface TrainCodeResponse {
     data: Array<{
@@ -75,7 +77,10 @@ export default async function queryTrainCodeThroughPrefix(prefix: string) {
         return json.data.map((item) => {
             return {
                 route: {
-                    code: item.params.station_train_code,
+                    code: parseExternalTrainCodeOrThrow(
+                        item.params.station_train_code,
+                        'station_train_code'
+                    ),
                     internalCode: item.params.train_no
                 }
             };

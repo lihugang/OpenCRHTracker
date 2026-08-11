@@ -15,6 +15,7 @@ import {
     listPendingTasksByExecutor
 } from '~/server/services/taskQueue';
 import getClientIp from '~/server/utils/api/quota/getClientIp';
+import { parseInternalJson } from '~/server/utils/internal/storageValues';
 import importSqlBatch from '~/server/utils/sql/importSqlBatch';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
 import type {
@@ -399,15 +400,11 @@ function findFingerprintMatch(
 
 function hasPendingRiskCaseTask(riskCaseId: number) {
     for (const task of listPendingTasksByExecutor(USER_RISK_TASK_EXECUTOR)) {
-        try {
-            const value = JSON.parse(task.arguments) as {
-                riskCaseId?: unknown;
-            };
-            if (value.riskCaseId === riskCaseId) {
-                return true;
-            }
-        } catch {
-            continue;
+        const value = parseInternalJson(task.arguments) as {
+            riskCaseId?: unknown;
+        };
+        if (value.riskCaseId === riskCaseId) {
+            return true;
         }
     }
 
@@ -804,13 +801,11 @@ function executePendingUserRiskCaseInternal(riskCaseId: number) {
 function reconcilePendingUserBanActions() {
     const existingActionIds = new Set<number>();
     for (const task of listPendingTasksByExecutor(USER_BAN_TASK_EXECUTOR)) {
-        try {
-            const value = JSON.parse(task.arguments) as { actionId?: unknown };
-            if (Number.isSafeInteger(value.actionId)) {
-                existingActionIds.add(value.actionId as number);
-            }
-        } catch {
-            continue;
+        const value = parseInternalJson(task.arguments) as {
+            actionId?: unknown;
+        };
+        if (Number.isSafeInteger(value.actionId)) {
+            existingActionIds.add(value.actionId as number);
         }
     }
 
@@ -833,15 +828,11 @@ function reconcilePendingUserBanActions() {
 function reconcilePendingUserRiskCases() {
     const existingRiskCaseIds = new Set<number>();
     for (const task of listPendingTasksByExecutor(USER_RISK_TASK_EXECUTOR)) {
-        try {
-            const value = JSON.parse(task.arguments) as {
-                riskCaseId?: unknown;
-            };
-            if (Number.isSafeInteger(value.riskCaseId)) {
-                existingRiskCaseIds.add(value.riskCaseId as number);
-            }
-        } catch {
-            continue;
+        const value = parseInternalJson(task.arguments) as {
+            riskCaseId?: unknown;
+        };
+        if (Number.isSafeInteger(value.riskCaseId)) {
+            existingRiskCaseIds.add(value.riskCaseId as number);
         }
     }
 

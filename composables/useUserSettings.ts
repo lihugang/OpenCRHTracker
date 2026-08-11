@@ -195,14 +195,6 @@ export function useUserSettings() {
                 retry: 0
             });
 
-            if (
-                !response ||
-                typeof response !== 'object' ||
-                typeof response.ok !== 'boolean'
-            ) {
-                throw new Error('设置接口未返回有效数据。');
-            }
-
             if (!response.ok) {
                 throw {
                     data: response

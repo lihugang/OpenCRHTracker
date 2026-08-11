@@ -3,6 +3,7 @@ import { deleteAnomalyRoute } from '~/server/services/adminAnomalyActionStore';
 import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';
 import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
+import { parseExternalServiceDate } from '~/server/utils/internal/boundaries';
 
 interface DeleteAnomalyRouteBody {
     date?: unknown;
@@ -45,7 +46,7 @@ export default defineEventHandler(async (event) => {
                 'routeId 不能为空'
             );
 
-            return deleteAnomalyRoute(date, routeId);
+            return deleteAnomalyRoute(parseExternalServiceDate(date), routeId);
         }
     );
 });

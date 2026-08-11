@@ -13,11 +13,17 @@ import parseLimit from '~/server/utils/api/query/parseLimit';
 import setCacheControl from '~/server/utils/api/response/setCacheControl';
 import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
 import type { StationTimetableResponse } from '~/types/lookup';
+import {
+    formatExternalTrainCode,
+    formatExternalTrainCodes,
+    parseExternalTrainCodeOrThrow
+} from '~/server/utils/internal/boundaries';
+import type { TrainCodeParts } from '~/server/utils/12306/trainCode';
 
 interface StationTimetableCursor {
     clockSortAt: number;
     sortAt: number;
-    trainCode: string;
+    trainCode: TrainCodeParts;
     stationNo: number;
     startAt: number;
 }
@@ -71,8 +77,8 @@ export default defineEventHandler(async (event) => {
 
             const items = await Promise.all(
                 pageRows.map(async (row) => ({
-                    trainCode: row.trainCode,
-                    allCodes: [...row.allCodes],
+                    trainCode: formatExternalTrainCode(row.trainCode),
+                    allCodes: formatExternalTrainCodes(row.allCodes),
                     arriveAt: row.arriveAt,
                     departAt: row.departAt,
                     platformNo: row.platformNo,
@@ -119,7 +125,12 @@ async function getReferenceModelsForRow(
     >
 ) {
     const cacheKey = [...row.allCodes]
-        .sort((left, right) => left.localeCompare(right))
+        .sort((left, right) =>
+            formatExternalTrainCode(left).localeCompare(
+                formatExternalTrainCode(right)
+            )
+        )
+        .map(formatExternalTrainCode)
         .join('|');
     const cachedReferenceModels = referenceModelsByCodeSet.get(cacheKey);
     if (cachedReferenceModels) {
@@ -165,7 +176,15 @@ function parseStationTimetableCursor(
     ] = match;
     const clockSortAt = Number(clockSortAtText);
     const sortAt = Number(sortAtText);
-    const trainCode = trainCodeText?.trim()?.toUpperCase() ?? '';
+    let trainCode: TrainCodeParts;
+    try {
+        trainCode = parseExternalTrainCodeOrThrow(
+            trainCodeText,
+            `${label}.trainCode`
+        );
+    } catch {
+        throw new ApiRequestError(400, 'invalid_param', `${label} 包含非法值`);
+    }
     const stationNo = Number(stationNoText);
     const startAt = Number(startAtText);
 
@@ -174,7 +193,6 @@ function parseStationTimetableCursor(
         clockSortAt < 0 ||
         !Number.isInteger(sortAt) ||
         sortAt < 0 ||
-        trainCode.length === 0 ||
         !Number.isInteger(stationNo) ||
         stationNo <= 0 ||
         !Number.isInteger(startAt) ||
@@ -196,7 +214,7 @@ function buildNextCursor(row: TodayScheduleStationIndexRow) {
     return [
         row.clockSortAt,
         row.sortAt,
-        row.trainCode,
+        formatExternalTrainCode(row.trainCode),
         row.stationNo,
         row.startAt
     ].join(':');
@@ -231,7 +249,9 @@ function compareRowWithCursor(
         return row.sortAt - cursor.sortAt;
     }
 
-    const trainCodeCompare = row.trainCode.localeCompare(cursor.trainCode);
+    const trainCodeCompare = formatExternalTrainCode(
+        row.trainCode
+    ).localeCompare(formatExternalTrainCode(cursor.trainCode));
     if (trainCodeCompare !== 0) {
         return trainCodeCompare;
     }

@@ -1,6 +1,9 @@
 import getLogger from '~/server/libs/log4js';
 import useConfig from '~/server/config';
-import { registerTaskExecutor } from '~/server/services/taskExecutorRegistry';
+import {
+    parseEmptyTaskArgs,
+    registerTaskExecutor
+} from '~/server/services/taskExecutorRegistry';
 import { enqueueTask } from '~/server/services/taskQueue';
 import buildTodaySchedule from '~/server/utils/12306/buildTodaySchedule';
 import {
@@ -87,8 +90,9 @@ export function registerBuildScheduleTaskExecutor() {
         return;
     }
 
-    registerTaskExecutor(BUILD_SCHEDULE_TASK_EXECUTOR, async () => {
-        await executeBuildScheduleTask();
+    registerTaskExecutor(BUILD_SCHEDULE_TASK_EXECUTOR, {
+        parse: parseEmptyTaskArgs,
+        execute: async () => executeBuildScheduleTask()
     });
     registered = true;
     logger.info(`registered executor=${BUILD_SCHEDULE_TASK_EXECUTOR}`);

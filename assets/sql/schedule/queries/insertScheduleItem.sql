@@ -1,6 +1,7 @@
 INSERT INTO schedule_items (
     state_kind,
-    item_code,
+    item_prefix,
+    item_number,
     item_index,
     internal_code,
     bureau_code,
@@ -12,4 +13,4 @@ INSERT INTO schedule_items (
     start_at,
     end_at,
     last_route_refresh_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);

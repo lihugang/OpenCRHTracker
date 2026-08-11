@@ -3,6 +3,7 @@ import { getAdminTrainRequestStats } from '~/server/services/adminTrainProvenanc
 import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';
 import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
+import { parseExternalServiceDate } from '~/server/utils/internal/boundaries';
 
 export default defineEventHandler(async (event) => {
     return executeApi(
@@ -23,7 +24,7 @@ export default defineEventHandler(async (event) => {
                 'date 必须是 YYYYMMDD'
             );
 
-            return getAdminTrainRequestStats(date);
+            return getAdminTrainRequestStats(parseExternalServiceDate(date));
         }
     );
 });

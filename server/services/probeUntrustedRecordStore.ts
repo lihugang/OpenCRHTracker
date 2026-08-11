@@ -1,8 +1,14 @@
 import '~/server/libs/database/emu';
+import {
+    asServiceDay,
+    serviceDateToDay,
+    unixSecondsToServiceDay,
+    type ServiceDay
+} from '~/server/utils/date/serviceDay';
+import type { TrainCodeParts } from '~/server/utils/12306/trainCode';
+import type { EmuId } from '~/server/libs/database/emu';
 import { createPreparedSqlStore } from '~/server/libs/database/prepared';
 import importSqlBatch from '~/server/utils/sql/importSqlBatch';
-import normalizeCode from '~/server/utils/12306/normalizeCode';
-import { formatShanghaiDateString } from '~/server/utils/date/getCurrentDateString';
 
 type ProbeUntrustedSqlKey =
     | 'clearProbeUntrustedRecords'
@@ -21,20 +27,16 @@ const probeUntrustedStatements = createPreparedSqlStore<ProbeUntrustedSqlKey>({
     sql: probeUntrustedSql
 });
 
-function normalizeServiceDate(value: string): string {
-    return /^\d{8}$/.test(value) ? value : '';
-}
-
 function normalizeServiceDateFromTimestamp(timestampSeconds: number) {
     if (
         !Number.isFinite(timestampSeconds) ||
         !Number.isInteger(timestampSeconds) ||
         timestampSeconds <= 0
     ) {
-        return '19700101';
+        return asServiceDay(0);
     }
 
-    return formatShanghaiDateString(timestampSeconds * 1000);
+    return unixSecondsToServiceDay(timestampSeconds);
 }
 
 function normalizeInclusiveServiceDateRange(
@@ -50,7 +52,7 @@ function normalizeInclusiveServiceDateRange(
         !Number.isInteger(effectiveEndAt) ||
         effectiveEndAt <= 0 ||
         effectiveEndAt >= Number.MAX_SAFE_INTEGER / 2
-            ? '99991231'
+            ? serviceDateToDay('99991231')
             : normalizeServiceDateFromTimestamp(effectiveEndAt);
 
     return {
@@ -60,30 +62,23 @@ function normalizeInclusiveServiceDateRange(
 }
 
 export function markProbeUntrustedRecord(
-    trainCode: string,
-    emuCode: string,
-    serviceDate: string,
+    trainCode: TrainCodeParts,
+    emuId: EmuId,
+    serviceDate: ServiceDay,
     reason: string,
     detail = ''
 ): boolean {
-    const normalizedTrainCode = normalizeCode(trainCode);
-    const normalizedEmuCode = normalizeCode(emuCode);
-    const normalizedServiceDate = normalizeServiceDate(serviceDate);
     const normalizedReason = reason.trim();
-    if (
-        normalizedTrainCode.length === 0 ||
-        normalizedEmuCode.length === 0 ||
-        normalizedServiceDate.length === 0 ||
-        normalizedReason.length === 0
-    ) {
+    if (normalizedReason.length === 0) {
         return false;
     }
 
     const result = probeUntrustedStatements.run(
         'insertProbeUntrustedRecord',
-        normalizedTrainCode,
-        normalizedEmuCode,
-        normalizedServiceDate,
+        trainCode.prefix,
+        trainCode.number,
+        emuId,
+        serviceDate,
         normalizedReason,
         detail.trim(),
         Math.floor(Date.now() / 1000)
@@ -92,63 +87,41 @@ export function markProbeUntrustedRecord(
 }
 
 export function isProbeUntrustedRecord(
-    trainCode: string,
-    emuCode: string,
-    serviceDate: string
+    trainCode: TrainCodeParts,
+    emuId: EmuId,
+    serviceDate: ServiceDay
 ): boolean {
-    const normalizedTrainCode = normalizeCode(trainCode);
-    const normalizedEmuCode = normalizeCode(emuCode);
-    const normalizedServiceDate = normalizeServiceDate(serviceDate);
-    if (
-        normalizedTrainCode.length === 0 ||
-        normalizedEmuCode.length === 0 ||
-        normalizedServiceDate.length === 0
-    ) {
-        return false;
-    }
-
     const row = probeUntrustedStatements.get<{ 1: number }>(
         'selectProbeUntrustedRecord',
-        normalizedTrainCode,
-        normalizedEmuCode,
-        normalizedServiceDate
+        trainCode.prefix,
+        trainCode.number,
+        emuId,
+        serviceDate
     );
     return row !== undefined;
 }
 
 export function deleteProbeUntrustedRecordsByTrainCodeAndEmuCodeAtServiceDate(
-    trainCode: string,
-    emuCode: string,
-    serviceDate: string
+    trainCode: TrainCodeParts,
+    emuId: EmuId,
+    serviceDate: ServiceDay
 ): number {
-    const normalizedTrainCode = normalizeCode(trainCode);
-    const normalizedEmuCode = normalizeCode(emuCode);
-    const normalizedServiceDate = normalizeServiceDate(serviceDate);
-    if (
-        normalizedTrainCode.length === 0 ||
-        normalizedEmuCode.length === 0 ||
-        normalizedServiceDate.length === 0
-    ) {
-        return 0;
-    }
-
     const result = probeUntrustedStatements.run(
         'deleteProbeUntrustedRecordsByTrainCodeAndEmuCodeAtServiceDate',
-        normalizedTrainCode,
-        normalizedEmuCode,
-        normalizedServiceDate
+        trainCode.prefix,
+        trainCode.number,
+        emuId,
+        serviceDate
     );
     return result.changes;
 }
 
 export function deleteProbeUntrustedRecordsByTrainCodeInRange(
-    trainCode: string,
+    trainCode: TrainCodeParts,
     startAt: number,
     endAtExclusive: number
 ): number {
-    const normalizedTrainCode = normalizeCode(trainCode);
     if (
-        normalizedTrainCode.length === 0 ||
         !Number.isInteger(startAt) ||
         !Number.isInteger(endAtExclusive) ||
         endAtExclusive <= startAt
@@ -160,7 +133,8 @@ export function deleteProbeUntrustedRecordsByTrainCodeInRange(
         normalizeInclusiveServiceDateRange(startAt, endAtExclusive, true);
     const result = probeUntrustedStatements.run(
         'deleteProbeUntrustedRecordsByTrainCodeInRange',
-        normalizedTrainCode,
+        trainCode.prefix,
+        trainCode.number,
         startServiceDate,
         endServiceDate
     );

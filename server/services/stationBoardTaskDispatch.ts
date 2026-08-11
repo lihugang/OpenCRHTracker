@@ -15,6 +15,8 @@ import fetchAllStations, {
 } from '~/server/utils/12306/network/fetchAllStations';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
+import type { ServiceDay } from '~/server/utils/date/serviceDay';
+import { parseInternalJson } from '~/server/utils/internal/storageValues';
 
 export interface PendingStationBoardTask {
     taskId: number;
@@ -40,7 +42,7 @@ export type StationTelecodeResolution =
       };
 
 export interface EnqueueOrReuseStationBoardFetchTaskInput {
-    serviceDate: string;
+    serviceDate: ServiceDay;
     stationName: string;
     stationTelecode: string;
     executionTime?: number;
@@ -58,7 +60,7 @@ export function normalizeStationName(value: string) {
 }
 
 export function buildStationBoardTaskKey(
-    serviceDate: string,
+    serviceDate: ServiceDay,
     stationTelecode: string
 ) {
     return `${serviceDate}:${normalizeCode(stationTelecode)}`;
@@ -131,22 +133,15 @@ export function listPendingStationBoardTasks() {
     for (const task of listPendingTasksByExecutor(
         FETCH_STATION_BOARD_TASK_EXECUTOR
     )) {
-        try {
-            const args = parseFetchStationBoardTaskArgs(
-                JSON.parse(task.arguments) as unknown
-            );
-            pendingTasks.set(
-                buildStationBoardTaskKey(
-                    args.serviceDate,
-                    args.stationTelecode
-                ),
-                {
-                    taskId: task.id
-                }
-            );
-        } catch {
-            continue;
-        }
+        const args = parseFetchStationBoardTaskArgs(
+            parseInternalJson(task.arguments)
+        );
+        pendingTasks.set(
+            buildStationBoardTaskKey(args.serviceDate, args.stationTelecode),
+            {
+                taskId: task.id
+            }
+        );
     }
 
     return pendingTasks;

@@ -11,6 +11,21 @@ import fetchStationExitInfo from '~/server/utils/12306/network/fetchStationExitI
 import fetchStationTransportInfo from '~/server/utils/12306/network/fetchStationTransportInfo';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
 import {
+    formatExternalTrainCode,
+    formatExternalTrainCodes,
+    formatExternalServiceDate,
+    parseExternalTrainCodeOrThrow
+} from '~/server/utils/internal/boundaries';
+import {
+    trainCodeKey,
+    type TrainCodeParts
+} from '~/server/utils/12306/trainCode';
+import {
+    serviceDateToDay,
+    serviceDayToShanghaiDayStartUnixSeconds,
+    type ServiceDay
+} from '~/server/utils/date/serviceDay';
+import {
     listScheduleCandidateItemsForCodes,
     listScheduleAliasesByStateKindAndItemCode,
     listSchedulePlatformInfoCandidatesByStateKindAndStationName,
@@ -26,9 +41,7 @@ import type {
     ScheduleItem,
     ScheduleStop
 } from '~/server/utils/12306/scheduleProbe/types';
-import uniqueNormalizedCodes from '~/server/utils/12306/uniqueNormalizedCodes';
 import { formatShanghaiDateString } from '~/server/utils/date/getCurrentDateString';
-import { toUnixSecondsFromShanghaiDayOffset } from '~/server/utils/date/shanghaiDateTime';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
 import type { StationPlatformRefreshEntryStatus } from '~/server/services/trainProvenanceStore';
 
@@ -43,8 +56,8 @@ interface StationPlatformInfoCandidate {
     stationTelecode: string;
     stationNo: number;
     stationOrder: number;
-    trainDate: string;
-    stationTrainCodes: string[];
+    trainDate: ServiceDay;
+    stationTrainCodes: TrainCodeParts[];
     routeReferences: StationPlatformInfoRouteReference[];
 }
 
@@ -60,7 +73,7 @@ interface FetchedStationPlatformInfo {
 }
 
 export interface StationPlatformInfoRouteReference {
-    trainCodes: string[];
+    trainCodes: TrainCodeParts[];
     startAt: number | null;
 }
 
@@ -70,9 +83,9 @@ export interface StationPlatformInfoRefreshEntry {
     stationTelecode: string;
     stationNo: number;
     stationOrder: number;
-    trainDate: string;
-    stationTrainCodes: string[];
-    attemptedTrainCodes: string[];
+    trainDate: ServiceDay;
+    stationTrainCodes: TrainCodeParts[];
+    attemptedTrainCodes: TrainCodeParts[];
     status: StationPlatformRefreshEntryStatus;
     platformNo: number | null;
     wicket: string | null;
@@ -97,14 +110,14 @@ export interface StationPlatformInfoRefreshResult {
 }
 
 export interface RefreshStationPlatformInfoForStationInput {
-    serviceDate: string;
+    serviceDate: ServiceDay;
     stationName: string;
     stationTelecode: string;
 }
 
 export interface ForceRefreshStationPlatformInfoForTrainCodesInput {
-    serviceDate: string;
-    trainCodes: readonly string[];
+    serviceDate: ServiceDay;
+    trainCodes: readonly TrainCodeParts[];
 }
 
 export function createEmptyStationPlatformInfoRefreshResult(): StationPlatformInfoRefreshResult {
@@ -137,7 +150,7 @@ function isValidStationNo(value: number) {
 }
 
 function toRouteReference(
-    serviceDate: string,
+    serviceDate: ServiceDay,
     item: Pick<ScheduleItem, 'code' | 'allCodes' | 'startAt'> | null
 ): StationPlatformInfoRouteReference | null {
     if (!item) {
@@ -145,9 +158,10 @@ function toRouteReference(
     }
 
     return {
-        trainCodes: uniqueNormalizedCodes([item.code, ...item.allCodes]),
+        trainCodes: [item.code, ...item.allCodes],
         startAt: isValidDayOffset(item.startAt)
-            ? toUnixSecondsFromShanghaiDayOffset(serviceDate, item.startAt)
+            ? serviceDayToShanghaiDayStartUnixSeconds(serviceDate) +
+              item.startAt
             : null
     };
 }
@@ -174,7 +188,7 @@ function appendRouteReference(
 
 function appendCandidate(
     candidatesByKey: Map<string, StationPlatformInfoCandidate>,
-    serviceDate: string,
+    serviceDate: ServiceDay,
     input: {
         lookupType: SchedulePlatformInfoLookupType;
         internalCode: string;
@@ -183,30 +197,38 @@ function appendCandidate(
         stationNo: number;
         stationOrder: number;
         dateOffset: number | null;
-        stationTrainCode: string;
+        stationTrainCode: TrainCodeParts;
         routeReference: StationPlatformInfoRouteReference | null;
     }
 ): boolean {
     const internalCode = normalizeCode(input.internalCode);
     const stationTelecode = normalizeCode(input.stationTelecode);
-    const stationTrainCode = normalizeCode(input.stationTrainCode);
+    const stationTrainCode = input.stationTrainCode;
     if (
         internalCode.length === 0 ||
         stationTelecode.length === 0 ||
-        stationTrainCode.length === 0 ||
+        trainCodeKey(stationTrainCode).length === 0 ||
         !isValidStationNo(input.stationNo) ||
         !isValidDayOffset(input.dateOffset)
     ) {
         return false;
     }
 
-    const trainDate = formatShanghaiDateString(
-        toUnixSecondsFromShanghaiDayOffset(serviceDate, input.dateOffset) * 1000
+    const trainDate = serviceDateToDay(
+        formatShanghaiDateString(
+            (serviceDayToShanghaiDayStartUnixSeconds(serviceDate) +
+                input.dateOffset) *
+                1000
+        )
     );
     const key = `${input.lookupType}:${internalCode}:${stationTelecode}:${input.stationNo}:${trainDate}`;
     const existing = candidatesByKey.get(key);
     if (existing) {
-        if (!existing.stationTrainCodes.includes(stationTrainCode)) {
+        if (
+            !existing.stationTrainCodes.some(
+                (code) => trainCodeKey(code) === trainCodeKey(stationTrainCode)
+            )
+        ) {
             existing.stationTrainCodes.push(stationTrainCode);
         }
         appendRouteReference(existing.routeReferences, input.routeReference);
@@ -228,7 +250,7 @@ function appendCandidate(
 }
 
 function buildCandidatesFromStationRows(
-    serviceDate: string,
+    serviceDate: ServiceDay,
     stationName: string,
     stationTelecode: string,
     rows: readonly SchedulePlatformInfoCandidateRow[]
@@ -250,8 +272,13 @@ function buildCandidatesFromStationRows(
             : row.arriveAt;
         const stationTrainCode = isOrigin
             ? row.currentStationTrainCode
-            : (row.arrivalStationTrainCode ?? '');
-        let routeReference = routeReferenceCache.get(row.itemCode);
+            : row.arrivalStationTrainCode;
+        if (!stationTrainCode) {
+            skippedRowCount += 1;
+            continue;
+        }
+        const itemCodeKey = trainCodeKey(row.itemCode);
+        let routeReference = routeReferenceCache.get(itemCodeKey);
         if (!routeReference) {
             routeReference = toRouteReference(serviceDate, {
                 code: row.itemCode,
@@ -261,7 +288,7 @@ function buildCandidatesFromStationRows(
                 ),
                 startAt: row.itemStartAt
             })!;
-            routeReferenceCache.set(row.itemCode, routeReference);
+            routeReferenceCache.set(itemCodeKey, routeReference);
         }
 
         if (
@@ -279,7 +306,7 @@ function buildCandidatesFromStationRows(
         ) {
             skippedRowCount += 1;
             logger.warn(
-                `skip_station_candidate lookupType=${lookupType} serviceDate=${serviceDate} stationName=${stationName} stationTelecode=${stationTelecode} itemCode=${row.itemCode} stopIndex=${row.stopIndex} stationNo=${row.stationNo} internalCode=${row.internalCode} dateOffset=${String(dateOffset)} stationTrainCode=${stationTrainCode}`
+                `skip_station_candidate lookupType=${lookupType} serviceDate=${formatExternalServiceDate(serviceDate)} stationName=${stationName} stationTelecode=${stationTelecode} itemCode=${formatExternalTrainCode(row.itemCode)} stopIndex=${row.stopIndex} stationNo=${row.stationNo} internalCode=${row.internalCode} dateOffset=${String(dateOffset)} stationTrainCode=${formatExternalTrainCode(stationTrainCode)}`
             );
         }
     }
@@ -293,7 +320,7 @@ function buildCandidatesFromStationRows(
 
 function appendRouteItemCandidates(
     candidatesByKey: Map<string, StationPlatformInfoCandidate>,
-    serviceDate: string,
+    serviceDate: ServiceDay,
     item: ScheduleItem
 ) {
     let localRowCount = 0;
@@ -311,7 +338,7 @@ function appendRouteItemCandidates(
             : stop.arriveAt;
         const stationTrainCode = isOrigin
             ? stop.stationTrainCode
-            : (previousStop?.stationTrainCode ?? '');
+            : (previousStop?.stationTrainCode ?? stop.stationTrainCode);
 
         if (
             !appendCandidate(candidatesByKey, serviceDate, {
@@ -328,7 +355,7 @@ function appendRouteItemCandidates(
         ) {
             skippedRowCount += 1;
             logger.warn(
-                `skip_route_candidate lookupType=${lookupType} serviceDate=${serviceDate} trainCode=${item.code} internalCode=${item.internalCode} stationName=${stop.stationName} stationTelecode=${stop.stationTelecode} stationNo=${stop.stationNo} dateOffset=${String(dateOffset)} stationTrainCode=${stationTrainCode}`
+                `skip_route_candidate lookupType=${lookupType} serviceDate=${formatExternalServiceDate(serviceDate)} trainCode=${formatExternalTrainCode(item.code)} internalCode=${item.internalCode} stationName=${stop.stationName} stationTelecode=${stop.stationTelecode} stationNo=${stop.stationNo} dateOffset=${String(dateOffset)} stationTrainCode=${formatExternalTrainCode(stationTrainCode)}`
             );
         }
     }
@@ -340,18 +367,17 @@ function appendRouteItemCandidates(
 }
 
 function buildCandidatesForTrainCodes(
-    serviceDate: string,
-    trainCodes: readonly string[]
+    serviceDate: ServiceDay,
+    trainCodes: readonly TrainCodeParts[]
 ): BuiltStationPlatformInfoCandidates {
-    const normalizedTrainCodes = uniqueNormalizedCodes([...trainCodes]);
     const initialItems = listScheduleCandidateItemsForCodes('published', {
-        aliasCodes: normalizedTrainCodes
+        aliasCodes: trainCodes
     });
-    const internalCodes = uniqueNormalizedCodes(
-        initialItems.map((item) => item.internalCode)
+    const internalCodes = initialItems.flatMap((item) =>
+        item.internalCode ? [item.internalCode] : []
     );
     const items = listScheduleCandidateItemsForCodes('published', {
-        aliasCodes: normalizedTrainCodes,
+        aliasCodes: trainCodes,
         internalCodes
     });
     const candidatesByKey = new Map<string, StationPlatformInfoCandidate>();
@@ -408,7 +434,7 @@ function toCachedPersistInput(
 
 async function fetchCandidatePlatformInfo(
     candidate: StationPlatformInfoCandidate,
-    stationTrainCode: string
+    stationTrainCode: TrainCodeParts
 ): Promise<FetchedStationPlatformInfo | null> {
     if (candidate.lookupType === 'origin_transport') {
         const result = await fetchStationTransportInfo(
@@ -435,23 +461,35 @@ interface TrainCodeNumber {
     number: number;
 }
 
-function parseTrainCodeNumber(trainCode: string): TrainCodeNumber | null {
-    const match = normalizeCode(trainCode).match(/^([A-Z]+)(\d+)$/);
-    if (!match) {
+function parseTrainCodeNumber(
+    trainCode: TrainCodeParts
+): TrainCodeNumber | null {
+    if (trainCode.number < 0) {
         return null;
     }
-
-    const number = Number(match[2]);
-    return Number.isSafeInteger(number) ? { prefix: match[1]!, number } : null;
+    return {
+        prefix: trainCode.prefix,
+        number: trainCode.number
+    };
 }
 
 function getCandidateTrainCodes(candidate: StationPlatformInfoCandidate) {
-    return uniqueNormalizedCodes([
+    const seen = new Set<string>();
+    const result: TrainCodeParts[] = [];
+    for (const code of [
         ...candidate.stationTrainCodes,
         ...candidate.routeReferences.flatMap(
             (reference) => reference.trainCodes
         )
-    ]);
+    ]) {
+        const key = trainCodeKey(code);
+        if (seen.has(key)) {
+            continue;
+        }
+        seen.add(key);
+        result.push(code);
+    }
+    return result;
 }
 
 function getCandidateStartAt(candidate: StationPlatformInfoCandidate) {
@@ -481,12 +519,10 @@ function findTerminalStop(
 function getArrivalStationTrainCode(
     timetable: TodayScheduleTimetable,
     stopIndex: number
-) {
-    return normalizeCode(
-        stopIndex > 0
-            ? (timetable.stops[stopIndex - 1]?.stationTrainCode ?? '')
-            : (timetable.stops[stopIndex]?.stationTrainCode ?? '')
-    );
+): TrainCodeParts | null {
+    return stopIndex > 0
+        ? (timetable.stops[stopIndex - 1]?.stationTrainCode ?? null)
+        : (timetable.stops[stopIndex]?.stationTrainCode ?? null);
 }
 
 function getReusableArrivalPlatform(
@@ -512,8 +548,8 @@ function getReusableArrivalPlatform(
         timetable,
         terminal.index
     );
-    const internalCode = normalizeCode(timetable.trainInternalCode);
-    if (internalCode.length === 0 || stationTrainCode.length === 0) {
+    const internalCode = timetable.trainInternalCode;
+    if (internalCode.length === 0 || stationTrainCode === null) {
         return null;
     }
 
@@ -539,7 +575,9 @@ function findCurrentCirculationNodeIndex(
         return -1;
     }
 
-    const candidateCodes = new Set(getCandidateTrainCodes(candidate));
+    const candidateCodes = new Set(
+        getCandidateTrainCodes(candidate).map(formatExternalTrainCode)
+    );
     return circulation.nodes.findIndex(
         (node) =>
             normalizeCode(node.internalCode) === candidate.internalCode ||
@@ -576,7 +614,11 @@ function resolvePlatformFromCirculation(
         return null;
     }
 
-    for (const trainCode of uniqueNormalizedCodes(previousNode.allCodes)) {
+    for (const externalTrainCode of previousNode.allCodes) {
+        const trainCode = parseExternalTrainCodeOrThrow(
+            externalTrainCode,
+            'circulation.previousNode.allCodes'
+        );
         const timetable = getTodayScheduleTimetableByTrainCode(trainCode);
         if (!timetable) {
             continue;
@@ -589,7 +631,7 @@ function resolvePlatformFromCirculation(
         );
         if (platformNo !== null) {
             logger.info(
-                `platform_fallback circulation current=${candidate.stationTrainCodes[0] ?? candidate.internalCode} previous=${trainCode} station=${candidate.stationName} gapSeconds=${timeGap}`
+                `platform_fallback circulation current=${candidate.stationTrainCodes[0] ? formatExternalTrainCode(candidate.stationTrainCodes[0]) : candidate.internalCode} previous=${formatExternalTrainCode(trainCode)} station=${candidate.stationName} gapSeconds=${timeGap}`
             );
             return platformNo;
         }
@@ -617,7 +659,7 @@ function resolvePlatformFromStationArrivals(
     }> = [];
     for (const row of rows) {
         if (
-            normalizeCode(row.trainInternalCode) === currentInternalCode ||
+            row.trainInternalCode === currentInternalCode ||
             normalizeCode(row.endStation) !==
                 normalizeCode(candidate.stationName) ||
             row.arriveAt === null ||
@@ -636,10 +678,7 @@ function resolvePlatformFromStationArrivals(
             continue;
         }
 
-        const rowTrainNumbers = uniqueNormalizedCodes([
-            row.trainCode,
-            ...row.allCodes
-        ])
+        const rowTrainNumbers = [row.trainCode, ...row.allCodes]
             .map(parseTrainCodeNumber)
             .filter((value): value is TrainCodeNumber => value !== null);
         if (
@@ -666,7 +705,7 @@ function resolvePlatformFromStationArrivals(
     }
 
     logger.info(
-        `platform_fallback station_arrival current=${candidate.stationTrainCodes[0] ?? candidate.internalCode} previous=${match.row.trainCode} station=${candidate.stationName} gapSeconds=${startAt - (match.row.arriveAt ?? startAt)}`
+        `platform_fallback station_arrival current=${candidate.stationTrainCodes[0] ? formatExternalTrainCode(candidate.stationTrainCodes[0]) : candidate.internalCode} previous=${formatExternalTrainCode(match.row.trainCode)} station=${candidate.stationName} gapSeconds=${startAt - (match.row.arriveAt ?? startAt)}`
     );
     return match.platformNo;
 }
@@ -696,7 +735,7 @@ function resolveOriginPlatformFallback(
             : null;
     } catch (error) {
         logger.warn(
-            `platform_fallback_failed current=${candidate.stationTrainCodes[0] ?? candidate.internalCode} station=${candidate.stationName} error=${toBoundedErrorMessage(error)}`
+            `platform_fallback_failed current=${candidate.stationTrainCodes[0] ? formatExternalTrainCode(candidate.stationTrainCodes[0]) : candidate.internalCode} station=${candidate.stationName} error=${toBoundedErrorMessage(error)}`
         );
         return null;
     }
@@ -713,7 +752,7 @@ function toBoundedErrorMessage(error: unknown) {
 function toRefreshEntry(
     candidate: StationPlatformInfoCandidate,
     input: {
-        attemptedTrainCodes: string[];
+        attemptedTrainCodes: TrainCodeParts[];
         status: StationPlatformRefreshEntryStatus;
         platformNo?: number | null;
         wicket?: string | null;
@@ -729,7 +768,13 @@ function toRefreshEntry(
         stationOrder: candidate.stationOrder,
         trainDate: candidate.trainDate,
         stationTrainCodes: [...candidate.stationTrainCodes],
-        attemptedTrainCodes: uniqueNormalizedCodes(input.attemptedTrainCodes),
+        attemptedTrainCodes: input.attemptedTrainCodes.filter(
+            (code, index, codes) =>
+                codes.findIndex(
+                    (candidateCode) =>
+                        trainCodeKey(candidateCode) === trainCodeKey(code)
+                ) === index
+        ),
         status: input.status,
         platformNo: input.platformNo ?? null,
         wicket: input.wicket?.trim() || null,
@@ -808,7 +853,7 @@ async function refreshCandidates(
         let resolved = false;
         let failed = false;
         let errorMessage = '';
-        const attemptedTrainCodes: string[] = [];
+        const attemptedTrainCodes: TrainCodeParts[] = [];
         for (const stationTrainCode of candidate.stationTrainCodes) {
             requestCount += 1;
             attemptedTrainCodes.push(stationTrainCode);
@@ -868,7 +913,7 @@ async function refreshCandidates(
                 failed = true;
                 errorMessage = toBoundedErrorMessage(error);
                 logger.warn(
-                    `request_failed lookupType=${candidate.lookupType} trainDate=${candidate.trainDate} stationName=${candidate.stationName} stationTelecode=${candidate.stationTelecode} stationNo=${candidate.stationNo} internalCode=${candidate.internalCode} stationTrainCode=${stationTrainCode} forceRefresh=${forceRefresh} error=${errorMessage}`
+                    `request_failed lookupType=${candidate.lookupType} trainDate=${formatExternalServiceDate(candidate.trainDate)} stationName=${candidate.stationName} stationTelecode=${candidate.stationTelecode} stationNo=${candidate.stationNo} internalCode=${candidate.internalCode} stationTrainCode=${formatExternalTrainCode(stationTrainCode)} forceRefresh=${forceRefresh} error=${errorMessage}`
                 );
                 break;
             }
@@ -970,11 +1015,7 @@ function createFailedStationPlatformInfoRefreshResult(
     };
 }
 
-function hasMatchingPublishedSchedule(serviceDate: string) {
-    if (!isValidServiceDate(serviceDate)) {
-        return false;
-    }
-
+function hasMatchingPublishedSchedule(serviceDate: ServiceDay) {
     return loadScheduleStateSummaryByKind('published')?.date === serviceDate;
 }
 
@@ -988,7 +1029,7 @@ function getPlatformInfoExpiresAt(now: number) {
 export async function refreshStationPlatformInfoForStation(
     input: RefreshStationPlatformInfoForStationInput
 ): Promise<StationPlatformInfoRefreshResult> {
-    const serviceDate = input.serviceDate.trim();
+    const serviceDate = input.serviceDate;
     const stationName = input.stationName.trim();
     const stationTelecode = normalizeCode(input.stationTelecode);
     if (
@@ -1021,7 +1062,7 @@ export async function refreshStationPlatformInfoForStation(
 export async function forceRefreshStationPlatformInfoForTrainCodes(
     input: ForceRefreshStationPlatformInfoForTrainCodesInput
 ): Promise<StationPlatformInfoRefreshResult> {
-    const serviceDate = input.serviceDate.trim();
+    const serviceDate = input.serviceDate;
     if (!hasMatchingPublishedSchedule(serviceDate)) {
         return createEmptyStationPlatformInfoRefreshResult();
     }
@@ -1041,7 +1082,7 @@ export async function forceRefreshStationPlatformInfoForTrainCodes(
 export async function refreshStationPlatformInfoForTrainCodes(
     input: ForceRefreshStationPlatformInfoForTrainCodesInput
 ): Promise<StationPlatformInfoRefreshResult> {
-    const serviceDate = input.serviceDate.trim();
+    const serviceDate = input.serviceDate;
     if (!hasMatchingPublishedSchedule(serviceDate)) {
         return createEmptyStationPlatformInfoRefreshResult();
     }

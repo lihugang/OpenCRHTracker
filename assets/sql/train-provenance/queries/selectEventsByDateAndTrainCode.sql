@@ -6,11 +6,13 @@ SELECT
     tr.status AS task_status,
     e.created_at,
     e.service_date,
-    e.train_code,
+    e.train_prefix,
+    e.train_number,
     e.start_at,
-    e.emu_code,
-    e.related_train_code,
-    e.related_emu_code,
+    e.emu_id,
+    e.related_train_prefix,
+    e.related_train_number,
+    e.related_emu_id,
     e.event_type,
     e.result,
     e.linked_scheduler_task_id,
@@ -22,6 +24,7 @@ INNER JOIN provenance_task_runs AS tr
 LEFT JOIN provenance_task_runs AS linked
     ON linked.scheduler_task_id = e.linked_scheduler_task_id
 WHERE e.service_date = ?
-  AND e.train_code = ?
+  AND e.train_prefix = ?
+  AND e.train_number = ?
   AND (? IS NULL OR e.start_at = ?)
 ORDER BY e.created_at ASC, tr.started_at ASC, e.sequence_no ASC, e.id ASC;

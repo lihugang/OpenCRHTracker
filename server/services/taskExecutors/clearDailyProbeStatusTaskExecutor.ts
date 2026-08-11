@@ -1,7 +1,10 @@
 import getLogger from '~/server/libs/log4js';
 import useConfig from '~/server/config';
 import { clearProbeStatus } from '~/server/services/probeStatusStore';
-import { registerTaskExecutor } from '~/server/services/taskExecutorRegistry';
+import {
+    parseEmptyTaskArgs,
+    registerTaskExecutor
+} from '~/server/services/taskExecutorRegistry';
 import { enqueueTask } from '~/server/services/taskQueue';
 import {
     formatShanghaiDateTime,
@@ -70,8 +73,9 @@ export function registerClearDailyProbeStatusTaskExecutor(): void {
         return;
     }
 
-    registerTaskExecutor(CLEAR_DAILY_PROBE_STATUS_TASK_EXECUTOR, async () => {
-        await executeClearDailyProbeStatusTask();
+    registerTaskExecutor(CLEAR_DAILY_PROBE_STATUS_TASK_EXECUTOR, {
+        parse: parseEmptyTaskArgs,
+        execute: async () => executeClearDailyProbeStatusTask()
     });
     registered = true;
     logger.info(

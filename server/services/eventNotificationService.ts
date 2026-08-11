@@ -17,6 +17,12 @@ import {
     buildFeedbackStatusUpdatedNotification
 } from '~/server/utils/notifications/templates/feedbackTopicUpdated';
 import { buildTrainStatusUpdatedNotification } from '~/server/utils/notifications/templates/trainStatusUpdated';
+import type { TrainCodeParts } from '~/server/utils/12306/trainCode';
+import type { EmuId } from '~/server/libs/database/emu';
+import {
+    formatExternalEmuCode,
+    formatExternalTrainCode
+} from '~/server/utils/internal/boundaries';
 import type { FeedbackStatus, FeedbackVisibility } from '~/types/feedback';
 import type {
     NotificationPayload,
@@ -26,7 +32,7 @@ import type {
 
 interface LookupStatusNotificationCandidate {
     targetType: Extract<NotificationTargetType, 'train' | 'emu'>;
-    targetId: string;
+    targetId: TrainCodeParts | EmuId;
     startAt: number;
     previousStatus: number;
     nextStatus: ProbeStatusValue;
@@ -44,21 +50,22 @@ function buildLookupStatusNotificationPayload(
     candidate: LookupStatusNotificationCandidate
 ): NotificationPayload {
     if (candidate.targetType === 'train') {
+        const targetId = candidate.targetId as TrainCodeParts;
         return buildTrainStatusUpdatedNotification(
-            candidate.targetId,
+            formatExternalTrainCode(targetId),
             candidate.startAt,
-            listProbeStatusByTrainCode(
-                candidate.targetId,
-                candidate.startAt
-            ).map((row) => row.emu_code)
+            listProbeStatusByTrainCode(targetId, candidate.startAt).map((row) =>
+                formatExternalEmuCode(row.emu_id)
+            )
         );
     }
 
+    const targetId = candidate.targetId as EmuId;
     return buildEmuStatusUpdatedNotification(
-        candidate.targetId,
+        formatExternalEmuCode(targetId),
         candidate.startAt,
-        listProbeStatusByEmuCode(candidate.targetId, candidate.startAt).map(
-            (row) => row.train_code
+        listProbeStatusByEmuCode(targetId, candidate.startAt).map((row) =>
+            formatExternalTrainCode(row.train_code)
         )
     );
 }
@@ -159,7 +166,13 @@ export async function notifyLookupStatusChanges(
         }
 
         uniqueCandidates.set(
-            `${candidate.targetType}:${candidate.targetId}:${candidate.startAt}:${candidate.nextStatus}`,
+            `${candidate.targetType}:${
+                candidate.targetType === 'train'
+                    ? formatExternalTrainCode(
+                          candidate.targetId as TrainCodeParts
+                      )
+                    : formatExternalEmuCode(candidate.targetId as EmuId)
+            }:${candidate.startAt}:${candidate.nextStatus}`,
             candidate
         );
     }
@@ -171,7 +184,12 @@ export async function notifyLookupStatusChanges(
             await sendNotificationToTargetSubscribers(
                 {
                     targetType: candidate.targetType,
-                    targetId: candidate.targetId
+                    targetId:
+                        candidate.targetType === 'train'
+                            ? formatExternalTrainCode(
+                                  candidate.targetId as TrainCodeParts
+                              )
+                            : formatExternalEmuCode(candidate.targetId as EmuId)
                 },
                 payload
             );

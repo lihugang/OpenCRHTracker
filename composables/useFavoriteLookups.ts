@@ -105,14 +105,6 @@ export function useFavoriteLookups() {
             retry: 0
         });
 
-        if (
-            !response ||
-            typeof response !== 'object' ||
-            typeof response.ok !== 'boolean'
-        ) {
-            throw new Error('收藏接口未返回有效数据。');
-        }
-
         if (!response.ok) {
             throw {
                 data: response

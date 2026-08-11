@@ -6,7 +6,10 @@ import {
     refreshRouteBatchForCodes,
     type RefreshRouteBatchResult
 } from '~/server/services/taskExecutors/refreshRouteBatchTaskExecutor';
-import { registerTaskExecutor } from '~/server/services/taskExecutorRegistry';
+import {
+    parseEmptyTaskArgs,
+    registerTaskExecutor
+} from '~/server/services/taskExecutorRegistry';
 import { removePendingTasksByExecutor } from '~/server/services/taskQueue';
 import {
     getScheduleDatabaseFilePath,
@@ -17,8 +20,16 @@ import {
     getGroupKey,
     splitIntoBatches
 } from '~/server/utils/12306/scheduleProbe/taskHelpers';
+import {
+    parseExternalTrainCodeOrThrow,
+    parseExternalTrainCode
+} from '~/server/utils/internal/boundaries';
+import { formatExternalServiceDate } from '~/server/utils/internal/boundaries';
 import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
+import { serviceDateToDay } from '~/server/utils/date/serviceDay';
 import { enqueueStationBoardDispatchTask } from './dispatchStationBoardTasksExecutor';
+import type { ServiceDay } from '~/server/utils/date/serviceDay';
+import type { TrainCodeParts } from '~/server/utils/12306/trainCode';
 
 export const REFRESH_ALL_ROUTES_AND_REQUEUE_PROBE_TASK_EXECUTOR =
     'refresh_routes_requeue_probe';
@@ -44,8 +55,8 @@ function mergeBatchResult(
 }
 
 function collectRouteRefreshTrainCodes(): {
-    date: string;
-    trainCodes: string[];
+    date: ServiceDay;
+    trainCodes: TrainCodeParts[];
 } {
     const scheduleFilePath = getScheduleDatabaseFilePath();
     const published = loadScheduleStateSummaryByKind('published');
@@ -53,7 +64,7 @@ function collectRouteRefreshTrainCodes(): {
         throw new Error(`published schedule not found: ${scheduleFilePath}`);
     }
 
-    const currentDate = getCurrentDateString();
+    const currentDate = serviceDateToDay(getCurrentDateString());
     if (published.date !== currentDate) {
         throw new Error(
             `published schedule is not current: scheduleDate=${published.date} currentDate=${currentDate}`
@@ -61,10 +72,10 @@ function collectRouteRefreshTrainCodes(): {
     }
 
     const visitedGroups = new Set<string>();
-    const trainCodes: string[] = [];
+    const trainCodes: TrainCodeParts[] = [];
     for (const item of listScheduleItemsByStateKind('published')) {
         const groupKey = getGroupKey({
-            code: item.itemCode,
+            code: parseExternalTrainCodeOrThrow(item.itemCode),
             internalCode: item.internalCode
         });
         if (visitedGroups.has(groupKey)) {
@@ -72,7 +83,7 @@ function collectRouteRefreshTrainCodes(): {
         }
 
         visitedGroups.add(groupKey);
-        trainCodes.push(item.itemCode);
+        trainCodes.push(parseExternalTrainCodeOrThrow(item.itemCode));
     }
 
     return {
@@ -126,12 +137,10 @@ export function registerRefreshAllRoutesAndRequeueProbeTaskExecutor(): void {
         return;
     }
 
-    registerTaskExecutor(
-        REFRESH_ALL_ROUTES_AND_REQUEUE_PROBE_TASK_EXECUTOR,
-        async () => {
-            await executeRefreshAllRoutesAndRequeueProbeTask();
-        }
-    );
+    registerTaskExecutor(REFRESH_ALL_ROUTES_AND_REQUEUE_PROBE_TASK_EXECUTOR, {
+        parse: parseEmptyTaskArgs,
+        execute: async () => executeRefreshAllRoutesAndRequeueProbeTask()
+    });
     registered = true;
     logger.info(
         `registered executor=${REFRESH_ALL_ROUTES_AND_REQUEUE_PROBE_TASK_EXECUTOR}`

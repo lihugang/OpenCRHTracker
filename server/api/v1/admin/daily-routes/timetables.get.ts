@@ -3,6 +3,10 @@ import { listAdminDailyRouteTimetableCandidates } from '~/server/services/adminD
 import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';
 import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
+import {
+    parseExternalServiceDate,
+    parseExternalTrainCodeOrThrow
+} from '~/server/utils/internal/boundaries';
 
 export default defineEventHandler(async (event) => {
     return executeApi(
@@ -32,7 +36,10 @@ export default defineEventHandler(async (event) => {
                 'trainCode 不能为空'
             );
 
-            return listAdminDailyRouteTimetableCandidates(date, trainCode);
+            return listAdminDailyRouteTimetableCandidates(
+                parseExternalServiceDate(date),
+                parseExternalTrainCodeOrThrow(trainCode, 'trainCode')
+            );
         }
     );
 });

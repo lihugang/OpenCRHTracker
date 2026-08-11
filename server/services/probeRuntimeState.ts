@@ -1,5 +1,13 @@
+import {
+    formatTrainCode,
+    type TrainCodeParts
+} from '~/server/utils/12306/trainCode';
+import type { EmuId } from '~/server/libs/database/emu';
+import {
+    serviceDateToDay,
+    type ServiceDay
+} from '~/server/utils/date/serviceDay';
 import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
-import normalizeCode from '~/server/utils/12306/normalizeCode';
 
 interface RunningEmuRecord {
     trainKey: string;
@@ -11,20 +19,20 @@ interface RunningEmuRecord {
 export interface AssignedEmuStateRecord extends RunningEmuRecord {}
 
 interface ProbeRuntimeSnapshotRow {
-    trainCode: string;
-    emuCode: string;
+    trainCode: TrainCodeParts;
+    emuId: EmuId;
     startAt: number;
 }
 
 interface ProbeRuntimeResolvedTrainGroup {
     trainKey: string;
-    trainInternalCode: string;
+    trainInternalCode: string | null;
 }
 
 interface RehydrateProbeRuntimeStateOptions {
     rows: ProbeRuntimeSnapshotRow[];
     resolveGroupByTrainCode: (
-        trainCode: string
+        trainCode: TrainCodeParts
     ) => ProbeRuntimeResolvedTrainGroup | null;
 }
 
@@ -36,18 +44,18 @@ interface RehydrateProbeRuntimeStateResult {
     fallbackKeys: number;
 }
 
-let currentDate = getCurrentDateString();
+let currentDate: ServiceDay = serviceDateToDay(getCurrentDateString());
 const queriedTodayTrainKeys = new Set<string>();
-const assignedTodayEmuState = new Map<string, RunningEmuRecord>();
+const assignedTodayEmuState = new Map<number, RunningEmuRecord>();
 
-function resetProbeState(today: string): void {
+function resetProbeState(today: ServiceDay): void {
     currentDate = today;
     queriedTodayTrainKeys.clear();
     assignedTodayEmuState.clear();
 }
 
 export function ensureProbeStateForToday(): void {
-    const today = getCurrentDateString();
+    const today = serviceDateToDay(getCurrentDateString());
     if (today === currentDate) {
         return;
     }
@@ -56,29 +64,27 @@ export function ensureProbeStateForToday(): void {
 }
 
 export function buildTrainKey(
-    trainCode: string,
-    trainInternalCode: string,
+    trainCode: TrainCodeParts,
+    trainInternalCode: string | null,
     startAt: number
 ): string {
-    const normalizedInternalCode = normalizeCode(trainInternalCode);
-    if (normalizedInternalCode.length > 0) {
-        return `internal:${normalizedInternalCode}`;
+    if (trainInternalCode) {
+        return `internal:${trainInternalCode.trim().toUpperCase()}`;
     }
 
-    return `fallback:${normalizeCode(trainCode)}@${startAt}`;
+    return `fallback:${formatTrainCode(trainCode)}@${startAt}`;
 }
 
 export function buildRunningEmuGroupKey(
-    trainCode: string,
-    trainInternalCode: string,
+    trainCode: TrainCodeParts,
+    trainInternalCode: string | null,
     startAt: number
 ): string {
-    const normalizedInternalCode = normalizeCode(trainInternalCode);
-    if (normalizedInternalCode.length > 0) {
-        return `internal:${normalizedInternalCode}@${startAt}`;
+    if (trainInternalCode) {
+        return `internal:${trainInternalCode.trim().toUpperCase()}@${startAt}`;
     }
 
-    return `fallback:${normalizeCode(trainCode)}@${startAt}`;
+    return `fallback:${formatTrainCode(trainCode)}@${startAt}`;
 }
 
 export function hasQueriedTrainKey(trainKey: string): boolean {
@@ -96,32 +102,24 @@ export function clearQueriedTrainKey(trainKey: string): void {
 export function rehydrateProbeRuntimeState(
     options: RehydrateProbeRuntimeStateOptions
 ): RehydrateProbeRuntimeStateResult {
-    const today = getCurrentDateString();
+    const today = serviceDateToDay(getCurrentDateString());
     resetProbeState(today);
 
     const restoredTrainKeys = new Set<string>();
-    const restoredAssignedEmuCodes = new Set<string>();
+    const restoredAssignedEmuCodes = new Set<number>();
     let skippedOlderRows = 0;
     let fallbackKeys = 0;
 
     for (const row of options.rows) {
-        const normalizedTrainCode = normalizeCode(row.trainCode);
-        const normalizedEmuCode = normalizeCode(row.emuCode);
-        if (
-            normalizedTrainCode.length === 0 ||
-            normalizedEmuCode.length === 0 ||
-            !Number.isInteger(row.startAt) ||
-            row.startAt < 0
-        ) {
+        if (!Number.isInteger(row.startAt) || row.startAt < 0) {
             continue;
         }
 
-        const resolvedGroup =
-            options.resolveGroupByTrainCode(normalizedTrainCode);
+        const resolvedGroup = options.resolveGroupByTrainCode(row.trainCode);
         const trainKey =
             resolvedGroup?.trainKey ??
-            buildTrainKey(normalizedTrainCode, '', row.startAt);
-        const trainInternalCode = resolvedGroup?.trainInternalCode ?? '';
+            buildTrainKey(row.trainCode, null, row.startAt);
+        const trainInternalCode = resolvedGroup?.trainInternalCode ?? null;
 
         if (!resolvedGroup) {
             fallbackKeys += 1;
@@ -130,22 +128,22 @@ export function rehydrateProbeRuntimeState(
         queriedTodayTrainKeys.add(trainKey);
         restoredTrainKeys.add(trainKey);
 
-        if (assignedTodayEmuState.has(normalizedEmuCode)) {
+        if (assignedTodayEmuState.has(Number(row.emuId))) {
             skippedOlderRows += 1;
             continue;
         }
 
-        assignedTodayEmuState.set(normalizedEmuCode, {
+        assignedTodayEmuState.set(Number(row.emuId), {
             trainKey,
             groupKey: buildRunningEmuGroupKey(
-                normalizedTrainCode,
+                row.trainCode,
                 trainInternalCode,
                 row.startAt
             ),
             startAt: row.startAt,
             lastSeenAt: row.startAt
         });
-        restoredAssignedEmuCodes.add(normalizedEmuCode);
+        restoredAssignedEmuCodes.add(Number(row.emuId));
     }
 
     return {
@@ -157,55 +155,44 @@ export function rehydrateProbeRuntimeState(
     };
 }
 
-export function isEmuAssignedToday(emuCode: string): boolean {
-    const normalizedEmuCode = normalizeCode(emuCode);
-    return assignedTodayEmuState.has(normalizedEmuCode);
+export function isEmuAssignedToday(emuId: EmuId): boolean {
+    return assignedTodayEmuState.has(Number(emuId));
 }
 
 export function getAssignedEmuState(
-    emuCode: string
+    emuId: EmuId
 ): AssignedEmuStateRecord | null {
-    const normalizedEmuCode = normalizeCode(emuCode);
-    if (normalizedEmuCode.length === 0) {
-        return null;
-    }
-
-    const record = assignedTodayEmuState.get(normalizedEmuCode);
+    const record = assignedTodayEmuState.get(Number(emuId));
     return record ? { ...record } : null;
 }
 
-export function listAssignedEmuCodesByTrainKey(trainKey: string): string[] {
+export function listAssignedEmuCodesByTrainKey(trainKey: string): EmuId[] {
     const normalizedTrainKey = trainKey.trim();
     if (normalizedTrainKey.length === 0) {
         return [];
     }
 
-    const emuCodes: string[] = [];
-    for (const [emuCode, record] of assignedTodayEmuState.entries()) {
+    const emuIds: EmuId[] = [];
+    for (const [emuId, record] of assignedTodayEmuState.entries()) {
         if (record.trainKey !== normalizedTrainKey) {
             continue;
         }
 
-        emuCodes.push(emuCode);
+        emuIds.push(emuId as EmuId);
     }
 
-    return emuCodes;
+    return emuIds;
 }
 
 export function markEmuCodesAssignedToday(
-    emuCodes: string[],
+    emuIds: EmuId[],
     trainKey: string,
     groupKey: string,
     startAt: number,
     nowSeconds: number
 ): void {
-    for (const rawCode of emuCodes) {
-        const normalizedCode = normalizeCode(rawCode);
-        if (normalizedCode.length === 0) {
-            continue;
-        }
-
-        assignedTodayEmuState.set(normalizedCode, {
+    for (const emuId of emuIds) {
+        assignedTodayEmuState.set(Number(emuId), {
             trainKey,
             groupKey,
             startAt,
@@ -214,53 +201,52 @@ export function markEmuCodesAssignedToday(
     }
 }
 
-export function listAssignedEmuCodesByGroupKey(groupKey: string): string[] {
+export function listAssignedEmuCodesByGroupKey(groupKey: string): EmuId[] {
     const normalizedGroupKey = groupKey.trim();
     if (normalizedGroupKey.length === 0) {
         return [];
     }
 
-    const emuCodes: string[] = [];
-    for (const [emuCode, record] of assignedTodayEmuState.entries()) {
+    const emuIds: EmuId[] = [];
+    for (const [emuId, record] of assignedTodayEmuState.entries()) {
         if (record.groupKey !== normalizedGroupKey) {
             continue;
         }
 
-        emuCodes.push(emuCode);
+        emuIds.push(emuId as EmuId);
     }
 
-    return emuCodes;
+    return emuIds;
 }
 
 export function clearAssignedEmuCodeByGroupKey(
     groupKey: string,
-    emuCode: string
+    emuId: EmuId
 ): boolean {
     const normalizedGroupKey = groupKey.trim();
-    const normalizedEmuCode = normalizeCode(emuCode);
-    if (normalizedGroupKey.length === 0 || normalizedEmuCode.length === 0) {
+    if (normalizedGroupKey.length === 0) {
         return false;
     }
 
-    const record = assignedTodayEmuState.get(normalizedEmuCode);
+    const record = assignedTodayEmuState.get(Number(emuId));
     if (!record || record.groupKey !== normalizedGroupKey) {
         return false;
     }
 
-    assignedTodayEmuState.delete(normalizedEmuCode);
+    assignedTodayEmuState.delete(Number(emuId));
     return true;
 }
 
-export function clearRunningEmuStateByTrainKey(trainKey: string): string[] {
-    const removedEmuCodes: string[] = [];
-    for (const [emuCode, record] of assignedTodayEmuState.entries()) {
+export function clearRunningEmuStateByTrainKey(trainKey: string): EmuId[] {
+    const removedEmuIds: EmuId[] = [];
+    for (const [emuId, record] of assignedTodayEmuState.entries()) {
         if (record.trainKey !== trainKey) {
             continue;
         }
 
-        assignedTodayEmuState.delete(emuCode);
-        removedEmuCodes.push(emuCode);
+        assignedTodayEmuState.delete(emuId);
+        removedEmuIds.push(emuId as EmuId);
     }
 
-    return removedEmuCodes;
+    return removedEmuIds;
 }

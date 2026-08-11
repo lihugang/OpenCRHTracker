@@ -1,6 +1,5 @@
 import { defineEventHandler, getQuery, getRouterParam } from 'h3';
 import {
-    formatTimetableHistoryServiceDate,
     listTimetableHistoryCoveragesByTrainCodePaged,
     type TimetableHistoryCoverageRow
 } from '~/server/services/timetableHistoryStore';
@@ -13,6 +12,11 @@ import { getHistoryResponseCacheControlMaxAge } from '~/server/utils/api/respons
 import setCacheControl from '~/server/utils/api/response/setCacheControl';
 import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
 import type { TrainTimetableHistoryListResponse } from '~/types/lookup';
+import {
+    parseExternalCursor,
+    parseExternalTrainCodeOrThrow,
+    formatExternalServiceDate
+} from '~/server/utils/internal/boundaries';
 
 function buildNextCursor(
     rows: Array<Pick<TimetableHistoryCoverageRow, 'service_date_start' | 'id'>>,
@@ -23,7 +27,7 @@ function buildNextCursor(
     }
 
     const last = rows[rows.length - 1]!;
-    return `${formatTimetableHistoryServiceDate(last.service_date_start)}:${last.id}`;
+    return `${formatExternalServiceDate(last.service_date_start)}:${last.id}`;
 }
 
 export default defineEventHandler(async (event) => {
@@ -53,10 +57,10 @@ export default defineEventHandler(async (event) => {
             );
 
             const query = getQuery(event);
-            const cursor = parseCursor(query.cursor, 'cursor');
+            const cursor = parseExternalCursor(query.cursor, 'cursor');
             const limit = parseLimit(event);
             const rows = listTimetableHistoryCoveragesByTrainCodePaged(
-                trainCode,
+                parseExternalTrainCodeOrThrow(trainCode, 'trainCode'),
                 cursor,
                 limit
             );
@@ -69,10 +73,10 @@ export default defineEventHandler(async (event) => {
                 items: rows.map((row) => ({
                     id: row.id,
                     historyId: row.content_id,
-                    serviceDateStart: formatTimetableHistoryServiceDate(
+                    serviceDateStart: formatExternalServiceDate(
                         row.service_date_start
                     ),
-                    serviceDateEndExclusive: formatTimetableHistoryServiceDate(
+                    serviceDateEndExclusive: formatExternalServiceDate(
                         row.service_date_end_exclusive
                     )
                 }))

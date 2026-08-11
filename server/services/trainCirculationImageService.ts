@@ -6,8 +6,22 @@ import { getPreferredTrainCirculation } from '~/server/services/trainCirculation
 import { getTodayScheduleTimetableByTrainCode } from '~/server/services/todayScheduleCache';
 import ApiRequestError from '~/server/utils/api/errors/ApiRequestError';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
-import { ensureScheduleDocumentMigrated } from '~/server/utils/12306/scheduleProbe/stateStore';
 import {
+    formatTrainCode,
+    type TrainCodeParts
+} from '~/server/utils/12306/trainCode';
+import {
+    formatExternalTrainCode,
+    formatExternalTrainCodes,
+    formatExternalServiceDate,
+    parseExternalTrainCodes
+} from '~/server/utils/internal/boundaries';
+import {
+    serviceDateToDay,
+    type ServiceDay
+} from '~/server/utils/date/serviceDay';
+import {
+    hasScheduleDatabaseDocument,
     listScheduleCandidateItemsForCodes,
     loadScheduleStateSummaries,
     loadScheduleStationsByTelecodes
@@ -245,7 +259,7 @@ function haversineDistanceKm(
 
 function buildMergedScheduleItemKey(item: ScheduleItem) {
     return [
-        normalizeCode(item.internalCode),
+        item.internalCode,
         item.startStation.trim(),
         item.endStation.trim(),
         item.startAt ?? '',
@@ -263,16 +277,19 @@ function mergeScheduleItems(items: ScheduleItem[]) {
         if (existingItem) {
             existingItem.allCodes = uniqueNormalizedCodes([
                 ...existingItem.allCodes,
-                item.code,
-                ...item.allCodes
+                formatTrainCode(item.code),
+                ...item.allCodes.map(formatTrainCode)
             ]);
             continue;
         }
 
         mergedItemsByKey.set(mergedItemKey, {
             representativeItem: item,
-            internalCode: normalizeCode(item.internalCode),
-            allCodes: uniqueNormalizedCodes([item.code, ...item.allCodes]),
+            internalCode: item.internalCode,
+            allCodes: uniqueNormalizedCodes([
+                formatTrainCode(item.code),
+                ...item.allCodes.map(formatTrainCode)
+            ]),
             startStation: item.startStation.trim(),
             endStation: item.endStation.trim(),
             startAt: item.startAt,
@@ -401,7 +418,7 @@ function resolveScheduleItemForNode(
 }
 
 function resolveCirculationNode(
-    scheduleDate: string,
+    scheduleDate: ServiceDay,
     stations: Record<string, ScheduleStationEntry>,
     item: MergedScheduleItem,
     node: TrainCirculation['nodes'][number]
@@ -456,7 +473,7 @@ function resolveCirculationNode(
 }
 
 function buildResolvedCirculationNodes(
-    scheduleDate: string,
+    scheduleDate: ServiceDay,
     circulation: TrainCirculation,
     items: ScheduleItem[],
     stations: Record<string, ScheduleStationEntry>
@@ -578,7 +595,7 @@ async function buildTrainCirculationHeaderInfo(input: {
     bureauCode: string;
     trainDepartment: string;
     passengerDepartment: string;
-    allCodes: string[];
+    allCodes: TrainCodeParts[];
 }): Promise<TrainCirculationHeaderInfo | null> {
     const parts: string[] = [];
     const bureauName = resolveBureauNameByCode(input.bureauCode);
@@ -613,7 +630,7 @@ function buildTypstSource(
     _requestTrainCode: string,
     nodes: ResolvedCirculationNode[],
     stationAxisPoints: StationAxisPoint[],
-    _scheduleDate: string,
+    _scheduleDate: ServiceDay,
     headerInfo: TrainCirculationHeaderInfo | null
 ) {
     const template = fs.readFileSync(TEMPLATE_PATH, 'utf8');
@@ -828,7 +845,7 @@ async function fetchBinaryContent(
     return new Uint8Array(await response.arrayBuffer());
 }
 
-function resolveCurrentCirculation(trainCode: string) {
+function resolveCurrentCirculation(trainCode: TrainCodeParts) {
     const timetable = getTodayScheduleTimetableByTrainCode(trainCode);
     if (!timetable || timetable.stops.length === 0) {
         throw new ApiRequestError(404, 'not_found', '当前暂无时刻表');
@@ -849,7 +866,7 @@ function resolveCurrentCirculation(trainCode: string) {
 }
 
 function resolvePublishedScheduleProjection(circulation: TrainCirculation) {
-    if (!ensureScheduleDocumentMigrated()) {
+    if (!hasScheduleDatabaseDocument()) {
         throw new ApiRequestError(404, 'not_found', '当前暂无时刻表');
     }
 
@@ -858,13 +875,19 @@ function resolvePublishedScheduleProjection(circulation: TrainCirculation) {
         loadScheduleStateSummaries().find(
             (summary) => summary.kind === 'published'
         ) ?? null;
-    if (!publishedSummary || publishedSummary.date !== currentDate) {
+    if (
+        !publishedSummary ||
+        publishedSummary.date !== serviceDateToDay(currentDate)
+    ) {
         throw new ApiRequestError(404, 'not_found', '当前暂无时刻表');
     }
 
     const items = listScheduleCandidateItemsForCodes('published', {
         internalCodes: circulation.nodes.map((node) => node.internalCode),
-        aliasCodes: circulation.nodes.flatMap((node) => node.allCodes)
+        aliasCodes: parseExternalTrainCodes(
+            circulation.nodes.flatMap((node) => node.allCodes),
+            'circulation.allCodes'
+        )
     });
     const stations = loadScheduleStationsByTelecodes(
         items.flatMap((item) => item.stops.map((stop) => stop.stationTelecode))
@@ -878,7 +901,7 @@ function resolvePublishedScheduleProjection(circulation: TrainCirculation) {
 }
 
 export async function renderTrainCirculationImage(
-    requestTrainCode: string,
+    requestTrainCode: TrainCodeParts,
     binaryRequested: boolean,
     format: TrainCirculationImageFormat
 ): Promise<TrainCirculationImageRenderResult> {
@@ -899,8 +922,9 @@ export async function renderTrainCirculationImage(
         publishedScheduleState.stations
     );
     const stationAxisPoints = buildStationAxisPoints(resolvedNodes);
+    const externalRequestTrainCode = formatExternalTrainCode(requestTrainCode);
     const typstSource = buildTypstSource(
-        requestTrainCode,
+        externalRequestTrainCode,
         resolvedNodes,
         stationAxisPoints,
         publishedScheduleState.date,
@@ -918,8 +942,8 @@ export async function renderTrainCirculationImage(
         : null;
 
     return {
-        requestTrainCode,
-        trainCode: timetable.trainCode,
+        requestTrainCode: externalRequestTrainCode,
+        trainCode: formatExternalTrainCode(timetable.trainCode),
         documentId: compileResult.id,
         cacheHit: compileResult.cacheHit,
         imageUrl,

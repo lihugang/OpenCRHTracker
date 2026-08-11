@@ -24,7 +24,14 @@ import { getStationBoardIdleTaskOptions } from '~/server/services/stationBoardTa
 import normalizeCode from '~/server/utils/12306/normalizeCode';
 import { loadPublishedScheduleStateSummary } from '~/server/utils/12306/scheduleProbe/stateStore';
 import { splitIntoBatches } from '~/server/utils/12306/scheduleProbe/taskHelpers';
-import uniqueNormalizedCodes from '~/server/utils/12306/uniqueNormalizedCodes';
+import {
+    formatExternalTrainCode,
+    formatExternalTrainCodes,
+    parseExternalTrainCodeOrThrow,
+    parseExternalTrainCodes
+} from '~/server/utils/internal/boundaries';
+import { serviceDateToDay } from '~/server/utils/date/serviceDay';
+import type { TrainCodeParts } from '~/server/utils/12306/trainCode';
 import ensure from '~/server/utils/api/executor/ensure';
 import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
@@ -182,7 +189,7 @@ function assertPublishedScheduleReadyForRefresh(): void {
         '当日已发布时刻表暂不可用'
     );
 
-    const currentDate = getCurrentDateString();
+    const currentDate = serviceDateToDay(getCurrentDateString());
     ensure(
         state.date === currentDate,
         409,
@@ -198,10 +205,11 @@ function createRegenerateDailyExportTask(
     >
 ): AdminCreateTaskResponse {
     const executionTime = getNowSeconds();
+    const serviceDay = serviceDateToDay(request.payload.date);
     const taskId = enqueueTask(
         EXPORT_DAILY_RECORDS_MANUAL_TASK_EXECUTOR,
         {
-            date: request.payload.date
+            date: serviceDay
         },
         executionTime
     );
@@ -228,7 +236,7 @@ function createRefreshRouteInfoNowTask(
 ): AdminCreateTaskResponse {
     assertPublishedScheduleReadyForRefresh();
 
-    const normalizedTrainCodes = uniqueNormalizedCodes(
+    const normalizedTrainCodes = parseExternalTrainCodes(
         request.payload.trainCodes
     );
     ensure(
@@ -259,7 +267,7 @@ function createRefreshRouteInfoNowTask(
 
     const taskIds = enqueueTasks(tasks);
     logger.info(
-        `admin_task_created type=${request.type} executor=${REFRESH_ROUTE_BATCH_TASK_EXECUTOR} taskIds=${taskIds.join(',')} codes=${normalizedTrainCodes.join(',')}`
+        `admin_task_created type=${request.type} executor=${REFRESH_ROUTE_BATCH_TASK_EXECUTOR} taskIds=${taskIds.join(',')} codes=${formatExternalTrainCodes(normalizedTrainCodes).join(',')}`
     );
 
     return {
@@ -274,14 +282,19 @@ function createRefreshRouteInfoNowTask(
             taskIds.length === 1
                 ? `已为 ${normalizedTrainCodes.length} 个车次创建 1 条线路刷新任务。`
                 : `已为 ${normalizedTrainCodes.length} 个车次创建 ${taskIds.length} 条线路刷新任务。`,
-        normalizedTrainCodes
+        normalizedTrainCodes: formatExternalTrainCodes(normalizedTrainCodes)
     };
 }
 
-function normalizeRefreshTrainCirculationCode(trainCode: string): string {
-    const normalizedTrainCode = normalizeCode(trainCode);
+function normalizeRefreshTrainCirculationCode(
+    trainCode: string
+): TrainCodeParts {
+    const normalizedTrainCode = parseExternalTrainCodeOrThrow(
+        trainCode,
+        'trainCode'
+    );
     ensure(
-        normalizedTrainCode.length > 0,
+        trainCode.trim().length > 0,
         400,
         'invalid_param',
         '至少需要提供一个有效车次'
@@ -332,7 +345,7 @@ function createRefreshTrainCirculationNowTask(
     );
 
     logger.info(
-        `admin_task_created type=${request.type} executor=${REFRESH_TRAIN_CIRCULATION_TASK_EXECUTOR} taskId=${taskId} trainCode=${normalizedTrainCode}`
+        `admin_task_created type=${request.type} executor=${REFRESH_TRAIN_CIRCULATION_TASK_EXECUTOR} taskId=${taskId} trainCode=${formatExternalTrainCode(normalizedTrainCode)}`
     );
 
     return {
@@ -343,8 +356,8 @@ function createRefreshTrainCirculationNowTask(
             REFRESH_TRAIN_CIRCULATION_TASK_EXECUTOR,
             executionTime
         ),
-        summary: `已为车次 ${normalizedTrainCode} 创建 1 条交路表刷新任务。`,
-        normalizedTrainCodes: [normalizedTrainCode]
+        summary: `已为车次 ${formatExternalTrainCode(normalizedTrainCode)} 创建 1 条交路表刷新任务。`,
+        normalizedTrainCodes: [formatExternalTrainCode(normalizedTrainCode)]
     };
 }
 

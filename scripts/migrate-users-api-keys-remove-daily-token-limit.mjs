@@ -176,10 +176,10 @@ function main() {
         'assets/sql/users/migrations/renameApiKeyScopesToLegacy.sql'
     );
     const createApiKeysTable = loadSql(
-        'assets/sql/users/schema/createApiKeysTable.sql'
+        'assets/sql/users/schema/008_createApiKeysTable.sql'
     );
     const createApiKeyScopesTable = loadSql(
-        'assets/sql/users/schema/createApiKeyScopesTable.sql'
+        'assets/sql/users/schema/009_createApiKeyScopesTable.sql'
     );
     const selectLegacyApiKeysRowsSql = loadSql(
         'assets/sql/users/migrations/selectLegacyApiKeysRows.sql'

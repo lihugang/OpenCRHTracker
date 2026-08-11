@@ -7,6 +7,17 @@ import getCurrentDateString from '../../date/getCurrentDateString';
 import { getShanghaiUnixSecondsFromDateAndTime } from '../../date/shanghaiDateTime';
 import log12306RequestFailure from './log12306RequestFailure';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
+import {
+    ensureEmuId,
+    formatExternalServiceDate,
+    parseExternalTrainCodeOrThrow
+} from '~/server/utils/internal/boundaries';
+import type { EmuId } from '~/server/libs/database/emu';
+import {
+    serviceDateToDay,
+    type ServiceDay
+} from '~/server/utils/date/serviceDay';
+import type { TrainCodeParts } from '~/server/utils/12306/trainCode';
 
 interface EMUInfoResponse {
     noLogin: string;
@@ -63,7 +74,7 @@ const logger = getLogger('12306-network:fetch-emu-info-by-seat-code');
 
 interface CachedSeatCodeResult {
     expiresAt: number;
-    startDay: string;
+    startDay: ServiceDay;
     value: FetchSeatCodeSuccessResult;
 }
 
@@ -77,24 +88,24 @@ export type FetchSeatCodeFailureReason =
 export interface FetchSeatCodeSuccessResult {
     status: 'success';
     route: {
-        code: string;
+        code: TrainCodeParts;
         internalCode: string;
-        startDay: string;
-        endDay: string;
+        startDay: ServiceDay;
+        endDay: ServiceDay;
         startAt: number;
         endAt: number;
         trainRepeat: string;
     };
     emu: {
-        code: string;
+        code: EmuId;
     };
 }
 
 export interface FetchSeatCodeRouteSnapshot {
-    code: string;
+    code: TrainCodeParts;
     internalCode: string;
-    startDay: string;
-    endDay: string;
+    startDay: ServiceDay;
+    endDay: ServiceDay;
     startAt: number;
     endAt: number;
     trainRepeat: string;
@@ -160,10 +171,10 @@ function buildRouteSnapshot(
     }
 
     return {
-        code: trainCode,
+        code: parseExternalTrainCodeOrThrow(trainCode, 'trainCode'),
         internalCode: trainNo,
-        startDay,
-        endDay,
+        startDay: serviceDateToDay(startDay),
+        endDay: serviceDateToDay(endDay),
         startAt: getShanghaiUnixSecondsFromDateAndTime(startDay, startTime),
         endAt: getShanghaiUnixSecondsFromDateAndTime(endDay, endTime),
         trainRepeat: data?.trainRepeat?.trim() ?? ''
@@ -187,7 +198,10 @@ export default async function fetchEMUInfoBySeatCode(
 
     const cached = cachedSeatCodeResults.get(normalizedCode);
     if (cached) {
-        if (cached.expiresAt > nowSeconds && cached.startDay === currentDate) {
+        if (
+            cached.expiresAt > nowSeconds &&
+            formatExternalServiceDate(cached.startDay) === currentDate
+        ) {
             return cached.value;
         }
 
@@ -323,10 +337,13 @@ export default async function fetchEMUInfoBySeatCode(
         const result: FetchSeatCodeSuccessResult = {
             status: 'success',
             route: {
-                code: data.trainCode, // G xxxx
+                code: parseExternalTrainCodeOrThrow(
+                    data.trainCode,
+                    'trainCode'
+                ),
                 internalCode: data.trainNo,
-                startDay,
-                endDay: data.endDay?.trim() ?? '',
+                startDay: serviceDateToDay(startDay),
+                endDay: serviceDateToDay(data.endDay?.trim() ?? ''),
                 startAt: getShanghaiUnixSecondsFromDateAndTime(
                     startDay,
                     data.startTime
@@ -338,14 +355,14 @@ export default async function fetchEMUInfoBySeatCode(
                 trainRepeat: data.trainRepeat?.trim() ?? ''
             },
             emu: {
-                code: canonicalEmuCode // like CR400AF-2230
+                code: ensureEmuId(canonicalEmuCode)
             }
         };
 
         if (result.route.endAt > nowSeconds) {
             cachedSeatCodeResults.set(normalizedCode, {
                 expiresAt: result.route.endAt,
-                startDay,
+                startDay: serviceDateToDay(startDay),
                 value: result
             });
         }

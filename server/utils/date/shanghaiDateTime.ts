@@ -1,4 +1,5 @@
 import parseTimeAsTimestamp from './parseTimeAsTimestamp';
+import type { ServiceDay } from './serviceDay';
 
 export const SHANGHAI_OFFSET_MS = 8 * 60 * 60 * 1000;
 export const SHANGHAI_DAY_SECONDS = 24 * 60 * 60;
@@ -139,23 +140,27 @@ export function expandSequentialShanghaiDayOffsets<T>(
 }
 
 export function toUnixSecondsFromShanghaiDayOffset(
-    dateYYYYMMDD: string,
+    serviceDay: ServiceDay,
     offsetSeconds: number
 ): number {
     if (!Number.isInteger(offsetSeconds) || offsetSeconds < 0) {
         throw new Error('offsetSeconds must be a non-negative integer');
     }
-    return getShanghaiDayStartUnixSeconds(dateYYYYMMDD) + offsetSeconds;
+    const dayStart =
+        -8 * 60 * 60 + Number(serviceDay) * SHANGHAI_DAY_SECONDS;
+    return dayStart + offsetSeconds;
 }
 
 export function toShanghaiDayOffsetFromUnixSeconds(
-    dateYYYYMMDD: string,
+    serviceDay: ServiceDay,
     unixSeconds: number
 ): number {
     if (!Number.isInteger(unixSeconds) || unixSeconds < 0) {
         throw new Error('unixSeconds must be a non-negative integer');
     }
-    return unixSeconds - getShanghaiDayStartUnixSeconds(dateYYYYMMDD);
+    const dayStart =
+        -8 * 60 * 60 + Number(serviceDay) * SHANGHAI_DAY_SECONDS;
+    return unixSeconds - dayStart;
 }
 
 export function getShanghaiUnixSecondsFromDateAndTime(

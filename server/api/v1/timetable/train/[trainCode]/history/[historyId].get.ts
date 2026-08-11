@@ -5,6 +5,7 @@ import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';
 import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
 import type { HistoricalTimetableData } from '~/types/lookup';
+import { formatExternalTrainCode } from '~/server/utils/internal/boundaries';
 
 const IMMUTABLE_CACHE_SECONDS = 365 * 24 * 60 * 60;
 
@@ -64,7 +65,9 @@ export default defineEventHandler(async (event) => {
                     stationName: stop.stationName,
                     arriveOffset: stop.arriveAt,
                     departOffset: stop.departAt,
-                    stationTrainCode: stop.stationTrainCode,
+                    stationTrainCode: formatExternalTrainCode(
+                        stop.stationTrainCode
+                    ),
                     isStart: stop.isStart,
                     isEnd: stop.isEnd
                 }))

@@ -1027,7 +1027,7 @@ function validateConfig(raw: unknown): Config {
                   banCorrelationWindowSeconds: 72 * 60 * 60
               }
             : asObject(user.qqBinding, 'user.qqBinding');
-    const userApiKeyPrefixes = asOptionalObject(
+    const userApiKeyPrefixes = asObject(
         user.apiKeyPrefixes,
         'user.apiKeyPrefixes'
     );
@@ -1038,10 +1038,6 @@ function validateConfig(raw: unknown): Config {
                   maxLength: 64
               }
             : asObject(user.apiKeyNameLength, 'user.apiKeyNameLength');
-    const legacyApiKeyPrefix =
-        user.apiKeyPrefix === undefined
-            ? undefined
-            : asString(user.apiKeyPrefix, 'user.apiKeyPrefix');
     const configAdminUserIds =
         user.adminUserIds === undefined
             ? []
@@ -1800,27 +1796,18 @@ function validateConfig(raw: unknown): Config {
         user: {
             saltLength: asNumber(user.saltLength, 'user.saltLength', 8),
             apiKeyPrefixes: {
-                webapp:
-                    userApiKeyPrefixes === undefined
-                        ? asString(legacyApiKeyPrefix, 'user.apiKeyPrefix')
-                        : asString(
-                              userApiKeyPrefixes.webapp,
-                              'user.apiKeyPrefixes.webapp'
-                          ),
-                api:
-                    userApiKeyPrefixes === undefined
-                        ? asString(legacyApiKeyPrefix, 'user.apiKeyPrefix')
-                        : asString(
-                              userApiKeyPrefixes.api,
-                              'user.apiKeyPrefixes.api'
-                          ),
-                oauth:
-                    userApiKeyPrefixes === undefined
-                        ? asString(legacyApiKeyPrefix, 'user.apiKeyPrefix')
-                        : asString(
-                              userApiKeyPrefixes.oauth,
-                              'user.apiKeyPrefixes.oauth'
-                          )
+                webapp: asString(
+                    userApiKeyPrefixes.webapp,
+                    'user.apiKeyPrefixes.webapp'
+                ),
+                api: asString(
+                    userApiKeyPrefixes.api,
+                    'user.apiKeyPrefixes.api'
+                ),
+                oauth: asString(
+                    userApiKeyPrefixes.oauth,
+                    'user.apiKeyPrefixes.oauth'
+                )
             },
             adminUserIds,
             favorites: {

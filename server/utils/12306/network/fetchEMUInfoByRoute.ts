@@ -5,6 +5,11 @@ import { record12306RequestHourlyStat } from '~/server/services/trainProvenanceS
 import getCurrentDateString from '../../date/getCurrentDateString';
 import log12306RequestFailure from './log12306RequestFailure';
 import waitFor12306RequestSlot from '../requestLimiter';
+import {
+    ensureEmuId,
+    formatExternalTrainCode
+} from '~/server/utils/internal/boundaries';
+import type { TrainCodeParts } from '~/server/utils/12306/trainCode';
 
 interface EMUInfoResponse {
     errMsg: string;
@@ -41,7 +46,8 @@ interface EMUInfoResponse {
 const config = useConfig();
 const logger = getLogger('12306-network:fetch-emu-info-by-route');
 
-export default async function fetchEMUInfoByRoute(route: string) {
+export default async function fetchEMUInfoByRoute(route: TrainCodeParts) {
+    const routeCode = formatExternalTrainCode(route);
     const url =
         'https://mobile.12306.cn/wxxcx/openplatform-inner/miniprogram/wifiapps/appFrontEnd/v2/lounge/open-smooth-common/trainStyleBatch/getCarDetail';
 
@@ -50,7 +56,7 @@ export default async function fetchEMUInfoByRoute(route: string) {
         // 12306 endpoint requires a non-empty carCode placeholder; value does not affect query result.
         const routeProbeCarCode = config.spider.params.routeProbeCarCode;
         const response = await fetch(
-            `${url}?carCode=${encodeURIComponent(routeProbeCarCode)}&trainCode=${route}&runningDay=${getCurrentDateString()}&reqType=form`,
+            `${url}?carCode=${encodeURIComponent(routeProbeCarCode)}&trainCode=${routeCode}&runningDay=${getCurrentDateString()}&reqType=form`,
             {
                 headers: {
                     'user-agent': config.spider.userAgent
@@ -68,7 +74,7 @@ export default async function fetchEMUInfoByRoute(route: string) {
                 operation: 'http_failed',
                 url,
                 context: {
-                    trainCode: route
+                    trainCode: routeCode
                 },
                 responseStatus: response.status,
                 responseOk: response.ok
@@ -90,7 +96,7 @@ export default async function fetchEMUInfoByRoute(route: string) {
                 operation: 'invalid_response',
                 url,
                 context: {
-                    trainCode: route
+                    trainCode: routeCode
                 },
                 responseStatus: response.status,
                 responseOk: response.ok,
@@ -112,7 +118,7 @@ export default async function fetchEMUInfoByRoute(route: string) {
                 code: route // G xxxx
             },
             emu: {
-                code: canonicalEmuCode // like CR400AF-2230
+                code: ensureEmuId(canonicalEmuCode)
             }
         };
     } catch (error) {
@@ -125,7 +131,7 @@ export default async function fetchEMUInfoByRoute(route: string) {
             operation: 'request_exception',
             url,
             context: {
-                trainCode: route
+                trainCode: routeCode
             },
             error
         });

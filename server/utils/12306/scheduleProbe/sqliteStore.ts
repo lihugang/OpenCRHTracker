@@ -5,7 +5,21 @@ import { useScheduleDatabase } from '~/server/libs/database/schedule';
 import { createPreparedSqlStore } from '~/server/libs/database/prepared';
 import importSqlBatch from '~/server/utils/sql/importSqlBatch';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
-import uniqueNormalizedCodes from '~/server/utils/12306/uniqueNormalizedCodes';
+import {
+    formatTrainCode,
+    trainCodeKey,
+    type TrainCodeParts
+} from '~/server/utils/12306/trainCode';
+import {
+    parseInternalJson,
+    stringifyInternalJson
+} from '~/server/utils/internal/storageValues';
+import {
+    asServiceDay,
+    serviceDateToDay,
+    type ServiceDay
+} from '~/server/utils/date/serviceDay';
+import { parseExternalTrainCodeOrThrow } from '~/server/utils/internal/boundaries';
 import {
     CURRENT_SCHEDULE_DOCUMENT_VERSION,
     SCHEDULE_SCHEMA_RELATIVE_PATH
@@ -77,7 +91,7 @@ type ScheduleSqlKey =
 
 export interface ScheduleStateSummary {
     kind: ScheduleStateKind;
-    date: string;
+    date: ServiceDay;
     status: ScheduleState['status'];
     phase: ScheduleState['progress']['phase'];
     generatedAt: number;
@@ -89,6 +103,13 @@ export interface ScheduleStateSummary {
 
 interface ScheduleStateRow extends ScheduleStateSummary {
     stateJson: string;
+}
+
+interface RawScheduleRouteRefreshQueueEntry {
+    trainPrefix: string;
+    trainNumber: number;
+    serviceDate: number;
+    enqueuedAt: number;
 }
 
 export interface ScheduleDbItemRow {
@@ -132,7 +153,7 @@ export interface ScheduleItemRecord {
 
 export interface SavePublishedScheduleItemsResult {
     status: 'saved' | 'date_mismatch' | 'published_not_found';
-    currentDate: string | null;
+    currentDate: ServiceDay | null;
     itemCount: number;
     aliasCount: number;
     stopCount: number;
@@ -160,7 +181,7 @@ export interface ScheduleStopStationCandidateRow {
 
 export interface ScheduleCandidateCodeInput {
     internalCodes?: readonly string[];
-    aliasCodes?: readonly string[];
+    aliasCodes?: readonly TrainCodeParts[];
 }
 
 export interface ScheduleCirculationRecord {
@@ -170,8 +191,8 @@ export interface ScheduleCirculationRecord {
 }
 
 export interface ScheduleStopMetadataUpdateInput {
-    trainNo: string;
-    stationTrainCode: string;
+    trainNo: string | null;
+    stationTrainCode: TrainCodeParts;
     stationTelecode: string;
     distance: number | null;
     platformNo: number | null;
@@ -182,6 +203,20 @@ export type SchedulePlatformInfoLookupType =
     | 'arrival_exit';
 
 export interface SchedulePlatformInfoCandidateRow {
+    itemCode: TrainCodeParts;
+    internalCode: string;
+    itemStartAt: number | null;
+    stopIndex: number;
+    stationNo: number;
+    stationTelecode: string;
+    arriveAt: number | null;
+    departAt: number | null;
+    currentStationTrainCode: TrainCodeParts;
+    arrivalStationTrainCode: TrainCodeParts | null;
+    isStart: number;
+}
+
+interface RawSchedulePlatformInfoCandidateRow {
     itemCode: string;
     internalCode: string;
     itemStartAt: number | null;
@@ -199,10 +234,22 @@ export interface ScheduleStationPlatformInfoCacheEntry {
     lookupType: SchedulePlatformInfoLookupType;
     internalCode: string;
     stationTelecode: string;
-    stationTrainCode: string;
+    stationTrainCode: TrainCodeParts;
     platformNo: number | null;
     wicket: string | null;
-    trainDate: string;
+    trainDate: ServiceDay;
+    fetchedAt: number;
+}
+
+interface RawScheduleStationPlatformInfoCacheEntry {
+    lookupType: SchedulePlatformInfoLookupType;
+    internalCode: string;
+    stationTelecode: string;
+    stationTrainPrefix: string;
+    stationTrainNumber: number;
+    platformNo: number | null;
+    wicket: string | null;
+    trainDate: number;
     fetchedAt: number;
 }
 
@@ -257,8 +304,6 @@ const DOCUMENT_VERSION_META_KEY = 'document_version';
 const DOCUMENT_UPDATED_AT_META_KEY = 'document_updated_at';
 const STATION_BOARD_LAST_FULL_SWEEP_DATE_META_KEY =
     'station_board_last_full_sweep_date';
-const MIGRATED_FROM_JSON_PATH_META_KEY = 'migrated_from_json_path';
-const MIGRATED_FROM_JSON_MTIME_MS_META_KEY = 'migrated_from_json_mtime_ms';
 const queries = createPreparedSqlStore<ScheduleSqlKey>({
     dbName: 'schedule',
     scope: 'schedule',
@@ -275,14 +320,6 @@ function toSqlBoolean(value: boolean): number {
 
 function parseSqlBoolean(value: number): boolean {
     return value === 1;
-}
-
-function parseJson<T>(value: string): T | null {
-    try {
-        return JSON.parse(value) as T;
-    } catch {
-        return null;
-    }
 }
 
 function getNowSeconds(): number {
@@ -305,15 +342,25 @@ function getStatePhase(
 }
 
 function serializeState(state: ScheduleState): string {
-    return JSON.stringify(state);
+    return stringifyInternalJson(state);
 }
 
 function normalizeItemCode(item: Pick<ScheduleItem, 'code'>): string {
-    return normalizeCode(item.code);
+    return trainCodeKey(item.code);
 }
 
-function listItemAliases(item: ScheduleItem): string[] {
-    return uniqueNormalizedCodes([item.code, ...item.allCodes]);
+function listItemAliases(item: ScheduleItem): TrainCodeParts[] {
+    const seen = new Set<string>();
+    const aliases: TrainCodeParts[] = [];
+    for (const code of [item.code, ...item.allCodes]) {
+        const key = trainCodeKey(code);
+        if (seen.has(key)) {
+            continue;
+        }
+        seen.add(key);
+        aliases.push(code);
+    }
+    return aliases;
 }
 
 function toScheduleStop(row: ScheduleDbStopRow): ScheduleStop {
@@ -323,7 +370,10 @@ function toScheduleStop(row: ScheduleDbStopRow): ScheduleStop {
         stationTelecode: row.stationTelecode,
         arriveAt: row.arriveAt,
         departAt: row.departAt,
-        stationTrainCode: row.stationTrainCode,
+        stationTrainCode: parseExternalTrainCodeOrThrow(
+            row.stationTrainCode,
+            'stationTrainCode'
+        ),
         wicket: row.wicket,
         distance: row.distance,
         platformNo: row.platformNo,
@@ -344,14 +394,17 @@ function toScheduleStation(row: ScheduleStationRow): ScheduleStationEntry {
 
 function toScheduleItem(
     row: ScheduleDbItemRow,
-    aliases: string[],
+    aliases: readonly TrainCodeParts[],
     stops: ScheduleStop[]
 ): ScheduleItem {
-    const itemCode = normalizeCode(row.itemCode);
+    const itemCode = parseExternalTrainCodeOrThrow(row.itemCode, 'itemCode');
+    const itemCodeKey = trainCodeKey(itemCode);
     return {
         code: itemCode,
-        internalCode: normalizeCode(row.internalCode),
-        allCodes: aliases.filter((aliasCode) => aliasCode !== itemCode),
+        internalCode: row.internalCode,
+        allCodes: aliases.filter(
+            (aliasCode) => trainCodeKey(aliasCode) !== itemCodeKey
+        ),
         bureauCode: row.bureauCode.trim(),
         trainStyle: row.trainStyle.trim(),
         trainDepartment: row.trainDepartment.trim(),
@@ -367,12 +420,29 @@ function toScheduleItem(
 
 function toScheduleCirculationRecord(
     row: ScheduleCirculationRow
-): ScheduleCirculationRecord | null {
-    const entry = parseJson<ScheduleCirculationEntry>(row.entryJson);
-    if (!entry) {
-        return null;
-    }
-
+): ScheduleCirculationRecord {
+    const parsed = parseInternalJson(row.entryJson, 'internal') as {
+        refreshedAt: number;
+        nodes: Array<{
+            internalCode: string;
+            allCodes: TrainCodeParts[];
+            startStation: string;
+            endStation: string;
+            startAt: number;
+            endAt: number;
+        }>;
+    };
+    const entry: ScheduleCirculationEntry = {
+        refreshedAt: parsed.refreshedAt,
+        nodes: parsed.nodes.map((node) => ({
+            internalCode: node.internalCode,
+            allCodes: node.allCodes,
+            startStation: node.startStation,
+            endStation: node.endStation,
+            startAt: node.startAt,
+            endAt: node.endAt
+        }))
+    };
     return {
         entryKey: row.entryKey,
         refreshedAt: row.refreshedAt,
@@ -402,7 +472,13 @@ function insertScheduleCirculationRecord(
         'insertScheduleCirculation',
         normalizedEntryKey,
         entry.refreshedAt,
-        JSON.stringify(entry),
+        stringifyInternalJson({
+            refreshedAt: entry.refreshedAt,
+            nodes: entry.nodes.map((node) => ({
+                ...node,
+                allCodes: node.allCodes
+            }))
+        }),
         updatedAt
     );
 
@@ -417,7 +493,9 @@ function insertScheduleCirculationRecord(
             );
         }
 
-        for (const allCode of uniqueNormalizedCodes(node.allCodes)) {
+        for (const allCode of uniqueNormalizedCodes(
+            node.allCodes.map(formatTrainCode)
+        )) {
             queries.run(
                 'insertScheduleCirculationLookup',
                 normalizedEntryKey,
@@ -491,17 +569,14 @@ function insertScheduleItemRows(
     itemIndex: number,
     item: ScheduleItem
 ): { aliasCount: number; stopCount: number } {
-    const itemCode = normalizeItemCode(item);
-    if (itemCode.length === 0) {
-        return { aliasCount: 0, stopCount: 0 };
-    }
-
+    const itemTrain = item.code;
     queries.run(
         'insertScheduleItem',
         kind,
-        itemCode,
+        itemTrain.prefix,
+        itemTrain.number,
         itemIndex,
-        normalizeCode(item.internalCode),
+        item.internalCode,
         item.bureauCode.trim(),
         item.trainStyle.trim(),
         item.trainDepartment.trim(),
@@ -518,8 +593,10 @@ function insertScheduleItemRows(
         queries.run(
             'insertScheduleItemAlias',
             kind,
-            itemCode,
-            aliasCode,
+            itemTrain.prefix,
+            itemTrain.number,
+            aliasCode.prefix,
+            aliasCode.number,
             aliasIndex
         );
     }
@@ -528,14 +605,16 @@ function insertScheduleItemRows(
         queries.run(
             'insertScheduleStop',
             kind,
-            itemCode,
+            itemTrain.prefix,
+            itemTrain.number,
             stopIndex,
             stop.stationNo,
             stop.stationName.trim(),
             normalizeCode(stop.stationTelecode),
             toNullableInteger(stop.arriveAt),
             toNullableInteger(stop.departAt),
-            stop.stationTrainCode.trim(),
+            stop.stationTrainCode.prefix,
+            stop.stationTrainCode.number,
             stop.wicket.trim(),
             toNullableInteger(stop.distance),
             toNullableInteger(stop.platformNo),
@@ -580,7 +659,8 @@ function saveScheduleRouteRefreshQueue(
         queries.run(
             'insertScheduleRouteRefreshQueueEntry',
             entry.serviceDate,
-            normalizeCode(entry.trainCode),
+            entry.trainCode.prefix,
+            entry.trainCode.number,
             entry.enqueuedAt
         );
     }
@@ -611,11 +691,9 @@ function loadScheduleItemWithStopsFromRow(
     kind: ScheduleStateKind,
     row: ScheduleDbItemRow
 ): ScheduleItem {
-    const aliases = listScheduleAliasesByStateKindAndItemCode(
-        kind,
-        row.itemCode
-    );
-    const stops = listScheduleStopsByStateKindAndItemCode(kind, row.itemCode);
+    const itemCode = parseExternalTrainCodeOrThrow(row.itemCode, 'itemCode');
+    const aliases = listScheduleAliasesByStateKindAndItemCode(kind, itemCode);
+    const stops = listScheduleStopsByStateKindAndItemCode(kind, itemCode);
     return toScheduleItem(row, aliases, stops);
 }
 
@@ -625,9 +703,6 @@ export function loadScheduleCirculationMapFromDatabase(): ScheduleCirculationMap
         'selectAllScheduleCirculations'
     )) {
         const record = toScheduleCirculationRecord(row);
-        if (!record) {
-            return null;
-        }
         circulation[record.entryKey] = record.entry;
     }
 
@@ -648,10 +723,7 @@ export function listScheduleCirculationRecordsByLookupCode(
             normalizedLookupCode,
             normalizedLookupCode
         )
-        .map(toScheduleCirculationRecord)
-        .filter(
-            (record): record is ScheduleCirculationRecord => record !== null
-        );
+        .map(toScheduleCirculationRecord);
 }
 
 export function loadScheduleCirculationEntryFromDatabase(
@@ -665,7 +737,7 @@ export function loadScheduleCirculationEntryFromDatabase(
         return null;
     }
 
-    return toScheduleCirculationRecord(row)?.entry ?? null;
+    return toScheduleCirculationRecord(row).entry;
 }
 
 export function loadScheduleCirculationRecordFromDatabase(
@@ -762,24 +834,37 @@ export function deleteScheduleCirculationEntryFromDatabase(
 }
 
 function loadRouteRefreshQueue(): ScheduleRouteRefreshQueueEntry[] {
-    return queries.all<ScheduleRouteRefreshQueueEntry>(
-        'selectAllScheduleRouteRefreshQueueEntries'
-    );
+    return queries
+        .all<RawScheduleRouteRefreshQueueEntry>(
+            'selectAllScheduleRouteRefreshQueueEntries'
+        )
+        .map((row) => ({
+            trainCode: {
+                prefix: row.trainPrefix,
+                number: row.trainNumber
+            },
+            serviceDate: asServiceDay(row.serviceDate),
+            enqueuedAt: row.enqueuedAt
+        }));
 }
 
 export function listScheduleRouteRefreshQueueEntries(
-    serviceDate?: string
+    serviceDate?: ServiceDay
 ): ScheduleRouteRefreshQueueEntry[] {
-    if (typeof serviceDate === 'string') {
-        const normalizedServiceDate = serviceDate.trim();
-        if (!/^\d{8}$/.test(normalizedServiceDate)) {
-            return [];
-        }
-
-        return queries.all<ScheduleRouteRefreshQueueEntry>(
-            'selectScheduleRouteRefreshQueueEntriesByServiceDate',
-            normalizedServiceDate
-        );
+    if (serviceDate !== undefined) {
+        return queries
+            .all<RawScheduleRouteRefreshQueueEntry>(
+                'selectScheduleRouteRefreshQueueEntriesByServiceDate',
+                serviceDate
+            )
+            .map((row) => ({
+                trainCode: {
+                    prefix: row.trainPrefix,
+                    number: row.trainNumber
+                },
+                serviceDate: asServiceDay(row.serviceDate),
+                enqueuedAt: row.enqueuedAt
+            }));
     }
 
     return loadRouteRefreshQueue();
@@ -792,18 +877,11 @@ export function appendScheduleRouteRefreshQueueEntries(
     const seenKeys = new Set<string>();
 
     for (const entry of entries) {
-        const serviceDate = entry.serviceDate.trim();
-        const trainCode = normalizeCode(entry.trainCode);
-        if (
-            !/^\d{8}$/.test(serviceDate) ||
-            trainCode.length === 0 ||
-            !Number.isInteger(entry.enqueuedAt) ||
-            entry.enqueuedAt < 0
-        ) {
+        if (!Number.isInteger(entry.enqueuedAt) || entry.enqueuedAt < 0) {
             continue;
         }
 
-        const queueKey = `${serviceDate}:${trainCode}`;
+        const queueKey = `${entry.serviceDate}:${trainCodeKey(entry.trainCode)}`;
         if (seenKeys.has(queueKey)) {
             continue;
         }
@@ -811,16 +889,13 @@ export function appendScheduleRouteRefreshQueueEntries(
 
         const result = queries.run(
             'insertScheduleRouteRefreshQueueEntryIfAbsent',
-            serviceDate,
-            trainCode,
+            entry.serviceDate,
+            entry.trainCode.prefix,
+            entry.trainCode.number,
             entry.enqueuedAt
         );
         if (result.changes > 0) {
-            appendedEntries.push({
-                serviceDate,
-                trainCode,
-                enqueuedAt: entry.enqueuedAt
-            });
+            appendedEntries.push(entry);
         }
     }
 
@@ -837,25 +912,17 @@ export function consumeScheduleRouteRefreshQueueEntries(
     const seenKeys = new Set<string>();
 
     for (const entry of entries) {
-        const serviceDate =
-            typeof entry.serviceDate === 'string'
-                ? entry.serviceDate.trim()
-                : '';
-        const trainCode = normalizeCode(String(entry.trainCode ?? ''));
-        if (!/^\d{8}$/.test(serviceDate) || trainCode.length === 0) {
-            continue;
-        }
-
-        const queueKey = `${serviceDate}:${trainCode}`;
+        const queueKey = `${entry.serviceDate}:${trainCodeKey(entry.trainCode)}`;
         if (seenKeys.has(queueKey)) {
             continue;
         }
         seenKeys.add(queueKey);
 
-        const existingEntry = queries.get<ScheduleRouteRefreshQueueEntry>(
+        const existingEntry = queries.get<RawScheduleRouteRefreshQueueEntry>(
             'selectScheduleRouteRefreshQueueEntry',
-            serviceDate,
-            trainCode
+            entry.serviceDate,
+            entry.trainCode.prefix,
+            entry.trainCode.number
         );
         if (!existingEntry) {
             continue;
@@ -863,11 +930,19 @@ export function consumeScheduleRouteRefreshQueueEntries(
 
         const result = queries.run(
             'deleteScheduleRouteRefreshQueueEntry',
-            serviceDate,
-            trainCode
+            entry.serviceDate,
+            entry.trainCode.prefix,
+            entry.trainCode.number
         );
         if (result.changes > 0) {
-            removedEntries.push(existingEntry);
+            removedEntries.push({
+                trainCode: {
+                    prefix: existingEntry.trainPrefix,
+                    number: existingEntry.trainNumber
+                },
+                serviceDate: asServiceDay(existingEntry.serviceDate),
+                enqueuedAt: existingEntry.enqueuedAt
+            });
         }
     }
 
@@ -875,23 +950,31 @@ export function consumeScheduleRouteRefreshQueueEntries(
 }
 
 function loadScheduleStateFromRow(row: ScheduleStateRow): ScheduleState | null {
-    return parseJson<ScheduleState>(row.stateJson);
+    return parseInternalJson(row.stateJson, 'internal') as ScheduleState;
 }
 
 export function getScheduleDatabaseFilePath(): string {
     return path.resolve(useConfig().data.databases.schedule.path);
 }
 
-export function loadStationBoardLastFullSweepDate(): string | null {
+export function loadStationBoardLastFullSweepDate(): ServiceDay | null {
     const value = loadMetaValue(STATION_BOARD_LAST_FULL_SWEEP_DATE_META_KEY);
-    return value && /^\d{8}$/.test(value) ? value : null;
+    if (!value) {
+        return null;
+    }
+    if (!/^\d+$/.test(value)) {
+        throw new Error(`invalid_station_board_last_full_sweep_date ${value}`);
+    }
+    return asServiceDay(Number.parseInt(value, 10));
 }
 
-export function saveStationBoardLastFullSweepDate(serviceDate: string): void {
-    if (!/^\d{8}$/.test(serviceDate)) {
-        throw new Error('serviceDate must be in YYYYMMDD format');
-    }
-    upsertMetaValue(STATION_BOARD_LAST_FULL_SWEEP_DATE_META_KEY, serviceDate);
+export function saveStationBoardLastFullSweepDate(
+    serviceDate: ServiceDay
+): void {
+    upsertMetaValue(
+        STATION_BOARD_LAST_FULL_SWEEP_DATE_META_KEY,
+        String(serviceDate)
+    );
 }
 
 export function getScheduleDatabaseModifiedAtMs(): number {
@@ -911,8 +994,7 @@ export function hasScheduleDatabaseDocument(): boolean {
 }
 
 export function saveScheduleDocumentToDatabase(
-    document: ScheduleDocument,
-    migrationSource?: { jsonPath: string; jsonMtimeMs: number | null }
+    document: ScheduleDocument
 ): void {
     const db = useScheduleDatabase();
     const transaction = db.transaction(() => {
@@ -926,19 +1008,6 @@ export function saveScheduleDocumentToDatabase(
             String(CURRENT_SCHEDULE_DOCUMENT_VERSION)
         );
         upsertMetaValue(DOCUMENT_UPDATED_AT_META_KEY, String(getNowSeconds()));
-
-        if (migrationSource) {
-            upsertMetaValue(
-                MIGRATED_FROM_JSON_PATH_META_KEY,
-                path.resolve(migrationSource.jsonPath)
-            );
-            if (migrationSource.jsonMtimeMs !== null) {
-                upsertMetaValue(
-                    MIGRATED_FROM_JSON_MTIME_MS_META_KEY,
-                    String(Math.floor(migrationSource.jsonMtimeMs))
-                );
-            }
-        }
     });
 
     transaction();
@@ -995,14 +1064,20 @@ export function listScheduleItemRecordsByStateKind(
         itemIndex: row.itemIndex,
         item: toScheduleItem(
             row,
-            aliasesByItemCode.get(row.itemCode) ?? [],
+            (aliasesByItemCode.get(row.itemCode) ?? []).map((aliasCode) =>
+                parseExternalTrainCodeOrThrow(aliasCode, 'aliasCode')
+            ),
             stopsByItemCode.get(row.itemCode) ?? []
         )
     }));
 }
 
 export function loadScheduleStateSummaries(): ScheduleStateSummary[] {
-    return queries.all<ScheduleStateSummary>('selectScheduleStateSummaries');
+    return queries
+        .all<
+            ScheduleStateSummary & { date: number }
+        >('selectScheduleStateSummaries')
+        .map((row) => ({ ...row, date: asServiceDay(row.date) }));
 }
 
 export function loadScheduleStateSummaryByKind(
@@ -1022,14 +1097,15 @@ export function resolveActiveScheduleStateSummary(
         summaries.find((summary) => summary.kind === 'published') ?? null;
     const building =
         summaries.find((summary) => summary.kind === 'building') ?? null;
+    const currentDay = serviceDateToDay(currentDate);
 
-    if (published && published.date === currentDate) {
+    if (published && published.date === currentDay) {
         return published;
     }
 
     if (
         building &&
-        building.date === currentDate &&
+        building.date === currentDay &&
         building.usableTimetableCount > 0
     ) {
         return building;
@@ -1039,7 +1115,7 @@ export function resolveActiveScheduleStateSummary(
         return published;
     }
 
-    if (building && building.date === currentDate) {
+    if (building && building.date === currentDay) {
         return building;
     }
 
@@ -1080,13 +1156,13 @@ export function listScheduleAliasesByStateKind(
 
 export function loadScheduleItemByStateKindAndCode(
     kind: ScheduleStateKind,
-    itemCode: string
+    itemCode: TrainCodeParts
 ): ScheduleDbItemRow | null {
     return (
         queries.get<ScheduleDbItemRow>(
             'selectScheduleItemByStateKindAndCode',
             kind,
-            normalizeCode(itemCode)
+            trainCodeKey(itemCode)
         ) ?? null
     );
 }
@@ -1095,40 +1171,27 @@ export function listScheduleItemsByStateKindAndInternalCode(
     kind: ScheduleStateKind,
     internalCode: string
 ): ScheduleDbItemRow[] {
-    const normalizedInternalCode = normalizeCode(internalCode);
-    if (normalizedInternalCode.length === 0) {
-        return [];
-    }
-
     return queries.all<ScheduleDbItemRow>(
         'selectScheduleItemsByStateKindAndInternalCode',
         kind,
-        normalizedInternalCode
+        internalCode
     );
 }
 
 export function listScheduleItemsByStateKindAndAlias(
     kind: ScheduleStateKind,
-    aliasCode: string
+    aliasCode: TrainCodeParts
 ): ScheduleDbItemRow[] {
-    const normalizedAliasCode = normalizeCode(aliasCode);
-    if (normalizedAliasCode.length === 0) {
-        return [];
-    }
-
     const rowsByItemCode = new Map<string, ScheduleDbItemRow>();
     for (const row of queries.all<ScheduleDbItemRow>(
         'selectScheduleItemsByStateKindAndAlias',
         kind,
-        normalizedAliasCode
+        trainCodeKey(aliasCode)
     )) {
         rowsByItemCode.set(row.itemCode, row);
     }
 
-    const directRow = loadScheduleItemByStateKindAndCode(
-        kind,
-        normalizedAliasCode
-    );
+    const directRow = loadScheduleItemByStateKindAndCode(kind, aliasCode);
     if (directRow) {
         rowsByItemCode.set(directRow.itemCode, directRow);
     }
@@ -1144,7 +1207,7 @@ export function listScheduleItemsByStateKindAndAlias(
 
 export function loadScheduleItemWithStopsByStateKindAndCode(
     kind: ScheduleStateKind,
-    itemCode: string
+    itemCode: TrainCodeParts
 ): ScheduleItem | null {
     const row = loadScheduleItemByStateKindAndCode(kind, itemCode);
     return row ? loadScheduleItemWithStopsFromRow(kind, row) : null;
@@ -1152,15 +1215,23 @@ export function loadScheduleItemWithStopsByStateKindAndCode(
 
 export function listScheduleItemsWithStopsByStateKindAndCodes(
     kind: ScheduleStateKind,
-    itemCodes: readonly string[]
+    itemCodes: readonly TrainCodeParts[]
 ): ScheduleItem[] {
     const items: ScheduleItem[] = [];
     const visitedItemCodes = new Set<string>();
 
-    for (const itemCode of uniqueNormalizedCodes([...itemCodes])) {
-        if (visitedItemCodes.has(itemCode)) {
+    const seen = new Set<string>();
+    const uniqueCodes: TrainCodeParts[] = [];
+    for (const itemCode of itemCodes) {
+        const key = trainCodeKey(itemCode);
+        if (seen.has(key)) {
             continue;
         }
+        seen.add(key);
+        uniqueCodes.push(itemCode);
+    }
+
+    for (const itemCode of uniqueCodes) {
         const item = loadScheduleItemWithStopsByStateKindAndCode(
             kind,
             itemCode
@@ -1169,7 +1240,7 @@ export function listScheduleItemsWithStopsByStateKindAndCodes(
             continue;
         }
 
-        visitedItemCodes.add(item.code);
+        visitedItemCodes.add(trainCodeKey(item.code));
         items.push(item);
     }
 
@@ -1191,9 +1262,7 @@ export function listScheduleCandidateItemsForCodes(
 ): ScheduleItem[] {
     const rowsByItemCode = new Map<string, ScheduleDbItemRow>();
 
-    for (const internalCode of uniqueNormalizedCodes([
-        ...(input.internalCodes ?? [])
-    ])) {
+    for (const internalCode of input.internalCodes ?? []) {
         for (const row of listScheduleItemsByStateKindAndInternalCode(
             kind,
             internalCode
@@ -1202,9 +1271,7 @@ export function listScheduleCandidateItemsForCodes(
         }
     }
 
-    for (const aliasCode of uniqueNormalizedCodes([
-        ...(input.aliasCodes ?? [])
-    ])) {
+    for (const aliasCode of input.aliasCodes ?? []) {
         for (const row of listScheduleItemsByStateKindAndAlias(
             kind,
             aliasCode
@@ -1230,9 +1297,7 @@ export function listScheduleCandidateItemRecordsForCodes(
 ): ScheduleItemRecord[] {
     const rowsByItemCode = new Map<string, ScheduleDbItemRow>();
 
-    for (const internalCode of uniqueNormalizedCodes([
-        ...(input.internalCodes ?? [])
-    ])) {
+    for (const internalCode of input.internalCodes ?? []) {
         for (const row of listScheduleItemsByStateKindAndInternalCode(
             kind,
             internalCode
@@ -1241,9 +1306,7 @@ export function listScheduleCandidateItemRecordsForCodes(
         }
     }
 
-    for (const aliasCode of uniqueNormalizedCodes([
-        ...(input.aliasCodes ?? [])
-    ])) {
+    for (const aliasCode of input.aliasCodes ?? []) {
         for (const row of listScheduleItemsByStateKindAndAlias(
             kind,
             aliasCode
@@ -1266,7 +1329,7 @@ export function listScheduleCandidateItemRecordsForCodes(
 }
 
 export function savePublishedScheduleItemsIncrementally(
-    expectedDate: string,
+    expectedDate: ServiceDay,
     records: readonly ScheduleItemRecord[],
     stations: ScheduleStationMap
 ): SavePublishedScheduleItemsResult {
@@ -1383,39 +1446,43 @@ export function syncPublishedScheduleSnapshotFromItems(): ScheduleState | null {
 
 export function loadScheduleItemCodeByStateKindAndAlias(
     kind: ScheduleStateKind,
-    aliasCode: string
-): string | null {
-    return (
+    aliasCode: TrainCodeParts
+): TrainCodeParts | null {
+    const itemCode =
         queries.get<ScheduleItemCodeRow>(
             'selectScheduleItemCodeByStateKindAndAlias',
             kind,
-            normalizeCode(aliasCode)
-        )?.itemCode ?? null
-    );
+            trainCodeKey(aliasCode)
+        )?.itemCode ?? null;
+    return itemCode
+        ? parseExternalTrainCodeOrThrow(itemCode, 'itemCode')
+        : null;
 }
 
 export function listScheduleAliasesByStateKindAndItemCode(
     kind: ScheduleStateKind,
-    itemCode: string
-): string[] {
+    itemCode: TrainCodeParts
+): TrainCodeParts[] {
     return queries
         .all<ScheduleAliasRow>(
             'selectScheduleAliasesByStateKindAndItemCode',
             kind,
-            normalizeCode(itemCode)
+            trainCodeKey(itemCode)
         )
-        .map((row) => row.aliasCode);
+        .map((row) =>
+            parseExternalTrainCodeOrThrow(row.aliasCode, 'aliasCode')
+        );
 }
 
 export function listScheduleStopsByStateKindAndItemCode(
     kind: ScheduleStateKind,
-    itemCode: string
+    itemCode: TrainCodeParts
 ): ScheduleStop[] {
     return queries
         .all<ScheduleDbStopRow>(
             'selectScheduleStopsByStateKindAndItemCode',
             kind,
-            normalizeCode(itemCode)
+            trainCodeKey(itemCode)
         )
         .map(toScheduleStop);
 }
@@ -1440,41 +1507,65 @@ export function listSchedulePlatformInfoCandidatesByStateKindAndStationName(
         return [];
     }
 
-    return queries.all<SchedulePlatformInfoCandidateRow>(
-        'selectSchedulePlatformInfoCandidatesByStation',
-        kind,
-        stationName.trim(),
-        expiresAt
-    );
+    return queries
+        .all<RawSchedulePlatformInfoCandidateRow>(
+            'selectSchedulePlatformInfoCandidatesByStation',
+            kind,
+            stationName.trim(),
+            expiresAt
+        )
+        .map((row) => ({
+            ...row,
+            itemCode: parseExternalTrainCodeOrThrow(row.itemCode, 'itemCode'),
+            currentStationTrainCode: parseExternalTrainCodeOrThrow(
+                row.currentStationTrainCode,
+                'currentStationTrainCode'
+            ),
+            arrivalStationTrainCode: row.arrivalStationTrainCode
+                ? parseExternalTrainCodeOrThrow(
+                      row.arrivalStationTrainCode,
+                      'arrivalStationTrainCode'
+                  )
+                : null
+        }));
 }
 
 export function loadScheduleStationPlatformInfoCacheEntry(input: {
     lookupType: SchedulePlatformInfoLookupType;
     internalCode: string;
     stationTelecode: string;
-    stationTrainCode: string;
+    stationTrainCode: TrainCodeParts;
 }): ScheduleStationPlatformInfoCacheEntry | null {
     const lookupType = input.lookupType;
     const internalCode = normalizeCode(input.internalCode);
     const stationTelecode = normalizeCode(input.stationTelecode);
-    const stationTrainCode = normalizeCode(input.stationTrainCode);
-    if (
-        internalCode.length === 0 ||
-        stationTelecode.length === 0 ||
-        stationTrainCode.length === 0
-    ) {
+    if (internalCode.length === 0 || stationTelecode.length === 0) {
         return null;
     }
 
-    return (
-        queries.get<ScheduleStationPlatformInfoCacheEntry>(
-            'selectScheduleStationPlatformInfoCache',
-            lookupType,
-            internalCode,
-            stationTelecode,
-            stationTrainCode
-        ) ?? null
+    const row = queries.get<RawScheduleStationPlatformInfoCacheEntry>(
+        'selectScheduleStationPlatformInfoCache',
+        lookupType,
+        internalCode,
+        stationTelecode,
+        input.stationTrainCode.prefix,
+        input.stationTrainCode.number
     );
+    return row
+        ? {
+              lookupType: row.lookupType,
+              internalCode: row.internalCode,
+              stationTelecode: row.stationTelecode,
+              stationTrainCode: {
+                  prefix: row.stationTrainPrefix,
+                  number: row.stationTrainNumber
+              },
+              platformNo: row.platformNo,
+              wicket: row.wicket,
+              trainDate: asServiceDay(row.trainDate),
+              fetchedAt: row.fetchedAt
+          }
+        : null;
 }
 
 export function listScheduleStopStationCandidateRowsByStateKind(
@@ -1501,12 +1592,16 @@ export function saveScheduleStopMetadataByStateKind(
             continue;
         }
 
-        const trainNo = normalizeCode(update.trainNo);
-        const stationTrainCode = normalizeCode(update.stationTrainCode);
         const candidateRows =
-            trainNo.length > 0
-                ? listScheduleItemsByStateKindAndInternalCode(kind, trainNo)
-                : listScheduleItemsByStateKindAndAlias(kind, stationTrainCode);
+            update.trainNo !== null
+                ? listScheduleItemsByStateKindAndInternalCode(
+                      kind,
+                      update.trainNo
+                  )
+                : listScheduleItemsByStateKindAndAlias(
+                      kind,
+                      update.stationTrainCode
+                  );
 
         for (const item of candidateRows) {
             for (const target of queries.all<ScheduleStopMetadataTargetRow>(
@@ -1562,7 +1657,6 @@ export function persistScheduleStationPlatformInfoByStateKind(
         const lookupType = update.lookupType;
         const internalCode = normalizeCode(update.internalCode);
         const stationTelecode = normalizeCode(update.stationTelecode);
-        const stationTrainCode = normalizeCode(update.stationTrainCode);
         const stationNo =
             Number.isInteger(update.stationNo) && update.stationNo > 0
                 ? update.stationNo
@@ -1582,14 +1676,11 @@ export function persistScheduleStationPlatformInfoByStateKind(
             Number.isInteger(update.fetchedAt) && update.fetchedAt >= 0
                 ? update.fetchedAt
                 : null;
-        const trainDate = update.trainDate.trim();
         if (
             internalCode.length === 0 ||
             stationTelecode.length === 0 ||
-            stationTrainCode.length === 0 ||
             stationNo === null ||
             fetchedAt === null ||
-            !/^\d{8}$/.test(trainDate) ||
             (platformNo === null && wicket === null)
         ) {
             continue;
@@ -1599,11 +1690,11 @@ export function persistScheduleStationPlatformInfoByStateKind(
             lookupType,
             internalCode,
             stationTelecode,
-            stationTrainCode,
+            stationTrainCode: update.stationTrainCode,
             stationNo,
             platformNo,
             wicket,
-            trainDate,
+            trainDate: update.trainDate,
             fetchedAt,
             overwritePlatform: update.overwritePlatform,
             writeCache: update.writeCache
@@ -1623,7 +1714,8 @@ export function persistScheduleStationPlatformInfoByStateKind(
                         update.lookupType,
                         update.internalCode,
                         update.stationTelecode,
-                        update.stationTrainCode,
+                        update.stationTrainCode.prefix,
+                        update.stationTrainCode.number,
                         update.platformNo,
                         update.wicket,
                         update.trainDate,
@@ -1631,7 +1723,7 @@ export function persistScheduleStationPlatformInfoByStateKind(
                     );
                     if (result.changes > 0) {
                         changedCacheKeys.add(
-                            `${update.lookupType}:${update.internalCode}:${update.stationTelecode}:${update.stationTrainCode}`
+                            `${update.lookupType}:${update.internalCode}:${update.stationTelecode}:${trainCodeKey(update.stationTrainCode)}`
                         );
                     }
                 }

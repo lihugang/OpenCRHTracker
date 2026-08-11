@@ -33,11 +33,24 @@ import {
     getTodayScheduleCache,
     type TodayScheduleRoute
 } from '~/server/services/todayScheduleCache';
+import { asEmuId, type EmuId } from '~/server/libs/database/emu';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
-import getDayTimestampRange from '~/server/utils/date/getDayTimestampRange';
+import type { TrainCodeParts } from '~/server/utils/12306/trainCode';
+import {
+    asServiceDay,
+    serviceDayToShanghaiDayStartUnixSeconds,
+    type ServiceDay
+} from '~/server/utils/date/serviceDay';
 import { formatShanghaiDateString } from '~/server/utils/date/getCurrentDateString';
-import { getShanghaiDayStartUnixSeconds } from '~/server/utils/date/shanghaiDateTime';
+import getDayTimestampRange from '~/server/utils/date/getDayTimestampRange';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
+import {
+    formatExternalEmuCode,
+    formatExternalServiceDate,
+    formatExternalTrainCode,
+    formatExternalTrainCodes,
+    parseExternalTrainCodeOrThrow
+} from '~/server/utils/internal/boundaries';
 import type {
     AdminCouplingScanCandidate,
     AdminCouplingScanDetailResponse,
@@ -85,6 +98,40 @@ import type {
     AdminTrainProvenanceResponse
 } from '~/types/admin';
 
+function formatOptionalTrainCode(
+    code: TrainCodeParts | null | undefined
+): string {
+    return code ? formatExternalTrainCode(code) : '';
+}
+
+function formatUnknownTrainCodeList(value: unknown): string[] {
+    if (!Array.isArray(value)) {
+        return [];
+    }
+    return value
+        .map((item) => {
+            if (
+                !!item &&
+                typeof item === 'object' &&
+                typeof (item as { prefix?: unknown }).prefix === 'string' &&
+                typeof (item as { number?: unknown }).number === 'number'
+            ) {
+                return formatExternalTrainCode(item as TrainCodeParts);
+            }
+            return '';
+        })
+        .filter((trainCode) => trainCode.length > 0);
+}
+
+function formatUnknownEmuIdList(value: unknown): string[] {
+    if (!Array.isArray(value)) {
+        return [];
+    }
+    return value
+        .filter((item): item is number => typeof item === 'number')
+        .map((emuId) => formatExternalEmuCode(asEmuId(emuId)));
+}
+
 const COUPLING_SCAN_TASK_EXECUTOR = 'detect_coupled_emu_group';
 const QRCODE_SCAN_TASK_EXECUTOR = 'probe_qrcode_detection_emu';
 const STATION_BOARD_DISPATCH_TASK_EXECUTOR = 'dispatch_station_board_tasks';
@@ -129,9 +176,9 @@ function toDailyRouteTrackingRecord(
 ): AdminDailyRouteTrackingRecord {
     return {
         id: row.id,
-        trainCode: row.train_code,
-        emuCode: row.emu_code,
-        serviceDate: row.service_date,
+        trainCode: formatExternalTrainCode(row.train_code),
+        emuCode: formatExternalEmuCode(row.emu_id),
+        serviceDate: formatExternalServiceDate(row.service_date),
         timetableId: row.timetable_id,
         startStation: row.start_station_name,
         endStation: row.end_station_name,
@@ -144,9 +191,9 @@ function toDailyRouteTrackingRecord(
 function toProbeStatusRecord(row: ProbeStatusRow): AdminProbeStatusRecord {
     return {
         id: row.id,
-        trainCode: row.train_code,
-        emuCode: row.emu_code,
-        serviceDate: row.service_date,
+        trainCode: formatExternalTrainCode(row.train_code),
+        emuCode: formatExternalEmuCode(row.emu_id),
+        serviceDate: formatExternalServiceDate(row.service_date),
         timetableId: row.timetable_id,
         status: row.status,
         statusLabel: toStatusLabel(row.status),
@@ -165,8 +212,8 @@ function toDeparture(
     const firstRouteRow = routeRows[0] ?? null;
     const emuCodes = Array.from(
         new Set([
-            ...routeRows.map((row) => row.emu_code),
-            ...probeRows.map((row) => row.emu_code),
+            ...routeRows.map((row) => formatExternalEmuCode(row.emu_id)),
+            ...probeRows.map((row) => formatExternalEmuCode(row.emu_id)),
             ...fallbackEmuCodes
         ])
     ).sort();
@@ -213,6 +260,160 @@ function getOptionalInteger(value: unknown): number | null {
     return typeof value === 'number' && Number.isInteger(value) && value >= 0
         ? value
         : null;
+}
+
+function formatPayloadTrainCode(value: unknown): string {
+    if (value === null || value === undefined) {
+        return '';
+    }
+    if (typeof value !== 'object' || Array.isArray(value)) {
+        throw new Error('invalid_internal_train_code');
+    }
+    return formatExternalTrainCode(value as TrainCodeParts);
+}
+
+function formatPayloadServiceDay(value: unknown): string {
+    if (value === null || value === undefined) {
+        return '';
+    }
+    if (typeof value !== 'number') {
+        throw new Error('invalid_internal_service_day');
+    }
+    return formatExternalServiceDate(asServiceDay(value));
+}
+
+function formatPayloadEmuId(value: unknown): string {
+    if (value === null || value === undefined) {
+        return '';
+    }
+    if (typeof value !== 'number') {
+        throw new Error('invalid_internal_emu_id');
+    }
+    return formatExternalEmuCode(asEmuId(value));
+}
+
+function formatInternalPayload(
+    value: unknown,
+    key?: string,
+    parentKey?: string
+): unknown {
+    const trainKeys = new Set([
+        'trainCode',
+        'relatedTrainCode',
+        'primaryTrainCode',
+        'scannedTrainCode',
+        'matchedTrainCode',
+        'stationTrainCode',
+        'seatTrainCode',
+        'probedTrainCode',
+        'train_code',
+        'related_train_code',
+        'primary_train_code',
+        'scanned_train_code',
+        'matched_train_code',
+        'station_train_code'
+    ]);
+    const trainArrayKeys = new Set([
+        'codes',
+        'allTrainCodes',
+        'failedEnrichCodes',
+        'trainCodes',
+        'stationTrainCodes',
+        'attemptedTrainCodes',
+        'allCodes',
+        'directHitTrainCodes',
+        'historicalTrainCodes',
+        'matchedTrainCodes',
+        'targetTrainCodes',
+        'requestedCodes',
+        'groupCodes',
+        'checkedTrainCodes',
+        'notRunningTrainCodes',
+        'requestFailedTrainCodes',
+        'mergedFromTrainCodes',
+        'unresolvedTrainCodes',
+        'train_codes',
+        'station_train_codes',
+        'attempted_train_codes'
+    ]);
+    const emuKeys = new Set([
+        'emuId',
+        'primaryEmuId',
+        'candidateEmuId',
+        'relatedEmuId',
+        'configuredEmuId',
+        'scannedEmuId',
+        'untrustedEmuId',
+        'emu_id',
+        'primary_emu_id',
+        'candidate_emu_id',
+        'related_emu_id'
+    ]);
+    const emuArrayKeys = new Set([
+        'emuIds',
+        'emu_ids',
+        'persistedEmuIds',
+        'allEmuIds',
+        'affectedEmuIds',
+        'mergedFromEmuIds'
+    ]);
+    const dateKeys = new Set([
+        'lastBuildDate',
+        'lastFullSweepDate',
+        'startDay',
+        'endDay',
+        'serviceDate',
+        'trainDate',
+        'date',
+        'service_date',
+        'train_date'
+    ]);
+    if (trainKeys.has(key ?? '')) {
+        return formatPayloadTrainCode(value);
+    }
+    if (trainArrayKeys.has(key ?? '')) {
+        if (!Array.isArray(value))
+            throw new Error('invalid_internal_train_codes');
+        return value.map(formatPayloadTrainCode);
+    }
+    if (emuKeys.has(key ?? '')) return formatPayloadEmuId(value);
+    if (emuArrayKeys.has(key ?? '')) {
+        if (!Array.isArray(value)) throw new Error('invalid_internal_emu_ids');
+        return value.map(formatPayloadEmuId);
+    }
+    if (dateKeys.has(key ?? '')) return formatPayloadServiceDay(value);
+    if (Array.isArray(value)) {
+        return value.map((item) =>
+            formatInternalPayload(item, undefined, parentKey)
+        );
+    }
+    const record = getPayloadObject(value);
+    if (record) {
+        const isTrainContainer =
+            key === 'route' ||
+            key === 'scannedRoute' ||
+            parentKey === 'route' ||
+            parentKey === 'scannedRoute' ||
+            (Object.prototype.hasOwnProperty.call(record, 'internalCode') &&
+                (Object.prototype.hasOwnProperty.call(record, 'stops') ||
+                    Object.prototype.hasOwnProperty.call(record, 'allCodes')));
+        const isEmuContainer = key === 'emu' || parentKey === 'emu';
+        return Object.fromEntries(
+            Object.entries(record).map(([childKey, childValue]) => [
+                childKey,
+                formatInternalPayload(
+                    childValue,
+                    childKey === 'code' && isTrainContainer
+                        ? 'trainCode'
+                        : childKey === 'code' && isEmuContainer
+                          ? 'emuId'
+                          : childKey,
+                    key
+                )
+            ])
+        );
+    }
+    return value;
 }
 
 function getStringArray(value: unknown): string[] {
@@ -328,9 +529,9 @@ function toTrackingMutation(value: unknown): AdminTrackingMutation | null {
         table,
         action,
         id: getNullableInteger(payload.id),
-        trainCode: normalizeCode(getOptionalString(payload.trainCode) ?? ''),
-        emuCode: normalizeCode(getOptionalString(payload.emuCode) ?? ''),
-        serviceDate: getOptionalString(payload.serviceDate) ?? '',
+        trainCode: formatPayloadTrainCode(payload.trainCode),
+        emuCode: formatPayloadEmuId(payload.emuId),
+        serviceDate: formatPayloadServiceDay(payload.serviceDate),
         timetableId: getNullableInteger(payload.timetableId),
         startAt: getNullableInteger(payload.startAt),
         previousStatus: getNullableInteger(payload.previousStatus),
@@ -638,8 +839,8 @@ function toStationBoardRows(value: unknown): AdminStationBoardRow[] {
             const trainNo = normalizeCode(
                 getOptionalString(payload.trainNo) ?? ''
             );
-            const stationTrainCode = normalizeCode(
-                getOptionalString(payload.stationTrainCode) ?? ''
+            const stationTrainCode = formatPayloadTrainCode(
+                payload.stationTrainCode
             );
             const circulationTrain = (
                 getOptionalString(payload.circulationTrain) ?? ''
@@ -650,7 +851,7 @@ function toStationBoardRows(value: unknown): AdminStationBoardRow[] {
             const endStationName = (
                 getOptionalString(payload.endStationName) ?? ''
             ).trim();
-            const saveStatus = getOptionalString(payload.saveStatus) ?? '';
+            const saveStatus = getOptionalString(payload.saveStatus);
             const saveReasonCode = (
                 getOptionalString(payload.saveReasonCode) ?? ''
             ).trim();
@@ -667,6 +868,13 @@ function toStationBoardRows(value: unknown): AdminStationBoardRow[] {
             ) {
                 return null;
             }
+            if (
+                saveStatus !== 'saved' &&
+                saveStatus !== 'not_saved' &&
+                saveStatus !== 'unknown_legacy'
+            ) {
+                return null;
+            }
 
             return {
                 trainNo,
@@ -674,18 +882,9 @@ function toStationBoardRows(value: unknown): AdminStationBoardRow[] {
                 circulationTrain,
                 startStationName,
                 endStationName,
-                saveStatus:
-                    saveStatus === 'saved' || saveStatus === 'not_saved'
-                        ? saveStatus
-                        : 'unknown_legacy',
-                saveReasonCode:
-                    saveStatus === 'saved' || saveStatus === 'not_saved'
-                        ? saveReasonCode
-                        : 'legacy_unrecorded',
-                saveReasonText:
-                    saveStatus === 'saved' || saveStatus === 'not_saved'
-                        ? saveReasonText
-                        : '旧记录未持久化逐行保存结果'
+                saveStatus,
+                saveReasonCode,
+                saveReasonText
             };
         })
         .filter((item): item is AdminStationBoardRow => item !== null);
@@ -824,7 +1023,7 @@ function buildGroupedRouteSnapshots(
             startStation: row.start_station_name,
             endStation: row.end_station_name
         };
-        currentGroup.trainCodes.add(row.train_code);
+        currentGroup.trainCodes.add(formatExternalTrainCode(row.train_code));
         groups.set(key, currentGroup);
     }
 
@@ -860,7 +1059,7 @@ function listRouteRowsByTrainCodesAtStart(
     const rowsById = new Map<number, DailyEmuRouteRow>();
     for (const trainCode of normalizeTrainCodeList(trainCodes)) {
         const rows = listDailyRoutesByTrainCodeInRange(
-            trainCode,
+            parseExternalTrainCodeOrThrow(trainCode, 'trainCode'),
             startAt,
             startAt + 1
         );
@@ -925,22 +1124,20 @@ function toSeatCodeRoutePayload(value: unknown): SeatCodeRoutePayload | null {
         return null;
     }
 
-    const code = normalizeCode(getOptionalString(payload.code) ?? '');
+    const code = formatPayloadTrainCode(payload.code);
     const internalCode = normalizeCode(
         getOptionalString(payload.internalCode) ?? ''
     );
     const startAt = getOptionalInteger(payload.startAt);
     const endAt = getOptionalInteger(payload.endAt);
-    const startDayRaw = getOptionalString(payload.startDay) ?? '';
-    const endDayRaw = getOptionalString(payload.endDay) ?? '';
     const startDay =
-        /^\d{8}$/.test(startDayRaw) && startDayRaw.length > 0
-            ? startDayRaw
-            : formatServiceDateFromStartAt(startAt);
+        payload.startDay === null || payload.startDay === undefined
+            ? formatServiceDateFromStartAt(startAt)
+            : formatPayloadServiceDay(payload.startDay);
     const endDay =
-        /^\d{8}$/.test(endDayRaw) && endDayRaw.length > 0
-            ? endDayRaw
-            : formatServiceDateFromStartAt(endAt);
+        payload.endDay === null || payload.endDay === undefined
+            ? formatServiceDateFromStartAt(endAt)
+            : formatPayloadServiceDay(payload.endDay);
 
     if (
         code.length === 0 &&
@@ -987,10 +1184,17 @@ function extractQrcodeScanTaskArgs(taskArgs: unknown): {
     manualNow: boolean;
 } {
     const payload = getPayloadObject(taskArgs);
+    const rawEmuId = payload?.emuId;
+    const emuCode =
+        typeof rawEmuId === 'number' &&
+        Number.isInteger(rawEmuId) &&
+        rawEmuId > 0
+            ? formatExternalEmuCode(asEmuId(rawEmuId))
+            : '';
 
     return {
         detectedAt: (getOptionalString(payload?.detectedAt) ?? '').trim(),
-        emuCode: normalizeCode(getOptionalString(payload?.emuCode) ?? ''),
+        emuCode,
         manualNow: payload?.manualNow === true
     };
 }
@@ -1011,11 +1215,11 @@ function toQrcodeScanTaskRunSummary(
         status: taskRun.status,
         startedAt: taskRun.startedAt,
         finishedAt: taskRun.finishedAt,
-        serviceDate: taskRun.serviceDate,
+        serviceDate: formatExternalServiceDate(taskRun.serviceDate),
         detectedAt: taskArgs.detectedAt,
         emuCode: taskArgs.emuCode,
         manualNow: taskArgs.manualNow,
-        taskArgs: taskRun.taskArgs
+        taskArgs: formatInternalPayload(taskRun.taskArgs)
     };
 }
 
@@ -1079,17 +1283,19 @@ function extractHistoricalReuseDetail(
 
     const payload = getPayloadObject(event.payload);
     const historicalStartAt = getOptionalInteger(payload?.historicalStartAt);
-    const emuCodes = getStringArray(payload?.emuCodes).map((emuCode) =>
-        normalizeCode(emuCode)
+    const emuCodes = formatUnknownEmuIdList(payload?.emuIds);
+    const payloadTrainCodes = formatUnknownTrainCodeList(
+        payload?.historicalTrainCodes
     );
-    const payloadTrainCodes = getStringArray(payload?.historicalTrainCodes);
     const routeRows =
         historicalStartAt === null
             ? []
-            : listProbeStatusByEmuCode(event.emuCode, historicalStartAt);
+            : event.emuId === null
+              ? []
+              : listProbeStatusByEmuCode(event.emuId, historicalStartAt);
     const historicalTrainCodes = normalizeTrainCodeList([
         ...payloadTrainCodes,
-        ...routeRows.map((row) => row.train_code)
+        ...routeRows.map((row) => formatExternalTrainCode(row.train_code))
     ]);
     const historicalRoute = fillRouteStationsFromTodayCache(
         resolveExactRouteSnapshot(
@@ -1114,13 +1320,19 @@ function extractCoupledResolutionDetail(
     }
 
     const payload = getPayloadObject(event.payload);
-    const emuCodes = normalizeTrainCodeList(getStringArray(payload?.emuCodes));
+    const emuCodes = normalizeTrainCodeList(
+        formatUnknownEmuIdList(payload?.emuIds)
+    );
+    const routeAllCodes = getTodayScheduleRouteByTrainCodes([
+        formatOptionalTrainCode(event.trainCode)
+    ])?.allCodes;
     const route =
         fillRouteStationsFromTodayCache(
             buildTrainRouteSnapshot({
                 serviceDate: formatServiceDateFromStartAt(event.startAt),
-                trainCodes: getTodayScheduleRouteByTrainCodes([event.trainCode])
-                    ?.allCodes ?? [event.trainCode],
+                trainCodes: routeAllCodes
+                    ? formatExternalTrainCodes(routeAllCodes)
+                    : [formatOptionalTrainCode(event.trainCode)],
                 startAt: event.startAt,
                 endAt: getOptionalInteger(payload?.endAt),
                 startStation: getOptionalString(payload?.startStation) ?? '',
@@ -1157,9 +1369,12 @@ function resolveScannedRoute(
         toSeatCodeRoutePayload(candidate.detail);
     const baseSnapshot =
         buildTrainRouteSnapshot({
-            serviceDate: routePayload?.startDay || candidate.serviceDate,
+            serviceDate:
+                routePayload?.startDay ||
+                formatExternalServiceDate(candidate.serviceDate),
             trainCodes: [
-                routePayload?.code || candidate.scannedTrainCode
+                routePayload?.code ||
+                    formatOptionalTrainCode(candidate.scannedTrainCode)
             ].filter((trainCode) => trainCode.length > 0),
             internalCode:
                 routePayload?.internalCode || candidate.scannedInternalCode,
@@ -1176,7 +1391,7 @@ function resolveMatchedRoute(
     candidate: CouplingScanCandidateRecord
 ): AdminTrainRouteSnapshot | null {
     if (
-        candidate.matchedTrainCode.length === 0 &&
+        formatOptionalTrainCode(candidate.matchedTrainCode).length === 0 &&
         candidate.matchedStartAt === null
     ) {
         return null;
@@ -1184,7 +1399,7 @@ function resolveMatchedRoute(
 
     return fillRouteStationsFromTodayCache(
         resolveExactRouteSnapshot(
-            [candidate.matchedTrainCode],
+            [formatOptionalTrainCode(candidate.matchedTrainCode)],
             candidate.matchedStartAt,
             formatServiceDateFromStartAt(candidate.matchedStartAt)
         )
@@ -1203,7 +1418,7 @@ function resolveDirectHitEventRoute(
         toSeatCodeRoutePayload(payload?.scannedRoute) ??
         toSeatCodeRoutePayload(payload?.route);
     const trainCodes = normalizeTrainCodeList(
-        getStringArray(payload?.directHitTrainCodes)
+        formatUnknownTrainCodeList(payload?.directHitTrainCodes)
     );
     const snapshot =
         buildTrainRouteSnapshot({
@@ -1215,8 +1430,8 @@ function resolveDirectHitEventRoute(
                     ? trainCodes
                     : [
                           routePayload?.code ||
-                              event.relatedTrainCode ||
-                              event.trainCode
+                              formatOptionalTrainCode(event.relatedTrainCode) ||
+                              formatOptionalTrainCode(event.trainCode)
                       ].filter((trainCode) => trainCode.length > 0),
             internalCode: routePayload?.internalCode ?? '',
             startAt: event.startAt ?? routePayload?.startAt ?? null,
@@ -1254,12 +1469,14 @@ function resolveEventScannedRoute(
         toSeatCodeRoutePayload(payload?.scannedRoute) ??
         toSeatCodeRoutePayload(payload?.route) ??
         toSeatCodeRoutePayload(seatCodeFailure?.route);
-    const payloadTrainCodes = getStringArray(payload?.directHitTrainCodes);
+    const payloadTrainCodes = formatUnknownTrainCodeList(
+        payload?.directHitTrainCodes
+    );
     const fallbackTrainCode =
-        getOptionalString(payload?.seatTrainCode) ??
-        routePayload?.code ??
-        event.relatedTrainCode ??
-        event.trainCode;
+        formatPayloadTrainCode(payload?.seatTrainCode) ||
+        routePayload?.code ||
+        formatOptionalTrainCode(event.relatedTrainCode) ||
+        formatOptionalTrainCode(event.trainCode);
     const fallbackInternalCode =
         getOptionalString(payload?.seatInternalCode) ??
         getOptionalString(payload?.trainInternalCode) ??
@@ -1274,8 +1491,8 @@ function resolveEventScannedRoute(
     const snapshot =
         buildTrainRouteSnapshot({
             serviceDate:
-                routePayload?.startDay ??
-                event.serviceDate ??
+                routePayload?.startDay ||
+                formatExternalServiceDate(event.serviceDate) ||
                 formatServiceDateFromStartAt(fallbackStartAt),
             trainCodes:
                 payloadTrainCodes.length > 0
@@ -1306,7 +1523,9 @@ function buildDepartureFallback(events: TrainProvenanceEventRecord[]): {
             : null;
     const emuCodes = normalizeTrainCodeList(
         directHitEvents
-            .map((event) => event.emuCode)
+            .map((event) =>
+                event.emuId === null ? '' : formatExternalEmuCode(event.emuId)
+            )
             .filter((emuCode) => emuCode.length > 0)
     );
 
@@ -1326,9 +1545,11 @@ function resolveOccupiedRoutes(
         return [];
     }
 
-    const occupiedDayRange = getDayTimestampRange(candidate.serviceDate);
+    const occupiedDayRange = getDayTimestampRange(
+        formatExternalServiceDate(candidate.serviceDate)
+    );
     const routeRows = listDailyRoutesByEmuCodeInRange(
-        candidate.candidateEmuCode,
+        candidate.candidateEmuId,
         occupiedDayRange.startAt,
         occupiedDayRange.endAt + 1
     );
@@ -1344,7 +1565,7 @@ function resolveOccupiedRoutes(
     const trackedGroupSnapshots = trackedGroupPayloads
         .map((item) => {
             const payload = getPayloadObject(item);
-            const trainCodes = getStringArray(payload?.trainCodes);
+            const trainCodes = formatUnknownTrainCodeList(payload?.trainCodes);
             const startAt = getOptionalInteger(payload?.startAt);
             if (trainCodes.length === 0 || startAt === null) {
                 return null;
@@ -1365,7 +1586,9 @@ function resolveOccupiedRoutes(
         return trackedGroupSnapshots;
     }
 
-    const hintedTrainCodes = getStringArray(detailPayload?.trainCodes);
+    const hintedTrainCodes = formatUnknownTrainCodeList(
+        detailPayload?.trainCodes
+    );
     const hintedStartAts = Array.isArray(detailPayload?.startAts)
         ? detailPayload.startAts
               .map((startAt) => getOptionalInteger(startAt))
@@ -1409,7 +1632,7 @@ function toConflictCurrentGroup(
         return null;
     }
 
-    const trainCodes = getStringArray(payload.trainCodes);
+    const trainCodes = formatUnknownTrainCodeList(payload.trainCodes);
     const startAt = getOptionalInteger(payload.startAt);
     const endAt = getOptionalInteger(payload.endAt);
     const startStation = getOptionalString(payload.startStation) ?? '';
@@ -1677,7 +1900,9 @@ function formatDirectHitEventSummary(
         toSeatCodeRoutePayload(payload?.scannedRoute) ??
         toSeatCodeRoutePayload(payload?.route);
     const scannedTrainCode =
-        scannedRoute?.code || event.relatedTrainCode || event.trainCode;
+        scannedRoute?.code ||
+        formatOptionalTrainCode(event.relatedTrainCode) ||
+        formatOptionalTrainCode(event.trainCode);
 
     return event.result === 'matched'
         ? `其他车组重联扫描，包含当前车次，当前车次已纳入追踪范围`
@@ -1749,7 +1974,7 @@ function formatEventSummary(
         case 'probe_task_skipped':
             return `发车探测任务已跳过：${event.result || 'skip'}`;
         case 'route_probe_succeeded':
-            return `发车探测任务：${event.relatedTrainCode || event.trainCode} 查询到车组 ${event.emuCode || '--'}`;
+            return `发车探测任务：${formatOptionalTrainCode(event.relatedTrainCode) || formatOptionalTrainCode(event.trainCode)} 查询到车组 ${event.emuId === null ? '--' : formatExternalEmuCode(event.emuId)}`;
         case 'route_probe_request_failed':
             return event.result === 'requeued'
                 ? `12306 探测失败，已重新排队`
@@ -1896,11 +2121,14 @@ function toTimelineEvent(
         taskStatus: event.taskStatus,
         outcomeStatus: resolveEventOutcomeStatus(event, stationPlatformRefresh),
         createdAt: event.createdAt,
-        trainCode: event.trainCode,
+        trainCode: formatOptionalTrainCode(event.trainCode),
         startAt: event.startAt,
-        emuCode: event.emuCode,
-        relatedTrainCode: event.relatedTrainCode,
-        relatedEmuCode: event.relatedEmuCode,
+        emuCode: event.emuId === null ? '' : formatExternalEmuCode(event.emuId),
+        relatedTrainCode: formatOptionalTrainCode(event.relatedTrainCode),
+        relatedEmuCode:
+            event.relatedEmuId === null
+                ? ''
+                : formatExternalEmuCode(event.relatedEmuId),
         eventType: event.eventType,
         result: event.result,
         summary,
@@ -1913,7 +2141,7 @@ function toTimelineEvent(
         coupledResolution,
         trackingMutations,
         stationPlatformRefresh,
-        payload: event.payload
+        payload: formatInternalPayload(event.payload)
     };
 }
 
@@ -2108,16 +2336,12 @@ function buildRequestTypeSummaries(
 }
 
 export function getAdminTrainRequestStats(
-    date: string
+    serviceDate: ServiceDay
 ): AdminTrainDataRequestStatsResponse {
     const runtimeConfig = getTrainProvenanceRuntimeConfig();
-    const compareDate = /^\d{8}$/.test(date)
-        ? formatShanghaiDateString(
-              (getShanghaiDayStartUnixSeconds(date) -
-                  REQUEST_STAT_DAY_SECONDS) *
-                  1000
-          )
-        : '';
+    const date = formatExternalServiceDate(serviceDate);
+    const compareServiceDate = asServiceDay(serviceDate - 1);
+    const compareDate = formatExternalServiceDate(compareServiceDate);
 
     if (!isTrainProvenanceEnabled()) {
         return {
@@ -2135,23 +2359,8 @@ export function getAdminTrainRequestStats(
         };
     }
 
-    if (!/^\d{8}$/.test(date)) {
-        return {
-            enabled: true,
-            retentionDays: runtimeConfig.retentionDays,
-            date,
-            compareDate,
-            asOf: getNowSeconds(),
-            totals: buildRequestSummary(
-                createRequestMetricAccumulator(),
-                createRequestMetricAccumulator()
-            ),
-            types: [],
-            hours: []
-        };
-    }
-
-    const currentDayStart = getShanghaiDayStartUnixSeconds(date);
+    const currentDayStart =
+        serviceDayToShanghaiDayStartUnixSeconds(serviceDate);
     const compareDayStart = currentDayStart - REQUEST_STAT_DAY_SECONDS;
     const queryEndAt = currentDayStart + REQUEST_STAT_DAY_SECONDS;
     const rows = list12306RequestHourlyStatsInRange(
@@ -2172,8 +2381,8 @@ export function getAdminTrainRequestStats(
             continue;
         }
 
-        const isCurrentDay = row.serviceDate === date;
-        const isCompareDay = row.serviceDate === compareDate;
+        const isCurrentDay = row.serviceDate === serviceDate;
+        const isCompareDay = row.serviceDate === compareServiceDate;
         if (!isCurrentDay && !isCompareDay) {
             continue;
         }
@@ -2232,11 +2441,12 @@ export function getAdminTrainRequestStats(
 }
 
 export function getAdminTrainProvenance(
-    date: string,
-    trainCode: string,
+    serviceDate: ServiceDay,
+    trainCode: TrainCodeParts,
     startAt: number | null
 ): AdminTrainProvenanceResponse {
-    const normalizedTrainCode = normalizeCode(trainCode);
+    const date = formatExternalServiceDate(serviceDate);
+    const trainCodeText = formatExternalTrainCode(trainCode);
     const runtimeConfig = getTrainProvenanceRuntimeConfig();
 
     if (!isTrainProvenanceEnabled()) {
@@ -2244,44 +2454,33 @@ export function getAdminTrainProvenance(
             enabled: false,
             retentionDays: runtimeConfig.retentionDays,
             date,
-            trainCode: normalizedTrainCode,
+            trainCode: trainCodeText,
             selectedStartAt: null,
             departures: [],
             timeline: []
         };
     }
 
-    if (!/^\d{8}$/.test(date) || normalizedTrainCode.length === 0) {
-        return {
-            enabled: true,
-            retentionDays: runtimeConfig.retentionDays,
-            date,
-            trainCode: normalizedTrainCode,
-            selectedStartAt: null,
-            departures: [],
-            timeline: []
-        };
-    }
-
-    const dayRange = getDayTimestampRange(date);
+    const dayRangeStart = serviceDayToShanghaiDayStartUnixSeconds(serviceDate);
+    const dayRangeEndExclusive = dayRangeStart + REQUEST_STAT_DAY_SECONDS;
     const allTimelineRecords = listTrainProvenanceEventsByDateAndTrainCode(
-        date,
-        normalizedTrainCode,
+        serviceDate,
+        trainCode,
         null
     );
     const eventDepartureStartAts = listTrainProvenanceDepartureStartAts(
-        date,
-        normalizedTrainCode
+        serviceDate,
+        trainCode
     );
     const routeRows = listDailyRoutesByTrainCodeInRange(
-        normalizedTrainCode,
-        dayRange.startAt,
-        dayRange.endAt + 1
+        trainCode,
+        dayRangeStart,
+        dayRangeEndExclusive
     );
     const probeRows = listProbeStatusByTrainCodeInRange(
-        normalizedTrainCode,
-        dayRange.startAt,
-        dayRange.endAt + 1
+        trainCode,
+        dayRangeStart,
+        dayRangeEndExclusive
     );
     const timelineRecordsByStartAt = new Map<
         number,
@@ -2338,7 +2537,7 @@ export function getAdminTrainProvenance(
         enabled: true,
         retentionDays: runtimeConfig.retentionDays,
         date,
-        trainCode: normalizedTrainCode,
+        trainCode: trainCodeText,
         selectedStartAt,
         departures,
         timeline
@@ -2370,10 +2569,10 @@ export function getAdminStationPlatformRefreshDetail(
         result: {
             resultId: record.id,
             taskRunId: record.taskRunId,
-            serviceDate: record.serviceDate,
+            serviceDate: formatExternalServiceDate(record.serviceDate),
             startAt: record.startAt,
-            primaryTrainCode: record.primaryTrainCode,
-            trainCodes: record.trainCodes,
+            primaryTrainCode: formatOptionalTrainCode(record.primaryTrainCode),
+            trainCodes: formatExternalTrainCodes(record.trainCodes),
             trigger: record.trigger,
             status: record.status,
             candidateCount: record.candidateCount,
@@ -2392,9 +2591,13 @@ export function getAdminStationPlatformRefreshDetail(
             stationName: entry.stationName,
             stationTelecode: entry.stationTelecode,
             stationNo: entry.stationNo,
-            trainDate: entry.trainDate,
-            stationTrainCodes: entry.stationTrainCodes,
-            attemptedTrainCodes: entry.attemptedTrainCodes,
+            trainDate: formatExternalServiceDate(entry.trainDate),
+            stationTrainCodes: formatExternalTrainCodes(
+                entry.stationTrainCodes
+            ),
+            attemptedTrainCodes: formatExternalTrainCodes(
+                entry.attemptedTrainCodes
+            ),
             status: entry.status,
             platformNo: entry.platformNo,
             wicket: entry.wicket,
@@ -2426,8 +2629,8 @@ export function getAdminCouplingScanDetail(
               status: taskRun.status,
               startedAt: taskRun.startedAt,
               finishedAt: taskRun.finishedAt,
-              serviceDate: taskRun.serviceDate,
-              taskArgs: taskRun.taskArgs
+              serviceDate: formatExternalServiceDate(taskRun.serviceDate),
+              taskArgs: formatInternalPayload(taskRun.taskArgs)
           }
         : null;
 
@@ -2435,17 +2638,21 @@ export function getAdminCouplingScanDetail(
         (candidate) => ({
             id: candidate.id,
             candidateOrder: candidate.candidateOrder,
-            serviceDate: candidate.serviceDate,
-            candidateEmuCode: candidate.candidateEmuCode,
+            serviceDate: formatExternalServiceDate(candidate.serviceDate),
+            candidateEmuCode: formatExternalEmuCode(candidate.candidateEmuId),
             status: candidate.status,
             reason: formatCouplingScanCandidateReason(
                 candidate.reason,
                 candidate.detail
             ),
-            scannedTrainCode: candidate.scannedTrainCode,
+            scannedTrainCode: formatOptionalTrainCode(
+                candidate.scannedTrainCode
+            ),
             scannedInternalCode: candidate.scannedInternalCode,
             scannedStartAt: candidate.scannedStartAt,
-            matchedTrainCode: candidate.matchedTrainCode,
+            matchedTrainCode: formatOptionalTrainCode(
+                candidate.matchedTrainCode
+            ),
             matchedStartAt: candidate.matchedStartAt,
             trainRepeat: candidate.trainRepeat,
             scannedRoute: resolveScannedRoute(candidate),
@@ -2464,9 +2671,10 @@ export function getAdminCouplingScanDetail(
 }
 
 export function getAdminCouplingScanTaskList(
-    date: string
+    serviceDate: ServiceDay
 ): AdminCouplingScanTaskListResponse {
     const runtimeConfig = getTrainProvenanceRuntimeConfig();
+    const date = formatExternalServiceDate(serviceDate);
 
     if (!isTrainProvenanceEnabled()) {
         return {
@@ -2477,18 +2685,9 @@ export function getAdminCouplingScanTaskList(
         };
     }
 
-    if (!/^\d{8}$/.test(date)) {
-        return {
-            enabled: true,
-            retentionDays: runtimeConfig.retentionDays,
-            date,
-            items: []
-        };
-    }
-
     const items: AdminCouplingScanTaskListItem[] =
         listTrainProvenanceTaskRunsByDateAndExecutor(
-            date,
+            serviceDate,
             COUPLING_SCAN_TASK_EXECUTOR
         )
             .filter((taskRun) => taskRun.status !== 'skipped')
@@ -2502,10 +2701,10 @@ export function getAdminCouplingScanTaskList(
                     status: taskRun.status,
                     startedAt: taskRun.startedAt,
                     finishedAt: taskRun.finishedAt,
-                    serviceDate: taskRun.serviceDate,
+                    serviceDate: formatExternalServiceDate(taskRun.serviceDate),
                     bureau: taskArgs.bureau,
                     model: taskArgs.model,
-                    taskArgs: taskRun.taskArgs
+                    taskArgs: formatInternalPayload(taskRun.taskArgs)
                 };
             });
 
@@ -2518,22 +2717,14 @@ export function getAdminCouplingScanTaskList(
 }
 
 export function getAdminQrcodeScanTaskList(
-    date: string
+    serviceDate: ServiceDay
 ): AdminQrcodeScanTaskListResponse {
     const runtimeConfig = getTrainProvenanceRuntimeConfig();
+    const date = formatExternalServiceDate(serviceDate);
 
     if (!isTrainProvenanceEnabled()) {
         return {
             enabled: false,
-            retentionDays: runtimeConfig.retentionDays,
-            date,
-            items: []
-        };
-    }
-
-    if (!/^\d{8}$/.test(date)) {
-        return {
-            enabled: true,
             retentionDays: runtimeConfig.retentionDays,
             date,
             items: []
@@ -2546,7 +2737,7 @@ export function getAdminQrcodeScanTaskList(
     >();
 
     for (const taskRun of listTrainProvenanceTaskRunsByDateAndExecutor(
-        date,
+        serviceDate,
         QRCODE_SCAN_TASK_EXECUTOR
     )) {
         const taskArgs = extractQrcodeScanTaskArgs(taskRun.taskArgs);
@@ -2575,9 +2766,11 @@ export function getAdminQrcodeScanTaskList(
 }
 
 export function getAdminQrcodeScanDetail(
-    date: string,
+    serviceDate: ServiceDay,
     detectedAt: string
 ): AdminQrcodeScanDetailResponse {
+    const date = formatExternalServiceDate(serviceDate);
+
     if (!isTrainProvenanceEnabled()) {
         return {
             enabled: false,
@@ -2588,7 +2781,7 @@ export function getAdminQrcodeScanDetail(
         };
     }
 
-    if (!/^\d{8}$/.test(date) || !/^\d{4}$/.test(detectedAt)) {
+    if (!/^\d{4}$/.test(detectedAt)) {
         return {
             enabled: true,
             date,
@@ -2599,7 +2792,7 @@ export function getAdminQrcodeScanDetail(
     }
 
     const matchingTaskRuns = listTrainProvenanceTaskRunsByDateAndExecutor(
-        date,
+        serviceDate,
         QRCODE_SCAN_TASK_EXECUTOR
     ).filter((taskRun) => {
         const taskArgs = extractQrcodeScanTaskArgs(taskRun.taskArgs);
@@ -2659,7 +2852,7 @@ function toStationBoardDispatchTaskListItem(
         status: taskRun.status,
         startedAt: taskRun.startedAt,
         finishedAt: taskRun.finishedAt,
-        serviceDate: taskRun.serviceDate,
+        serviceDate: formatExternalServiceDate(taskRun.serviceDate),
         candidateGroupCount: result?.candidateGroupCount ?? 0,
         selectedStationCount:
             result?.selectedStationCount ?? selectedStations.length,
@@ -2669,7 +2862,7 @@ function toStationBoardDispatchTaskListItem(
         skippedAmbiguousCount: result?.skippedAmbiguousCount ?? 0,
         selectedStations,
         selectedStationItems,
-        taskArgs: taskRun.taskArgs
+        taskArgs: formatInternalPayload(taskRun.taskArgs)
     };
 }
 
@@ -2820,9 +3013,10 @@ function dedupeStationBoardStationTaskItems(
 }
 
 export function getAdminStationBoardTaskList(
-    date: string
+    serviceDate: ServiceDay
 ): AdminStationBoardTaskListResponse {
     const runtimeConfig = getTrainProvenanceRuntimeConfig();
+    const date = formatExternalServiceDate(serviceDate);
 
     if (!isTrainProvenanceEnabled()) {
         return {
@@ -2833,21 +3027,12 @@ export function getAdminStationBoardTaskList(
         };
     }
 
-    if (!/^\d{8}$/.test(date)) {
-        return {
-            enabled: true,
-            retentionDays: runtimeConfig.retentionDays,
-            date,
-            items: []
-        };
-    }
-
     const taskRuns = listTrainProvenanceTaskRunsByDateAndExecutor(
-        date,
+        serviceDate,
         STATION_BOARD_DISPATCH_TASK_EXECUTOR
     );
     const resultByTaskRunId = new Map(
-        listStationBoardDispatchResultsByDate(date).map((result) => [
+        listStationBoardDispatchResultsByDate(serviceDate).map((result) => [
             result.taskRunId,
             result
         ])
@@ -2905,7 +3090,14 @@ export function getAdminStationBoardDispatchDetail(
 
     const taskRun = getTrainProvenanceTaskRunById(taskRunId);
     const result = getStationBoardDispatchResultByTaskRunId(taskRunId);
-    const serviceDate = taskRun?.serviceDate ?? result?.serviceDate ?? '';
+    const serviceDate = taskRun
+        ? taskRun.serviceDate
+        : result
+          ? result.serviceDate
+          : null;
+    const serviceDateText = serviceDate
+        ? formatExternalServiceDate(serviceDate)
+        : '';
     const selectedStations = toStationBoardSelectedStations(
         result?.selectedStations ?? []
     );
@@ -2916,12 +3108,13 @@ export function getAdminStationBoardDispatchDetail(
         dispatchDetails.length > 0
             ? toStationBoardSelectedStationItemsFromDetails(dispatchDetails)
             : toStationBoardSelectedStationItemsFromNames(selectedStations);
-    const fetchTaskRuns = /^\d{8}$/.test(serviceDate)
-        ? listTrainProvenanceTaskRunsByDateAndExecutor(
-              serviceDate,
-              STATION_BOARD_FETCH_TASK_EXECUTOR
-          )
-        : [];
+    const fetchTaskRuns =
+        serviceDate !== null
+            ? listTrainProvenanceTaskRunsByDateAndExecutor(
+                  serviceDate,
+                  STATION_BOARD_FETCH_TASK_EXECUTOR
+              )
+            : [];
     const fetchTaskRunBySchedulerTaskId = new Map(
         fetchTaskRuns.map((fetchTaskRun) => [
             fetchTaskRun.schedulerTaskId,
@@ -2929,7 +3122,7 @@ export function getAdminStationBoardDispatchDetail(
         ])
     );
     const fetchResultsByParentSchedulerTaskId =
-        taskRun && /^\d{8}$/.test(serviceDate)
+        taskRun && serviceDate !== null
             ? listStationBoardFetchResultsByParentSchedulerTaskId(
                   serviceDate,
                   taskRun.schedulerTaskId
@@ -2991,7 +3184,7 @@ export function getAdminStationBoardDispatchDetail(
         enabled: true,
         taskRunId,
         schedulerTaskId: taskRun?.schedulerTaskId ?? null,
-        serviceDate,
+        serviceDate: serviceDateText,
         status: taskRun?.status ?? null,
         startedAt: taskRun?.startedAt ?? null,
         finishedAt: taskRun?.finishedAt ?? null,

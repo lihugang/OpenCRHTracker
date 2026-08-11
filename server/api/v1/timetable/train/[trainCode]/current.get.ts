@@ -11,6 +11,11 @@ import setCacheControl from '~/server/utils/api/response/setCacheControl';
 import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
 import type { CurrentTrainTimetableData } from '~/types/lookup';
 import resolveBureauNameByCode from '~/utils/railway/resolveBureauNameByCode';
+import {
+    formatExternalTrainCode,
+    formatExternalTrainCodes,
+    parseExternalTrainCodeOrThrow
+} from '~/server/utils/internal/boundaries';
 
 export default defineEventHandler(async (event) => {
     const cacheMaxAge = useConfig().api.cache.timetableMaxAgeSeconds;
@@ -34,11 +39,14 @@ export default defineEventHandler(async (event) => {
                 'trainCode 不能为空'
             );
 
-            const scheduleTimetable =
-                getTodayScheduleTimetableByTrainCode(trainCode);
+            const scheduleTimetable = getTodayScheduleTimetableByTrainCode(
+                parseExternalTrainCodeOrThrow(trainCode, 'trainCode')
+            );
             const supplementTimetable = scheduleTimetable
                 ? null
-                : getSupplementTrainTimetableByTrainCode(trainCode);
+                : getSupplementTrainTimetableByTrainCode(
+                      parseExternalTrainCodeOrThrow(trainCode, 'trainCode')
+                  );
             const timetable = scheduleTimetable ?? supplementTimetable;
             ensure(
                 timetable && timetable.stops.length > 0,
@@ -50,9 +58,9 @@ export default defineEventHandler(async (event) => {
             const response: CurrentTrainTimetableData = {
                 updatedAt: timetable.updatedAt,
                 requestTrainCode: trainCode,
-                trainCode: timetable.trainCode,
+                trainCode: formatExternalTrainCode(timetable.trainCode),
                 internalCode: timetable.trainInternalCode,
-                allCodes: [...timetable.allCodes],
+                allCodes: formatExternalTrainCodes(timetable.allCodes),
                 bureauCode: timetable.bureauCode,
                 bureauName: resolveBureauNameByCode(timetable.bureauCode),
                 trainDepartment: timetable.trainDepartment,
@@ -72,7 +80,10 @@ export default defineEventHandler(async (event) => {
                               allCodes: timetable.allCodes
                           }),
                 stops: timetable.stops.map((stop) => ({
-                    ...stop
+                    ...stop,
+                    stationTrainCode: formatExternalTrainCode(
+                        stop.stationTrainCode
+                    )
                 }))
             };
 

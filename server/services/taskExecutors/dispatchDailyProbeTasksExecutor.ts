@@ -1,6 +1,9 @@
 import getLogger from '~/server/libs/log4js';
 import useConfig from '~/server/config';
-import { registerTaskExecutor } from '~/server/services/taskExecutorRegistry';
+import {
+    parseEmptyTaskArgs,
+    registerTaskExecutor
+} from '~/server/services/taskExecutorRegistry';
 import {
     getSafeTodayScheduleProbeTrainCodes,
     getTodayScheduleProbeGroups,
@@ -18,9 +21,16 @@ import { isScheduleProbeTrackingEnabled } from '~/server/utils/12306/schedulePro
 import { loadPublishedScheduleStateSummary } from '~/server/utils/12306/scheduleProbe/stateStore';
 import { getScheduleDatabaseFilePath } from '~/server/utils/12306/scheduleProbe/sqliteStore';
 import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
-import { getShanghaiUnixSecondsFromDateAndTime } from '~/server/utils/date/shanghaiDateTime';
+import {
+    serviceDateToDay,
+    serviceDayToShanghaiDayStartUnixSeconds,
+    type ServiceDay
+} from '~/server/utils/date/serviceDay';
+import parseTimeAsTimestamp from '~/server/utils/date/parseTimeAsTimestamp';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
 import { PROBE_TRAIN_DEPARTURE_TASK_EXECUTOR } from '~/server/services/taskExecutors/probeTrainDepartureTaskExecutor';
+import type { TrainCodeParts } from '~/server/utils/12306/trainCode';
+import { formatTrainCode } from '~/server/utils/12306/trainCode';
 
 export const DISPATCH_DAILY_PROBE_TASKS_EXECUTOR = 'dispatch_daily_probe_tasks';
 
@@ -31,31 +41,30 @@ const DISABLED_LATEST_EXECUTION_TIME_HHMM = '0000';
 let registered = false;
 
 export interface DispatchDailyProbeTasksResult {
-    date: string | null;
+    date: ServiceDay | null;
     groupCount: number;
     createdTaskIds: number[];
 }
 
 interface TrackableProbeGroup {
-    trainCodes: string[];
+    trainCodes: TrainCodeParts[];
     group: TodayScheduleProbeGroup;
 }
 
 function resolveProbeTaskExecutionTime(
     startAt: number,
     now: number,
-    serviceDate: string,
+    serviceDate: ServiceDay,
     latestExecutionTimeHHmm: string
 ): number {
     let plannedExecutionTime = startAt;
 
     if (latestExecutionTimeHHmm !== DISABLED_LATEST_EXECUTION_TIME_HHMM) {
-        const latestExecutionTime = getShanghaiUnixSecondsFromDateAndTime(
-            serviceDate,
-            latestExecutionTimeHHmm
-        );
-        if (startAt > latestExecutionTime) {
-            plannedExecutionTime = latestExecutionTime;
+        const latestExecutionTimeForServiceDate =
+            serviceDayToShanghaiDayStartUnixSeconds(serviceDate) +
+            parseTimeAsTimestamp(latestExecutionTimeHHmm);
+        if (startAt > latestExecutionTimeForServiceDate) {
+            plannedExecutionTime = latestExecutionTimeForServiceDate;
         }
     }
 
@@ -78,7 +87,7 @@ export async function dispatchDailyProbeTasks(): Promise<DispatchDailyProbeTasks
         };
     }
 
-    const currentDate = getCurrentDateString();
+    const currentDate = serviceDateToDay(getCurrentDateString());
     if (scheduleState.date !== currentDate) {
         markCurrentTrainProvenanceTaskSkipped('schedule_not_current');
         logger.warn(
@@ -172,8 +181,11 @@ export function registerDispatchDailyProbeTasksExecutor(): void {
         return;
     }
 
-    registerTaskExecutor(DISPATCH_DAILY_PROBE_TASKS_EXECUTOR, async () => {
-        await dispatchDailyProbeTasks();
+    registerTaskExecutor(DISPATCH_DAILY_PROBE_TASKS_EXECUTOR, {
+        parse: parseEmptyTaskArgs,
+        execute: async () => {
+            await dispatchDailyProbeTasks();
+        }
     });
     registered = true;
     logger.info(`registered executor=${DISPATCH_DAILY_PROBE_TASKS_EXECUTOR}`);

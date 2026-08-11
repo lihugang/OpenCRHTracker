@@ -4,7 +4,8 @@ import { useTimetableHistoryDatabase } from '~/server/libs/database/timetableHis
 import {
     buildCodeIndex,
     buildGroupIndex,
-    getGroupKey
+    getGroupKey,
+    uniqueTrainCodes
 } from '~/server/utils/12306/scheduleProbe/taskHelpers';
 import type {
     ScheduleItem,
@@ -16,13 +17,22 @@ import {
     loadScheduleItemWithStopsByStateKindAndCode,
     type ScheduleStateKind
 } from '~/server/utils/12306/scheduleProbe/sqliteStore';
-import uniqueNormalizedCodes from '~/server/utils/12306/uniqueNormalizedCodes';
-import normalizeCode from '~/server/utils/12306/normalizeCode';
+import {
+    trainCodeKey,
+    type TrainCodeParts
+} from '~/server/utils/12306/trainCode';
 import getCanonicalTimetableContent from '~/server/utils/12306/getCanonicalTimetableContent';
-import { formatShanghaiDateString } from '~/server/utils/date/getCurrentDateString';
-import { getShanghaiDayStartUnixSeconds } from '~/server/utils/date/shanghaiDateTime';
 import importSqlBatch from '~/server/utils/sql/importSqlBatch';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
+import {
+    asServiceDay,
+    serviceDateToDay,
+    type ServiceDay
+} from '~/server/utils/date/serviceDay';
+import {
+    parseInternalJson,
+    stringifyInternalJson
+} from '~/server/utils/internal/storageValues';
 
 export interface TimetableHistoryContentRow {
     id: number;
@@ -34,7 +44,18 @@ export interface TimetableHistoryContentRow {
 
 export interface TimetableHistoryCoverageRow {
     id: number;
-    train_code: string;
+    train_code: TrainCodeParts;
+    service_date_start: ServiceDay;
+    service_date_end_exclusive: ServiceDay;
+    content_id: number;
+    created_at: number;
+    updated_at: number;
+}
+
+interface RawTimetableHistoryCoverageRow {
+    id: number;
+    train_prefix: string;
+    train_number: number;
     service_date_start: number;
     service_date_end_exclusive: number;
     content_id: number;
@@ -43,7 +64,7 @@ export interface TimetableHistoryCoverageRow {
 }
 
 export interface TimetableHistoryCursorPoint {
-    serviceDate: string;
+    serviceDate: ServiceDay;
     id: number;
 }
 
@@ -71,7 +92,7 @@ export interface TimetableHistorySyncResult {
     updatedCoverages: number;
     deletedCoverages: number;
     noopedCoverages: number;
-    timetableChangedTrainCodes: string[];
+    timetableChangedTrainCodes: TrainCodeParts[];
 }
 
 interface SyncCoverageStats {
@@ -99,24 +120,22 @@ const timetableHistoryStatements =
     });
 
 const DEFAULT_TIMETABLE_HISTORY_CURSOR_POINT: TimetableHistoryCursorPoint = {
-    serviceDate: '99991231',
+    serviceDate: serviceDateToDay('99991231'),
     id: Number.MAX_SAFE_INTEGER
 };
 
-function normalizeServiceDateInteger(serviceDate: string): number {
-    if (!/^\d{8}$/.test(serviceDate)) {
-        throw new Error(`invalid_service_date ${serviceDate}`);
-    }
-
-    return Number.parseInt(serviceDate, 10);
-}
-
-export function normalizeTimetableHistoryServiceDate(serviceDate: string) {
-    return normalizeServiceDateInteger(serviceDate);
-}
-
-export function formatTimetableHistoryServiceDate(serviceDate: number) {
-    return formatServiceDateInteger(serviceDate);
+function decodeCoverageRow(
+    row: RawTimetableHistoryCoverageRow
+): TimetableHistoryCoverageRow {
+    return {
+        ...row,
+        train_code: {
+            prefix: row.train_prefix,
+            number: row.train_number
+        },
+        service_date_start: asServiceDay(row.service_date_start),
+        service_date_end_exclusive: asServiceDay(row.service_date_end_exclusive)
+    };
 }
 
 export function getTimetableHistoryContentById(contentId: number) {
@@ -137,96 +156,76 @@ export function getTimetableHistoryCoverageById(coverageId: number) {
         return null;
     }
 
-    return (
-        timetableHistoryStatements.get<TimetableHistoryCoverageRow>(
-            'selectCoverageById',
-            coverageId
-        ) ?? null
+    const row = timetableHistoryStatements.get<RawTimetableHistoryCoverageRow>(
+        'selectCoverageById',
+        coverageId
     );
+    return row ? decodeCoverageRow(row) : null;
 }
 
 export function getTimetableHistoryCoverageByTrainCodeAtDate(
-    trainCode: string,
-    serviceDate: string
+    trainCode: TrainCodeParts,
+    serviceDate: ServiceDay
 ) {
-    const normalizedTrainCode = normalizeCode(trainCode);
-    if (normalizedTrainCode.length === 0) {
-        return null;
-    }
-
-    const normalizedServiceDate = normalizeServiceDateInteger(serviceDate);
-    return (
-        timetableHistoryStatements.get<TimetableHistoryCoverageRow>(
-            'selectCoverageByTrainCodeAtDate',
-            normalizedTrainCode,
-            normalizedServiceDate,
-            normalizedServiceDate
-        ) ?? null
+    const row = timetableHistoryStatements.get<RawTimetableHistoryCoverageRow>(
+        'selectCoverageByTrainCodeAtDate',
+        trainCode.prefix,
+        trainCode.number,
+        serviceDate,
+        serviceDate
     );
+    return row ? decodeCoverageRow(row) : null;
 }
 
 export function getLatestTimetableHistoryCoverageByTrainCodeAtOrBeforeDate(
-    trainCode: string,
-    serviceDate: string
+    trainCode: TrainCodeParts,
+    serviceDate: ServiceDay
 ) {
-    const normalizedTrainCode = normalizeCode(trainCode);
-    if (normalizedTrainCode.length === 0) {
-        return null;
-    }
-
-    const normalizedServiceDate = normalizeServiceDateInteger(serviceDate);
-    return (
-        timetableHistoryStatements.get<TimetableHistoryCoverageRow>(
-            'selectLatestCoverageByTrainCodeAtOrBeforeDate',
-            normalizedTrainCode,
-            normalizedServiceDate
-        ) ?? null
+    const row = timetableHistoryStatements.get<RawTimetableHistoryCoverageRow>(
+        'selectLatestCoverageByTrainCodeAtOrBeforeDate',
+        trainCode.prefix,
+        trainCode.number,
+        serviceDate
     );
+    return row ? decodeCoverageRow(row) : null;
 }
 
 export function listTimetableHistoryCoveragesByTrainCodePaged(
-    trainCode: string,
+    trainCode: TrainCodeParts,
     cursor: TimetableHistoryCursorPoint | null,
     limit: number
 ) {
-    const normalizedTrainCode = normalizeCode(trainCode);
-    if (
-        normalizedTrainCode.length === 0 ||
-        !Number.isInteger(limit) ||
-        limit <= 0
-    ) {
-        return [];
-    }
+    if (!Number.isInteger(limit) || limit <= 0) return [];
 
     const cursorPoint = cursor ?? DEFAULT_TIMETABLE_HISTORY_CURSOR_POINT;
-    const cursorServiceDate = normalizeServiceDateInteger(
-        cursorPoint.serviceDate
-    );
 
-    return timetableHistoryStatements.all<TimetableHistoryCoverageRow>(
-        'selectCoveragesByTrainCodePaged',
-        normalizedTrainCode,
-        cursorServiceDate,
-        cursorServiceDate,
-        cursorPoint.id,
-        limit
-    );
+    return timetableHistoryStatements
+        .all<RawTimetableHistoryCoverageRow>(
+            'selectCoveragesByTrainCodePaged',
+            trainCode.prefix,
+            trainCode.number,
+            cursorPoint.serviceDate,
+            cursorPoint.serviceDate,
+            cursorPoint.id,
+            limit
+        )
+        .map(decodeCoverageRow);
 }
 
-export function listTimetableHistoryCoveragesByTrainCode(trainCode: string) {
-    const normalizedTrainCode = normalizeCode(trainCode);
-    if (normalizedTrainCode.length === 0) {
-        return [];
-    }
-
-    return timetableHistoryStatements.all<TimetableHistoryCoverageRow>(
-        'selectCoveragesByTrainCode',
-        normalizedTrainCode
-    );
+export function listTimetableHistoryCoveragesByTrainCode(
+    trainCode: TrainCodeParts
+) {
+    return timetableHistoryStatements
+        .all<RawTimetableHistoryCoverageRow>(
+            'selectCoveragesByTrainCode',
+            trainCode.prefix,
+            trainCode.number
+        )
+        .map(decodeCoverageRow);
 }
 
 export interface TimetableHistoryMergedCoverageResult {
-    trainCode: string;
+    trainCode: TrainCodeParts;
     previous: TimetableHistoryCoverageRow;
     middle: TimetableHistoryCoverageRow;
     next: TimetableHistoryCoverageRow;
@@ -240,8 +239,10 @@ export function isTimetableHistoryMergeCandidate(
     next: TimetableHistoryCoverageRow
 ) {
     return (
-        previous.train_code === middle.train_code &&
-        middle.train_code === next.train_code &&
+        previous.train_code.prefix === middle.train_code.prefix &&
+        previous.train_code.number === middle.train_code.number &&
+        middle.train_code.prefix === next.train_code.prefix &&
+        middle.train_code.number === next.train_code.number &&
         previous.service_date_end_exclusive === middle.service_date_start &&
         middle.service_date_end_exclusive === next.service_date_start &&
         previous.content_id === next.content_id &&
@@ -308,43 +309,26 @@ export function mergeTimetableHistoryCoverageByMiddleId(
 }
 
 export function listLatestTimetableHistoryCoveragesByTrainCodeAtOrBeforeDate(
-    trainCode: string,
-    serviceDate: string,
+    trainCode: TrainCodeParts,
+    serviceDate: ServiceDay,
     limit: number
 ) {
-    const normalizedTrainCode = normalizeCode(trainCode);
-    if (
-        normalizedTrainCode.length === 0 ||
-        !Number.isInteger(limit) ||
-        limit <= 0
-    ) {
-        return [];
-    }
+    if (!Number.isInteger(limit) || limit <= 0) return [];
 
-    const normalizedServiceDate = normalizeServiceDateInteger(serviceDate);
-    return timetableHistoryStatements.all<TimetableHistoryCoverageRow>(
-        'selectLatestCoveragesByTrainCodeAtOrBeforeDate',
-        normalizedTrainCode,
-        normalizedServiceDate,
-        normalizedServiceDate,
-        limit
-    );
+    return timetableHistoryStatements
+        .all<RawTimetableHistoryCoverageRow>(
+            'selectLatestCoveragesByTrainCodeAtOrBeforeDate',
+            trainCode.prefix,
+            trainCode.number,
+            serviceDate,
+            serviceDate,
+            limit
+        )
+        .map(decodeCoverageRow);
 }
 
-function formatServiceDateInteger(serviceDate: number): string {
-    if (!Number.isInteger(serviceDate) || serviceDate <= 0) {
-        throw new Error(`invalid_service_date_int ${serviceDate}`);
-    }
-
-    return serviceDate.toString().padStart(8, '0');
-}
-
-function getNextServiceDateInteger(serviceDate: number): number {
-    const currentDate = formatServiceDateInteger(serviceDate);
-    const nextDate = formatShanghaiDateString(
-        (getShanghaiDayStartUnixSeconds(currentDate) + 24 * 60 * 60) * 1000
-    );
-    return normalizeServiceDateInteger(nextDate);
+function getNextServiceDateInteger(serviceDate: ServiceDay): ServiceDay {
+    return asServiceDay(serviceDate + 1);
 }
 
 function ensureContentRow(
@@ -354,13 +338,16 @@ function ensureContentRow(
     nowSeconds: number,
     stats: SyncCoverageStats
 ) {
+    const internalTimetableJson = stringifyInternalJson(
+        parseInternalJson(timetableJson, 'internal')
+    );
     const existingRow =
         timetableHistoryStatements.get<TimetableHistoryContentRow>(
             'selectContentByHash',
             hash
         );
     if (existingRow) {
-        if (existingRow.timetable_json !== timetableJson) {
+        if (existingRow.timetable_json !== internalTimetableJson) {
             throw new Error(`timetable_history_hash_collision hash=${hash}`);
         }
         return existingRow;
@@ -369,7 +356,7 @@ function ensureContentRow(
     timetableHistoryStatements.run(
         'insertContent',
         hash,
-        timetableJson,
+        internalTimetableJson,
         stopCount,
         nowSeconds
     );
@@ -382,7 +369,7 @@ function ensureContentRow(
     if (!insertedRow) {
         throw new Error(`timetable_history_content_insert_failed hash=${hash}`);
     }
-    if (insertedRow.timetable_json !== timetableJson) {
+    if (insertedRow.timetable_json !== internalTimetableJson) {
         throw new Error(`timetable_history_hash_collision hash=${hash}`);
     }
 
@@ -391,16 +378,17 @@ function ensureContentRow(
 }
 
 function insertCoverage(
-    trainCode: string,
-    serviceDate: number,
-    nextServiceDate: number,
+    trainCode: TrainCodeParts,
+    serviceDate: ServiceDay,
+    nextServiceDate: ServiceDay,
     contentId: number,
     nowSeconds: number,
     stats: SyncCoverageStats
 ) {
     timetableHistoryStatements.run(
         'insertCoverage',
-        trainCode,
+        trainCode.prefix,
+        trainCode.number,
         serviceDate,
         nextServiceDate,
         contentId,
@@ -461,14 +449,17 @@ function deleteCoverage(coverageId: number, stats: SyncCoverageStats) {
 }
 
 function normalizeAdjacentCoverages(
-    trainCode: string,
+    trainCode: TrainCodeParts,
     nowSeconds: number,
     stats: SyncCoverageStats
 ) {
-    const rows = timetableHistoryStatements.all<TimetableHistoryCoverageRow>(
-        'selectCoveragesByTrainCode',
-        trainCode
-    );
+    const rows = timetableHistoryStatements
+        .all<RawTimetableHistoryCoverageRow>(
+            'selectCoveragesByTrainCode',
+            trainCode.prefix,
+            trainCode.number
+        )
+        .map(decodeCoverageRow);
     if (rows.length < 2) {
         return;
     }
@@ -490,7 +481,9 @@ function normalizeAdjacentCoverages(
             deleteCoverage(currentRow.id, stats);
             previousRow = {
                 ...previousRow,
-                service_date_end_exclusive: mergedServiceDateEndExclusive,
+                service_date_end_exclusive: asServiceDay(
+                    mergedServiceDateEndExclusive
+                ),
                 updated_at: nowSeconds
             };
             continue;
@@ -501,19 +494,21 @@ function normalizeAdjacentCoverages(
 }
 
 function syncCoverageForTrainCode(
-    trainCode: string,
-    serviceDate: number,
-    nextServiceDate: number,
+    trainCode: TrainCodeParts,
+    serviceDate: ServiceDay,
+    nextServiceDate: ServiceDay,
     contentId: number,
     nowSeconds: number,
     stats: SyncCoverageStats
 ): CoverageSyncResult {
-    const currentRow =
-        timetableHistoryStatements.get<TimetableHistoryCoverageRow>(
+    const currentRawRow =
+        timetableHistoryStatements.get<RawTimetableHistoryCoverageRow>(
             'selectLatestCoverageByTrainCodeAtOrBeforeDate',
-            trainCode,
+            trainCode.prefix,
+            trainCode.number,
             serviceDate
         ) ?? null;
+    const currentRow = currentRawRow ? decodeCoverageRow(currentRawRow) : null;
 
     if (!currentRow) {
         insertCoverage(
@@ -584,18 +579,19 @@ function syncCoverageForTrainCode(
 
 export function syncConfirmedTimetableHistoryForPublishedState(
     state: ScheduleState,
-    confirmedTrainCodes: string[],
+    confirmedTrainCodes: readonly TrainCodeParts[],
     nowSeconds = getNowSeconds()
 ): TimetableHistorySyncResult {
-    const normalizedConfirmedTrainCodes =
-        uniqueNormalizedCodes(confirmedTrainCodes);
+    const normalizedConfirmedTrainCodes = uniqueTrainCodes([
+        ...confirmedTrainCodes
+    ]);
     const groupItemsByGroupKey = new Map<string, ScheduleItem[]>();
 
     const codeIndex = buildCodeIndex(state.items);
     const groupIndex = buildGroupIndex(state.items);
 
     for (const confirmedTrainCode of normalizedConfirmedTrainCodes) {
-        const itemIndex = codeIndex.get(confirmedTrainCode);
+        const itemIndex = codeIndex.get(trainCodeKey(confirmedTrainCode));
         if (itemIndex === undefined) {
             continue;
         }
@@ -629,12 +625,13 @@ export function syncConfirmedTimetableHistoryForPublishedState(
 
 export function syncConfirmedTimetableHistoryForScheduleStateKind(
     kind: ScheduleStateKind,
-    serviceDate: string,
-    confirmedTrainCodes: string[],
+    serviceDate: ServiceDay,
+    confirmedTrainCodes: readonly TrainCodeParts[],
     nowSeconds = getNowSeconds()
 ): TimetableHistorySyncResult {
-    const normalizedConfirmedTrainCodes =
-        uniqueNormalizedCodes(confirmedTrainCodes);
+    const normalizedConfirmedTrainCodes = uniqueTrainCodes([
+        ...confirmedTrainCodes
+    ]);
     const groupItemsByGroupKey = new Map<string, ScheduleItem[]>();
 
     for (const confirmedTrainCode of normalizedConfirmedTrainCodes) {
@@ -676,7 +673,7 @@ export function syncConfirmedTimetableHistoryForScheduleStateKind(
 }
 
 function createTimetableHistorySyncResult(
-    normalizedConfirmedTrainCodes: readonly string[]
+    normalizedConfirmedTrainCodes: readonly TrainCodeParts[]
 ): TimetableHistorySyncResult {
     return {
         confirmedGroups: 0,
@@ -692,8 +689,8 @@ function createTimetableHistorySyncResult(
 }
 
 function syncConfirmedTimetableHistoryGroups(
-    serviceDateString: string,
-    normalizedConfirmedTrainCodes: readonly string[],
+    serviceDate: ServiceDay,
+    normalizedConfirmedTrainCodes: readonly TrainCodeParts[],
     groups: ScheduleItem[][],
     nowSeconds: number
 ): TimetableHistorySyncResult {
@@ -705,7 +702,6 @@ function syncConfirmedTimetableHistoryGroups(
         return result;
     }
 
-    const serviceDate = normalizeServiceDateInteger(serviceDateString);
     const nextServiceDate = getNextServiceDateInteger(serviceDate);
     const transaction = useTimetableHistoryDatabase().transaction(() => {
         for (const groupItems of groups) {
@@ -722,7 +718,7 @@ function syncConfirmedTimetableHistoryGroups(
                 continue;
             }
 
-            const aliasCodes = uniqueNormalizedCodes([
+            const aliasCodes = uniqueTrainCodes([
                 ...groupItems.map((item) => item.code),
                 ...groupItems.flatMap((item) => item.allCodes)
             ]);
@@ -751,13 +747,8 @@ function syncConfirmedTimetableHistoryGroups(
             let groupTimetableChanged = false;
 
             for (const aliasCode of aliasCodes) {
-                const normalizedAliasCode = normalizeCode(aliasCode);
-                if (normalizedAliasCode.length === 0) {
-                    continue;
-                }
-
                 const coverageSyncResult = syncCoverageForTrainCode(
-                    normalizedAliasCode,
+                    aliasCode,
                     serviceDate,
                     nextServiceDate,
                     contentRow.id,
@@ -778,9 +769,7 @@ function syncConfirmedTimetableHistoryGroups(
                 groupTimetableChanged ||
                 (!groupHasComparableContent && groupHasFirstObservation)
             ) {
-                result.timetableChangedTrainCodes.push(
-                    normalizeCode(representativeItem.code)
-                );
+                result.timetableChangedTrainCodes.push(representativeItem.code);
             }
             result.confirmedGroups += 1;
         }

@@ -3,13 +3,15 @@ INSERT INTO provenance_events (
     sequence_no,
     created_at,
     service_date,
-    train_code,
+    train_prefix,
+    train_number,
     start_at,
-    emu_code,
-    related_train_code,
-    related_emu_code,
+    emu_id,
+    related_train_prefix,
+    related_train_number,
+    related_emu_id,
     event_type,
     result,
     linked_scheduler_task_id,
     payload_json
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);

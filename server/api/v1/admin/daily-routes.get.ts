@@ -3,6 +3,11 @@ import { searchAdminDailyRoutes } from '~/server/services/adminDailyRouteMainten
 import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';
 import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
+import {
+    ensureExternalEmuId,
+    parseExternalServiceDate,
+    parseExternalTrainCode
+} from '~/server/utils/internal/boundaries';
 
 export default defineEventHandler(async (event) => {
     return executeApi(
@@ -34,7 +39,11 @@ export default defineEventHandler(async (event) => {
                 'trainCode 与 emuCode 至少填写一个'
             );
 
-            return searchAdminDailyRoutes(date, trainCode, emuCode);
+            return searchAdminDailyRoutes(
+                parseExternalServiceDate(date),
+                trainCode.length > 0 ? parseExternalTrainCode(trainCode) : null,
+                emuCode.length > 0 ? ensureExternalEmuId(emuCode) : null
+            );
         }
     );
 });

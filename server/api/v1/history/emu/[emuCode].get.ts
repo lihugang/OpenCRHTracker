@@ -12,6 +12,12 @@ import parseLimit from '~/server/utils/api/query/parseLimit';
 import { getHistoryResponseCacheControlMaxAge } from '~/server/utils/api/response/getResponseCacheControlMaxAge';
 import setCacheControl from '~/server/utils/api/response/setCacheControl';
 import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
+import {
+    ensureExternalEmuId,
+    formatExternalServiceDate,
+    formatExternalTrainCode,
+    parseExternalCursor
+} from '~/server/utils/internal/boundaries';
 
 export default defineEventHandler(async (event) => {
     return executeApi(
@@ -42,10 +48,10 @@ export default defineEventHandler(async (event) => {
             const query = getQuery(event);
             const start = parseOptionalTimestamp(query.start, 'start');
             const end = parseOptionalTimestamp(query.end, 'end');
-            const cursor = parseCursor(query.cursor, 'cursor');
+            const cursor = parseExternalCursor(query.cursor, 'cursor');
             const limit = parseLimit(event);
             const rows = listHistoryLightByEmuPaged(
-                emuCode,
+                ensureExternalEmuId(emuCode),
                 start ?? 0,
                 end ?? Number.MAX_SAFE_INTEGER,
                 cursor,
@@ -61,9 +67,9 @@ export default defineEventHandler(async (event) => {
                 nextCursor: buildNextCursor(rows, limit),
                 items: rows.map((row) => ({
                     id: String(row.id),
-                    serviceDate: row.service_date,
+                    serviceDate: formatExternalServiceDate(row.service_date),
                     timetableId: row.timetable_id,
-                    trainCode: row.train_code
+                    trainCode: formatExternalTrainCode(row.train_code)
                 }))
             };
         }

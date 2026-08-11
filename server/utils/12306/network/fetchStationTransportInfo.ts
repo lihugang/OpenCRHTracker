@@ -4,6 +4,8 @@ import { record12306RequestHourlyStat } from '~/server/services/trainProvenanceS
 import parsePlatformNo from '../parsePlatformNo';
 import waitFor12306RequestSlot from '../requestLimiter';
 import log12306RequestFailure from './log12306RequestFailure';
+import { formatExternalTrainCode } from '~/server/utils/internal/boundaries';
+import type { TrainCodeParts } from '~/server/utils/12306/trainCode';
 
 interface StationTransportInfoResponse {
     httpCode?: unknown;
@@ -32,10 +34,11 @@ function isObject(value: unknown): value is Record<string, unknown> {
 
 export default async function fetchStationTransportInfo(
     stationTelecode: string,
-    stationTrainCode: string
+    stationTrainCode: TrainCodeParts
 ): Promise<StationTransportInfo | null> {
     const normalizedStationTelecode = stationTelecode.trim().toUpperCase();
-    const normalizedStationTrainCode = stationTrainCode.trim().toUpperCase();
+    const normalizedStationTrainCode =
+        formatExternalTrainCode(stationTrainCode);
     if (normalizedStationTelecode.length === 0) {
         throw new Error('stationTelecode must be a non-empty string');
     }

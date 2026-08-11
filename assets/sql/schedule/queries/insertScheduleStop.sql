@@ -1,17 +1,19 @@
 INSERT INTO schedule_stops (
     state_kind,
-    item_code,
+    item_prefix,
+    item_number,
     stop_index,
     station_no,
     station_name,
     station_telecode,
     arrive_at,
     depart_at,
-    station_train_code,
+    station_train_prefix,
+    station_train_number,
     wicket,
     distance,
     platform_no,
     station_platform_info_fetched_at,
     is_start,
     is_end
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);

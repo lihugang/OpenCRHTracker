@@ -2,7 +2,8 @@ INSERT INTO station_platform_refresh_results (
     task_run_id,
     service_date,
     start_at,
-    primary_train_code,
+    primary_train_prefix,
+    primary_train_number,
     train_codes_json,
     trigger,
     status,
@@ -14,4 +15,4 @@ INSERT INTO station_platform_refresh_results (
     failed_count,
     error_message,
     created_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);

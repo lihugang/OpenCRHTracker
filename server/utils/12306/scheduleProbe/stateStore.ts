@@ -1,11 +1,14 @@
-import fs from 'fs';
-import path from 'path';
 import getCurrentDateString from '../../date/getCurrentDateString';
 import normalizeCode from '../normalizeCode';
 import uniqueNormalizedCodes from '../uniqueNormalizedCodes';
+import { trainCodeKey, type TrainCodeParts } from '../trainCode';
+import {
+    asServiceDay,
+    serviceDateToDay,
+    type ServiceDay
+} from '~/server/utils/date/serviceDay';
 import {
     CURRENT_SCHEDULE_DOCUMENT_VERSION,
-    LEGACY_SCHEDULE_JSON_PATH,
     SCHEDULE_SCHEMA_RELATIVE_PATH
 } from './constants';
 import { filterInvalidScheduleItems } from './filterInvalidScheduleItems';
@@ -14,7 +17,6 @@ import {
     appendScheduleRouteRefreshQueueEntries,
     consumeScheduleRouteRefreshQueueEntries,
     deleteScheduleCirculationEntryFromDatabase,
-    hasScheduleDatabaseDocument,
     loadScheduleCirculationEntryFromDatabase,
     loadScheduleCirculationMapFromDatabase,
     loadScheduleDocumentFromDatabase,
@@ -34,7 +36,6 @@ import type {
     ScheduleRouteRefreshQueueEntry,
     ScheduleStationEntry,
     ScheduleStationMap,
-    ScheduleStop,
     ScheduleState,
     ScheduleProbeRuntimeConfig
 } from './types';
@@ -50,13 +51,12 @@ interface LoadedBuildingScheduleState {
         | 'refresh_non_running'
         | 'refresh_cross_day'
         | 'refresh_scope_or_strategy_changed'
-        | 'init_missing_file'
-        | 'reset_invalid_file';
+        | 'init_missing_file';
 }
 
 export interface ScheduleStopMetadataUpdate {
-    trainNo: string;
-    stationTrainCode: string;
+    trainNo: string | null;
+    stationTrainCode: TrainCodeParts;
     stationTelecode: string;
     distance: number | null;
     platformNo: number | null;
@@ -141,40 +141,6 @@ function normalizeScheduleStationEntry(
     };
 }
 
-function normalizeScheduleStations(value: unknown): {
-    stations: ScheduleStationMap;
-    migrated: boolean;
-} {
-    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-        return {
-            stations: {},
-            migrated: true
-        };
-    }
-
-    let migrated = false;
-    const stations: ScheduleStationMap = {};
-
-    for (const [key, entry] of Object.entries(value)) {
-        const normalizedEntry = normalizeScheduleStationEntry(key, entry);
-        if (!normalizedEntry) {
-            migrated = true;
-            continue;
-        }
-
-        const normalizedKey = normalizedEntry.stationTelecode;
-        if (stations[normalizedKey]) {
-            migrated = true;
-        }
-        stations[normalizedKey] = normalizedEntry;
-    }
-
-    return {
-        stations,
-        migrated
-    };
-}
-
 function mergeScheduleStationMaps(
     base: ScheduleStationMap,
     updates: ScheduleStationMap | null | undefined
@@ -194,74 +160,6 @@ function mergeScheduleStationMaps(
     }
 
     return merged;
-}
-
-function normalizeRouteRefreshQueueEntry(
-    value: unknown
-): ScheduleRouteRefreshQueueEntry | null {
-    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-        return null;
-    }
-
-    const row = value as Partial<ScheduleRouteRefreshQueueEntry>;
-    const trainCode = normalizeCode(String(row.trainCode ?? ''));
-    const serviceDate =
-        typeof row.serviceDate === 'string' ? row.serviceDate.trim() : '';
-    const enqueuedAt = row.enqueuedAt;
-
-    if (
-        trainCode.length === 0 ||
-        !/^\d{8}$/.test(serviceDate) ||
-        typeof enqueuedAt !== 'number' ||
-        !Number.isInteger(enqueuedAt) ||
-        enqueuedAt < 0
-    ) {
-        return null;
-    }
-
-    return {
-        trainCode,
-        serviceDate,
-        enqueuedAt
-    };
-}
-
-function normalizeRouteRefreshQueue(value: unknown): {
-    queue: ScheduleRouteRefreshQueueEntry[];
-    migrated: boolean;
-} {
-    if (!Array.isArray(value)) {
-        return {
-            queue: [],
-            migrated: true
-        };
-    }
-
-    let migrated = false;
-    const deduplication = new Set<string>();
-    const queue: ScheduleRouteRefreshQueueEntry[] = [];
-
-    for (const item of value) {
-        const normalized = normalizeRouteRefreshQueueEntry(item);
-        if (!normalized) {
-            migrated = true;
-            continue;
-        }
-
-        const dedupeKey = `${normalized.serviceDate}:${normalized.trainCode}`;
-        if (deduplication.has(dedupeKey)) {
-            migrated = true;
-            continue;
-        }
-
-        deduplication.add(dedupeKey);
-        queue.push(normalized);
-    }
-
-    return {
-        queue,
-        migrated
-    };
 }
 
 function normalizeScheduleCirculationNode(value: unknown) {
@@ -299,15 +197,28 @@ function normalizeScheduleCirculationNode(value: unknown) {
         return null;
     }
 
-    const allCodes = uniqueNormalizedCodes(
-        Array.isArray(row.allCodes)
-            ? [
-                  ...row.allCodes.filter(
-                      (code): code is string => typeof code === 'string'
-                  )
-              ]
-            : []
-    );
+    const allCodes: TrainCodeParts[] = [];
+    const seenCodes = new Set<string>();
+    for (const code of Array.isArray(row.allCodes) ? row.allCodes : []) {
+        if (
+            typeof code !== 'object' ||
+            code === null ||
+            typeof (code as { prefix?: unknown }).prefix !== 'string' ||
+            typeof (code as { number?: unknown }).number !== 'number'
+        ) {
+            return null;
+        }
+        const parsedCode = {
+            prefix: (code as { prefix: string }).prefix,
+            number: (code as { number: number }).number
+        } satisfies TrainCodeParts;
+        const codeKey = trainCodeKey(parsedCode);
+        if (seenCodes.has(codeKey)) {
+            continue;
+        }
+        seenCodes.add(codeKey);
+        allCodes.push(parsedCode);
+    }
     if (allCodes.length === 0) {
         return null;
     }
@@ -383,480 +294,12 @@ function normalizeScheduleCirculationEntry(
     };
 }
 
-function normalizeScheduleCirculation(value: unknown): {
-    circulation: ScheduleCirculationMap;
-    migrated: boolean;
-} {
-    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-        return {
-            circulation: {},
-            migrated: true
-        };
-    }
-
-    let migrated = false;
-    const circulation: ScheduleCirculationMap = {};
-    for (const [key, entry] of Object.entries(value)) {
-        const normalizedEntry = normalizeScheduleCirculationEntry(key, entry);
-        if (!normalizedEntry) {
-            migrated = true;
-            continue;
-        }
-
-        const normalizedKeys =
-            getScheduleCirculationKeysFromEntry(normalizedEntry);
-        for (const normalizedKey of normalizedKeys) {
-            if (circulation[normalizedKey]) {
-                continue;
-            }
-            circulation[normalizedKey] =
-                cloneScheduleCirculationEntry(normalizedEntry);
-        }
-    }
-
-    return {
-        circulation,
-        migrated
-    };
-}
-
-function ensureScheduleItem(
-    value: unknown
-): value is Partial<ScheduleItem> & { code: string } {
-    return (
-        typeof value === 'object' &&
-        value !== null &&
-        !Array.isArray(value) &&
-        typeof (value as { code?: unknown }).code === 'string' &&
-        (value as { code: string }).code.length > 0
-    );
-}
-
 function normalizeOptionalNonNegativeInteger(value: unknown): number | null {
     if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
         return null;
     }
 
     return value;
-}
-
-function normalizeScheduleStop(
-    value: unknown,
-    fallbackStationNo: number
-): ScheduleStop | null {
-    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-        return null;
-    }
-
-    const stop = value as Partial<ScheduleStop>;
-    const stationNo =
-        typeof stop.stationNo === 'number' &&
-        Number.isInteger(stop.stationNo) &&
-        stop.stationNo > 0
-            ? stop.stationNo
-            : fallbackStationNo;
-    const stationName =
-        typeof stop.stationName === 'string' ? stop.stationName.trim() : '';
-    if (stationName.length === 0) {
-        return null;
-    }
-
-    const arriveAt =
-        typeof stop.arriveAt === 'number' &&
-        Number.isInteger(stop.arriveAt) &&
-        stop.arriveAt >= 0
-            ? stop.arriveAt
-            : null;
-    const departAt =
-        typeof stop.departAt === 'number' &&
-        Number.isInteger(stop.departAt) &&
-        stop.departAt >= 0
-            ? stop.departAt
-            : null;
-    const distance = normalizeOptionalNonNegativeInteger(stop.distance);
-    const platformNo = normalizeOptionalNonNegativeInteger(stop.platformNo);
-    const stationPlatformInfoFetchedAt = normalizeOptionalNonNegativeInteger(
-        stop.stationPlatformInfoFetchedAt
-    );
-
-    return {
-        stationNo,
-        stationName,
-        stationTelecode:
-            typeof stop.stationTelecode === 'string'
-                ? normalizeCode(stop.stationTelecode)
-                : '',
-        arriveAt,
-        departAt,
-        stationTrainCode:
-            typeof stop.stationTrainCode === 'string'
-                ? stop.stationTrainCode.trim().toUpperCase()
-                : '',
-        wicket: typeof stop.wicket === 'string' ? stop.wicket.trim() : '',
-        ...(distance !== null ? { distance } : {}),
-        ...(platformNo !== null ? { platformNo } : {}),
-        ...(stationPlatformInfoFetchedAt !== null
-            ? { stationPlatformInfoFetchedAt }
-            : {}),
-        isStart: stop.isStart === true,
-        isEnd: stop.isEnd === true
-    };
-}
-
-function asScheduleState(value: unknown): ScheduleState | null {
-    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-        return null;
-    }
-
-    const state = value as Partial<ScheduleState>;
-    if (typeof state.date !== 'string') {
-        return null;
-    }
-    if (
-        state.status !== 'running' &&
-        state.status !== 'done' &&
-        state.status !== 'partial_failed'
-    ) {
-        return null;
-    }
-    if (
-        typeof state.startedAtMs !== 'number' ||
-        !Number.isFinite(state.startedAtMs)
-    ) {
-        return null;
-    }
-    if (
-        typeof state.generatedAt !== 'number' ||
-        !Number.isFinite(state.generatedAt)
-    ) {
-        return null;
-    }
-    if (
-        typeof state.strategy !== 'object' ||
-        state.strategy === null ||
-        typeof state.scope !== 'object' ||
-        state.scope === null ||
-        typeof state.progress !== 'object' ||
-        state.progress === null ||
-        typeof state.stats !== 'object' ||
-        state.stats === null ||
-        !Array.isArray(state.items)
-    ) {
-        return null;
-    }
-    if (
-        state.progress.phase !== 'discover' &&
-        state.progress.phase !== 'enrich' &&
-        state.progress.phase !== 'done'
-    ) {
-        return null;
-    }
-    if (
-        typeof state.progress.enrichCursor !== 'number' ||
-        !Number.isFinite(state.progress.enrichCursor)
-    ) {
-        return null;
-    }
-    if (
-        typeof state.stats.rawItems !== 'number' ||
-        !Number.isFinite(state.stats.rawItems) ||
-        typeof state.stats.uniqueItems !== 'number' ||
-        !Number.isFinite(state.stats.uniqueItems) ||
-        typeof state.stats.durationMs !== 'number' ||
-        !Number.isFinite(state.stats.durationMs)
-    ) {
-        return null;
-    }
-    if (
-        !Array.isArray(state.progress.discoverQueue) ||
-        !Array.isArray(state.progress.discoverProcessed) ||
-        !Array.isArray(state.progress.failedKeywords) ||
-        !Array.isArray(state.progress.failedEnrichCodes)
-    ) {
-        return null;
-    }
-
-    const prefixRules = (state.scope as { prefixRules?: unknown }).prefixRules;
-    if (!Array.isArray(prefixRules)) {
-        return null;
-    }
-    for (const prefixRule of prefixRules) {
-        if (
-            typeof prefixRule !== 'object' ||
-            prefixRule === null ||
-            Array.isArray(prefixRule)
-        ) {
-            return null;
-        }
-
-        const rule = prefixRule as { track?: unknown };
-        if (rule.track === undefined) {
-            rule.track = true;
-        } else if (typeof rule.track !== 'boolean') {
-            return null;
-        }
-    }
-
-    if (typeof state.lastBuildDate !== 'string') {
-        state.lastBuildDate = state.date;
-    }
-    if (
-        state.progress.discoverMode !== 'full' &&
-        state.progress.discoverMode !== 'retry'
-    ) {
-        state.progress.discoverMode = 'full';
-    }
-    if (
-        typeof state.progress.counters !== 'object' ||
-        state.progress.counters === null
-    ) {
-        state.progress.counters = {
-            apiCalls: 0,
-            apiRetries: 0
-        };
-    }
-    if (
-        typeof state.progress.counters.apiCalls !== 'number' ||
-        !Number.isFinite(state.progress.counters.apiCalls)
-    ) {
-        state.progress.counters.apiCalls = 0;
-    }
-    if (
-        typeof state.progress.counters.apiRetries !== 'number' ||
-        !Number.isFinite(state.progress.counters.apiRetries)
-    ) {
-        state.progress.counters.apiRetries = 0;
-    }
-
-    for (const item of state.items) {
-        if (!ensureScheduleItem(item)) {
-            return null;
-        }
-
-        const row = item as Partial<ScheduleItem>;
-        if (typeof row.internalCode !== 'string') {
-            row.internalCode = '';
-        }
-        if (typeof row.bureauCode !== 'string') {
-            row.bureauCode = '';
-        }
-        if (typeof row.trainStyle !== 'string') {
-            row.trainStyle = '';
-        }
-        if (typeof row.trainDepartment !== 'string') {
-            row.trainDepartment = '';
-        }
-        if (typeof row.passengerDepartment !== 'string') {
-            row.passengerDepartment = '';
-        }
-        if (typeof row.startStation !== 'string') {
-            row.startStation = '';
-        }
-        if (typeof row.endStation !== 'string') {
-            row.endStation = '';
-        }
-        if (
-            row.startAt !== null &&
-            (typeof row.startAt !== 'number' ||
-                !Number.isInteger(row.startAt) ||
-                row.startAt < 0)
-        ) {
-            row.startAt = null;
-        }
-        if (
-            row.endAt !== null &&
-            (typeof row.endAt !== 'number' ||
-                !Number.isInteger(row.endAt) ||
-                row.endAt < 0)
-        ) {
-            row.endAt = null;
-        }
-        if (
-            row.lastRouteRefreshAt !== null &&
-            (typeof row.lastRouteRefreshAt !== 'number' ||
-                !Number.isInteger(row.lastRouteRefreshAt) ||
-                row.lastRouteRefreshAt < 0)
-        ) {
-            row.lastRouteRefreshAt = null;
-        }
-        if (typeof row.lastRouteRefreshAt === 'undefined') {
-            row.lastRouteRefreshAt = null;
-        }
-        const normalizedCode = normalizeCode(String(row.code ?? ''));
-        row.allCodes = uniqueNormalizedCodes(
-            Array.isArray(row.allCodes)
-                ? [
-                      normalizedCode,
-                      ...row.allCodes.filter(
-                          (code): code is string => typeof code === 'string'
-                      )
-                  ]
-                : [normalizedCode]
-        );
-        row.stops = Array.isArray(row.stops)
-            ? row.stops
-                  .map((stop, index) => normalizeScheduleStop(stop, index + 1))
-                  .filter((stop): stop is ScheduleStop => stop !== null)
-            : [];
-        delete (row as { isRunningToday?: unknown }).isRunningToday;
-    }
-
-    return state as ScheduleState;
-}
-
-function scheduleStateNeedsRouteMetadataMigration(value: unknown): boolean {
-    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-        return false;
-    }
-
-    const items = (value as { items?: unknown }).items;
-    if (!Array.isArray(items)) {
-        return false;
-    }
-
-    return items.some((item) => {
-        if (typeof item !== 'object' || item === null || Array.isArray(item)) {
-            return false;
-        }
-
-        const row = item as {
-            bureauCode?: unknown;
-            trainStyle?: unknown;
-            trainDepartment?: unknown;
-            passengerDepartment?: unknown;
-        };
-        return (
-            typeof row.bureauCode !== 'string' ||
-            typeof row.trainStyle !== 'string' ||
-            typeof row.trainDepartment !== 'string' ||
-            typeof row.passengerDepartment !== 'string'
-        );
-    });
-}
-
-function scheduleStateNeedsStopTelecodeMigration(value: unknown): boolean {
-    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-        return false;
-    }
-
-    const items = (value as { items?: unknown }).items;
-    if (!Array.isArray(items)) {
-        return false;
-    }
-
-    return items.some((item) => {
-        if (typeof item !== 'object' || item === null || Array.isArray(item)) {
-            return false;
-        }
-
-        const stops = (item as { stops?: unknown }).stops;
-        if (!Array.isArray(stops)) {
-            return false;
-        }
-
-        return stops.some(
-            (stop) =>
-                typeof stop !== 'object' ||
-                stop === null ||
-                Array.isArray(stop) ||
-                typeof (stop as { stationTelecode?: unknown })
-                    .stationTelecode !== 'string'
-        );
-    });
-}
-
-function parseScheduleDocument(value: unknown): {
-    document: ScheduleDocument | null;
-    migrated: boolean;
-} {
-    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-        return {
-            document: null,
-            migrated: false
-        };
-    }
-
-    const document = value as Record<string, unknown>;
-    const version =
-        typeof document.version === 'number' ? document.version : undefined;
-    if (
-        version !== 3 &&
-        version !== 4 &&
-        version !== 5 &&
-        version !== 6 &&
-        version !== 7 &&
-        version !== CURRENT_SCHEDULE_DOCUMENT_VERSION
-    ) {
-        return {
-            document: null,
-            migrated: false
-        };
-    }
-    const normalizedStations = normalizeScheduleStations(document.stations);
-    const normalizedQueue = normalizeRouteRefreshQueue(
-        document.routeRefreshQueue
-    );
-    const normalizedCirculation = normalizeScheduleCirculation(
-        document.circulation
-    );
-    const publishedNeedsMigration =
-        document.published !== null &&
-        typeof document.published !== 'undefined' &&
-        (scheduleStateNeedsRouteMetadataMigration(document.published) ||
-            scheduleStateNeedsStopTelecodeMigration(document.published));
-    const buildingNeedsMigration =
-        document.building !== null &&
-        typeof document.building !== 'undefined' &&
-        (scheduleStateNeedsRouteMetadataMigration(document.building) ||
-            scheduleStateNeedsStopTelecodeMigration(document.building));
-    const migrated =
-        version !== CURRENT_SCHEDULE_DOCUMENT_VERSION ||
-        normalizedStations.migrated ||
-        normalizedCirculation.migrated ||
-        normalizedQueue.migrated ||
-        publishedNeedsMigration ||
-        buildingNeedsMigration;
-
-    let published: ScheduleState | null = null;
-    if (
-        document.published !== null &&
-        typeof document.published !== 'undefined'
-    ) {
-        published = asScheduleState(document.published);
-        if (!published) {
-            return {
-                document: null,
-                migrated: false
-            };
-        }
-    }
-
-    let building: ScheduleState | null = null;
-    if (
-        document.building !== null &&
-        typeof document.building !== 'undefined'
-    ) {
-        building = asScheduleState(document.building);
-        if (!building) {
-            return {
-                document: null,
-                migrated: false
-            };
-        }
-    }
-
-    return {
-        document: {
-            $schema: SCHEDULE_SCHEMA_RELATIVE_PATH,
-            version: CURRENT_SCHEDULE_DOCUMENT_VERSION,
-            stations: normalizedStations.stations,
-            circulation: normalizedCirculation.circulation,
-            routeRefreshQueue: normalizedQueue.queue,
-            published,
-            building
-        },
-        migrated
-    };
 }
 
 function isSameScopeAndStrategy(
@@ -901,11 +344,11 @@ function mergePublishedRouteInfo(
 
     const currentItemsByCode = new Map<string, ScheduleItem>();
     for (const item of currentPublished.items) {
-        currentItemsByCode.set(normalizeCode(item.code), item);
+        currentItemsByCode.set(trainCodeKey(item.code), item);
     }
 
     for (const item of nextPublished.items) {
-        const currentItem = currentItemsByCode.get(normalizeCode(item.code));
+        const currentItem = currentItemsByCode.get(trainCodeKey(item.code));
         if (!currentItem) {
             continue;
         }
@@ -932,10 +375,7 @@ function mergePublishedRouteInfo(
         item.stops = currentItem.stops.map((stop) => ({
             ...stop
         }));
-        if (
-            item.internalCode.length === 0 &&
-            currentItem.internalCode.length > 0
-        ) {
+        if (!item.internalCode && currentItem.internalCode) {
             item.internalCode = currentItem.internalCode;
         }
     }
@@ -944,12 +384,12 @@ function mergePublishedRouteInfo(
 }
 
 export function createInitialScheduleState(
-    date: string,
+    date: ServiceDay,
     config: ScheduleProbeRuntimeConfig
 ): ScheduleState {
     return {
         date,
-        lastBuildDate: '',
+        lastBuildDate: asServiceDay(0),
         status: 'running',
         strategy: {
             retryAttempts: config.retryAttempts,
@@ -996,25 +436,25 @@ export function createInitialScheduleDocument(): ScheduleDocument {
 }
 
 export function appendRouteRefreshQueueTrainCodes(
-    scheduleFilePath: string,
-    serviceDate: string,
-    trainCodes: readonly string[],
+    serviceDate: ServiceDay,
+    trainCodes: readonly TrainCodeParts[],
     enqueuedAt: number
 ): ScheduleRouteRefreshQueueEntry[] {
-    if (
-        !/^\d{8}$/.test(serviceDate) ||
-        !Number.isInteger(enqueuedAt) ||
-        enqueuedAt < 0
-    ) {
+    if (!Number.isInteger(enqueuedAt) || enqueuedAt < 0) {
         return [];
     }
 
-    const normalizedTrainCodes = uniqueNormalizedCodes([...trainCodes]);
+    const seenTrainCodes = new Set<string>();
+    const normalizedTrainCodes: TrainCodeParts[] = [];
+    for (const trainCode of trainCodes) {
+        const key = trainCodeKey(trainCode);
+        if (seenTrainCodes.has(key)) {
+            continue;
+        }
+        seenTrainCodes.add(key);
+        normalizedTrainCodes.push(trainCode);
+    }
     if (normalizedTrainCodes.length === 0) {
-        return [];
-    }
-
-    if (!ensureScheduleDocumentMigrated(scheduleFilePath)) {
         return [];
     }
 
@@ -1028,7 +468,6 @@ export function appendRouteRefreshQueueTrainCodes(
 }
 
 export function consumeRouteRefreshQueueEntries(
-    scheduleFilePath: string,
     entries: readonly Pick<
         ScheduleRouteRefreshQueueEntry,
         'serviceDate' | 'trainCode'
@@ -1038,78 +477,32 @@ export function consumeRouteRefreshQueueEntries(
         return [];
     }
 
+    const consumptionEntries: Pick<
+        ScheduleRouteRefreshQueueEntry,
+        'serviceDate' | 'trainCode'
+    >[] = [];
     const consumptionKeys = new Set<string>();
     for (const entry of entries) {
-        const trainCode = normalizeCode(String(entry.trainCode ?? ''));
-        const serviceDate =
-            typeof entry.serviceDate === 'string'
-                ? entry.serviceDate.trim()
-                : '';
-        if (trainCode.length === 0 || !/^\d{8}$/.test(serviceDate)) {
+        const key = `${entry.serviceDate}:${trainCodeKey(entry.trainCode)}`;
+        if (consumptionKeys.has(key)) {
             continue;
         }
-
-        consumptionKeys.add(`${serviceDate}:${trainCode}`);
+        consumptionKeys.add(key);
+        consumptionEntries.push(entry);
     }
 
-    if (consumptionKeys.size === 0) {
+    if (consumptionEntries.length === 0) {
         return [];
     }
 
-    if (!ensureScheduleDocumentMigrated(scheduleFilePath)) {
-        return [];
-    }
-    return consumeScheduleRouteRefreshQueueEntries(
-        [...consumptionKeys].map((consumptionKey) => {
-            const [serviceDate = '', trainCode = ''] =
-                consumptionKey.split(':');
-            return {
-                serviceDate,
-                trainCode
-            };
-        })
-    );
+    return consumeScheduleRouteRefreshQueueEntries(consumptionEntries);
 }
 
-export function loadScheduleDocument(
-    scheduleFilePath: string = LEGACY_SCHEDULE_JSON_PATH
-): ScheduleDocument | null {
-    const databaseDocument = loadScheduleDocumentFromDatabase();
-    if (databaseDocument) {
-        return databaseDocument;
-    }
-
-    if (hasScheduleDatabaseDocument()) {
-        return null;
-    }
-
-    const absolutePath = path.resolve(scheduleFilePath);
-    if (!fs.existsSync(absolutePath)) {
-        return null;
-    }
-
-    try {
-        const raw = JSON.parse(fs.readFileSync(absolutePath, 'utf8'));
-        const parsed = parseScheduleDocument(raw);
-        if (!parsed.document) {
-            return null;
-        }
-
-        const stat = fs.statSync(absolutePath);
-        saveScheduleDocumentToDatabase(parsed.document, {
-            jsonPath: absolutePath,
-            jsonMtimeMs: Number.isFinite(stat.mtimeMs) ? stat.mtimeMs : null
-        });
-        return parsed.document;
-    } catch {
-        return null;
-    }
+export function loadScheduleDocument(): ScheduleDocument | null {
+    return loadScheduleDocumentFromDatabase();
 }
 
-export function saveScheduleDocument(
-    scheduleFilePath: string,
-    document: ScheduleDocument
-): void {
+export function saveScheduleDocument(document: ScheduleDocument): void {
     document.$schema = SCHEDULE_SCHEMA_RELATIVE_PATH;
     document.version = CURRENT_SCHEDULE_DOCUMENT_VERSION;
     document.stations = cloneScheduleStationMap(document.stations);
@@ -1117,58 +510,25 @@ export function saveScheduleDocument(
     saveScheduleDocumentToDatabase(document);
 }
 
-export function ensureScheduleDocumentMigrated(
-    scheduleFilePath: string = LEGACY_SCHEDULE_JSON_PATH
-): boolean {
-    if (hasScheduleDatabaseDocument()) {
-        return true;
-    }
-
-    return loadScheduleDocument(scheduleFilePath) !== null;
-}
-
-export function loadPublishedScheduleState(
-    scheduleFilePath: string = LEGACY_SCHEDULE_JSON_PATH
-): ScheduleState | null {
-    if (!ensureScheduleDocumentMigrated(scheduleFilePath)) {
-        return null;
-    }
-
+export function loadPublishedScheduleState(): ScheduleState | null {
     const state = loadScheduleStateFromDatabase('published');
     return state ? cloneScheduleState(state) : null;
 }
 
-export function loadPublishedScheduleStateSummary(
-    scheduleFilePath: string = LEGACY_SCHEDULE_JSON_PATH
-): ScheduleStateSummary | null {
-    if (!ensureScheduleDocumentMigrated(scheduleFilePath)) {
-        return null;
-    }
-
+export function loadPublishedScheduleStateSummary(): ScheduleStateSummary | null {
     return loadScheduleStateSummaryByKind('published');
 }
 
-export function loadScheduleCirculationMap(
-    scheduleFilePath: string = LEGACY_SCHEDULE_JSON_PATH
-): ScheduleCirculationMap {
-    if (!ensureScheduleDocumentMigrated(scheduleFilePath)) {
-        return {};
-    }
-
+export function loadScheduleCirculationMap(): ScheduleCirculationMap {
     const circulation = loadScheduleCirculationMapFromDatabase();
     return circulation ? cloneScheduleCirculationMap(circulation) : {};
 }
 
 export function loadScheduleCirculationEntry(
-    scheduleFilePath: string,
     internalCode: string
 ): ScheduleCirculationEntry | null {
     const normalizedInternalCode = normalizeCode(internalCode);
     if (normalizedInternalCode.length === 0) {
-        return null;
-    }
-
-    if (!ensureScheduleDocumentMigrated(scheduleFilePath)) {
         return null;
     }
 
@@ -1179,7 +539,6 @@ export function loadScheduleCirculationEntry(
 }
 
 export function saveScheduleCirculationEntry(
-    scheduleFilePath: string,
     entry: ScheduleCirculationEntry
 ): string | null {
     const normalizedEntry = normalizeScheduleCirculationEntry(
@@ -1195,10 +554,6 @@ export function saveScheduleCirculationEntry(
         return null;
     }
 
-    if (!ensureScheduleDocumentMigrated(scheduleFilePath)) {
-        return null;
-    }
-
     const savedKeys = saveScheduleCirculationEntriesToDatabase([
         normalizedEntry
     ]);
@@ -1206,14 +561,9 @@ export function saveScheduleCirculationEntry(
 }
 
 export function saveScheduleCirculationEntries(
-    scheduleFilePath: string,
     entries: readonly ScheduleCirculationEntry[]
 ): string[] {
     if (entries.length === 0) {
-        return [];
-    }
-
-    if (!ensureScheduleDocumentMigrated(scheduleFilePath)) {
         return [];
     }
 
@@ -1238,20 +588,13 @@ function hasScheduleStopMetadataUpdate(update: ScheduleStopMetadataUpdate) {
 }
 
 export function saveScheduleStopMetadataFromStationBoard(
-    scheduleFilePath: string,
-    serviceDate: string,
+    serviceDate: ServiceDay,
     updates: readonly ScheduleStopMetadataUpdate[]
 ): SaveScheduleStopMetadataResult {
-    if (!/^\d{8}$/.test(serviceDate)) {
-        return {
-            updatedStopCount: 0
-        };
-    }
-
     const normalizedUpdates = updates
         .map((update) => ({
-            trainNo: normalizeCode(update.trainNo),
-            stationTrainCode: normalizeCode(update.stationTrainCode),
+            trainNo: update.trainNo,
+            stationTrainCode: update.stationTrainCode,
             stationTelecode: normalizeCode(update.stationTelecode),
             distance: normalizeOptionalNonNegativeInteger(update.distance),
             platformNo: normalizeOptionalNonNegativeInteger(update.platformNo)
@@ -1262,12 +605,6 @@ export function saveScheduleStopMetadataFromStationBoard(
                 hasScheduleStopMetadataUpdate(update)
         );
     if (normalizedUpdates.length === 0) {
-        return {
-            updatedStopCount: 0
-        };
-    }
-
-    if (!ensureScheduleDocumentMigrated(scheduleFilePath)) {
         return {
             updatedStopCount: 0
         };
@@ -1288,28 +625,16 @@ export function saveScheduleStopMetadataFromStationBoard(
     };
 }
 
-export function deleteScheduleCirculationEntry(
-    scheduleFilePath: string,
-    entryKey: string
-): string[] {
+export function deleteScheduleCirculationEntry(entryKey: string): string[] {
     const normalizedEntryKey = normalizeCode(entryKey);
     if (normalizedEntryKey.length === 0) {
         return [];
     }
 
-    if (!ensureScheduleDocumentMigrated(scheduleFilePath)) {
-        return [];
-    }
     return deleteScheduleCirculationEntryFromDatabase(normalizedEntryKey);
 }
 
-export function loadActiveScheduleState(
-    scheduleFilePath: string = LEGACY_SCHEDULE_JSON_PATH
-): ScheduleState | null {
-    if (!ensureScheduleDocumentMigrated(scheduleFilePath)) {
-        return null;
-    }
-
+export function loadActiveScheduleState(): ScheduleState | null {
     const today = getCurrentDateString();
     const activeKind = resolveActiveScheduleStateKind(today);
     if (!activeKind) {
@@ -1321,55 +646,43 @@ export function loadActiveScheduleState(
 }
 
 export function savePublishedScheduleState(
-    scheduleFilePath: string,
     state: ScheduleState | null,
     stations?: ScheduleStationMap
 ): void {
     const document = cloneScheduleDocument(
-        loadScheduleDocument(scheduleFilePath) ??
-            createInitialScheduleDocument()
+        loadScheduleDocument() ?? createInitialScheduleDocument()
     );
     document.published = state
         ? filterInvalidScheduleItems(cloneScheduleState(state)).state
         : null;
     document.stations = mergeScheduleStationMaps(document.stations, stations);
-    saveScheduleDocument(scheduleFilePath, document);
+    saveScheduleDocument(document);
 }
 
-export function loadBuildingScheduleState(
-    scheduleFilePath: string = LEGACY_SCHEDULE_JSON_PATH
-): ScheduleState | null {
-    if (!ensureScheduleDocumentMigrated(scheduleFilePath)) {
-        return null;
-    }
-
+export function loadBuildingScheduleState(): ScheduleState | null {
     const state = loadScheduleStateFromDatabase('building');
     return state ? cloneScheduleState(state) : null;
 }
 
 export function saveBuildingScheduleState(
-    scheduleFilePath: string,
     state: ScheduleState | null,
     stations?: ScheduleStationMap
 ): void {
     const document = cloneScheduleDocument(
-        loadScheduleDocument(scheduleFilePath) ??
-            createInitialScheduleDocument()
+        loadScheduleDocument() ?? createInitialScheduleDocument()
     );
     document.building = state
         ? filterInvalidScheduleItems(cloneScheduleState(state)).state
         : null;
     document.stations = mergeScheduleStationMaps(document.stations, stations);
-    saveScheduleDocument(scheduleFilePath, document);
+    saveScheduleDocument(document);
 }
 
 export function promoteBuildingScheduleState(
-    scheduleFilePath: string,
     fallbackState: ScheduleState
 ): ScheduleState {
     const document = cloneScheduleDocument(
-        loadScheduleDocument(scheduleFilePath) ??
-            createInitialScheduleDocument()
+        loadScheduleDocument() ?? createInitialScheduleDocument()
     );
     const buildingState = document.building
         ? cloneScheduleState(document.building)
@@ -1382,7 +695,7 @@ export function promoteBuildingScheduleState(
     ).state;
     document.published = promotedState;
     document.building = null;
-    saveScheduleDocument(scheduleFilePath, document);
+    saveScheduleDocument(document);
     bumpPublishedScheduleStateVersion();
     return cloneScheduleState(promotedState);
 }
@@ -1392,19 +705,16 @@ export function getScheduleStateVersion() {
 }
 
 export function loadOrInitBuildingScheduleState(
-    scheduleFilePath: string,
     config: ScheduleProbeRuntimeConfig
 ): LoadedBuildingScheduleState {
-    const today = getCurrentDateString();
-    const absolutePath = path.resolve(scheduleFilePath);
-    const fileExists = fs.existsSync(absolutePath);
-    const document = loadScheduleDocument(scheduleFilePath);
+    const today = serviceDateToDay(getCurrentDateString());
+    const document = loadScheduleDocument();
     if (!document) {
         return {
             state: createInitialScheduleState(today, config),
             resumed: false,
             publishPending: false,
-            reason: fileExists ? 'reset_invalid_file' : 'init_missing_file'
+            reason: 'init_missing_file'
         };
     }
 

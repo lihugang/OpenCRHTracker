@@ -1,14 +1,15 @@
 import getLogger from '~/server/libs/log4js';
 import { invalidateTrainCirculationIndexCache } from '~/server/services/trainCirculationIndexStore';
-import { ensureScheduleDocumentMigrated } from '~/server/utils/12306/scheduleProbe/stateStore';
 import {
     deleteScheduleCirculationEntryFromDatabase,
     getScheduleDatabaseFilePath,
     getScheduleDatabaseModifiedAtMs,
+    hasScheduleDatabaseDocument,
     listScheduleCirculationRecordsByLookupCode,
     loadScheduleCirculationRecordFromDatabase
 } from '~/server/utils/12306/scheduleProbe/sqliteStore';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
+import { formatExternalTrainCode } from '~/server/utils/internal/boundaries';
 import ApiRequestError from '~/server/utils/api/errors/ApiRequestError';
 import type { ScheduleCirculationEntry } from '~/server/utils/12306/scheduleProbe/types';
 import type {
@@ -49,12 +50,13 @@ function createSearchItem(
         }
 
         for (const code of node.allCodes) {
-            if (normalizeCode(code) !== normalizedKeyword) {
+            const externalCode = formatExternalTrainCode(code);
+            if (normalizeCode(externalCode) !== normalizedKeyword) {
                 continue;
             }
 
             matchedBy.add('all_code');
-            matchedCodes.add(code);
+            matchedCodes.add(externalCode);
         }
     }
 
@@ -72,7 +74,7 @@ function createSearchItem(
         nodeCount: entry.nodes.length,
         nodes: entry.nodes.map((node) => ({
             internalCode: node.internalCode,
-            allCodes: [...node.allCodes],
+            allCodes: node.allCodes.map(formatExternalTrainCode),
             startStation: node.startStation,
             endStation: node.endStation,
             startAt: node.startAt,
@@ -89,7 +91,7 @@ export function searchAdminOfficialCirculations(
         throw new ApiRequestError(400, 'invalid_param', 'keyword 不能为空');
     }
 
-    if (!ensureScheduleDocumentMigrated()) {
+    if (!hasScheduleDatabaseDocument()) {
         throw new ApiRequestError(
             404,
             'not_found',
@@ -134,7 +136,7 @@ export function deleteAdminOfficialCirculation(
         throw new ApiRequestError(400, 'invalid_param', 'entryKey 不能为空');
     }
 
-    if (!ensureScheduleDocumentMigrated()) {
+    if (!hasScheduleDatabaseDocument()) {
         throw new ApiRequestError(
             404,
             'not_found',

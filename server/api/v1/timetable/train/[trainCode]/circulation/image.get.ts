@@ -10,6 +10,8 @@ import {
     type TrainCirculationImageFormat,
     type TrainCirculationImageRenderResult
 } from '~/server/services/trainCirculationImageService';
+import { parseExternalTrainCodeOrThrow } from '~/server/utils/internal/boundaries';
+import type { TrainCodeParts } from '~/server/utils/12306/trainCode';
 
 function parseBinaryFlag(value: unknown): boolean {
     if (value === undefined) {
@@ -96,8 +98,18 @@ export default defineEventHandler(async (event) => {
                 ensure(false, 400, 'invalid_param', 'format 必须是 png 或 pdf');
             }
 
+            let parsedTrainCode: TrainCodeParts;
+            try {
+                parsedTrainCode = parseExternalTrainCodeOrThrow(
+                    trainCode,
+                    'trainCode'
+                );
+            } catch {
+                ensure(false, 400, 'invalid_param', 'trainCode 非法');
+            }
+
             return renderTrainCirculationImage(
-                trainCode,
+                parsedTrainCode,
                 binaryRequested,
                 format
             );

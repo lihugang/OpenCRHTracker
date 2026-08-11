@@ -1,7 +1,10 @@
 import type { RouteStopData } from '~/server/utils/12306/network/fetchRouteInfo';
 import { loadStationCoordAssets } from '~/server/services/stationCoordStore';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
-import { toShanghaiDayOffsetFromUnixSeconds } from '~/server/utils/date/shanghaiDateTime';
+import {
+    serviceDayToShanghaiDayStartUnixSeconds,
+    type ServiceDay
+} from '~/server/utils/date/serviceDay';
 import type { ScheduleStationMap, ScheduleStop } from './types';
 
 interface ResolvedRouteStationCoord {
@@ -12,21 +15,16 @@ interface ResolvedRouteStationCoord {
 }
 
 export function toScheduleStops(
-    date: string,
+    serviceDate: ServiceDay,
     stops: RouteStopData[]
 ): ScheduleStop[] {
+    const dayStartAt = serviceDayToShanghaiDayStartUnixSeconds(serviceDate);
     return stops.map((stop) => ({
         stationNo: stop.stationNo,
         stationName: stop.stationName,
         stationTelecode: normalizeCode(stop.stationTelecode),
-        arriveAt:
-            stop.arriveAt === null
-                ? null
-                : toShanghaiDayOffsetFromUnixSeconds(date, stop.arriveAt),
-        departAt:
-            stop.departAt === null
-                ? null
-                : toShanghaiDayOffsetFromUnixSeconds(date, stop.departAt),
+        arriveAt: stop.arriveAt === null ? null : stop.arriveAt - dayStartAt,
+        departAt: stop.departAt === null ? null : stop.departAt - dayStartAt,
         stationTrainCode: stop.stationTrainCode,
         wicket: stop.wicket,
         ...(stop.distance !== null ? { distance: stop.distance } : {}),

@@ -1,5 +1,9 @@
 import getLogger from '~/server/libs/log4js';
-import normalizeCode from '~/server/utils/12306/normalizeCode';
+import {
+    formatTrainCode,
+    trainCodeKey,
+    type TrainCodeParts
+} from '~/server/utils/12306/trainCode';
 import fetchRouteInfo from '../network/fetchRouteInfo';
 import queryTrainCodeThroughPrefix from '../network/queryTrainCodeThroughPrefix';
 import { expandKeyword } from './prefixTree';
@@ -25,6 +29,17 @@ function pushUnique(list: string[], value: string): void {
     list.push(value);
 }
 
+function pushUniqueTrainCode(
+    list: TrainCodeParts[],
+    value: TrainCodeParts
+): void {
+    const key = trainCodeKey(value);
+    if (list.some((item) => trainCodeKey(item) === key)) {
+        return;
+    }
+    list.push(value);
+}
+
 function updateItemsFromMap(
     state: ScheduleState,
     itemsByCode: Map<string, ScheduleItem>,
@@ -45,10 +60,7 @@ function restorePreservedRouteInfo(
         return false;
     }
 
-    if (
-        item.internalCode.length === 0 &&
-        preservedItem.internalCode.length > 0
-    ) {
+    if (!item.internalCode && preservedItem.internalCode) {
         item.internalCode = preservedItem.internalCode;
     }
 
@@ -73,7 +85,6 @@ function restorePreservedRouteInfo(
 }
 
 async function runScheduleProbeInternal(
-    scheduleFilePath: string,
     state: ScheduleState,
     config: ScheduleProbeRuntimeConfig,
     runId: string,
@@ -82,7 +93,7 @@ async function runScheduleProbeInternal(
     const logger = getLogger('schedule-probe');
     const itemsByCode = new Map<string, ScheduleItem>();
     for (const item of state.items) {
-        itemsByCode.set(item.code, item);
+        itemsByCode.set(trainCodeKey(item.code), item);
     }
 
     if (!Number.isFinite(state.startedAtMs) || state.startedAtMs <= 0) {
@@ -127,24 +138,21 @@ async function runScheduleProbeInternal(
                 );
                 state.stats.rawItems += normalizedItems.length;
                 for (const item of normalizedItems) {
-                    const existed = itemsByCode.get(item.code);
+                    const existed = itemsByCode.get(trainCodeKey(item.code));
                     if (!existed) {
                         if (
                             restorePreservedRouteInfo(
                                 item,
                                 preservedItemsByCode?.get(
-                                    normalizeCode(item.code)
+                                    formatTrainCode(item.code)
                                 )
                             )
                         ) {
                             reusedRouteInfoCount += 1;
                         }
-                        itemsByCode.set(item.code, item);
+                        itemsByCode.set(trainCodeKey(item.code), item);
                         newlyAddedCount += 1;
-                    } else if (
-                        existed.internalCode.length === 0 &&
-                        item.internalCode.length > 0
-                    ) {
+                    } else if (!existed.internalCode && item.internalCode) {
                         existed.internalCode = item.internalCode;
                     }
                 }
@@ -172,11 +180,7 @@ async function runScheduleProbeInternal(
 
             if (processedSinceFlush >= config.checkpointFlushEvery) {
                 updateItemsFromMap(state, itemsByCode, config);
-                saveBuildingScheduleState(
-                    scheduleFilePath,
-                    state,
-                    stationUpdates
-                );
+                saveBuildingScheduleState(state, stationUpdates);
                 logger.info(
                     `discover checkpoint runId=${runId} processed=${state.progress.discoverProcessed.length} pending=${state.progress.discoverQueue.length} rawItems=${state.stats.rawItems} uniqueItems=${state.stats.uniqueItems} newlyAdded=${newlyAddedCount} reusedRouteInfo=${reusedRouteInfoCount} apiCalls=${state.progress.counters.apiCalls} apiRetries=${state.progress.counters.apiRetries}`
                 );
@@ -191,7 +195,7 @@ async function runScheduleProbeInternal(
             Math.max(0, state.progress.enrichCursor),
             state.items.length
         );
-        saveBuildingScheduleState(scheduleFilePath, state, stationUpdates);
+        saveBuildingScheduleState(state, stationUpdates);
         logger.info(
             `discover finish runId=${runId} processed=${state.progress.discoverProcessed.length} failedKeywords=${state.progress.failedKeywords.length} uniqueItems=${state.stats.uniqueItems} newlyAdded=${newlyAddedCount} reusedRouteInfo=${reusedRouteInfoCount}`
         );
@@ -202,7 +206,7 @@ async function runScheduleProbeInternal(
             `enrich start runId=${runId} totalItems=${state.items.length} fromCursor=${state.progress.enrichCursor}`
         );
         const pendingRetrySet = new Set(
-            state.progress.failedEnrichCodes.map((code) => normalizeCode(code))
+            state.progress.failedEnrichCodes.map((code) => trainCodeKey(code))
         );
         state.progress.failedEnrichCodes = [];
         const groupIndexByKey = buildGroupIndex(state.items);
@@ -220,7 +224,7 @@ async function runScheduleProbeInternal(
             index += 1
         ) {
             const item = state.items[index]!;
-            const itemCodeKey = normalizeCode(item.code);
+            const itemCodeKey = trainCodeKey(item.code);
             const groupKey = getGroupKey(item);
             if (processedGroupKeys.has(groupKey)) {
                 state.progress.enrichCursor = index + 1;
@@ -233,7 +237,7 @@ async function runScheduleProbeInternal(
             );
             const shouldRetryFailed = pendingRetrySet.has(itemCodeKey);
             const shouldRetryFailedGroup = groupItems.some((groupItem) =>
-                pendingRetrySet.has(normalizeCode(groupItem.code))
+                pendingRetrySet.has(trainCodeKey(groupItem.code))
             );
             const shouldBackfillMissing = groupItems.some(
                 (groupItem) =>
@@ -296,6 +300,13 @@ async function runScheduleProbeInternal(
                     ))
                 };
                 for (const groupItem of groupItems) {
+                    if (
+                        !groupItem.internalCode &&
+                        routeResult.data.route.internalCode
+                    ) {
+                        groupItem.internalCode =
+                            routeResult.data.route.internalCode;
+                    }
                     groupItem.bureauCode = routeResult.data.route.bureauCode;
                     groupItem.trainStyle = routeResult.data.route.trainStyle;
                     groupItem.trainDepartment =
@@ -306,7 +317,7 @@ async function runScheduleProbeInternal(
                         routeResult.data.route.startStation.trim();
                     groupItem.endStation =
                         routeResult.data.route.endStation.trim();
-                    groupItem.allCodes = [...routeResult.data.route.allCodes];
+                    groupItem.allCodes = routeResult.data.route.allCodes;
                     groupItem.startAt = normalizedRoute.startAt;
                     groupItem.endAt = normalizedRoute.endAt;
                     groupItem.lastRouteRefreshAt = refreshedAt;
@@ -317,7 +328,7 @@ async function runScheduleProbeInternal(
                 enrichedCount += 1;
             } else {
                 for (const groupItem of groupItems) {
-                    pushUnique(
+                    pushUniqueTrainCode(
                         state.progress.failedEnrichCodes,
                         groupItem.code
                     );
@@ -332,11 +343,7 @@ async function runScheduleProbeInternal(
             processedSinceFlush += 1;
 
             if (processedSinceFlush >= config.checkpointFlushEvery) {
-                saveBuildingScheduleState(
-                    scheduleFilePath,
-                    state,
-                    stationUpdates
-                );
+                saveBuildingScheduleState(state, stationUpdates);
                 logger.info(
                     `enrich checkpoint runId=${runId} cursor=${state.progress.enrichCursor} totalItems=${state.items.length} failedEnrichCodes=${state.progress.failedEnrichCodes.length} enriched=${enrichedCount} apiCalls=${state.progress.counters.apiCalls} apiRetries=${state.progress.counters.apiRetries}`
                 );
@@ -360,24 +367,17 @@ async function runScheduleProbeInternal(
             ? 'partial_failed'
             : 'done';
 
-    saveBuildingScheduleState(scheduleFilePath, state, stationUpdates);
+    saveBuildingScheduleState(state, stationUpdates);
     logger.info(
         `done runId=${runId} status=${state.status} durationMs=${state.stats.durationMs} rawItems=${state.stats.rawItems} uniqueItems=${state.stats.uniqueItems} newlyAdded=${newlyAddedCount} reusedRouteInfo=${reusedRouteInfoCount} enriched=${enrichedCount} failedKeywords=${state.progress.failedKeywords.length} failedEnrichCodes=${state.progress.failedEnrichCodes.length} apiCalls=${state.progress.counters.apiCalls} apiRetries=${state.progress.counters.apiRetries}`
     );
 }
 
 export default async function runScheduleProbe(
-    scheduleFilePath: string,
     state: ScheduleState,
     config: ScheduleProbeRuntimeConfig,
     runId: string,
     preservedItemsByCode?: Map<string, ScheduleItem>
 ): Promise<void> {
-    await runScheduleProbeInternal(
-        scheduleFilePath,
-        state,
-        config,
-        runId,
-        preservedItemsByCode
-    );
+    await runScheduleProbeInternal(state, config, runId, preservedItemsByCode);
 }

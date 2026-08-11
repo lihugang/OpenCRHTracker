@@ -1,14 +1,16 @@
-import normalizeTrainCode from '~/server/utils/12306/normalizeCode';
+import {
+    trainCodeKey,
+    type TrainCodeParts
+} from '~/server/utils/12306/trainCode';
 import type { ScheduleItem } from './types';
 
 export function getGroupKey(
     item: Pick<ScheduleItem, 'code' | 'internalCode'>
 ): string {
-    const internalCode = item.internalCode.trim().toUpperCase();
-    if (internalCode.length > 0) {
-        return `internal:${internalCode}`;
+    if (item.internalCode) {
+        return `internal:${item.internalCode.trim().toUpperCase()}`;
     }
-    return `code:${normalizeTrainCode(item.code)}`;
+    return `code:${trainCodeKey(item.code)}`;
 }
 
 export function splitIntoBatches<T>(list: T[], size: number): T[][] {
@@ -40,7 +42,23 @@ export function buildGroupIndex(items: ScheduleItem[]): Map<string, number[]> {
 export function buildCodeIndex(items: ScheduleItem[]): Map<string, number> {
     const indexByCode = new Map<string, number>();
     for (const [index, item] of items.entries()) {
-        indexByCode.set(normalizeTrainCode(item.code), index);
+        indexByCode.set(trainCodeKey(item.code), index);
     }
     return indexByCode;
+}
+
+export function uniqueTrainCodes(
+    values: readonly TrainCodeParts[]
+): TrainCodeParts[] {
+    const seen = new Set<string>();
+    const result: TrainCodeParts[] = [];
+    for (const value of values) {
+        const key = trainCodeKey(value);
+        if (seen.has(key)) {
+            continue;
+        }
+        seen.add(key);
+        result.push(value);
+    }
+    return result;
 }

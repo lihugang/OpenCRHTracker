@@ -1,31 +1,64 @@
 import '~/server/libs/database/emu';
+import { asEmuId, type EmuId } from '~/server/libs/database/emu';
 import { createPreparedSqlStore } from '~/server/libs/database/prepared';
 import {
     hydrateHistoricalRouteSummary,
     resolveTimetableIdentityLink
 } from '~/server/services/historicalTimetableResolver';
-import normalizeCode from '~/server/utils/12306/normalizeCode';
-import { formatShanghaiDateString } from '~/server/utils/date/getCurrentDateString';
+import type { TrainCodeParts } from '~/server/utils/12306/trainCode';
+import {
+    asServiceDay,
+    dayToServiceDate,
+    serviceDateToDay,
+    unixSecondsToServiceDay,
+    type ServiceDay
+} from '~/server/utils/date/serviceDay';
 import importSqlBatch from '~/server/utils/sql/importSqlBatch';
 
 export interface CursorPoint {
-    serviceDate: string;
+    serviceDate: ServiceDay;
     id: number;
 }
 
 interface RawDailyEmuRouteRow {
     id: number;
-    train_code: string;
-    emu_code: string;
-    service_date: string;
+    train_prefix: string;
+    train_number: number;
+    emu_id: number;
+    service_date: number;
     timetable_id: number | null;
 }
 
-export interface DailyEmuRouteRow extends RawDailyEmuRouteRow {
+export interface DailyEmuRouteLightRow {
+    id: number;
+    train_code: TrainCodeParts;
+    emu_id: EmuId;
+    service_date: ServiceDay;
+    timetable_id: number | null;
+}
+
+export interface DailyEmuRouteRow extends DailyEmuRouteLightRow {
     start_station_name: string;
     end_station_name: string;
     start_at: number;
     end_at: number;
+}
+
+function toInternalRow(row: RawDailyEmuRouteRow): DailyEmuRouteLightRow {
+    return {
+        id: row.id,
+        train_code: {
+            prefix: row.train_prefix,
+            number: row.train_number
+        },
+        emu_id: asEmuId(row.emu_id),
+        service_date: asServiceDay(row.service_date),
+        timetable_id: row.timetable_id
+    };
+}
+
+function toInternalRows(rows: RawDailyEmuRouteRow[]): DailyEmuRouteLightRow[] {
+    return rows.map(toInternalRow);
 }
 
 type EmuRouteSqlKey =
@@ -55,7 +88,7 @@ const emuRouteStatements = createPreparedSqlStore<EmuRouteSqlKey>({
 });
 
 const DEFAULT_CURSOR_POINT: CursorPoint = {
-    serviceDate: '99991231',
+    serviceDate: serviceDateToDay('99991231'),
     id: Number.MAX_SAFE_INTEGER
 };
 
@@ -65,10 +98,10 @@ function normalizeServiceDateFromTimestamp(timestampSeconds: number) {
         !Number.isInteger(timestampSeconds) ||
         timestampSeconds <= 0
     ) {
-        return '19700101';
+        return asServiceDay(0);
     }
 
-    return formatShanghaiDateString(timestampSeconds * 1000);
+    return unixSecondsToServiceDay(timestampSeconds);
 }
 
 function normalizeInclusiveServiceDateRange(
@@ -84,7 +117,7 @@ function normalizeInclusiveServiceDateRange(
         !Number.isInteger(effectiveEndAt) ||
         effectiveEndAt <= 0 ||
         effectiveEndAt >= Number.MAX_SAFE_INTEGER / 2
-            ? '99991231'
+            ? serviceDateToDay('99991231')
             : normalizeServiceDateFromTimestamp(effectiveEndAt);
 
     return {
@@ -93,7 +126,8 @@ function normalizeInclusiveServiceDateRange(
     };
 }
 
-function hydrateRow(row: RawDailyEmuRouteRow): DailyEmuRouteRow {
+function hydrateRow(rawRow: RawDailyEmuRouteRow): DailyEmuRouteRow {
+    const row = toInternalRow(rawRow);
     const hydratedSummary = hydrateHistoricalRouteSummary(
         row.service_date,
         row.timetable_id
@@ -124,11 +158,11 @@ function isRowWithinRange(
             : row.start_at >= startAt && row.start_at <= endAt;
     }
 
-    const rowServiceDate = row.service_date;
     const { startServiceDate, endServiceDate } =
         normalizeInclusiveServiceDateRange(startAt, endAt, endExclusive);
     return (
-        rowServiceDate >= startServiceDate && rowServiceDate <= endServiceDate
+        row.service_date >= startServiceDate &&
+        row.service_date <= endServiceDate
     );
 }
 
@@ -144,14 +178,14 @@ function sortRowsAscendingByStartAt(
     }
 
     if (left.service_date !== right.service_date) {
-        return left.service_date.localeCompare(right.service_date);
+        return Number(left.service_date) - Number(right.service_date);
     }
 
     return left.id - right.id;
 }
 
 function selectRawHistoryByTrainPaged(
-    trainCode: string,
+    trainCode: TrainCodeParts,
     startAt: number,
     endAt: number,
     cursor: CursorPoint | null,
@@ -163,7 +197,8 @@ function selectRawHistoryByTrainPaged(
 
     return emuRouteStatements.all<RawDailyEmuRouteRow>(
         'selectHistoryByTrainPaged',
-        normalizeCode(trainCode),
+        trainCode.prefix,
+        trainCode.number,
         startServiceDate,
         endServiceDate,
         cursorPoint.serviceDate,
@@ -174,7 +209,7 @@ function selectRawHistoryByTrainPaged(
 }
 
 function selectRawHistoryByEmuPaged(
-    emuCode: string,
+    emuId: EmuId,
     startAt: number,
     endAt: number,
     cursor: CursorPoint | null,
@@ -186,7 +221,7 @@ function selectRawHistoryByEmuPaged(
 
     return emuRouteStatements.all<RawDailyEmuRouteRow>(
         'selectHistoryByEmuPaged',
-        normalizeCode(emuCode),
+        emuId,
         startServiceDate,
         endServiceDate,
         cursorPoint.serviceDate,
@@ -197,7 +232,7 @@ function selectRawHistoryByEmuPaged(
 }
 
 export function listHistoryByTrainPaged(
-    trainCode: string,
+    trainCode: TrainCodeParts,
     startAt: number,
     endAt: number,
     cursor: CursorPoint | null,
@@ -209,42 +244,35 @@ export function listHistoryByTrainPaged(
 }
 
 export function listHistoryLightByTrainPaged(
-    trainCode: string,
+    trainCode: TrainCodeParts,
     startAt: number,
     endAt: number,
     cursor: CursorPoint | null,
     limit: number
-) {
-    return selectRawHistoryByTrainPaged(
-        trainCode,
-        startAt,
-        endAt,
-        cursor,
-        limit
+): DailyEmuRouteLightRow[] {
+    return toInternalRows(
+        selectRawHistoryByTrainPaged(trainCode, startAt, endAt, cursor, limit)
     );
 }
 
 export function listDailyRoutesByEmuCodeInRange(
-    emuCode: string,
+    emuId: EmuId,
     startAt: number,
     endAtExclusive: number
 ): DailyEmuRouteRow[] {
-    const normalizedEmuCode = normalizeCode(emuCode);
     if (
-        normalizedEmuCode.length === 0 ||
         !Number.isInteger(startAt) ||
         !Number.isInteger(endAtExclusive) ||
         endAtExclusive <= startAt
     ) {
         return [];
     }
-
     const { startServiceDate, endServiceDate } =
         normalizeInclusiveServiceDateRange(startAt, endAtExclusive, true);
     return hydrateRows(
         emuRouteStatements.all<RawDailyEmuRouteRow>(
             'selectDailyRoutesByEmuCodeInRange',
-            normalizedEmuCode,
+            emuId,
             startServiceDate,
             endServiceDate
         )
@@ -254,13 +282,11 @@ export function listDailyRoutesByEmuCodeInRange(
 }
 
 export function listDailyRoutesByTrainCodeInRange(
-    trainCode: string,
+    trainCode: TrainCodeParts,
     startAt: number,
     endAtExclusive: number
 ): DailyEmuRouteRow[] {
-    const normalizedTrainCode = normalizeCode(trainCode);
     if (
-        normalizedTrainCode.length === 0 ||
         !Number.isInteger(startAt) ||
         !Number.isInteger(endAtExclusive) ||
         endAtExclusive <= startAt
@@ -273,7 +299,8 @@ export function listDailyRoutesByTrainCodeInRange(
     return hydrateRows(
         emuRouteStatements.all<RawDailyEmuRouteRow>(
             'selectDailyRoutesByTrainCodeInRange',
-            normalizedTrainCode,
+            trainCode.prefix,
+            trainCode.number,
             startServiceDate,
             endServiceDate
         )
@@ -283,112 +310,100 @@ export function listDailyRoutesByTrainCodeInRange(
 }
 
 export function listLatestDailyRoutesByTrainCode(
-    trainCode: string,
+    trainCode: TrainCodeParts,
     limit: number
 ): DailyEmuRouteRow[] {
-    const normalizedTrainCode = normalizeCode(trainCode);
-    if (
-        normalizedTrainCode.length === 0 ||
-        !Number.isInteger(limit) ||
-        limit <= 0
-    ) {
+    if (!Number.isInteger(limit) || limit <= 0) {
         return [];
     }
 
     return hydrateRows(
         emuRouteStatements.all<RawDailyEmuRouteRow>(
             'selectLatestDailyRoutesByTrainCode',
-            normalizedTrainCode,
+            trainCode.prefix,
+            trainCode.number,
             limit
         )
     );
 }
 
 export function listHistoryByEmuPaged(
-    emuCode: string,
+    emuId: EmuId,
     startAt: number,
     endAt: number,
     cursor: CursorPoint | null,
     limit: number
 ): DailyEmuRouteRow[] {
     return hydrateRows(
-        selectRawHistoryByEmuPaged(emuCode, startAt, endAt, cursor, limit)
+        selectRawHistoryByEmuPaged(emuId, startAt, endAt, cursor, limit)
     ).filter((row) => isRowWithinRange(row, startAt, endAt));
 }
 
 export function listHistoryLightByEmuPaged(
-    emuCode: string,
+    emuId: EmuId,
     startAt: number,
     endAt: number,
     cursor: CursorPoint | null,
     limit: number
-) {
-    return selectRawHistoryByEmuPaged(emuCode, startAt, endAt, cursor, limit);
+): DailyEmuRouteLightRow[] {
+    return toInternalRows(
+        selectRawHistoryByEmuPaged(emuId, startAt, endAt, cursor, limit)
+    );
 }
 
 export function insertDailyEmuRoute(
-    trainCode: string,
-    emuCode: string,
+    trainCode: TrainCodeParts,
+    emuId: EmuId,
     _startStationName: string,
     _endStationName: string,
     startAt: number,
     _endAt: number
 ): void {
-    const normalizedTrainCode = normalizeCode(trainCode);
-    const normalizedEmuCode = normalizeCode(emuCode);
-    if (normalizedTrainCode.length === 0 || normalizedEmuCode.length === 0) {
-        return;
-    }
-
-    const identityLink = resolveTimetableIdentityLink(
-        normalizedTrainCode,
-        startAt
-    );
+    const identityLink = resolveTimetableIdentityLink(trainCode, startAt);
     emuRouteStatements.run(
         'deleteDailyRouteByTrainCodeAndEmuCodeAtStartAt',
-        normalizedTrainCode,
-        normalizedEmuCode,
+        trainCode.prefix,
+        trainCode.number,
+        emuId,
         identityLink.serviceDate
     );
 
     emuRouteStatements.run(
         'insertDailyEmuRoute',
-        normalizedTrainCode,
-        normalizedEmuCode,
+        trainCode.prefix,
+        trainCode.number,
+        emuId,
         identityLink.serviceDate,
         identityLink.timetableId
     );
 }
 
 export function insertDailyEmuRouteWithIdentity(
-    trainCode: string,
-    emuCode: string,
-    serviceDate: string,
+    trainCode: TrainCodeParts,
+    emuId: EmuId,
+    serviceDate: ServiceDay,
     timetableId: number | null
 ): number {
-    const normalizedTrainCode = normalizeCode(trainCode);
-    const normalizedEmuCode = normalizeCode(emuCode);
     if (
-        normalizedTrainCode.length === 0 ||
-        normalizedEmuCode.length === 0 ||
-        !/^\d{8}$/.test(serviceDate) ||
-        (timetableId !== null &&
-            (!Number.isInteger(timetableId) || timetableId <= 0))
+        timetableId !== null &&
+        (!Number.isInteger(timetableId) || timetableId <= 0)
     ) {
         return 0;
     }
 
     emuRouteStatements.run(
         'deleteDailyRouteByTrainCodeAndEmuCodeAtServiceDate',
-        normalizedTrainCode,
-        normalizedEmuCode,
+        trainCode.prefix,
+        trainCode.number,
+        emuId,
         serviceDate
     );
 
     const result = emuRouteStatements.run(
         'insertDailyEmuRouteWithIdentity',
-        normalizedTrainCode,
-        normalizedEmuCode,
+        trainCode.prefix,
+        trainCode.number,
+        emuId,
         serviceDate,
         timetableId
     );
@@ -396,13 +411,11 @@ export function insertDailyEmuRouteWithIdentity(
 }
 
 export function deleteDailyRoutesByTrainCodeInRange(
-    trainCode: string,
+    trainCode: TrainCodeParts,
     startAt: number,
     endAtExclusive: number
 ): number {
-    const normalizedTrainCode = normalizeCode(trainCode);
     if (
-        normalizedTrainCode.length === 0 ||
         !Number.isInteger(startAt) ||
         !Number.isInteger(endAtExclusive) ||
         endAtExclusive <= startAt
@@ -414,7 +427,8 @@ export function deleteDailyRoutesByTrainCodeInRange(
         normalizeInclusiveServiceDateRange(startAt, endAtExclusive, true);
     const result = emuRouteStatements.run(
         'deleteDailyRoutesByTrainCodeInRange',
-        normalizedTrainCode,
+        trainCode.prefix,
+        trainCode.number,
         startServiceDate,
         endServiceDate
     );
@@ -422,26 +436,20 @@ export function deleteDailyRoutesByTrainCodeInRange(
 }
 
 export function deleteDailyRouteByTrainCodeAndEmuCodeAtStartAt(
-    trainCode: string,
-    emuCode: string,
+    trainCode: TrainCodeParts,
+    emuId: EmuId,
     startAt: number
 ): number {
-    const normalizedTrainCode = normalizeCode(trainCode);
-    const normalizedEmuCode = normalizeCode(emuCode);
-    if (
-        normalizedTrainCode.length === 0 ||
-        normalizedEmuCode.length === 0 ||
-        !Number.isInteger(startAt) ||
-        startAt < 0
-    ) {
+    if (!Number.isInteger(startAt) || startAt < 0) {
         return 0;
     }
 
     const serviceDate = normalizeServiceDateFromTimestamp(startAt);
     const result = emuRouteStatements.run(
         'deleteDailyRouteByTrainCodeAndEmuCodeAtStartAt',
-        normalizedTrainCode,
-        normalizedEmuCode,
+        trainCode.prefix,
+        trainCode.number,
+        emuId,
         serviceDate
     );
     return result.changes;
@@ -462,17 +470,17 @@ export function getDailyRecordById(id: number): DailyEmuRouteRow | null {
 
 export function getDailyRecordLightById(
     id: number
-): RawDailyEmuRouteRow | null {
+): DailyEmuRouteLightRow | null {
     if (!Number.isInteger(id) || id <= 0) {
         return null;
     }
 
-    return (
+    const row =
         emuRouteStatements.get<RawDailyEmuRouteRow>(
             'selectDailyRecordById',
             id
-        ) ?? null
-    );
+        ) ?? null;
+    return row ? toInternalRow(row) : null;
 }
 
 export function deleteDailyRouteById(id: number): number {
@@ -512,19 +520,21 @@ export function listDailyRecordLightPaged(
     endAt: number,
     cursor: CursorPoint | null,
     limit: number
-) {
+): DailyEmuRouteLightRow[] {
     const cursorPoint = cursor ?? DEFAULT_CURSOR_POINT;
     const { startServiceDate, endServiceDate } =
         normalizeInclusiveServiceDateRange(startAt, endAt);
 
-    return emuRouteStatements.all<RawDailyEmuRouteRow>(
-        'selectDailyRecordsPaged',
-        startServiceDate,
-        endServiceDate,
-        cursorPoint.serviceDate,
-        cursorPoint.serviceDate,
-        cursorPoint.id,
-        limit
+    return toInternalRows(
+        emuRouteStatements.all<RawDailyEmuRouteRow>(
+            'selectDailyRecordsPaged',
+            startServiceDate,
+            endServiceDate,
+            cursorPoint.serviceDate,
+            cursorPoint.serviceDate,
+            cursorPoint.id,
+            limit
+        )
     );
 }
 
@@ -553,5 +563,5 @@ export function buildNextCursor(
     }
 
     const last = rows[rows.length - 1]!;
-    return `${last.service_date}:${last.id}`;
+    return `${dayToServiceDate(last.service_date)}:${last.id}`;
 }

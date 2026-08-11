@@ -8,14 +8,15 @@ CREATE TABLE IF NOT EXISTS provenance_task_runs (
     status TEXT NOT NULL CHECK (status IN ('running', 'success', 'failed', 'skipped')),
     error_message TEXT NOT NULL DEFAULT '',
     task_args_json TEXT NOT NULL,
-    service_date TEXT NOT NULL,
-    primary_train_code TEXT NOT NULL DEFAULT '',
+    service_date INTEGER NOT NULL CHECK(service_date >= 0),
+    primary_train_prefix TEXT NOT NULL DEFAULT '',
+    primary_train_number INTEGER NOT NULL DEFAULT 0 CHECK(primary_train_number >= 0 AND primary_train_number <= 9999),
     primary_start_at INTEGER,
-    primary_emu_code TEXT NOT NULL DEFAULT ''
+    primary_emu_id INTEGER
 );
 
-CREATE INDEX IF NOT EXISTS idx_provenance_task_runs_service_date_train
-ON provenance_task_runs(service_date, primary_train_code, primary_start_at);
+CREATE INDEX IF NOT EXISTS idx_provenance_task_runs_service_train
+ON provenance_task_runs(service_date, primary_train_prefix, primary_train_number, primary_start_at);
 
 CREATE INDEX IF NOT EXISTS idx_provenance_task_runs_finished_at
 ON provenance_task_runs(finished_at, started_at);

@@ -15,6 +15,7 @@ import {
     getNextExecutionTimeInShanghaiSeconds,
     parseDailyTimeHHmm
 } from '~/server/utils/date/shanghaiDateTime';
+import { parseInternalJson } from '~/server/utils/internal/storageValues';
 
 export const BACKUP_DATABASE_TASK_EXECUTOR = 'backup_database';
 
@@ -97,8 +98,7 @@ function enqueueNextDatabaseBackupTask(args: BackupDatabaseTaskArgs): void {
     );
 }
 
-async function executeBackupDatabaseTask(rawArgs: unknown): Promise<void> {
-    const args = parseBackupDatabaseTaskArgs(rawArgs);
+async function executeBackupDatabaseTask(args: BackupDatabaseTaskArgs): Promise<void> {
     let caughtError: unknown = null;
 
     try {
@@ -166,14 +166,9 @@ export function synchronizeDatabaseBackupTasks(): string[] {
     for (const task of listPendingTasksByExecutor(
         BACKUP_DATABASE_TASK_EXECUTOR
     )) {
-        let parsedArgs: BackupDatabaseTaskArgs;
-        try {
-            parsedArgs = parseBackupDatabaseTaskArgs(
-                JSON.parse(task.arguments)
-            );
-        } catch {
-            continue;
-        }
+        const parsedArgs = parseBackupDatabaseTaskArgs(
+            parseInternalJson(task.arguments)
+        );
 
         if (configuredArgs.has(JSON.stringify(parsedArgs))) {
             continue;
@@ -217,8 +212,9 @@ export function registerBackupDatabaseTaskExecutor(): void {
         return;
     }
 
-    registerTaskExecutor(BACKUP_DATABASE_TASK_EXECUTOR, async (args) => {
-        await executeBackupDatabaseTask(args);
+    registerTaskExecutor(BACKUP_DATABASE_TASK_EXECUTOR, {
+        parse: parseBackupDatabaseTaskArgs,
+        execute: executeBackupDatabaseTask
     });
     registered = true;
     logger.info(`registered executor=${BACKUP_DATABASE_TASK_EXECUTOR}`);

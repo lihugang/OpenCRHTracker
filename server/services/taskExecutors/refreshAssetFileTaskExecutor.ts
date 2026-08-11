@@ -254,9 +254,8 @@ function enqueueNextRefreshTask(
 
 async function executeRefreshAssetTask(
     definition: RefreshAssetTaskDefinition,
-    rawArgs: unknown
+    args: RefreshAssetTaskArgs
 ): Promise<void> {
-    const args = parseRefreshAssetTaskArgs(rawArgs);
     let caughtError: unknown = null;
     try {
         const configuredRefreshAt =
@@ -375,8 +374,9 @@ export function registerRefreshAssetFileTaskExecutors(): void {
     }
 
     for (const definition of REFRESH_ASSET_TASK_DEFINITIONS) {
-        registerTaskExecutor(definition.executor, async (args) => {
-            await executeRefreshAssetTask(definition, args);
+        registerTaskExecutor(definition.executor, {
+            parse: parseRefreshAssetTaskArgs,
+            execute: async (args) => executeRefreshAssetTask(definition, args)
         });
         definition.logger.info(`registered executor=${definition.executor}`);
     }

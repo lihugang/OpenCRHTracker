@@ -3,6 +3,12 @@ import getLogger from '~/server/libs/log4js';
 import { record12306RequestHourlyStat } from '~/server/services/trainProvenanceStore';
 import waitFor12306RequestSlot from '../requestLimiter';
 import log12306RequestFailure from './log12306RequestFailure';
+import {
+    formatExternalServiceDate,
+    parseExternalTrainCodeOrThrow
+} from '~/server/utils/internal/boundaries';
+import type { ServiceDay } from '~/server/utils/date/serviceDay';
+import type { TrainCodeParts } from '~/server/utils/12306/trainCode';
 
 interface StationBoardResponseRow {
     train_no?: unknown;
@@ -22,7 +28,7 @@ interface StationBoardResponse {
 
 export interface StationBoardTrainRow {
     trainNo: string;
-    stationTrainCode: string;
+    stationTrainCode: TrainCodeParts;
     circulationTrain: string;
     startStationName: string;
     endStationName: string;
@@ -55,10 +61,10 @@ function normalizeStationBoardRow(value: unknown): StationBoardTrainRow | null {
             typeof row.train_no === 'string'
                 ? row.train_no.trim().toUpperCase()
                 : '',
-        stationTrainCode:
-            typeof row.station_train_code === 'string'
-                ? row.station_train_code.trim().toUpperCase()
-                : '',
+        stationTrainCode: parseExternalTrainCodeOrThrow(
+            row.station_train_code,
+            'stationTrainCode'
+        ),
         circulationTrain:
             typeof row.jiaolu_train === 'string' ? row.jiaolu_train.trim() : '',
         startStationName:
@@ -74,10 +80,10 @@ function normalizeStationBoardRow(value: unknown): StationBoardTrainRow | null {
 }
 
 export default async function fetchStationBoardByStation(
-    serviceDate: string,
+    serviceDate: ServiceDay,
     stationTelecode: string
 ): Promise<StationBoardTrainRow[]> {
-    const normalizedServiceDate = serviceDate.trim();
+    const normalizedServiceDate = formatExternalServiceDate(serviceDate);
     const normalizedStationTelecode = stationTelecode.trim().toUpperCase();
     if (!/^\d{8}$/.test(normalizedServiceDate)) {
         throw new Error('serviceDate must be in YYYYMMDD format');

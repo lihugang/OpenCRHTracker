@@ -13,11 +13,16 @@ import {
     type StationPlatformRefreshTrigger,
     type TrainProvenanceTaskRunStatus
 } from '~/server/services/trainProvenanceStore';
-import normalizeCode from '~/server/utils/12306/normalizeCode';
-import uniqueNormalizedCodes from '~/server/utils/12306/uniqueNormalizedCodes';
-import getCurrentDateString, {
-    formatShanghaiDateString
-} from '~/server/utils/date/getCurrentDateString';
+import {
+    trainCodeKey,
+    type TrainCodeParts
+} from '~/server/utils/12306/trainCode';
+import { asEmuId, type EmuId } from '~/server/libs/database/emu';
+import {
+    asServiceDay,
+    unixSecondsToServiceDay,
+    type ServiceDay
+} from '~/server/utils/date/serviceDay';
 import type { TaskExecutionContextValue } from '~/server/services/taskExecutionContext';
 import type {
     StationPlatformInfoRefreshEntry,
@@ -54,33 +59,48 @@ function extractObject(value: unknown): Record<string, unknown> | null {
     return value as Record<string, unknown>;
 }
 
-function extractPrimaryTrainCode(taskArgs: unknown): string {
+function isTrainCodeParts(value: unknown): value is TrainCodeParts {
+    return (
+        !!value &&
+        typeof value === 'object' &&
+        typeof (value as { prefix?: unknown }).prefix === 'string' &&
+        typeof (value as { number?: unknown }).number === 'number' &&
+        Number.isInteger((value as { number: number }).number)
+    );
+}
+
+function extractPrimaryTrainCode(taskArgs: unknown): TrainCodeParts | null {
     const body = extractObject(taskArgs);
     if (!body) {
-        return '';
+        return null;
     }
 
-    if (typeof body.trainCode === 'string') {
-        return normalizeCode(body.trainCode);
+    if (isTrainCodeParts(body.trainCode)) {
+        return body.trainCode;
     }
 
     if (Array.isArray(body.codes)) {
         const firstCode = body.codes.find(
-            (item): item is string => typeof item === 'string'
+            (item): item is TrainCodeParts => isTrainCodeParts(item)
         );
-        return firstCode ? normalizeCode(firstCode) : '';
+        return firstCode ?? null;
     }
 
-    return '';
+    return null;
 }
 
-function extractPrimaryEmuCode(taskArgs: unknown): string {
+function extractPrimaryEmuId(taskArgs: unknown): EmuId | null {
     const body = extractObject(taskArgs);
-    if (!body || typeof body.emuCode !== 'string') {
-        return '';
+    if (!body) {
+        return null;
     }
 
-    return normalizeCode(body.emuCode);
+    const emuId = body.emuId ?? body.primaryEmuId;
+    if (typeof emuId === 'number' && Number.isInteger(emuId) && emuId > 0) {
+        return asEmuId(emuId);
+    }
+
+    return null;
 }
 
 function extractPrimaryStartAt(taskArgs: unknown): number | null {
@@ -99,25 +119,26 @@ function extractPrimaryStartAt(taskArgs: unknown): number | null {
 function extractServiceDate(
     taskArgs: unknown,
     executionContext: TaskExecutionContextValue
-): string {
+): ServiceDay {
     const body = extractObject(taskArgs);
-    if (body && typeof body.date === 'string' && /^\d{8}$/.test(body.date)) {
-        return body.date;
+    const rawServiceDate = body?.serviceDate ?? body?.date;
+    if (typeof rawServiceDate === 'number' && Number.isInteger(rawServiceDate)) {
+        return asServiceDay(rawServiceDate);
     }
 
     const primaryStartAt = extractPrimaryStartAt(taskArgs);
     if (primaryStartAt !== null) {
-        return formatShanghaiDateString(primaryStartAt * 1000);
+        return unixSecondsToServiceDay(primaryStartAt);
     }
 
     if (
         Number.isInteger(executionContext.executionTime) &&
         executionContext.executionTime > 0
     ) {
-        return formatShanghaiDateString(executionContext.executionTime * 1000);
+        return unixSecondsToServiceDay(executionContext.executionTime);
     }
 
-    return getCurrentDateString();
+    throw new Error('train_provenance_service_date_missing');
 }
 
 function getCurrentContext() {
@@ -137,27 +158,18 @@ export async function runWithTrainProvenanceTaskContext<T>(
         return callback();
     }
 
-    let taskRunId = 0;
-    try {
-        const taskRun = startTrainProvenanceTaskRun({
-            schedulerTaskId: executionContext.taskId,
-            executor: executionContext.executor,
-            executionTime: executionContext.executionTime,
-            startedAt: Math.floor(Date.now() / 1000),
-            taskArgs,
-            serviceDate: extractServiceDate(taskArgs, executionContext),
-            primaryTrainCode: extractPrimaryTrainCode(taskArgs),
-            primaryStartAt: extractPrimaryStartAt(taskArgs),
-            primaryEmuCode: extractPrimaryEmuCode(taskArgs)
-        });
-        taskRunId = taskRun.id;
-    } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        logger.error(
-            `task_run_start_failed taskId=${executionContext.taskId} executor=${executionContext.executor} error=${message}`
-        );
-        return callback();
-    }
+    const taskRun = startTrainProvenanceTaskRun({
+        schedulerTaskId: executionContext.taskId,
+        executor: executionContext.executor,
+        executionTime: executionContext.executionTime,
+        startedAt: Math.floor(Date.now() / 1000),
+        taskArgs,
+        serviceDate: extractServiceDate(taskArgs, executionContext),
+        primaryTrainCode: extractPrimaryTrainCode(taskArgs),
+        primaryStartAt: extractPrimaryStartAt(taskArgs),
+        primaryEmuId: extractPrimaryEmuId(taskArgs)
+    });
+    const taskRunId = taskRun.id;
 
     const contextValue: TrainProvenanceContextValue = {
         taskRunId,
@@ -234,26 +246,23 @@ export function recordCurrentTrainProvenanceEvent(
         return;
     }
 
-    try {
-        recordTrainProvenanceEvent({
-            ...input,
-            taskRunId: context.taskRunId,
-            sequenceNo: context.nextSequenceNo
-        });
-        context.nextSequenceNo += 1;
-    } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        logger.warn(
-            `record_event_failed taskRunId=${context.taskRunId} eventType=${input.eventType} error=${message}`
-        );
-    }
+    recordTrainProvenanceEvent({
+        ...input,
+        taskRunId: context.taskRunId,
+        sequenceNo: context.nextSequenceNo
+    });
+    context.nextSequenceNo += 1;
 }
 
 export function recordCurrentTrainProvenanceEventsForTrainCodes(
-    trainCodes: string[],
+    trainCodes: TrainCodeParts[],
     input: Omit<TrainProvenanceEventInput, 'trainCode'>
 ) {
-    for (const trainCode of uniqueNormalizedCodes(trainCodes)) {
+    const seen = new Set<string>();
+    for (const trainCode of trainCodes) {
+        const key = trainCodeKey(trainCode);
+        if (seen.has(key)) continue;
+        seen.add(key);
         recordCurrentTrainProvenanceEvent({
             ...input,
             trainCode
@@ -262,7 +271,7 @@ export function recordCurrentTrainProvenanceEventsForTrainCodes(
 }
 
 interface StationPlatformRefreshGroup {
-    trainCodes: string[];
+    trainCodes: TrainCodeParts[];
     startAt: number | null;
     entries: StationPlatformInfoRefreshEntry[];
 }
@@ -270,7 +279,8 @@ interface StationPlatformRefreshGroup {
 function getStationPlatformRefreshGroupKey(
     reference: StationPlatformInfoRouteReference
 ) {
-    return `${reference.startAt ?? 'null'}:${[...reference.trainCodes]
+    return `${reference.startAt ?? 'null'}:${reference.trainCodes
+        .map(trainCodeKey)
         .sort()
         .join('/')}`;
 }
@@ -318,7 +328,7 @@ function getStationPlatformRefreshEventType(
 }
 
 export function recordCurrentStationPlatformRefreshResults(input: {
-    serviceDate: string;
+    serviceDate: ServiceDay;
     trigger: StationPlatformRefreshTrigger;
     result: StationPlatformInfoRefreshResult;
     fallbackRouteReferences?: StationPlatformInfoRouteReference[];
@@ -331,7 +341,11 @@ export function recordCurrentStationPlatformRefreshResults(input: {
 
     const groups = new Map<string, StationPlatformRefreshGroup>();
     const ensureGroup = (reference: StationPlatformInfoRouteReference) => {
-        const trainCodes = uniqueNormalizedCodes(reference.trainCodes);
+        const trainCodes = [
+            ...new Map(
+                reference.trainCodes.map((code) => [trainCodeKey(code), code])
+            ).values()
+        ];
         if (trainCodes.length === 0) {
             return null;
         }
@@ -374,72 +388,64 @@ export function recordCurrentStationPlatformRefreshResults(input: {
             group.entries,
             persistenceErrorMessage
         );
-        try {
-            const resultId = recordStationPlatformRefreshResult({
-                taskRunId: context.taskRunId,
-                serviceDate: input.serviceDate,
-                startAt: group.startAt,
-                primaryTrainCode: group.trainCodes[0] ?? '',
-                trainCodes: group.trainCodes,
+        const resultId = recordStationPlatformRefreshResult({
+            taskRunId: context.taskRunId,
+            serviceDate: input.serviceDate,
+            startAt: group.startAt,
+            primaryTrainCode: group.trainCodes[0]!,
+            trainCodes: group.trainCodes,
+            trigger: input.trigger,
+            status,
+            entries: group.entries.map((entry) => ({
+                stationOrder: entry.stationOrder,
+                lookupType: entry.lookupType,
+                stationName: entry.stationName,
+                stationTelecode: entry.stationTelecode,
+                stationNo: entry.stationNo,
+                trainDate: entry.trainDate,
+                stationTrainCodes: entry.stationTrainCodes,
+                attemptedTrainCodes: entry.attemptedTrainCodes,
+                status: entry.status,
+                platformNo: entry.platformNo,
+                wicket: entry.wicket,
+                fetchedAt: entry.fetchedAt,
+                errorMessage: entry.errorMessage
+            })),
+            errorMessage: persistenceErrorMessage
+        });
+        const updatedCount = group.entries.filter(
+            (entry) => entry.status === 'updated'
+        ).length;
+        const cacheHitCount = group.entries.filter(
+            (entry) => entry.status === 'cache_hit'
+        ).length;
+        const cacheFallbackCount = group.entries.filter(
+            (entry) => entry.status === 'cache_fallback'
+        ).length;
+        const noDataCount = group.entries.filter(
+            (entry) => entry.status === 'no_data'
+        ).length;
+        const failedCount = group.entries.filter(
+            (entry) =>
+                entry.status === 'request_failed' ||
+                entry.status === 'persist_failed'
+        ).length;
+        recordCurrentTrainProvenanceEventsForTrainCodes(group.trainCodes, {
+            serviceDate: input.serviceDate,
+            startAt: group.startAt,
+            eventType: getStationPlatformRefreshEventType(status),
+            result: status,
+            payload: {
+                resultId,
                 trigger: input.trigger,
-                status,
-                entries: group.entries.map((entry) => ({
-                    stationOrder: entry.stationOrder,
-                    lookupType: entry.lookupType,
-                    stationName: entry.stationName,
-                    stationTelecode: entry.stationTelecode,
-                    stationNo: entry.stationNo,
-                    trainDate: entry.trainDate,
-                    stationTrainCodes: entry.stationTrainCodes,
-                    attemptedTrainCodes: entry.attemptedTrainCodes,
-                    status: entry.status,
-                    platformNo: entry.platformNo,
-                    wicket: entry.wicket,
-                    fetchedAt: entry.fetchedAt,
-                    errorMessage: entry.errorMessage
-                })),
-                errorMessage: persistenceErrorMessage
-            });
-            const updatedCount = group.entries.filter(
-                (entry) => entry.status === 'updated'
-            ).length;
-            const cacheHitCount = group.entries.filter(
-                (entry) => entry.status === 'cache_hit'
-            ).length;
-            const cacheFallbackCount = group.entries.filter(
-                (entry) => entry.status === 'cache_fallback'
-            ).length;
-            const noDataCount = group.entries.filter(
-                (entry) => entry.status === 'no_data'
-            ).length;
-            const failedCount = group.entries.filter(
-                (entry) =>
-                    entry.status === 'request_failed' ||
-                    entry.status === 'persist_failed'
-            ).length;
-            recordCurrentTrainProvenanceEventsForTrainCodes(group.trainCodes, {
-                serviceDate: input.serviceDate,
-                startAt: group.startAt,
-                eventType: getStationPlatformRefreshEventType(status),
-                result: status,
-                payload: {
-                    resultId,
-                    trigger: input.trigger,
-                    candidateCount: group.entries.length,
-                    updatedCount,
-                    cacheHitCount,
-                    cacheFallbackCount,
-                    noDataCount,
-                    failedCount
-                }
-            });
-        } catch (error) {
-            const message =
-                error instanceof Error ? error.message : String(error);
-            logger.warn(
-                `record_station_platform_refresh_failed taskRunId=${context.taskRunId} trainCodes=${group.trainCodes.join('/')} error=${message}`
-            );
-        }
+                candidateCount: group.entries.length,
+                updatedCount,
+                cacheHitCount,
+                cacheFallbackCount,
+                noDataCount,
+                failedCount
+            }
+        });
     }
 }
 
@@ -451,10 +457,8 @@ export function recordCurrentCouplingScanCandidate(
         return;
     }
 
-    try {
-        recordCouplingScanCandidate({
-            ...input,
-            taskRunId: context.taskRunId
-        });
-    } catch {}
+    recordCouplingScanCandidate({
+        ...input,
+        taskRunId: context.taskRunId
+    });
 }

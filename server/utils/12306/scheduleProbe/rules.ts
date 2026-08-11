@@ -1,9 +1,13 @@
 import type { ScheduleProbePrefixRule } from './types';
+import {
+    formatTrainCode,
+    type TrainCodeParts
+} from '~/server/utils/12306/trainCode';
 
 interface RuleByCodeMatch {
     rule: ScheduleProbePrefixRule;
     no: number;
-    normalizedCode: string;
+    normalizedCode: TrainCodeParts;
 }
 
 interface RuleByKeywordMatch {
@@ -44,10 +48,10 @@ export function getRulesByKeyword(
 }
 
 export function getRuleByCode(
-    code: string,
+    code: TrainCodeParts,
     rules: ScheduleProbePrefixRule[]
 ): RuleByCodeMatch | null {
-    const normalized = code.trim().toUpperCase();
+    const normalized = formatTrainCode(code);
     for (const rule of sortRulesByPrefixLengthDesc(rules)) {
         if (!normalized.startsWith(rule.prefix)) {
             continue;
@@ -66,14 +70,17 @@ export function getRuleByCode(
         return {
             rule,
             no,
-            normalizedCode: `${rule.prefix}${no}`
+            normalizedCode: {
+                prefix: rule.prefix,
+                number: no
+            }
         };
     }
     return null;
 }
 
 export function isScheduleProbeTrackingEnabled(
-    code: string,
+    code: TrainCodeParts,
     rules: ScheduleProbePrefixRule[]
 ): boolean {
     return getRuleByCode(code, rules)?.rule.track === true;

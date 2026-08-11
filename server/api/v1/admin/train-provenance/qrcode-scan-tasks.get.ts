@@ -3,6 +3,7 @@ import { getAdminQrcodeScanTaskList } from '~/server/services/adminTrainProvenan
 import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';
 import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
+import { parseExternalServiceDate } from '~/server/utils/internal/boundaries';
 
 export default defineEventHandler(async (event) => {
     return executeApi(
@@ -20,10 +21,10 @@ export default defineEventHandler(async (event) => {
                 /^\d{8}$/.test(date),
                 400,
                 'invalid_param',
-                'date 蹇呴』鏄?YYYYMMDD'
+                'date 必须是 YYYYMMDD'
             );
 
-            return getAdminQrcodeScanTaskList(date);
+            return getAdminQrcodeScanTaskList(parseExternalServiceDate(date));
         }
     );
 });

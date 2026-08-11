@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS request_hourly_stats (
     bucket_start INTEGER NOT NULL,
-    service_date TEXT NOT NULL,
+    service_date INTEGER NOT NULL CHECK(service_date >= 0),
     request_type TEXT NOT NULL,
     is_success INTEGER NOT NULL CHECK (is_success IN (0, 1)),
     request_count INTEGER NOT NULL DEFAULT 0 CHECK (request_count >= 0),

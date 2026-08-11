@@ -1,13 +1,22 @@
 import fs from 'fs';
 import getLogger from '~/server/libs/log4js';
-import normalizeCode from '~/server/utils/12306/normalizeCode';
 import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
 import parseTimeAsTimestamp from '~/server/utils/date/parseTimeAsTimestamp';
 import { toUnixSecondsFromShanghaiDayOffset } from '~/server/utils/date/shanghaiDateTime';
 import {
+    serviceDateToDay,
+    type ServiceDay
+} from '~/server/utils/date/serviceDay';
+import {
     getAssetFilePath,
     writeTextFileAtomically
 } from '~/server/utils/dataAssets/store';
+import {
+    formatTrainCode,
+    trainCodeKey,
+    type TrainCodeParts
+} from '~/server/utils/12306/trainCode';
+import { parseExternalTrainCodeOrThrow } from '~/server/utils/internal/boundaries';
 import type {
     TodayScheduleStop,
     TodayScheduleTimetable
@@ -35,8 +44,8 @@ export interface SupplementTrainStopInput {
 }
 
 export interface SupplementTrainEntry {
-    trainCode: string;
-    aliases: string[];
+    trainCode: TrainCodeParts;
+    aliases: TrainCodeParts[];
     bureauCode: string;
     trainStyle: string;
     trainDepartment: string;
@@ -56,7 +65,7 @@ interface SupplementTrainRegistry {
     fileMtimeMs: number;
     entriesByTrainCode: Map<string, SupplementTrainEntry>;
     aliasesByCode: Map<string, string>;
-    trainCodes: string[];
+    trainCodes: TrainCodeParts[];
 }
 
 let cached: SupplementTrainRegistry | null = null;
@@ -84,13 +93,13 @@ function normalizeOptionalString(value: unknown, label: string): string {
     return value.trim();
 }
 
-function parseStop(raw: unknown, trainCode: string, index: number) {
+function parseStop(raw: unknown, trainCode: TrainCodeParts, index: number) {
     assert(
         typeof raw === 'object' && raw !== null && !Array.isArray(raw),
-        `items[${trainCode}].stops[${index}] must be an object`
+        `items[${formatTrainCode(trainCode)}].stops[${index}] must be an object`
     );
     const stop = raw as Record<string, unknown>;
-    const label = `items[${trainCode}].stops[${index}]`;
+    const label = `items[${formatTrainCode(trainCode)}].stops[${index}]`;
 
     assert(
         Number.isInteger(stop.stationNo) && (stop.stationNo as number) >= 1,
@@ -174,14 +183,15 @@ function parseSupplementTrainsText(text: string): SupplementTrainEntry[] {
             `items[${index}].trainCode must be a non-empty string`
         );
 
-        const trainCode = normalizeCode(item.trainCode);
-        if (seenTrainCodes.has(trainCode)) {
+        const trainCode = parseExternalTrainCodeOrThrow(item.trainCode);
+        const trainCodeKeyValue = trainCodeKey(trainCode);
+        if (seenTrainCodes.has(trainCodeKeyValue)) {
             logger.warn(
-                `duplicate_supplement_train_code code=${trainCode} strategy=first_record`
+                `duplicate_supplement_train_code code=${trainCodeKeyValue} strategy=first_record`
             );
             continue;
         }
-        seenTrainCodes.add(trainCode);
+        seenTrainCodes.add(trainCodeKeyValue);
 
         assert(
             Array.isArray(item.stops),
@@ -192,7 +202,7 @@ function parseSupplementTrainsText(text: string): SupplementTrainEntry[] {
             `items[${trainCode}].stops must not be empty`
         );
 
-        const aliases: string[] = [];
+        const aliases: TrainCodeParts[] = [];
         if (item.aliases !== undefined) {
             assert(
                 Array.isArray(item.aliases),
@@ -204,12 +214,13 @@ function parseSupplementTrainsText(text: string): SupplementTrainEntry[] {
                     typeof rawAlias === 'string' && rawAlias.trim().length > 0,
                     `items[${trainCode}].aliases[${aliasIndex}] must be a non-empty string`
                 );
-                const alias = normalizeCode(rawAlias);
-                if (alias.length === 0 || alias === trainCode) {
+                const alias = parseExternalTrainCodeOrThrow(rawAlias);
+                const aliasKey = trainCodeKey(alias);
+                if (aliasKey.length === 0 || aliasKey === trainCodeKeyValue) {
                     continue;
                 }
-                if (!seenAliases.has(alias)) {
-                    seenAliases.add(alias);
+                if (!seenAliases.has(aliasKey)) {
+                    seenAliases.add(aliasKey);
                     aliases.push(alias);
                 }
             }
@@ -254,10 +265,11 @@ function buildRegistry(filePath: string): SupplementTrainRegistry {
     const aliasesByCode = new Map<string, string>();
 
     for (const entry of entries) {
-        entriesByTrainCode.set(entry.trainCode, entry);
+        entriesByTrainCode.set(trainCodeKey(entry.trainCode), entry);
         for (const alias of entry.aliases) {
-            if (!aliasesByCode.has(alias)) {
-                aliasesByCode.set(alias, entry.trainCode);
+            const aliasKey = trainCodeKey(alias);
+            if (!aliasesByCode.has(aliasKey)) {
+                aliasesByCode.set(aliasKey, trainCodeKey(entry.trainCode));
             }
         }
     }
@@ -326,7 +338,7 @@ export function listSupplementTrainLookupRows(): SupplementTrainLookupRow[] {
     const rows: SupplementTrainLookupRow[] = [];
 
     for (const trainCode of registry.trainCodes) {
-        const entry = registry.entriesByTrainCode.get(trainCode);
+        const entry = registry.entriesByTrainCode.get(trainCodeKey(trainCode));
         if (!entry) {
             continue;
         }
@@ -337,15 +349,15 @@ export function listSupplementTrainLookupRows(): SupplementTrainLookupRow[] {
         const endStation = lastStop?.stationName ?? '';
 
         rows.push({
-            code: entry.trainCode,
-            canonicalCode: entry.trainCode,
+            code: formatTrainCode(entry.trainCode),
+            canonicalCode: formatTrainCode(entry.trainCode),
             startStation,
             endStation
         });
         for (const alias of entry.aliases) {
             rows.push({
-                code: alias,
-                canonicalCode: entry.trainCode,
+                code: formatTrainCode(alias),
+                canonicalCode: formatTrainCode(entry.trainCode),
                 startStation,
                 endStation
             });
@@ -360,7 +372,7 @@ export function listSupplementTrainEntries(): SupplementTrainEntry[] {
     const entries: SupplementTrainEntry[] = [];
 
     for (const trainCode of registry.trainCodes) {
-        const entry = registry.entriesByTrainCode.get(trainCode);
+        const entry = registry.entriesByTrainCode.get(trainCodeKey(trainCode));
         if (entry) {
             entries.push(entry);
         }
@@ -370,10 +382,10 @@ export function listSupplementTrainEntries(): SupplementTrainEntry[] {
 }
 
 export function getSupplementTrainTimetableByTrainCode(
-    trainCode: string
+    trainCode: TrainCodeParts
 ): TodayScheduleTimetable | null {
     const registry = getActiveRegistry();
-    const normalizedCode = normalizeCode(trainCode);
+    const normalizedCode = trainCodeKey(trainCode);
     if (normalizedCode.length === 0) {
         return null;
     }
@@ -391,11 +403,14 @@ export function getSupplementTrainTimetableByTrainCode(
         return null;
     }
 
-    return buildSupplementTimetable(getCurrentDateString(), entry);
+    return buildSupplementTimetable(
+        serviceDateToDay(getCurrentDateString()),
+        entry
+    );
 }
 
 function buildSupplementTimetable(
-    date: string,
+    date: ServiceDay,
     entry: SupplementTrainEntry
 ): TodayScheduleTimetable {
     const stops = [...entry.stops].sort(
@@ -430,7 +445,7 @@ function buildSupplementTimetable(
 
     return {
         trainCode: entry.trainCode,
-        trainInternalCode: `supplement_trains_${entry.trainCode}`,
+        trainInternalCode: `supplement_trains_${formatTrainCode(entry.trainCode)}`,
         allCodes,
         bureauCode: entry.bureauCode,
         trainStyle: entry.trainStyle,

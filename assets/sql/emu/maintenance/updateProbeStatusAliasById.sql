@@ -1,5 +1,5 @@
 UPDATE probe_status
-SET emu_code = ?,
+SET emu_id = ?,
     timetable_id = ?,
     status = ?
 WHERE id = ?;

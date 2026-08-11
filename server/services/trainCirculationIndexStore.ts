@@ -14,8 +14,10 @@ import {
     loadScheduleCirculationEntry,
     loadScheduleCirculationMap
 } from '~/server/utils/12306/scheduleProbe/stateStore';
-import { LEGACY_SCHEDULE_JSON_PATH } from '~/server/utils/12306/scheduleProbe/constants';
-import type { ScheduleCirculationEntry } from '~/server/utils/12306/scheduleProbe/types';
+import type {
+    ScheduleCirculationEntry,
+    ScheduleCirculationNode
+} from '~/server/utils/12306/scheduleProbe/types';
 import { getRelativeDateString } from '~/server/utils/date/getCurrentDateString';
 import {
     expandSequentialShanghaiDayOffsets,
@@ -24,6 +26,17 @@ import {
 } from '~/server/utils/date/shanghaiDateTime';
 import murmurHash32 from '~/server/utils/hash/murmurHash32';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
+import { trainCodeKey, type TrainCodeParts } from '~/server/utils/12306/trainCode';
+import {
+    formatExternalEmuCode,
+    formatExternalTrainCode,
+    parseExternalTrainCodeOrThrow
+} from '~/server/utils/internal/boundaries';
+import {
+    serviceDateToDay,
+    serviceDayToShanghaiDayStartUnixSeconds,
+    type ServiceDay
+} from '~/server/utils/date/serviceDay';
 import type {
     InferredTrainCirculationMetadata,
     InferredTrainCirculationReference,
@@ -34,7 +47,7 @@ import type {
 } from '~/types/lookup';
 
 interface CursorPoint {
-    serviceDate: string;
+    serviceDate: ServiceDay;
     id: number;
 }
 
@@ -67,7 +80,7 @@ interface CirculationWindowStats {
 }
 
 interface TrainCirculationIndexCache {
-    currentDate: string;
+    currentDate: ServiceDay;
     scheduleStateVersion: number;
     windowDays: number;
     windowStart: number;
@@ -104,26 +117,26 @@ interface OfficialCirculationCandidateEvaluation {
 
 interface CirculationNodeMeta {
     nodeKey: string;
-    trainCode: string;
+    trainCode: TrainCodeParts;
     internalCode: string | null;
-    allCodes: string[];
+    allCodes: TrainCodeParts[];
 }
 
 interface InternalInferredCirculationNode {
-    trainCode: string;
+    trainCode: TrainCodeParts;
     internalCode: string | null;
-    allCodes: string[];
-    incomingTrainCodes: string[] | null;
+    allCodes: TrainCodeParts[];
+    incomingTrainCodes: TrainCodeParts[] | null;
     incomingWeight: number | null;
     incomingSupportCount: number | null;
-    outgoingTrainCodes: string[] | null;
+    outgoingTrainCodes: TrainCodeParts[] | null;
     outgoingWeight: number | null;
     outgoingSupportCount: number | null;
 }
 
 interface InternalInferredCirculation {
     routeId: string;
-    trainCodes: string[];
+    trainCodes: TrainCodeParts[];
     windowStart: number;
     windowEnd: number;
     threshold: number;
@@ -142,8 +155,8 @@ function getWindowConfig() {
     return useConfig().task.circulation;
 }
 
-function getWindowRange(currentDate: string, windowDays: number) {
-    const todayStartAt = getShanghaiDayStartUnixSeconds(currentDate);
+function getWindowRange(currentDate: ServiceDay, windowDays: number) {
+    const todayStartAt = serviceDayToShanghaiDayStartUnixSeconds(currentDate);
     const startAt = todayStartAt - (windowDays - 1) * 24 * 60 * 60;
     const endAt = todayStartAt + 24 * 60 * 60 - 1;
     return {
@@ -152,24 +165,19 @@ function getWindowRange(currentDate: string, windowDays: number) {
     };
 }
 
-function uniqueNormalizedCodes(codes: string[]) {
-    const normalizedCodes = new Set<string>();
-
+function uniqueTrainCodes(codes: readonly TrainCodeParts[]) {
+    const byKey = new Map<string, TrainCodeParts>();
     for (const code of codes) {
-        const normalized = normalizeCode(code);
-        if (normalized.length > 0) {
-            normalizedCodes.add(normalized);
-        }
+        byKey.set(trainCodeKey(code), code);
     }
-
-    return [...normalizedCodes].sort((left, right) =>
-        left.localeCompare(right)
-    );
+    return [...byKey.entries()]
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([, code]) => code);
 }
 
-function buildFallbackNodeMeta(trainCode: string): CirculationNodeMeta {
+function buildFallbackNodeMeta(trainCode: TrainCodeParts): CirculationNodeMeta {
     return {
-        nodeKey: `fallback:${trainCode}`,
+        nodeKey: `fallback:${trainCodeKey(trainCode)}`,
         trainCode,
         internalCode: null,
         allCodes: [trainCode]
@@ -192,18 +200,20 @@ function buildTrainCodeNodeMetaMap(
     const excludedTrainCodes = new Set<string>();
 
     for (const group of getTodayScheduleProbeGroups().values()) {
-        const allCodes = uniqueNormalizedCodes(group.allCodes);
+        const allCodes = uniqueTrainCodes(group.allCodes);
         if (allCodes.length === 0) {
             continue;
         }
 
-        const normalizedInternalCode = normalizeCode(group.trainInternalCode);
+        const normalizedInternalCode = group.trainInternalCode
+            ? normalizeCode(group.trainInternalCode)
+            : '';
         if (
             excludeOfficialInternalCodes &&
             officialInternalCodes.has(normalizedInternalCode)
         ) {
             for (const trainCode of allCodes) {
-                excludedTrainCodes.add(trainCode);
+                excludedTrainCodes.add(trainCodeKey(trainCode));
             }
             continue;
         }
@@ -211,7 +221,7 @@ function buildTrainCodeNodeMetaMap(
         if (normalizedInternalCode.length === 0) {
             for (const trainCode of allCodes) {
                 nodeMetaByTrainCode.set(
-                    trainCode,
+                    trainCodeKey(trainCode),
                     buildFallbackNodeMeta(trainCode)
                 );
             }
@@ -226,17 +236,18 @@ function buildTrainCodeNodeMetaMap(
         };
 
         for (const trainCode of allCodes) {
-            nodeMetaByTrainCode.set(trainCode, nodeMeta);
+            nodeMetaByTrainCode.set(trainCodeKey(trainCode), nodeMeta);
         }
     }
 
     return {
-        resolve(trainCode: string) {
-            if (excludedTrainCodes.has(trainCode)) {
+        resolve(trainCode: TrainCodeParts) {
+            const key = trainCodeKey(trainCode);
+            if (excludedTrainCodes.has(key)) {
                 return null;
             }
             return (
-                nodeMetaByTrainCode.get(trainCode) ??
+                nodeMetaByTrainCode.get(key) ??
                 buildFallbackNodeMeta(trainCode)
             );
         }
@@ -348,8 +359,10 @@ function normalizeEdgeCounts(
                 if (left.count !== right.count) {
                     return right.count - left.count;
                 }
-                return nodeMetasByNodeId[left.nodeId]!.trainCode.localeCompare(
-                    nodeMetasByNodeId[right.nodeId]!.trainCode
+                return trainCodeKey(
+                    nodeMetasByNodeId[left.nodeId]!.trainCode
+                ).localeCompare(
+                    trainCodeKey(nodeMetasByNodeId[right.nodeId]!.trainCode)
                 );
             });
         normalized.set(sourceNodeId, items);
@@ -388,15 +401,15 @@ function buildRouteTrainCodes(
     routeNodeIds: number[],
     nodeMetasByNodeId: CirculationNodeMeta[]
 ) {
-    const trainCodes = new Set<string>();
+    const trainCodes = new Map<string, TrainCodeParts>();
 
     for (const nodeId of routeNodeIds) {
         for (const trainCode of nodeMetasByNodeId[nodeId]!.allCodes) {
-            trainCodes.add(trainCode);
+            trainCodes.set(trainCodeKey(trainCode), trainCode);
         }
     }
 
-    return [...trainCodes];
+    return [...trainCodes.values()];
 }
 
 function buildCirculation(
@@ -483,13 +496,14 @@ function buildLookupByTrainCode(circulations: InternalInferredCirculation[]) {
 
     for (const circulation of circulations) {
         for (const trainCode of circulation.trainCodes) {
-            const existing = lookupByTrainCode.get(trainCode);
+            const key = trainCodeKey(trainCode);
+            const existing = lookupByTrainCode.get(key);
             if (existing) {
                 existing.push(circulation);
                 continue;
             }
 
-            lookupByTrainCode.set(trainCode, [circulation]);
+            lookupByTrainCode.set(key, [circulation]);
         }
     }
 
@@ -539,7 +553,7 @@ function buildInferredMetadata(
 }
 
 function resolvePublicNodeTimetable(node: InternalInferredCirculationNode) {
-    const candidateTrainCodes = uniqueNormalizedCodes([
+    const candidateTrainCodes = uniqueTrainCodes([
         node.trainCode,
         ...node.allCodes
     ]);
@@ -557,7 +571,11 @@ function resolvePublicNodeTimetable(node: InternalInferredCirculationNode) {
     }
 
     for (const group of getTodayScheduleProbeGroups().values()) {
-        if (normalizeCode(group.trainInternalCode) !== normalizedInternalCode) {
+        if (
+            (group.trainInternalCode
+                ? normalizeCode(group.trainInternalCode)
+                : '') !== normalizedInternalCode
+        ) {
             continue;
         }
 
@@ -569,19 +587,21 @@ function resolvePublicNodeTimetable(node: InternalInferredCirculationNode) {
 
 function buildPublicNodeInternalCode(
     node: InternalInferredCirculationNode,
-    timetableTrainCode: string
+    timetableTrainCode: TrainCodeParts
 ) {
     const normalizedInternalCode = normalizeCode(node.internalCode ?? '');
     if (normalizedInternalCode.length > 0) {
         return normalizedInternalCode;
     }
 
-    const publicTrainCode = uniqueNormalizedCodes([
+    const publicTrainCode = uniqueTrainCodes([
         ...node.allCodes,
         node.trainCode,
         timetableTrainCode
     ])[0];
-    return publicTrainCode ?? timetableTrainCode;
+    return publicTrainCode
+        ? formatExternalTrainCode(publicTrainCode)
+        : formatExternalTrainCode(timetableTrainCode);
 }
 
 function buildPublicCirculationNodes(
@@ -607,7 +627,7 @@ function buildPublicCirculationNodes(
     for (const [index, node] of circulation.nodes.entries()) {
         const timetable = resolvedTimetables[index]!;
         const expandedOffset = expandedOffsets[index]!;
-        const allCodes = uniqueNormalizedCodes([
+        const allCodes = uniqueTrainCodes([
             ...node.allCodes,
             node.trainCode,
             timetable.trainCode
@@ -621,7 +641,7 @@ function buildPublicCirculationNodes(
                 node,
                 timetable.trainCode
             ),
-            allCodes,
+            allCodes: allCodes.map(formatExternalTrainCode),
             startStation: timetable.startStation,
             endStation: timetable.endStation,
             startAt: expandedOffset.startAt,
@@ -783,8 +803,12 @@ function buildCirculationsFromGraph(
     }
 
     circulations.sort((left, right) => {
-        const leftCode = left.trainCodes[0] ?? '';
-        const rightCode = right.trainCodes[0] ?? '';
+        const leftCode = left.trainCodes[0]
+            ? trainCodeKey(left.trainCodes[0])
+            : '';
+        const rightCode = right.trainCodes[0]
+            ? trainCodeKey(right.trainCodes[0])
+            : '';
         if (leftCode !== rightCode) {
             return leftCode.localeCompare(rightCode);
         }
@@ -896,19 +920,25 @@ function buildInternalCirculationIndex(
 
 function buildComparableNodeCodes(node: {
     internalCode: string | null | undefined;
-    allCodes: string[];
+    allCodes: TrainCodeParts[];
 }) {
     const normalizedInternalCode = normalizeCode(node.internalCode ?? '');
     if (normalizedInternalCode.length > 0) {
         return [normalizedInternalCode];
     }
 
-    return uniqueNormalizedCodes(node.allCodes);
+    return node.allCodes.map(trainCodeKey);
 }
 
 function nodesShareComparableCode(
-    left: { internalCode: string | null | undefined; allCodes: string[] },
-    right: { internalCode: string | null | undefined; allCodes: string[] }
+    left: {
+        internalCode: string | null | undefined;
+        allCodes: TrainCodeParts[];
+    },
+    right: {
+        internalCode: string | null | undefined;
+        allCodes: TrainCodeParts[];
+    }
 ) {
     const leftCodes = buildComparableNodeCodes(left);
     const rightCodeSet = new Set(buildComparableNodeCodes(right));
@@ -1041,7 +1071,7 @@ function buildOfficialCandidateEvaluations(
 
         for (const trainCode of node.allCodes) {
             for (const circulation of fullLookupByTrainCode.get(
-                normalizeCode(trainCode)
+                trainCodeKey(trainCode)
             ) ?? []) {
                 candidateMap.set(circulation.routeId, circulation);
             }
@@ -1067,10 +1097,10 @@ function buildOfficialValidationMetadata(
     };
 }
 
-function cloneOfficialEntryNodes(nodes: TrainCirculationNode[]) {
+function cloneOfficialEntryNodes(nodes: ScheduleCirculationNode[]) {
     return nodes.map((node) => ({
         internalCode: node.internalCode,
-        allCodes: [...node.allCodes],
+        allCodes: node.allCodes.map(formatExternalTrainCode),
         startStation: node.startStation,
         endStation: node.endStation,
         startAt: node.startAt,
@@ -1081,7 +1111,7 @@ function cloneOfficialEntryNodes(nodes: TrainCirculationNode[]) {
 function buildPublicOfficialCirculationFromEntry(
     entryKey: string,
     entry: ScheduleCirculationEntry,
-    nodes: TrainCirculationNode[],
+    nodes: ScheduleCirculationNode[],
     metadata: TrainCirculationMetadata
 ): TrainCirculation {
     return {
@@ -1284,12 +1314,8 @@ function consumeRow(
     outgoingCounts: Map<number, Map<number, number>>,
     incomingCounts: Map<number, Map<number, number>>
 ) {
-    const trainCode = normalizeCode(row.train_code);
-    const emuCode = normalizeCode(row.emu_code);
-    if (trainCode.length === 0 || emuCode.length === 0) {
-        return false;
-    }
-
+    const trainCode = row.train_code;
+    const emuCode = formatExternalEmuCode(row.emu_id);
     const nodeMeta = trainCodeNodeMetaMap.resolve(trainCode);
     const state = scanStatesByEmuCode.get(emuCode);
     const runKey = buildRunKey(row);
@@ -1324,7 +1350,7 @@ function consumeRow(
 }
 
 export function rebuildTrainCirculationIndex(): TrainCirculationIndexCache {
-    const currentDate = getRelativeDateString(0);
+    const currentDate = serviceDateToDay(getRelativeDateString(0));
     const config = getWindowConfig();
     const { startAt, endAt } = getWindowRange(currentDate, config.windowDays);
     const officialInternalCodes = loadOfficialCirculationInternalCodes();
@@ -1386,23 +1412,17 @@ export function getTrainCirculationIndexStats() {
 }
 
 function getInternalInferredCirculationsByTrainCodes(
-    trainCodes: string[]
+    trainCodes: TrainCodeParts[]
 ): InternalInferredCirculation[] {
-    const normalizedTrainCodes = Array.from(
-        new Set(
-            trainCodes
-                .map((trainCode) => normalizeCode(trainCode))
-                .filter((trainCode) => trainCode.length > 0)
-        )
-    );
-    if (normalizedTrainCodes.length === 0) {
+    const trainCodeKeys = [...new Set(trainCodes.map(trainCodeKey))];
+    if (trainCodeKeys.length === 0) {
         return [];
     }
 
     const activeCache = getActiveCache();
     const resultsByRouteId = new Map<string, InternalInferredCirculation>();
 
-    for (const trainCode of normalizedTrainCodes) {
+    for (const trainCode of trainCodeKeys) {
         for (const circulation of activeCache.inferredLookupByTrainCode.get(
             trainCode
         ) ?? []) {
@@ -1416,7 +1436,7 @@ function getInternalInferredCirculationsByTrainCodes(
 }
 
 export function getTrainCirculationByTrainCodes(
-    trainCodes: string[]
+    trainCodes: TrainCodeParts[]
 ): TrainCirculation | null {
     const activeCache = getActiveCache();
     const circulation =
@@ -1442,10 +1462,7 @@ function toPublicOfficialTrainCirculation(
         return cachedOfficialCirculation;
     }
 
-    const entry = loadScheduleCirculationEntry(
-        LEGACY_SCHEDULE_JSON_PATH,
-        normalizedInternalCode
-    );
+    const entry = loadScheduleCirculationEntry(normalizedInternalCode);
     if (!entry) {
         return null;
     }
@@ -1460,7 +1477,7 @@ function toPublicOfficialTrainCirculation(
 
 export function getPreferredTrainCirculation(input: {
     trainInternalCode: string;
-    allCodes: string[];
+    allCodes: TrainCodeParts[];
 }): TrainCirculation | null {
     const officialCirculation = toPublicOfficialTrainCirculation(
         input.trainInternalCode

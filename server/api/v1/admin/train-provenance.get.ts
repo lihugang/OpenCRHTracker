@@ -3,6 +3,10 @@ import { getAdminTrainProvenance } from '~/server/services/adminTrainProvenanceS
 import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';
 import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
+import {
+    parseExternalServiceDate,
+    parseExternalTrainCode
+} from '~/server/utils/internal/boundaries';
 
 export default defineEventHandler(async (event) => {
     return executeApi(
@@ -46,7 +50,19 @@ export default defineEventHandler(async (event) => {
                 'startAt 必须是正整数时间戳'
             );
 
-            return getAdminTrainProvenance(date, trainCode, startAt);
+            const parsedTrainCode = parseExternalTrainCode(trainCode);
+            ensure(
+                parsedTrainCode !== null,
+                400,
+                'invalid_param',
+                'trainCode 必须是有效车次'
+            );
+
+            return getAdminTrainProvenance(
+                parseExternalServiceDate(date),
+                parsedTrainCode,
+                startAt
+            );
         }
     );
 });

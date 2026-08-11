@@ -2,17 +2,22 @@ import useConfig from '~/server/config';
 import getLogger from '~/server/libs/log4js';
 import { syncCurrentDayTimetableIdsForTrainCodes } from '~/server/services/currentDayTimetableIdSync';
 import { syncConfirmedTimetableHistoryForScheduleStateKind } from '~/server/services/timetableHistoryStore';
-import normalizeCode from '~/server/utils/12306/normalizeCode';
+import {
+    trainCodeKey,
+    type TrainCodeParts
+} from '~/server/utils/12306/trainCode';
+import {
+    formatExternalServiceDate,
+    formatExternalTrainCodes
+} from '~/server/utils/internal/boundaries';
 import {
     getScheduleDatabaseFilePath,
     syncPublishedScheduleSnapshotFromItems
 } from '~/server/utils/12306/scheduleProbe/sqliteStore';
 import runScheduleProbe from './scheduleProbe/runner';
 import { getGroupKey } from './scheduleProbe/taskHelpers';
-import { LEGACY_SCHEDULE_JSON_PATH } from './scheduleProbe/constants';
 import {
     appendRouteRefreshQueueTrainCodes,
-    ensureScheduleDocumentMigrated,
     loadOrInitBuildingScheduleState,
     promoteBuildingScheduleState,
     saveBuildingScheduleState
@@ -31,7 +36,7 @@ function buildResultFromState(
     return {
         ok: state.status === 'done',
         resumed,
-        date: state.date,
+        date: formatExternalServiceDate(state.date),
         file,
         stats: {
             apiCalls: state.progress.counters.apiCalls,
@@ -43,7 +48,9 @@ function buildResultFromState(
             durationMs: state.stats.durationMs
         },
         failedKeywords: state.progress.failedKeywords,
-        failedEnrichCodes: state.progress.failedEnrichCodes
+        failedEnrichCodes: formatExternalTrainCodes(
+            state.progress.failedEnrichCodes
+        )
     };
 }
 
@@ -54,7 +61,7 @@ function listConfirmedTrainCodesFromBuildState(state: ScheduleState) {
     }
 
     const confirmedGroupKeys = new Set<string>();
-    const confirmedTrainCodes: string[] = [];
+    const confirmedTrainCodes: TrainCodeParts[] = [];
 
     for (const item of state.items) {
         if (
@@ -71,7 +78,7 @@ function listConfirmedTrainCodesFromBuildState(state: ScheduleState) {
         }
 
         confirmedGroupKeys.add(groupKey);
-        confirmedTrainCodes.push(normalizeCode(item.code));
+        confirmedTrainCodes.push(item.code);
     }
 
     return confirmedTrainCodes;
@@ -79,9 +86,8 @@ function listConfirmedTrainCodesFromBuildState(state: ScheduleState) {
 
 function syncBuildConfirmedTimetableHistory(
     logger: ReturnType<typeof getLogger>,
-    scheduleFilePath: string,
     promotedState: ScheduleState,
-    confirmedTrainCodes: string[]
+    confirmedTrainCodes: TrainCodeParts[]
 ) {
     const syncResult = syncConfirmedTimetableHistoryForScheduleStateKind(
         'published',
@@ -90,16 +96,15 @@ function syncBuildConfirmedTimetableHistory(
         promotedState.generatedAt
     );
     logger.info(
-        `history_sync date=${promotedState.date} confirmedGroups=${syncResult.confirmedGroups} confirmedTrainCodes=${syncResult.confirmedTrainCodes} skippedGroups=${syncResult.skippedGroups} createdContents=${syncResult.createdContents} insertedCoverages=${syncResult.insertedCoverages} updatedCoverages=${syncResult.updatedCoverages} deletedCoverages=${syncResult.deletedCoverages} noopedCoverages=${syncResult.noopedCoverages}`
+        `history_sync date=${formatExternalServiceDate(promotedState.date)} confirmedGroups=${syncResult.confirmedGroups} confirmedTrainCodes=${syncResult.confirmedTrainCodes} skippedGroups=${syncResult.skippedGroups} createdContents=${syncResult.createdContents} insertedCoverages=${syncResult.insertedCoverages} updatedCoverages=${syncResult.updatedCoverages} deletedCoverages=${syncResult.deletedCoverages} noopedCoverages=${syncResult.noopedCoverages}`
     );
     const appendedQueueEntries = appendRouteRefreshQueueTrainCodes(
-        scheduleFilePath,
         promotedState.date,
         syncResult.timetableChangedTrainCodes,
         promotedState.generatedAt
     );
     logger.info(
-        `route_refresh_queue_sync date=${promotedState.date} candidates=${syncResult.timetableChangedTrainCodes.length} appended=${appendedQueueEntries.length}`
+        `route_refresh_queue_sync date=${formatExternalServiceDate(promotedState.date)} candidates=${syncResult.timetableChangedTrainCodes.length} appended=${appendedQueueEntries.length}`
     );
 
     const timetableIdSyncResult = syncCurrentDayTimetableIdsForTrainCodes(
@@ -107,7 +112,7 @@ function syncBuildConfirmedTimetableHistory(
         confirmedTrainCodes
     );
     logger.info(
-        `timetable_id_sync date=${promotedState.date} scannedTrainCodes=${timetableIdSyncResult.scannedTrainCodes} changedTrainCodes=${timetableIdSyncResult.changedTrainCodes} updatedDailyRows=${timetableIdSyncResult.updatedDailyRows} deletedDailyRows=${timetableIdSyncResult.deletedDailyRows} updatedProbeRows=${timetableIdSyncResult.updatedProbeRows} deletedProbeRows=${timetableIdSyncResult.deletedProbeRows}`
+        `timetable_id_sync date=${formatExternalServiceDate(promotedState.date)} scannedTrainCodes=${timetableIdSyncResult.scannedTrainCodes} changedTrainCodes=${timetableIdSyncResult.changedTrainCodes} updatedDailyRows=${timetableIdSyncResult.updatedDailyRows} deletedDailyRows=${timetableIdSyncResult.deletedDailyRows} updatedProbeRows=${timetableIdSyncResult.updatedProbeRows} deletedProbeRows=${timetableIdSyncResult.deletedProbeRows}`
     );
 }
 
@@ -120,22 +125,20 @@ export default async function buildTodaySchedule(): Promise<BuildScheduleResult>
         checkpointFlushEvery: config.spider.scheduleProbe.checkpointFlushEvery,
         prefixRules: config.spider.scheduleProbe.prefixRules
     };
-    const scheduleFilePath = LEGACY_SCHEDULE_JSON_PATH;
     const scheduleDatabasePath = getScheduleDatabaseFilePath();
-    ensureScheduleDocumentMigrated();
     const snapshotStartedAtMs = Date.now();
     const publishedState = syncPublishedScheduleSnapshotFromItems();
     logger.info(
-        `published_snapshot_sync date=${publishedState?.date ?? 'null'} items=${publishedState?.items.length ?? 0} durationMs=${Date.now() - snapshotStartedAtMs}`
+        `published_snapshot_sync date=${publishedState ? formatExternalServiceDate(publishedState.date) : 'null'} items=${publishedState?.items.length ?? 0} durationMs=${Date.now() - snapshotStartedAtMs}`
     );
 
     const { state, resumed, reason, publishPending } =
-        loadOrInitBuildingScheduleState(scheduleFilePath, runtimeConfig);
-    const runId = `${state.date}-${Date.now()}`;
+        loadOrInitBuildingScheduleState(runtimeConfig);
+    const runId = `${formatExternalServiceDate(state.date)}-${Date.now()}`;
 
     if (reason === 'reuse_published_terminal') {
         logger.info(
-            `skip_reuse_published runId=${runId} status=${state.status} date=${state.date} file=${scheduleDatabasePath}`
+            `skip_reuse_published runId=${runId} status=${state.status} date=${formatExternalServiceDate(state.date)} file=${scheduleDatabasePath}`
         );
         return buildResultFromState(state, resumed, scheduleDatabasePath);
     }
@@ -148,31 +151,27 @@ export default async function buildTodaySchedule(): Promise<BuildScheduleResult>
         shouldReusePreviousRouteInfo && publishedState
             ? new Map(
                   publishedState.items.map((item) => [
-                      normalizeCode(item.code),
+                      trainCodeKey(item.code),
                       item
                   ])
               )
             : undefined;
 
     logger.info(
-        `start runId=${runId} resumed=${resumed} reason=${reason} date=${state.date} file=${scheduleDatabasePath} retryAttempts=${runtimeConfig.retryAttempts} maxBatchSize=${runtimeConfig.maxBatchSize} checkpointFlushEvery=${runtimeConfig.checkpointFlushEvery} prefixRules=${JSON.stringify(runtimeConfig.prefixRules)}`
+        `start runId=${runId} resumed=${resumed} reason=${reason} date=${formatExternalServiceDate(state.date)} file=${scheduleDatabasePath} retryAttempts=${runtimeConfig.retryAttempts} maxBatchSize=${runtimeConfig.maxBatchSize} checkpointFlushEvery=${runtimeConfig.checkpointFlushEvery} prefixRules=${JSON.stringify(runtimeConfig.prefixRules)}`
     );
 
     if (publishPending) {
         const confirmedTrainCodes =
             listConfirmedTrainCodesFromBuildState(state);
-        const promotedState = promoteBuildingScheduleState(
-            scheduleFilePath,
-            state
-        );
+        const promotedState = promoteBuildingScheduleState(state);
         syncBuildConfirmedTimetableHistory(
             logger,
-            scheduleFilePath,
             promotedState,
             confirmedTrainCodes
         );
         logger.info(
-            `finish_pending_publish runId=${runId} status=${promotedState.status} date=${promotedState.date} durationMs=${promotedState.stats.durationMs} apiCalls=${promotedState.progress.counters.apiCalls} apiRetries=${promotedState.progress.counters.apiRetries} processedKeywords=${promotedState.progress.discoverProcessed.length} pendingKeywords=${promotedState.progress.discoverQueue.length} rawItems=${promotedState.stats.rawItems} uniqueItems=${promotedState.stats.uniqueItems} failedKeywords=${promotedState.progress.failedKeywords.length} failedEnrichCodes=${promotedState.progress.failedEnrichCodes.length}`
+            `finish_pending_publish runId=${runId} status=${promotedState.status} date=${formatExternalServiceDate(promotedState.date)} durationMs=${promotedState.stats.durationMs} apiCalls=${promotedState.progress.counters.apiCalls} apiRetries=${promotedState.progress.counters.apiRetries} processedKeywords=${promotedState.progress.discoverProcessed.length} pendingKeywords=${promotedState.progress.discoverQueue.length} rawItems=${promotedState.stats.rawItems} uniqueItems=${promotedState.stats.uniqueItems} failedKeywords=${promotedState.progress.failedKeywords.length} failedEnrichCodes=${promotedState.progress.failedEnrichCodes.length}`
         );
         return buildResultFromState(
             promotedState,
@@ -181,11 +180,10 @@ export default async function buildTodaySchedule(): Promise<BuildScheduleResult>
         );
     }
 
-    saveBuildingScheduleState(scheduleFilePath, state);
+    saveBuildingScheduleState(state);
 
     try {
         await runScheduleProbe(
-            scheduleFilePath,
             state,
             runtimeConfig,
             runId,
@@ -203,10 +201,9 @@ export default async function buildTodaySchedule(): Promise<BuildScheduleResult>
     }
 
     const confirmedTrainCodes = listConfirmedTrainCodesFromBuildState(state);
-    const promotedState = promoteBuildingScheduleState(scheduleFilePath, state);
+    const promotedState = promoteBuildingScheduleState(state);
     syncBuildConfirmedTimetableHistory(
         logger,
-        scheduleFilePath,
         promotedState,
         confirmedTrainCodes
     );

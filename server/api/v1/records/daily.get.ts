@@ -12,6 +12,12 @@ import { getDailyResponseCacheControlMaxAge } from '~/server/utils/api/response/
 import setCacheControl from '~/server/utils/api/response/setCacheControl';
 import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
 import getDayTimestampRange from '~/server/utils/date/getDayTimestampRange';
+import {
+    formatExternalEmuCode,
+    formatExternalServiceDate,
+    formatExternalTrainCode,
+    parseExternalCursor
+} from '~/server/utils/internal/boundaries';
 
 export default defineEventHandler(async (event) => {
     return executeApi(
@@ -38,7 +44,7 @@ export default defineEventHandler(async (event) => {
                 'date 必须是 YYYYMMDD'
             );
 
-            const cursor = parseCursor(query.cursor, 'cursor');
+            const cursor = parseExternalCursor(query.cursor, 'cursor');
             const limit = parseLimit(event);
             const dayRange = getDayTimestampRange(date);
             const lightRows = listDailyRecordLightPaged(
@@ -55,10 +61,10 @@ export default defineEventHandler(async (event) => {
                 nextCursor: buildNextCursor(lightRows, limit),
                 items: lightRows.map((row) => ({
                     id: String(row.id),
-                    serviceDate: row.service_date,
+                    serviceDate: formatExternalServiceDate(row.service_date),
                     timetableId: row.timetable_id,
-                    emuCode: row.emu_code,
-                    trainCode: row.train_code
+                    emuCode: formatExternalEmuCode(row.emu_id),
+                    trainCode: formatExternalTrainCode(row.train_code)
                 }))
             };
         }

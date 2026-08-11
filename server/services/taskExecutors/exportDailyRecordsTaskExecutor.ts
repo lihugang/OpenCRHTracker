@@ -2,14 +2,23 @@ import getLogger from '~/server/libs/log4js';
 import useConfig from '~/server/config';
 import { writeDailyExportFiles } from '~/server/services/dailyExportStore';
 import { listDailyRecordsAll } from '~/server/services/emuRoutesStore';
-import { registerTaskExecutor } from '~/server/services/taskExecutorRegistry';
+import {
+    parseEmptyTaskArgs,
+    registerTaskExecutor
+} from '~/server/services/taskExecutorRegistry';
 import { enqueueTask } from '~/server/services/taskQueue';
 import getDayTimestampRange from '~/server/utils/date/getDayTimestampRange';
+import getNowSeconds from '~/server/utils/time/getNowSeconds';
 import {
     formatShanghaiDateTime,
     getNextDayExecutionTimeInShanghaiSeconds
 } from '~/server/utils/date/shanghaiDateTime';
-import { getRelativeDateString } from '~/server/utils/date/getCurrentDateString';
+import { formatExternalServiceDate } from '~/server/utils/internal/boundaries';
+import {
+    asServiceDay,
+    unixSecondsToServiceDay,
+    type ServiceDay
+} from '~/server/utils/date/serviceDay';
 
 export const EXPORT_DAILY_RECORDS_TASK_EXECUTOR = 'export_daily_records';
 export const EXPORT_DAILY_RECORDS_MANUAL_TASK_EXECUTOR =
@@ -20,7 +29,7 @@ const logger = getLogger('task-executor:export-daily-records');
 let registered = false;
 
 interface ExportDailyRecordsManualTaskArgs {
-    date: string;
+    date: ServiceDay;
 }
 
 function parseManualTaskArgs(raw: unknown): ExportDailyRecordsManualTaskArgs {
@@ -28,20 +37,18 @@ function parseManualTaskArgs(raw: unknown): ExportDailyRecordsManualTaskArgs {
         throw new Error('task arguments must be an object');
     }
 
-    const date =
-        typeof (raw as { date?: unknown }).date === 'string'
-            ? (raw as { date: string }).date.trim()
-            : '';
-    if (!/^\d{8}$/.test(date)) {
-        throw new Error('task arguments date must be YYYYMMDD');
+    const rawDate = (raw as { date?: unknown }).date;
+    if (typeof rawDate !== 'number' || !Number.isInteger(rawDate)) {
+        throw new Error('task arguments date must be a v2 service day');
     }
 
     return {
-        date
+        date: asServiceDay(rawDate)
     };
 }
 
-function exportDailyRecordsForDate(date: string) {
+function exportDailyRecordsForDate(serviceDate: ServiceDay) {
+    const date = formatExternalServiceDate(serviceDate);
     const dayRange = getDayTimestampRange(date);
     const rows = listDailyRecordsAll(dayRange.startAt, dayRange.endAt);
     const result = writeDailyExportFiles(date, rows);
@@ -72,7 +79,9 @@ async function executeExportDailyRecordsTask(): Promise<void> {
     let caughtError: unknown = null;
 
     try {
-        exportDailyRecordsForDate(getRelativeDateString(-1));
+        exportDailyRecordsForDate(
+            asServiceDay(unixSecondsToServiceDay(getNowSeconds()) - 1)
+        );
     } catch (error) {
         caughtError = error;
         const message =
@@ -101,9 +110,8 @@ async function executeExportDailyRecordsTask(): Promise<void> {
 }
 
 async function executeManualExportDailyRecordsTask(
-    rawArgs: unknown
+    args: ExportDailyRecordsManualTaskArgs
 ): Promise<void> {
-    const args = parseManualTaskArgs(rawArgs);
     exportDailyRecordsForDate(args.date);
 }
 
@@ -112,15 +120,14 @@ export function registerExportDailyRecordsTaskExecutor(): void {
         return;
     }
 
-    registerTaskExecutor(EXPORT_DAILY_RECORDS_TASK_EXECUTOR, async () => {
-        await executeExportDailyRecordsTask();
+    registerTaskExecutor(EXPORT_DAILY_RECORDS_TASK_EXECUTOR, {
+        parse: parseEmptyTaskArgs,
+        execute: async () => executeExportDailyRecordsTask()
     });
-    registerTaskExecutor(
-        EXPORT_DAILY_RECORDS_MANUAL_TASK_EXECUTOR,
-        async (args) => {
-            await executeManualExportDailyRecordsTask(args);
-        }
-    );
+    registerTaskExecutor(EXPORT_DAILY_RECORDS_MANUAL_TASK_EXECUTOR, {
+        parse: parseManualTaskArgs,
+        execute: executeManualExportDailyRecordsTask
+    });
     registered = true;
     logger.info(
         `registered executor=${EXPORT_DAILY_RECORDS_TASK_EXECUTOR},${EXPORT_DAILY_RECORDS_MANUAL_TASK_EXECUTOR}`

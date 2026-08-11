@@ -50,16 +50,27 @@ import {
     type TodayScheduleProbeGroup,
     type TodayScheduleRoute
 } from '~/server/services/todayScheduleCache';
+import { asEmuId, type EmuId } from '~/server/libs/database/emu';
 import fetchEMUInfoBySeatCode, {
     type FetchSeatCodeFailureResult
 } from '~/server/utils/12306/network/fetchEMUInfoBySeatCode';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
-import uniqueNormalizedCodes from '~/server/utils/12306/uniqueNormalizedCodes';
-import { getShanghaiDayStartUnixSeconds } from '~/server/utils/date/shanghaiDateTime';
-import getCurrentDateString, {
-    formatShanghaiDateString
-} from '~/server/utils/date/getCurrentDateString';
+import {
+    trainCodeKey,
+    type TrainCodeParts
+} from '~/server/utils/12306/trainCode';
+import { serviceDayToShanghaiDayStartUnixSeconds } from '~/server/utils/date/serviceDay';
+import {
+    unixSecondsToServiceDay,
+    type ServiceDay
+} from '~/server/utils/date/serviceDay';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
+import {
+    ensureExternalEmuId,
+    formatExternalEmuCode,
+    formatExternalTrainCode,
+    parseExternalTrainCodeOrThrow
+} from '~/server/utils/internal/boundaries';
 
 export const DETECT_COUPLED_EMU_GROUP_TASK_EXECUTOR =
     'detect_coupled_emu_group';
@@ -73,33 +84,33 @@ interface DetectCoupledEmuGroupTaskArgs {
 
 interface TrackedTrainGroup {
     group: TodayScheduleProbeGroup;
-    trainCodes: string[];
+    trainCodes: TrainCodeParts[];
     rows: ProbeStatusRow[];
-    knownEmuCodes: Set<string>;
+    knownEmuCodes: Set<EmuId>;
     finalStatus: ProbeStatusValue;
 }
 
 interface MatchedEmuScanRecord {
-    emuCode: string;
+    emuId: EmuId;
     trainRepeat: string;
 }
 
 interface DirectHitTrainTarget {
-    trainCodes: string[];
+    trainCodes: TrainCodeParts[];
     startAt: number;
-    serviceDate: string;
+    serviceDate: ServiceDay;
     scheduleGroup: TodayScheduleProbeGroup | null;
 }
 
 interface UntrackedResolvedGroup {
-    trainCode: string;
+    trainCode: TrainCodeParts;
     trainInternalCode: string;
     startAt: number;
     endAt: number;
-    emuTrainRepeatByCode: Map<string, string>;
+    emuTrainRepeatByCode: Map<EmuId, string>;
     candidates: Array<{
         candidateOrder: number;
-        candidateEmuCode: string;
+        candidateEmuId: EmuId;
         trainRepeat: string;
     }>;
 }
@@ -116,11 +127,11 @@ interface AssignedCandidateScanState {
         assignmentState: 'active' | 'expired' | 'unknown';
         trackedGroups: Array<{
             trainKey: string;
-            trainCodes: string[];
+            trainCodes: TrainCodeParts[];
             startAt: number;
             endAt: number;
         }>;
-        unresolvedTrainCodes: string[];
+        unresolvedTrainCodes: TrainCodeParts[];
         endAts: number[];
         nowSeconds: number;
     };
@@ -176,21 +187,21 @@ function getCurrentDayWindow(): {
     dayStart: number;
     nextDayStart: number;
 } {
-    const currentDate = getCurrentDateString();
-    const dayStart = getShanghaiDayStartUnixSeconds(currentDate);
+    const today = unixSecondsToServiceDay(getNowSeconds());
+    const dayStart = serviceDayToShanghaiDayStartUnixSeconds(today);
     return {
         dayStart,
         nextDayStart: dayStart + 24 * 60 * 60
     };
 }
 
-function buildCandidateEmuCode(candidate: EmuListRecord): string {
-    return normalizeCode(`${candidate.model}-${candidate.trainSetNo}`);
+function buildCandidateEmuCode(candidate: EmuListRecord): EmuId {
+    return ensureExternalEmuId(`${candidate.model}-${candidate.trainSetNo}`);
 }
 
 function persistDailyRoutes(
-    trainCodes: string[],
-    emuCodes: string[],
+    trainCodes: TrainCodeParts[],
+    emuCodes: EmuId[],
     startStation: string,
     endStation: string,
     startAt: number,
@@ -211,11 +222,11 @@ function persistDailyRoutes(
 }
 
 function resolveScheduleRoute(
-    trainCodes: string[],
+    trainCodes: TrainCodeParts[],
     scheduleRoutesByTrainCode: Map<string, TodayScheduleRoute>
 ): TodayScheduleRoute | null {
     for (const trainCode of trainCodes) {
-        const route = scheduleRoutesByTrainCode.get(normalizeCode(trainCode));
+        const route = scheduleRoutesByTrainCode.get(trainCodeKey(trainCode));
         if (route) {
             return route;
         }
@@ -224,24 +235,27 @@ function resolveScheduleRoute(
     return null;
 }
 
-function buildTrainStartKey(trainCode: string, startAt: number): string {
-    return `${normalizeCode(trainCode)}@${startAt}`;
+function buildTrainStartKey(
+    trainCode: TrainCodeParts,
+    startAt: number
+): string {
+    return `${trainCodeKey(trainCode)}@${startAt}`;
 }
 
 function persistBackfilledCoupledRoutes(
-    emuCodes: string[],
+    emuCodes: EmuId[],
     scheduleRoutesByTrainCode: Map<string, TodayScheduleRoute>
 ): void {
     if (emuCodes.length <= 1) {
         return;
     }
 
-    const currentDate = getCurrentDateString();
-    const dayStart = getShanghaiDayStartUnixSeconds(currentDate);
+    const today = unixSecondsToServiceDay(getNowSeconds());
+    const dayStart = serviceDayToShanghaiDayStartUnixSeconds(today);
     const nextDayStart = dayStart + 24 * 60 * 60;
     const candidateRows = new Map<
         string,
-        { trainCode: string; startAt: number }
+        { trainCode: TrainCodeParts; startAt: number }
     >();
 
     for (const emuCode of emuCodes) {
@@ -262,25 +276,21 @@ function persistBackfilledCoupledRoutes(
     }
 
     for (const candidate of candidateRows.values()) {
-        const normalizedTrainCode = normalizeCode(candidate.trainCode);
-        if (normalizedTrainCode.length === 0) {
-            continue;
-        }
-
         const existingRows = listProbeStatusByTrainCode(
-            normalizedTrainCode,
+            candidate.trainCode,
             candidate.startAt
         );
-        const scheduleRoute =
-            scheduleRoutesByTrainCode.get(normalizedTrainCode);
+        const scheduleRoute = scheduleRoutesByTrainCode.get(
+            trainCodeKey(candidate.trainCode)
+        );
 
         if (!scheduleRoute) {
             logger.warn(
-                `backfill_schedule_cache_missing trainCode=${normalizedTrainCode} startAt=${candidate.startAt}`
+                `backfill_schedule_cache_missing trainCode=${formatExternalTrainCode(candidate.trainCode)} startAt=${candidate.startAt}`
             );
         } else if (scheduleRoute.startAt !== candidate.startAt) {
             logger.warn(
-                `backfill_schedule_cache_start_mismatch trainCode=${normalizedTrainCode} scheduleStartAt=${scheduleRoute.startAt} probeStartAt=${candidate.startAt}`
+                `backfill_schedule_cache_start_mismatch trainCode=${formatExternalTrainCode(candidate.trainCode)} scheduleStartAt=${scheduleRoute.startAt} probeStartAt=${candidate.startAt}`
             );
         }
 
@@ -288,14 +298,11 @@ function persistBackfilledCoupledRoutes(
         const endStation = scheduleRoute?.endStation ?? '';
         const endAt = scheduleRoute?.endAt ?? candidate.startAt;
         for (const emuCode of emuCodes) {
-            const normalizedEmuCode = normalizeCode(emuCode);
             if (
-                existingRows.some(
-                    (row) => row.emu_code === normalizedEmuCode
-                ) &&
+                existingRows.some((row) => row.emu_id === emuCode) &&
                 existingRows.some(
                     (row) =>
-                        row.emu_code === normalizedEmuCode &&
+                        row.emu_id === emuCode &&
                         row.status === ProbeStatusValue.CoupledFormationResolved
                 )
             ) {
@@ -303,14 +310,14 @@ function persistBackfilledCoupledRoutes(
             }
 
             ensureProbeStatus(
-                normalizedTrainCode,
-                normalizedEmuCode,
+                candidate.trainCode,
+                emuCode,
                 candidate.startAt,
                 ProbeStatusValue.CoupledFormationResolved
             );
             insertDailyEmuRoute(
-                normalizedTrainCode,
-                normalizedEmuCode,
+                candidate.trainCode,
+                emuCode,
                 startStation,
                 endStation,
                 candidate.startAt,
@@ -341,22 +348,17 @@ function getTrackedGroupStatus(rows: ProbeStatusRow[]): ProbeStatusValue {
 }
 
 function resolveTrackedGroupByTrainCode(
-    trainCode: string,
+    trainCode: TrainCodeParts,
     cache: Map<string, TrackedTrainGroup | null>
 ): TrackedTrainGroup | null {
-    const normalizedTrainCode = normalizeCode(trainCode);
-    if (normalizedTrainCode.length === 0) {
-        return null;
-    }
-
-    const cached = cache.get(normalizedTrainCode);
+    const cached = cache.get(trainCodeKey(trainCode));
     if (cached !== undefined) {
         return cached;
     }
 
-    const group = getTodayScheduleProbeGroupByTrainCode(normalizedTrainCode);
+    const group = getTodayScheduleProbeGroupByTrainCode(trainCode);
     if (!group) {
-        cache.set(normalizedTrainCode, null);
+        cache.set(trainCodeKey(trainCode), null);
         return null;
     }
 
@@ -366,7 +368,7 @@ function resolveTrackedGroupByTrainCode(
         const rows = listProbeStatusByTrainCode(code, group.startAt);
         for (const row of rows) {
             rowsByKey.set(
-                `${row.train_code}#${row.emu_code}#${row.start_at}`,
+                `${trainCodeKey(row.train_code)}#${formatExternalEmuCode(row.emu_id)}#${row.start_at}`,
                 row
             );
         }
@@ -374,7 +376,7 @@ function resolveTrackedGroupByTrainCode(
 
     if (rowsByKey.size === 0) {
         for (const code of trainCodes) {
-            cache.set(code, null);
+            cache.set(trainCodeKey(code), null);
         }
         return null;
     }
@@ -384,33 +386,29 @@ function resolveTrackedGroupByTrainCode(
         group,
         trainCodes,
         rows,
-        knownEmuCodes: new Set(rows.map((row) => row.emu_code)),
+        knownEmuCodes: new Set(rows.map((row) => row.emu_id)),
         finalStatus: getTrackedGroupStatus(rows)
     };
 
     for (const code of trainCodes) {
-        cache.set(code, trackedGroup);
+        cache.set(trainCodeKey(code), trackedGroup);
     }
 
     return trackedGroup;
 }
 
 function collectTrackedGroupHintsByEmuCode(
-    emuCode: string,
+    emuId: EmuId,
     dayStart: number,
     nextDayStart: number,
     cache: Map<string, TrackedTrainGroup | null>
 ): {
-    trainCodes: string[];
+    trainCodes: TrainCodeParts[];
     groupKeys: string[];
     startAts: number[];
 } {
-    const rows = listProbeStatusByEmuCodeInRange(
-        emuCode,
-        dayStart,
-        nextDayStart
-    );
-    const trainCodes = new Set<string>();
+    const rows = listProbeStatusByEmuCodeInRange(emuId, dayStart, nextDayStart);
+    const trainCodes = new Set<TrainCodeParts>();
     const groupKeys = new Set<string>();
     const startAts = new Set<number>();
 
@@ -429,30 +427,32 @@ function collectTrackedGroupHintsByEmuCode(
             continue;
         }
 
-        trainCodes.add(normalizeCode(row.train_code));
+        trainCodes.add(row.train_code);
     }
 
     return {
-        trainCodes: Array.from(trainCodes),
+        trainCodes: Array.from(trainCodes).filter(
+            (trainCode, index, all) =>
+                all.findIndex(
+                    (candidate) =>
+                        trainCodeKey(candidate) === trainCodeKey(trainCode)
+                ) === index
+        ),
         groupKeys: Array.from(groupKeys),
         startAts: Array.from(startAts).sort((left, right) => left - right)
     };
 }
 
 function resolveAssignedCandidateScanState(
-    emuCode: string,
+    emuId: EmuId,
     dayStart: number,
     nextDayStart: number,
     nowSeconds: number,
     cache: Map<string, TrackedTrainGroup | null>
 ): AssignedCandidateScanState {
-    const rows = listProbeStatusByEmuCodeInRange(
-        emuCode,
-        dayStart,
-        nextDayStart
-    );
+    const rows = listProbeStatusByEmuCodeInRange(emuId, dayStart, nextDayStart);
     const trackedGroupsByKey = new Map<string, TrackedTrainGroup>();
-    const unresolvedTrainCodes = new Set<string>();
+    const unresolvedTrainCodes = new Set<TrainCodeParts>();
 
     for (const row of rows) {
         const trackedGroup = resolveTrackedGroupByTrainCode(
@@ -460,7 +460,7 @@ function resolveAssignedCandidateScanState(
             cache
         );
         if (!trackedGroup) {
-            unresolvedTrainCodes.add(normalizeCode(row.train_code));
+            unresolvedTrainCodes.add(row.train_code);
             continue;
         }
 
@@ -489,7 +489,11 @@ function resolveAssignedCandidateScanState(
                 endAt: trackedGroup.group.endAt
             })),
             unresolvedTrainCodes: Array.from(unresolvedTrainCodes).filter(
-                (trainCode) => trainCode.length > 0
+                (trainCode, index, all) =>
+                    all.findIndex(
+                        (candidate) =>
+                            trainCodeKey(candidate) === trainCodeKey(trainCode)
+                    ) === index
             ),
             endAts: trackedGroups
                 .map((trackedGroup) => trackedGroup.group.endAt)
@@ -508,13 +512,9 @@ function collectPendingTrackedGroups(
     const pendingGroups = new Map<string, TrackedTrainGroup>();
 
     for (const candidate of candidates) {
-        const emuCode = buildCandidateEmuCode(candidate);
-        if (emuCode.length === 0) {
-            continue;
-        }
-
+        const emuId = buildCandidateEmuCode(candidate);
         const rows = listProbeStatusByEmuCodeInRange(
-            emuCode,
+            emuId,
             dayStart,
             nextDayStart
         );
@@ -544,7 +544,7 @@ function collectPendingTrackedGroups(
 
 function resolveDirectHitTrainTarget(
     scannedTrainInternalCode: string,
-    scannedTrainCode: string,
+    scannedTrainCode: TrainCodeParts,
     fallbackStartAt: number
 ): DirectHitTrainTarget | null {
     const normalizedTrainInternalCode = normalizeCode(scannedTrainInternalCode);
@@ -554,42 +554,47 @@ function resolveDirectHitTrainTarget(
         );
         if (internalCodeGroup) {
             return {
-                trainCodes: uniqueNormalizedCodes([
+                trainCodes: [
                     internalCodeGroup.trainCode,
                     ...getSafeTodayScheduleProbeTrainCodes(internalCodeGroup)
-                ]),
-                startAt: internalCodeGroup.startAt,
-                serviceDate: formatShanghaiDateString(
-                    internalCodeGroup.startAt * 1000
+                ].filter(
+                    (code, index, codes) =>
+                        codes.findIndex(
+                            (candidate) =>
+                                trainCodeKey(candidate) === trainCodeKey(code)
+                        ) === index
                 ),
+                startAt: internalCodeGroup.startAt,
+                serviceDate: unixSecondsToServiceDay(internalCodeGroup.startAt),
                 scheduleGroup: internalCodeGroup
             };
         }
     }
 
-    const normalizedTrainCode = normalizeCode(scannedTrainCode);
-    if (normalizedTrainCode.length === 0) {
-        return null;
-    }
-
     const scheduleGroup =
-        getTodayScheduleProbeGroupByTrainCode(normalizedTrainCode);
+        getTodayScheduleProbeGroupByTrainCode(scannedTrainCode);
     if (scheduleGroup) {
         return {
-            trainCodes: uniqueNormalizedCodes([
+            trainCodes: [
                 scheduleGroup.trainCode,
                 ...getSafeTodayScheduleProbeTrainCodes(scheduleGroup)
-            ]),
+            ].filter(
+                (code, index, codes) =>
+                    codes.findIndex(
+                        (candidate) =>
+                            trainCodeKey(candidate) === trainCodeKey(code)
+                    ) === index
+            ),
             startAt: scheduleGroup.startAt,
-            serviceDate: formatShanghaiDateString(scheduleGroup.startAt * 1000),
+            serviceDate: unixSecondsToServiceDay(scheduleGroup.startAt),
             scheduleGroup
         };
     }
 
     return {
-        trainCodes: [normalizedTrainCode],
+        trainCodes: [scannedTrainCode],
         startAt: fallbackStartAt,
-        serviceDate: formatShanghaiDateString(fallbackStartAt * 1000),
+        serviceDate: unixSecondsToServiceDay(fallbackStartAt),
         scheduleGroup: null
     };
 }
@@ -598,9 +603,9 @@ function recordDirectHitTrainProvenanceEvent(input: {
     bureau: string;
     model: string;
     candidateOrder: number;
-    candidateEmuCode: string;
-    scannedEmuCode: string;
-    scannedTrainCode: string;
+    candidateEmuId: EmuId;
+    scannedEmuId: EmuId;
+    scannedTrainCode: TrainCodeParts;
     scannedTrainInternalCode: string;
     scannedStartAt: number;
     scannedEndAt: number;
@@ -619,22 +624,22 @@ function recordDirectHitTrainProvenanceEvent(input: {
     recordCurrentTrainProvenanceEventsForTrainCodes(target.trainCodes, {
         serviceDate: target.serviceDate,
         startAt: target.startAt,
-        emuCode: input.scannedEmuCode,
+        emuId: input.scannedEmuId,
         relatedTrainCode: input.scannedTrainCode,
-        relatedEmuCode: input.candidateEmuCode,
+        relatedEmuId: input.candidateEmuId,
         eventType: 'coupling_scan_candidate_direct_hit',
         result: input.trackedGroup ? 'matched' : 'unmatched',
         payload: {
             bureau: input.bureau,
             model: input.model,
             candidateOrder: input.candidateOrder,
-            candidateEmuCode: input.candidateEmuCode,
+            candidateEmuId: input.candidateEmuId,
             directHitTrainCodes: target.trainCodes,
             scannedRoute: {
                 code: input.scannedTrainCode,
                 internalCode: input.scannedTrainInternalCode,
-                startDay: formatShanghaiDateString(input.scannedStartAt * 1000),
-                endDay: formatShanghaiDateString(input.scannedEndAt * 1000),
+                startDay: unixSecondsToServiceDay(input.scannedStartAt),
+                endDay: unixSecondsToServiceDay(input.scannedEndAt),
                 startAt: input.scannedStartAt,
                 endAt: input.scannedEndAt,
                 trainRepeat: input.trainRepeat
@@ -676,7 +681,7 @@ async function scanUnassignedCandidates(
     nowSeconds: number
 ): Promise<{
     matchedGroups: Map<string, TrackedTrainGroup>;
-    matchedEmuScanRecordsByTrainKey: Map<string, Map<string, string>>;
+    matchedEmuScanRecordsByTrainKey: Map<string, Map<EmuId, string>>;
     untrackedGroups: Map<string, UntrackedResolvedGroup>;
     skippedAssignedCount: number;
     scannedCount: number;
@@ -686,7 +691,7 @@ async function scanUnassignedCandidates(
     const matchedGroups = new Map<string, TrackedTrainGroup>();
     const matchedEmuScanRecordsByTrainKey = new Map<
         string,
-        Map<string, string>
+        Map<EmuId, string>
     >();
     const untrackedGroups = new Map<string, UntrackedResolvedGroup>();
     let skippedAssignedCount = 0;
@@ -695,14 +700,12 @@ async function scanUnassignedCandidates(
 
     for (const [index, candidate] of candidates.entries()) {
         const candidateOrder = index + 1;
-        const candidateEmuCode = buildCandidateEmuCode(candidate);
-        if (candidateEmuCode.length === 0) {
-            continue;
-        }
+        const candidateEmuId = buildCandidateEmuCode(candidate);
+        const currentServiceDate = unixSecondsToServiceDay(getNowSeconds());
 
-        if (isEmuAssignedToday(candidateEmuCode)) {
+        if (isEmuAssignedToday(candidateEmuId)) {
             const assignedScanState = resolveAssignedCandidateScanState(
-                candidateEmuCode,
+                candidateEmuId,
                 dayStart,
                 nextDayStart,
                 nowSeconds,
@@ -712,10 +715,10 @@ async function scanUnassignedCandidates(
                 skippedAssignedCount += 1;
                 recordCurrentCouplingScanCandidate({
                     candidateOrder,
-                    serviceDate: getCurrentDateString(),
+                    serviceDate: currentServiceDate,
                     bureau,
                     model,
-                    candidateEmuCode,
+                    candidateEmuId,
                     status: 'skipped',
                     reason: 'already_assigned',
                     detail: assignedScanState.detail
@@ -725,10 +728,10 @@ async function scanUnassignedCandidates(
 
             recordCurrentCouplingScanCandidate({
                 candidateOrder,
-                serviceDate: getCurrentDateString(),
+                serviceDate: currentServiceDate,
                 bureau,
                 model,
-                candidateEmuCode,
+                candidateEmuId,
                 status: 'pending',
                 reason: 'already_assigned_expired',
                 detail: assignedScanState.detail
@@ -741,10 +744,10 @@ async function scanUnassignedCandidates(
         if (!seatCode) {
             recordCurrentCouplingScanCandidate({
                 candidateOrder,
-                serviceDate: getCurrentDateString(),
+                serviceDate: currentServiceDate,
                 bureau,
                 model,
-                candidateEmuCode,
+                candidateEmuId,
                 status: 'skipped',
                 reason: 'seat_code_missing'
             });
@@ -755,10 +758,10 @@ async function scanUnassignedCandidates(
         if (seatCodeResult.status !== 'success') {
             recordCurrentCouplingScanCandidate({
                 candidateOrder,
-                serviceDate: getCurrentDateString(),
+                serviceDate: currentServiceDate,
                 bureau,
                 model,
-                candidateEmuCode,
+                candidateEmuId,
                 status: 'request_failed',
                 reason: toSeatCodeRequestFailedReason(seatCodeResult),
                 detail: seatCodeResult
@@ -767,9 +770,8 @@ async function scanUnassignedCandidates(
         }
 
         scannedCount += 1;
-        const scannedEmuCode =
-            normalizeCode(seatCodeResult.emu.code) || candidateEmuCode;
-        const scannedTrainCode = normalizeCode(seatCodeResult.route.code);
+        const scannedEmuId = seatCodeResult.emu.code;
+        const scannedTrainCode = seatCodeResult.route.code;
         const scannedTrainInternalCode = normalizeCode(
             seatCodeResult.route.internalCode
         );
@@ -781,8 +783,8 @@ async function scanUnassignedCandidates(
             bureau,
             model,
             candidateOrder,
-            candidateEmuCode,
-            scannedEmuCode,
+            candidateEmuId,
+            scannedEmuId,
             scannedTrainCode,
             scannedTrainInternalCode,
             scannedStartAt: seatCodeResult.route.startAt,
@@ -801,26 +803,26 @@ async function scanUnassignedCandidates(
                 trainInternalCode: scannedTrainInternalCode,
                 startAt: seatCodeResult.route.startAt,
                 endAt: seatCodeResult.route.endAt,
-                emuTrainRepeatByCode: new Map<string, string>(),
+                emuTrainRepeatByCode: new Map<EmuId, string>(),
                 candidates: []
             };
             untrackedGroup.emuTrainRepeatByCode.set(
-                scannedEmuCode,
+                scannedEmuId,
                 seatCodeResult.route.trainRepeat
             );
             untrackedGroup.candidates.push({
                 candidateOrder,
-                candidateEmuCode,
+                candidateEmuId,
                 trainRepeat: seatCodeResult.route.trainRepeat
             });
             untrackedGroups.set(untrackedGroupKey, untrackedGroup);
             warningCount += 1;
             recordCurrentCouplingScanCandidate({
                 candidateOrder,
-                serviceDate: getCurrentDateString(),
+                serviceDate: currentServiceDate,
                 bureau,
                 model,
-                candidateEmuCode,
+                candidateEmuId,
                 status: 'unmatched',
                 reason: 'route_not_tracked',
                 scannedTrainCode,
@@ -830,8 +832,12 @@ async function scanUnassignedCandidates(
                     route: {
                         code: scannedTrainCode,
                         internalCode: scannedTrainInternalCode,
-                        startDay: seatCodeResult.route.startDay,
-                        endDay: seatCodeResult.route.endDay,
+                        startDay: unixSecondsToServiceDay(
+                            seatCodeResult.route.startAt
+                        ),
+                        endDay: unixSecondsToServiceDay(
+                            seatCodeResult.route.endAt
+                        ),
                         startAt: seatCodeResult.route.startAt,
                         endAt: seatCodeResult.route.endAt,
                         trainRepeat: seatCodeResult.route.trainRepeat
@@ -839,19 +845,17 @@ async function scanUnassignedCandidates(
                 }
             });
             logger.debug(
-                `scan_unmatched_current_group bureau=${bureau} model=${model} emuCode=${scannedEmuCode} trainCode=${scannedTrainCode} trainInternalCode=${scannedTrainInternalCode} startAt=${seatCodeResult.route.startAt} endAt=${seatCodeResult.route.endAt}`
+                `scan_unmatched_current_group bureau=${bureau} model=${model} emuCode=${formatExternalEmuCode(scannedEmuId)} trainCode=${formatExternalTrainCode(scannedTrainCode)} trainInternalCode=${scannedTrainInternalCode} startAt=${seatCodeResult.route.startAt} endAt=${seatCodeResult.route.endAt}`
             );
             continue;
         }
 
         recordCurrentCouplingScanCandidate({
             candidateOrder,
-            serviceDate: formatShanghaiDateString(
-                trackedGroup.group.startAt * 1000
-            ),
+            serviceDate: unixSecondsToServiceDay(trackedGroup.group.startAt),
             bureau,
             model,
-            candidateEmuCode,
+            candidateEmuId,
             status: 'matched',
             reason: 'tracked_group_matched',
             scannedTrainCode,
@@ -866,9 +870,9 @@ async function scanUnassignedCandidates(
         matchedGroups.set(trackedGroup.group.trainKey, trackedGroup);
         const matchedEmuScanRecords =
             matchedEmuScanRecordsByTrainKey.get(trackedGroup.group.trainKey) ??
-            new Map<string, string>();
+            new Map<EmuId, string>();
         matchedEmuScanRecords.set(
-            scannedEmuCode,
+            scannedEmuId,
             seatCodeResult.route.trainRepeat
         );
         matchedEmuScanRecordsByTrainKey.set(
@@ -888,39 +892,61 @@ async function scanUnassignedCandidates(
 }
 
 function collectMatchedEmuScanRecords(
-    matchedEmuScans: Map<string, string> | undefined
+    matchedEmuScans: Map<EmuId, string> | undefined
 ): MatchedEmuScanRecord[] {
     if (!matchedEmuScans) {
         return [];
     }
 
-    return Array.from(matchedEmuScans.entries(), ([emuCode, trainRepeat]) => ({
-        emuCode,
+    return Array.from(matchedEmuScans.entries(), ([emuId, trainRepeat]) => ({
+        emuId,
         trainRepeat
     }));
 }
 
 function collectResolvedEmuCodes(
-    emuTrainRepeatByCode: Map<string, string>
-): string[] {
-    const originalEmuCodes = Array.from(emuTrainRepeatByCode.keys());
-    if (originalEmuCodes.length <= 2) {
-        return originalEmuCodes;
+    emuTrainRepeatByCode: Map<EmuId, string>
+): EmuId[] {
+    const originalEmuIds = Array.from(emuTrainRepeatByCode.keys());
+    if (originalEmuIds.length <= 2) {
+        return originalEmuIds;
     }
 
-    const trainRepeatZeroEmuCodes = new Set(
+    const trainRepeatZeroEmuIds = new Set(
         Array.from(emuTrainRepeatByCode.entries())
             .filter(([, trainRepeat]) => trainRepeat === '0')
-            .map(([emuCode]) => emuCode)
+            .map(([emuId]) => emuId)
     );
-    if (trainRepeatZeroEmuCodes.size === 0) {
-        return originalEmuCodes;
+    if (trainRepeatZeroEmuIds.size === 0) {
+        return originalEmuIds;
     }
 
-    const filteredEmuCodes = originalEmuCodes.filter(
-        (emuCode) => !trainRepeatZeroEmuCodes.has(emuCode)
+    const filteredEmuIds = originalEmuIds.filter(
+        (emuId) => !trainRepeatZeroEmuIds.has(emuId)
     );
-    return filteredEmuCodes.length > 0 ? filteredEmuCodes : originalEmuCodes;
+    return filteredEmuIds.length > 0 ? filteredEmuIds : originalEmuIds;
+}
+
+function uniqueEmuIds(emuIds: readonly EmuId[]): EmuId[] {
+    return Array.from(
+        new Map(emuIds.map((emuId) => [Number(emuId), emuId])).values()
+    );
+}
+
+function uniqueTrainCodeValues(
+    trainCodes: readonly TrainCodeParts[]
+): TrainCodeParts[] {
+    const seen = new Set<string>();
+    const result: TrainCodeParts[] = [];
+    for (const trainCode of trainCodes) {
+        const key = trainCodeKey(trainCode);
+        if (seen.has(key)) {
+            continue;
+        }
+        seen.add(key);
+        result.push(trainCode);
+    }
+    return result;
 }
 
 async function persistResolvedUntrackedGroups(
@@ -933,10 +959,10 @@ async function persistResolvedUntrackedGroups(
     const probeAssets = await loadProbeAssets();
 
     for (const group of groups.values()) {
-        const emuCodes = uniqueNormalizedCodes(
+        const emuCodes = uniqueEmuIds(
             collectResolvedEmuCodes(group.emuTrainRepeatByCode)
         );
-        if (group.trainCode.length === 0 || emuCodes.length === 0) {
+        if (emuCodes.length === 0) {
             continue;
         }
 
@@ -944,7 +970,7 @@ async function persistResolvedUntrackedGroups(
             emuCodes.length === 1
                 ? getProbeEmuMultipleStateFromCode(
                       probeAssets,
-                      emuCodes[0] ?? ''
+                      formatExternalEmuCode(emuCodes[0]!)
                   )
                 : 'multiple';
         const finalStatus =
@@ -998,8 +1024,8 @@ async function persistResolvedUntrackedGroups(
         for (const candidate of group.candidates) {
             recordCurrentCouplingScanCandidate({
                 candidateOrder: candidate.candidateOrder,
-                serviceDate: formatShanghaiDateString(group.startAt * 1000),
-                candidateEmuCode: candidate.candidateEmuCode,
+                serviceDate: unixSecondsToServiceDay(group.startAt),
+                candidateEmuId: candidate.candidateEmuId,
                 status:
                     finalStatus === ProbeStatusValue.CoupledFormationResolved
                         ? 'resolved'
@@ -1017,7 +1043,7 @@ async function persistResolvedUntrackedGroups(
                 trainRepeat: candidate.trainRepeat,
                 detail: {
                     persistedStatus: finalStatus,
-                    persistedEmuCodes: emuCodes,
+                    persistedEmuIds: emuCodes,
                     persistedStartAt: group.startAt,
                     persistedEndAt: group.endAt
                 }
@@ -1025,9 +1051,9 @@ async function persistResolvedUntrackedGroups(
         }
 
         recordCurrentTrainProvenanceEventsForTrainCodes([group.trainCode], {
-            serviceDate: formatShanghaiDateString(group.startAt * 1000),
+            serviceDate: unixSecondsToServiceDay(group.startAt),
             startAt: group.startAt,
-            emuCode: emuCodes[0] ?? '',
+            emuId: emuCodes[0]!,
             eventType:
                 finalStatus === ProbeStatusValue.PendingCouplingDetection
                     ? 'pending_coupling_detection'
@@ -1040,12 +1066,12 @@ async function persistResolvedUntrackedGroups(
                       : 'untracked_single',
             payload: {
                 source: 'coupling_scan_untracked',
-                emuCodes,
+                emuIds: emuCodes,
                 nonMultiple: multipleState === 'non_multiple'
             }
         });
         logger.info(
-            `persist_untracked_group trainCode=${group.trainCode} trainInternalCode=${group.trainInternalCode} startAt=${group.startAt} endAt=${group.endAt} status=${finalStatus} emuCodes=${emuCodes.join('/')}`
+            `persist_untracked_group trainCode=${formatExternalTrainCode(group.trainCode)} trainInternalCode=${group.trainInternalCode} startAt=${group.startAt} endAt=${group.endAt} status=${finalStatus} emuCodes=${emuCodes.map(formatExternalEmuCode).join('/')}`
         );
     }
 
@@ -1059,7 +1085,7 @@ async function persistResolvedUntrackedGroups(
 function cleanupPrunedTrackedGroupRows(
     trackedGroup: TrackedTrainGroup,
     groupKey: string,
-    removedEmuCodes: string[]
+    removedEmuCodes: EmuId[]
 ): {
     deletedProbeStatusRows: number;
     deletedDailyRouteRows: number;
@@ -1111,10 +1137,10 @@ async function persistResolvedTrackedGroup(
         group.trainInternalCode,
         group.startAt
     );
-    const originalEmuCodes = uniqueNormalizedCodes([
+    const originalEmuCodes = uniqueEmuIds([
         ...Array.from(trackedGroup.knownEmuCodes),
         ...listAssignedEmuCodesByGroupKey(groupKey),
-        ...matchedEmuScanRecords.map((record) => record.emuCode)
+        ...matchedEmuScanRecords.map((record) => record.emuId)
     ]);
     if (trainCodes.length === 0 || originalEmuCodes.length === 0) {
         return;
@@ -1125,7 +1151,7 @@ async function persistResolvedTrackedGroup(
         const trainRepeatZeroEmuCodes = new Set(
             matchedEmuScanRecords
                 .filter((record) => record.trainRepeat === '0')
-                .map((record) => record.emuCode)
+                .map((record) => record.emuId)
         );
         const removedEmuCodes = originalEmuCodes.filter((emuCode) =>
             trainRepeatZeroEmuCodes.has(emuCode)
@@ -1141,20 +1167,20 @@ async function persistResolvedTrackedGroup(
                 (emuCode) => !trainRepeatZeroEmuCodes.has(emuCode)
             );
             logger.warn(
-                `over_limit_prune_train_repeat_zero trainCodes=${trainCodes.join('/')} originalEmuCodes=${originalEmuCodes.join('/')} removedEmuCodes=${removedEmuCodes.join('/')} remainingEmuCodes=${emuCodes.join('/')} startAt=${group.startAt} groupKey=${groupKey} deletedProbeStatusRows=${cleanupState.deletedProbeStatusRows} deletedDailyRouteRows=${cleanupState.deletedDailyRouteRows} clearedAssignedEmuCodes=${cleanupState.clearedAssignedEmuCodes}`
+                `over_limit_prune_train_repeat_zero trainCodes=${trainCodes.map(formatExternalTrainCode).join('/')} originalEmuCodes=${originalEmuCodes.map(formatExternalEmuCode).join('/')} removedEmuCodes=${removedEmuCodes.map(formatExternalEmuCode).join('/')} remainingEmuCodes=${emuCodes.map(formatExternalEmuCode).join('/')} startAt=${group.startAt} groupKey=${groupKey} deletedProbeStatusRows=${cleanupState.deletedProbeStatusRows} deletedDailyRouteRows=${cleanupState.deletedDailyRouteRows} clearedAssignedEmuCodes=${cleanupState.clearedAssignedEmuCodes}`
             );
         }
 
         if (emuCodes.length > 2) {
             logger.warn(
-                `over_limit_after_prune_continue trainCodes=${trainCodes.join('/')} originalEmuCodes=${originalEmuCodes.join('/')} remainingEmuCodes=${emuCodes.join('/')} startAt=${group.startAt} groupKey=${groupKey}`
+                `over_limit_after_prune_continue trainCodes=${trainCodes.map(formatExternalTrainCode).join('/')} originalEmuCodes=${originalEmuCodes.map(formatExternalEmuCode).join('/')} remainingEmuCodes=${emuCodes.map(formatExternalEmuCode).join('/')} startAt=${group.startAt} groupKey=${groupKey}`
             );
         }
     }
 
     if (emuCodes.length === 0) {
         logger.warn(
-            `all_emu_codes_pruned trainCodes=${trainCodes.join('/')} originalEmuCodes=${originalEmuCodes.join('/')} startAt=${group.startAt} groupKey=${groupKey}`
+            `all_emu_codes_pruned trainCodes=${trainCodes.map(formatExternalTrainCode).join('/')} originalEmuCodes=${originalEmuCodes.map(formatExternalEmuCode).join('/')} startAt=${group.startAt} groupKey=${groupKey}`
         );
         return;
     }
@@ -1174,7 +1200,7 @@ async function persistResolvedTrackedGroup(
     const endStation = scheduleRoute?.endStation ?? group.endStation ?? '';
     const endAt = scheduleRoute?.endAt ?? group.endAt;
     const notificationCandidates = [
-        ...uniqueNormalizedCodes(trainCodes).map((targetId) => ({
+        ...uniqueTrainCodeValues(trainCodes).map((targetId) => ({
             targetType: 'train' as const,
             targetId,
             startAt: group.startAt,
@@ -1184,7 +1210,7 @@ async function persistResolvedTrackedGroup(
             ),
             nextStatus: finalStatus
         })),
-        ...uniqueNormalizedCodes(emuCodes).map((targetId) => ({
+        ...uniqueEmuIds(emuCodes).map((targetId) => ({
             targetType: 'emu' as const,
             targetId,
             startAt: group.startAt,
@@ -1214,25 +1240,25 @@ async function persistResolvedTrackedGroup(
     if (finalStatus === ProbeStatusValue.CoupledFormationResolved) {
         if (previousStatus === ProbeStatusValue.SingleFormationResolved) {
             logger.warn(
-                `single_group_upgraded_to_coupled trainCodes=${trainCodes.join('/')} emuCodes=${emuCodes.join('/')} startAt=${group.startAt} groupKey=${groupKey}`
+                `single_group_upgraded_to_coupled trainCodes=${trainCodes.map(formatExternalTrainCode).join('/')} emuCodes=${emuCodes.map(formatExternalEmuCode).join('/')} startAt=${group.startAt} groupKey=${groupKey}`
             );
         } else {
             logger.info(
-                `coupled_group_detected trainCodes=${trainCodes.join('/')} emuCodes=${emuCodes.join('/')} startAt=${group.startAt} groupKey=${groupKey}`
+                `coupled_group_detected trainCodes=${trainCodes.map(formatExternalTrainCode).join('/')} emuCodes=${emuCodes.map(formatExternalEmuCode).join('/')} startAt=${group.startAt} groupKey=${groupKey}`
             );
         }
         persistBackfilledCoupledRoutes(emuCodes, scheduleRoutesByTrainCode);
         recordCurrentTrainProvenanceEventsForTrainCodes(trainCodes, {
-            serviceDate: formatShanghaiDateString(group.startAt * 1000),
+            serviceDate: unixSecondsToServiceDay(group.startAt),
             startAt: group.startAt,
-            emuCode: emuCodes[0] ?? '',
+            emuId: emuCodes[0]!,
             eventType: 'coupling_group_resolved_coupled',
             result:
                 previousStatus === ProbeStatusValue.SingleFormationResolved
                     ? 'upgraded_from_single'
                     : 'matched',
             payload: {
-                emuCodes,
+                emuIds: emuCodes,
                 startStation,
                 endStation,
                 endAt,
@@ -1241,16 +1267,16 @@ async function persistResolvedTrackedGroup(
         });
     } else if (previousStatus === ProbeStatusValue.PendingCouplingDetection) {
         logger.info(
-            `pending_group_resolved_single trainCodes=${trainCodes.join('/')} emuCodes=${emuCodes.join('/')} startAt=${group.startAt} groupKey=${groupKey}`
+            `pending_group_resolved_single trainCodes=${trainCodes.map(formatExternalTrainCode).join('/')} emuCodes=${emuCodes.map(formatExternalEmuCode).join('/')} startAt=${group.startAt} groupKey=${groupKey}`
         );
         recordCurrentTrainProvenanceEventsForTrainCodes(trainCodes, {
-            serviceDate: formatShanghaiDateString(group.startAt * 1000),
+            serviceDate: unixSecondsToServiceDay(group.startAt),
             startAt: group.startAt,
-            emuCode: emuCodes[0] ?? '',
+            emuId: emuCodes[0]!,
             eventType: 'coupling_group_resolved_single',
             result: 'finalized_single',
             payload: {
-                emuCodes,
+                emuIds: emuCodes,
                 startStation,
                 endStation,
                 endAt
@@ -1274,10 +1300,9 @@ async function persistResolvedTrackedGroup(
 }
 
 async function executeDetectCoupledEmuGroupTaskInternal(
-    rawArgs: unknown
+    args: DetectCoupledEmuGroupTaskArgs
 ): Promise<void> {
     ensureProbeStateForToday();
-    const args = parseTaskArgs(rawArgs);
     const readiness = rescheduleTaskUntilScheduleReady(
         DETECT_COUPLED_EMU_GROUP_TASK_EXECUTOR,
         args
@@ -1285,7 +1310,7 @@ async function executeDetectCoupledEmuGroupTaskInternal(
     if (!readiness.ready) {
         markCurrentTrainProvenanceTaskSkipped('schedule_refresh_pending');
         recordCurrentTrainProvenanceEvent({
-            serviceDate: getCurrentDateString(),
+            serviceDate: unixSecondsToServiceDay(getNowSeconds()),
             eventType: 'coupling_scan_skipped',
             result: 'schedule_refresh_pending',
             linkedSchedulerTaskId: readiness.rescheduledTaskId,
@@ -1348,7 +1373,7 @@ async function executeDetectCoupledEmuGroupTaskInternal(
         trackedGroupCache
     );
     recordCurrentTrainProvenanceEvent({
-        serviceDate: getCurrentDateString(),
+        serviceDate: unixSecondsToServiceDay(getNowSeconds()),
         eventType: 'coupling_scan_started',
         result: 'running',
         payload: {
@@ -1409,7 +1434,7 @@ async function executeDetectCoupledEmuGroupTaskInternal(
 
     markCoupledGroupDetected(bureau, args.model, nowSeconds);
     recordCurrentTrainProvenanceEvent({
-        serviceDate: getCurrentDateString(),
+        serviceDate: unixSecondsToServiceDay(getNowSeconds()),
         eventType: 'coupling_scan_completed',
         result: 'done',
         payload: {
@@ -1433,23 +1458,15 @@ async function executeDetectCoupledEmuGroupTaskInternal(
     );
 }
 
-async function executeDetectCoupledEmuGroupTask(
-    rawArgs: unknown
-): Promise<void> {
-    await executeDetectCoupledEmuGroupTaskInternal(rawArgs);
-}
-
 export function registerDetectCoupledEmuGroupTaskExecutor(): void {
     if (registered) {
         return;
     }
 
-    registerTaskExecutor(
-        DETECT_COUPLED_EMU_GROUP_TASK_EXECUTOR,
-        async (args) => {
-            await executeDetectCoupledEmuGroupTask(args);
-        }
-    );
+    registerTaskExecutor(DETECT_COUPLED_EMU_GROUP_TASK_EXECUTOR, {
+        parse: parseTaskArgs,
+        execute: executeDetectCoupledEmuGroupTaskInternal
+    });
     registered = true;
     logger.info(
         `registered executor=${DETECT_COUPLED_EMU_GROUP_TASK_EXECUTOR}`

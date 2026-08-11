@@ -9,7 +9,6 @@ import {
     saveScheduleCirculationEntries,
     saveScheduleStopMetadataFromStationBoard
 } from '~/server/utils/12306/scheduleProbe/stateStore';
-import { LEGACY_SCHEDULE_JSON_PATH } from '~/server/utils/12306/scheduleProbe/constants';
 import type {
     ScheduleCirculationEntry,
     ScheduleRouteRefreshQueueEntry
@@ -24,7 +23,12 @@ import fetchStationBoardByStation, {
     type StationBoardTrainRow
 } from '~/server/utils/12306/network/fetchStationBoardByStation';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
+import { formatTrainCode } from '~/server/utils/12306/trainCode';
+import { trainCodeKey } from '~/server/utils/12306/trainCode';
 import uniqueNormalizedCodes from '~/server/utils/12306/uniqueNormalizedCodes';
+import { parseExternalTrainCodeOrThrow } from '~/server/utils/internal/boundaries';
+import { serviceDateToDay } from '~/server/utils/date/serviceDay';
+import { asServiceDay, type ServiceDay } from '~/server/utils/date/serviceDay';
 import {
     getTodayScheduleProbeGroupByTrainCode,
     type TodayScheduleProbeGroup
@@ -44,7 +48,7 @@ export const FETCH_STATION_BOARD_TASK_EXECUTOR = 'fetch_station_board';
 const logger = getLogger('task-executor:fetch-station-board');
 
 export interface FetchStationBoardTaskArgs {
-    serviceDate: string;
+    serviceDate: ServiceDay;
     stationName: string;
     stationTelecode: string;
     retryRemaining: number;
@@ -104,7 +108,9 @@ export function parseFetchStationBoardTaskArgs(
         parentSchedulerTaskId?: unknown;
     };
     const serviceDate =
-        typeof body.serviceDate === 'string' ? body.serviceDate.trim() : '';
+        typeof body.serviceDate === 'number'
+            ? asServiceDay(body.serviceDate)
+            : (null as ServiceDay | null);
     const stationName =
         typeof body.stationName === 'string' ? body.stationName.trim() : '';
     const stationTelecode =
@@ -124,9 +130,9 @@ export function parseFetchStationBoardTaskArgs(
             ? body.parentSchedulerTaskId
             : null;
 
-    if (!/^\d{8}$/.test(serviceDate)) {
+    if (serviceDate === null) {
         throw new Error(
-            'task arguments serviceDate must be in YYYYMMDD format'
+            'task arguments serviceDate must be a v2 service day'
         );
     }
     if (stationName.length === 0) {
@@ -150,7 +156,7 @@ export function parseFetchStationBoardTaskArgs(
 }
 
 function maybeRecordFetchResult(input: {
-    serviceDate: string;
+    serviceDate: ServiceDay;
     parentSchedulerTaskId: number | null;
     stationName: string;
     stationTelecode: string;
@@ -242,7 +248,9 @@ function resolveUniqueGroupForRawCode(
 
     const groupsByKey = new Map<string, TodayScheduleProbeGroup>();
     for (const code of expandedCodes) {
-        const group = getTodayScheduleProbeGroupByTrainCode(code);
+        const group = getTodayScheduleProbeGroupByTrainCode(
+            parseExternalTrainCodeOrThrow(code, 'trainCode')
+        );
         if (
             !group ||
             !matchesGroupStations(group, startStationName, endStationName)
@@ -264,7 +272,7 @@ function resolveUniqueGroupForRawCode(
     }
 
     const group = Array.from(groupsByKey.values())[0]!;
-    return normalizeCode(group.trainInternalCode).length > 0 ? group : null;
+    return group.trainInternalCode ? group : null;
 }
 
 function buildOfficialCirculationEntry(
@@ -284,12 +292,21 @@ function buildOfficialCirculationEntry(
     for (const [index, node] of nodes.entries()) {
         const currentGroup = node.group;
         const expandedOffset = expandedOffsets[index]!;
-        const allCodes = uniqueNormalizedCodes([
+        const allCodes: TodayScheduleProbeGroup['allCodes'] = [];
+        const seenCodeKeys = new Set<string>();
+        for (const code of [
             currentGroup.trainCode,
             ...currentGroup.allCodes
-        ]);
-        const internalCode = normalizeCode(currentGroup.trainInternalCode);
-        if (allCodes.length === 0 || internalCode.length === 0) {
+        ]) {
+            const key = trainCodeKey(code);
+            if (seenCodeKeys.has(key)) {
+                continue;
+            }
+            seenCodeKeys.add(key);
+            allCodes.push(code);
+        }
+        const internalCode = currentGroup.trainInternalCode;
+        if (allCodes.length === 0 || !internalCode) {
             return null;
         }
 
@@ -445,7 +462,7 @@ function parseCirculationTrainToEntry(
             continue;
         }
 
-        if (normalizeCode(group.trainInternalCode).length === 0) {
+        if (!group.trainInternalCode) {
             return buildFailedParsedStationBoardRowEntry(
                 row,
                 'missing_internal_code',
@@ -602,7 +619,7 @@ function chooseCirculationEntries(
     return chosenEntries;
 }
 
-function collectResolvedQueueEntries(serviceDate: string) {
+function collectResolvedQueueEntries(serviceDate: ServiceDay) {
     const resolvedEntries: ScheduleRouteRefreshQueueEntry[] = [];
 
     for (const queueEntry of listScheduleRouteRefreshQueueEntries(
@@ -616,7 +633,7 @@ function collectResolvedQueueEntries(serviceDate: string) {
             continue;
         }
 
-        const internalCode = normalizeCode(item.internalCode);
+        const internalCode = item.internalCode;
         if (
             internalCode.length === 0 ||
             !loadScheduleCirculationEntryFromDatabase(internalCode)
@@ -681,11 +698,9 @@ function maybeRequeueTask(args: FetchStationBoardTaskArgs, reason: string) {
     );
 }
 
-async function executeFetchStationBoardTask(rawArgs: unknown) {
-    const args = parseFetchStationBoardTaskArgs(rawArgs);
-    const currentDate = getCurrentDateString();
+async function executeFetchStationBoardTask(args: FetchStationBoardTaskArgs) {
+    const currentDate = serviceDateToDay(getCurrentDateString());
     const scheduleFilePath = getScheduleDatabaseFilePath();
-    const scheduleStorePath = LEGACY_SCHEDULE_JSON_PATH;
     const published = loadPublishedScheduleStateSummary();
     if (!published) {
         logger.warn(`skip schedule_not_found file=${scheduleFilePath}`);
@@ -714,7 +729,6 @@ async function executeFetchStationBoardTask(rawArgs: unknown) {
     }
 
     const stopMetadataResult = saveScheduleStopMetadataFromStationBoard(
-        scheduleStorePath,
         args.serviceDate,
         rows.map((row) => ({
             trainNo: row.trainNo,
@@ -764,15 +778,10 @@ async function executeFetchStationBoardTask(rawArgs: unknown) {
         return;
     }
 
-    const savedKeys = saveScheduleCirculationEntries(
-        scheduleStorePath,
-        chosenEntries
-    );
+    const savedKeys = saveScheduleCirculationEntries(chosenEntries);
     const resolvedQueueEntries = collectResolvedQueueEntries(args.serviceDate);
-    const removedQueueEntries = consumeRouteRefreshQueueEntries(
-        scheduleStorePath,
-        resolvedQueueEntries
-    );
+    const removedQueueEntries =
+        consumeRouteRefreshQueueEntries(resolvedQueueEntries);
 
     maybeRecordFetchResult({
         serviceDate: args.serviceDate,
@@ -813,8 +822,9 @@ export function registerFetchStationBoardTaskExecutor() {
         return;
     }
 
-    registerTaskExecutor(FETCH_STATION_BOARD_TASK_EXECUTOR, async (args) => {
-        await executeFetchStationBoardTask(args);
+    registerTaskExecutor(FETCH_STATION_BOARD_TASK_EXECUTOR, {
+        parse: parseFetchStationBoardTaskArgs,
+        execute: executeFetchStationBoardTask
     });
     registered = true;
     logger.info(`registered executor=${FETCH_STATION_BOARD_TASK_EXECUTOR}`);
