@@ -462,7 +462,6 @@ export const DEFAULT_DOCS_API_RUNTIME_CONFIG: DocsApiRuntimeConfig = {
 
 const PUBLIC_DOCS_API_SLUGS = new Set<string>([
     'auth-me',
-    'auth-membership-redeem',
     'records-daily',
     'timetable-train-current',
     'timetable-train-circulation-image',
@@ -733,7 +732,6 @@ const tagDescriptionMap = new Map(
 
 const FIXED_COST_ENDPOINT_KEYS = {
     'auth-me': 'authMe',
-    'auth-membership-redeem': 'authRedeemMembership',
     'oauth-clients-create': 'authCreateOauthClient',
     'allocation-emu': 'allocationEmu',
     'timetable-train-current': 'timetableTrainCurrent',
