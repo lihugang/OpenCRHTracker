@@ -491,7 +491,7 @@ export async function refreshRouteBatchForCodes(
         const shiftSeconds = normalizeRouteGroupDayOffsets([normalizedRoute]);
         if (shiftSeconds > 0) {
             logger.info(
-                `normalize_route_day_offsets groupKey=${groupKey} trainCode=${item.code} shiftSeconds=${shiftSeconds} groupSize=${groupItemIndexes.length}`
+                `normalize_route_day_offsets groupKey=${groupKey} trainCode=${formatTrainCode(item.code)} shiftSeconds=${shiftSeconds} groupSize=${groupItemIndexes.length}`
             );
         }
         const normalizedStartAt = normalizedRoute.startAt;

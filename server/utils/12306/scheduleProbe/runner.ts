@@ -290,7 +290,7 @@ async function runScheduleProbeInternal(
                 ]);
                 if (shiftSeconds > 0) {
                     logger.info(
-                        `normalize_route_day_offsets runId=${runId} groupKey=${groupKey} trainCode=${item.code} shiftSeconds=${shiftSeconds} groupSize=${groupItems.length}`
+                        `normalize_route_day_offsets runId=${runId} groupKey=${groupKey} trainCode=${formatTrainCode(item.code)} shiftSeconds=${shiftSeconds} groupSize=${groupItems.length}`
                     );
                 }
                 stationUpdates = {
@@ -334,7 +334,7 @@ async function runScheduleProbeInternal(
                     );
                 }
                 logger.debug(
-                    `enrich failed runId=${runId} trainCode=${item.code} attempts=${routeResult.attempts} groupSize=${groupItems.length}`
+                    `enrich failed runId=${runId} trainCode=${formatTrainCode(item.code)} attempts=${routeResult.attempts} groupSize=${groupItems.length}`
                 );
             }
 

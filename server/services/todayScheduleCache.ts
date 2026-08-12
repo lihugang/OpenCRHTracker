@@ -133,7 +133,7 @@ function rebuildCache(): TodayScheduleCache {
             const shiftSeconds = getRouteGroupDayOffsetShift(groupItems);
             if (shiftSeconds > 0) {
                 logger.warn(
-                    `normalize_stored_route_day_offsets stateKind=${activeStateKind} groupKey=${groupKey} trainCode=${groupItems[0]?.code ?? 'unknown'} shiftSeconds=${shiftSeconds} groupSize=${groupItems.length}`
+                    `normalize_stored_route_day_offsets stateKind=${activeStateKind} groupKey=${groupKey} trainCode=${groupItems[0] ? trainCodeKey(groupItems[0].code) : 'unknown'} shiftSeconds=${shiftSeconds} groupSize=${groupItems.length}`
                 );
             }
             for (const groupItem of groupItems) {

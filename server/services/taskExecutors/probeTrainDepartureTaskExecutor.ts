@@ -82,6 +82,7 @@ import {
 import {
     trainCodeKey,
     formatTrainCode,
+    formatTrainCodes,
     type TrainCodeParts
 } from '~/server/utils/12306/trainCode';
 import type { EmuId } from '~/server/libs/database/emu';
@@ -1089,7 +1090,7 @@ async function tryAutoMergeResolvedInternalGroup(
         }
     });
     logger.info(
-        `resolved_internal_code_auto_merge trainCode=${formatTrainCode(args.trainCode)} trainInternalCode=${args.trainInternalCode ?? ''} mainEmuCode=${formatExternalEmuCode(mainEmuId)} mergedEmuCodes=${mergedEmuIds.map(formatExternalEmuCode).join('/')} mergedTrainCodes=${mergedTrainCodes.join('/')} assignedEmuCodes=${assignedEmuCodes.map(formatExternalEmuCode).join('/')}`
+        `resolved_internal_code_auto_merge trainCode=${formatTrainCode(args.trainCode)} trainInternalCode=${args.trainInternalCode ?? ''} mainEmuCode=${formatExternalEmuCode(mainEmuId)} mergedEmuCodes=${mergedEmuIds.map(formatExternalEmuCode).join('/')} mergedTrainCodes=${mergedTrainCodes.map(formatTrainCode).join('/')} assignedEmuCodes=${assignedEmuCodes.map(formatExternalEmuCode).join('/')}`
     );
     return true;
 }
@@ -2153,7 +2154,7 @@ async function executeProbeTrainDepartureTaskInternal(
             });
             markCurrentTrainProvenanceTaskSkipped('route_probe_requeued');
             logger.debug(
-                `route_probe_failed_requeue trainCode=${formatTrainCode(args.trainCode)} retry=${args.retry} nextRetry=${nextRetry} nextTaskId=${nextTaskId} attemptedTrainCodes=${allTrainCodes.join(',')}`
+                `route_probe_failed_requeue trainCode=${formatTrainCode(args.trainCode)} retry=${args.retry} nextRetry=${nextRetry} nextTaskId=${nextTaskId} attemptedTrainCodes=${formatTrainCodes(allTrainCodes).join(',')}`
             );
             return;
         }
@@ -2217,7 +2218,7 @@ async function executeProbeTrainDepartureTaskInternal(
                 'historical_recent_not_running'
             );
             logger.info(
-                `skip_historical_recent_same_assignment_not_running trainCode=${formatTrainCode(args.trainCode)} probedTrainCode=${formatTrainCode(probedTrainCode)} mainEmuCode=${mainEmuCode} historicalRecentMatchedTrainCodes=${historicalRecentMatchingTrainCodes.map(formatTrainCode).join(',')} checkedTrainCodes=${allTrainCodes.join(',')} notRunningTrainCodes=${todayTrainCodesValidation.notRunningTrainCodes.map(formatTrainCode).join(',')}`
+                `skip_historical_recent_same_assignment_not_running trainCode=${formatTrainCode(args.trainCode)} probedTrainCode=${formatTrainCode(probedTrainCode)} mainEmuCode=${mainEmuCode} historicalRecentMatchedTrainCodes=${historicalRecentMatchingTrainCodes.map(formatTrainCode).join(',')} checkedTrainCodes=${formatTrainCodes(allTrainCodes).join(',')} notRunningTrainCodes=${todayTrainCodesValidation.notRunningTrainCodes.map(formatTrainCode).join(',')}`
             );
             return;
         }
@@ -2405,7 +2406,7 @@ async function executeProbeTrainDepartureTaskInternal(
 
         if (todayTrainCodesValidation.state === 'request_failed') {
             logger.info(
-                `continue_historical_recent_same_assignment_request_failed trainCode=${formatTrainCode(args.trainCode)} probedTrainCode=${formatTrainCode(probedTrainCode)} mainEmuCode=${mainEmuCode} historicalRecentMatchedTrainCodes=${historicalRecentMatchingTrainCodes.map(formatTrainCode).join(',')} checkedTrainCodes=${allTrainCodes.join(',')} requestFailedTrainCodes=${todayTrainCodesValidation.requestFailedTrainCodes.map(formatTrainCode).join(',')} notRunningTrainCodes=${todayTrainCodesValidation.notRunningTrainCodes.map(formatTrainCode).join(',')}`
+                `continue_historical_recent_same_assignment_request_failed trainCode=${formatTrainCode(args.trainCode)} probedTrainCode=${formatTrainCode(probedTrainCode)} mainEmuCode=${mainEmuCode} historicalRecentMatchedTrainCodes=${historicalRecentMatchingTrainCodes.map(formatTrainCode).join(',')} checkedTrainCodes=${formatTrainCodes(allTrainCodes).join(',')} requestFailedTrainCodes=${todayTrainCodesValidation.requestFailedTrainCodes.map(formatTrainCode).join(',')} notRunningTrainCodes=${todayTrainCodesValidation.notRunningTrainCodes.map(formatTrainCode).join(',')}`
             );
         }
     }

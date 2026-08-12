@@ -174,11 +174,17 @@ function appendRouteReference(
         return;
     }
 
-    const key = `${value.startAt ?? 'null'}:${value.trainCodes.join('/')}`;
+    const key = `${value.startAt ?? 'null'}:${value.trainCodes
+        .map(trainCodeKey)
+        .sort()
+        .join('/')}`;
     if (
         target.some(
             (item) =>
-                `${item.startAt ?? 'null'}:${item.trainCodes.join('/')}` === key
+                `${item.startAt ?? 'null'}:${item.trainCodes
+                    .map(trainCodeKey)
+                    .sort()
+                    .join('/')}` === key
         )
     ) {
         return;
