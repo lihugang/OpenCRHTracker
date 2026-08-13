@@ -16,6 +16,7 @@ import type {
     TrainHistoryResponse
 } from '~/types/lookup';
 import getApiErrorMessage from '~/utils/api/getApiErrorMessage';
+import getShanghaiDayStartUnixSeconds from '~/utils/time/getShanghaiDayStartUnixSeconds';
 
 const REQUEST_LIMIT = 20;
 
@@ -37,6 +38,49 @@ function buildHistoryQuery(cursor: string) {
         limit: REQUEST_LIMIT,
         cursor: cursor || undefined
     };
+}
+
+function getHistorySortTimestamp(item: LookupHistoryListItem) {
+    if (
+        item.startAt !== null &&
+        Number.isFinite(item.startAt) &&
+        item.startAt > 0
+    ) {
+        return item.startAt;
+    }
+
+    return (
+        getShanghaiDayStartUnixSeconds(item.serviceDate) ??
+        Number.NEGATIVE_INFINITY
+    );
+}
+
+function compareHistoryItemsByTimeDescending(
+    left: LookupHistoryListItem,
+    right: LookupHistoryListItem
+) {
+    const leftTimestamp = getHistorySortTimestamp(left);
+    const rightTimestamp = getHistorySortTimestamp(right);
+
+    if (leftTimestamp === rightTimestamp) {
+        return 0;
+    }
+
+    return leftTimestamp > rightTimestamp ? -1 : 1;
+}
+
+function mergeHistoryPage(
+    currentItems: readonly LookupHistoryListItem[],
+    pageItems: readonly LookupHistoryListItem[]
+) {
+    const windowStart = Math.max(currentItems.length - REQUEST_LIMIT, 0);
+    const stableItems = currentItems.slice(0, windowStart);
+    const sortableItems = [
+        ...currentItems.slice(windowStart),
+        ...pageItems
+    ].sort(compareHistoryItemsByTimeDescending);
+
+    return [...stableItems, ...sortableItems];
 }
 
 async function fetchTrainHistoryPage(
@@ -128,7 +172,7 @@ export function useRecentHistoryList(
     const requestFetch: TrackedRequestFetch = import.meta.server
         ? useTrackedRequestFetch()
         : ($fetch as TrackedRequestFetch);
-    const extraItems = ref<LookupHistoryListItem[]>([]);
+    const extraPages = ref<LookupHistoryListItem[][]>([]);
     const manualNextCursor = ref<string | null>(null);
     const isLoadingMore = ref(false);
     const loadMoreErrorMessage = ref('');
@@ -174,9 +218,17 @@ export function useRecentHistoryList(
         return response;
     });
 
-    const initialItems = computed(() => data.value?.items ?? []);
+    const initialItems = computed(() =>
+        initialResponse.value ? (data.value?.items ?? []) : []
+    );
 
-    const items = computed(() => [...initialItems.value, ...extraItems.value]);
+    const items = computed(() =>
+        extraPages.value.reduce(
+            (mergedItems, pageItems) =>
+                mergeHistoryPage(mergedItems, pageItems),
+            mergeHistoryPage([], initialItems.value)
+        )
+    );
 
     const nextCursor = computed(() => {
         if (manualNextCursor.value !== null) {
@@ -265,7 +317,7 @@ export function useRecentHistoryList(
     });
 
     function resetTransientState() {
-        extraItems.value = [];
+        extraPages.value = [];
         manualNextCursor.value = null;
         isLoadingMore.value = false;
         loadMoreErrorMessage.value = '';
@@ -304,7 +356,7 @@ export function useRecentHistoryList(
                 return;
             }
 
-            extraItems.value = [...extraItems.value, ...result.items];
+            extraPages.value = [...extraPages.value, result.items];
             manualNextCursor.value = result.response.nextCursor ?? '';
         } catch (loadMoreError) {
             if (currentRequestVersion !== requestVersion.value) {
