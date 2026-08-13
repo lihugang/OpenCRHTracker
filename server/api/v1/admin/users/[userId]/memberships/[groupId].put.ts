@@ -1,5 +1,5 @@
 import { defineEventHandler, getRouterParam, readBody } from 'h3';
-import { upsertUserMembership } from '~/server/services/membershipStore';
+import { putAdminUserMembership } from '~/server/domain/admin/users';
 import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';
 import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
@@ -73,7 +73,7 @@ export default defineEventHandler(async (event) => {
                 '计算得到的赞助权益到期时间必须晚于当前时间'
             );
 
-            return upsertUserMembership({
+            return putAdminUserMembership({
                 userId,
                 groupId,
                 startsAt: request.startsAt,

@@ -1,8 +1,5 @@
 import { defineEventHandler, getQuery, getRouterParam } from 'h3';
-import {
-    listTimetableHistoryCoveragesByTrainCodePaged,
-    type TimetableHistoryCoverageRow
-} from '~/server/services/timetableHistoryStore';
+import { getTrainTimetableHistoryPaged } from '~/server/domain/timetable';
 import getPerRecordCost from '~/server/utils/api/cost/getPerRecordCost';
 import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';
@@ -11,24 +8,11 @@ import parseLimit from '~/server/utils/api/query/parseLimit';
 import { getHistoryResponseCacheControlMaxAge } from '~/server/utils/api/response/getResponseCacheControlMaxAge';
 import setCacheControl from '~/server/utils/api/response/setCacheControl';
 import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
-import type { TrainTimetableHistoryListResponse } from '~/types/lookup';
 import {
     parseExternalCursor,
     parseExternalTrainCodeOrThrow,
     formatExternalServiceDate
 } from '~/server/utils/internal/boundaries';
-
-function buildNextCursor(
-    rows: Array<Pick<TimetableHistoryCoverageRow, 'service_date_start' | 'id'>>,
-    limit: number
-) {
-    if (rows.length < limit || rows.length === 0) {
-        return '';
-    }
-
-    const last = rows[rows.length - 1]!;
-    return `${formatExternalServiceDate(last.service_date_start)}:${last.id}`;
-}
 
 export default defineEventHandler(async (event) => {
     return executeApi(
@@ -57,32 +41,35 @@ export default defineEventHandler(async (event) => {
             );
 
             const query = getQuery(event);
-            const cursor = parseExternalCursor(query.cursor, 'cursor');
             const limit = parseLimit(event);
-            const rows = listTimetableHistoryCoveragesByTrainCodePaged(
-                parseExternalTrainCodeOrThrow(trainCode, 'trainCode'),
-                cursor,
+            const result = getTrainTimetableHistoryPaged({
+                trainCode: parseExternalTrainCodeOrThrow(
+                    trainCode,
+                    'trainCode'
+                ),
+                cursor: parseExternalCursor(query.cursor, 'cursor'),
                 limit
-            );
+            });
 
-            const response: TrainTimetableHistoryListResponse = {
+            return {
                 trainCode,
                 cursor: typeof query.cursor === 'string' ? query.cursor : '',
                 limit,
-                nextCursor: buildNextCursor(rows, limit),
-                items: rows.map((row) => ({
-                    id: row.id,
-                    historyId: row.content_id,
+                nextCursor:
+                    result.nextCursor === null
+                        ? ''
+                        : `${formatExternalServiceDate(result.nextCursor.serviceDate)}:${result.nextCursor.id}`,
+                items: result.items.map((row) => ({
+                    id: row.coverageId,
+                    historyId: row.timetableId,
                     serviceDateStart: formatExternalServiceDate(
-                        row.service_date_start
+                        row.serviceDayStart
                     ),
                     serviceDateEndExclusive: formatExternalServiceDate(
-                        row.service_date_end_exclusive
+                        row.serviceDayEndExclusive
                     )
                 }))
             };
-
-            return response;
         }
     );
 });

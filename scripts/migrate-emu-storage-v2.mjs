@@ -2,6 +2,7 @@
 
 import Database from 'better-sqlite3';
 import {
+    appendFileSync,
     existsSync,
     mkdirSync,
     readFileSync,
@@ -38,6 +39,10 @@ const USER_OAUTH_SCHEMA_FILES = [
     'createOauthConsentsTable.sql',
     'createOauthLoginContinuationsTable.sql'
 ];
+const AUTH_SKIPPED_FILE = resolve(
+    repoRoot,
+    'data/migrate-auth-v2-skipped.jsonl'
+);
 
 const TRAIN_KEYS = new Set([
     'trainCode',
@@ -145,11 +150,13 @@ function parseArgs(argv) {
             );
         else if (arg.startsWith('--task='))
             options.overrides.task = resolve(repoRoot, arg.slice(7));
+        else if (arg.startsWith('--users='))
+            options.overrides.users = resolve(repoRoot, arg.slice(8));
         else if (arg.startsWith('--schedule-file='))
             options.scheduleFile = resolve(repoRoot, arg.slice(16));
         else if (arg === '--help') {
             console.log(
-                'Usage: node scripts/migrate-emu-storage-v2.mjs [--apply] [--config=path] [--output-dir=path] [--schedule-file=path] [--emu=path] [--schedule=path] [--timetable-history=path] [--train-provenance=path] [--task=path]'
+                'Usage: node scripts/migrate-emu-storage-v2.mjs [--apply] [--config=path] [--output-dir=path] [--schedule-file=path] [--emu=path] [--schedule=path] [--timetable-history=path] [--train-provenance=path] [--task=path] [--users=path]'
             );
             process.exit(0);
         } else throw new Error(`unknown_argument ${arg}`);
@@ -802,6 +809,9 @@ function validateIndexes(target, kind) {
 
 function validateTarget(source, target, kind, copiedCounts, mapping) {
     for (const table of tableNames(source)) {
+        if (kind === 'users' && table === 'user_event_subscriptions') {
+            continue;
+        }
         const sourceCount = source
             .prepare(`SELECT COUNT(*) AS count FROM ${JSON.stringify(table)}`)
             .get().count;
@@ -884,6 +894,325 @@ function loadConfigPaths(options) {
     );
 }
 
+function authNormalizeTags(value) {
+    if (!Array.isArray(value)) return [];
+    return value
+        .filter((tag) => typeof tag === 'string')
+        .map((tag) => tag.trim())
+        .filter(
+            (tag, index, array) =>
+                tag.length > 0 && array.indexOf(tag) === index
+        );
+}
+
+function authConvertFavoriteEntry(entry, mapping, context) {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+        return null;
+    }
+
+    const starredAt = entry.starredAt;
+    if (!Number.isInteger(starredAt) || starredAt <= 0) {
+        return null;
+    }
+
+    const tags = authNormalizeTags(entry.tags);
+
+    // Already v2-shaped favorites (re-run safety).
+    if (
+        entry.target &&
+        typeof entry.target === 'object' &&
+        !Array.isArray(entry.target)
+    ) {
+        const target = entry.target;
+        if (target.kind === 'train') {
+            const code = target.trainCode;
+            if (
+                code &&
+                typeof code === 'object' &&
+                typeof code.prefix === 'string' &&
+                /^[A-Z]?$/.test(code.prefix) &&
+                Number.isInteger(code.number) &&
+                code.number > 0
+            ) {
+                return {
+                    target: {
+                        kind: 'train',
+                        trainCode: { prefix: code.prefix, number: code.number }
+                    },
+                    tags,
+                    starredAt
+                };
+            }
+            return null;
+        }
+        if (target.kind === 'emu') {
+            if (Number.isInteger(target.emuId) && target.emuId > 0) {
+                return {
+                    target: { kind: 'emu', emuId: target.emuId },
+                    tags,
+                    starredAt
+                };
+            }
+            return null;
+        }
+        if (target.kind === 'station') {
+            const stationName = String(target.stationName ?? '').trim();
+            if (stationName.length === 0) return null;
+            return {
+                target: { kind: 'station', stationName },
+                tags,
+                starredAt
+            };
+        }
+        return null;
+    }
+
+    if (entry.type === 'train') {
+        let parts;
+        try {
+            parts = parseTrain(entry.code, `${context}.target`);
+        } catch {
+            return null;
+        }
+        return { target: { kind: 'train', trainCode: parts }, tags, starredAt };
+    }
+
+    if (entry.type === 'emu') {
+        let normalized;
+        try {
+            normalized = normalizeEmu(entry.code, `${context}.target`);
+        } catch {
+            return null;
+        }
+        const emuId = mapping.get(normalized);
+        if (emuId === undefined) {
+            return null;
+        }
+        return { target: { kind: 'emu', emuId }, tags, starredAt };
+    }
+
+    if (entry.type === 'station') {
+        const stationName = String(entry.code ?? '').trim();
+        if (stationName.length === 0) return null;
+        return { target: { kind: 'station', stationName }, tags, starredAt };
+    }
+
+    return null;
+}
+
+function authConvertSubscriptionRow(row, mapping, context) {
+    const targetType = String(row.target_type ?? '').trim();
+    const targetId = String(row.target_id ?? '').trim();
+    const createdAt = row.created_at;
+    const updatedAt = row.updated_at;
+    if (!Number.isInteger(createdAt) || !Number.isInteger(updatedAt)) {
+        return null;
+    }
+
+    if (targetType === 'train') {
+        let parts;
+        try {
+            parts = parseTrain(targetId, `${context}.target`);
+        } catch {
+            return null;
+        }
+        return {
+            kind: 'train',
+            emu_id: null,
+            topic_id: null,
+            train_prefix: parts.prefix,
+            train_number: parts.number,
+            target_key: `train:${parts.prefix}:${parts.number}`
+        };
+    }
+
+    if (targetType === 'emu') {
+        let normalized;
+        try {
+            normalized = normalizeEmu(targetId, `${context}.target`);
+        } catch {
+            return null;
+        }
+        const emuId = mapping.get(normalized);
+        if (emuId === undefined) {
+            return null;
+        }
+        return {
+            kind: 'emu',
+            emu_id: emuId,
+            topic_id: null,
+            train_prefix: null,
+            train_number: null,
+            target_key: `emu:${emuId}`
+        };
+    }
+
+    if (targetType === 'feedback') {
+        if (!/^\d+$/.test(targetId) || Number(targetId) <= 0) {
+            return null;
+        }
+        const topicId = Number(targetId);
+        return {
+            kind: 'feedback',
+            emu_id: null,
+            topic_id: topicId,
+            train_prefix: null,
+            train_number: null,
+            target_key: `feedback:${topicId}`
+        };
+    }
+
+    return null;
+}
+
+function authMigrateUsers(db, mapping, apply, skippedRecords) {
+    const summary = {
+        favoritesUsers: 0,
+        favoritesItems: 0,
+        favoritesConverted: 0,
+        favoritesSkipped: 0,
+        subscriptionRows: 0,
+        subscriptionsConverted: 0,
+        subscriptionsSkipped: 0
+    };
+
+    if (!tableNames(db).includes('user_profiles')) {
+        return summary;
+    }
+
+    const profileRows = db
+        .prepare(
+            'SELECT user_id, data_json FROM user_profiles ORDER BY user_id'
+        )
+        .all();
+    for (const row of profileRows) {
+        let parsed;
+        try {
+            parsed = JSON.parse(String(row.data_json ?? 'null'));
+        } catch {
+            continue;
+        }
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+            continue;
+        }
+        if (!Array.isArray(parsed.favorites)) {
+            continue;
+        }
+
+        summary.favoritesUsers += 1;
+        summary.favoritesItems += parsed.favorites.length;
+        const converted = [];
+        parsed.favorites.forEach((entry, index) => {
+            const context = `users.user_profiles.${row.user_id}.favorites[${index}]`;
+            const result = authConvertFavoriteEntry(entry, mapping, context);
+            if (result === null) {
+                summary.favoritesSkipped += 1;
+                if (skippedRecords) {
+                    skippedRecords.push({
+                        userId: row.user_id,
+                        section: 'favorites',
+                        reason: 'unparseable',
+                        original: entry
+                    });
+                }
+                return;
+            }
+            converted.push(result);
+        });
+
+        if (!apply) {
+            summary.favoritesConverted += converted.length;
+            continue;
+        }
+
+        parsed.version = 2;
+        parsed.favorites = converted;
+        db.prepare(
+            'UPDATE user_profiles SET data_json = ?, updated_at = updated_at WHERE user_id = ?'
+        ).run(JSON.stringify(parsed), row.user_id);
+        summary.favoritesConverted += converted.length;
+    }
+
+    const hasOldSubscriptionTable = db
+        .prepare(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='user_event_subscriptions'"
+        )
+        .get();
+    if (!hasOldSubscriptionTable) {
+        return summary;
+    }
+
+    const rows = db
+        .prepare(
+            'SELECT user_id, target_type, target_id, created_at, updated_at FROM user_event_subscriptions ORDER BY user_id, target_type, target_id'
+        )
+        .all();
+    summary.subscriptionRows = rows.length;
+    const insertV2 = apply
+        ? db.prepare(
+              'INSERT INTO user_event_subscriptions_v2 (user_id, kind, emu_id, topic_id, train_prefix, train_number, target_key, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+          )
+        : null;
+    for (const row of rows) {
+        const context = `users.user_event_subscriptions.${row.user_id}:${row.target_type}:${row.target_id}`;
+        const converted = authConvertSubscriptionRow(row, mapping, context);
+        if (converted === null) {
+            summary.subscriptionsSkipped += 1;
+            if (skippedRecords) {
+                skippedRecords.push({
+                    userId: row.user_id,
+                    section: 'event_subscriptions',
+                    reason: 'unparseable',
+                    original: {
+                        target_type: row.target_type,
+                        target_id: row.target_id
+                    }
+                });
+            }
+            continue;
+        }
+        summary.subscriptionsConverted += 1;
+        if (insertV2) {
+            insertV2.run(
+                row.user_id,
+                converted.kind,
+                converted.emu_id,
+                converted.topic_id,
+                converted.train_prefix,
+                converted.train_number,
+                converted.target_key,
+                row.created_at,
+                row.updated_at
+            );
+        }
+    }
+
+    if (apply) {
+        db.exec(
+            'ALTER TABLE "user_event_subscriptions" RENAME TO "user_event_subscriptions.v1.bak"'
+        );
+    }
+
+    return summary;
+}
+
+function reportAuthSkipped(skippedRecords) {
+    if (skippedRecords.length === 0) {
+        return;
+    }
+    const sampleCount = Math.min(skippedRecords.length, 20);
+    for (const record of skippedRecords.slice(0, sampleCount)) {
+        console.warn(
+            `auth_migrate_skipped userId=${record.userId} section=${record.section} reason=${record.reason} original=${JSON.stringify(record.original).slice(0, 400)}`
+        );
+    }
+    if (skippedRecords.length > sampleCount) {
+        console.warn(
+            `auth_migrate_skipped_more total=${skippedRecords.length}`
+        );
+    }
+}
+
 function migrate(options) {
     const sources = loadConfigPaths(options);
     const sourceDbs = new Map(
@@ -901,13 +1230,20 @@ function migrate(options) {
         mapping,
         false
     );
+    const usersSource = sourceDbs.get('users');
+    const authDryRunSkipped = [];
+    const authDryRun = usersSource
+        ? authMigrateUsers(usersSource, mapping, false, authDryRunSkipped)
+        : null;
+    reportAuthSkipped(authDryRunSkipped);
     console.log(
         JSON.stringify(
             {
                 dryRun: !options.apply,
                 emuCodes: mapping.size,
                 sources,
-                scheduleFile
+                scheduleFile,
+                authMigration: authDryRun
             },
             null,
             2
@@ -924,6 +1260,7 @@ function migrate(options) {
     rmSync(stagingDir, { recursive: true, force: true });
     mkdirSync(stagingDir, { recursive: true });
     const stagedPaths = new Map();
+    const authSkippedRecords = [];
     try {
         for (const [kind, source] of sourceDbs) {
             const outputName =
@@ -962,11 +1299,24 @@ function migrate(options) {
                 copySqliteSequences(source, output);
             });
             tx();
+            if (kind === 'users') {
+                authMigrateUsers(output, mapping, true, authSkippedRecords);
+            }
             output.pragma('foreign_keys = ON');
             validateTarget(source, output, kind, copiedCounts, mapping);
             output.close();
         }
         for (const db of sourceDbs.values()) db.close();
+        if (authSkippedRecords.length > 0) {
+            mkdirSync(dirname(AUTH_SKIPPED_FILE), { recursive: true });
+            appendFileSync(
+                AUTH_SKIPPED_FILE,
+                `${authSkippedRecords
+                    .map((record) => JSON.stringify(record))
+                    .join('\n')}\n`
+            );
+        }
+        reportAuthSkipped(authSkippedRecords);
         for (const [kind, sourcePath] of Object.entries(sources)) {
             atomicallyReplaceDatabase(sourcePath, stagedPaths.get(kind));
         }

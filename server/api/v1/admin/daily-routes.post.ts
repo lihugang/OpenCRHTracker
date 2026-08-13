@@ -1,5 +1,5 @@
 import { defineEventHandler, readBody } from 'h3';
-import { createAdminDailyRoute } from '~/server/services/adminDailyRouteMaintenanceStore';
+import { postAdminDailyRoutes } from '~/server/domain/admin/dailyRoutes';
 import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';
 import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
@@ -20,15 +20,12 @@ function normalizeTimetableId(value: unknown) {
     if (value === null || value === undefined || value === '') {
         return null;
     }
-
     if (typeof value === 'number' && Number.isInteger(value)) {
         return value;
     }
-
     if (typeof value === 'string' && /^\d+$/.test(value)) {
         return Number.parseInt(value, 10);
     }
-
     return Number.NaN;
 }
 
@@ -84,12 +81,15 @@ export default defineEventHandler(async (event) => {
                 'timetableId 必须是正整数或 null'
             );
 
-            return createAdminDailyRoute(
-                parseExternalServiceDate(date),
-                parseExternalTrainCodeOrThrow(trainCode, 'trainCode'),
-                ensureExternalEmuId(emuCode),
+            return postAdminDailyRoutes({
+                serviceDay: parseExternalServiceDate(date),
+                trainCode: parseExternalTrainCodeOrThrow(
+                    trainCode,
+                    'trainCode'
+                ),
+                emuId: ensureExternalEmuId(emuCode),
                 timetableId
-            );
+            });
         }
     );
 });

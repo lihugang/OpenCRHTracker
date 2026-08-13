@@ -1,5 +1,5 @@
 import { defineEventHandler, getQuery } from 'h3';
-import { listAdminDailyRouteTimetableCandidates } from '~/server/services/adminDailyRouteMaintenanceStore';
+import { getAdminDailyRoutesTimetables } from '~/server/domain/admin/dailyRoutes';
 import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';
 import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
@@ -36,7 +36,7 @@ export default defineEventHandler(async (event) => {
                 'trainCode 不能为空'
             );
 
-            return listAdminDailyRouteTimetableCandidates(
+            return getAdminDailyRoutesTimetables(
                 parseExternalServiceDate(date),
                 parseExternalTrainCodeOrThrow(trainCode, 'trainCode')
             );

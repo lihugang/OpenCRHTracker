@@ -1,5 +1,5 @@
 import { defineEventHandler, getRouterParam } from 'h3';
-import { deleteAdminOfficialCirculation } from '~/server/services/adminOfficialCirculationStore';
+import { deleteAdminOfficialCirculation } from '~/server/domain/admin/officialCirculations';
 import ensurePayloadStringLength from '~/server/utils/api/payload/ensurePayloadStringLength';
 import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';

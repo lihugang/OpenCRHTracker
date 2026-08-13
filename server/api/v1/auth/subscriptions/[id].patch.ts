@@ -1,16 +1,12 @@
 import { defineEventHandler, getRouterParam, readBody } from 'h3';
 import useConfig from '~/server/config';
-import { renameUserSubscription } from '~/server/services/userProfileStore';
+import { patchAuthSubscription } from '~/server/domain/auth';
 import getFixedCost from '~/server/utils/api/cost/getFixedCost';
 import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';
 import ensurePayloadStringLength from '~/server/utils/api/payload/ensurePayloadStringLength';
 import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
-import {
-    createSubscriptionListResponse,
-    getSubscriptionNameMaxLength,
-    normalizeSubscriptionName
-} from '~/server/utils/auth/subscriptions';
+import { getSubscriptionNameMaxLength } from '~/server/utils/auth/subscriptions';
 
 interface PatchSubscriptionBody {
     name?: unknown;
@@ -57,13 +53,11 @@ export default defineEventHandler(async (event) => {
                 Math.min(nameMaxLength, config.api.payload.maxStringLength)
             );
 
-            const items = renameUserSubscription(
+            return patchAuthSubscription(
                 identity.id,
                 subscriptionId,
-                normalizeSubscriptionName(body.name)
+                body.name
             );
-
-            return createSubscriptionListResponse(identity.id, items);
         }
     );
 });

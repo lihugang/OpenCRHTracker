@@ -1,5 +1,5 @@
 import { defineEventHandler, getRouterParam } from 'h3';
-import { revokeUserMembership } from '~/server/services/membershipStore';
+import { deleteAdminUserMembership } from '~/server/domain/admin/users';
 import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';
 import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
@@ -21,7 +21,7 @@ export default defineEventHandler(async (event) => {
                 '赞助权益组 ID 不能为空'
             );
 
-            return revokeUserMembership(userId, groupId, identity.id);
+            return deleteAdminUserMembership(userId, groupId, identity.id);
         }
     );
 });

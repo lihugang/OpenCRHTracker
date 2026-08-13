@@ -1,5 +1,5 @@
 import { defineEventHandler, getQuery } from 'h3';
-import { getAdminQrcodeScanDetail } from '~/server/services/adminTrainProvenanceStore';
+import { getAdminTrainProvenanceQrcodeScan } from '~/server/domain/admin/trainProvenance';
 import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';
 import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
@@ -9,7 +9,6 @@ export default defineEventHandler(async (event) => {
     return executeApi(
         event,
         {
-            cors: true,
             requiredScopes: [API_SCOPES.admin]
         },
         async () => {
@@ -20,7 +19,6 @@ export default defineEventHandler(async (event) => {
                 typeof query.detectedAt === 'string'
                     ? query.detectedAt.trim()
                     : '';
-
             ensure(
                 /^\d{8}$/.test(date),
                 400,
@@ -28,13 +26,13 @@ export default defineEventHandler(async (event) => {
                 'date 必须是 YYYYMMDD'
             );
             ensure(
-                /^\d{4}$/.test(detectedAt),
+                detectedAt.length > 0,
                 400,
                 'invalid_param',
-                'detectedAt 必须是 HHmm'
+                'detectedAt 不能为空'
             );
 
-            return getAdminQrcodeScanDetail(
+            return getAdminTrainProvenanceQrcodeScan(
                 parseExternalServiceDate(date),
                 detectedAt
             );

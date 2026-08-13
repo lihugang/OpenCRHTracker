@@ -1,26 +1,21 @@
 import { defineEventHandler, getQuery } from 'h3';
 import {
+    getFeedbackTopics
+} from '~/server/domain/feedback';
+import {
     isValidFeedbackCategory,
     isValidFeedbackPrimaryType,
     isValidFeedbackSecondaryType,
     isValidFeedbackStatus,
-    listAllFeedbackTopics,
-    listMyFeedbackTopics,
-    listPublicFeedbackTopics,
     parseFeedbackTopicCursor
 } from '~/server/services/feedbackStore';
 import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';
 import parseLimit from '~/server/utils/api/query/parseLimit';
-import {
-    canManageFeedback,
-    canReadFeedback
-} from '~/server/utils/feedback/permissions';
 import type {
     FeedbackPrimaryType,
     FeedbackSecondaryType,
-    FeedbackStatus,
-    FeedbackTopicListResponse
+    FeedbackStatus
 } from '~/types/feedback';
 
 export default defineEventHandler(async (event) => {
@@ -89,72 +84,14 @@ export default defineEventHandler(async (event) => {
                 'cursor 无效'
             );
 
-            const limit = parseLimit(event);
-            const filters = {
+            return getFeedbackTopics(identity, {
+                view: rawView as 'public' | 'mine' | 'all',
                 primaryType: rawPrimaryType as FeedbackPrimaryType | '',
                 secondaryType: rawSecondaryType as FeedbackSecondaryType | '',
-                status: rawStatus as FeedbackStatus | ''
-            };
-
-            if (rawView === 'all') {
-                ensure(
-                    canManageFeedback(identity),
-                    403,
-                    'forbidden_scope',
-                    '当前身份无法查看全部反馈'
-                );
-
-                const result = listAllFeedbackTopics(filters, cursor, limit);
-
-                return {
-                    view: 'all',
-                    ...filters,
-                    limit,
-                    nextCursor: result.nextCursor,
-                    items: result.items
-                } satisfies FeedbackTopicListResponse;
-            }
-
-            ensure(
-                canReadFeedback(identity),
-                403,
-                'forbidden_scope',
-                '当前身份无法查看反馈'
-            );
-
-            if (rawView === 'mine') {
-                ensure(
-                    identity.type === 'user',
-                    403,
-                    'forbidden_scope',
-                    '当前身份无法查看我的反馈'
-                );
-
-                const result = listMyFeedbackTopics(
-                    identity.id,
-                    filters,
-                    cursor,
-                    limit
-                );
-
-                return {
-                    view: 'mine',
-                    ...filters,
-                    limit,
-                    nextCursor: result.nextCursor,
-                    items: result.items
-                } satisfies FeedbackTopicListResponse;
-            }
-
-            const result = listPublicFeedbackTopics(filters, cursor, limit);
-
-            return {
-                view: 'public',
-                ...filters,
-                limit,
-                nextCursor: result.nextCursor,
-                items: result.items
-            } satisfies FeedbackTopicListResponse;
+                status: rawStatus as FeedbackStatus | '',
+                cursor,
+                limit: parseLimit(event)
+            });
         }
     );
 });

@@ -1,0 +1,123 @@
+syntax = "proto3";
+
+package opencrh.v2;
+
+import "opencrh/v2/common.proto";
+
+// Health, debug echo, and exposed configuration.
+
+message GetHealthRequest {}
+
+message GetHealthData {
+  string status = 1;
+  int64 timestamp = 2;
+}
+
+message GetHealthResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    GetHealthData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message GetDebugEchoErrorRequest {}
+
+message GetDebugEchoErrorData {}
+
+message GetDebugEchoErrorResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    GetDebugEchoErrorData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message GetExposedConfigRequest {}
+
+message ExposedConfigAbout {
+  int64 scheduler_poll_interval_ms = 1;
+  double scheduler_poll_interval_minutes = 2;
+}
+
+message ExposedConfigQqBinding {
+  bool enabled = 1;
+  uint32 code_ttl_seconds = 2;
+  uint32 send_interval_seconds = 3;
+}
+
+message ExposedConfigHeaders {
+  string remain = 1;
+  string cost = 2;
+  string retry_after = 3;
+}
+
+message ExposedConfigPagination {
+  uint32 default_limit = 1;
+  uint32 max_limit = 2;
+}
+
+message ExposedConfigQuota {
+  uint32 anonymous_max_tokens = 1;
+  uint32 user_max_tokens = 2;
+  uint32 refill_amount = 3;
+  uint32 refill_interval_seconds = 4;
+}
+
+message ExposedConfigCostFixed {
+  int64 auth_me = 1;
+  int64 auth_redeem_membership = 2;
+  int64 auth_create_oauth_client = 3;
+  int64 allocation_emu = 4;
+  int64 timetable_train_current = 5;
+  int64 train_circulation_image_cache_hit = 6;
+  int64 train_circulation_image = 7;
+  int64 train_circulation_image_failure = 8;
+  int64 timetable_train_history = 9;
+  int64 export_daily_index = 10;
+  int64 export_daily = 11;
+}
+
+message ExposedConfigCostPerRecordRule {
+  double unit_cost = 1;
+  string rounding = 2;
+}
+
+message ExposedConfigCostPerRecord {
+  ExposedConfigCostPerRecordRule records_daily = 1;
+  ExposedConfigCostPerRecordRule timetable_train_history = 2;
+  ExposedConfigCostPerRecordRule timetable_station = 3;
+  ExposedConfigCostPerRecordRule history_train = 4;
+  ExposedConfigCostPerRecordRule history_emu = 5;
+}
+
+message ExposedConfigCost {
+  uint32 minimum_request_cost = 1;
+  ExposedConfigCostFixed fixed = 2;
+  ExposedConfigCostPerRecord per_record = 3;
+}
+
+message ExposedConfigApi {
+  string version_prefix = 1;
+  string api_key_header = 2;
+  string auth_cookie_name = 3;
+  string timestamp_unit = 4;
+  ExposedConfigHeaders headers = 5;
+  ExposedConfigPagination pagination = 6;
+  ExposedConfigQuota quota = 7;
+  ExposedConfigCost cost = 8;
+}
+
+message GetExposedConfigData {
+  ExposedConfigAbout about = 1;
+  ExposedConfigQqBinding qq_binding = 2;
+  ExposedConfigApi api = 3;
+}
+
+message GetExposedConfigResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    GetExposedConfigData data = 2;
+    ApiError error = 3;
+  }
+}

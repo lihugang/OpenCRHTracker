@@ -1,13 +1,9 @@
 import { defineEventHandler, getRouterParam, readBody } from 'h3';
-import { updateOauthClientByOwner } from '~/server/services/oauthStore';
+import { patchOauthClient } from '~/server/domain/oauth';
 import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';
 import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
-import hasScope from '~/server/utils/api/scopes/hasScope';
-import type {
-    OAuthClientCreateInput,
-    OAuthClientMutationResponse
-} from '~/types/auth';
+import type { OAuthClientCreateInput } from '~/types/auth';
 
 interface OAuthClientUpdateBody {
     name?: unknown;
@@ -67,26 +63,8 @@ export default defineEventHandler(async (event) => {
                     String(item ?? '').trim()
                 )
             };
-            ensure(
-                !input.requestedScopes.some((scope) =>
-                    hasScope([scope], API_SCOPES.notifications.send)
-                ),
-                403,
-                'forbidden_scope',
-                '该权限只能由管理员在后台启用'
-            );
 
-            const client = updateOauthClientByOwner(
-                clientId,
-                identity.id,
-                input
-            );
-            ensure(client, 404, 'not_found', 'OAuth 客户端不存在');
-
-            const response: OAuthClientMutationResponse = {
-                client
-            };
-            return response;
+            return patchOauthClient(identity.id, clientId, input);
         }
     );
 });

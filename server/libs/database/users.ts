@@ -17,7 +17,9 @@ function ensureUsersSchema(db: Database.Database) {
         '008_createApiKeysTable',
         '009_createApiKeyScopesTable',
         '010_createUserEventSubscriptionsTable',
-        '011_createUserEventSubscriptionsIndexes'
+        '011_createUserEventSubscriptionsIndexes',
+        '012_createUserEventSubscriptionsV2Table',
+        '013_createUserEventSubscriptionsV2Indexes'
     ];
     const executedKeys = new Set<string>();
 

@@ -1,6 +1,6 @@
 import { defineEventHandler, getQuery } from 'h3';
 import useConfig from '~/server/config';
-import { readPassiveAlerts } from '~/server/services/adminPassiveAlertStore';
+import { getAdminPassiveAlerts } from '~/server/domain/admin/passiveAlerts';
 import ApiRequestError from '~/server/utils/api/errors/ApiRequestError';
 import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';
@@ -94,7 +94,7 @@ export default defineEventHandler(async (event) => {
                 'date 必须是 YYYYMMDD'
             );
 
-            return readPassiveAlerts({
+            return getAdminPassiveAlerts({
                 date,
                 type: type === 'all' ? '' : type,
                 limit,

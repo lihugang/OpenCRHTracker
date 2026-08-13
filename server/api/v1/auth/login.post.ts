@@ -1,18 +1,10 @@
 import { defineEventHandler, readBody } from 'h3';
-import {
-    assertUserNotBanned,
-    createApiKey,
-    getUserByUsername,
-    updateLastLoginAt,
-    verifyUserPassword
-} from '~/server/services/authStore';
+import { postAuthLogin } from '~/server/domain/auth';
 import ensureAuthRateLimit from '~/server/utils/api/authRateLimit/ensureAuthRateLimit';
 import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';
-import ApiRequestError from '~/server/utils/api/errors/ApiRequestError';
 import { setAuthCookie } from '~/server/utils/auth/authCookie';
 import toPublicAuthSession from '~/server/utils/auth/toPublicAuthSession';
-import { validatePasswordDigest } from '~/utils/auth/credentials';
 
 interface LoginBody {
     username?: string;
@@ -49,29 +41,10 @@ export default defineEventHandler(async (event) => {
                 'passwordDigest 不能为空'
             );
 
-            const passwordDigestError = validatePasswordDigest(
-                body.passwordDigest
-            );
-            if (passwordDigestError) {
-                throw new ApiRequestError(
-                    400,
-                    'invalid_param',
-                    passwordDigestError
-                );
-            }
-
-            const user = getUserByUsername(body.username);
-            if (!user || !verifyUserPassword(user, body.passwordDigest)) {
-                throw new ApiRequestError(
-                    401,
-                    'invalid_credentials',
-                    '用户名或密码错误'
-                );
-            }
-
-            assertUserNotBanned(user.username);
-            updateLastLoginAt(user.username);
-            const session = createApiKey(user.username);
+            const session = postAuthLogin({
+                username: body.username,
+                passwordDigest: body.passwordDigest
+            });
             setAuthCookie(event, session.apiKey);
             return toPublicAuthSession(session);
         }

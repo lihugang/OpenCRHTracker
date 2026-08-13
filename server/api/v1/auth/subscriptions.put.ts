@@ -1,23 +1,12 @@
 import { defineEventHandler, getHeader, readBody } from 'h3';
-import getLogger from '~/server/libs/log4js';
 import useConfig from '~/server/config';
-import {
-    listUserSubscriptions,
-    upsertUserSubscription
-} from '~/server/services/userProfileStore';
-import { sendPushNotificationToSubscription } from '~/server/services/pushNotificationService';
+import { putAuthSubscriptions } from '~/server/domain/auth';
 import getFixedCost from '~/server/utils/api/cost/getFixedCost';
 import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';
 import ensurePayloadStringLength from '~/server/utils/api/payload/ensurePayloadStringLength';
 import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
-import {
-    createSubscriptionListResponse,
-    getSubscriptionNameMaxLength,
-    normalizeSubscriptionName,
-    previewSubscriptionEndpoint
-} from '~/server/utils/auth/subscriptions';
-import { buildDeviceRegistrationSucceededNotification } from '~/server/utils/notifications/templates/deviceRegistrationSucceeded';
+import { getSubscriptionNameMaxLength } from '~/server/utils/auth/subscriptions';
 
 interface PutSubscriptionBody {
     name?: unknown;
@@ -33,16 +22,6 @@ interface PutSubscriptionValue {
 interface PutSubscriptionKeysValue {
     p256dh?: unknown;
     auth?: unknown;
-}
-
-const logger = getLogger('auth-subscriptions-api');
-
-function getErrorMessage(error: unknown) {
-    if (error instanceof Error) {
-        return error.message;
-    }
-
-    return String(error);
 }
 
 export default defineEventHandler(async (event) => {
@@ -146,49 +125,21 @@ export default defineEventHandler(async (event) => {
                 );
             }
 
-            const result = upsertUserSubscription(
+            return putAuthSubscriptions(
                 identity.id,
                 {
-                    name: normalizeSubscriptionName(
-                        typeof body.name === 'string' ? body.name : undefined
-                    ),
-                    endpoint: subscription.endpoint.trim(),
+                    name: typeof body.name === 'string' ? body.name : undefined,
+                    endpoint: subscription.endpoint,
                     expirationTime:
                         typeof subscription.expirationTime === 'number'
                             ? subscription.expirationTime
                             : null,
                     keys: {
-                        p256dh: keys.p256dh.trim(),
-                        auth: keys.auth.trim()
+                        p256dh: keys.p256dh,
+                        auth: keys.auth
                     }
                 },
                 getHeader(event, 'user-agent') ?? ''
-            );
-
-            if (result.action === 'created') {
-                try {
-                    const notificationResult =
-                        await sendPushNotificationToSubscription(
-                            identity.id,
-                            result.item,
-                            buildDeviceRegistrationSucceededNotification()
-                        );
-
-                    if (!notificationResult.delivered) {
-                        logger.warn(
-                            `subscription_registration_notification_failed userId=${identity.id} endpoint=${previewSubscriptionEndpoint(result.item.endpoint)} message=${notificationResult.message}`
-                        );
-                    }
-                } catch (error) {
-                    logger.error(
-                        `subscription_registration_notification_failed_unexpected userId=${identity.id} endpoint=${previewSubscriptionEndpoint(result.item.endpoint)} message=${getErrorMessage(error)}`
-                    );
-                }
-            }
-
-            return createSubscriptionListResponse(
-                identity.id,
-                listUserSubscriptions(identity.id)
             );
         }
     );

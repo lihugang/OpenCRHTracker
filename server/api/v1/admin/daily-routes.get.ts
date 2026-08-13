@@ -1,5 +1,5 @@
 import { defineEventHandler, getQuery } from 'h3';
-import { searchAdminDailyRoutes } from '~/server/services/adminDailyRouteMaintenanceStore';
+import { getAdminDailyRoutes } from '~/server/domain/admin/dailyRoutes';
 import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';
 import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
@@ -39,7 +39,7 @@ export default defineEventHandler(async (event) => {
                 'trainCode 与 emuCode 至少填写一个'
             );
 
-            return searchAdminDailyRoutes(
+            return getAdminDailyRoutes(
                 parseExternalServiceDate(date),
                 trainCode.length > 0 ? parseExternalTrainCode(trainCode) : null,
                 emuCode.length > 0 ? ensureExternalEmuId(emuCode) : null

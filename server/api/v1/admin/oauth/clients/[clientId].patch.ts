@@ -1,10 +1,9 @@
 import { defineEventHandler, getRouterParam, readBody } from 'h3';
-import { updateOauthClientAdmin } from '~/server/services/oauthStore';
+import { patchAdminOauthClient } from '~/server/domain/admin/oauth';
 import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';
 import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
 import type {
-    OAuthClientMutationResponse,
     OAuthClientScopeReviewStatus,
     OAuthClientStatus
 } from '~/types/auth';
@@ -46,57 +45,54 @@ export default defineEventHandler(async (event) => {
                 'scopeReviews 必须为数组'
             );
 
-            const client = updateOauthClientAdmin(clientId, {
-                status: body.status as OAuthClientStatus,
-                isTrusted: body.isTrusted,
-                adminGrants:
-                    typeof body.adminGrants === 'object' &&
-                    body.adminGrants !== null &&
-                    !Array.isArray(body.adminGrants)
-                        ? {
-                              notificationSend:
-                                  typeof (
-                                      body.adminGrants as Record<
-                                          string,
-                                          unknown
-                                      >
-                                  ).notificationSend === 'boolean'
-                                      ? Boolean(
-                                            (
-                                                body.adminGrants as Record<
-                                                    string,
-                                                    unknown
-                                                >
-                                            ).notificationSend
-                                        )
-                                      : undefined
-                          }
-                        : undefined,
-                scopeReviews: body.scopeReviews.map((item) => {
-                    const row = item as Record<string, unknown>;
-                    const reviewStatus = row.reviewStatus;
-                    ensure(
-                        reviewStatus === 'pending' ||
-                            reviewStatus === 'approved' ||
-                            reviewStatus === 'rejected',
-                        400,
-                        'invalid_param',
-                        'reviewStatus 无效'
-                    );
-                    return {
-                        scope: String(row.scope ?? ''),
-                        reviewStatus:
-                            reviewStatus as OAuthClientScopeReviewStatus
-                    };
-                }),
-                reviewedBy: identity.id
-            });
-            ensure(client, 404, 'not_found', 'OAuth 客户端不存在');
-
-            const response: OAuthClientMutationResponse = {
-                client
-            };
-            return response;
+            return patchAdminOauthClient(
+                clientId,
+                {
+                    status: body.status as OAuthClientStatus,
+                    isTrusted: body.isTrusted,
+                    adminGrants:
+                        typeof body.adminGrants === 'object' &&
+                        body.adminGrants !== null &&
+                        !Array.isArray(body.adminGrants)
+                            ? {
+                                  notificationSend:
+                                      typeof (
+                                          body.adminGrants as Record<
+                                              string,
+                                              unknown
+                                          >
+                                      ).notificationSend === 'boolean'
+                                          ? Boolean(
+                                                (
+                                                    body.adminGrants as Record<
+                                                        string,
+                                                        unknown
+                                                    >
+                                                ).notificationSend
+                                            )
+                                          : undefined
+                              }
+                            : undefined,
+                    scopeReviews: body.scopeReviews.map((item) => {
+                        const row = item as Record<string, unknown>;
+                        const reviewStatus = row.reviewStatus;
+                        ensure(
+                            reviewStatus === 'pending' ||
+                                reviewStatus === 'approved' ||
+                                reviewStatus === 'rejected',
+                            400,
+                            'invalid_param',
+                            'reviewStatus 无效'
+                        );
+                        return {
+                            scope: String(row.scope ?? ''),
+                            reviewStatus:
+                                reviewStatus as OAuthClientScopeReviewStatus
+                        };
+                    })
+                },
+                identity.id
+            );
         }
     );
 });

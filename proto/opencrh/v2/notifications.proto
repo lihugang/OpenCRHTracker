@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package opencrh.v2;
+
+import "opencrh/v2/common.proto";
+
+message PostNotificationsSendRequest {
+  string title = 1;
+  string body = 2;
+  string url = 3;
+  string tag = 4;
+}
+
+message PostNotificationsSendData {
+  uint32 delivered_count = 1;
+  uint32 removed_endpoint_count = 2;
+  bool has_subscriptions = 3;
+}
+
+message PostNotificationsSendResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    PostNotificationsSendData data = 2;
+    ApiError error = 3;
+  }
+}

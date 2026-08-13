@@ -1,10 +1,9 @@
 import { defineEventHandler, getQuery } from 'h3';
-import { listMembershipCodes } from '~/server/services/membershipCodeStore';
+import { getAdminMembershipCodes } from '~/server/domain/admin/membershipCodes';
 import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';
 import parseLimit from '~/server/utils/api/query/parseLimit';
 import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
-import type { AdminMembershipCodeStatus } from '~/types/admin';
 
 function parseQueryString(value: unknown, field: string) {
     ensure(
@@ -32,10 +31,10 @@ export default defineEventHandler(async (event) => {
                 'status 必须为 used、unused 或留空'
             );
 
-            return listMembershipCodes({
+            return getAdminMembershipCodes({
                 groupId: parseQueryString(query.groupId, 'groupId'),
                 batchId: parseQueryString(query.batchId, 'batchId'),
-                status: status as AdminMembershipCodeStatus | '',
+                status,
                 cursor: parseQueryString(query.cursor, 'cursor'),
                 limit: parseLimit(event)
             });

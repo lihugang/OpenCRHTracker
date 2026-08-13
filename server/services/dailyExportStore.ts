@@ -7,13 +7,20 @@ import {
     formatExternalEmuCode,
     formatExternalTrainCode
 } from '~/server/utils/internal/boundaries';
+import {
+    getShanghaiDayBucket,
+    getShanghaiDayOffsetSeconds
+} from '~/server/utils/date/shanghaiDateTime';
+import {
+    dayToServiceDate,
+    serviceDateToDay,
+    type ServiceDay
+} from '~/server/utils/date/serviceDay';
 
-export const DAILY_EXPORT_FORMATS = ['csv', 'jsonl'] as const;
 const UTF8_BOM = '\uFEFF';
 
-export type DailyExportFormat = (typeof DAILY_EXPORT_FORMATS)[number];
-
 export interface DailyExportRecord {
+    id: number;
     trainCode: string;
     emuCode: string;
     startStation: string;
@@ -22,15 +29,13 @@ export interface DailyExportRecord {
     endAt: number;
 }
 
-export interface DailyExportFiles {
-    csvFilePath: string;
-    jsonlFilePath: string;
+export interface DailyExportFileResult {
+    filePath: string;
     total: number;
 }
 
 export interface DailyExportIndexItem {
-    date: string;
-    formats: DailyExportFormat[];
+    serviceDay: ServiceDay;
 }
 
 export interface DailyExportIndex {
@@ -43,6 +48,7 @@ export interface DailyExportIndex {
 
 function toDailyExportRecord(row: DailyEmuRouteRow): DailyExportRecord {
     return {
+        id: row.id,
         trainCode: formatExternalTrainCode(row.train_code),
         emuCode: formatExternalEmuCode(row.emu_id),
         startStation: row.start_station_name,
@@ -61,72 +67,124 @@ function toCsvCell(value: string | number): string {
     return `"${text.replace(/"/g, '""')}"`;
 }
 
+function toHhMm(offsetSeconds: number): string {
+    const totalMinutes = Math.floor(offsetSeconds / 60);
+    const hour = Math.floor(totalMinutes / 60);
+    const minute = totalMinutes % 60;
+    return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+}
+
+function isPositiveInteger(value: number) {
+    return Number.isInteger(value) && value > 0;
+}
+
+function warnInvalidEndAt(row: DailyExportRecord) {
+    console.warn(
+        `v2 export invalid endAt recordId=${row.id} trainCode=${row.trainCode} emuCode=${row.emuCode} recordStartAt=${row.startAt} recordEndAt=${row.endAt}`
+    );
+}
+
+function formatExportTime(
+    timestampSeconds: number,
+    departureDayBucket: number
+) {
+    const dayBucket = getShanghaiDayBucket(timestampSeconds);
+    const dayOffset = dayBucket - departureDayBucket;
+    const timeText = toHhMm(getShanghaiDayOffsetSeconds(timestampSeconds));
+    return dayOffset === 0 ? timeText : `${timeText}+${dayOffset}`;
+}
+
 function serializeCsv(records: readonly DailyExportRecord[]): string {
+    const sorted = [...records].sort(compareExportRecords);
+    const rows = sorted.map((row) => {
+        const departureDayBucket = isPositiveInteger(row.startAt)
+            ? getShanghaiDayBucket(row.startAt)
+            : null;
+        const startTime =
+            departureDayBucket === null
+                ? ''
+                : formatExportTime(row.startAt, departureDayBucket);
+        let endTime = '';
+        if (
+            departureDayBucket !== null &&
+            isPositiveInteger(row.endAt) &&
+            row.endAt >= row.startAt
+        ) {
+            endTime = formatExportTime(row.endAt, departureDayBucket);
+        } else if (departureDayBucket !== null) {
+            warnInvalidEndAt(row);
+        }
+
+        return [
+            toCsvCell(row.trainCode),
+            toCsvCell(row.emuCode),
+            toCsvCell(row.startStation),
+            toCsvCell(row.endStation),
+            toCsvCell(startTime),
+            toCsvCell(endTime)
+        ].join(',');
+    });
+
     return (
         UTF8_BOM +
         [
-            'trainCode,emuCode,startStation,endStation,startAt,endAt',
-            ...records.map((row) =>
-                [
-                    toCsvCell(row.trainCode),
-                    toCsvCell(row.emuCode),
-                    toCsvCell(row.startStation),
-                    toCsvCell(row.endStation),
-                    toCsvCell(row.startAt),
-                    toCsvCell(row.endAt)
-                ].join(',')
-            )
+            'trainCode,emuCode,startStation,endStation,startTime,endTime',
+            ...rows
         ].join('\n')
     );
 }
 
-function serializeJsonl(records: readonly DailyExportRecord[]): string {
-    return records.map((row) => JSON.stringify(row)).join('\n');
+function compareExportRecords(
+    left: DailyExportRecord,
+    right: DailyExportRecord
+) {
+    const leftStartAt =
+        left.startAt > 0 ? left.startAt : Number.MAX_SAFE_INTEGER;
+    const rightStartAt =
+        right.startAt > 0 ? right.startAt : Number.MAX_SAFE_INTEGER;
+
+    if (leftStartAt !== rightStartAt) {
+        return leftStartAt - rightStartAt;
+    }
+
+    const trainCodeCompare = left.trainCode.localeCompare(right.trainCode);
+    if (trainCodeCompare !== 0) {
+        return trainCodeCompare;
+    }
+
+    const emuCodeCompare = left.emuCode.localeCompare(right.emuCode);
+    if (emuCodeCompare !== 0) {
+        return emuCodeCompare;
+    }
+
+    return left.id - right.id;
 }
 
-export function getDailyExportFilePath(
-    date: string,
-    format: DailyExportFormat
-): string {
-    return path.resolve('data/exports', `${date}.${format}`);
+export function getDailyExportFilePath(date: string): string {
+    return path.resolve('data/exports', `${date}.csv`);
 }
 
-export function getDailyExportFileName(
-    date: string,
-    format: DailyExportFormat
-): string {
-    return `${date}.${format}`;
+export function getDailyExportFileName(date: string): string {
+    return `${date}.csv`;
 }
 
-export function getDailyExportContentType(format: DailyExportFormat): string {
-    return format === 'csv'
-        ? 'text/csv; charset=utf-8'
-        : 'application/x-ndjson; charset=utf-8';
-}
-
-export function writeDailyExportFiles(
+export function writeDailyExportFile(
     date: string,
     rows: readonly DailyEmuRouteRow[]
-): DailyExportFiles {
+): DailyExportFileResult {
     const records = rows.map(toDailyExportRecord);
-    const csvFilePath = getDailyExportFilePath(date, 'csv');
-    const jsonlFilePath = getDailyExportFilePath(date, 'jsonl');
+    const filePath = getDailyExportFilePath(date);
 
-    writeTextFileAtomically(csvFilePath, serializeCsv(records));
-    writeTextFileAtomically(jsonlFilePath, serializeJsonl(records));
+    writeTextFileAtomically(filePath, serializeCsv(records));
 
     return {
-        csvFilePath,
-        jsonlFilePath,
+        filePath,
         total: records.length
     };
 }
 
-export function readDailyExportText(
-    date: string,
-    format: DailyExportFormat
-): string | null {
-    const filePath = getDailyExportFilePath(date, format);
+export function readDailyExportText(date: string): string | null {
+    const filePath = getDailyExportFilePath(date);
     if (!fs.existsSync(filePath)) {
         return null;
     }
@@ -134,17 +192,7 @@ export function readDailyExportText(
     return fs.readFileSync(filePath, 'utf8');
 }
 
-export function countDailyExportItems(
-    format: DailyExportFormat,
-    content: string
-): number {
-    if (format === 'jsonl') {
-        return content
-            .split(/\r?\n/)
-            .map((line) => line.trim())
-            .filter((line) => line.length > 0).length;
-    }
-
+export function countDailyExportItems(content: string): number {
     const lines = content
         .split(/\r?\n/)
         .map((line) => line.trimEnd())
@@ -157,19 +205,9 @@ export function countDailyExportItems(
     return Math.max(0, lines.length - 1);
 }
 
-function parseDailyExportFileName(fileName: string): {
-    date: string;
-    format: DailyExportFormat;
-} | null {
-    const match = /^(\d{8})\.(csv|jsonl)$/.exec(fileName);
-    if (!match) {
-        return null;
-    }
-
-    return {
-        date: match[1]!,
-        format: match[2]! as DailyExportFormat
-    };
+function parseDailyExportFileName(fileName: string): string | null {
+    const match = /^(\d{8})\.csv$/.exec(fileName);
+    return match ? match[1]! : null;
 }
 
 function getCurrentShanghaiYearMonth() {
@@ -227,7 +265,7 @@ export function listDailyExportIndex(
         };
     }
 
-    const formatsByDate = new Map<string, Set<DailyExportFormat>>();
+    const dates = new Set<string>();
     const monthsByYear = new Map<number, Set<number>>();
 
     for (const entry of fs.readdirSync(exportsDirectory, {
@@ -237,18 +275,14 @@ export function listDailyExportIndex(
             continue;
         }
 
-        const parsed = parseDailyExportFileName(entry.name);
-        if (!parsed) {
+        const date = parseDailyExportFileName(entry.name);
+        if (!date) {
             continue;
         }
 
-        const year = Number.parseInt(parsed.date.slice(0, 4), 10);
-        const month = Number.parseInt(parsed.date.slice(4, 6), 10);
-        const formats = formatsByDate.get(parsed.date) ?? new Set();
-
-        formats.add(parsed.format);
-        formatsByDate.set(parsed.date, formats);
-
+        dates.add(date);
+        const year = Number.parseInt(date.slice(0, 4), 10);
+        const month = Number.parseInt(date.slice(4, 6), 10);
         const months = monthsByYear.get(year) ?? new Set<number>();
         months.add(month);
         monthsByYear.set(year, months);
@@ -276,19 +310,16 @@ export function listDailyExportIndex(
     );
     const selectedMonth = pickNearestValue(requestedMonth, monthsForYear);
 
-    const items = [...formatsByDate.entries()]
-        .filter(([date]) => {
+    const items = [...dates]
+        .filter((date) => {
             return (
                 Number.parseInt(date.slice(0, 4), 10) === selectedYear &&
                 Number.parseInt(date.slice(4, 6), 10) === selectedMonth
             );
         })
-        .sort(([leftDate], [rightDate]) => rightDate.localeCompare(leftDate))
-        .map(([date, formats]) => ({
-            date,
-            formats: DAILY_EXPORT_FORMATS.filter((format) =>
-                formats.has(format)
-            )
+        .sort((left, right) => right.localeCompare(left))
+        .map((date) => ({
+            serviceDay: serviceDateToDay(date)
         }));
 
     return {
@@ -298,4 +329,8 @@ export function listDailyExportIndex(
         availableMonths: monthsForYear,
         items
     };
+}
+
+export function dayToExportDate(serviceDay: ServiceDay): string {
+    return dayToServiceDate(serviceDay);
 }

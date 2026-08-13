@@ -1,5 +1,5 @@
 import { defineEventHandler, readBody } from 'h3';
-import { runAdminConfigFileAction } from '~/server/services/adminConfigFileStore';
+import { postAdminConfigFiles } from '~/server/domain/admin/configFiles';
 import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';
 import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
@@ -14,7 +14,6 @@ function asPlainObject(value: unknown): Record<string, unknown> | null {
     if (typeof value !== 'object' || value === null || Array.isArray(value)) {
         return null;
     }
-
     return value as Record<string, unknown>;
 }
 
@@ -65,10 +64,7 @@ export default defineEventHandler(async (event) => {
                 '请求体必须是 JSON 对象'
             );
 
-            return await runAdminConfigFileAction(
-                parseRequestBody(body),
-                identity.id
-            );
+            return postAdminConfigFiles(parseRequestBody(body), identity.id);
         }
     );
 });

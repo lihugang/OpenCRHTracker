@@ -1,9 +1,8 @@
 import { defineEventHandler, getRouterParam, readBody, setHeader } from 'h3';
-import { updateAdminConfigFileDocument } from '~/server/services/adminConfigFileStore';
+import { putAdminConfigFile } from '~/server/domain/admin/configFiles';
 import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';
 import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
-import type { AdminRuntimeConfigUpdateRequest } from '~/types/admin';
 
 interface AdminConfigFileUpdateBody {
     content?: unknown;
@@ -45,13 +44,12 @@ export default defineEventHandler(async (event) => {
                 'expectedRevision 必须为有效的 SHA-256 revision'
             );
 
-            const request: AdminRuntimeConfigUpdateRequest = {
-                content: body.content,
-                expectedRevision: body.expectedRevision
-            };
-            return await updateAdminConfigFileDocument(
+            return putAdminConfigFile(
                 target,
-                request,
+                {
+                    content: body.content,
+                    expectedRevision: body.expectedRevision
+                },
                 identity.id
             );
         }

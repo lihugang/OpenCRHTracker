@@ -1,14 +1,13 @@
 import { defineEventHandler, getQuery, getRouterParam, setHeader } from 'h3';
 import useConfig from '~/server/config';
+import { getTrainCirculationImage } from '~/server/domain/timetable';
 import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';
 import setCacheControl from '~/server/utils/api/response/setCacheControl';
 import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
 import {
-    renderTrainCirculationImage,
     toTrainCirculationImageData,
-    type TrainCirculationImageFormat,
-    type TrainCirculationImageRenderResult
+    type TrainCirculationImageFormat
 } from '~/server/services/trainCirculationImageService';
 import { parseExternalTrainCodeOrThrow } from '~/server/utils/internal/boundaries';
 import type { TrainCodeParts } from '~/server/utils/12306/trainCode';
@@ -74,7 +73,7 @@ export default defineEventHandler(async (event) => {
             successHeaders: (successEvent) =>
                 setCacheControl(successEvent, cacheMaxAge)
         },
-        async (): Promise<TrainCirculationImageRenderResult> => {
+        async () => {
             const trainCode = getRouterParam(event, 'trainCode');
             const query = getQuery(event);
 
@@ -108,8 +107,8 @@ export default defineEventHandler(async (event) => {
                 ensure(false, 400, 'invalid_param', 'trainCode 非法');
             }
 
-            return renderTrainCirculationImage(
-                parsedTrainCode,
+            return getTrainCirculationImage(
+                parsedTrainCode!,
                 binaryRequested,
                 format
             );

@@ -1,7 +1,7 @@
 import { defineEventHandler } from 'h3';
+import { getHealth } from '~/server/domain/system';
 import getFixedCost from '~/server/utils/api/cost/getFixedCost';
 import executeApi from '~/server/utils/api/executor/executeApi';
-import getNowSeconds from '~/server/utils/time/getNowSeconds';
 
 export default defineEventHandler(async (event) => {
     return executeApi(
@@ -10,11 +10,6 @@ export default defineEventHandler(async (event) => {
             cors: true,
             fixedCost: getFixedCost('health')
         },
-        async () => {
-            return {
-                status: 'ok',
-                timestamp: getNowSeconds()
-            };
-        }
+        async () => getHealth()
     );
 });

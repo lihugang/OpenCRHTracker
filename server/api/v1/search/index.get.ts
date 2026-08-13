@@ -1,6 +1,6 @@
 import { defineEventHandler } from 'h3';
 import useConfig from '~/server/config';
-import { getLookupIndex } from '~/server/services/lookupIndexStore';
+import { getSearchIndex } from '~/server/domain/search';
 import getFixedCost from '~/server/utils/api/cost/getFixedCost';
 import executeApi from '~/server/utils/api/executor/executeApi';
 import setCacheControl from '~/server/utils/api/response/setCacheControl';
@@ -17,10 +17,6 @@ export default defineEventHandler(async (event) => {
             successHeaders: (successEvent) =>
                 setCacheControl(successEvent, cacheMaxAge)
         },
-        async () => {
-            return {
-                items: getLookupIndex()
-            };
-        }
+        async () => getSearchIndex()
     );
 });

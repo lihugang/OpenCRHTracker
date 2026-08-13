@@ -1,5 +1,5 @@
 import { defineEventHandler, getQuery } from 'h3';
-import { listAdminTimetableHistoryMergeCandidates } from '~/server/services/adminTimetableHistoryMaintenanceStore';
+import { getAdminTimetableHistoryMergeCandidates } from '~/server/domain/admin/timetableHistory';
 import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';
 import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
@@ -25,7 +25,7 @@ export default defineEventHandler(async (event) => {
                 'trainCode 不能为空'
             );
 
-            return listAdminTimetableHistoryMergeCandidates(
+            return getAdminTimetableHistoryMergeCandidates(
                 parseExternalTrainCodeOrThrow(trainCode, 'trainCode')
             );
         }

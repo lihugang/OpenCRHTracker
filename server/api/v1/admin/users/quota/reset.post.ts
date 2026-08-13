@@ -1,12 +1,8 @@
 import { defineEventHandler, readBody } from 'h3';
-import { resetAdminUserQuota } from '~/server/services/adminUserStore';
+import { postAdminUsersQuotaReset } from '~/server/domain/admin/users';
 import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';
 import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
-import type {
-    AdminResetUserQuotaRequest,
-    AdminResetUserQuotaResponse
-} from '~/types/admin';
 
 interface AdminResetUserQuotaBody {
     userId?: unknown;
@@ -35,13 +31,7 @@ export default defineEventHandler(async (event) => {
                 typeof body.userId === 'string' ? body.userId.trim() : '';
             ensure(userId.length > 0, 400, 'invalid_param', 'userId 不能为空');
 
-            const request: AdminResetUserQuotaRequest = {
-                userId
-            };
-            const response: AdminResetUserQuotaResponse =
-                resetAdminUserQuota(request);
-
-            return response;
+            return postAdminUsersQuotaReset(userId);
         }
     );
 });

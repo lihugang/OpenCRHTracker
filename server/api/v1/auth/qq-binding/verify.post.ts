@@ -1,5 +1,5 @@
 import { defineEventHandler, readBody } from 'h3';
-import { verifyQqBinding } from '~/server/services/qqBindingService';
+import { postAuthVerifyQqBinding } from '~/server/domain/auth';
 import getFixedCost from '~/server/utils/api/cost/getFixedCost';
 import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';
@@ -33,7 +33,11 @@ export default defineEventHandler(async (event) =>
                 'qqNumber 和 code 不能为空'
             );
 
-            return verifyQqBinding(identity.id, body.qqNumber, body.code);
+            return postAuthVerifyQqBinding(
+                identity.id,
+                body.qqNumber,
+                body.code
+            );
         }
     )
 );

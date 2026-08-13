@@ -1,5 +1,5 @@
 import { defineEventHandler, getQuery } from 'h3';
-import { searchAdminOfficialCirculations } from '~/server/services/adminOfficialCirculationStore';
+import { getAdminOfficialCirculations } from '~/server/domain/admin/officialCirculations';
 import ensurePayloadStringLength from '~/server/utils/api/payload/ensurePayloadStringLength';
 import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';
@@ -25,7 +25,7 @@ export default defineEventHandler(async (event) => {
             );
             ensurePayloadStringLength(keyword, 'keyword', 64);
 
-            return searchAdminOfficialCirculations(keyword);
+            return getAdminOfficialCirculations(keyword);
         }
     );
 });

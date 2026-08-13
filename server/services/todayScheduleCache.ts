@@ -244,6 +244,10 @@ export function getTodayScheduleCache(): Map<string, TodayScheduleRoute> {
     return rebuildCache().routesByTrainCode;
 }
 
+export function getTodayScheduleServiceDay(): ServiceDay {
+    return getActiveCache().date;
+}
+
 export function getTodayScheduleProbeGroups(): Map<
     string,
     TodayScheduleProbeGroup

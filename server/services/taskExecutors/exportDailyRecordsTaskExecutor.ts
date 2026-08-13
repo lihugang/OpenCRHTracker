@@ -1,6 +1,6 @@
 import getLogger from '~/server/libs/log4js';
 import useConfig from '~/server/config';
-import { writeDailyExportFiles } from '~/server/services/dailyExportStore';
+import { writeDailyExportFile } from '~/server/services/dailyExportStore';
 import { listDailyRecordsAll } from '~/server/services/emuRoutesStore';
 import {
     parseEmptyTaskArgs,
@@ -51,9 +51,9 @@ function exportDailyRecordsForDate(serviceDate: ServiceDay) {
     const date = formatExternalServiceDate(serviceDate);
     const dayRange = getDayTimestampRange(date);
     const rows = listDailyRecordsAll(dayRange.startAt, dayRange.endAt);
-    const result = writeDailyExportFiles(date, rows);
+    const result = writeDailyExportFile(date, rows);
     logger.info(
-        `export_succeeded date=${date} total=${result.total} csvFilePath=${result.csvFilePath} jsonlFilePath=${result.jsonlFilePath}`
+        `export_succeeded date=${date} total=${result.total} filePath=${result.filePath}`
     );
     return result;
 }

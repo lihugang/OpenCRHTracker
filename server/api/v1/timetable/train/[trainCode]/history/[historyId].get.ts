@@ -1,10 +1,9 @@
 import { defineEventHandler, getRouterParam, setHeader } from 'h3';
-import { getHistoricalTimetableContent } from '~/server/services/historicalTimetableResolver';
+import { getTrainTimetableHistoryDetail } from '~/server/domain/timetable';
 import getFixedCost from '~/server/utils/api/cost/getFixedCost';
 import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';
 import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
-import type { HistoricalTimetableData } from '~/types/lookup';
 import { formatExternalTrainCode } from '~/server/utils/internal/boundaries';
 
 const IMMUTABLE_CACHE_SECONDS = 365 * 24 * 60 * 60;
@@ -49,12 +48,11 @@ export default defineEventHandler(async (event) => {
                 'historyId 必须是正整数'
             );
 
-            const timetable = getHistoricalTimetableContent(historyId);
-            ensure(timetable !== null, 404, 'not_found', '历史时刻表不存在');
+            const timetable = getTrainTimetableHistoryDetail(historyId);
 
             setHeader(event, 'ETag', `"history-timetable-${historyId}"`);
 
-            const response: HistoricalTimetableData = {
+            return {
                 historyId,
                 startStation: timetable.startStation,
                 endStation: timetable.endStation,
@@ -72,8 +70,6 @@ export default defineEventHandler(async (event) => {
                     isEnd: stop.isEnd
                 }))
             };
-
-            return response;
         }
     );
 });

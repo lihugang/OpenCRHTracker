@@ -1,5 +1,5 @@
 import { defineEventHandler, readBody } from 'h3';
-import { redeemMembershipCode } from '~/server/services/membershipCodeStore';
+import { postAuthRedeemMembership } from '~/server/domain/auth';
 import getFixedCost from '~/server/utils/api/cost/getFixedCost';
 import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';
@@ -37,7 +37,7 @@ export default defineEventHandler(async (event) => {
                 'code 必须是有效的兑换码字符串'
             );
 
-            return redeemMembershipCode(body.code, identity.id);
+            return postAuthRedeemMembership(identity.id, body.code);
         }
     );
 });

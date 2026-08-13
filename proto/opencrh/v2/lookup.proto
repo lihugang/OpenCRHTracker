@@ -1,0 +1,303 @@
+syntax = "proto3";
+
+package opencrh.v2;
+
+import "opencrh/v2/common.proto";
+import "opencrh/v2/identifiers.proto";
+import "opencrh/v2/mappings.proto";
+
+// Allocation, search index, current timetable, and station timetable.
+
+message GetEmuAllocationRequest {}
+
+message EmuAllocationCoachLayout {
+  uint32 coach_no = 1;
+  string coach_type_code = 2;
+  string coach_type_name = 3;
+  uint32 capacity = 4;
+  bool has_power = 5;
+  bool has_pantograph = 6;
+  bool has_large_luggage_area = 7;
+  bool has_accessible_facility = 8;
+}
+
+message GetEmuAllocationData {
+  uint32 emu_id = 1;
+  map<uint32, string> emu_code_mappings = 2;
+  string model = 3;
+  string train_set_no = 4;
+  string bureau = 5;
+  string train_depot = 6;
+  string depot = 7;
+  string sub_model = 8;
+  string custom_type = 9;
+  string trainset_manufacturer = 10;
+  string trailer_manufacturer = 11;
+  string manufacture_month = 12;
+  uint32 design_max_speed = 13;
+  uint32 operating_max_speed = 14;
+  bool is_public = 15;
+  bool railway_travel_code_enabled = 16;
+  bool first_class_power_legrest = 17;
+  string toilet_status = 18;
+  string socket_location = 19;
+  string business_seat_type = 20;
+  string model_remark = 21;
+  string note = 22;
+  repeated string tags = 23;
+  repeated string alias = 24;
+  repeated EmuAllocationCoachLayout coach_layouts = 25;
+}
+
+message GetEmuAllocationResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    GetEmuAllocationData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message GetSearchIndexRequest {}
+
+message LookupSuggestItem {
+  string type = 1;
+  string code = 2;
+  string subtitle = 3;
+  repeated string tags = 4;
+}
+
+message GetSearchIndexData {
+  repeated LookupSuggestItem items = 1;
+}
+
+message GetSearchIndexResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    GetSearchIndexData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message ReferenceModelItem {
+  string model = 1;
+  double weighted_share = 2;
+}
+
+message CurrentTrainTimetableStop {
+  uint32 station_no = 1;
+  string station_name = 2;
+  optional int64 arrive_at = 3;
+  optional int64 depart_at = 4;
+  TrainCode station_train_code = 5;
+  string wicket = 6;
+  optional double distance = 7;
+  optional uint32 platform_no = 8;
+  bool is_start = 9;
+  bool is_end = 10;
+}
+
+message TrainCirculationNode {
+  string internal_code = 1;
+  repeated TrainCode all_codes = 2;
+  string start_station = 3;
+  string end_station = 4;
+  int64 start_at = 5;
+  int64 end_at = 6;
+}
+
+message InferredTrainCirculationMetadata {
+  string route_id = 1;
+  int64 window_start = 2;
+  int64 window_end = 3;
+  double threshold = 4;
+  optional double lowest_link_weight = 5;
+  optional uint32 lowest_link_support_count = 6;
+  bool contains_loop_break = 7;
+}
+
+message InferredTrainCirculationReference {
+  optional int64 refresh_at = 1;
+  repeated TrainCirculationNode nodes = 2;
+  InferredTrainCirculationMetadata metadata = 3;
+}
+
+enum CirculationValidationState {
+  CIRCULATION_VALIDATION_STATE_UNSPECIFIED = 0;
+  CIRCULATION_VALIDATION_STATE_RAW_OFFICIAL = 1;
+  CIRCULATION_VALIDATION_STATE_SPLIT_OFFICIAL = 2;
+  CIRCULATION_VALIDATION_STATE_UNMATCHED_OFFICIAL = 3;
+}
+
+message TrainCirculationMetadata {
+  optional string route_id = 1;
+  optional int64 window_start = 2;
+  optional int64 window_end = 3;
+  optional double threshold = 4;
+  optional double lowest_link_weight = 5;
+  optional uint32 lowest_link_support_count = 6;
+  optional bool contains_loop_break = 7;
+  optional CirculationValidationState validation_state = 8;
+  optional string original_official_entry_key = 9;
+  optional uint32 split_segment_index = 10;
+  optional uint32 split_segment_count = 11;
+  optional string matched_inferred_route_id = 12;
+  optional InferredTrainCirculationReference candidate_inferred_circulation = 13;
+}
+
+enum TrainCirculationSource {
+  TRAIN_CIRCULATION_SOURCE_UNSPECIFIED = 0;
+  TRAIN_CIRCULATION_SOURCE_OFFICIAL = 1;
+  TRAIN_CIRCULATION_SOURCE_INFERRED = 2;
+}
+
+message TrainCirculation {
+  TrainCirculationSource source = 1;
+  optional int64 refresh_at = 2;
+  repeated TrainCirculationNode nodes = 3;
+  optional TrainCirculationMetadata metadata = 4;
+}
+
+message GetCurrentTrainTimetableRequest {}
+
+message GetCurrentTrainTimetableData {
+  optional int64 updated_at = 1;
+  TrainCode request_train_code = 2;
+  TrainCode train_code = 3;
+  string internal_code = 4;
+  repeated TrainCode all_codes = 5;
+  string bureau_code = 6;
+  string bureau_name = 7;
+  string train_department = 8;
+  string passenger_department = 9;
+  repeated ReferenceModelItem reference_models = 10;
+  string start_station = 11;
+  string end_station = 12;
+  int64 start_at = 13;
+  int64 end_at = 14;
+  optional TrainCirculation circulation = 15;
+  repeated CurrentTrainTimetableStop stops = 16;
+}
+
+message GetCurrentTrainTimetableResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    GetCurrentTrainTimetableData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message GetStationTimetableRequest {}
+
+message StationTimetableRecord {
+  TrainCode train_code = 1;
+  repeated TrainCode all_codes = 2;
+  optional int64 arrive_at = 3;
+  optional int64 depart_at = 4;
+  optional uint32 platform_no = 5;
+  string start_station = 6;
+  string end_station = 7;
+  optional int64 updated_at = 8;
+  repeated ReferenceModelItem reference_models = 9;
+}
+
+message GetStationTimetableData {
+  string station_name = 1;
+  string cursor = 2;
+  uint32 limit = 3;
+  string next_cursor = 4;
+  repeated StationTimetableRecord items = 5;
+}
+
+message GetStationTimetableResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    GetStationTimetableData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message GetDailyRecordsRequest {}
+
+message DailyRecordItem {
+  uint32 id = 1;
+  uint32 service_day = 2;
+  optional uint32 timetable_id = 3;
+  uint32 emu_id = 4;
+  TrainCode train_code = 5;
+}
+
+message GetDailyRecordsData {
+  uint32 service_day = 1;
+  string cursor = 2;
+  uint32 limit = 3;
+  string next_cursor = 4;
+  repeated DailyRecordItem items = 5;
+  map<uint32, string> emu_code_mappings = 6;
+  map<uint32, HistoricalTimetable> timetable_mappings = 7;
+}
+
+message GetDailyRecordsResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    GetDailyRecordsData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message GetTrainHistoryRequest {}
+
+message TrainHistoryRecord {
+  uint32 id = 1;
+  uint32 service_day = 2;
+  optional uint32 timetable_id = 3;
+  uint32 emu_id = 4;
+}
+
+message GetTrainHistoryData {
+  TrainCode train_code = 1;
+  optional int64 start = 2;
+  optional int64 end = 3;
+  string cursor = 4;
+  uint32 limit = 5;
+  string next_cursor = 6;
+  repeated TrainHistoryRecord items = 7;
+  map<uint32, string> emu_code_mappings = 8;
+  map<uint32, HistoricalTimetable> timetable_mappings = 9;
+}
+
+message GetTrainHistoryResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    GetTrainHistoryData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message GetEmuHistoryRequest {}
+
+message EmuHistoryRecord {
+  uint32 id = 1;
+  uint32 service_day = 2;
+  optional uint32 timetable_id = 3;
+  TrainCode train_code = 4;
+}
+
+message GetEmuHistoryData {
+  uint32 emu_id = 1;
+  optional int64 start = 2;
+  optional int64 end = 3;
+  string cursor = 4;
+  uint32 limit = 5;
+  string next_cursor = 6;
+  repeated EmuHistoryRecord items = 7;
+  map<uint32, string> emu_code_mappings = 8;
+  map<uint32, HistoricalTimetable> timetable_mappings = 9;
+}
+
+message GetEmuHistoryResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    GetEmuHistoryData data = 2;
+    ApiError error = 3;
+  }
+}

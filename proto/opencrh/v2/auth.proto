@@ -1,0 +1,741 @@
+syntax = "proto3";
+
+package opencrh.v2;
+
+import "opencrh/v2/common.proto";
+import "opencrh/v2/identifiers.proto";
+import "opencrh/v2/oauth.proto";
+
+enum AuthApiKeyIssuer {
+  AUTH_API_KEY_ISSUER_UNSPECIFIED = 0;
+  AUTH_API_KEY_ISSUER_WEBAPP = 1;
+  AUTH_API_KEY_ISSUER_API = 2;
+  AUTH_API_KEY_ISSUER_OAUTH = 3;
+}
+
+message AuthQuotaSummary {
+  uint32 token_limit = 1;
+  uint32 remain = 2;
+  uint32 refill_amount = 3;
+  uint32 refill_interval_seconds = 4;
+  optional int64 next_refill_at = 5;
+}
+
+message AuthApiKeyUsageSummary {
+  uint32 last_1_hour = 1;
+  uint32 last_8_hours = 2;
+  uint32 last_1_day = 3;
+  uint32 bucket_seconds = 4;
+}
+
+message AuthPublicSession {
+  string user_id = 1;
+  string revoke_id = 2;
+  AuthApiKeyIssuer issuer = 3;
+  string masked_api_key = 4;
+  repeated string scopes = 5;
+  int64 active_from = 6;
+  int64 expires_at = 7;
+  uint32 daily_token_limit = 8;
+}
+
+message GetAuthMeRequest {}
+
+message GetAuthMeData {
+  message User {
+    string user_id = 1;
+  }
+  message ApiKey {
+    string revoke_id = 1;
+    AuthApiKeyIssuer issuer = 2;
+    string masked_api_key = 3;
+    int64 active_from = 4;
+    int64 expires_at = 5;
+    uint32 daily_token_limit = 6;
+    repeated string scopes = 7;
+  }
+  User user = 1;
+  ApiKey api_key = 2;
+  AuthQuotaSummary quota = 3;
+}
+
+message GetAuthMeResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    GetAuthMeData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message AuthApiKeyListItem {
+  string name = 1;
+  string revoke_id = 2;
+  string masked_key_id = 3;
+  AuthApiKeyIssuer issuer = 4;
+  optional string oauth_client_id = 5;
+  int64 active_from = 6;
+  optional int64 revoked_at = 7;
+  int64 expires_at = 8;
+  uint32 daily_token_limit = 9;
+  repeated string scopes = 10;
+  bool is_current = 11;
+  optional AuthApiKeyUsageSummary usage = 12;
+}
+
+message AuthApiKeyNameLength {
+  uint32 min_length = 1;
+  uint32 max_length = 2;
+}
+
+message GetAuthApiKeysRequest {}
+
+message GetAuthApiKeysData {
+  string user_id = 1;
+  AuthQuotaSummary quota = 2;
+  repeated AuthApiKeyListItem items = 3;
+  repeated string creatable_scopes = 4;
+  repeated string default_scopes = 5;
+  int64 max_lifetime_seconds = 6;
+  AuthApiKeyNameLength api_key_name_length = 7;
+}
+
+message GetAuthApiKeysResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    GetAuthApiKeysData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message PostAuthApiKeysRequest {
+  string name = 1;
+  optional int64 active_from = 2;
+  optional int64 expires_at = 3;
+  repeated string scopes = 4;
+}
+
+message PostAuthApiKeysData {
+  string user_id = 1;
+  string name = 2;
+  string revoke_id = 3;
+  AuthApiKeyIssuer issuer = 4;
+  optional string oauth_client_id = 5;
+  string api_key = 6;
+  string masked_api_key = 7;
+  int64 active_from = 8;
+  int64 expires_at = 9;
+  repeated string scopes = 10;
+}
+
+message PostAuthApiKeysResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    PostAuthApiKeysData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message DeleteAuthApiKeyRequest {}
+
+message DeleteAuthApiKeyData {
+  string user_id = 1;
+  bool revoked = 2;
+  string revoke_id = 3;
+}
+
+message DeleteAuthApiKeyResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    DeleteAuthApiKeyData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message AuthAuthorizationItem {
+  string client_id = 1;
+  string name = 2;
+  optional string description = 3;
+  optional string homepage_url = 4;
+  string owner_user_id = 5;
+  OAuthClientStatus status = 6;
+  bool is_trusted = 7;
+  repeated string granted_scopes = 8;
+  int64 granted_at = 9;
+  int64 updated_at = 10;
+}
+
+message GetAuthAuthorizationsRequest {}
+
+message GetAuthAuthorizationsData {
+  string user_id = 1;
+  repeated AuthAuthorizationItem items = 2;
+}
+
+message GetAuthAuthorizationsResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    GetAuthAuthorizationsData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message DeleteAuthAuthorizationRequest {}
+
+message DeleteAuthAuthorizationData {
+  string user_id = 1;
+  string client_id = 2;
+  bool revoked = 3;
+}
+
+message DeleteAuthAuthorizationResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    DeleteAuthAuthorizationData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message EventSubscriptionTarget {
+  oneof target {
+    TrainCode train = 1;
+    uint32 emu_id = 2;
+    uint32 topic_id = 3;
+  }
+}
+
+message AuthEventSubscriptionItem {
+  EventSubscriptionTarget target = 1;
+  string label = 2;
+  string path = 3;
+  int64 created_at = 4;
+  int64 updated_at = 5;
+}
+
+message GetAuthEventSubscriptionsData {
+  string user_id = 1;
+  uint32 max_entries = 2;
+  repeated AuthEventSubscriptionItem items = 3;
+  map<uint32, string> emu_code_mappings = 4;
+}
+
+message GetAuthEventSubscriptionsRequest {}
+
+message GetAuthEventSubscriptionsResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    GetAuthEventSubscriptionsData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message PutAuthEventSubscriptionsRequest {
+  EventSubscriptionTarget target = 1;
+}
+
+message PutAuthEventSubscriptionsData {
+  string user_id = 1;
+  uint32 max_entries = 2;
+  repeated AuthEventSubscriptionItem items = 3;
+  map<uint32, string> emu_code_mappings = 4;
+}
+
+message PutAuthEventSubscriptionsResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    PutAuthEventSubscriptionsData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message DeleteAuthEventSubscriptionsRequest {
+  EventSubscriptionTarget target = 1;
+}
+
+message DeleteAuthEventSubscriptionsData {
+  string user_id = 1;
+  uint32 max_entries = 2;
+  repeated AuthEventSubscriptionItem items = 3;
+  map<uint32, string> emu_code_mappings = 4;
+}
+
+message DeleteAuthEventSubscriptionsResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    DeleteAuthEventSubscriptionsData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message FavoriteTarget {
+  oneof target {
+    TrainCode train = 1;
+    uint32 emu_id = 2;
+    string station_name = 3;
+  }
+}
+
+message AuthFavoriteItem {
+  FavoriteTarget target = 1;
+  repeated string tags = 2;
+  int64 starred_at = 3;
+}
+
+message GetAuthFavoritesData {
+  string user_id = 1;
+  uint32 max_entries = 2;
+  repeated AuthFavoriteItem items = 3;
+  map<uint32, string> emu_code_mappings = 4;
+}
+
+message GetAuthFavoritesRequest {}
+
+message GetAuthFavoritesResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    GetAuthFavoritesData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message PutAuthFavoritesRequest {
+  FavoriteTarget target = 1;
+  repeated string tags = 2;
+}
+
+message PutAuthFavoritesData {
+  string user_id = 1;
+  uint32 max_entries = 2;
+  repeated AuthFavoriteItem items = 3;
+  map<uint32, string> emu_code_mappings = 4;
+}
+
+message PutAuthFavoritesResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    PutAuthFavoritesData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message DeleteAuthFavoritesRequest {
+  FavoriteTarget target = 1;
+}
+
+message DeleteAuthFavoritesData {
+  string user_id = 1;
+  uint32 max_entries = 2;
+  repeated AuthFavoriteItem items = 3;
+  map<uint32, string> emu_code_mappings = 4;
+}
+
+message DeleteAuthFavoritesResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    DeleteAuthFavoritesData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message PostAuthLoginRequest {
+  string username = 1;
+  string password_digest = 2;
+}
+
+message PostAuthLoginData {
+  string user_id = 1;
+  string revoke_id = 2;
+  AuthApiKeyIssuer issuer = 3;
+  string masked_api_key = 4;
+  repeated string scopes = 5;
+  int64 active_from = 6;
+  int64 expires_at = 7;
+  uint32 daily_token_limit = 8;
+}
+
+message PostAuthLoginResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    PostAuthLoginData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message PostAuthRegisterRequest {
+  string username = 1;
+  string password_digest = 2;
+}
+
+message PostAuthRegisterData {
+  string user_id = 1;
+  string revoke_id = 2;
+  AuthApiKeyIssuer issuer = 3;
+  string masked_api_key = 4;
+  repeated string scopes = 5;
+  int64 active_from = 6;
+  int64 expires_at = 7;
+  uint32 daily_token_limit = 8;
+}
+
+message PostAuthRegisterResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    PostAuthRegisterData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message PostAuthLogoutRequest {}
+
+message PostAuthLogoutData {
+  bool logged_out = 1;
+  bool revoked = 2;
+  string revoke_id = 3;
+}
+
+message PostAuthLogoutResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    PostAuthLogoutData data = 2;
+    ApiError error = 3;
+  }
+}
+
+enum UserMembershipStatus {
+  USER_MEMBERSHIP_STATUS_UNSPECIFIED = 0;
+  USER_MEMBERSHIP_STATUS_ACTIVE = 1;
+  USER_MEMBERSHIP_STATUS_SCHEDULED = 2;
+  USER_MEMBERSHIP_STATUS_EXPIRED = 3;
+  USER_MEMBERSHIP_STATUS_REVOKED = 4;
+  USER_MEMBERSHIP_STATUS_DISABLED = 5;
+  USER_MEMBERSHIP_STATUS_UNKNOWN = 6;
+}
+
+message SponsorshipQuotaContribution {
+  optional uint32 token_limit = 1;
+  optional uint32 refill_amount = 2;
+}
+
+message SponsorshipPermissionGroupItem {
+  string id = 1;
+  string name = 2;
+  repeated string scopes = 3;
+}
+
+message SponsorshipGroupCatalogItem {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  bool enabled = 4;
+  bool visible = 5;
+  bool assignable = 6;
+  uint32 sort_order = 7;
+  SponsorshipQuotaContribution quota = 8;
+  repeated SponsorshipPermissionGroupItem permission_groups = 9;
+  optional string subscription_url = 10;
+}
+
+message UserMembershipItem {
+  string user_id = 1;
+  string group_id = 2;
+  optional SponsorshipGroupCatalogItem group = 3;
+  UserMembershipStatus status = 4;
+  int64 starts_at = 5;
+  int64 expires_at = 6;
+  string source = 7;
+  string granted_by = 8;
+  optional int64 revoked_at = 9;
+  optional string revoked_by = 10;
+  int64 created_at = 11;
+  int64 updated_at = 12;
+}
+
+message AuthMembershipItem {
+  string group_id = 1;
+  SponsorshipGroupCatalogItem group = 2;
+  UserMembershipStatus status = 3;
+  int64 starts_at = 4;
+  int64 expires_at = 5;
+}
+
+message SponsorshipGroupSummary {
+  string group_id = 1;
+  string name = 2;
+  int64 starts_at = 3;
+  int64 expires_at = 4;
+}
+
+message SponsorshipEffectiveQuota {
+  uint32 token_limit = 1;
+  uint32 refill_amount = 2;
+  uint32 refill_interval_seconds = 3;
+}
+
+message SponsorshipQuotaBreakdownBaseline {
+  uint32 token_limit = 1;
+  uint32 refill_amount = 2;
+}
+
+message SponsorshipQuotaBreakdown {
+  SponsorshipQuotaBreakdownBaseline baseline = 1;
+  SponsorshipQuotaContribution sponsorship = 2;
+}
+
+message GetAuthMembershipsRequest {}
+
+message GetAuthMembershipsData {
+  string user_id = 1;
+  int64 as_of = 2;
+  repeated AuthMembershipItem items = 3;
+  repeated SponsorshipGroupCatalogItem catalog = 4;
+  repeated string account_scopes = 5;
+  SponsorshipEffectiveQuota effective_quota = 6;
+  SponsorshipQuotaBreakdown quota_breakdown = 7;
+}
+
+message GetAuthMembershipsResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    GetAuthMembershipsData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message PostAuthRedeemMembershipRequest {
+  string code = 1;
+}
+
+message PostAuthRedeemMembershipData {
+  string code = 1;
+  int64 redeemed_at = 2;
+  uint32 duration_days = 3;
+  AuthMembershipItem membership = 4;
+  GetAuthMembershipsData memberships = 5;
+}
+
+message PostAuthRedeemMembershipResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    PostAuthRedeemMembershipData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message PatchAuthPasswordRequest {
+  string current_password_digest = 1;
+  string new_password_digest = 2;
+}
+
+message PatchAuthPasswordData {
+  string user_id = 1;
+  string revoke_id = 2;
+  AuthApiKeyIssuer issuer = 3;
+  string masked_api_key = 4;
+  repeated string scopes = 5;
+  int64 active_from = 6;
+  int64 expires_at = 7;
+  uint32 daily_token_limit = 8;
+}
+
+message PatchAuthPasswordResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    PatchAuthPasswordData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message PostAuthSendQqBindingCodeRequest {
+  string qq_number = 1;
+}
+
+message PostAuthSendQqBindingCodeData {
+  int64 expires_at = 1;
+  int64 next_send_at = 2;
+}
+
+message PostAuthSendQqBindingCodeResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    PostAuthSendQqBindingCodeData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message PostAuthUnbindQqBindingRequest {}
+
+message AuthQqBindingStatusData {
+  bool enabled = 1;
+  bool bound = 2;
+  optional string qq_number = 3;
+}
+
+message PostAuthUnbindQqBindingData {
+  bool enabled = 1;
+  bool bound = 2;
+  optional string qq_number = 3;
+}
+
+message PostAuthUnbindQqBindingResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    PostAuthUnbindQqBindingData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message PostAuthVerifyQqBindingRequest {
+  string qq_number = 1;
+  string code = 2;
+}
+
+message PostAuthVerifyQqBindingData {
+  bool enabled = 1;
+  bool bound = 2;
+  optional string qq_number = 3;
+}
+
+message PostAuthVerifyQqBindingResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    PostAuthVerifyQqBindingData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message AuthUserPreference {
+  bool save_search_history = 1;
+}
+
+message GetAuthSettingsRequest {}
+
+message GetAuthSettingsData {
+  string user_id = 1;
+  AuthUserPreference user_preference = 2;
+  AuthQqBindingStatusData qq_binding = 3;
+}
+
+message GetAuthSettingsResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    GetAuthSettingsData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message PatchAuthSettingsRequest {
+  AuthUserPreference user_preference = 1;
+}
+
+message PatchAuthSettingsData {
+  string user_id = 1;
+  AuthUserPreference user_preference = 2;
+  AuthQqBindingStatusData qq_binding = 3;
+}
+
+message PatchAuthSettingsResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    PatchAuthSettingsData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message AuthSubscriptionItem {
+  string id = 1;
+  string name = 2;
+  string endpoint = 3;
+  string endpoint_preview = 4;
+  optional int64 expiration_time = 5;
+  int64 created_at = 6;
+  int64 updated_at = 7;
+  string user_agent = 8;
+}
+
+message GetAuthSubscriptionsData {
+  string user_id = 1;
+  uint32 max_devices = 2;
+  string vapid_public_key = 3;
+  uint32 sync_timeout_seconds = 4;
+  repeated AuthSubscriptionItem items = 5;
+}
+
+message GetAuthSubscriptionsRequest {}
+
+message GetAuthSubscriptionsResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    GetAuthSubscriptionsData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message WebPushSubscriptionKeys {
+  string p256dh = 1;
+  string auth = 2;
+}
+
+message WebPushSubscriptionValue {
+  string endpoint = 1;
+  optional int64 expiration_time = 2;
+  WebPushSubscriptionKeys keys = 3;
+}
+
+message PutAuthSubscriptionsRequest {
+  optional string name = 1;
+  WebPushSubscriptionValue subscription = 2;
+}
+
+message PutAuthSubscriptionsData {
+  string user_id = 1;
+  uint32 max_devices = 2;
+  string vapid_public_key = 3;
+  uint32 sync_timeout_seconds = 4;
+  repeated AuthSubscriptionItem items = 5;
+}
+
+message PutAuthSubscriptionsResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    PutAuthSubscriptionsData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message DeleteAuthSubscriptionRequest {}
+
+message DeleteAuthSubscriptionData {
+  string user_id = 1;
+  uint32 max_devices = 2;
+  string vapid_public_key = 3;
+  uint32 sync_timeout_seconds = 4;
+  repeated AuthSubscriptionItem items = 5;
+}
+
+message DeleteAuthSubscriptionResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    DeleteAuthSubscriptionData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message PatchAuthSubscriptionRequest {
+  string subscription_id = 1;
+  string name = 2;
+}
+
+message PatchAuthSubscriptionData {
+  string user_id = 1;
+  uint32 max_devices = 2;
+  string vapid_public_key = 3;
+  uint32 sync_timeout_seconds = 4;
+  repeated AuthSubscriptionItem items = 5;
+}
+
+message PatchAuthSubscriptionResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    PatchAuthSubscriptionData data = 2;
+    ApiError error = 3;
+  }
+}

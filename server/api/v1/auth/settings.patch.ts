@@ -1,10 +1,8 @@
 import { defineEventHandler, readBody } from 'h3';
-import { updateUserPreference } from '~/server/services/userProfileStore';
-import { getQqBindingStatus } from '~/server/services/qqBindingService';
+import { patchAuthSettings } from '~/server/domain/auth';
 import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';
 import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
-import { createAuthSettingsResponse } from '~/server/utils/auth/settings';
 
 interface PatchAuthSettingsBody {
     userPreference?: {
@@ -45,12 +43,9 @@ export default defineEventHandler(async (event) => {
                 'userPreference.saveSearchHistory 必须是布尔值'
             );
 
-            return createAuthSettingsResponse(
+            return patchAuthSettings(
                 identity.id,
-                updateUserPreference(identity.id, {
-                    saveSearchHistory: body.userPreference.saveSearchHistory
-                }),
-                getQqBindingStatus(identity.id)
+                body.userPreference.saveSearchHistory
             );
         }
     );

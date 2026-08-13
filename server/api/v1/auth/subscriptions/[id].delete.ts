@@ -1,10 +1,9 @@
 import { defineEventHandler, getRouterParam } from 'h3';
-import { removeUserSubscription } from '~/server/services/userProfileStore';
+import { deleteAuthSubscription } from '~/server/domain/auth';
 import getFixedCost from '~/server/utils/api/cost/getFixedCost';
 import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';
 import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
-import { createSubscriptionListResponse } from '~/server/utils/auth/subscriptions';
 
 export default defineEventHandler(async (event) => {
     return executeApi(
@@ -23,10 +22,7 @@ export default defineEventHandler(async (event) => {
                 'id 不能为空'
             );
 
-            return createSubscriptionListResponse(
-                identity.id,
-                removeUserSubscription(identity.id, subscriptionId)
-            );
+            return deleteAuthSubscription(identity.id, subscriptionId);
         }
     );
 });

@@ -1,0 +1,531 @@
+syntax = "proto3";
+
+package opencrh.v2;
+
+import "google/protobuf/struct.proto";
+import "opencrh/v2/common.proto";
+
+enum AdminTrainProvenanceTaskRunStatus {
+  ADMIN_TRAIN_PROVENANCE_TASK_RUN_STATUS_UNSPECIFIED = 0;
+  ADMIN_TRAIN_PROVENANCE_TASK_RUN_STATUS_RUNNING = 1;
+  ADMIN_TRAIN_PROVENANCE_TASK_RUN_STATUS_SUCCESS = 2;
+  ADMIN_TRAIN_PROVENANCE_TASK_RUN_STATUS_FAILED = 3;
+  ADMIN_TRAIN_PROVENANCE_TASK_RUN_STATUS_SKIPPED = 4;
+}
+
+enum AdminTrainProvenanceLatestStatus {
+  ADMIN_TRAIN_PROVENANCE_LATEST_STATUS_UNSPECIFIED = 0;
+  ADMIN_TRAIN_PROVENANCE_LATEST_STATUS_UNKNOWN = 1;
+  ADMIN_TRAIN_PROVENANCE_LATEST_STATUS_PENDING = 2;
+  ADMIN_TRAIN_PROVENANCE_LATEST_STATUS_SINGLE = 3;
+  ADMIN_TRAIN_PROVENANCE_LATEST_STATUS_COUPLED = 4;
+}
+
+enum AdminTrainProvenanceOutcomeStatus {
+  ADMIN_TRAIN_PROVENANCE_OUTCOME_STATUS_UNSPECIFIED = 0;
+  ADMIN_TRAIN_PROVENANCE_OUTCOME_STATUS_SUCCESS = 1;
+  ADMIN_TRAIN_PROVENANCE_OUTCOME_STATUS_PARTIAL = 2;
+  ADMIN_TRAIN_PROVENANCE_OUTCOME_STATUS_FAILED = 3;
+  ADMIN_TRAIN_PROVENANCE_OUTCOME_STATUS_SKIPPED = 4;
+}
+
+enum AdminTrainDataRequestType {
+  ADMIN_TRAIN_DATA_REQUEST_TYPE_UNSPECIFIED = 0;
+  ADMIN_TRAIN_DATA_REQUEST_TYPE_SEARCH_TRAIN_CODE = 1;
+  ADMIN_TRAIN_DATA_REQUEST_TYPE_FETCH_ROUTE_INFO = 2;
+  ADMIN_TRAIN_DATA_REQUEST_TYPE_FETCH_EMU_BY_ROUTE = 3;
+  ADMIN_TRAIN_DATA_REQUEST_TYPE_FETCH_EMU_BY_SEAT_CODE = 4;
+  ADMIN_TRAIN_DATA_REQUEST_TYPE_FETCH_ALL_STATIONS = 5;
+  ADMIN_TRAIN_DATA_REQUEST_TYPE_FETCH_STATION_BOARD = 6;
+  ADMIN_TRAIN_DATA_REQUEST_TYPE_FETCH_STATION_EXIT_INFO = 7;
+  ADMIN_TRAIN_DATA_REQUEST_TYPE_FETCH_STATION_TRANSPORT_INFO = 8;
+}
+
+enum AdminStationPlatformRefreshTrigger {
+  ADMIN_STATION_PLATFORM_REFRESH_TRIGGER_UNSPECIFIED = 0;
+  ADMIN_STATION_PLATFORM_REFRESH_TRIGGER_ROUTE_REFRESH = 1;
+  ADMIN_STATION_PLATFORM_REFRESH_TRIGGER_STATION_BOARD = 2;
+}
+
+enum AdminStationPlatformRefreshEntryStatus {
+  ADMIN_STATION_PLATFORM_REFRESH_ENTRY_STATUS_UNSPECIFIED = 0;
+  ADMIN_STATION_PLATFORM_REFRESH_ENTRY_STATUS_UPDATED = 1;
+  ADMIN_STATION_PLATFORM_REFRESH_ENTRY_STATUS_CACHE_HIT = 2;
+  ADMIN_STATION_PLATFORM_REFRESH_ENTRY_STATUS_CACHE_FALLBACK = 3;
+  ADMIN_STATION_PLATFORM_REFRESH_ENTRY_STATUS_NO_DATA = 4;
+  ADMIN_STATION_PLATFORM_REFRESH_ENTRY_STATUS_REQUEST_FAILED = 5;
+  ADMIN_STATION_PLATFORM_REFRESH_ENTRY_STATUS_PERSIST_FAILED = 6;
+}
+
+message AdminDailyRouteTrackingRecord {
+  uint32 id = 1;
+  string train_code = 2;
+  string emu_code = 3;
+  uint32 service_day = 4;
+  optional uint32 timetable_id = 5;
+  string start_station = 6;
+  string end_station = 7;
+  int64 start_at = 8;
+  int64 end_at = 9;
+  bool is_timetable_resolved = 10;
+}
+
+message AdminProbeStatusRecord {
+  uint32 id = 1;
+  string train_code = 2;
+  string emu_code = 3;
+  uint32 service_day = 4;
+  optional uint32 timetable_id = 5;
+  uint32 status = 6;
+  AdminTrainProvenanceLatestStatus status_label = 7;
+  int64 start_at = 8;
+  bool is_timetable_resolved = 9;
+}
+
+message AdminTrainProvenanceDeparture {
+  int64 start_at = 1;
+  optional int64 end_at = 2;
+  string start_station = 3;
+  string end_station = 4;
+  AdminTrainProvenanceLatestStatus latest_status = 5;
+  repeated string emu_codes = 6;
+  repeated AdminDailyRouteTrackingRecord daily_route_rows = 7;
+  repeated AdminProbeStatusRecord probe_status_rows = 8;
+}
+
+message AdminTrainRouteSnapshot {
+  uint32 service_day = 1;
+  repeated string train_codes = 2;
+  string internal_code = 3;
+  optional int64 start_at = 4;
+  optional int64 end_at = 5;
+  string start_station = 6;
+  string end_station = 7;
+  string cache_status = 8;
+  string cache_note = 9;
+}
+
+message AdminTrainProvenanceEvent {
+  uint32 id = 1;
+  uint32 task_run_id = 2;
+  uint32 scheduler_task_id = 3;
+  string executor = 4;
+  AdminTrainProvenanceTaskRunStatus task_status = 5;
+  optional AdminTrainProvenanceOutcomeStatus outcome_status = 6;
+  int64 created_at = 7;
+  string train_code = 8;
+  optional int64 start_at = 9;
+  string emu_code = 10;
+  string related_train_code = 11;
+  string related_emu_code = 12;
+  string event_type = 13;
+  string result = 14;
+  string summary = 15;
+  optional uint32 linked_scheduler_task_id = 16;
+  optional uint32 linked_task_run_id = 17;
+  optional google.protobuf.Struct conflict_detail = 18;
+  optional google.protobuf.Struct coupling_scan = 19;
+  optional AdminTrainRouteSnapshot scanned_route = 20;
+  optional google.protobuf.Struct historical_reuse = 21;
+  optional google.protobuf.Struct coupled_resolution = 22;
+  optional google.protobuf.Struct tracking_mutations = 23;
+  optional google.protobuf.Struct station_platform_refresh = 24;
+  optional google.protobuf.Struct payload = 25;
+}
+
+message GetAdminTrainProvenanceRequest {}
+
+message GetAdminTrainProvenanceData {
+  bool enabled = 1;
+  uint32 retention_days = 2;
+  string date = 3;
+  string train_code = 4;
+  optional int64 selected_start_at = 5;
+  repeated AdminTrainProvenanceDeparture departures = 6;
+  repeated AdminTrainProvenanceEvent timeline = 7;
+}
+
+message GetAdminTrainProvenanceResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    GetAdminTrainProvenanceData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message AdminCouplingScanTaskRunSummary {
+  uint32 id = 1;
+  uint32 scheduler_task_id = 2;
+  string executor = 3;
+  AdminTrainProvenanceTaskRunStatus status = 4;
+  int64 started_at = 5;
+  optional int64 finished_at = 6;
+  uint32 service_day = 7;
+  optional google.protobuf.Struct task_args = 8;
+}
+
+message AdminCouplingScanTaskListItem {
+  uint32 task_run_id = 1;
+  uint32 scheduler_task_id = 2;
+  string executor = 3;
+  AdminTrainProvenanceTaskRunStatus status = 4;
+  int64 started_at = 5;
+  optional int64 finished_at = 6;
+  uint32 service_day = 7;
+  string bureau = 8;
+  string model = 9;
+  optional google.protobuf.Struct task_args = 10;
+}
+
+message GetAdminTrainProvenanceCouplingScanTasksRequest {}
+
+message GetAdminTrainProvenanceCouplingScanTasksData {
+  bool enabled = 1;
+  uint32 retention_days = 2;
+  string date = 3;
+  repeated AdminCouplingScanTaskListItem items = 4;
+}
+
+message GetAdminTrainProvenanceCouplingScanTasksResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    GetAdminTrainProvenanceCouplingScanTasksData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message AdminCouplingScanCandidate {
+  uint32 id = 1;
+  uint32 candidate_order = 2;
+  uint32 service_day = 3;
+  string candidate_emu_code = 4;
+  string status = 5;
+  string reason = 6;
+  string scanned_train_code = 7;
+  string scanned_internal_code = 8;
+  optional int64 scanned_start_at = 9;
+  string matched_train_code = 10;
+  optional int64 matched_start_at = 11;
+  string train_repeat = 12;
+  optional AdminTrainRouteSnapshot scanned_route = 13;
+  optional AdminTrainRouteSnapshot matched_route = 14;
+  repeated AdminTrainRouteSnapshot occupied_routes = 15;
+  optional google.protobuf.Struct detail = 16;
+  int64 created_at = 17;
+}
+
+message GetAdminTrainProvenanceCouplingScanRequest {}
+
+message GetAdminTrainProvenanceCouplingScanData {
+  bool enabled = 1;
+  optional AdminCouplingScanTaskRunSummary task_run = 2;
+  repeated AdminCouplingScanCandidate candidates = 3;
+}
+
+message GetAdminTrainProvenanceCouplingScanResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    GetAdminTrainProvenanceCouplingScanData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message AdminQrcodeScanTimeSummaryItem {
+  string detected_at = 1;
+  uint32 total = 2;
+  uint32 success_count = 3;
+  uint32 failed_count = 4;
+  uint32 skipped_count = 5;
+  uint32 pending_coupling_count = 6;
+}
+
+message AdminQrcodeScanTaskListItem {
+  string detected_at = 1;
+  uint32 total = 2;
+  uint32 success_count = 3;
+  uint32 failed_count = 4;
+  uint32 skipped_count = 5;
+  uint32 pending_coupling_count = 6;
+}
+
+message GetAdminTrainProvenanceQrcodeScanTasksRequest {}
+
+message GetAdminTrainProvenanceQrcodeScanTasksData {
+  bool enabled = 1;
+  uint32 retention_days = 2;
+  string date = 3;
+  repeated AdminQrcodeScanTaskListItem items = 4;
+}
+
+message GetAdminTrainProvenanceQrcodeScanTasksResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    GetAdminTrainProvenanceQrcodeScanTasksData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message AdminQrcodeScanTaskRunSummary {
+  uint32 id = 1;
+  uint32 scheduler_task_id = 2;
+  string executor = 3;
+  AdminTrainProvenanceTaskRunStatus status = 4;
+  int64 started_at = 5;
+  optional int64 finished_at = 6;
+  uint32 service_day = 7;
+  string detected_at = 8;
+  string emu_code = 9;
+  bool manual_now = 10;
+  optional google.protobuf.Struct task_args = 11;
+}
+
+message AdminQrcodeScanTimeDetailTaskItem {
+  AdminQrcodeScanTaskRunSummary task_run = 1;
+  repeated AdminTrainProvenanceEvent timeline = 2;
+}
+
+message GetAdminTrainProvenanceQrcodeScanRequest {}
+
+message GetAdminTrainProvenanceQrcodeScanData {
+  bool enabled = 1;
+  string date = 2;
+  string detected_at = 3;
+  optional AdminQrcodeScanTimeSummaryItem summary = 4;
+  repeated AdminQrcodeScanTimeDetailTaskItem tasks = 5;
+}
+
+message GetAdminTrainProvenanceQrcodeScanResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    GetAdminTrainProvenanceQrcodeScanData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message AdminTrainDataRequestMetrics {
+  uint32 total = 1;
+  uint32 success = 2;
+  uint32 failure = 3;
+  optional double success_rate = 4;
+}
+
+message AdminTrainDataRequestComparison {
+  uint32 compare_total = 1;
+  uint32 compare_success = 2;
+  uint32 compare_failure = 3;
+  int32 total_delta = 4;
+  int32 success_delta = 5;
+  int32 failure_delta = 6;
+  optional double total_change_ratio = 7;
+  optional double success_change_ratio = 8;
+  optional double failure_change_ratio = 9;
+}
+
+message AdminTrainDataRequestTypeSummary {
+  AdminTrainDataRequestType type = 1;
+  AdminTrainDataRequestMetrics metrics = 2;
+  AdminTrainDataRequestComparison comparison = 3;
+}
+
+message AdminTrainDataRequestHourBucket {
+  uint32 hour = 1;
+  int64 start_at = 2;
+  int64 end_at = 3;
+  AdminTrainDataRequestMetrics metrics = 4;
+  AdminTrainDataRequestComparison comparison = 5;
+  repeated AdminTrainDataRequestTypeSummary types = 6;
+}
+
+message GetAdminTrainProvenanceRequestStatsRequest {}
+
+message GetAdminTrainProvenanceRequestStatsData {
+  bool enabled = 1;
+  uint32 retention_days = 2;
+  string date = 3;
+  string compare_date = 4;
+  int64 as_of = 5;
+  AdminTrainDataRequestMetrics totals = 6;
+  AdminTrainDataRequestComparison comparison = 7;
+  repeated AdminTrainDataRequestTypeSummary types = 8;
+  repeated AdminTrainDataRequestHourBucket hours = 9;
+}
+
+message GetAdminTrainProvenanceRequestStatsResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    GetAdminTrainProvenanceRequestStatsData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message AdminStationBoardSelectedStationItem {
+  string key = 1;
+  string station_name = 2;
+  string station_telecode = 3;
+  string display_name = 4;
+}
+
+message AdminStationBoardRow {
+  string train_no = 1;
+  string station_train_code = 2;
+  string circulation_train = 3;
+  string start_station_name = 4;
+  string end_station_name = 5;
+  string save_status = 6;
+  string save_reason_code = 7;
+  string save_reason_text = 8;
+}
+
+enum AdminStationBoardStationTaskAction {
+  ADMIN_STATION_BOARD_STATION_TASK_ACTION_UNSPECIFIED = 0;
+  ADMIN_STATION_BOARD_STATION_TASK_ACTION_CREATED = 1;
+  ADMIN_STATION_BOARD_STATION_TASK_ACTION_REUSED = 2;
+  ADMIN_STATION_BOARD_STATION_TASK_ACTION_STATION_TELECODE_NOT_FOUND = 3;
+  ADMIN_STATION_BOARD_STATION_TASK_ACTION_STATION_TELECODE_AMBIGUOUS = 4;
+}
+
+enum AdminStationBoardFetchResultStatus {
+  ADMIN_STATION_BOARD_FETCH_RESULT_STATUS_UNSPECIFIED = 0;
+  ADMIN_STATION_BOARD_FETCH_RESULT_STATUS_SAVED_ENTRIES = 1;
+  ADMIN_STATION_BOARD_FETCH_RESULT_STATUS_NO_OFFICIAL_ENTRIES = 2;
+}
+
+message AdminStationBoardStationTaskItem {
+  string key = 1;
+  string station_name = 2;
+  string station_telecode = 3;
+  string display_name = 4;
+  AdminStationBoardStationTaskAction action = 5;
+  optional uint32 scheduler_task_id = 6;
+  optional uint32 task_run_id = 7;
+  optional AdminTrainProvenanceTaskRunStatus task_status = 8;
+  optional int64 started_at = 9;
+  optional int64 finished_at = 10;
+  optional AdminStationBoardFetchResultStatus result_status = 11;
+  uint32 row_count = 12;
+  uint32 parsed_entry_count = 13;
+  uint32 saved_entry_count = 14;
+  uint32 consumed_queue_entry_count = 15;
+  repeated AdminStationBoardRow rows = 16;
+  repeated string ambiguous_telecodes = 17;
+}
+
+message GetAdminTrainProvenanceStationBoardRequest {}
+
+message GetAdminTrainProvenanceStationBoardData {
+  bool enabled = 1;
+  uint32 task_run_id = 2;
+  optional uint32 scheduler_task_id = 3;
+  uint32 service_day = 4;
+  optional AdminTrainProvenanceTaskRunStatus status = 5;
+  optional int64 started_at = 6;
+  optional int64 finished_at = 7;
+  uint32 candidate_group_count = 8;
+  repeated string selected_stations = 9;
+  repeated AdminStationBoardSelectedStationItem selected_station_items = 10;
+  uint32 created_task_count = 11;
+  uint32 reused_task_count = 12;
+  uint32 skipped_not_found_count = 13;
+  uint32 skipped_ambiguous_count = 14;
+  repeated AdminStationBoardStationTaskItem stations = 15;
+}
+
+message GetAdminTrainProvenanceStationBoardResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    GetAdminTrainProvenanceStationBoardData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message AdminStationBoardDispatchTaskListItem {
+  uint32 task_run_id = 1;
+  uint32 scheduler_task_id = 2;
+  string executor = 3;
+  AdminTrainProvenanceTaskRunStatus status = 4;
+  int64 started_at = 5;
+  optional int64 finished_at = 6;
+  uint32 service_day = 7;
+  uint32 candidate_group_count = 8;
+  uint32 selected_station_count = 9;
+  uint32 created_task_count = 10;
+  uint32 reused_task_count = 11;
+  uint32 skipped_not_found_count = 12;
+  uint32 skipped_ambiguous_count = 13;
+  repeated string selected_stations = 14;
+  repeated AdminStationBoardSelectedStationItem selected_station_items = 15;
+  optional google.protobuf.Struct task_args = 16;
+}
+
+message GetAdminTrainProvenanceStationBoardTasksRequest {}
+
+message GetAdminTrainProvenanceStationBoardTasksData {
+  bool enabled = 1;
+  uint32 retention_days = 2;
+  string date = 3;
+  repeated AdminStationBoardDispatchTaskListItem items = 4;
+}
+
+message GetAdminTrainProvenanceStationBoardTasksResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    GetAdminTrainProvenanceStationBoardTasksData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message AdminStationPlatformRefreshSummary {
+  uint32 result_id = 1;
+  AdminStationPlatformRefreshTrigger trigger = 2;
+  AdminTrainProvenanceOutcomeStatus status = 3;
+  uint32 candidate_count = 4;
+  uint32 updated_count = 5;
+  uint32 cache_hit_count = 6;
+  uint32 cache_fallback_count = 7;
+  uint32 no_data_count = 8;
+  uint32 failed_count = 9;
+}
+
+message AdminStationPlatformRefreshEntry {
+  uint32 id = 1;
+  uint32 station_order = 2;
+  string lookup_type = 3;
+  string station_name = 4;
+  string station_telecode = 5;
+  uint32 station_no = 6;
+  string train_date = 7;
+  repeated string station_train_codes = 8;
+  repeated string attempted_train_codes = 9;
+  AdminStationPlatformRefreshEntryStatus status = 10;
+  optional uint32 platform_no = 11;
+  optional string wicket = 12;
+  optional int64 fetched_at = 13;
+  string error_message = 14;
+}
+
+message GetAdminTrainProvenanceStationPlatformRefreshRequest {}
+
+message AdminStationPlatformRefreshResult {
+  AdminStationPlatformRefreshSummary summary = 1;
+  uint32 task_run_id = 2;
+  uint32 service_day = 3;
+  optional int64 start_at = 4;
+  string primary_train_code = 5;
+  repeated string train_codes = 6;
+  string error_message = 7;
+  int64 created_at = 8;
+}
+
+message GetAdminTrainProvenanceStationPlatformRefreshData {
+  bool enabled = 1;
+  optional AdminStationPlatformRefreshResult result = 2;
+  repeated AdminStationPlatformRefreshEntry entries = 3;
+}
+
+message GetAdminTrainProvenanceStationPlatformRefreshResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    GetAdminTrainProvenanceStationPlatformRefreshData data = 2;
+    ApiError error = 3;
+  }
+}

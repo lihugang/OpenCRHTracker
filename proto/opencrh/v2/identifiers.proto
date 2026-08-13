@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+package opencrh.v2;
+
+// Canonical structured train identity used in all v2 messages.
+
+message TrainCode {
+  string prefix = 1;
+  uint32 number = 2;
+}

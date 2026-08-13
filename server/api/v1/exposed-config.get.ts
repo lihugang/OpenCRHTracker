@@ -1,9 +1,9 @@
 import { defineEventHandler } from 'h3';
 import useConfig from '~/server/config';
+import { getExposedConfig } from '~/server/domain/system';
 import executeApi from '~/server/utils/api/executor/executeApi';
 import setCacheControl from '~/server/utils/api/response/setCacheControl';
 import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
-import type { AboutExposedConfigData } from '~/types/about';
 
 export default defineEventHandler(async (event) => {
     const config = useConfig();
@@ -20,107 +20,6 @@ export default defineEventHandler(async (event) => {
                     config.api.cache.currentDayMaxAgeSeconds
                 )
         },
-        async () => {
-            const schedulerPollIntervalMs =
-                config.task.scheduler.pollIntervalMs;
-
-            const response: AboutExposedConfigData = {
-                about: {
-                    schedulerPollIntervalMs,
-                    schedulerPollIntervalMinutes:
-                        schedulerPollIntervalMs / 60_000
-                },
-                qqBinding: {
-                    enabled: config.user.qqBinding.enabled,
-                    codeTtlSeconds: config.user.qqBinding.codeTtlSeconds,
-                    sendIntervalSeconds:
-                        config.user.qqBinding.sendIntervalSeconds
-                },
-                api: {
-                    versionPrefix: config.api.versionPrefix,
-                    apiKeyHeader: config.api.apiKeyHeader,
-                    authCookieName: config.api.authCookieName,
-                    timestampUnit: config.api.timestampUnit,
-                    headers: {
-                        remain: config.api.headers.remain,
-                        cost: config.api.headers.cost,
-                        retryAfter: config.api.headers.retryAfter
-                    },
-                    pagination: {
-                        defaultLimit: config.api.pagination.defaultLimit,
-                        maxLimit: config.api.pagination.maxLimit
-                    },
-                    quota: {
-                        anonymousMaxTokens: config.quota.anonymousMaxTokens,
-                        userMaxTokens: config.quota.userMaxTokens,
-                        refillAmount: config.quota.refillAmount,
-                        refillIntervalSeconds:
-                            config.quota.refillIntervalSeconds
-                    },
-                    cost: {
-                        minimumRequestCost: 1,
-                        fixed: {
-                            authMe: config.cost.fixed.authMe,
-                            authRedeemMembership:
-                                config.cost.fixed.authRedeemMembership,
-                            authCreateOauthClient:
-                                config.cost.fixed.authCreateOauthClient,
-                            allocationEmu: config.cost.fixed.allocationEmu,
-                            timetableTrainCurrent:
-                                config.cost.fixed.timetableTrainCurrent,
-                            trainCirculationImageCacheHit:
-                                config.cost.fixed.trainCirculationImageCacheHit,
-                            trainCirculationImage:
-                                config.cost.fixed.trainCirculationImage,
-                            trainCirculationImageFailure:
-                                config.cost.fixed.trainCirculationImageFailure,
-                            timetableTrainHistory:
-                                config.cost.fixed.timetableTrainHistory,
-                            exportDailyIndex:
-                                config.cost.fixed.exportDailyIndex,
-                            exportDaily: config.cost.fixed.exportDaily
-                        },
-                        perRecord: {
-                            recordsDaily: {
-                                unitCost:
-                                    config.cost.perRecord.recordsDaily.unitCost,
-                                rounding:
-                                    config.cost.perRecord.recordsDaily.rounding
-                            },
-                            timetableTrainHistory: {
-                                unitCost:
-                                    config.cost.perRecord.timetableTrainHistory
-                                        .unitCost,
-                                rounding:
-                                    config.cost.perRecord.timetableTrainHistory
-                                        .rounding
-                            },
-                            timetableStation: {
-                                unitCost:
-                                    config.cost.perRecord.timetableStation
-                                        .unitCost,
-                                rounding:
-                                    config.cost.perRecord.timetableStation
-                                        .rounding
-                            },
-                            historyTrain: {
-                                unitCost:
-                                    config.cost.perRecord.historyTrain.unitCost,
-                                rounding:
-                                    config.cost.perRecord.historyTrain.rounding
-                            },
-                            historyEmu: {
-                                unitCost:
-                                    config.cost.perRecord.historyEmu.unitCost,
-                                rounding:
-                                    config.cost.perRecord.historyEmu.rounding
-                            }
-                        }
-                    }
-                }
-            };
-
-            return response;
-        }
+        async () => getExposedConfig()
     );
 });

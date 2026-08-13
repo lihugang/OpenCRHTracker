@@ -1,24 +1,17 @@
 import { defineEventHandler, readBody } from 'h3';
+import { postFeedbackTopics } from '~/server/domain/feedback';
 import {
-    createFeedbackTopic,
     isValidFeedbackCategory,
     isValidFeedbackVisibility
 } from '~/server/services/feedbackStore';
-import { autoSubscribeFeedbackTopic } from '~/server/services/eventNotificationService';
 import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';
 import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
-import useConfig from '~/server/config';
-import getNowSeconds from '~/server/utils/time/getNowSeconds';
-import { ensureFeedbackString } from '~/server/utils/feedback/request';
 import type {
-    CreateFeedbackTopicResponse,
     FeedbackPrimaryType,
     FeedbackSecondaryType,
-    FeedbackStatus,
     FeedbackVisibility
 } from '~/types/feedback';
-import { buildFeedbackAutoTitle } from '~/utils/feedback/topic';
 
 interface CreateFeedbackTopicBody {
     primaryType?: unknown;
@@ -28,7 +21,6 @@ interface CreateFeedbackTopicBody {
 }
 
 export default defineEventHandler(async (event) => {
-    const config = useConfig();
     return executeApi(
         event,
         {
@@ -46,7 +38,6 @@ export default defineEventHandler(async (event) => {
                 'invalid_param',
                 '请求体必须是 JSON 对象'
             );
-
             ensure(
                 typeof body.primaryType === 'string' &&
                     typeof body.secondaryType === 'string' &&
@@ -66,52 +57,12 @@ export default defineEventHandler(async (event) => {
                 '反馈可见性无效'
             );
 
-            const primaryType = body.primaryType as FeedbackPrimaryType;
-            const secondaryType = body.secondaryType as FeedbackSecondaryType;
-            const content = ensureFeedbackString(
-                body.body,
-                'body',
-                config.api.feedback.validation.createBody.minLength,
-                config.api.feedback.validation.createBody.maxLength
-            );
-            const isSecurityIssue =
-                primaryType === 'website' && secondaryType === 'security';
-            const requestedVisibility = isSecurityIssue
-                ? 'private'
-                : (body.visibility as FeedbackVisibility);
-
-            ensure(
-                identity.type === 'user' || requestedVisibility === 'public',
-                403,
-                'forbidden_scope',
-                isSecurityIssue
-                    ? '安全问题反馈需要登录后提交'
-                    : '游客仅可提交公开反馈'
-            );
-
-            const title = buildFeedbackAutoTitle(primaryType, secondaryType);
-            const now = getNowSeconds();
-            const topicId = createFeedbackTopic({
-                creatorUserId: identity.type === 'user' ? identity.id : null,
-                creatorType: identity.type === 'user' ? 'user' : 'guest',
-                visibility: requestedVisibility,
-                primaryType,
-                secondaryType,
-                status: 'pending' satisfies FeedbackStatus,
-                title,
-                titleMode: 'auto',
-                body: content,
-                now
+            return postFeedbackTopics(identity, {
+                primaryType: body.primaryType as FeedbackPrimaryType,
+                secondaryType: body.secondaryType as FeedbackSecondaryType,
+                visibility: body.visibility as FeedbackVisibility,
+                body: typeof body.body === 'string' ? body.body : ''
             });
-
-            if (identity.type === 'user') {
-                autoSubscribeFeedbackTopic(identity.id, topicId);
-            }
-
-            return {
-                id: topicId,
-                title
-            } satisfies CreateFeedbackTopicResponse;
         }
     );
 });

@@ -1,12 +1,9 @@
 import { defineEventHandler, readBody } from 'h3';
-import { updateAdminUserBanState } from '~/server/services/adminUserStore';
+import { postAdminUsersStatus } from '~/server/domain/admin/users';
 import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';
 import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
-import type {
-    AdminUpdateUserBanStateRequest,
-    AdminUpdateUserBanStateResponse
-} from '~/types/admin';
+import type { AdminUpdateUserBanStateRequest } from '~/types/admin';
 
 interface AdminUpdateUserBanStateBody {
     userId?: unknown;
@@ -47,10 +44,7 @@ export default defineEventHandler(async (event) => {
                 userId,
                 banned: body.banned
             };
-            const response: AdminUpdateUserBanStateResponse =
-                updateAdminUserBanState(request, identity.id);
-
-            return response;
+            return postAdminUsersStatus(request, identity.id);
         }
     );
 });

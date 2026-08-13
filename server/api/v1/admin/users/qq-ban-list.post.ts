@@ -1,6 +1,6 @@
 import { defineEventHandler, readBody } from 'h3';
+import { postAdminQqBanEntry } from '~/server/domain/admin/users';
 import { normalizeQqNumber } from '~/server/services/qqBindingService';
-import { addQqBanListEntry } from '~/server/services/userBanSecurityStore';
 import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';
 import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
@@ -24,7 +24,7 @@ export default defineEventHandler(async (event) => {
                 '请求体必须是 JSON 对象'
             );
 
-            return addQqBanListEntry(
+            return postAdminQqBanEntry(
                 normalizeQqNumber(body.qqNumber),
                 identity.id
             );

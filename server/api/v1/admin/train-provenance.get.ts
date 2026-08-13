@@ -1,5 +1,5 @@
 import { defineEventHandler, getQuery } from 'h3';
-import { getAdminTrainProvenance } from '~/server/services/adminTrainProvenanceStore';
+import { getAdminTrainProvenance } from '~/server/domain/admin/trainProvenance';
 import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';
 import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
@@ -58,11 +58,11 @@ export default defineEventHandler(async (event) => {
                 'trainCode 必须是有效车次'
             );
 
-            return getAdminTrainProvenance(
-                parseExternalServiceDate(date),
-                parsedTrainCode,
+            return getAdminTrainProvenance({
+                serviceDay: parseExternalServiceDate(date),
+                trainCode: parsedTrainCode,
                 startAt
-            );
+            });
         }
     );
 });

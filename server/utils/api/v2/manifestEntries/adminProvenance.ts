@@ -1,0 +1,163 @@
+import { defineV2Operation } from '~/server/utils/api/v2/V2Types';
+import {
+    GetAdminTrainProvenanceRequestSchema,
+    GetAdminTrainProvenanceDataSchema,
+    GetAdminTrainProvenanceResponseSchema,
+    GetAdminTrainProvenanceCouplingScanRequestSchema,
+    GetAdminTrainProvenanceCouplingScanDataSchema,
+    GetAdminTrainProvenanceCouplingScanResponseSchema,
+    GetAdminTrainProvenanceCouplingScanTasksRequestSchema,
+    GetAdminTrainProvenanceCouplingScanTasksDataSchema,
+    GetAdminTrainProvenanceCouplingScanTasksResponseSchema,
+    GetAdminTrainProvenanceQrcodeScanRequestSchema,
+    GetAdminTrainProvenanceQrcodeScanDataSchema,
+    GetAdminTrainProvenanceQrcodeScanResponseSchema,
+    GetAdminTrainProvenanceQrcodeScanTasksRequestSchema,
+    GetAdminTrainProvenanceQrcodeScanTasksDataSchema,
+    GetAdminTrainProvenanceQrcodeScanTasksResponseSchema,
+    GetAdminTrainProvenanceRequestStatsRequestSchema,
+    GetAdminTrainProvenanceRequestStatsDataSchema,
+    GetAdminTrainProvenanceRequestStatsResponseSchema,
+    GetAdminTrainProvenanceStationBoardRequestSchema,
+    GetAdminTrainProvenanceStationBoardDataSchema,
+    GetAdminTrainProvenanceStationBoardResponseSchema,
+    GetAdminTrainProvenanceStationBoardTasksRequestSchema,
+    GetAdminTrainProvenanceStationBoardTasksDataSchema,
+    GetAdminTrainProvenanceStationBoardTasksResponseSchema,
+    GetAdminTrainProvenanceStationPlatformRefreshRequestSchema,
+    GetAdminTrainProvenanceStationPlatformRefreshDataSchema,
+    GetAdminTrainProvenanceStationPlatformRefreshResponseSchema
+} from '~/server/generated/proto/opencrh/v2/admin_provenance_pb';
+import {
+    getAdminTrainProvenanceCouplingScanTasksV2Adapter,
+    getAdminTrainProvenanceCouplingScanV2Adapter,
+    getAdminTrainProvenanceQrcodeScanTasksV2Adapter,
+    getAdminTrainProvenanceQrcodeScanV2Adapter,
+    getAdminTrainProvenanceRequestStatsV2Adapter,
+    getAdminTrainProvenanceStationBoardTasksV2Adapter,
+    getAdminTrainProvenanceStationBoardV2Adapter,
+    getAdminTrainProvenanceStationPlatformRefreshV2Adapter,
+    getAdminTrainProvenanceV2Adapter
+} from '~/server/utils/api/v2/adapters/adminProvenance';
+import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
+
+export const ADMIN_PROVENANCE_MANIFEST_ENTRIES = {
+    GetAdminTrainProvenance: defineV2Operation({
+        operationName: 'GetAdminTrainProvenance',
+        method: 'GET',
+        pathTemplate: '/api/v2/admin/train-provenance',
+        requestSchema: GetAdminTrainProvenanceRequestSchema,
+        dataSchema: GetAdminTrainProvenanceDataSchema,
+        responseSchema: GetAdminTrainProvenanceResponseSchema,
+        requiredScopes: [API_SCOPES.admin],
+        cors: true,
+        cost: { kind: 'none' },
+        bodyMode: 'none',
+        handler: getAdminTrainProvenanceV2Adapter
+    }),
+    GetAdminTrainProvenanceCouplingScan: defineV2Operation({
+        operationName: 'GetAdminTrainProvenanceCouplingScan',
+        method: 'GET',
+        pathTemplate: '/api/v2/admin/train-provenance/coupling-scan',
+        requestSchema: GetAdminTrainProvenanceCouplingScanRequestSchema,
+        dataSchema: GetAdminTrainProvenanceCouplingScanDataSchema,
+        responseSchema: GetAdminTrainProvenanceCouplingScanResponseSchema,
+        requiredScopes: [API_SCOPES.admin],
+        cors: false,
+        cost: { kind: 'none' },
+        bodyMode: 'none',
+        handler: getAdminTrainProvenanceCouplingScanV2Adapter
+    }),
+    GetAdminTrainProvenanceCouplingScanTasks: defineV2Operation({
+        operationName: 'GetAdminTrainProvenanceCouplingScanTasks',
+        method: 'GET',
+        pathTemplate: '/api/v2/admin/train-provenance/coupling-scan-tasks',
+        requestSchema: GetAdminTrainProvenanceCouplingScanTasksRequestSchema,
+        dataSchema: GetAdminTrainProvenanceCouplingScanTasksDataSchema,
+        responseSchema: GetAdminTrainProvenanceCouplingScanTasksResponseSchema,
+        requiredScopes: [API_SCOPES.admin],
+        cors: false,
+        cost: { kind: 'none' },
+        bodyMode: 'none',
+        handler: getAdminTrainProvenanceCouplingScanTasksV2Adapter
+    }),
+    GetAdminTrainProvenanceQrcodeScan: defineV2Operation({
+        operationName: 'GetAdminTrainProvenanceQrcodeScan',
+        method: 'GET',
+        pathTemplate: '/api/v2/admin/train-provenance/qrcode-scan',
+        requestSchema: GetAdminTrainProvenanceQrcodeScanRequestSchema,
+        dataSchema: GetAdminTrainProvenanceQrcodeScanDataSchema,
+        responseSchema: GetAdminTrainProvenanceQrcodeScanResponseSchema,
+        requiredScopes: [API_SCOPES.admin],
+        cors: false,
+        cost: { kind: 'none' },
+        bodyMode: 'none',
+        handler: getAdminTrainProvenanceQrcodeScanV2Adapter
+    }),
+    GetAdminTrainProvenanceQrcodeScanTasks: defineV2Operation({
+        operationName: 'GetAdminTrainProvenanceQrcodeScanTasks',
+        method: 'GET',
+        pathTemplate: '/api/v2/admin/train-provenance/qrcode-scan-tasks',
+        requestSchema: GetAdminTrainProvenanceQrcodeScanTasksRequestSchema,
+        dataSchema: GetAdminTrainProvenanceQrcodeScanTasksDataSchema,
+        responseSchema: GetAdminTrainProvenanceQrcodeScanTasksResponseSchema,
+        requiredScopes: [API_SCOPES.admin],
+        cors: false,
+        cost: { kind: 'none' },
+        bodyMode: 'none',
+        handler: getAdminTrainProvenanceQrcodeScanTasksV2Adapter
+    }),
+    GetAdminTrainProvenanceRequestStats: defineV2Operation({
+        operationName: 'GetAdminTrainProvenanceRequestStats',
+        method: 'GET',
+        pathTemplate: '/api/v2/admin/train-provenance/request-stats',
+        requestSchema: GetAdminTrainProvenanceRequestStatsRequestSchema,
+        dataSchema: GetAdminTrainProvenanceRequestStatsDataSchema,
+        responseSchema: GetAdminTrainProvenanceRequestStatsResponseSchema,
+        requiredScopes: [API_SCOPES.admin],
+        cors: false,
+        cost: { kind: 'none' },
+        bodyMode: 'none',
+        handler: getAdminTrainProvenanceRequestStatsV2Adapter
+    }),
+    GetAdminTrainProvenanceStationBoard: defineV2Operation({
+        operationName: 'GetAdminTrainProvenanceStationBoard',
+        method: 'GET',
+        pathTemplate: '/api/v2/admin/train-provenance/station-board',
+        requestSchema: GetAdminTrainProvenanceStationBoardRequestSchema,
+        dataSchema: GetAdminTrainProvenanceStationBoardDataSchema,
+        responseSchema: GetAdminTrainProvenanceStationBoardResponseSchema,
+        requiredScopes: [API_SCOPES.admin],
+        cors: false,
+        cost: { kind: 'none' },
+        bodyMode: 'none',
+        handler: getAdminTrainProvenanceStationBoardV2Adapter
+    }),
+    GetAdminTrainProvenanceStationBoardTasks: defineV2Operation({
+        operationName: 'GetAdminTrainProvenanceStationBoardTasks',
+        method: 'GET',
+        pathTemplate: '/api/v2/admin/train-provenance/station-board-tasks',
+        requestSchema: GetAdminTrainProvenanceStationBoardTasksRequestSchema,
+        dataSchema: GetAdminTrainProvenanceStationBoardTasksDataSchema,
+        responseSchema: GetAdminTrainProvenanceStationBoardTasksResponseSchema,
+        requiredScopes: [API_SCOPES.admin],
+        cors: false,
+        cost: { kind: 'none' },
+        bodyMode: 'none',
+        handler: getAdminTrainProvenanceStationBoardTasksV2Adapter
+    }),
+    GetAdminTrainProvenanceStationPlatformRefresh: defineV2Operation({
+        operationName: 'GetAdminTrainProvenanceStationPlatformRefresh',
+        method: 'GET',
+        pathTemplate: '/api/v2/admin/train-provenance/station-platform-refresh',
+        requestSchema: GetAdminTrainProvenanceStationPlatformRefreshRequestSchema,
+        dataSchema: GetAdminTrainProvenanceStationPlatformRefreshDataSchema,
+        responseSchema:
+            GetAdminTrainProvenanceStationPlatformRefreshResponseSchema,
+        requiredScopes: [API_SCOPES.admin],
+        cors: false,
+        cost: { kind: 'none' },
+        bodyMode: 'none',
+        handler: getAdminTrainProvenanceStationPlatformRefreshV2Adapter
+    })
+} as const;
