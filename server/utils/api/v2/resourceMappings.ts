@@ -1,26 +1,13 @@
 import { asEmuId, getEmuCode } from '~/server/libs/database/emu';
-import { getHistoricalTimetableContent } from '~/server/services/historicalTimetableResolver';
+import { getHistoricalTimetableSummary } from '~/server/services/historicalTimetableResolver';
 
 export type V2EmuCodeMappings = Record<string, string>;
 
-export interface V2HistoricalTimetableMapping {
-    timetableId: number;
+export interface V2HistoricalTimetableSummaryMapping {
     startStation?: string;
     endStation?: string;
     startOffset?: number;
     endOffset?: number;
-    stops: Array<{
-        stationNo: number;
-        stationName: string;
-        arriveOffset?: number;
-        departOffset?: number;
-        stationTrainCode: {
-            prefix: string;
-            number: number;
-        };
-        isStart: boolean;
-        isEnd: boolean;
-    }>;
 }
 
 export function resolveEmuCodeMappings(
@@ -51,50 +38,33 @@ export function resolveEmuCodeMappings(
 
 export function resolveTimetableMappings(
     ids: readonly number[]
-): Record<string, V2HistoricalTimetableMapping> | undefined {
+): Record<string, V2HistoricalTimetableSummaryMapping> | undefined {
     const uniqueIds = [...new Set(ids)].filter((id) => Number.isInteger(id));
     uniqueIds.sort((left, right) => left - right);
 
-    const mappings: Record<string, V2HistoricalTimetableMapping> = {};
+    const mappings: Record<string, V2HistoricalTimetableSummaryMapping> = {};
     let foundAny = false;
 
     for (const id of uniqueIds) {
-        const content = getHistoricalTimetableContent(id);
-        if (content === null) {
+        const summary = getHistoricalTimetableSummary(id);
+        if (summary === null) {
             console.error(`v2 timetable mapping missing timetableId=${id}`);
             continue;
         }
 
         mappings[String(id)] = {
-            timetableId: content.id,
-            ...(content.startStation === null
+            ...(summary.startStation === null
                 ? {}
-                : { startStation: content.startStation }),
-            ...(content.endStation === null
+                : { startStation: summary.startStation }),
+            ...(summary.endStation === null
                 ? {}
-                : { endStation: content.endStation }),
-            ...(content.startOffset === null
+                : { endStation: summary.endStation }),
+            ...(summary.startOffset === null
                 ? {}
-                : { startOffset: content.startOffset }),
-            ...(content.endOffset === null
+                : { startOffset: summary.startOffset }),
+            ...(summary.endOffset === null
                 ? {}
-                : { endOffset: content.endOffset }),
-            stops: content.stops.map((stop) => ({
-                stationNo: stop.stationNo,
-                stationName: stop.stationName,
-                ...(stop.arriveAt === null
-                    ? {}
-                    : { arriveOffset: stop.arriveAt }),
-                ...(stop.departAt === null
-                    ? {}
-                    : { departOffset: stop.departAt }),
-                stationTrainCode: {
-                    prefix: stop.stationTrainCode.prefix,
-                    number: stop.stationTrainCode.number
-                },
-                isStart: stop.isStart,
-                isEnd: stop.isEnd
-            }))
+                : { endOffset: summary.endOffset })
         };
         foundAny = true;
     }

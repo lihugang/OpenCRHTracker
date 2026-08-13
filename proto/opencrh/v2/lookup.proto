@@ -233,7 +233,7 @@ message GetDailyRecordsData {
   string next_cursor = 4;
   repeated DailyRecordItem items = 5;
   map<uint32, string> emu_code_mappings = 6;
-  map<uint32, HistoricalTimetable> timetable_mappings = 7;
+  map<uint32, HistoricalTimetableSummary> timetable_mappings = 7;
 }
 
 message GetDailyRecordsResponse {
@@ -262,7 +262,7 @@ message GetTrainHistoryData {
   string next_cursor = 6;
   repeated TrainHistoryRecord items = 7;
   map<uint32, string> emu_code_mappings = 8;
-  map<uint32, HistoricalTimetable> timetable_mappings = 9;
+  map<uint32, HistoricalTimetableSummary> timetable_mappings = 9;
 }
 
 message GetTrainHistoryResponse {
@@ -291,7 +291,7 @@ message GetEmuHistoryData {
   string next_cursor = 6;
   repeated EmuHistoryRecord items = 7;
   map<uint32, string> emu_code_mappings = 8;
-  map<uint32, HistoricalTimetable> timetable_mappings = 9;
+  map<uint32, HistoricalTimetableSummary> timetable_mappings = 9;
 }
 
 message GetEmuHistoryResponse {

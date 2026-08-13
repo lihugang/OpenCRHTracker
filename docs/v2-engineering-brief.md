@@ -43,7 +43,7 @@ message XxxResponse {
 }
 ```
 
-- `ApiError`、`ApiMeta`、`TrainCode`、`TimetableStop`、`HistoricalTimetable` 已在 `common.proto`、`identifiers.proto`、`mappings.proto` 定义，直接 import 复用，不得重复定义。
+- `ApiError`、`ApiMeta`、`TrainCode`、`TimetableStop`、`HistoricalTimetableSummary` 已在 `common.proto`、`identifiers.proto`、`mappings.proto` 定义，直接 import 复用，不得重复定义。
 - 字段规则：
     - 数据库 ID（emuId、记录 ID、coverageId、timetableId、topicId、subscription ID、revokeId、clientId、userId、qqNumber、groupId 等）一律 `uint32`；JSON 输出 number。
     - `serviceDay`、`serviceDayStart`、`serviceDayEndExclusive` 等语义为服务日的字段一律 `uint32`（epoch day）。
@@ -55,7 +55,7 @@ message XxxResponse {
     - 分页 cursor/nextCursor 是不透明字符串；无下一页时 `nextCursor` 为 `''`，仍回显当前 `cursor`。
 - 已知管理员任务变体（`regenerate_daily_export`、`refresh_route_info_now`、`refresh_train_circulation_now`、`refresh_all_routes_and_requeue_probe_now`、`detect_coupled_emu_group_now`、`run_qrcode_detection_now`、`dispatch_station_board_tasks_now`）用强类型 oneof，字段名/类型对照现有 `adminTaskStore`/v1 handler 的 payload。
 - `GetTrainTimetableHistoryData`：每项含 `coverage_id`、`timetable_id`、`service_day_start`、`service_day_end_exclusive`、起终点/起止 offset（可空）、start/end Unix 秒（可空）等，无 cursor/limit/nextCursor。
-- `GetTrainTimetableHistoryDetailData`：`timetable_id` + 完整 `HistoricalTimetable` 内容字段；`timetableMappings` 不重复出现在详情里。
+- `GetTrainTimetableHistoryDetailData`：`timetable_id` + 完整时刻表内容（起终站、start/end offset、完整 `TimetableStop` 列表）；`timetableMappings` 不重复出现在详情里。
 - v2 中不再出现 `historyId`、`requestEmuId`、`type + code` 泛化收藏、`targetType + targetId` 泛化订阅、JSONL/`formats`。
 - 收藏/订阅持久化也使用上述 typed 表示（不再是 `type + code` / `targetType + targetId` 字符串），由 `migrate-emu-storage-v2.mjs` 的 auth 迁移步骤转换旧数据。
 
@@ -123,7 +123,7 @@ export const getDailyRecordsEntry = defineV2Operation({
 - 记录/历史列表：`id`/`coverageId`/`timetableId` 输出 number；`serviceDate` → `serviceDay`（epoch day）；`emuCode` → `emuId`（number）+ 顶层 `emuCodeMappings`；`trainCode` → `TrainCode` 对象。
 - 当前时刻表：`requestTrainCode` 与 `trainCode` 都是 `TrainCode` 对象。
 - 收藏：`FavoriteTarget.oneof`（train 含 TrainCode、emu 含 emuId、station 含 stationName）；事件订阅 oneof 同理；EMU 相关列表附 `emuCodeMappings`。
-- 映射：`emuCodeMappings` JSON 为 `Record<string,string>`（key 是十进制 emuId 字符串），proto 为 `map<uint32,string>`；`timetableMappings` JSON 为 `Record<string,HistoricalTimetable>`，proto 为 `map<uint32,HistoricalTimetable>`；按数值 key 升序；无引用或全部缺失时整个字段省略；缺失时保留原始 ID 并 `console.error` 记录完整性错误，响应仍成功。
+- 映射：`emuCodeMappings` JSON 为 `Record<string,string>`（key 是十进制 emuId 字符串），proto 为 `map<uint32,string>`；`timetableMappings` JSON 为 `Record<string,HistoricalTimetableSummary>`，proto 为 `map<uint32,HistoricalTimetableSummary>`，map key 是 `timetableId`，值只含 `startStation/endStation/startOffset/endOffset`，不含 stops；按数值 key 升序；无引用或全部缺失时整个字段省略；缺失时保留原始 ID 并 `console.error` 记录完整性错误，响应仍成功。
 - 资源引用收集：只收集本 operation schema 顶层明确声明映射字段且 data 实际引用的 ID。
 
 ## 7. 内容协商与错误（执行器行为，adapter 只需配合）

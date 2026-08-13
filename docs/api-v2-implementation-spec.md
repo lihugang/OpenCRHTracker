@@ -200,7 +200,7 @@ Authoritative sources live under `proto/opencrh/v2/**`, split by domain into app
 proto/opencrh/v2/
   common.proto            ApiError、ApiMeta
   identifiers.proto       TrainCode
-  mappings.proto          HistoricalTimetable 及 stop 结构
+  mappings.proto          HistoricalTimetableSummary 及 stop 结构
   lookup.proto            allocation、search、current/station timetable
   timetable.proto         train history、history detail、circulation image
   exports.proto           daily export index / download
@@ -237,7 +237,7 @@ JSON remains `{ ok, data, error }`: success `true/object/''`; failure `false/use
 
 ## 7. Resource mappings and timetable contracts
 
-Only schema-declared top-level resource references produce mappings. `emuCodeMappings` is JSON `Record<string,string>` and protobuf `map<uint32,string>`; `timetableMappings` is JSON `Record<string,HistoricalTimetable>` and protobuf `map<uint32,HistoricalTimetable>`. Numeric keys are ascending. Include only successfully parsed IDs actually referenced by the successful response. Omit the entire field when there are no references or all mappings are missing. Preserve raw IDs on missing data, log a server integrity error, and never emit `UNKNOWN`, null map values or convert the whole response to 500. A timetable detail that already contains complete content does not repeat `timetableMappings`.
+Only schema-declared top-level resource references produce mappings. `emuCodeMappings` is JSON `Record<string,string>` and protobuf `map<uint32,string>`; `timetableMappings` is JSON `Record<string,HistoricalTimetableSummary>` and protobuf `map<uint32,HistoricalTimetableSummary>`. Each timetable mapping contains only `startStation`, `endStation`, `startOffset`, `endOffset` and never includes `stops`; the map key is the `timetableId`. Numeric keys are ascending. Include only successfully parsed IDs actually referenced by the successful response. Omit the entire field when there are no references or all mappings are missing. Preserve raw IDs on missing data, log a server integrity error, and never emit `UNKNOWN`, null map values or convert the whole response to 500. Complete stops appear only in `GetCurrentTrainTimetableData` and `GetTrainTimetableHistoryDetailData`; a timetable detail that already contains complete content does not repeat `timetableMappings`.
 
 Historical timetable is keyed by `timetableId`; coverage rows use `coverageId`; `historyId` disappears from v2. A stop contains `stationNo`, `stationName`, optional relative `arriveOffset`/`departOffset`, object `stationTrainCode`, `isStart`, `isEnd`. Offsets are seconds from service-day midnight, never absolute `arriveAt/departAt`.
 

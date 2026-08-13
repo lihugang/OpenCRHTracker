@@ -4,7 +4,7 @@ package opencrh.v2;
 
 import "opencrh/v2/identifiers.proto";
 
-// Historical timetable content and resource mapping blocks.
+// Historical timetable summaries and resource mapping blocks.
 
 message TimetableStop {
   uint32 station_no = 1;
@@ -16,11 +16,9 @@ message TimetableStop {
   bool is_end = 7;
 }
 
-message HistoricalTimetable {
-  uint32 timetable_id = 1;
-  optional string start_station = 2;
-  optional string end_station = 3;
-  optional int64 start_offset = 4;
-  optional int64 end_offset = 5;
-  repeated TimetableStop stops = 6;
+message HistoricalTimetableSummary {
+  optional string start_station = 1;
+  optional string end_station = 2;
+  optional int64 start_offset = 3;
+  optional int64 end_offset = 4;
 }

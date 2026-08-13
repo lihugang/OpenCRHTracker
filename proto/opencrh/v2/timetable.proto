@@ -20,7 +20,7 @@ message TrainTimetableHistoryCoverage {
 message GetTrainTimetableHistoryData {
   TrainCode train_code = 1;
   repeated TrainTimetableHistoryCoverage items = 2;
-  map<uint32, HistoricalTimetable> timetable_mappings = 3;
+  map<uint32, HistoricalTimetableSummary> timetable_mappings = 3;
 }
 
 message GetTrainTimetableHistoryResponse {

@@ -270,7 +270,7 @@ message GetAdminDailyRoutesData {
   uint32 total = 4;
   repeated AdminDailyRouteRecord items = 5;
   map<uint32, string> emu_code_mappings = 6;
-  map<uint32, HistoricalTimetable> timetable_mappings = 7;
+  map<uint32, HistoricalTimetableSummary> timetable_mappings = 7;
 }
 
 message GetAdminDailyRoutesResponse {
@@ -296,7 +296,7 @@ message PostAdminDailyRoutesData {
   optional AdminDailyRouteRecord created_record = 5;
   bool inserted = 6;
   map<uint32, string> emu_code_mappings = 7;
-  map<uint32, HistoricalTimetable> timetable_mappings = 8;
+  map<uint32, HistoricalTimetableSummary> timetable_mappings = 8;
 }
 
 message PostAdminDailyRoutesResponse {
@@ -347,7 +347,7 @@ message GetAdminDailyRoutesTimetablesData {
   string train_code = 2;
   optional uint32 default_timetable_id = 3;
   repeated AdminDailyRouteTimetableCandidate items = 4;
-  map<uint32, HistoricalTimetable> timetable_mappings = 5;
+  map<uint32, HistoricalTimetableSummary> timetable_mappings = 5;
 }
 
 message GetAdminDailyRoutesTimetablesResponse {
@@ -751,7 +751,7 @@ message GetAdminTimetableHistoryMergeCandidatesData {
   string train_code = 1;
   uint32 total = 2;
   repeated AdminTimetableHistoryCoverageMergeCandidate items = 3;
-  map<uint32, HistoricalTimetable> timetable_mappings = 4;
+  map<uint32, HistoricalTimetableSummary> timetable_mappings = 4;
 }
 
 message GetAdminTimetableHistoryMergeCandidatesResponse {
@@ -771,7 +771,7 @@ message DeleteAdminTimetableHistoryCoverageData {
   AdminTimetableHistoryCoverageSummary middle = 4;
   AdminTimetableHistoryCoverageSummary next = 5;
   AdminTimetableHistoryCoverageSummary merged = 6;
-  map<uint32, HistoricalTimetable> timetable_mappings = 7;
+  map<uint32, HistoricalTimetableSummary> timetable_mappings = 7;
 }
 
 message DeleteAdminTimetableHistoryCoverageResponse {

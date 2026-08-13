@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file opencrh/v2/mappings.proto.
  */
 export const file_opencrh_v2_mappings: GenFile = /*@__PURE__*/
-  fileDesc("ChlvcGVuY3JoL3YyL21hcHBpbmdzLnByb3RvEgpvcGVuY3JoLnYyIuoBCg1UaW1ldGFibGVTdG9wEhIKCnN0YXRpb25fbm8YASABKA0SFAoMc3RhdGlvbl9uYW1lGAIgASgJEhoKDWFycml2ZV9vZmZzZXQYAyABKANIAIgBARIaCg1kZXBhcnRfb2Zmc2V0GAQgASgDSAGIAQESMQoSc3RhdGlvbl90cmFpbl9jb2RlGAUgASgLMhUub3BlbmNyaC52Mi5UcmFpbkNvZGUSEAoIaXNfc3RhcnQYBiABKAgSDgoGaXNfZW5kGAcgASgIQhAKDl9hcnJpdmVfb2Zmc2V0QhAKDl9kZXBhcnRfb2Zmc2V0IoECChNIaXN0b3JpY2FsVGltZXRhYmxlEhQKDHRpbWV0YWJsZV9pZBgBIAEoDRIaCg1zdGFydF9zdGF0aW9uGAIgASgJSACIAQESGAoLZW5kX3N0YXRpb24YAyABKAlIAYgBARIZCgxzdGFydF9vZmZzZXQYBCABKANIAogBARIXCgplbmRfb2Zmc2V0GAUgASgDSAOIAQESKAoFc3RvcHMYBiADKAsyGS5vcGVuY3JoLnYyLlRpbWV0YWJsZVN0b3BCEAoOX3N0YXJ0X3N0YXRpb25CDgoMX2VuZF9zdGF0aW9uQg8KDV9zdGFydF9vZmZzZXRCDQoLX2VuZF9vZmZzZXRiBnByb3RvMw", [file_opencrh_v2_identifiers]);
+  fileDesc("ChlvcGVuY3JoL3YyL21hcHBpbmdzLnByb3RvEgpvcGVuY3JoLnYyIuoBCg1UaW1ldGFibGVTdG9wEhIKCnN0YXRpb25fbm8YASABKA0SFAoMc3RhdGlvbl9uYW1lGAIgASgJEhoKDWFycml2ZV9vZmZzZXQYAyABKANIAIgBARIaCg1kZXBhcnRfb2Zmc2V0GAQgASgDSAGIAQESMQoSc3RhdGlvbl90cmFpbl9jb2RlGAUgASgLMhUub3BlbmNyaC52Mi5UcmFpbkNvZGUSEAoIaXNfc3RhcnQYBiABKAgSDgoGaXNfZW5kGAcgASgIQhAKDl9hcnJpdmVfb2Zmc2V0QhAKDl9kZXBhcnRfb2Zmc2V0IsgBChpIaXN0b3JpY2FsVGltZXRhYmxlU3VtbWFyeRIaCg1zdGFydF9zdGF0aW9uGAEgASgJSACIAQESGAoLZW5kX3N0YXRpb24YAiABKAlIAYgBARIZCgxzdGFydF9vZmZzZXQYAyABKANIAogBARIXCgplbmRfb2Zmc2V0GAQgASgDSAOIAQFCEAoOX3N0YXJ0X3N0YXRpb25CDgoMX2VuZF9zdGF0aW9uQg8KDV9zdGFydF9vZmZzZXRCDQoLX2VuZF9vZmZzZXRiBnByb3RvMw", [file_opencrh_v2_identifiers]);
 
 /**
  * @generated from message opencrh.v2.TimetableStop
@@ -62,44 +62,34 @@ export const TimetableStopSchema: GenMessage<TimetableStop> = /*@__PURE__*/
   messageDesc(file_opencrh_v2_mappings, 0);
 
 /**
- * @generated from message opencrh.v2.HistoricalTimetable
+ * @generated from message opencrh.v2.HistoricalTimetableSummary
  */
-export type HistoricalTimetable = Message<"opencrh.v2.HistoricalTimetable"> & {
+export type HistoricalTimetableSummary = Message<"opencrh.v2.HistoricalTimetableSummary"> & {
   /**
-   * @generated from field: uint32 timetable_id = 1;
-   */
-  timetableId: number;
-
-  /**
-   * @generated from field: optional string start_station = 2;
+   * @generated from field: optional string start_station = 1;
    */
   startStation?: string | undefined;
 
   /**
-   * @generated from field: optional string end_station = 3;
+   * @generated from field: optional string end_station = 2;
    */
   endStation?: string | undefined;
 
   /**
-   * @generated from field: optional int64 start_offset = 4;
+   * @generated from field: optional int64 start_offset = 3;
    */
   startOffset?: bigint | undefined;
 
   /**
-   * @generated from field: optional int64 end_offset = 5;
+   * @generated from field: optional int64 end_offset = 4;
    */
   endOffset?: bigint | undefined;
-
-  /**
-   * @generated from field: repeated opencrh.v2.TimetableStop stops = 6;
-   */
-  stops: TimetableStop[];
 };
 
 /**
- * Describes the message opencrh.v2.HistoricalTimetable.
- * Use `create(HistoricalTimetableSchema)` to create a new message.
+ * Describes the message opencrh.v2.HistoricalTimetableSummary.
+ * Use `create(HistoricalTimetableSummarySchema)` to create a new message.
  */
-export const HistoricalTimetableSchema: GenMessage<HistoricalTimetable> = /*@__PURE__*/
+export const HistoricalTimetableSummarySchema: GenMessage<HistoricalTimetableSummary> = /*@__PURE__*/
   messageDesc(file_opencrh_v2_mappings, 1);
 
