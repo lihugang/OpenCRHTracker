@@ -126,6 +126,11 @@ export interface ForceRefreshStationPlatformInfoForTrainCodesInput {
     trainCodes: readonly TrainCodeParts[];
 }
 
+export interface ForceRefreshStationPlatformInfoForStationTrainCodesInput extends ForceRefreshStationPlatformInfoForTrainCodesInput {
+    stationName: string;
+    stationTelecode: string;
+}
+
 export function createEmptyStationPlatformInfoRefreshResult(): StationPlatformInfoRefreshResult {
     return {
         localRowCount: 0,
@@ -1125,6 +1130,48 @@ export async function refreshStationPlatformInfoForTrainCodes(
             built,
             getPlatformInfoExpiresAt(getNowSeconds()),
             false
+        );
+    } catch (error) {
+        return createFailedStationPlatformInfoRefreshResult(built, error);
+    }
+}
+
+export async function forceRefreshStationPlatformInfoForStationTrainCodes(
+    input: ForceRefreshStationPlatformInfoForStationTrainCodesInput
+): Promise<StationPlatformInfoRefreshResult> {
+    const stationName = input.stationName.trim();
+    const stationTelecode = normalizeCode(input.stationTelecode);
+    if (
+        !hasMatchingPublishedSchedule(input.serviceDate) ||
+        stationName.length === 0 ||
+        stationTelecode.length === 0 ||
+        input.trainCodes.length === 0
+    ) {
+        return createEmptyStationPlatformInfoRefreshResult();
+    }
+
+    let built: BuiltStationPlatformInfoCandidates = {
+        localRowCount: 0,
+        skippedRowCount: 0,
+        candidates: []
+    };
+
+    try {
+        built = buildCandidatesForTrainCodes(
+            input.serviceDate,
+            input.trainCodes,
+            (stop) =>
+                stop.stationName.trim() === stationName &&
+                normalizeCode(stop.stationTelecode) === stationTelecode
+        );
+        return await refreshCandidates(
+            built,
+            getPlatformInfoExpiresAt(getNowSeconds()),
+            true,
+            {
+                requirePlatformNo: true,
+                allowCacheFallback: false
+            }
         );
     } catch (error) {
         return createFailedStationPlatformInfoRefreshResult(built, error);

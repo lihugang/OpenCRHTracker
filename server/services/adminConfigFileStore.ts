@@ -40,6 +40,7 @@ import {
 import { synchronizeQrcodeDetectionDispatchTasks } from '~/server/services/taskExecutors/dispatchQrcodeDetectionTasksExecutor';
 import { reloadQrcodeAssetAfterRefresh } from '~/server/services/taskExecutors/refreshAssetFileTaskExecutor';
 import { synchronizeDatabaseBackupTasks } from '~/server/services/taskExecutors/backupDatabaseTaskExecutor';
+import { synchronizeStationPlatformOverlapTask } from '~/server/services/taskExecutors/scanStationPlatformOverlapsTaskExecutor';
 import ApiRequestError from '~/server/utils/api/errors/ApiRequestError';
 import ensure from '~/server/utils/api/executor/ensure';
 import {
@@ -295,6 +296,7 @@ async function reloadConfigFromLocal(
     resetSafeRuntimeCaches();
     const qrcodeWarning = await reloadQrcodeDetectionAfterAssetChange();
     const backupTasks = synchronizeDatabaseBackupTasks();
+    const stationPlatformOverlapTask = synchronizeStationPlatformOverlapTask();
 
     const item = buildConfigFileItem('config');
     logger.info(
@@ -306,8 +308,8 @@ async function reloadConfigFromLocal(
         action: 'reload_local',
         summary:
             qrcodeWarning.length > 0
-                ? `已重载当前运行配置文件，并重新同步固定车组畅行码检测计划和数据库备份计划（${backupTasks.length} 个时刻）。${qrcodeWarning}`
-                : `已重载当前运行配置文件，并重新同步固定车组畅行码检测计划和数据库备份计划（${backupTasks.length} 个时刻）。`,
+                ? `已重载当前运行配置文件，并重新同步固定车组畅行码检测计划、数据库备份计划（${backupTasks.length} 个时刻）和站台重叠扫描计划（${stationPlatformOverlapTask.status}）。${qrcodeWarning}`
+                : `已重载当前运行配置文件，并重新同步固定车组畅行码检测计划、数据库备份计划（${backupTasks.length} 个时刻）和站台重叠扫描计划（${stationPlatformOverlapTask.status}）。`,
         item
     };
 }

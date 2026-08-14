@@ -85,6 +85,8 @@ export interface TodayScheduleStationIndexRow extends TodayScheduleRoute {
     arriveAt: number | null;
     departAt: number | null;
     platformNo: number | null;
+    isStart: boolean;
+    isEnd: boolean;
     clockSortAt: number;
     sortAt: number;
     stableKey: string;
@@ -843,6 +845,8 @@ function upsertStationRow(
         arriveAt: stop.arriveAt,
         departAt: stop.departAt,
         platformNo: normalizePlatformNo(stop.platformNo),
+        isStart: stop.isStart,
+        isEnd: stop.isEnd,
         clockSortAt,
         sortAt,
         stableKey: aggregationKey
@@ -888,6 +892,8 @@ function mergeStationRow(
     row.arriveAt = mergeNullableMin(row.arriveAt, stop.arriveAt);
     row.departAt = mergeNullableMax(row.departAt, stop.departAt);
     row.platformNo = row.platformNo ?? normalizePlatformNo(stop.platformNo);
+    row.isStart = row.isStart || stop.isStart;
+    row.isEnd = row.isEnd || stop.isEnd;
     row.sortAt = row.arriveAt ?? row.departAt ?? timetable.startAt;
     row.clockSortAt = buildStationClockSortAt(date, row.sortAt);
 }

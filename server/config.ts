@@ -125,6 +125,10 @@ interface DailyExportTaskConfig {
     dailyTimeHHmm: string;
 }
 
+interface StationPlatformOverlapTaskConfig {
+    dailyTimesHHmm: string[];
+}
+
 interface ReferenceModelTaskConfig {
     windowDays: number;
     batchSize: number;
@@ -197,7 +201,8 @@ const ALLOWED_STARTUP_TASK_EXECUTORS = [
     'cleanup_revoked_api_keys',
     'export_daily_records',
     'rebuild_reference_model_index',
-    'rebuild_train_circulation_index'
+    'rebuild_train_circulation_index',
+    'scan_station_platform_overlaps'
 ] as const;
 
 type StartupTaskExecutor = (typeof ALLOWED_STARTUP_TASK_EXECUTORS)[number];
@@ -410,6 +415,7 @@ export interface Config {
         };
         apiKeyCleanup: ApiKeyCleanupConfig;
         dailyExport: DailyExportTaskConfig;
+        stationPlatformOverlap: StationPlatformOverlapTaskConfig;
         referenceModel: ReferenceModelTaskConfig;
         circulation: CirculationTaskConfig;
         scheduleReadiness: ScheduleReadinessTaskConfig;
@@ -1476,6 +1482,10 @@ function validateConfig(raw: unknown): Config {
         'task.apiKeyCleanup'
     );
     const taskDailyExport = asObject(task.dailyExport, 'task.dailyExport');
+    const taskStationPlatformOverlap = asObject(
+        task.stationPlatformOverlap,
+        'task.stationPlatformOverlap'
+    );
     const taskReferenceModel = asObject(
         task.referenceModel,
         'task.referenceModel'
@@ -2266,6 +2276,12 @@ function validateConfig(raw: unknown): Config {
                     'task.dailyExport.dailyTimeHHmm'
                 )
             },
+            stationPlatformOverlap: {
+                dailyTimesHHmm: parseDailyTimesHHmm(
+                    taskStationPlatformOverlap.dailyTimesHHmm,
+                    'task.stationPlatformOverlap.dailyTimesHHmm'
+                )
+            },
             referenceModel: {
                 windowDays: asInteger(
                     taskReferenceModel.windowDays,
@@ -2680,6 +2696,10 @@ function validateConfig(raw: unknown): Config {
         const message = error instanceof Error ? error.message : String(error);
         assert(false, `task.dailyExport.dailyTimeHHmm is invalid: ${message}`);
     }
+    assert(
+        configResult.task.stationPlatformOverlap.dailyTimesHHmm.length > 0,
+        'task.stationPlatformOverlap.dailyTimesHHmm must not be empty'
+    );
     assert(
         configResult.task.referenceModel.threshold > 0 &&
             configResult.task.referenceModel.threshold <= 1,

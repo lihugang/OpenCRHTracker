@@ -1125,6 +1125,17 @@ export const deployDocsSections: DocsContentSection[] = [
                         description: '每日导出任务的执行时间。'
                     },
                     {
+                        path: 'task.stationPlatformOverlap.dailyTimesHHmm',
+                        valueType: 'array[string(HHmm)]',
+                        required: true,
+                        description:
+                            '按车站扫描站台占用重叠并触发冲突车站强制刷新任务的每日执行时刻。',
+                        notes: [
+                            '默认示例为 ["0840", "1140", "1440", "1740", "2040"]；数组不能为空且时间不能重复。',
+                            '任务使用上海时区，启动时只安排下一个配置时刻；每轮顺序读取一个车站，整个扫描任务按 idle 任务调度。'
+                        ]
+                    },
+                    {
                         path: 'task.referenceModel',
                         valueType: 'object',
                         required: true,
@@ -1324,6 +1335,7 @@ export const deployDocsSections: DocsContentSection[] = [
                     '升级到支持 OAuth 客户端删除的版本后，既有私有部署需要在 cost.fixed 中补充 authDeleteOauthClient，并按需在 api.permissions.issuedKeyDefaultScopes 中补充 api.auth.oauth-clients.delete。',
                     '提高 api.permissions.anonymousScopes、quota 或 cost 前，先确认你准备公开暴露的接口范围和限额策略。',
                     '修改 spider.scheduleProbe.prefixRules、task.referenceModel.dailyTimesHHmm、task.circulation.dailyTimesHHmm 或 task.scheduler 参数后，重启后应观察首轮任务执行是否符合预期。',
+                    '修改 task.stationPlatformOverlap.dailyTimesHHmm 后，管理员面板重载配置会立即替换未来的站台重叠扫描任务；应关注冲突车站数、请求数和强制刷新结果。',
                     '修改 spider.rateLimit.stationBoard 或 task.circulation.stationBoard 后，重启后应关注车站大屏相关抓取、重试与交路推断任务是否按预期工作。',
                     '修改 spider.stationPlatformInfo.ttlDays、spider.stationPlatformInfo.onDemandCooldownHours 或 spider.stationPlatformInfo.stationOnDemandCooldownHours 后需要重启；应同时关注 fetch_station_exit_info 和 fetch_station_transport_info 的请求量与失败统计。'
                 ]

@@ -48,6 +48,11 @@ import {
 import { registerFetchStationBoardTaskExecutor } from '~/server/services/taskExecutors/fetchStationBoardTaskExecutor';
 import { registerRefreshTrainStationPlatformTaskExecutor } from '~/server/services/taskExecutors/refreshTrainStationPlatformTaskExecutor';
 import { registerRefreshStationTimetablePlatformTaskExecutor } from '~/server/services/taskExecutors/refreshStationTimetablePlatformTaskExecutor';
+import {
+    SCAN_STATION_PLATFORM_OVERLAPS_TASK_EXECUTOR,
+    registerScanStationPlatformOverlapsTaskExecutor,
+    synchronizeStationPlatformOverlapTask
+} from '~/server/services/taskExecutors/scanStationPlatformOverlapsTaskExecutor';
 import { registerRefreshTrainCirculationTaskExecutor } from '~/server/services/taskExecutors/refreshTrainCirculationTaskExecutor';
 import { registerProbeTrainDepartureTaskExecutor } from '~/server/services/taskExecutors/probeTrainDepartureTaskExecutor';
 import { registerProbeQrcodeDetectionEmuTaskExecutor } from '~/server/services/taskExecutors/probeQrcodeDetectionEmuTaskExecutor';
@@ -287,6 +292,7 @@ export default defineNitroPlugin(async () => {
         registerFetchStationBoardTaskExecutor();
         registerRefreshTrainStationPlatformTaskExecutor();
         registerRefreshStationTimetablePlatformTaskExecutor();
+        registerScanStationPlatformOverlapsTaskExecutor();
         registerRefreshTrainCirculationTaskExecutor();
         registerProbeTrainDepartureTaskExecutor();
         registerProbeQrcodeDetectionEmuTaskExecutor();
@@ -432,6 +438,11 @@ export default defineNitroPlugin(async () => {
 
         enqueuedStartupTasks.push(...reconcileRefreshAssetTasks());
         enqueuedStartupTasks.push(...synchronizeDatabaseBackupTasks());
+        const stationPlatformOverlapTask =
+            synchronizeStationPlatformOverlapTask({ discardPending: true });
+        enqueuedStartupTasks.push(
+            `${SCAN_STATION_PLATFORM_OVERLAPS_TASK_EXECUTOR}:${stationPlatformOverlapTask.taskId ?? 'disabled'}:${stationPlatformOverlapTask.executionTime ?? 'none'}`
+        );
 
         logger.info(
             `enqueued_startup_tasks executionTime=${executionTime} enqueued=${JSON.stringify(enqueuedStartupTasks)}`

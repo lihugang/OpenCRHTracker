@@ -191,6 +191,34 @@ export const crawlDocsSections: DocsContentSection[] = [
         ]
     },
     {
+        id: 'station-platform-overlap',
+        title: '扫描站台占用重叠',
+        summary:
+            'scan_station_platform_overlaps 按配置时刻以 idle 任务运行，逐个读取当前已发布时刻表中的车站，并尝试修正同站台时间冲突。',
+        blocks: [
+            {
+                type: 'list',
+                title: '重叠与刷新规则',
+                items: [
+                    '始发车占用区间为发车前 5 分钟至发车时刻，终到车为到站时刻至到站后 5 分钟，过路车为到达前 2 分钟至发车后 2 分钟；区间端点相同也视为重叠。',
+                    '只比较同一车站、同一有效站台号且不属于同一 trainKey 的列车；站台未知或必要到发时间缺失的记录不参与判定。',
+                    '任务一次只读取一个车站的数据。发现重叠后，仅强制重新请求冲突列车在该车站的站台信息，不刷新其余经停站。',
+                    '同一轮任务使用服务日期、trainKey 和车站作为请求缓存键；同一列车参与多对冲突时只请求一次，失败或空结果也不会在本轮重试，下一配置时刻再复查。',
+                    '服务启动时不会立即补跑，只安排下一个 task.stationPlatformOverlap.dailyTimesHHmm 时刻；管理员重载配置时会立即重新同步未来任务。'
+                ]
+            },
+            {
+                type: 'code',
+                title: '相关配置',
+                language: 'text',
+                code: [
+                    'task.stationPlatformOverlap.dailyTimesHHmm',
+                    'spider.rateLimit.query.minIntervalMs'
+                ].join('\n')
+            }
+        ]
+    },
+    {
         id: 'dispatch-probe',
         title: '派发当日发车探测任务',
         summary:
