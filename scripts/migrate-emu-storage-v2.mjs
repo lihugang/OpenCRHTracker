@@ -105,6 +105,27 @@ const EMU_ARRAY_KEYS = new Set([
     'affectedEmuCodes',
     'mergedFromEmuCodes'
 ]);
+const V2_EMU_KEYS = new Set([
+    'emuId',
+    'primaryEmuId',
+    'candidateEmuId',
+    'relatedEmuId',
+    'configuredEmuId',
+    'scannedEmuId',
+    'untrustedEmuId',
+    'emu_id',
+    'primary_emu_id',
+    'candidate_emu_id',
+    'related_emu_id'
+]);
+const V2_EMU_ARRAY_KEYS = new Set([
+    'emuIds',
+    'emu_ids',
+    'persistedEmuIds',
+    'allEmuIds',
+    'affectedEmuIds',
+    'mergedFromEmuIds'
+]);
 const DATE_KEYS = new Set([
     'lastBuildDate',
     'startDay',
@@ -127,7 +148,8 @@ function parseArgs(argv) {
         config: resolve(repoRoot, 'data/config.json'),
         outputDir: resolve(repoRoot, 'data'),
         overrides: {},
-        scheduleFile: resolve(repoRoot, 'data/schedule.json')
+        scheduleFile: resolve(repoRoot, 'data/schedule.json'),
+        emuListFile: null
     };
     for (const arg of argv) {
         if (arg === '--apply') options.apply = true;
@@ -155,9 +177,11 @@ function parseArgs(argv) {
             options.overrides.users = resolve(repoRoot, arg.slice(8));
         else if (arg.startsWith('--schedule-file='))
             options.scheduleFile = resolve(repoRoot, arg.slice(16));
+        else if (arg.startsWith('--emu-list='))
+            options.emuListFile = resolve(repoRoot, arg.slice(11));
         else if (arg === '--help') {
             console.log(
-                'Usage: node scripts/migrate-emu-storage-v2.mjs [--apply] [--config=path] [--output-dir=path] [--schedule-file=path] [--emu=path] [--schedule=path] [--timetable-history=path] [--train-provenance=path] [--task=path] [--users=path]'
+                'Usage: node scripts/migrate-emu-storage-v2.mjs [--apply] [--config=path] [--output-dir=path] [--schedule-file=path] [--emu-list=path] [--emu=path] [--schedule=path] [--timetable-history=path] [--train-provenance=path] [--task=path] [--users=path]'
             );
             process.exit(0);
         } else throw new Error(`unknown_argument ${arg}`);
@@ -165,16 +189,114 @@ function parseArgs(argv) {
     return options;
 }
 
+function isRecord(value) {
+    return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function describeTrainValue(value) {
+    if (typeof value === 'string') return value.trim().toUpperCase();
+    try {
+        return JSON.stringify(value);
+    } catch {
+        return String(value);
+    }
+}
+
+function invalidTrain(value, context) {
+    throw new Error(
+        `invalid_train_code context=${context} value=${describeTrainValue(value)}`
+    );
+}
+
 function parseTrain(value, context = 'train') {
+    if (value === null) return null;
+    if (isRecord(value)) {
+        const prefix =
+            typeof value.prefix === 'string'
+                ? value.prefix.trim().toUpperCase()
+                : null;
+        const number = value.number;
+        if (
+            prefix !== null &&
+            /^[A-Z]?$/.test(prefix) &&
+            Number.isInteger(number) &&
+            number >= 0 &&
+            number <= 9999
+        ) {
+            return { prefix, number };
+        }
+        invalidTrain(value, context);
+    }
+    if (Array.isArray(value)) invalidTrain(value, context);
     const normalized = String(value ?? '')
         .trim()
         .toUpperCase();
     const match = /^([A-Z]?)([0-9]{1,4})$/.exec(normalized);
-    if (!match)
-        throw new Error(
-            `invalid_train_code context=${context} value=${normalized}`
-        );
+    if (!match) invalidTrain(value, context);
     return { prefix: match[1] ?? '', number: Number(match[2]) };
+}
+
+function assertNoUnsupportedV2Emu(value, context) {
+    if (!isRecord(value) || value[INTERNAL_JSON_MARKER] !== INTERNAL_JSON_VERSION)
+        return;
+
+    const visit = (node, key = '', parentKey = '', nodeContext = context) => {
+        if (
+            V2_EMU_KEYS.has(key) ||
+            V2_EMU_ARRAY_KEYS.has(key) ||
+            (parentKey === 'emu' && key === 'code' && typeof node === 'number')
+        ) {
+            throw new Error(
+                `unsupported_mixed_emu_schema context=${nodeContext}`
+            );
+        }
+        if (Array.isArray(node)) {
+            node.forEach((item, index) =>
+                visit(item, '', key, `${nodeContext}[${index}]`)
+            );
+        } else if (isRecord(node)) {
+            Object.entries(node).forEach(([childKey, childValue]) =>
+                visit(
+                    childValue,
+                    childKey,
+                    key,
+                    `${nodeContext}.${childKey}`
+                )
+            );
+        }
+    };
+
+    visit(value);
+}
+
+function unwrapInternalJson(value, semanticKey, context) {
+    if (!isRecord(value) || value[INTERNAL_JSON_MARKER] !== INTERNAL_JSON_VERSION)
+        return value;
+
+    assertNoUnsupportedV2Emu(value, context);
+    if (semanticKey) {
+        if (
+            value[INTERNAL_JSON_SEMANTIC_KEY] !== semanticKey ||
+            !Object.prototype.hasOwnProperty.call(value, 'value')
+        ) {
+            throw new Error(
+                `invalid_internal_json_semantic_value context=${context} expected=${semanticKey}`
+            );
+        }
+        return value.value;
+    }
+
+    if (
+        typeof value[INTERNAL_JSON_SEMANTIC_KEY] === 'string' &&
+        value[INTERNAL_JSON_SEMANTIC_KEY].length > 0
+    ) {
+        throw new Error(
+            `unexpected_internal_json_semantic_key context=${context} value=${value[INTERNAL_JSON_SEMANTIC_KEY]}`
+        );
+    }
+    if (Object.prototype.hasOwnProperty.call(value, 'value')) return value.value;
+    const { [INTERNAL_JSON_MARKER]: _version, ...body } = value;
+    return body;
 }
 
 function serviceDay(value, context = 'service_date') {
@@ -302,7 +424,8 @@ function encodeJson(value, key, mapping, context) {
 
 function stringifyInternalJson(raw, mapping, context, semanticKey = '') {
     const parsed = JSON.parse(String(raw ?? 'null'));
-    const encoded = encodeJson(parsed, semanticKey, mapping, context);
+    const payload = unwrapInternalJson(parsed, semanticKey, context);
+    const encoded = encodeJson(payload, semanticKey, mapping, context);
     const result = { [INTERNAL_JSON_MARKER]: INTERNAL_JSON_VERSION };
     if (semanticKey) {
         result[INTERNAL_JSON_SEMANTIC_KEY] = semanticKey;
@@ -565,6 +688,10 @@ function copyTable(source, target, table, mapping, kind) {
     return count;
 }
 
+function createEmuCodeMapping(codes) {
+    return new Map([...codes].sort().map((value, index) => [value, index + 1]));
+}
+
 function collectEmuCodes(sourceDbs) {
     const codes = new Set();
     for (const [kind, db] of sourceDbs) {
@@ -654,7 +781,85 @@ function collectEmuCodes(sourceDbs) {
             }
         }
     }
-    return new Map([...codes].sort().map((value, index) => [value, index + 1]));
+    return createEmuCodeMapping(codes);
+}
+
+function collectEmuCodesFromEmuListFile(emuListFile, mapping) {
+    if (!existsSync(emuListFile)) {
+        throw new Error(`emu_list_file_not_found path=${emuListFile}`);
+    }
+
+    const payload = readJson(emuListFile);
+    if (!isRecord(payload)) {
+        throw new Error(`invalid_emu_list_file path=${emuListFile}`);
+    }
+
+    const modelRows = payload.trainset_models;
+    if (!Array.isArray(modelRows)) {
+        throw new Error(`invalid_emu_list_models path=${emuListFile}`);
+    }
+    const modelById = new Map();
+    for (const [index, row] of modelRows.entries()) {
+        if (!isRecord(row) || !Number.isInteger(row.id) || row.id <= 0) {
+            throw new Error(
+                `invalid_emu_list_model path=${emuListFile} index=${index}`
+            );
+        }
+        const model = String(row.model ?? '').trim();
+        if (!model) {
+            throw new Error(
+                `invalid_emu_list_model_name path=${emuListFile} index=${index}`
+            );
+        }
+        if (modelById.has(row.id)) {
+            throw new Error(
+                `duplicate_emu_list_model_id path=${emuListFile} id=${row.id}`
+            );
+        }
+        modelById.set(row.id, model);
+    }
+
+    const trainsetRows = Array.isArray(payload.emu_trainsets)
+        ? payload.emu_trainsets
+        : payload.trainsets;
+    if (!Array.isArray(trainsetRows)) {
+        throw new Error(`invalid_emu_list_trainsets path=${emuListFile}`);
+    }
+
+    const allocationCodes = new Set();
+    for (const [index, row] of trainsetRows.entries()) {
+        if (!isRecord(row)) {
+            throw new Error(
+                `invalid_emu_list_trainset path=${emuListFile} index=${index}`
+            );
+        }
+        if (row.railway_travel_code_enabled === false) continue;
+        const model = modelById.get(row.model_id);
+        if (!model) {
+            throw new Error(
+                `unknown_emu_list_model path=${emuListFile} index=${index} modelId=${String(row.model_id)}`
+            );
+        }
+        const trainSetNo = String(row.car_no ?? '').trim();
+        if (!trainSetNo) {
+            throw new Error(
+                `invalid_emu_list_car_no path=${emuListFile} index=${index}`
+            );
+        }
+        allocationCodes.add(
+            normalizeEmu(`${model}-${trainSetNo}`, `EMUList.trainsets[${index}]`)
+        );
+    }
+
+    if (allocationCodes.size === 0) {
+        throw new Error(`emu_list_file_has_no_enabled_trainsets path=${emuListFile}`);
+    }
+
+    const codes = new Set([...mapping.keys(), ...allocationCodes]);
+    return {
+        mapping: createEmuCodeMapping(codes),
+        emuCodes: allocationCodes.size
+    };
 }
 
 function collectEmuCodesFromScheduleFile(scheduleFile, mapping) {
@@ -690,7 +895,7 @@ function collectEmuCodesFromScheduleFile(scheduleFile, mapping) {
             );
     };
     visit(readJson(scheduleFile));
-    return new Map([...codes].sort().map((value, index) => [value, index + 1]));
+    return createEmuCodeMapping(codes);
 }
 
 function copySqliteSequences(source, target) {
@@ -877,18 +1082,78 @@ function validateIndexes(target, kind) {
     }
 }
 
-function validateTarget(source, target, kind, copiedCounts, mapping) {
+function countTableRows(db, table) {
+    return db
+        .prepare(`SELECT COUNT(*) AS count FROM ${JSON.stringify(table)}`)
+        .get().count;
+}
+
+function validateUserEventSubscriptionsMigration(
+    source,
+    target,
+    copiedCounts,
+    authMigration
+) {
+    const sourceTables = new Set(tableNames(source));
+    const targetTables = new Set(tableNames(target));
+    const v1Table = 'user_event_subscriptions';
+    const v1BackupTable = 'user_event_subscriptions.v1.bak';
+    const v2Table = 'user_event_subscriptions_v2';
+    const sourceV2Count = sourceTables.has(v2Table)
+        ? countTableRows(source, v2Table)
+        : 0;
+    const copiedV2Count = copiedCounts.get(v2Table) ?? 0;
+    const convertedCount = authMigration?.subscriptionsConverted ?? 0;
+    const targetV2Count = countTableRows(target, v2Table);
+    const expectedV2Count = sourceV2Count + convertedCount;
+
+    if (
+        copiedV2Count !== sourceV2Count ||
+        targetV2Count !== expectedV2Count
+    ) {
+        throw new Error(
+            `row_count_mismatch database=users table=${v2Table} sourceExisting=${sourceV2Count} converted=${convertedCount} target=${targetV2Count}`
+        );
+    }
+
+    if (!sourceTables.has(v1Table)) return;
+    const sourceV1Count = countTableRows(source, v1Table);
+    if (!targetTables.has(v1BackupTable)) {
+        throw new Error(
+            `missing_target_table database=users table=${v1BackupTable}`
+        );
+    }
+    const targetV1BackupCount = countTableRows(target, v1BackupTable);
+    if (
+        copiedCounts.get(v1Table) !== sourceV1Count ||
+        authMigration?.subscriptionRows !== sourceV1Count ||
+        targetV1BackupCount !== sourceV1Count
+    ) {
+        throw new Error(
+            `row_count_mismatch database=users table=${v1BackupTable} source=${sourceV1Count} target=${targetV1BackupCount}`
+        );
+    }
+}
+
+function validateTarget(
+    source,
+    target,
+    kind,
+    copiedCounts,
+    mapping,
+    authMigration = null
+) {
     for (const table of tableNames(source)) {
-        if (kind === 'users' && table === 'user_event_subscriptions') {
+        if (
+            kind === 'users' &&
+            (table === 'user_event_subscriptions' ||
+                table === 'user_event_subscriptions_v2')
+        ) {
             continue;
         }
         if (isRebuiltTable(kind, table)) continue;
-        const sourceCount = source
-            .prepare(`SELECT COUNT(*) AS count FROM ${JSON.stringify(table)}`)
-            .get().count;
-        const targetCount = target
-            .prepare(`SELECT COUNT(*) AS count FROM ${JSON.stringify(table)}`)
-            .get().count;
+        const sourceCount = countTableRows(source, table);
+        const targetCount = countTableRows(target, table);
         if (
             sourceCount !== targetCount ||
             copiedCounts.get(table) !== sourceCount
@@ -897,6 +1162,14 @@ function validateTarget(source, target, kind, copiedCounts, mapping) {
                 `row_count_mismatch database=${kind} table=${table} source=${sourceCount} target=${targetCount}`
             );
         }
+    }
+    if (kind === 'users') {
+        validateUserEventSubscriptionsMigration(
+            source,
+            target,
+            copiedCounts,
+            authMigration
+        );
     }
     if (kind === 'EMUTracked') validateEmuCodeMapping(target, mapping);
     const foreignKeyErrors = target.prepare('PRAGMA foreign_key_check').all();
@@ -924,7 +1197,8 @@ function migrateScheduleFile(scheduleFile, mapping, apply) {
     }
     const rawText = readFileSync(scheduleFile, 'utf8').replace(/^\uFEFF/, '');
     const raw = JSON.parse(rawText);
-    const encoded = encodeJson(raw, '', mapping, 'schedule-file');
+    const payload = unwrapInternalJson(raw, '', 'schedule-file');
+    const encoded = encodeJson(payload, '', mapping, 'schedule-file');
     if (encoded && typeof encoded === 'object' && !Array.isArray(encoded)) {
         encoded.version = 8;
     }
@@ -957,13 +1231,24 @@ function atomicallyReplaceDatabase(sourcePath, stagedPath) {
 function loadConfigPaths(options) {
     const config = readJson(options.config);
     const databases = config?.data?.databases ?? {};
-    return Object.fromEntries(
-        Object.keys(SCHEMAS).map((kind) => [
-            kind,
-            options.overrides[kind] ??
-                resolve(repoRoot, databases[kind]?.path ?? `data/${kind}.db`)
-        ])
-    );
+    return {
+        sources: Object.fromEntries(
+            Object.keys(SCHEMAS).map((kind) => [
+                kind,
+                options.overrides[kind] ??
+                    resolve(
+                        repoRoot,
+                        databases[kind]?.path ?? `data/${kind}.db`
+                    )
+            ])
+        ),
+        emuListFile:
+            options.emuListFile ??
+            resolve(
+                repoRoot,
+                config?.data?.assets?.EMUList?.file ?? 'data/emu_list.json'
+            )
+    };
 }
 
 function authNormalizeTags(value) {
@@ -1286,16 +1571,20 @@ function reportAuthSkipped(skippedRecords) {
 }
 
 function migrate(options) {
-    const sources = loadConfigPaths(options);
+    const { sources, emuListFile } = loadConfigPaths(options);
     const sourceDbs = new Map(
         Object.entries(sources).map(([kind, path]) => [
             kind,
             new Database(path, { readonly: true })
         ])
     );
+    const emuList = collectEmuCodesFromEmuListFile(
+        emuListFile,
+        collectEmuCodes(sourceDbs)
+    );
     const mapping = collectEmuCodesFromScheduleFile(
         options.scheduleFile,
-        collectEmuCodes(sourceDbs)
+        emuList.mapping
     );
     const scheduleFile = migrateScheduleFile(
         options.scheduleFile,
@@ -1314,6 +1603,11 @@ function migrate(options) {
                 dryRun: !options.apply,
                 emuCodes: mapping.size,
                 sources,
+                emuListFile: {
+                    path: emuListFile,
+                    exists: true,
+                    emuCodes: emuList.emuCodes
+                },
                 scheduleFile,
                 authMigration: authDryRun
             },
@@ -1373,11 +1667,24 @@ function migrate(options) {
                 copySqliteSequences(source, output);
             });
             tx();
-            if (kind === 'users') {
-                authMigrateUsers(output, mapping, true, authSkippedRecords);
-            }
+            const authMigration =
+                kind === 'users'
+                    ? authMigrateUsers(
+                          output,
+                          mapping,
+                          true,
+                          authSkippedRecords
+                      )
+                    : null;
             output.pragma('foreign_keys = ON');
-            validateTarget(source, output, kind, copiedCounts, mapping);
+            validateTarget(
+                source,
+                output,
+                kind,
+                copiedCounts,
+                mapping,
+                authMigration
+            );
             output.close();
         }
         for (const db of sourceDbs.values()) db.close();
