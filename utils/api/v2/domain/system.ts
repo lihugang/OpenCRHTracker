@@ -77,19 +77,16 @@ function mapExposedConfig(data: GetExposedConfigData): AboutExposedConfigData {
                 perRecord: {
                     recordsDaily: {
                         unitCost: perRecord.recordsDaily!.unitCost,
-                        rounding:
-                            perRecord.recordsDaily!.rounding as 'ceil'
+                        rounding: perRecord.recordsDaily!.rounding as 'ceil'
                     },
                     timetableTrainHistory: {
-                        unitCost:
-                            perRecord.timetableTrainHistory!.unitCost,
-                        rounding:
-                            perRecord.timetableTrainHistory!.rounding as 'ceil'
+                        unitCost: perRecord.timetableTrainHistory!.unitCost,
+                        rounding: perRecord.timetableTrainHistory!
+                            .rounding as 'ceil'
                     },
                     timetableStation: {
                         unitCost: perRecord.timetableStation!.unitCost,
-                        rounding:
-                            perRecord.timetableStation!.rounding as 'ceil'
+                        rounding: perRecord.timetableStation!.rounding as 'ceil'
                     },
                     historyTrain: {
                         unitCost: perRecord.historyTrain!.unitCost,

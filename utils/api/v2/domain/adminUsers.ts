@@ -67,11 +67,16 @@ function mapSponsorshipGroupSummary(item: {
     };
 }
 
-function mapEffectiveQuota(item: {
-    tokenLimit: number;
-    refillAmount: number;
-    refillIntervalSeconds: number;
-} | null | undefined) {
+function mapEffectiveQuota(
+    item:
+        | {
+              tokenLimit: number;
+              refillAmount: number;
+              refillIntervalSeconds: number;
+          }
+        | null
+        | undefined
+) {
     if (!item) {
         return {
             tokenLimit: 0,
@@ -99,11 +104,13 @@ function mapUserListItem(item: {
         startsAt: bigint | number;
         expiresAt: bigint | number;
     }>;
-    effectiveQuota?: {
-        tokenLimit: number;
-        refillAmount: number;
-        refillIntervalSeconds: number;
-    } | undefined;
+    effectiveQuota?:
+        | {
+              tokenLimit: number;
+              refillAmount: number;
+              refillIntervalSeconds: number;
+          }
+        | undefined;
 }): AdminUserListItem {
     return {
         userId: item.userId,
@@ -147,10 +154,8 @@ function mapUserMemberships(
                       assignable: item.group.assignable,
                       sortOrder: item.group.sortOrder,
                       quota: {
-                          tokenLimit:
-                              item.group.quota?.tokenLimit ?? null,
-                          refillAmount:
-                              item.group.quota?.refillAmount ?? null
+                          tokenLimit: item.group.quota?.tokenLimit ?? null,
+                          refillAmount: item.group.quota?.refillAmount ?? null
                       },
                       permissionGroups: item.group.permissionGroups.map(
                           (group) => ({
@@ -195,10 +200,8 @@ function mapUserMemberships(
         effectiveQuota: mapEffectiveQuota(data.effectiveQuota),
         quotaBreakdown: {
             baseline: {
-                tokenLimit:
-                    data.quotaBreakdown?.baseline?.tokenLimit ?? 0,
-                refillAmount:
-                    data.quotaBreakdown?.baseline?.refillAmount ?? 0
+                tokenLimit: data.quotaBreakdown?.baseline?.tokenLimit ?? 0,
+                refillAmount: data.quotaBreakdown?.baseline?.refillAmount ?? 0
             },
             sponsorship: {
                 tokenLimit:

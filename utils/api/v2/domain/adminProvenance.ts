@@ -340,8 +340,7 @@ function mapCouplingScanCandidate(item: {
         occupiedRoutes: item.occupiedRoutes
             .map((route) => mapRouteSnapshot(route as never))
             .filter(
-                (route): route is AdminTrainRouteSnapshot =>
-                    route !== null
+                (route): route is AdminTrainRouteSnapshot => route !== null
             ),
         detail: mapStruct(item.detail),
         createdAt: protoInt64ToNumber(item.createdAt) ?? 0
@@ -395,30 +394,27 @@ function mapQrcodeDetail(
         date: data.date,
         detectedAt: data.detectedAt,
         summary: data.summary ? mapQrcodeSummary(data.summary) : null,
-        tasks: data.tasks.map(
-            (item): AdminQrcodeScanTimeDetailTaskItem => {
-                const taskRun = item.taskRun;
-                return {
-                    taskRun: {
-                        id: taskRun?.id ?? 0,
-                        schedulerTaskId: taskRun?.schedulerTaskId ?? 0,
-                        executor: taskRun?.executor ?? '',
-                        status: mapTaskRunStatus(taskRun?.status ?? 0),
-                        startedAt:
-                            protoInt64ToNumber(taskRun?.startedAt) ?? 0,
-                        finishedAt: protoInt64ToNumber(taskRun?.finishedAt),
-                        serviceDate: taskRun
-                            ? epochServiceDayToDateString(taskRun.serviceDay)
-                            : '',
-                        detectedAt: taskRun?.detectedAt ?? '',
-                        emuCode: taskRun?.emuCode ?? '',
-                        manualNow: taskRun?.manualNow ?? false,
-                        taskArgs: mapStruct(taskRun?.taskArgs)
-                    },
-                    timeline: item.timeline.map(mapEvent)
-                };
-            }
-        )
+        tasks: data.tasks.map((item): AdminQrcodeScanTimeDetailTaskItem => {
+            const taskRun = item.taskRun;
+            return {
+                taskRun: {
+                    id: taskRun?.id ?? 0,
+                    schedulerTaskId: taskRun?.schedulerTaskId ?? 0,
+                    executor: taskRun?.executor ?? '',
+                    status: mapTaskRunStatus(taskRun?.status ?? 0),
+                    startedAt: protoInt64ToNumber(taskRun?.startedAt) ?? 0,
+                    finishedAt: protoInt64ToNumber(taskRun?.finishedAt),
+                    serviceDate: taskRun
+                        ? epochServiceDayToDateString(taskRun.serviceDay)
+                        : '',
+                    detectedAt: taskRun?.detectedAt ?? '',
+                    emuCode: taskRun?.emuCode ?? '',
+                    manualNow: taskRun?.manualNow ?? false,
+                    taskArgs: mapStruct(taskRun?.taskArgs)
+                },
+                timeline: item.timeline.map(mapEvent)
+            };
+        })
     };
 }
 
@@ -470,31 +466,33 @@ function mapRequestType(value: number): AdminTrainDataRequestType {
 
 function mapRequestTypeSummary(item: {
     type: number;
-    metrics?: {
-        total: number;
-        success: number;
-        failure: number;
-        successRate?: number | undefined;
-    } | undefined;
-    comparison?: {
-        compareTotal: number;
-        compareSuccess: number;
-        compareFailure: number;
-        totalDelta: number;
-        successDelta: number;
-        failureDelta: number;
-        totalChangeRatio?: number | undefined;
-        successChangeRatio?: number | undefined;
-        failureChangeRatio?: number | undefined;
-    } | undefined;
+    metrics?:
+        | {
+              total: number;
+              success: number;
+              failure: number;
+              successRate?: number | undefined;
+          }
+        | undefined;
+    comparison?:
+        | {
+              compareTotal: number;
+              compareSuccess: number;
+              compareFailure: number;
+              totalDelta: number;
+              successDelta: number;
+              failureDelta: number;
+              totalChangeRatio?: number | undefined;
+              successChangeRatio?: number | undefined;
+              failureChangeRatio?: number | undefined;
+          }
+        | undefined;
 }): AdminTrainDataRequestTypeSummary {
     const metrics = item.metrics;
     const comparison = item.comparison;
     return {
         type: mapRequestType(item.type),
-        ...mapRequestMetrics(
-            metrics ?? { total: 0, success: 0, failure: 0 }
-        ),
+        ...mapRequestMetrics(metrics ?? { total: 0, success: 0, failure: 0 }),
         compareTotal: comparison?.compareTotal ?? 0,
         compareSuccess: comparison?.compareSuccess ?? 0,
         compareFailure: comparison?.compareFailure ?? 0,
@@ -546,10 +544,8 @@ function mapRequestStats(
                 successDelta: hour.comparison?.successDelta ?? 0,
                 failureDelta: hour.comparison?.failureDelta ?? 0,
                 totalChangeRatio: hour.comparison?.totalChangeRatio ?? null,
-                successChangeRatio:
-                    hour.comparison?.successChangeRatio ?? null,
-                failureChangeRatio:
-                    hour.comparison?.failureChangeRatio ?? null,
+                successChangeRatio: hour.comparison?.successChangeRatio ?? null,
+                failureChangeRatio: hour.comparison?.failureChangeRatio ?? null,
                 types: hour.types.map(mapRequestTypeSummary)
             })
         )
@@ -741,14 +737,11 @@ function mapPlatformRefresh(
                   candidateCount: summary?.candidateCount ?? 0,
                   updatedCount: summary?.updatedCount ?? 0,
                   cacheHitCount: summary?.cacheHitCount ?? 0,
-                  cacheFallbackCount:
-                      summary?.cacheFallbackCount ?? 0,
+                  cacheFallbackCount: summary?.cacheFallbackCount ?? 0,
                   noDataCount: summary?.noDataCount ?? 0,
                   failedCount: summary?.failedCount ?? 0,
                   taskRunId: result.taskRunId,
-                  serviceDate: epochServiceDayToDateString(
-                      result.serviceDay
-                  ),
+                  serviceDate: epochServiceDayToDateString(result.serviceDay),
                   startAt: protoInt64ToNumber(result.startAt),
                   primaryTrainCode: result.primaryTrainCode,
                   trainCodes: result.trainCodes,
