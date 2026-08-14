@@ -75,6 +75,7 @@ export const EXPORTS_MANIFEST_ENTRIES = {
             kind: 'csv',
             isRequested: (query) =>
                 query.binary === '1' || query.binary === 'true',
+            resolveContentType: () => 'text/csv',
             build: (data) => ({
                 content: Buffer.from(
                     (data as { content: Uint8Array }).content

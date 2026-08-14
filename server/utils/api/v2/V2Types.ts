@@ -26,6 +26,9 @@ export type V2AuthRateLimitKey = 'login' | 'register' | 'oauthAuthorize';
 export interface V2RawMediaSpec<TData> {
     kind: 'png' | 'pdf' | 'csv';
     isRequested: (query: Readonly<Record<string, unknown>>) => boolean;
+    resolveContentType: (
+        query: Readonly<Record<string, unknown>>
+    ) => string | null;
     build: (data: TData) => {
         content: string | Uint8Array;
         contentType: string;

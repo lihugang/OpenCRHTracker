@@ -298,6 +298,15 @@ export const LOOKUP_MANIFEST_ENTRIES = {
             kind: 'png',
             isRequested: (query) =>
                 query.binary === '1' || query.binary === 'true',
+            resolveContentType: (query) => {
+                if (query.format === undefined || query.format === 'png') {
+                    return 'image/png';
+                }
+                if (query.format === 'pdf') {
+                    return 'application/pdf';
+                }
+                return null;
+            },
             build: (data) => ({
                 content: (data as GetTrainCirculationImageData)
                     .content as Uint8Array,

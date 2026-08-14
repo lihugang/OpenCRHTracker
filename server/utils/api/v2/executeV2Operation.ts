@@ -35,6 +35,7 @@ import setCommonHeaders from '~/server/utils/api/response/setCommonHeaders';
 import assertRequiredScopes from '~/server/utils/api/scopes/assertRequiredScopes';
 import { encodeMessageToJson } from '~/server/utils/api/v2/jsonCodec';
 import {
+    acceptsResponseMediaType,
     negotiateResponseCodec,
     parseRequestBodyCodec
 } from '~/server/utils/api/v2/negotiation';
@@ -378,9 +379,28 @@ export default async function executeV2Operation(
 
     const failures: V2TransportFailure[] = [];
     let codec: V2ResponseCodec = 'json';
+    const query = getQuery(event) as Readonly<Record<string, unknown>>;
+    const rawMediaRequested = entry.rawMedia?.isRequested(query) === true;
+    const rawMediaContentType = rawMediaRequested
+        ? (entry.rawMedia?.resolveContentType(query) ?? null)
+        : null;
 
     try {
-        codec = negotiateResponseCodec(getHeader(event, 'accept'));
+        const accept = getHeader(event, 'accept');
+        if (
+            rawMediaContentType !== null &&
+            !acceptsResponseMediaType(accept, rawMediaContentType)
+        ) {
+            const failure: V2TransportFailure = {
+                statusCode: 406,
+                errorCode: 'not_acceptable',
+                userMessage: `Accept 不支持 ${rawMediaContentType}`
+            };
+            throw failure;
+        }
+        if (!rawMediaRequested) {
+            codec = negotiateResponseCodec(accept);
+        }
     } catch (error) {
         if (isTransportFailure(error)) {
             failures.push(error);
@@ -564,7 +584,7 @@ export default async function executeV2Operation(
                 params: (event.context.params ?? {}) as Readonly<
                     Record<string, string>
                 >,
-                query: getQuery(event) as Readonly<Record<string, unknown>>,
+                query,
                 request: request!
             });
         } catch (error) {
@@ -676,7 +696,7 @@ export default async function executeV2Operation(
         setHeader(event, 'CDN-Cache-Control', headers.cdnCacheControl);
     }
 
-    if (entry.rawMedia && entry.rawMedia.isRequested(getQuery(event))) {
+    if (entry.rawMedia && rawMediaRequested) {
         const raw = entry.rawMedia.build(data as never);
         mergeVaryHeader(event, 'Accept');
         setHeader(event, 'Content-Type', raw.contentType);

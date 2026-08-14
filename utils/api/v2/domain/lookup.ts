@@ -710,6 +710,9 @@ export async function fetchTrainCirculationImageRaw(
                 binary: true
             }
         },
-        mode
+        mode,
+        {
+            rawContentType: format === 'pdf' ? 'application/pdf' : 'image/png'
+        }
     );
 }

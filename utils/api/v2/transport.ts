@@ -27,6 +27,10 @@ export interface V2RequestOptions extends Record<string, unknown> {
     onResponseError?: (context: { response?: unknown }) => void | Promise<void>;
 }
 
+export interface V2RawRequestOptions extends V2RequestOptions {
+    rawContentType?: string;
+}
+
 export interface V2ApiSuccess<TData> {
     ok: true;
     data: TData;
@@ -405,7 +409,7 @@ export async function requestV2Raw(
     entry: V2ClientOperation,
     input: V2RequestInput,
     mode: 'blob' | 'arrayBuffer' | 'text',
-    options: V2RequestOptions = {}
+    options: V2RawRequestOptions = {}
 ): Promise<Blob | ArrayBuffer | string> {
     const url = buildV2Url(entry, input);
     const responseHolder: { response: Response | null } = {
@@ -415,10 +419,32 @@ export async function requestV2Raw(
     const headers = new Headers(
         (options.headers as HeadersInit | undefined) ?? undefined
     );
-    if (entry.rawContentTypes && entry.rawContentTypes.length > 0) {
-        headers.set('Accept', entry.rawContentTypes[0]!);
+    const requestedContentType =
+        options.rawContentType ?? entry.rawContentTypes?.[0];
+    if (
+        requestedContentType &&
+        entry.rawContentTypes &&
+        !entry.rawContentTypes.some(
+            (contentType) =>
+                getMediaType(contentType) === getMediaType(requestedContentType)
+        )
+    ) {
+        throw new V2ApiError(
+            entry.operationName,
+            null,
+            'invalid_raw_content_type',
+            '请求的下载响应格式未在接口中登记'
+        );
     }
-    const { onResponse: callerOnResponse, onResponseError, ...rest } = options;
+    if (requestedContentType) {
+        headers.set('Accept', requestedContentType);
+    }
+    const {
+        rawContentType: _rawContentType,
+        onResponse: callerOnResponse,
+        onResponseError,
+        ...rest
+    } = options;
 
     try {
         const raw = await fetchImpl<Blob | ArrayBuffer | string>(url, {
@@ -441,15 +467,11 @@ export async function requestV2Raw(
         });
 
         const status = responseHolder.response?.status ?? 200;
-        if (entry.rawContentTypes && entry.rawContentTypes.length > 0) {
+        if (requestedContentType) {
             const mediaType = getMediaType(
                 responseHolder.response?.headers.get('content-type')
             );
-            if (
-                !entry.rawContentTypes.some(
-                    (contentType) => getMediaType(contentType) === mediaType
-                )
-            ) {
+            if (getMediaType(requestedContentType) !== mediaType) {
                 throw new V2ApiError(
                     entry.operationName,
                     status,

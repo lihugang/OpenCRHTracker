@@ -86,6 +86,27 @@ function qualityFor(
     return bestQuality;
 }
 
+export function acceptsResponseMediaType(
+    acceptValue: string | null | undefined,
+    contentType: string
+) {
+    const entries = parseAcceptList(acceptValue);
+    if (entries === null) {
+        return true;
+    }
+
+    const [type, subtype] = contentType
+        .split(';', 1)[0]!
+        .trim()
+        .toLowerCase()
+        .split('/');
+    if (!type || !subtype) {
+        return false;
+    }
+
+    return qualityFor(entries, type, subtype) > 0;
+}
+
 export function negotiateResponseCodec(
     acceptValue: string | null | undefined
 ): V2ResponseCodec {
