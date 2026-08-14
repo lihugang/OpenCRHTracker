@@ -33,6 +33,21 @@ function toFeedbackString(
     return value === undefined ? undefined : enumJsonName(schema, value);
 }
 
+function toFeedbackSecondaryString(value: number | undefined) {
+    const name = toFeedbackString(FeedbackSecondaryTypeSchema, value);
+    return name === 'empty' ? '' : name;
+}
+
+function toFeedbackTopicResponse<T extends { secondaryType: string }>(
+    topic: T
+) {
+    return {
+        ...topic,
+        secondaryType:
+            topic.secondaryType === '' ? 'empty' : topic.secondaryType
+    };
+}
+
 export async function getFeedbackTopicsV2Adapter(ctx: V2OperationContext) {
     const rawView =
         typeof ctx.query.view === 'string' ? ctx.query.view : 'public';
@@ -90,7 +105,7 @@ export async function getFeedbackTopicsV2Adapter(ctx: V2OperationContext) {
         'cursor 无效'
     );
 
-    return getFeedbackTopics(ctx.identity, {
+    const result = getFeedbackTopics(ctx.identity, {
         view: rawView as 'public' | 'mine' | 'all',
         primaryType: rawPrimaryType as never,
         secondaryType: rawSecondaryType as never,
@@ -98,6 +113,16 @@ export async function getFeedbackTopicsV2Adapter(ctx: V2OperationContext) {
         cursor,
         limit: parseLimit(ctx.event)
     });
+
+    return {
+        ...result,
+        primaryType:
+            result.primaryType === '' ? 'unspecified' : result.primaryType,
+        secondaryType:
+            result.secondaryType === '' ? 'unspecified' : result.secondaryType,
+        status: result.status === '' ? 'unspecified' : result.status,
+        items: result.items.map(toFeedbackTopicResponse)
+    };
 }
 
 export async function postFeedbackTopicsV2Adapter(ctx: V2OperationContext) {
@@ -112,8 +137,7 @@ export async function postFeedbackTopicsV2Adapter(ctx: V2OperationContext) {
             FeedbackPrimaryTypeSchema,
             request.primaryType ?? 0
         ) as never,
-        secondaryType: enumJsonName(
-            FeedbackSecondaryTypeSchema,
+        secondaryType: toFeedbackSecondaryString(
             request.secondaryType ?? 0
         ) as never,
         visibility: enumJsonName(
@@ -125,28 +149,40 @@ export async function postFeedbackTopicsV2Adapter(ctx: V2OperationContext) {
 }
 
 export async function getFeedbackTopicV2Adapter(ctx: V2OperationContext) {
+    const detail = getFeedbackTopic(ctx.identity, Number(ctx.params.id ?? ''));
+    const { permissions, messages, ...topic } = detail;
+
     return {
-        topic: getFeedbackTopic(ctx.identity, Number(ctx.params.id ?? ''))
+        topic: {
+            topic: toFeedbackTopicResponse(topic),
+            permissions,
+            messages
+        }
     };
 }
 
 export async function patchFeedbackTopicV2Adapter(ctx: V2OperationContext) {
     const request = ctx.request as Record<string, unknown>;
-    return patchFeedbackTopic(ctx.identity, Number(ctx.params.id ?? ''), {
-        primaryType: toFeedbackString(
-            FeedbackPrimaryTypeSchema,
-            request.primaryType as number | undefined
-        ),
-        secondaryType: toFeedbackString(
-            FeedbackSecondaryTypeSchema,
-            request.secondaryType as number | undefined
-        ),
-        status: toFeedbackString(
-            FeedbackStatusSchema,
-            request.status as number | undefined
-        ),
-        title: typeof request.title === 'string' ? request.title : undefined
-    });
+    const result = await patchFeedbackTopic(
+        ctx.identity,
+        Number(ctx.params.id ?? ''),
+        {
+            primaryType: toFeedbackString(
+                FeedbackPrimaryTypeSchema,
+                request.primaryType as number | undefined
+            ),
+            secondaryType: toFeedbackSecondaryString(
+                request.secondaryType as number | undefined
+            ),
+            status: toFeedbackString(
+                FeedbackStatusSchema,
+                request.status as number | undefined
+            ),
+            title: typeof request.title === 'string' ? request.title : undefined
+        }
+    );
+
+    return toFeedbackTopicResponse(result);
 }
 
 export async function deleteFeedbackTopicV2Adapter(ctx: V2OperationContext) {

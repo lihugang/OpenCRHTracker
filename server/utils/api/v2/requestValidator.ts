@@ -76,47 +76,28 @@ function normalizeFieldValue(
         case 'enum':
             return resolveEnumNumber(field.enum, jsonValue, path);
         case 'message': {
-            if (
-                field.message.typeName === 'google.protobuf.Struct' ||
-                field.message.typeName === 'google.protobuf.Value' ||
-                field.message.typeName === 'google.protobuf.ListValue'
-            ) {
-                return jsonValue;
-            }
-
-            if (
-                jsonValue === null ||
-                typeof jsonValue !== 'object' ||
-                Array.isArray(jsonValue)
-            ) {
-                return jsonValue;
-            }
-
-            const objectValue = jsonValue as Record<string, unknown>;
-            const normalized: Record<string, unknown> = {};
-            for (const [key, value] of Object.entries(objectValue)) {
-                const fieldDescriptor = field.message.fields.find(
-                    (candidate) =>
-                        candidate.jsonName === key || candidate.name === key
-                );
-                normalized[key] = fieldDescriptor
-                    ? normalizeFieldValue(
-                          fieldDescriptor,
-                          value,
-                          `${path}.${key}`
-                      )
-                    : value;
-            }
-            return normalized;
+            return normalizeMessageValue(field.message, jsonValue, path);
         }
         case 'list': {
             if (!Array.isArray(jsonValue)) {
                 return jsonValue;
             }
 
-            return jsonValue.map((item, index) =>
-                normalizeFieldValue(field, item, `${path}[${index}]`)
-            );
+            return jsonValue.map((item, index) => {
+                const itemPath = `${path}[${index}]`;
+                switch (field.listKind) {
+                    case 'enum':
+                        return resolveEnumNumber(field.enum, item, itemPath);
+                    case 'message':
+                        return normalizeMessageValue(
+                            field.message,
+                            item,
+                            itemPath
+                        );
+                    default:
+                        return item;
+                }
+            });
         }
         case 'map': {
             if (
@@ -130,11 +111,26 @@ function normalizeFieldValue(
             const objectValue = jsonValue as Record<string, unknown>;
             const normalized: Record<string, unknown> = {};
             for (const [key, value] of Object.entries(objectValue)) {
-                normalized[key] = normalizeFieldValue(
-                    field,
-                    value,
-                    `${path}[${key}]`
-                );
+                const valuePath = `${path}[${key}]`;
+                switch (field.mapKind) {
+                    case 'enum':
+                        normalized[key] = resolveEnumNumber(
+                            field.enum,
+                            value,
+                            valuePath
+                        );
+                        break;
+                    case 'message':
+                        normalized[key] = normalizeMessageValue(
+                            field.message,
+                            value,
+                            valuePath
+                        );
+                        break;
+                    default:
+                        normalized[key] = value;
+                        break;
+                }
             }
             return normalized;
         }
@@ -143,11 +139,24 @@ function normalizeFieldValue(
     }
 }
 
-export function normalizeRequestJsonEnums(
+function normalizeMessageValue(
     schema: DescMessage,
-    jsonValue: unknown
+    jsonValue: unknown,
+    path: string
 ): unknown {
-    if (typeof jsonValue !== 'object' || jsonValue === null) {
+    if (
+        schema.typeName === 'google.protobuf.Struct' ||
+        schema.typeName === 'google.protobuf.Value' ||
+        schema.typeName === 'google.protobuf.ListValue'
+    ) {
+        return jsonValue;
+    }
+
+    if (
+        jsonValue === null ||
+        typeof jsonValue !== 'object' ||
+        Array.isArray(jsonValue)
+    ) {
         return jsonValue;
     }
 
@@ -158,10 +167,21 @@ export function normalizeRequestJsonEnums(
             (candidate) => candidate.jsonName === key || candidate.name === key
         );
         normalized[key] = field
-            ? normalizeFieldValue(field, value, key)
+            ? normalizeFieldValue(
+                  field,
+                  value,
+                  path.length === 0 ? key : `${path}.${key}`
+              )
             : value;
     }
     return normalized;
+}
+
+export function normalizeRequestJsonEnums(
+    schema: DescMessage,
+    jsonValue: unknown
+): unknown {
+    return normalizeMessageValue(schema, jsonValue, '');
 }
 
 function validateMessageEnums(
