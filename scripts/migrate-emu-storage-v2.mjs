@@ -253,6 +253,12 @@ function encodeJson(value, key, mapping, context) {
             return id;
         });
     }
+    if (
+        key === 'lastBuildDate' &&
+        typeof value === 'string' &&
+        value.trim() === ''
+    )
+        return 0;
     if (DATE_KEYS.has(key) && typeof value === 'string')
         return serviceDay(value, `${context}.${key}`);
     if (Array.isArray(value))
