@@ -155,11 +155,11 @@ const CURSOR_QUERY: OpenApiParameter = {
     name: 'cursor',
     in: 'query',
     description:
-        '分页游标，格式为 serviceDay:id（例如 20260814:681106）。第一页不需要传，翻页时直接复用上一页响应里的 nextCursor。',
+        '分页游标，格式为 serviceDay:id（例如 20679:681106）。第一页不需要传，翻页时直接复用上一页响应里的 nextCursor。serviceDay 是按上海时间自 1970-01-01 起的天数（epoch day），不是日期字符串。',
     schema: {
         type: 'string'
     },
-    example: '20260814:681106'
+    example: '20679:681106'
 };
 
 const LIMIT_QUERY: OpenApiParameter = {
@@ -432,7 +432,7 @@ export const V2_DOC_ENDPOINTS: V2DocEndpointMetadata[] = [
             },
             {
                 question: 'serviceDay 为什么是数字而不是日期字符串？',
-                answer: 'v2 统一使用 YYYYMMDD 形式的数字表示服务日期，例如 20260814 就是 2026 年 8 月 14 日。'
+                answer: 'serviceDay 表示服务日期，是按上海时间自 1970-01-01 起的天数（epoch day），例如 2026-08-14 对应 20679。它只是内部表示，需要展示日期时再换算即可。'
             }
         ],
         parameters: [DAILY_DATE_QUERY, LIMIT_QUERY, CURSOR_QUERY],
@@ -455,7 +455,7 @@ export const V2_DOC_ENDPOINTS: V2DocEndpointMetadata[] = [
                 query: {
                     date: '20260814',
                     limit: '2',
-                    cursor: '20260814:681106'
+                    cursor: '20679:681106'
                 }
             }
         ],
@@ -465,14 +465,14 @@ export const V2_DOC_ENDPOINTS: V2DocEndpointMetadata[] = [
                 cost: 2
             },
             data: {
-                serviceDay: 20260814,
+                serviceDay: 20679,
                 cursor: '',
                 limit: 2,
-                nextCursor: '20260814:681106',
+                nextCursor: '20679:681106',
                 items: [
                     {
                         id: 681107,
-                        serviceDay: 20260814,
+                        serviceDay: 20679,
                         timetableId: 5096,
                         emuId: 2844,
                         trainCode: {
@@ -482,7 +482,7 @@ export const V2_DOC_ENDPOINTS: V2DocEndpointMetadata[] = [
                     },
                     {
                         id: 681106,
-                        serviceDay: 20260814,
+                        serviceDay: 20679,
                         timetableId: 5096,
                         emuId: 2844,
                         trainCode: {
@@ -588,7 +588,7 @@ export const V2_DOC_ENDPOINTS: V2DocEndpointMetadata[] = [
                 endStation: '北京北',
                 startAt: 1786665600,
                 endAt: 1786672800,
-                serviceDay: 20260814,
+                serviceDay: 20679,
                 circulation: {
                     source: 'official',
                     refreshAt: 1786668000,
@@ -842,7 +842,7 @@ export const V2_DOC_ENDPOINTS: V2DocEndpointMetadata[] = [
             {
                 question:
                     'items 里的 serviceDayStart 和 serviceDayEndExclusive 是什么意思？',
-                answer: '它们表示这份时刻表的生效区间：从 serviceDayStart 当天开始，到 serviceDayEndExclusive 当天之前结束，即结束日期是不包含在区间内的。'
+                answer: '它们表示这份时刻表的生效区间：从 serviceDayStart 当天开始，到 serviceDayEndExclusive 当天之前结束，即结束日期不包含在区间内。这两个值都是按上海时间自 1970-01-01 起的天数（epoch day），例如 20575 对应 2026-05-02。'
             },
             {
                 question: '为什么历史详情没有单独的接口了？',
@@ -884,14 +884,14 @@ export const V2_DOC_ENDPOINTS: V2DocEndpointMetadata[] = [
                     {
                         coverageId: 6845,
                         timetableId: 5479,
-                        serviceDayStart: 20260502,
-                        serviceDayEndExclusive: 20260503
+                        serviceDayStart: 20575,
+                        serviceDayEndExclusive: 20576
                     },
                     {
                         coverageId: 6846,
                         timetableId: 5480,
-                        serviceDayStart: 20260503,
-                        serviceDayEndExclusive: 20260504
+                        serviceDayStart: 20576,
+                        serviceDayEndExclusive: 20577
                     }
                 ],
                 timetableMappings: {
@@ -982,7 +982,7 @@ export const V2_DOC_ENDPOINTS: V2DocEndpointMetadata[] = [
                 },
                 query: {
                     limit: '1',
-                    cursor: '20260814:22440'
+                    cursor: '20679:22440'
                 }
             }
         ],
@@ -995,7 +995,7 @@ export const V2_DOC_ENDPOINTS: V2DocEndpointMetadata[] = [
                 stationName: '北京南',
                 cursor: '',
                 limit: 1,
-                nextCursor: '20260814:22440',
+                nextCursor: '20679:22440',
                 items: [
                     {
                         trainCode: {
@@ -1083,7 +1083,7 @@ export const V2_DOC_ENDPOINTS: V2DocEndpointMetadata[] = [
                 },
                 query: {
                     limit: '2',
-                    cursor: '20260814:496651'
+                    cursor: '20679:496651'
                 }
             }
         ],
@@ -1099,17 +1099,17 @@ export const V2_DOC_ENDPOINTS: V2DocEndpointMetadata[] = [
                 },
                 cursor: '',
                 limit: 2,
-                nextCursor: '20260814:496651',
+                nextCursor: '20679:496651',
                 items: [
                     {
                         id: 512596,
-                        serviceDay: 20260814,
+                        serviceDay: 20679,
                         timetableId: 5479,
                         emuId: 5156
                     },
                     {
                         id: 496651,
-                        serviceDay: 20260813,
+                        serviceDay: 20678,
                         timetableId: 5479,
                         emuId: 5159
                     }
@@ -1283,7 +1283,7 @@ export const V2_DOC_ENDPOINTS: V2DocEndpointMetadata[] = [
                 },
                 query: {
                     limit: '2',
-                    cursor: '20260814:528424'
+                    cursor: '20679:528424'
                 }
             }
         ],
@@ -1296,11 +1296,11 @@ export const V2_DOC_ENDPOINTS: V2DocEndpointMetadata[] = [
                 emuId: 5156,
                 cursor: '',
                 limit: 2,
-                nextCursor: '20260814:528424',
+                nextCursor: '20679:528424',
                 items: [
                     {
                         id: 528425,
-                        serviceDay: 20260814,
+                        serviceDay: 20679,
                         timetableId: 6373,
                         trainCode: {
                             prefix: 'G',
@@ -1309,7 +1309,7 @@ export const V2_DOC_ENDPOINTS: V2DocEndpointMetadata[] = [
                     },
                     {
                         id: 528424,
-                        serviceDay: 20260814,
+                        serviceDay: 20679,
                         timetableId: 6373,
                         trainCode: {
                             prefix: 'G',
@@ -1353,7 +1353,7 @@ export const V2_DOC_ENDPOINTS: V2DocEndpointMetadata[] = [
             },
             {
                 question: 'items 里的 serviceDay 是什么？',
-                answer: '就是有导出文件的日期，使用 YYYYMMDD 数字格式。可以用它直接拼接“读取单日导出文件”接口的路径参数。'
+                answer: '它表示有导出文件的日期，是按上海时间自 1970-01-01 起的天数（epoch day），例如 20679 对应 2026-08-14。需要展示日期时再换算，不要直接当日期字符串用。'
             }
         ],
         parameters: [EXPORT_YEAR_QUERY, EXPORT_MONTH_QUERY],
@@ -1387,10 +1387,10 @@ export const V2_DOC_ENDPOINTS: V2DocEndpointMetadata[] = [
                 availableMonths: [1, 2, 3, 4, 5, 6, 7, 8],
                 items: [
                     {
-                        serviceDay: 20260814
+                        serviceDay: 20679
                     },
                     {
-                        serviceDay: 20260813
+                        serviceDay: 20678
                     }
                 ]
             }
@@ -1454,7 +1454,7 @@ export const V2_DOC_ENDPOINTS: V2DocEndpointMetadata[] = [
                 cost: 400
             },
             data: {
-                serviceDay: 20260814,
+                serviceDay: 20679,
                 total: 2,
                 content:
                     'trainCode,emuCode,startStation,endStation,startAt,endAt\nG1,CR400AF-2149,北京南,上海虹桥,1786665600,1786680000\nG2,CR400BF-5028,北京南,上海虹桥,1786665600,1786680000'
