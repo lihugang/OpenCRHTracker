@@ -215,7 +215,11 @@ import type {
     AdminRuntimeConfigDocumentResponse,
     AdminRuntimeConfigUpdateResponse
 } from '~/types/admin';
-import type { TrackerApiResponse } from '~/types/homepage';
+import {
+    fetchAdminConfigFile,
+    updateAdminConfigFile
+} from '~/utils/api/v2/domain/admin';
+import { V2ApiError } from '~/utils/api/v2/V2ApiError';
 import getApiErrorMessage from '~/utils/api/getApiErrorMessage';
 import formatTrackerTimestamp from '~/utils/time/formatTrackerTimestamp';
 
@@ -247,9 +251,6 @@ const feedbackMessage = ref('');
 const isDiscardConfirmOpen = ref(false);
 const pendingDiscardAction = ref<PendingDiscardAction | null>(null);
 
-const apiPath = computed(
-    () => '/api/v1/admin/config-files/' + encodeURIComponent(props.target)
-);
 const modalEyebrow = computed(() => 'CONFIG FILE');
 const modalTitle = computed(() => '文件原始 JSON');
 const modalDescription = computed(
@@ -309,6 +310,10 @@ const feedbackClass = computed(() => {
 });
 
 function getApiErrorCode(error: unknown) {
+    if (error instanceof V2ApiError) {
+        return error.code;
+    }
+
     if (typeof error !== 'object' || error === null) {
         return '';
     }
@@ -333,20 +338,7 @@ function applyDocument(document: AdminRuntimeConfigDocumentResponse) {
 }
 
 async function fetchConfigFileDocument() {
-    const response = await $fetch<
-        TrackerApiResponse<AdminRuntimeConfigDocumentResponse>
-    >(apiPath.value, {
-        retry: 0,
-        cache: 'no-store'
-    });
-
-    if (!response.ok) {
-        throw {
-            data: response
-        };
-    }
-
-    return response.data;
+    return fetchAdminConfigFile(props.target);
 }
 
 async function loadConfigFileDocument() {
@@ -385,40 +377,18 @@ async function saveAndReload() {
 
     try {
         const submittedContent = draftContent.value;
-        const { data, error } = await useCsrfFetch<
-            TrackerApiResponse<AdminRuntimeConfigUpdateResponse>
-        >(apiPath.value, {
-            method: 'PUT',
-            retry: 0,
-            body: {
-                content: submittedContent,
-                expectedRevision: revision.value
-            },
-            key: `admin:config-files:update:${props.target}:${Date.now()}`,
-            watch: false,
-            server: false
-        });
-
-        if (error.value) {
-            throw error.value;
-        }
-
-        const response = data.value;
-        if (!response) {
-            throw new Error('Missing config file update response');
-        }
-        if (!response.ok) {
-            throw {
-                data: response
-            };
-        }
+        const response = await updateAdminConfigFile(
+            props.target,
+            submittedContent,
+            revision.value
+        );
 
         originalContent.value = submittedContent;
-        revision.value = response.data.revision;
-        modifiedAt.value = response.data.modifiedAt;
+        revision.value = response.revision;
+        modifiedAt.value = response.modifiedAt;
         feedbackTone.value = 'success';
-        feedbackMessage.value = response.data.summary;
-        emit('updated', response.data);
+        feedbackMessage.value = response.summary;
+        emit('updated', response);
     } catch (error) {
         feedbackTone.value =
             getApiErrorCode(error) === 'config_conflict' ? 'conflict' : 'error';

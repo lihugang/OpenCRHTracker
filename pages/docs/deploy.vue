@@ -1,6 +1,6 @@
 <template>
     <DocsShell
-        eyebrow="DEPLOY"
+        eyebrow="部署"
         title="部署 Open CRH Tracker"
         description="">
         <UiCard :show-accent-bar="false">

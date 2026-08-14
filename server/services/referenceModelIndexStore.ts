@@ -13,17 +13,28 @@ import {
     getRelativeDateString
 } from '~/server/utils/date/getCurrentDateString';
 import { getShanghaiDayStartUnixSeconds } from '~/server/utils/date/shanghaiDateTime';
+import { serviceDayToShanghaiDayStartUnixSeconds } from '~/server/utils/date/serviceDay';
 import { getTodayScheduleCache } from '~/server/services/todayScheduleCache';
+import {
+    formatTrainCode,
+    trainCodeKey,
+    type TrainCodeParts
+} from '~/server/utils/12306/trainCode';
+import type { ServiceDay } from '~/server/utils/date/serviceDay';
+import {
+    formatExternalEmuCode,
+    formatExternalTrainCode
+} from '~/server/utils/internal/boundaries';
 
 interface CursorPoint {
-    serviceDate: string;
+    serviceDate: ServiceDay;
     id: number;
 }
 
 interface ReferenceModelRunBucket {
-    trainCode: string;
+    trainCode: TrainCodeParts;
     startAt: number;
-    serviceDate: string;
+    serviceDate: ServiceDay;
     startStation: string;
     endStation: string;
     models: Set<string>;
@@ -31,7 +42,7 @@ interface ReferenceModelRunBucket {
 
 interface ReferenceModelObservedRun {
     runKey: string;
-    serviceDate: string;
+    serviceDate: ServiceDay;
     models: string[];
 }
 
@@ -64,8 +75,8 @@ function getWindowRange(currentDate: string, windowDays: number) {
     };
 }
 
-function buildRunBucketKey(trainCode: string, startAt: number) {
-    return `${trainCode}@${startAt}`;
+function buildRunBucketKey(trainCode: TrainCodeParts, startAt: number) {
+    return `${trainCodeKey(trainCode)}@${startAt}`;
 }
 
 function buildObservedRunKey(bucket: ReferenceModelRunBucket) {
@@ -84,14 +95,20 @@ function normalizeStationText(value: string) {
     return value.trim();
 }
 
-function normalizeQueryTrainCodes(trainCodes: string[]) {
-    return Array.from(
-        new Set(
-            trainCodes
-                .map((code) => normalizeCode(code))
-                .filter((code) => code.length > 0)
-        )
-    );
+function normalizeQueryTrainCodes(
+    trainCodes: readonly TrainCodeParts[]
+): TrainCodeParts[] {
+    const seen = new Set<string>();
+    const result: TrainCodeParts[] = [];
+    for (const code of trainCodes) {
+        const key = trainCodeKey(code);
+        if (seen.has(key)) {
+            continue;
+        }
+        seen.add(key);
+        result.push(code);
+    }
+    return result;
 }
 
 function roundWeightedShare(value: number) {
@@ -99,13 +116,14 @@ function roundWeightedShare(value: number) {
 }
 
 async function getFallbackReferenceModelFromTimetableSources(
-    trainCodes: string[]
+    trainCodes: TrainCodeParts[]
 ): Promise<ReferenceModelItem | null> {
     const scheduleRoutesByTrainCode = getTodayScheduleCache();
     const trainStyleMappingAssets = await loadTrainStyleMapping();
 
     for (const trainCode of trainCodes) {
-        const route = scheduleRoutesByTrainCode.get(trainCode) ?? null;
+        const route =
+            scheduleRoutesByTrainCode.get(trainCodeKey(trainCode)) ?? null;
         let trainStyle = route?.trainStyle.trim() ?? '';
         let allCodes = route?.allCodes ?? [];
 
@@ -126,7 +144,7 @@ async function getFallbackReferenceModelFromTimetableSources(
             trainStyleMappingAssets.mappings.get(trainStyle) ?? trainStyle;
         if (mappedModel === trainStyle) {
             logger.warn(
-                `train_style_mapping_miss trainCode=${trainCode} trainStyle=${trainStyle} allCodes=${allCodes.join('/') ?? ''} strategy=keep_raw_train_style`
+                `train_style_mapping_miss trainCode=${formatTrainCode(trainCode)} trainStyle=${trainStyle} allCodes=${allCodes.map(formatTrainCode).join('/')} strategy=keep_raw_train_style`
             );
         }
 
@@ -156,13 +174,15 @@ function buildRunsByTrainCode(
                 left.localeCompare(right)
             )
         };
-        const existingRuns = runsByTrainCode.get(bucket.trainCode);
+        const existingRuns = runsByTrainCode.get(
+            trainCodeKey(bucket.trainCode)
+        );
         if (existingRuns) {
             existingRuns.push(run);
             continue;
         }
 
-        runsByTrainCode.set(bucket.trainCode, [run]);
+        runsByTrainCode.set(trainCodeKey(bucket.trainCode), [run]);
     }
 
     return runsByTrainCode;
@@ -205,19 +225,14 @@ function consumeDailyRecordRow(
     buckets: Map<string, ReferenceModelRunBucket>,
     row: DailyEmuRouteRow
 ) {
-    const trainCode = normalizeCode(row.train_code);
-    if (trainCode.length === 0) {
-        return;
-    }
-
-    const parsedEmuCode = parseEmuCode(row.emu_code);
+    const parsedEmuCode = parseEmuCode(formatExternalEmuCode(row.emu_id));
     const model = normalizeCode(parsedEmuCode?.model ?? '');
     if (model.length === 0) {
         return;
     }
 
-    const bucketKey = buildRunBucketKey(trainCode, row.start_at);
-    const serviceDate = formatShanghaiDateString(row.start_at * 1000);
+    const bucketKey = buildRunBucketKey(row.train_code, row.start_at);
+    const serviceDate = row.service_date;
     const startStation = normalizeStationText(row.start_station_name);
     const endStation = normalizeStationText(row.end_station_name);
     const existingBucket = buckets.get(bucketKey);
@@ -237,7 +252,7 @@ function consumeDailyRecordRow(
     }
 
     buckets.set(bucketKey, {
-        trainCode,
+        trainCode: row.train_code,
         startAt: row.start_at,
         serviceDate,
         startStation,
@@ -277,7 +292,7 @@ export function invalidateReferenceModelIndexCache() {
 }
 
 export async function getReferenceModelsByTrainCodes(
-    trainCodes: string[]
+    trainCodes: readonly TrainCodeParts[]
 ): Promise<ReferenceModelItem[]> {
     const normalizedTrainCodes = normalizeQueryTrainCodes(trainCodes);
     if (normalizedTrainCodes.length === 0) {
@@ -293,7 +308,8 @@ export async function getReferenceModelsByTrainCodes(
     const dedupedRuns = new Map<string, ReferenceModelObservedRun>();
 
     for (const trainCode of normalizedTrainCodes) {
-        const runs = activeCache.runsByTrainCode.get(trainCode) ?? [];
+        const runs =
+            activeCache.runsByTrainCode.get(trainCodeKey(trainCode)) ?? [];
         for (const run of runs) {
             dedupedRuns.set(run.runKey, run);
         }
@@ -307,7 +323,7 @@ export async function getReferenceModelsByTrainCodes(
         return fallbackModel ? [fallbackModel] : [];
     }
 
-    const modelsByServiceDate = new Map<string, Set<string>>();
+    const modelsByServiceDate = new Map<ServiceDay, Set<string>>();
     for (const run of dedupedRuns.values()) {
         const serviceDateModels =
             modelsByServiceDate.get(run.serviceDate) ?? new Set<string>();
@@ -328,7 +344,8 @@ export async function getReferenceModelsByTrainCodes(
         const ageDays = Math.max(
             0,
             Math.floor(
-                (todayStartAt - getShanghaiDayStartUnixSeconds(serviceDate)) /
+                (todayStartAt -
+                    serviceDayToShanghaiDayStartUnixSeconds(serviceDate)) /
                     (24 * 60 * 60)
             )
         );

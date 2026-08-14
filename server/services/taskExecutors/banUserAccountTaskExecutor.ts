@@ -24,8 +24,10 @@ function parseArguments(value: unknown): BanUserAccountTaskArguments {
 }
 
 export function registerBanUserAccountTaskExecutor() {
-    registerTaskExecutor(USER_BAN_TASK_EXECUTOR, async (value) => {
-        const args = parseArguments(value);
-        executeQueuedUserBanAction(args.actionId);
+    registerTaskExecutor(USER_BAN_TASK_EXECUTOR, {
+        parse: parseArguments,
+        execute: async (args) => {
+            executeQueuedUserBanAction(args.actionId);
+        }
     });
 }

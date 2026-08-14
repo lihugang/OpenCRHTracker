@@ -1,0 +1,228 @@
+syntax = "proto3";
+
+package opencrh.v2;
+
+import "google/protobuf/struct.proto";
+import "opencrh/v2/common.proto";
+
+enum FeedbackVisibility {
+  FEEDBACK_VISIBILITY_UNSPECIFIED = 0;
+  FEEDBACK_VISIBILITY_PUBLIC = 1;
+  FEEDBACK_VISIBILITY_PRIVATE = 2;
+}
+
+enum FeedbackStatus {
+  FEEDBACK_STATUS_UNSPECIFIED = 0;
+  FEEDBACK_STATUS_PENDING = 1;
+  FEEDBACK_STATUS_PROCESSING = 2;
+  FEEDBACK_STATUS_SUBMITTED_CHANGE = 3;
+  FEEDBACK_STATUS_RESOLVED = 4;
+  FEEDBACK_STATUS_INVALID = 5;
+}
+
+enum FeedbackTitleMode {
+  FEEDBACK_TITLE_MODE_UNSPECIFIED = 0;
+  FEEDBACK_TITLE_MODE_AUTO = 1;
+  FEEDBACK_TITLE_MODE_CUSTOM = 2;
+}
+
+enum FeedbackPrimaryType {
+  FEEDBACK_PRIMARY_TYPE_UNSPECIFIED = 0;
+  FEEDBACK_PRIMARY_TYPE_WEBSITE = 1;
+  FEEDBACK_PRIMARY_TYPE_DATA = 2;
+  FEEDBACK_PRIMARY_TYPE_API = 3;
+  FEEDBACK_PRIMARY_TYPE_DOCS = 4;
+  FEEDBACK_PRIMARY_TYPE_OTHER = 5;
+}
+
+enum FeedbackSecondaryType {
+  FEEDBACK_SECONDARY_TYPE_UNSPECIFIED = 0;
+  FEEDBACK_SECONDARY_TYPE_EMPTY = 1;
+  FEEDBACK_SECONDARY_TYPE_BUG = 2;
+  FEEDBACK_SECONDARY_TYPE_FEATURE = 3;
+  FEEDBACK_SECONDARY_TYPE_SECURITY = 4;
+  FEEDBACK_SECONDARY_TYPE_OTHER = 5;
+  FEEDBACK_SECONDARY_TYPE_TRAIN_MISSING = 6;
+  FEEDBACK_SECONDARY_TYPE_TRAIN_WRONG = 7;
+  FEEDBACK_SECONDARY_TYPE_COUPLING_MISSING = 8;
+  FEEDBACK_SECONDARY_TYPE_ROUTE_WRONG = 9;
+  FEEDBACK_SECONDARY_TYPE_ALLOCATION_WRONG = 10;
+  FEEDBACK_SECONDARY_TYPE_MORE_QUOTA = 11;
+}
+
+enum FeedbackTopicAuthorType {
+  FEEDBACK_TOPIC_AUTHOR_TYPE_UNSPECIFIED = 0;
+  FEEDBACK_TOPIC_AUTHOR_TYPE_GUEST = 1;
+  FEEDBACK_TOPIC_AUTHOR_TYPE_USER = 2;
+}
+
+enum FeedbackMessageAuthorType {
+  FEEDBACK_MESSAGE_AUTHOR_TYPE_UNSPECIFIED = 0;
+  FEEDBACK_MESSAGE_AUTHOR_TYPE_USER = 1;
+  FEEDBACK_MESSAGE_AUTHOR_TYPE_TOPIC_CREATOR = 2;
+  FEEDBACK_MESSAGE_AUTHOR_TYPE_ADMIN = 3;
+  FEEDBACK_MESSAGE_AUTHOR_TYPE_SYSTEM = 4;
+}
+
+enum FeedbackTopicListView {
+  FEEDBACK_TOPIC_LIST_VIEW_UNSPECIFIED = 0;
+  FEEDBACK_TOPIC_LIST_VIEW_PUBLIC = 1;
+  FEEDBACK_TOPIC_LIST_VIEW_MINE = 2;
+  FEEDBACK_TOPIC_LIST_VIEW_ALL = 3;
+}
+
+message FeedbackPermissions {
+  bool can_reply = 1;
+  bool can_manage = 2;
+  bool is_owner = 3;
+}
+
+message FeedbackMessage {
+  uint32 id = 1;
+  FeedbackMessageAuthorType author_type = 2;
+  string author_name = 3;
+  string body = 4;
+  int64 created_at = 5;
+  google.protobuf.Struct meta = 6;
+}
+
+message FeedbackTopicListItem {
+  uint32 id = 1;
+  FeedbackTopicAuthorType author_type = 2;
+  string author_name = 3;
+  FeedbackVisibility visibility = 4;
+  FeedbackPrimaryType primary_type = 5;
+  FeedbackSecondaryType secondary_type = 6;
+  FeedbackStatus status = 7;
+  string title = 8;
+  FeedbackTitleMode title_mode = 9;
+  string body = 10;
+  uint32 reply_count = 11;
+  int64 created_at = 12;
+  int64 updated_at = 13;
+  int64 last_replied_at = 14;
+}
+
+message FeedbackTopicDetail {
+  FeedbackTopicListItem topic = 1;
+  FeedbackPermissions permissions = 2;
+  repeated FeedbackMessage messages = 3;
+}
+
+message GetFeedbackTopicsRequest {}
+
+message GetFeedbackTopicsData {
+  FeedbackTopicListView view = 1;
+  FeedbackPrimaryType primary_type = 2;
+  FeedbackSecondaryType secondary_type = 3;
+  FeedbackStatus status = 4;
+  uint32 limit = 5;
+  string next_cursor = 6;
+  repeated FeedbackTopicListItem items = 7;
+}
+
+message GetFeedbackTopicsResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    GetFeedbackTopicsData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message PostFeedbackTopicsRequest {
+  FeedbackPrimaryType primary_type = 1;
+  FeedbackSecondaryType secondary_type = 2;
+  FeedbackVisibility visibility = 3;
+  string body = 4;
+}
+
+message PostFeedbackTopicsData {
+  uint32 id = 1;
+  string title = 2;
+}
+
+message PostFeedbackTopicsResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    PostFeedbackTopicsData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message GetFeedbackTopicRequest {}
+
+message GetFeedbackTopicData {
+  FeedbackTopicDetail topic = 1;
+}
+
+message GetFeedbackTopicResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    GetFeedbackTopicData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message PatchFeedbackTopicRequest {
+  uint32 topic_id = 1;
+  optional FeedbackPrimaryType primary_type = 2;
+  optional FeedbackSecondaryType secondary_type = 3;
+  optional FeedbackStatus status = 4;
+  optional string title = 5;
+  optional FeedbackVisibility visibility = 6;
+}
+
+message PatchFeedbackTopicData {
+  uint32 id = 1;
+  FeedbackPrimaryType primary_type = 2;
+  FeedbackSecondaryType secondary_type = 3;
+  FeedbackStatus status = 4;
+  string title = 5;
+  FeedbackTitleMode title_mode = 6;
+  int64 updated_at = 7;
+}
+
+message PatchFeedbackTopicResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    PatchFeedbackTopicData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message DeleteFeedbackTopicRequest {
+  uint32 topic_id = 1;
+}
+
+message DeleteFeedbackTopicData {
+  uint32 id = 1;
+  FeedbackVisibility visibility = 2;
+  int64 updated_at = 3;
+}
+
+message DeleteFeedbackTopicResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    DeleteFeedbackTopicData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message PostFeedbackTopicMessageRequest {
+  uint32 topic_id = 1;
+  string body = 2;
+  google.protobuf.Struct meta = 3;
+}
+
+message PostFeedbackTopicMessageData {
+  uint32 topic_id = 1;
+  uint32 message_id = 2;
+}
+
+message PostFeedbackTopicMessageResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    PostFeedbackTopicMessageData data = 2;
+    ApiError error = 3;
+  }
+}

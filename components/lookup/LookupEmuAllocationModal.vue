@@ -180,7 +180,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import type { EmuAllocationProfileResponse } from '~/types/lookup';
-import type { TrackerApiResponse } from '~/types/homepage';
+import { V2ApiError } from '~/utils/api/v2/V2ApiError';
+import { fetchEmuAllocation } from '~/utils/api/v2/domain/lookup';
 import getApiErrorMessage from '~/utils/api/getApiErrorMessage';
 
 type AllocationState = 'idle' | 'loading' | 'success' | 'empty' | 'error';
@@ -342,26 +343,13 @@ async function loadProfile() {
     errorMessage.value = '';
 
     try {
-        const response = await $fetch<
-            TrackerApiResponse<EmuAllocationProfileResponse>
-        >(`/api/v1/allocation/emu/${encodeURIComponent(emuCode)}`);
+        const data = await fetchEmuAllocation(emuCode);
 
         if (currentVersion !== requestVersion.value) {
             return;
         }
 
-        if (!response.ok) {
-            if (response.error === 'allocation_not_found') {
-                state.value = 'empty';
-                return;
-            }
-
-            throw {
-                data: response
-            };
-        }
-
-        profile.value = response.data;
+        profile.value = data;
         state.value = 'success';
     } catch (error) {
         if (currentVersion !== requestVersion.value) {
@@ -370,11 +358,8 @@ async function loadProfile() {
 
         const message = getApiErrorMessage(error, '配属信息加载失败。');
         if (
-            typeof error === 'object' &&
-            error !== null &&
-            'data' in error &&
-            (error as { data?: { error?: unknown } }).data?.error ===
-                'allocation_not_found'
+            error instanceof V2ApiError &&
+            error.code === 'allocation_not_found'
         ) {
             state.value = 'empty';
             return;

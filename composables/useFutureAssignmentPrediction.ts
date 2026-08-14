@@ -1,16 +1,5 @@
 import { computed, ref, toValue, watch, type MaybeRefOrGetter } from 'vue';
-import useTrackedRequestFetch, {
-    type TrackedRequestFetch
-} from '~/composables/useTrackedRequestFetch';
-import {
-    hydrateEmuHistoryRecords,
-    hydrateTrainHistoryRecords,
-    type HydratedEmuHistoryRecord,
-    type HydratedTrainHistoryRecord
-} from '~/composables/useHistoricalTimetableContent';
-import type { TrackerApiResponse } from '~/types/homepage';
 import type {
-    EmuHistoryResponse,
     FutureAssignmentDisplayAnchor,
     FutureAssignmentPredictedEmuItem,
     FutureAssignmentPredictionMatchSource,
@@ -21,20 +10,20 @@ import type {
     RecentAssignmentsState,
     TrainCirculation,
     TrainCirculationNode,
-    TrainHistoryResponse
+    LookupHistoryListItem
 } from '~/types/lookup';
+import {
+    fetchEmuHistoryPage,
+    fetchTrainHistoryPage
+} from '~/utils/api/v2/domain/lookup';
 import getApiErrorMessage from '~/utils/api/getApiErrorMessage';
 
 const DAY_SECONDS = 24 * 60 * 60;
 const SHANGHAI_OFFSET_SECONDS = 8 * 60 * 60;
-const EMU_HISTORY_LIMIT = 200;
+const PREDICTION_PAGE_LIMIT = 200;
 
-type RequestFetch = <T>(
-    request: string,
-    options?: {
-        query?: Record<string, number | string | undefined>;
-    }
-) => Promise<T>;
+type HydratedTrainHistoryRecord = LookupHistoryListItem;
+type HydratedEmuHistoryRecord = LookupHistoryListItem;
 
 interface RouteNodeSegment {
     key: string;
@@ -231,55 +220,44 @@ function buildRouteSegments(circulation: TrainCirculation) {
 }
 
 async function fetchTrainHistoryRecords(
-    requestFetch: RequestFetch,
     trainCode: string,
     startAt: number,
-    endAt: number,
-    limit: number
+    endAt: number
 ) {
     const normalizedTrainCode = normalizeComparableCode(trainCode);
     if (normalizedTrainCode.length === 0) {
         return [];
     }
 
-    const cacheKey = [
-        normalizedTrainCode,
-        String(startAt),
-        String(endAt),
-        String(limit)
-    ].join(':');
+    const cacheKey = [normalizedTrainCode, String(startAt), String(endAt)].join(
+        ':'
+    );
     const cachedRecords = trainHistoryCache.get(cacheKey);
     if (cachedRecords !== undefined) {
         return cachedRecords;
     }
 
-    const response = await requestFetch<
-        TrackerApiResponse<TrainHistoryResponse>
-    >('/api/v1/history/train/' + encodeURIComponent(normalizedTrainCode), {
-        query: {
+    const records: HydratedTrainHistoryRecord[] = [];
+    let cursor = '';
+    while (true) {
+        const page = await fetchTrainHistoryPage(normalizedTrainCode, {
+            cursor: cursor || undefined,
+            limit: PREDICTION_PAGE_LIMIT,
             start: startAt,
-            end: endAt,
-            limit
+            end: endAt
+        });
+        records.push(...page.items);
+        cursor = page.nextCursor;
+        if (cursor.length === 0 || page.items.length === 0) {
+            break;
         }
-    });
-
-    if (!response.ok) {
-        throw {
-            data: response
-        };
     }
 
-    const items = await hydrateTrainHistoryRecords(
-        requestFetch,
-        normalizedTrainCode,
-        response.data.items
-    );
-    trainHistoryCache.set(cacheKey, items);
-    return items;
+    trainHistoryCache.set(cacheKey, records);
+    return records;
 }
 
 async function fetchEmuHistoryRecords(
-    requestFetch: RequestFetch,
     emuCode: string,
     startAt: number,
     endAt: number
@@ -297,29 +275,24 @@ async function fetchEmuHistoryRecords(
         return cachedRecords;
     }
 
-    const response = await requestFetch<TrackerApiResponse<EmuHistoryResponse>>(
-        '/api/v1/history/emu/' + encodeURIComponent(normalizedEmuCode),
-        {
-            query: {
-                start: startAt,
-                end: endAt,
-                limit: EMU_HISTORY_LIMIT
-            }
+    const records: HydratedEmuHistoryRecord[] = [];
+    let cursor = '';
+    while (true) {
+        const page = await fetchEmuHistoryPage(normalizedEmuCode, {
+            cursor: cursor || undefined,
+            limit: PREDICTION_PAGE_LIMIT,
+            start: startAt,
+            end: endAt
+        });
+        records.push(...page.items);
+        cursor = page.nextCursor;
+        if (cursor.length === 0 || page.items.length === 0) {
+            break;
         }
-    );
-
-    if (!response.ok) {
-        throw {
-            data: response
-        };
     }
 
-    const items = await hydrateEmuHistoryRecords(
-        requestFetch,
-        response.data.items
-    );
-    emuHistoryCache.set(cacheKey, items);
-    return items;
+    emuHistoryCache.set(cacheKey, records);
+    return records;
 }
 
 function matchEmuRecordToRouteNode(
@@ -330,7 +303,7 @@ function matchEmuRecordToRouteNode(
         return null;
     }
 
-    const normalizedTrainCode = normalizeComparableCode(record.trainCode);
+    const normalizedTrainCode = normalizeComparableCode(record.code);
     if (normalizedTrainCode.length === 0) {
         return null;
     }
@@ -532,7 +505,7 @@ function buildTrainHistoryRuns(records: HydratedTrainHistoryRecord[]) {
         }
 
         const runKey = `${record.startAt}:${record.endAt}`;
-        const normalizedEmuCode = normalizeComparableCode(record.emuCode);
+        const normalizedEmuCode = normalizeComparableCode(record.code);
         const existingRun = runs.get(runKey);
 
         if (existingRun) {
@@ -820,7 +793,6 @@ function buildTrainPredictedEmus(
 }
 
 async function resolveTrainAnchor(
-    requestFetch: RequestFetch,
     routeNodes: RouteNodeSegment[],
     targetNodes: RouteNodeSegment[],
     nowUnixSeconds: number
@@ -843,11 +815,9 @@ async function resolveTrainAnchor(
     const startAt = todayStartAt - (routeDayCount - 1) * DAY_SECONDS;
     const endAt = todayStartAt + DAY_SECONDS - 1;
     const historyRecords = await fetchTrainHistoryRecords(
-        requestFetch,
         trainAnchorHistoryQuery.queryCode,
         startAt,
-        endAt,
-        Math.max(routeDayCount * 6, routeDayCount)
+        endAt
     );
     const historyByDayBucket = buildHistoryByDayBucket(
         buildTrainHistoryRuns(historyRecords)
@@ -907,7 +877,6 @@ async function resolveTrainAnchor(
 }
 
 async function resolveEmuAnchor(
-    requestFetch: RequestFetch,
     routeNodes: RouteNodeSegment[],
     emuCode: string,
     startAt: number,
@@ -915,7 +884,6 @@ async function resolveEmuAnchor(
     todayDayBucket: number
 ) {
     const historyRecords = await fetchEmuHistoryRecords(
-        requestFetch,
         emuCode,
         startAt,
         endAt
@@ -978,9 +946,6 @@ export default function useFutureAssignmentPrediction(
     anchorTrainCodeSource: MaybeRefOrGetter<string>,
     activeSource: MaybeRefOrGetter<boolean>
 ) {
-    const requestFetch: TrackedRequestFetch = import.meta.server
-        ? useTrackedRequestFetch()
-        : ($fetch as TrackedRequestFetch);
     const localState = ref<RecentAssignmentsState>('idle');
     const predictionState = ref<FutureAssignmentPredictionStatus>('idle');
     const predictedNodes = ref<FutureAssignmentPredictionNode[]>([]);
@@ -1082,7 +1047,6 @@ export default function useFutureAssignmentPrediction(
 
                 if (sourceType === 'emu') {
                     const anchor = await resolveEmuAnchor(
-                        requestFetch,
                         routeNodes,
                         sourceCode,
                         window.startAt,
@@ -1121,7 +1085,6 @@ export default function useFutureAssignmentPrediction(
                 }
 
                 const anchor = await resolveTrainAnchor(
-                    requestFetch,
                     routeNodes,
                     targetNodes,
                     nowUnixSeconds

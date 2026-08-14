@@ -8,6 +8,7 @@ import { estimateIdleTaskDurationMs } from '~/server/services/idleTaskEstimator'
 import { listDailyRecordsAll } from '~/server/services/emuRoutesStore';
 import { clearProbeStatus } from '~/server/services/probeStatusStore';
 import { rehydrateProbeRuntimeState } from '~/server/services/probeRuntimeState';
+import type { TrainCodeParts } from '~/server/utils/12306/trainCode';
 import {
     formatQrcodeDetectionConfigWarnings,
     reloadQrcodeDetectionConfig
@@ -27,6 +28,7 @@ import {
 import { loadProbeAssets } from '~/server/services/probeAssetStore';
 import { warmHistoricalRecentTrainEmuIndex } from '~/server/services/historicalRecentTrainEmuIndexStore';
 import { cleanupExpiredTrainProvenance } from '~/server/services/trainProvenanceStore';
+import { parseInternalJson } from '~/server/utils/internal/storageValues';
 import {
     BUILD_SCHEDULE_TASK_EXECUTOR,
     registerBuildScheduleTaskExecutor
@@ -73,6 +75,7 @@ import {
     registerRefreshAssetFileTaskExecutors
 } from '~/server/services/taskExecutors/refreshAssetFileTaskExecutor';
 import { getTodayScheduleProbeGroups } from '~/server/services/todayScheduleCache';
+import { trainCodeKey } from '~/server/utils/12306/trainCode';
 import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
 import {
@@ -141,17 +144,13 @@ function catchUpOverdueProbeStatusClear(
 }
 
 function parseRefreshAssetTaskRefreshAt(task: TaskRecord): string | null {
-    try {
-        const raw = JSON.parse(task.arguments) as unknown;
-        if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
-            return null;
-        }
-
-        const refreshAt = (raw as { refreshAt?: unknown }).refreshAt;
-        return typeof refreshAt === 'string' ? refreshAt.trim() : null;
-    } catch {
+    const raw = parseInternalJson(task.arguments);
+    if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
         return null;
     }
+
+    const refreshAt = (raw as { refreshAt?: unknown }).refreshAt;
+    return typeof refreshAt === 'string' ? refreshAt.trim() : null;
 }
 
 function reconcileRefreshAssetTasks(): string[] {
@@ -219,12 +218,12 @@ function rehydrateProbeRuntimeCache(): void {
     const rows = listDailyRecordsAll(dayStart, nextDayStart - 1);
     const scheduleGroupsByTrainCode = new Map<
         string,
-        { trainKey: string; trainInternalCode: string }
+        { trainKey: string; trainInternalCode: string | null }
     >();
 
     for (const group of getTodayScheduleProbeGroups().values()) {
         for (const trainCode of new Set([group.trainCode, ...group.allCodes])) {
-            scheduleGroupsByTrainCode.set(trainCode, {
+            scheduleGroupsByTrainCode.set(trainCodeKey(trainCode), {
                 trainKey: group.trainKey,
                 trainInternalCode: group.trainInternalCode
             });
@@ -234,11 +233,11 @@ function rehydrateProbeRuntimeCache(): void {
     const summary = rehydrateProbeRuntimeState({
         rows: rows.map((row) => ({
             trainCode: row.train_code,
-            emuCode: row.emu_code,
+            emuId: row.emu_id,
             startAt: row.start_at
         })),
         resolveGroupByTrainCode: (trainCode) =>
-            scheduleGroupsByTrainCode.get(trainCode) ?? null
+            scheduleGroupsByTrainCode.get(trainCodeKey(trainCode)) ?? null
     });
 
     logger.info(

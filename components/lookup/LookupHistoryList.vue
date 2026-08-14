@@ -666,6 +666,7 @@
         :model-value="isTimetableModalOpen"
         :train-code="selectedTimetableTrainCode"
         :display-codes="selectedTimetableDisplayCodes"
+        :requested-timetable-id="requestedTimetableId"
         @update:model-value="isTimetableModalOpen = $event" />
 </template>
 
@@ -745,6 +746,7 @@ const sentinelRef = ref<HTMLElement | null>(null);
 const isTimetableModalOpen = ref(false);
 const selectedTimetableTrainCode = ref('');
 const selectedTimetableDisplayCodes = ref<string[]>([]);
+const requestedTimetableId = ref<number | null>(null);
 let sentinelObserver: IntersectionObserver | null = null;
 
 const codeColumnLabel = computed(() => {
@@ -903,6 +905,7 @@ function openTimetable(item: DisplayHistoryListItem) {
     }
 
     selectedTimetableTrainCode.value = trainCode;
+    requestedTimetableId.value = item.timetableId;
     selectedTimetableDisplayCodes.value =
         props.type === 'train'
             ? [props.code.trim().toUpperCase()]

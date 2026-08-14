@@ -1,4 +1,4 @@
-DELETE FROM user_event_subscriptions
+DELETE FROM user_event_subscriptions_v2
 WHERE user_id = ?
-    AND target_type = ?
-    AND target_id = ?;
+    AND kind = ?
+    AND target_key = ?;

@@ -1,5 +1,7 @@
 import { createHash } from 'node:crypto';
 import normalizeTimetableBoundaryStopTimes from '~/server/utils/12306/normalizeTimetableBoundaryStopTimes';
+import type { TrainCodeParts } from '~/server/utils/12306/trainCode';
+import { stringifyInternalJson } from '~/server/utils/internal/storageValues';
 import type { ScheduleStop } from '~/server/utils/12306/scheduleProbe/types';
 
 interface CanonicalTimetableStop {
@@ -7,7 +9,7 @@ interface CanonicalTimetableStop {
     stationName: string;
     arriveAt: number | null;
     departAt: number | null;
-    stationTrainCode: string;
+    stationTrainCode: TrainCodeParts;
 }
 
 export interface CanonicalTimetableContent {
@@ -25,7 +27,7 @@ export default function getCanonicalTimetableContent(
             stationName: stop.stationName.trim(),
             arriveAt: stop.arriveAt,
             departAt: stop.departAt,
-            stationTrainCode: stop.stationTrainCode.trim().toUpperCase(),
+            stationTrainCode: stop.stationTrainCode,
             inputIndex: index
         }))
         .sort((left, right) => {
@@ -49,17 +51,16 @@ export default function getCanonicalTimetableContent(
             if (leftDepartAt !== rightDepartAt) {
                 return leftDepartAt - rightDepartAt;
             }
-            const codeDiff = left.stationTrainCode.localeCompare(
-                right.stationTrainCode,
-                'zh-Hans-CN'
-            );
+            const leftCode = `${left.stationTrainCode.prefix}${left.stationTrainCode.number}`;
+            const rightCode = `${right.stationTrainCode.prefix}${right.stationTrainCode.number}`;
+            const codeDiff = leftCode.localeCompare(rightCode, 'zh-Hans-CN');
             if (codeDiff !== 0) {
                 return codeDiff;
             }
             return left.inputIndex - right.inputIndex;
         })
         .map(({ inputIndex: _inputIndex, ...stop }) => stop);
-    const timetableJson = JSON.stringify({
+    const timetableJson = stringifyInternalJson({
         stops: normalizedStops as CanonicalTimetableStop[]
     });
 

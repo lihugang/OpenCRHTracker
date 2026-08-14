@@ -9,8 +9,9 @@ SELECT
     error_message,
     task_args_json,
     service_date,
-    primary_train_code,
+    primary_train_prefix,
+    primary_train_number,
     primary_start_at,
-    primary_emu_code
+    primary_emu_id
 FROM provenance_task_runs
 WHERE id = ?;

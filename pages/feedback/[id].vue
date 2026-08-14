@@ -565,18 +565,12 @@ import {
     ref,
     watch
 } from 'vue';
-import useTrackedRequestFetch, {
-    type TrackedRequestFetch
-} from '~/composables/useTrackedRequestFetch';
 import type { NotificationTarget } from '~/types/notifications';
 import type {
-    DeleteFeedbackTopicResponse,
     FeedbackCategoryKey,
     FeedbackMessage,
     FeedbackStatus,
-    FeedbackTopicDetail,
-    ReplyFeedbackMessageResponse,
-    UpdateFeedbackTopicResponse
+    FeedbackTopicDetail
 } from '~/types/feedback';
 import { FEEDBACK_CATEGORY_OPTIONS } from '~/types/feedback';
 import UiButton from '~/components/ui/UiButton.vue';
@@ -595,12 +589,14 @@ import {
     getFeedbackVisibilityLabel
 } from '~/utils/feedback/catalog';
 import formatTrackerTimestamp from '~/utils/time/formatTrackerTimestamp';
-import type { TrackerApiResponse } from '~/types/homepage';
+import {
+    deleteFeedbackTopic,
+    fetchFeedbackTopic,
+    replyFeedbackTopic,
+    updateFeedbackTopic
+} from '~/utils/api/v2/domain/feedback';
 
 const route = useRoute();
-const requestFetch: TrackedRequestFetch = import.meta.server
-    ? useTrackedRequestFetch()
-    : ($fetch as TrackedRequestFetch);
 const {
     errorMessage: eventSubscriptionErrorMessage,
     isSubscribed,
@@ -739,19 +735,7 @@ watch(
 );
 
 async function fetchTopicDetail() {
-    const response = await requestFetch<
-        TrackerApiResponse<FeedbackTopicDetail>
-    >('/api/v1/feedback/topics/' + String(route.params.id), {
-        retry: 0
-    });
-
-    if (!response.ok) {
-        throw {
-            data: response
-        };
-    }
-
-    return response.data;
+    return fetchFeedbackTopic(Number(route.params.id));
 }
 
 async function loadTopic() {
@@ -782,32 +766,7 @@ async function submitReply() {
     replyErrorMessage.value = '';
 
     try {
-        const { data, error } = await useCsrfFetch<
-            TrackerApiResponse<ReplyFeedbackMessageResponse>
-        >('/api/v1/feedback/topics/' + topic.value.id + '/messages', {
-            method: 'POST',
-            body: {
-                body: replyBody.value
-            },
-            key: 'feedback:reply:' + topic.value.id + ':' + Date.now(),
-            watch: false,
-            server: false
-        });
-
-        if (error.value) {
-            throw error.value;
-        }
-
-        const response = data.value;
-        if (!response) {
-            throw new Error('Missing reply response');
-        }
-
-        if (!response.ok) {
-            throw {
-                data: response
-            };
-        }
+        await replyFeedbackTopic(topic.value.id, replyBody.value, {});
 
         replyBody.value = '';
         await loadTopic();
@@ -838,35 +797,12 @@ async function saveManageChanges() {
     manageErrorMessage.value = '';
 
     try {
-        const { data, error } = await useCsrfFetch<
-            TrackerApiResponse<UpdateFeedbackTopicResponse>
-        >('/api/v1/feedback/topics/' + topic.value.id, {
-            method: 'PATCH',
-            body: {
-                title: manageForm.title,
-                primaryType: category.primaryType,
-                secondaryType: category.secondaryType,
-                status: manageForm.status
-            },
-            key: 'feedback:manage:' + topic.value.id + ':' + Date.now(),
-            watch: false,
-            server: false
+        await updateFeedbackTopic(topic.value.id, {
+            title: manageForm.title,
+            primaryType: category.primaryType,
+            secondaryType: category.secondaryType,
+            status: manageForm.status
         });
-
-        if (error.value) {
-            throw error.value;
-        }
-
-        const response = data.value;
-        if (!response) {
-            throw new Error('Missing topic update response');
-        }
-
-        if (!response.ok) {
-            throw {
-                data: response
-            };
-        }
 
         await loadTopic();
     } catch (error) {
@@ -891,29 +827,7 @@ async function hideTopic() {
     isDeleting.value = true;
 
     try {
-        const { data, error } = await useCsrfFetch<
-            TrackerApiResponse<DeleteFeedbackTopicResponse>
-        >('/api/v1/feedback/topics/' + topic.value.id, {
-            method: 'DELETE',
-            key: 'feedback:delete:' + topic.value.id + ':' + Date.now(),
-            watch: false,
-            server: false
-        });
-
-        if (error.value) {
-            throw error.value;
-        }
-
-        const response = data.value;
-        if (!response) {
-            throw new Error('Missing delete response');
-        }
-
-        if (!response.ok) {
-            throw {
-                data: response
-            };
-        }
+        await deleteFeedbackTopic(topic.value.id);
 
         await loadTopic();
     } catch (error) {

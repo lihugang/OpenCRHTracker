@@ -1,14 +1,14 @@
 <template>
     <DocsShell
-        eyebrow="OAUTH"
+        eyebrow="授权"
         title="OAuth 文档"
-        description="本文档介绍如何通过 OAuth 2.0 协议授权第三方 App 获取本网站上的信息。">
+        description="通过 OAuth 2.0 授权第三方应用访问本站信息，从创建客户端到换取令牌，一步步带你走完。">
         <UiCard :show-accent-bar="false">
             <div class="space-y-4">
                 <div class="space-y-2">
                     <p
                         class="text-xs font-medium uppercase tracking-[0.2em] text-crh-blue/80">
-                        INTRO
+                        介绍
                     </p>
                     <h2 class="text-2xl font-semibold text-slate-900">
                         什么是 OAuth 2.0
@@ -17,44 +17,36 @@
 
                 <p class="text-sm leading-7 text-slate-600">
                     OAuth 2.0
-                    可以理解为一种“授权第三方应用访问部分信息”的方式。它的重点不是把你的账号密码交给第三方
-                    App，而是让你先在本站完成登录和确认，再决定是否允许对方读取你同意开放的信息。
+                    可以理解为一种“授权第三方应用访问部分信息”的方式。它的重点不是把你的账号密码交给第三方应用，而是让你先在本站完成登录和确认，再决定是否允许对方读取你同意开放的信息。
                 </p>
 
                 <p class="text-sm leading-7 text-slate-600">
-                    在本网站的实际应用过程中，`第三方 App`
-                    指的是接入本网站账号体系的外部应用、网站或程序；`授权页面`
-                    则是本站展示给你的确认页面，用来让你决定是否同意授权，以及允许它访问哪些内容。
+                    在本网站的实际应用过程中，第三方应用指的是接入本网站账号体系的外部应用、网站或程序；授权页面则是本站展示给你的确认页面，用来让你决定是否同意授权，以及允许它访问哪些内容。
                 </p>
 
                 <p class="text-sm leading-7 text-slate-600">
-                    `scope` 可以理解为“权限范围”。它的作用是告诉本站，这个第三方
-                    App
-                    想读取哪些信息；只有你同意、并且本站允许开放的范围，才会真的授权出去，这样可以避免一旦登录就把所有信息都交给对方。
+                    scope
+                    可以理解为“权限范围”。它的作用是告诉本站，这个第三方应用想读取哪些信息；只有你同意、并且本站允许开放的范围，才会真的授权出去。这样可以避免一旦登录就把所有信息都交给对方。
                 </p>
 
                 <p class="text-sm leading-7 text-slate-600">
-                    `access_token` 可以理解为授权成功后发给第三方 App
-                    的访问凭证。它的作用是让 App
-                    在后续请求接口时证明“这位用户已经同意授权了”，因此它不等于你的账号密码，而是一份带有限制条件的授权结果。
+                    access_token
+                    可以理解为授权成功后发给第三方应用的访问凭证。它的作用是让应用在后续请求接口时证明“这位用户已经同意授权了”，因此它不等于你的账号密码，而是一份带有限制条件的授权结果。
                 </p>
 
                 <p class="text-sm leading-7 text-slate-600">
-                    当你确认授权后，本站会先返回一个一次性的 `authorization
-                    code` 给第三方 App。这个临时码不能直接长期使用，它还需要配合
-                    `PKCE`
+                    当你确认授权后，本站会先返回一个一次性的 authorization code
+                    给第三方应用。这个临时码不能长期使用，它还需要配合 PKCE
                     这个安全机制一起完成校验，避免授权码在中途被别人拿去冒用。这里的
-                    `redirect_uri` 则是授权完成后浏览器要跳回去的回调地址。
+                    redirect_uri 则是授权完成后浏览器要跳回去的回调地址。
                 </p>
 
                 <p class="text-sm leading-7 text-slate-600">
-                    在后续结果里，你还会看到 `id_token` 和 `nonce`
-                    这类名词。`id_token` 主要用于告诉第三方 App
-                    当前授权对应的是哪个登录身份；`nonce`
-                    可以理解为这次登录请求附带的另一串随机标记。第三方 App
-                    发起请求时先保存它，本站再把它写回 `id_token`，这样第三方
-                    App
-                    就能检查拿到的身份结果是不是确实对应当前这一次登录授权流程。
+                    在后续结果里，你还会看到 id_token 和 nonce
+                    这类名词。id_token
+                    主要用于告诉第三方应用当前授权对应的是哪个登录身份；nonce
+                    可以理解为这次登录请求附带的另一串随机标记。第三方应用发起请求时先保存它，本站再把它写回
+                    id_token，这样应用就能检查拿到的身份结果是不是确实对应当前这一次登录授权流程。
                 </p>
 
                 <p class="text-sm leading-6 text-slate-600">
@@ -78,7 +70,7 @@
                 <div class="space-y-2">
                     <p
                         class="text-xs font-medium uppercase tracking-[0.2em] text-crh-blue/80">
-                        {{ section.id }}
+                        {{ section.eyebrow ?? section.id }}
                     </p>
                     <h2 class="text-2xl font-semibold text-slate-900">
                         {{ section.title }}

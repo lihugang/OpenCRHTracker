@@ -1100,9 +1100,6 @@
 import UiField from '~/components/ui/UiField.vue';
 import UiModal from '~/components/ui/UiModal.vue';
 import UiStatusBadge from '~/components/ui/UiStatusBadge.vue';
-import useTrackedRequestFetch, {
-    type TrackedRequestFetch
-} from '~/composables/useTrackedRequestFetch';
 import { useAdminDateQuery } from '~/composables/useAdminDateQuery';
 import type {
     AdminAddQqBanListResponse,
@@ -1120,7 +1117,15 @@ import type {
     AdminUserSecurityResponse,
     AdminUsersResponse
 } from '~/types/admin';
-import type { TrackerApiResponse } from '~/types/homepage';
+import {
+    addAdminQqBanEntry,
+    clearAdminUserRisk,
+    fetchAdminUsers,
+    fetchAdminUsersSecurity,
+    removeAdminQqBanEntry,
+    resetAdminUserQuota,
+    updateAdminUserStatus
+} from '~/utils/api/v2/domain/adminUsers';
 import getApiErrorMessage from '~/utils/api/getApiErrorMessage';
 import formatTrackerTimestamp from '~/utils/time/formatTrackerTimestamp';
 
@@ -1128,27 +1133,11 @@ definePageMeta({
     middleware: 'admin-required'
 });
 
-const requestFetch: TrackedRequestFetch = import.meta.server
-    ? useTrackedRequestFetch()
-    : ($fetch as TrackedRequestFetch);
 const { session } = useAuthState();
 const { selectedDateInput, todayDateInputValue } = await useAdminDateQuery();
 
 async function fetchUsers() {
-    const response = await requestFetch<TrackerApiResponse<AdminUsersResponse>>(
-        '/api/v1/admin/users',
-        {
-            retry: 0
-        }
-    );
-
-    if (!response.ok) {
-        throw {
-            data: response
-        };
-    }
-
-    return response.data;
+    return fetchAdminUsers({});
 }
 
 const {
@@ -1159,19 +1148,7 @@ const {
 } = await useAsyncData('admin-users', fetchUsers);
 
 async function fetchUserSecurity() {
-    const response = await requestFetch<
-        TrackerApiResponse<AdminUserSecurityResponse>
-    >('/api/v1/admin/users/security', {
-        retry: 0
-    });
-
-    if (!response.ok) {
-        throw {
-            data: response
-        };
-    }
-
-    return response.data;
+    return fetchAdminUsersSecurity();
 }
 
 const {
@@ -1444,36 +1421,11 @@ async function confirmClearRiskState() {
     riskClearSuccessMessage.value = '';
 
     try {
-        const { data, error } = await useCsrfFetch<
-            TrackerApiResponse<AdminClearUserRiskResponse>
-        >('/api/v1/admin/users/risk/clear', {
-            method: 'POST',
-            retry: 0,
-            body: {
-                userId: riskCase.userId
-            },
-            key: `admin:users:risk:clear:${riskCase.userId}:${Date.now()}`,
-            watch: false,
-            server: false
-        });
+        const response = await clearAdminUserRisk(riskCase.userId);
 
-        if (error.value) {
-            throw error.value;
-        }
-
-        const response = data.value;
-        if (!response) {
-            throw new Error('Missing user risk clear response');
-        }
-        if (!response.ok) {
-            throw {
-                data: response
-            };
-        }
-
-        riskClearSuccessMessage.value = response.data.changed
-            ? `已解除用户 ${response.data.userId} 的风控状态。`
-            : `用户 ${response.data.userId} 当前没有待解除的风控状态。`;
+        riskClearSuccessMessage.value = response.changed
+            ? `已解除用户 ${response.userId} 的风控状态。`
+            : `用户 ${response.userId} 当前没有待解除的风控状态。`;
         isClearRiskDialogOpen.value = false;
         pendingClearRiskCase.value = null;
         await refreshSecurity();
@@ -1530,43 +1482,16 @@ async function confirmBanStatusChange() {
     banStatusSuccessMessage.value = '';
 
     try {
-        const { data, error } = await useCsrfFetch<
-            TrackerApiResponse<AdminUpdateUserBanStateResponse>
-        >('/api/v1/admin/users/status', {
-            method: 'POST',
-            retry: 0,
-            body: {
-                userId: user.userId,
-                banned
-            },
-            key: `admin:users:status:${user.userId}:${Date.now()}`,
-            watch: false,
-            server: false
-        });
+        const response = await updateAdminUserStatus(user.userId, banned);
 
-        if (error.value) {
-            throw error.value;
-        }
-
-        const response = data.value;
-        if (!response) {
-            throw new Error('Missing admin user status update response');
-        }
-
-        if (!response.ok) {
-            throw {
-                data: response
-            };
-        }
-
-        if (response.data.isBanned) {
-            banStatusSuccessMessage.value = response.data.changed
-                ? `已封禁用户 ${response.data.userId}。吊销 webapp key ${formatNumber(response.data.revokedWebappApiKeyCount)} 个。`
-                : `用户 ${response.data.userId} 已处于封禁状态，并清理了 ${formatNumber(response.data.revokedWebappApiKeyCount)} 个残留 webapp key。`;
+        if (response.isBanned) {
+            banStatusSuccessMessage.value = response.changed
+                ? `已封禁用户 ${response.userId}。吊销 webapp key ${formatNumber(response.revokedWebappApiKeyCount)} 个。`
+                : `用户 ${response.userId} 已处于封禁状态，并清理了 ${formatNumber(response.revokedWebappApiKeyCount)} 个残留 webapp key。`;
         } else {
-            banStatusSuccessMessage.value = response.data.changed
-                ? `已解封用户 ${response.data.userId}，用户可以重新登录。`
-                : `用户 ${response.data.userId} 已处于正常状态，无需重复操作。`;
+            banStatusSuccessMessage.value = response.changed
+                ? `已解封用户 ${response.userId}，用户可以重新登录。`
+                : `用户 ${response.userId} 已处于正常状态，无需重复操作。`;
         }
         isBanDialogOpen.value = false;
         pendingBanUser.value = null;
@@ -1592,35 +1517,8 @@ async function resetUserQuota(userId: string) {
     resettingQuotaUserId.value = userId;
 
     try {
-        const { data, error } = await useCsrfFetch<
-            TrackerApiResponse<AdminResetUserQuotaResponse>
-        >('/api/v1/admin/users/quota/reset', {
-            method: 'POST',
-            retry: 0,
-            body: {
-                userId
-            },
-            key: `admin:users:quota:reset:${userId}:${Date.now()}`,
-            watch: false,
-            server: false
-        });
-
-        if (error.value) {
-            throw error.value;
-        }
-
-        const response = data.value;
-        if (!response) {
-            throw new Error('Missing admin user quota reset response');
-        }
-
-        if (!response.ok) {
-            throw {
-                data: response
-            };
-        }
-
-        quotaResetSuccessMessage.value = `已重置用户 ${response.data.userId} 的当前 API 剩余额度。`;
+        const response = await resetAdminUserQuota(userId);
+        quotaResetSuccessMessage.value = `已重置用户 ${response.userId} 的当前 API 剩余额度。`;
 
         await refreshUsers();
     } catch (error) {
@@ -1652,37 +1550,12 @@ async function addQqBanEntry() {
 
     isAddingQqBanEntry.value = true;
     try {
-        const { data, error } = await useCsrfFetch<
-            TrackerApiResponse<AdminAddQqBanListResponse>
-        >('/api/v1/admin/users/qq-ban-list', {
-            method: 'POST',
-            retry: 0,
-            body: {
-                qqNumber
-            },
-            key: `admin:users:qq-ban-list:add:${qqNumber}:${Date.now()}`,
-            watch: false,
-            server: false
-        });
-
-        if (error.value) {
-            throw error.value;
-        }
-
-        const response = data.value;
-        if (!response) {
-            throw new Error('Missing QQ ban list add response');
-        }
-        if (!response.ok) {
-            throw {
-                data: response
-            };
-        }
+        const response = await addAdminQqBanEntry(qqNumber);
 
         qqBanForm.qqNumber = '';
-        qqBanMutationSuccessMessage.value = response.data.created
-            ? `已将 QQ ${response.data.item.qqNumber} 加入封禁清单。`
-            : `QQ ${response.data.item.qqNumber} 已在封禁清单中。`;
+        qqBanMutationSuccessMessage.value = response.created
+            ? `已将 QQ ${response.item.qqNumber} 加入封禁清单。`
+            : `QQ ${response.item.qqNumber} 已在封禁清单中。`;
         await refreshSecurity();
     } catch (error) {
         qqBanMutationErrorMessage.value = getApiErrorMessage(
@@ -1731,36 +1604,11 @@ async function confirmRemoveQqBanEntry() {
     isRemovingQqBanEntry.value = true;
     clearQqBanMutationMessages();
     try {
-        const { data, error } = await useCsrfFetch<
-            TrackerApiResponse<AdminRemoveQqBanListResponse>
-        >(
-            `/api/v1/admin/users/qq-ban-list/${encodeURIComponent(item.qqNumber)}`,
-            {
-                method: 'DELETE',
-                retry: 0,
-                key: `admin:users:qq-ban-list:remove:${item.qqNumber}:${Date.now()}`,
-                watch: false,
-                server: false
-            }
-        );
+        const response = await removeAdminQqBanEntry(item.qqNumber);
 
-        if (error.value) {
-            throw error.value;
-        }
-
-        const response = data.value;
-        if (!response) {
-            throw new Error('Missing QQ ban list remove response');
-        }
-        if (!response.ok) {
-            throw {
-                data: response
-            };
-        }
-
-        qqBanMutationSuccessMessage.value = response.data.removed
-            ? `已将 QQ ${response.data.qqNumber} 从封禁清单移除。`
-            : `QQ ${response.data.qqNumber} 已不在封禁清单中。`;
+        qqBanMutationSuccessMessage.value = response.removed
+            ? `已将 QQ ${response.qqNumber} 从封禁清单移除。`
+            : `QQ ${response.qqNumber} 已不在封禁清单中。`;
         isRemoveQqBanDialogOpen.value = false;
         pendingRemoveQqBanEntry.value = null;
         await refreshSecurity();

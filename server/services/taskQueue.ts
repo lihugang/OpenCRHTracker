@@ -2,6 +2,10 @@ import { useTaskDatabase } from '~/server/libs/database/task';
 import importSqlBatch from '~/server/utils/sql/importSqlBatch';
 import { createPreparedSqlStore } from '~/server/libs/database/prepared';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
+import {
+    parseInternalJson,
+    stringifyInternalJson
+} from '~/server/utils/internal/storageValues';
 
 type TaskSqlKey = 'addTask' | 'completeTask' | 'selectPendingTasksByExecutor';
 
@@ -124,7 +128,7 @@ function normalizeTaskInsert(
 
     return {
         executor: normalizedExecutor,
-        argumentsJson: JSON.stringify(args ?? null),
+        argumentsJson: stringifyInternalJson(args ?? null),
         executionTime,
         isIdle: normalizedIsIdle,
         expectedDurationMs: normalizedExpectedDurationMs
@@ -416,7 +420,12 @@ export function reconcileFuturePendingTaskByExecutorAndArgs(
     );
     const nowSeconds = getNowSeconds();
     const matchingTasks = getPendingTasksByExecutor(normalizedTask.executor)
-        .filter((task) => task.arguments === normalizedTask.argumentsJson)
+        .filter((task) => {
+            return (
+                stringifyInternalJson(parseInternalJson(task.arguments)) ===
+                normalizedTask.argumentsJson
+            );
+        })
         .sort((left, right) => {
             if (left.executionTime !== right.executionTime) {
                 return left.executionTime - right.executionTime;

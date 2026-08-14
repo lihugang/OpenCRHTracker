@@ -1,6 +1,5 @@
 import type { LookupTarget } from '~/types/lookup';
-
-const TRAIN_CODE_PATTERN = /^[A-Z]+\d+[A-Z\d-]*$/;
+import { parseCanonicalTrainCode } from '~/utils/api/v2/mappers/trainCode';
 
 export function normalizeLookupCode(value: string) {
     return value.trim().toUpperCase();
@@ -19,7 +18,7 @@ export function resolveLookupTarget(value: string): LookupTarget | null {
         };
     }
 
-    if (TRAIN_CODE_PATTERN.test(code)) {
+    if (parseCanonicalTrainCode(code)) {
         return {
             type: 'train',
             code

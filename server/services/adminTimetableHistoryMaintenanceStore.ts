@@ -1,12 +1,15 @@
 import ApiRequestError from '~/server/utils/api/errors/ApiRequestError';
-import normalizeCode from '~/server/utils/12306/normalizeCode';
 import {
-    formatTimetableHistoryServiceDate,
+    formatExternalTrainCode,
+    formatExternalServiceDate
+} from '~/server/utils/internal/boundaries';
+import {
     isTimetableHistoryMergeCandidate,
     listTimetableHistoryCoveragesByTrainCode,
     mergeTimetableHistoryCoverageByMiddleId,
     type TimetableHistoryCoverageRow
 } from '~/server/services/timetableHistoryStore';
+import type { TrainCodeParts } from '~/server/utils/12306/trainCode';
 import {
     getHistoricalTimetableContent,
     getHistoricalTimetableSummary
@@ -18,15 +21,6 @@ import type {
     AdminTimetableHistoryMergeCandidatesResponse
 } from '~/types/admin';
 
-function assertTrainCode(value: string) {
-    const normalized = normalizeCode(value);
-    if (normalized.length === 0) {
-        throw new ApiRequestError(400, 'invalid_param', 'trainCode 不能为空');
-    }
-
-    return normalized;
-}
-
 function toCoverageSummary(
     row: TimetableHistoryCoverageRow
 ): AdminTimetableHistoryCoverageSummary {
@@ -35,10 +29,8 @@ function toCoverageSummary(
     return {
         coverageId: row.id,
         timetableId: row.content_id,
-        serviceDateStart: formatTimetableHistoryServiceDate(
-            row.service_date_start
-        ),
-        serviceDateEndExclusive: formatTimetableHistoryServiceDate(
+        serviceDateStart: formatExternalServiceDate(row.service_date_start),
+        serviceDateEndExclusive: formatExternalServiceDate(
             row.service_date_end_exclusive
         ),
         startStation: summary?.startStation ?? '',
@@ -62,20 +54,19 @@ function toMergeCandidate(
         previous: toCoverageSummary(previous),
         middle: toCoverageSummary(middle),
         next: toCoverageSummary(next),
-        mergedServiceDateStart: formatTimetableHistoryServiceDate(
+        mergedServiceDateStart: formatExternalServiceDate(
             previous.service_date_start
         ),
-        mergedServiceDateEndExclusive: formatTimetableHistoryServiceDate(
+        mergedServiceDateEndExclusive: formatExternalServiceDate(
             next.service_date_end_exclusive
         )
     };
 }
 
 export function listAdminTimetableHistoryMergeCandidates(
-    trainCode: string
+    trainCode: TrainCodeParts
 ): AdminTimetableHistoryMergeCandidatesResponse {
-    const normalizedTrainCode = assertTrainCode(trainCode);
-    const rows = listTimetableHistoryCoveragesByTrainCode(normalizedTrainCode);
+    const rows = listTimetableHistoryCoveragesByTrainCode(trainCode);
     const items: AdminTimetableHistoryCoverageMergeCandidate[] = [];
 
     for (let index = 1; index < rows.length - 1; index += 1) {
@@ -89,7 +80,7 @@ export function listAdminTimetableHistoryMergeCandidates(
     }
 
     return {
-        trainCode: normalizedTrainCode,
+        trainCode: formatExternalTrainCode(trainCode),
         total: items.length,
         items
     };
@@ -116,7 +107,7 @@ export function mergeAdminTimetableHistoryCoverage(
     }
 
     return {
-        trainCode: result.trainCode,
+        trainCode: formatExternalTrainCode(result.trainCode),
         deletedCoverageIds: result.deletedCoverageIds,
         previous: toCoverageSummary(result.previous),
         middle: toCoverageSummary(result.middle),

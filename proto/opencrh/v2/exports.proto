@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package opencrh.v2;
+
+import "opencrh/v2/common.proto";
+
+// CSV-only daily exports.
+
+message GetDailyExportIndexRequest {}
+
+message DailyExportIndexItem {
+  uint32 service_day = 1;
+}
+
+message GetDailyExportIndexData {
+  uint32 selected_year = 1;
+  uint32 selected_month = 2;
+  repeated uint32 available_years = 3;
+  repeated uint32 available_months = 4;
+  repeated DailyExportIndexItem items = 5;
+}
+
+message GetDailyExportIndexResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    GetDailyExportIndexData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message GetDailyExportRequest {}
+
+message GetDailyExportData {
+  uint32 service_day = 1;
+  uint32 total = 2;
+  bytes content = 3;
+}
+
+message GetDailyExportResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    GetDailyExportData data = 2;
+    ApiError error = 3;
+  }
+}

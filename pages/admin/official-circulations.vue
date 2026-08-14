@@ -356,9 +356,6 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import UiBottomSheet from '~/components/ui/UiBottomSheet.vue';
 import UiModal from '~/components/ui/UiModal.vue';
-import useTrackedRequestFetch, {
-    type TrackedRequestFetch
-} from '~/composables/useTrackedRequestFetch';
 import { useAdminDateQuery } from '~/composables/useAdminDateQuery';
 import type {
     AdminOfficialCirculationDeleteResponse,
@@ -366,8 +363,11 @@ import type {
     AdminOfficialCirculationSearchItem,
     AdminOfficialCirculationSearchResponse
 } from '~/types/admin';
-import type { TrackerApiResponse } from '~/types/homepage';
 import getApiErrorMessage from '~/utils/api/getApiErrorMessage';
+import {
+    deleteAdminOfficialCirculation,
+    fetchAdminOfficialCirculations
+} from '~/utils/api/v2/domain/admin';
 import formatTrackerTimestamp from '~/utils/time/formatTrackerTimestamp';
 
 definePageMeta({
@@ -376,9 +376,6 @@ definePageMeta({
 
 const MOBILE_QUERY = '(max-width: 767px)';
 
-const requestFetch: TrackedRequestFetch = import.meta.server
-    ? useTrackedRequestFetch()
-    : ($fetch as TrackedRequestFetch);
 const { session } = useAuthState();
 const { selectedDateInput, todayDateInputValue } = await useAdminDateQuery();
 
@@ -424,22 +421,7 @@ onBeforeUnmount(() => {
 });
 
 async function fetchOfficialCirculations(keyword: string) {
-    const response = await requestFetch<
-        TrackerApiResponse<AdminOfficialCirculationSearchResponse>
-    >('/api/v1/admin/official-circulations', {
-        retry: 0,
-        query: {
-            keyword
-        }
-    });
-
-    if (!response.ok) {
-        throw {
-            data: response
-        };
-    }
-
-    return response.data;
+    return fetchAdminOfficialCirculations({ query: { keyword } });
 }
 
 async function performSearch(keyword: string, clearSuccessMessage = true) {
@@ -529,33 +511,7 @@ function handleDeleteDialogVisibilityChange(nextValue: boolean) {
 }
 
 async function deleteOfficialCirculation(entryKey: string) {
-    const encodedEntryKey = encodeURIComponent(entryKey);
-    const { data, error } = await useCsrfFetch<
-        TrackerApiResponse<AdminOfficialCirculationDeleteResponse>
-    >(`/api/v1/admin/official-circulations/${encodedEntryKey}`, {
-        method: 'DELETE',
-        retry: 0,
-        key: `admin:official-circulation-delete:${entryKey}:${Date.now()}`,
-        watch: false,
-        server: false
-    });
-
-    if (error.value) {
-        throw error.value;
-    }
-
-    const response = data.value;
-    if (!response) {
-        throw new Error('Missing official circulation delete response');
-    }
-
-    if (!response.ok) {
-        throw {
-            data: response
-        };
-    }
-
-    return response.data;
+    return deleteAdminOfficialCirculation(entryKey);
 }
 
 async function confirmDelete() {

@@ -4,6 +4,12 @@ import { record12306RequestHourlyStat } from '~/server/services/trainProvenanceS
 import parsePlatformNo from '../parsePlatformNo';
 import waitFor12306RequestSlot from '../requestLimiter';
 import log12306RequestFailure from './log12306RequestFailure';
+import {
+    formatExternalServiceDate,
+    formatExternalTrainCode
+} from '~/server/utils/internal/boundaries';
+import type { ServiceDay } from '~/server/utils/date/serviceDay';
+import type { TrainCodeParts } from '~/server/utils/12306/trainCode';
 
 interface StationExitInfoResponse {
     data?: unknown;
@@ -34,13 +40,14 @@ function isResponseData(value: unknown): value is StationExitInfoResponseData {
 }
 
 export default async function fetchStationExitInfo(
-    trainDate: string,
+    trainDate: ServiceDay,
     stationTelecode: string,
-    stationTrainCode: string
+    stationTrainCode: TrainCodeParts
 ): Promise<StationExitInfo | null> {
-    const normalizedTrainDate = trainDate.trim();
+    const normalizedTrainDate = formatExternalServiceDate(trainDate);
     const normalizedStationTelecode = stationTelecode.trim().toUpperCase();
-    const normalizedStationTrainCode = stationTrainCode.trim().toUpperCase();
+    const normalizedStationTrainCode =
+        formatExternalTrainCode(stationTrainCode);
     if (!/^\d{8}$/.test(normalizedTrainDate)) {
         throw new Error('trainDate must be in YYYYMMDD format');
     }

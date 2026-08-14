@@ -1,10 +1,11 @@
 CREATE TABLE IF NOT EXISTS station_platform_refresh_results (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     task_run_id INTEGER NOT NULL,
-    service_date TEXT NOT NULL,
+    service_date INTEGER NOT NULL CHECK(service_date >= 0),
     start_at INTEGER,
-    primary_train_code TEXT NOT NULL DEFAULT '',
-    train_codes_json TEXT NOT NULL DEFAULT '[]',
+    primary_train_prefix TEXT NOT NULL DEFAULT '',
+    primary_train_number INTEGER NOT NULL DEFAULT 0 CHECK(primary_train_number >= 0 AND primary_train_number <= 9999),
+    train_codes_json TEXT NOT NULL,
     trigger TEXT NOT NULL,
     status TEXT NOT NULL,
     candidate_count INTEGER NOT NULL DEFAULT 0,
@@ -21,8 +22,8 @@ CREATE TABLE IF NOT EXISTS station_platform_refresh_results (
 CREATE INDEX IF NOT EXISTS idx_station_platform_refresh_results_task_run
 ON station_platform_refresh_results(task_run_id, id);
 
-CREATE INDEX IF NOT EXISTS idx_station_platform_refresh_results_train
-ON station_platform_refresh_results(service_date, primary_train_code, start_at, created_at);
+CREATE INDEX IF NOT EXISTS idx_station_platform_refresh_results_service_train
+ON station_platform_refresh_results(service_date, primary_train_prefix, primary_train_number, start_at, created_at);
 
 CREATE TABLE IF NOT EXISTS station_platform_refresh_entries (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -32,9 +33,9 @@ CREATE TABLE IF NOT EXISTS station_platform_refresh_entries (
     station_name TEXT NOT NULL,
     station_telecode TEXT NOT NULL,
     station_no INTEGER NOT NULL,
-    train_date TEXT NOT NULL,
-    station_train_codes_json TEXT NOT NULL DEFAULT '[]',
-    attempted_train_codes_json TEXT NOT NULL DEFAULT '[]',
+    train_date INTEGER NOT NULL CHECK(train_date >= 0),
+    station_train_codes_json TEXT NOT NULL,
+    attempted_train_codes_json TEXT NOT NULL,
     status TEXT NOT NULL,
     platform_no INTEGER,
     wicket TEXT,

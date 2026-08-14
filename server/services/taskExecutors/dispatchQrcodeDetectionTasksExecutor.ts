@@ -22,6 +22,9 @@ import {
     markCurrentTrainProvenanceTaskSkipped,
     recordCurrentTrainProvenanceEvent
 } from '~/server/services/trainProvenanceRecorder';
+import { parseInternalJson } from '~/server/utils/internal/storageValues';
+import { ensureExternalEmuId } from '~/server/utils/internal/boundaries';
+import { serviceDateToDay } from '~/server/utils/date/serviceDay';
 
 export const DISPATCH_QRCODE_DETECTION_TASKS_EXECUTOR =
     'dispatch_qrcode_detection_tasks';
@@ -53,12 +56,8 @@ function parseDispatchTaskArgs(
 }
 
 function parseDispatchDetectedAt(task: TaskRecord): string | null {
-    try {
-        const args = JSON.parse(task.arguments) as unknown;
-        return parseDispatchTaskArgs(args).detectedAt;
-    } catch {
-        return null;
-    }
+    const args = parseInternalJson(task.arguments);
+    return parseDispatchTaskArgs(args).detectedAt;
 }
 
 export async function enqueueQrcodeDetectionProbeTasksForDetectedAt(
@@ -72,7 +71,7 @@ export async function enqueueQrcodeDetectionProbeTasksForDetectedAt(
         executor: PROBE_QRCODE_DETECTION_EMU_TASK_EXECUTOR,
         args: {
             detectedAt,
-            emuCode,
+            emuId: ensureExternalEmuId(emuCode),
             manualNow
         },
         executionTime
@@ -91,7 +90,7 @@ export async function enqueueTemporaryQrcodeDetectionProbeTasks(
         executor: PROBE_QRCODE_DETECTION_EMU_TASK_EXECUTOR,
         args: {
             detectedAt,
-            emuCode,
+            emuId: ensureExternalEmuId(emuCode),
             manualNow: true,
             temporary: true
         },
@@ -142,8 +141,9 @@ export async function synchronizeQrcodeDetectionDispatchTasks(): Promise<void> {
     }
 }
 
-async function executeDispatchQrcodeDetectionTasks(rawArgs: unknown) {
-    const args = parseDispatchTaskArgs(rawArgs);
+async function executeDispatchQrcodeDetectionTasks(
+    args: DispatchQrcodeDetectionTasksTaskArgs
+) {
     const config = await loadQrcodeDetectionConfig();
     if (!config.detectedAt.includes(args.detectedAt)) {
         markCurrentTrainProvenanceTaskSkipped('qrcode_detection_time_removed');
@@ -164,7 +164,7 @@ async function executeDispatchQrcodeDetectionTasks(rawArgs: unknown) {
         nextExecutionTime
     );
     recordCurrentTrainProvenanceEvent({
-        serviceDate: getCurrentDateString(),
+        serviceDate: serviceDateToDay(getCurrentDateString()),
         eventType: 'qrcode_detection_dispatch_completed',
         result: 'queued',
         payload: {
@@ -183,12 +183,10 @@ export function registerDispatchQrcodeDetectionTasksExecutor(): void {
         return;
     }
 
-    registerTaskExecutor(
-        DISPATCH_QRCODE_DETECTION_TASKS_EXECUTOR,
-        async (args) => {
-            await executeDispatchQrcodeDetectionTasks(args);
-        }
-    );
+    registerTaskExecutor(DISPATCH_QRCODE_DETECTION_TASKS_EXECUTOR, {
+        parse: parseDispatchTaskArgs,
+        execute: executeDispatchQrcodeDetectionTasks
+    });
     registered = true;
     logger.info(
         `registered executor=${DISPATCH_QRCODE_DETECTION_TASKS_EXECUTOR}`

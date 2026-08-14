@@ -1,8 +1,9 @@
 INSERT INTO timetable_history_coverages (
-    train_code,
+    train_prefix,
+    train_number,
     service_date_start,
     service_date_end_exclusive,
     content_id,
     created_at,
     updated_at
-) VALUES (?, ?, ?, ?, ?, ?);
+) VALUES (?, ?, ?, ?, ?, ?, ?);

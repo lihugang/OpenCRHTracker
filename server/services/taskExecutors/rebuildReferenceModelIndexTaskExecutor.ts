@@ -1,7 +1,10 @@
 import getLogger from '~/server/libs/log4js';
 import useConfig from '~/server/config';
 import { rebuildReferenceModelIndex } from '~/server/services/referenceModelIndexStore';
-import { registerTaskExecutor } from '~/server/services/taskExecutorRegistry';
+import {
+    parseEmptyTaskArgs,
+    registerTaskExecutor
+} from '~/server/services/taskExecutorRegistry';
 import { enqueueTask } from '~/server/services/taskQueue';
 import {
     formatShanghaiDateTime,
@@ -71,12 +74,10 @@ export function registerRebuildReferenceModelIndexTaskExecutor() {
         return;
     }
 
-    registerTaskExecutor(
-        REBUILD_REFERENCE_MODEL_INDEX_TASK_EXECUTOR,
-        async () => {
-            await executeRebuildReferenceModelIndexTask();
-        }
-    );
+    registerTaskExecutor(REBUILD_REFERENCE_MODEL_INDEX_TASK_EXECUTOR, {
+        parse: parseEmptyTaskArgs,
+        execute: async () => executeRebuildReferenceModelIndexTask()
+    });
     registered = true;
     logger.info(
         `registered executor=${REBUILD_REFERENCE_MODEL_INDEX_TASK_EXECUTOR}`

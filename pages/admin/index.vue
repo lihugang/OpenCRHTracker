@@ -290,14 +290,8 @@
 </template>
 
 <script setup lang="ts">
-import useTrackedRequestFetch, {
-    type TrackedRequestFetch
-} from '~/composables/useTrackedRequestFetch';
-import type {
-    AdminPassiveAlertLevel,
-    AdminPassiveAlertsResponse
-} from '~/types/admin';
-import type { TrackerApiResponse } from '~/types/homepage';
+import type { AdminPassiveAlertLevel } from '~/types/admin';
+import { fetchAdminPassiveAlerts } from '~/utils/api/v2/domain/admin';
 import {
     buildAdminRoute,
     useAdminDateQuery
@@ -309,30 +303,12 @@ definePageMeta({
     middleware: 'admin-required'
 });
 
-const requestFetch: TrackedRequestFetch = import.meta.server
-    ? useTrackedRequestFetch()
-    : ($fetch as TrackedRequestFetch);
 const { session } = useAuthState();
 const { selectedDateInput, selectedDateYmd, todayDateInputValue } =
     await useAdminDateQuery();
 
 async function fetchPassiveAlerts(date: string) {
-    const response = await requestFetch<
-        TrackerApiResponse<AdminPassiveAlertsResponse>
-    >('/api/v1/admin/passive-alerts', {
-        retry: 0,
-        query: {
-            date
-        }
-    });
-
-    if (!response.ok) {
-        throw {
-            data: response
-        };
-    }
-
-    return response.data;
+    return fetchAdminPassiveAlerts({ query: { date } });
 }
 
 const {

@@ -19,14 +19,18 @@ import { notifyLookupStatusChanges } from '~/server/services/eventNotificationSe
 import { enqueueTask } from '~/server/services/taskQueue';
 import { DETECT_COUPLED_EMU_GROUP_TASK_EXECUTOR } from '~/server/services/taskExecutors/detectCoupledEmuGroupTaskExecutor';
 import type { EmuListRecord } from '~/server/services/probeAssetStore';
-import uniqueNormalizedCodes from '~/server/utils/12306/uniqueNormalizedCodes';
+import {
+    trainCodeKey,
+    type TrainCodeParts
+} from '~/server/utils/12306/trainCode';
+import type { EmuId } from '~/server/libs/database/emu';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
 
 interface ApplyResolvedProbeResultInput {
-    trainCode: string;
-    trainInternalCode: string;
-    allTrainCodes: string[];
-    allEmuCodes: string[];
+    trainCode: TrainCodeParts;
+    trainInternalCode: string | null;
+    allTrainCodes: TrainCodeParts[];
+    allEmuCodes: EmuId[];
     startStation: string;
     endStation: string;
     startAt: number;
@@ -42,20 +46,39 @@ interface ApplyPendingCouplingProbeResultInput extends Omit<
 > {}
 
 function collectLookupStatusNotificationCandidates(
-    allTrainCodes: string[],
-    allEmuCodes: string[],
+    allTrainCodes: TrainCodeParts[],
+    allEmuCodes: EmuId[],
     startAt: number,
     status: ProbeStatusValue
 ) {
+    const seenTrainKeys = new Set<string>();
+    const uniqueTrainCodes = allTrainCodes.filter((trainCode) => {
+        const key = trainCodeKey(trainCode);
+        if (seenTrainKeys.has(key)) {
+            return false;
+        }
+        seenTrainKeys.add(key);
+        return true;
+    });
+    const seenEmuIds = new Set<number>();
+    const uniqueEmuIds = allEmuCodes.filter((emuId) => {
+        const key = Number(emuId);
+        if (seenEmuIds.has(key)) {
+            return false;
+        }
+        seenEmuIds.add(key);
+        return true;
+    });
+
     return [
-        ...uniqueNormalizedCodes(allTrainCodes).map((targetId) => ({
+        ...uniqueTrainCodes.map((targetId) => ({
             targetType: 'train' as const,
             targetId,
             startAt,
             previousStatus: getProbeStatusByTrainCodeValue(targetId, startAt),
             nextStatus: status
         })),
-        ...uniqueNormalizedCodes(allEmuCodes).map((targetId) => ({
+        ...uniqueEmuIds.map((targetId) => ({
             targetType: 'emu' as const,
             targetId,
             startAt,
@@ -82,7 +105,7 @@ export async function applyResolvedProbeResult(
 
     const trackingMutations = persistProbeTrackingRows({
         trainCodes: input.allTrainCodes,
-        emuCodes: input.allEmuCodes,
+        emuIds: input.allEmuCodes,
         startStation: input.startStation,
         endStation: input.endStation,
         startAt: input.startAt,
@@ -126,7 +149,7 @@ export async function applyPendingCouplingProbeResult(
 
     const trackingMutations = persistProbeTrackingRows({
         trainCodes: input.allTrainCodes,
-        emuCodes: input.allEmuCodes,
+        emuIds: input.allEmuCodes,
         startStation: input.startStation,
         endStation: input.endStation,
         startAt: input.startAt,

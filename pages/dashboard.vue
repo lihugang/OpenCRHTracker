@@ -686,24 +686,32 @@ import {
     ref,
     watch
 } from 'vue';
-import useTrackedRequestFetch, {
-    type TrackedRequestFetch
-} from '~/composables/useTrackedRequestFetch';
 import type {
     AuthAuthorizationItem,
-    AuthAuthorizationListResponse,
     AuthApiKeyIssuer,
     AuthApiKeyListItem,
-    AuthApiKeyListResponse,
     AuthApiKeyNameLength,
     AuthQuotaSummary,
     AuthIssueApiKeyResponse,
-    AuthSession,
-    OAuthClientListResponse,
-    OAuthClientMutationResponse,
     OAuthClientPublicItem
 } from '~/types/auth';
-import type { TrackerApiResponse } from '~/types/homepage';
+import {
+    changePassword as changePasswordRequest,
+    createAuthApiKey,
+    deleteAuthApiKey,
+    deleteAuthAuthorization,
+    fetchAuthApiKeys,
+    fetchAuthAuthorizations,
+    logout as logoutRequest,
+    sendQqBindingCode,
+    unbindQqBinding,
+    verifyQqBinding
+} from '~/utils/api/v2/domain/auth';
+import {
+    createOauthClient as createOauthClientRequest,
+    deleteOauthClient,
+    fetchOauthClients as fetchOauthClientsRequest
+} from '~/utils/api/v2/domain/oauth';
 import getApiErrorMessage from '~/utils/api/getApiErrorMessage';
 import {
     normalizeApiKeyName,
@@ -858,19 +866,11 @@ const scopeLabelMap: Record<string, string> = {
     'api.feedback.manage': '管理反馈'
 };
 
-interface DashboardMutationOptions {
-    method: 'POST' | 'PATCH' | 'DELETE';
-    body?: Record<string, unknown>;
-}
-
 type DeveloperMode = 'keys' | 'oauth';
 
 const route = useRoute();
 const router = useRouter();
 const { session, clearSession, setSession } = useAuthState();
-const requestFetch: TrackedRequestFetch = import.meta.server
-    ? useTrackedRequestFetch()
-    : ($fetch as TrackedRequestFetch);
 const {
     userPreference,
     qqBinding,
@@ -1075,19 +1075,7 @@ if (import.meta.client) {
 }
 
 async function fetchApiKeys() {
-    const response = await requestFetch<
-        TrackerApiResponse<AuthApiKeyListResponse>
-    >('/api/v1/auth/api-keys', {
-        retry: 0
-    });
-
-    if (!response.ok) {
-        throw {
-            data: response
-        };
-    }
-
-    return response.data;
+    return fetchAuthApiKeys();
 }
 
 const {
@@ -1098,35 +1086,11 @@ const {
 } = await useAsyncData('dashboard-api-keys', fetchApiKeys);
 
 async function fetchOauthClients() {
-    const response = await requestFetch<
-        TrackerApiResponse<OAuthClientListResponse>
-    >('/api/v1/oauth/clients', {
-        retry: 0
-    });
-
-    if (!response.ok) {
-        throw {
-            data: response
-        };
-    }
-
-    return response.data;
+    return fetchOauthClientsRequest();
 }
 
 async function fetchAuthorizations() {
-    const response = await requestFetch<
-        TrackerApiResponse<AuthAuthorizationListResponse>
-    >('/api/v1/auth/authorizations', {
-        retry: 0
-    });
-
-    if (!response.ok) {
-        throw {
-            data: response
-        };
-    }
-
-    return response.data;
+    return fetchAuthAuthorizations();
 }
 
 const {
@@ -1708,38 +1672,6 @@ function handleRevokeModalVisibilityChange(nextValue: boolean) {
     }
 }
 
-async function executeMutation<TData>(
-    path: string,
-    options: DashboardMutationOptions
-) {
-    const { data, error } = await useCsrfFetch<TrackerApiResponse<TData>>(
-        path,
-        {
-            ...options,
-            key: `dashboard:${path}:${Date.now()}`,
-            watch: false,
-            server: false
-        }
-    );
-
-    if (error.value) {
-        throw error.value;
-    }
-
-    const response = data.value;
-    if (!response) {
-        throw new Error('API 响应缺失');
-    }
-
-    if (!response.ok) {
-        throw {
-            data: response
-        };
-    }
-
-    return response.data;
-}
-
 function clearChangePasswordState() {
     changePasswordMessage.value = '';
     changePasswordTone.value = 'success';
@@ -1807,15 +1739,9 @@ async function changePassword() {
             hashPasswordDigest(changePasswordForm.currentPassword),
             hashPasswordDigest(changePasswordForm.newPassword)
         ]);
-        const nextSession = await executeMutation<AuthSession>(
-            '/api/v1/auth/password',
-            {
-                method: 'PATCH',
-                body: {
-                    currentPasswordDigest,
-                    newPasswordDigest
-                }
-            }
+        const nextSession = await changePasswordRequest(
+            currentPasswordDigest,
+            newPasswordDigest
         );
 
         setSession(nextSession);
@@ -1841,9 +1767,7 @@ async function logout() {
     logoutErrorMessage.value = '';
 
     try {
-        await executeMutation('/api/v1/auth/logout', {
-            method: 'POST'
-        });
+        await logoutRequest();
         clearSession();
         await navigateTo('/login');
     } catch (error) {
@@ -1911,16 +1835,11 @@ async function sendQqCode(qqNumber: string) {
     isQqBindingPending.value = true;
     clearQqBindingMessage();
     try {
-        const response = await executeMutation<{
-            nextSendAt: number;
-        }>('/api/v1/auth/qq-binding/send-code', {
-            method: 'POST',
-            body: { qqNumber }
-        });
+        const response = await sendQqBindingCode(qqNumber);
         if (flowRevision !== qqBindingFlowRevision.value) {
             return;
         }
-        qqNextSendAt.value = response.nextSendAt;
+        qqNextSendAt.value = response.nextSendAt ?? 0;
         qqCodeSent.value = true;
         qqBindingTone.value = 'success';
         qqBindingMessage.value =
@@ -1948,10 +1867,7 @@ async function verifyQq(qqNumber: string, code: string) {
     isQqBindingPending.value = true;
     clearQqBindingMessage();
     try {
-        await executeMutation('/api/v1/auth/qq-binding/verify', {
-            method: 'POST',
-            body: { qqNumber, code }
-        });
+        await verifyQqBinding(qqNumber, code);
         await refreshUserSettings(true);
         qqCodeSent.value = false;
         qqNextSendAt.value = 0;
@@ -1979,9 +1895,7 @@ async function unbindQq() {
     isQqBindingPending.value = true;
     clearQqBindingMessage();
     try {
-        await executeMutation('/api/v1/auth/qq-binding/unbind', {
-            method: 'POST'
-        });
+        await unbindQqBinding();
         await refreshUserSettings(true);
         qqBindingTone.value = 'success';
         qqBindingMessage.value = 'QQ 已解绑。';
@@ -2007,9 +1921,7 @@ async function confirmRevoke() {
     const target = revokeTarget.value;
 
     try {
-        await executeMutation(`/api/v1/auth/api-keys/${target.revokeId}`, {
-            method: 'DELETE'
-        });
+        await deleteAuthApiKey(target.revokeId);
 
         if (session.value?.revokeId === target.revokeId) {
             clearSession();
@@ -2041,12 +1953,7 @@ async function confirmAuthorizationRevoke() {
     revokingAuthorizationClientIds.value = [target.clientId];
 
     try {
-        await executeMutation(
-            `/api/v1/auth/authorizations/${target.clientId}`,
-            {
-                method: 'DELETE'
-            }
-        );
+        await deleteAuthAuthorization(target.clientId);
 
         authorizationRevokeTarget.value = null;
         await refreshAuthorizations();
@@ -2072,9 +1979,7 @@ async function confirmOauthClientDelete() {
     deletingOauthClientIds.value = [target.clientId];
 
     try {
-        await executeMutation(`/api/v1/oauth/clients/${target.clientId}`, {
-            method: 'DELETE'
-        });
+        await deleteOauthClient(target.clientId);
 
         oauthClientDeleteTarget.value = null;
         await refreshOauthClients();
@@ -2140,18 +2045,12 @@ async function issueApiKey() {
     issueErrorMessage.value = '';
 
     try {
-        issuedKeyResult.value = await executeMutation<AuthIssueApiKeyResponse>(
-            '/api/v1/auth/api-keys',
-            {
-                method: 'POST',
-                body: {
-                    name: normalizeApiKeyName(issueForm.name),
-                    activeFrom: issueActiveFromTimestamp.value!,
-                    expiresAt: issueExpiresAtTimestamp.value!,
-                    scopes: issueForm.scopes
-                }
-            }
-        );
+        issuedKeyResult.value = await createAuthApiKey({
+            name: normalizeApiKeyName(issueForm.name),
+            activeFrom: issueActiveFromTimestamp.value!,
+            expiresAt: issueExpiresAtTimestamp.value!,
+            scopes: issueForm.scopes
+        });
         copyState.value = 'idle';
         await refreshApiKeys();
     } catch (error) {
@@ -2194,19 +2093,13 @@ async function createOauthClient() {
     oauthMutationMessage.value = '';
 
     try {
-        await executeMutation<OAuthClientMutationResponse>(
-            '/api/v1/oauth/clients',
-            {
-                method: 'POST',
-                body: {
-                    name: oauthForm.name,
-                    description: oauthForm.description,
-                    homepageUrl: oauthForm.homepageUrl,
-                    redirectUris: splitLines(oauthForm.redirectUrisText),
-                    requestedScopes: oauthForm.requestedScopes
-                }
-            }
-        );
+        await createOauthClientRequest({
+            name: oauthForm.name,
+            description: oauthForm.description,
+            homepageUrl: oauthForm.homepageUrl,
+            redirectUris: splitLines(oauthForm.redirectUrisText),
+            requestedScopes: oauthForm.requestedScopes
+        });
 
         oauthMutationTone.value = 'success';
         oauthMutationMessage.value = '已创建 OAuth 客户端，请等待管理员审核。';

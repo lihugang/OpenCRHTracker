@@ -1,44 +1,19 @@
 import { computed, ref, toValue, watch, type MaybeRefOrGetter } from 'vue';
-import useTrackedRequestFetch, {
-    type TrackedRequestFetch
-} from '~/composables/useTrackedRequestFetch';
-import {
-    hydrateEmuHistoryRecords,
-    hydrateTrainHistoryRecords,
-    toLookupHistoryListItems
-} from '~/composables/useHistoricalTimetableContent';
-import type { TrackerApiResponse } from '~/types/homepage';
 import type {
-    EmuHistoryResponse,
     LookupHistoryListItem,
     LookupTarget,
-    RecentAssignmentsState,
-    TrainHistoryResponse
+    RecentAssignmentsState
 } from '~/types/lookup';
+import {
+    fetchEmuHistoryPage,
+    fetchTrainHistoryPage,
+    type LookupHistoryPageResult
+} from '~/utils/api/v2/domain/lookup';
 import getApiErrorMessage from '~/utils/api/getApiErrorMessage';
 import getShanghaiDayStartUnixSeconds from '~/utils/time/getShanghaiDayStartUnixSeconds';
+import { parseCanonicalTrainCode } from '~/utils/api/v2/mappers/trainCode';
 
-const REQUEST_LIMIT = 20;
-
-type HistoryPageResponse = TrainHistoryResponse | EmuHistoryResponse;
-type HistoryPageResult = {
-    response: HistoryPageResponse;
-    items: LookupHistoryListItem[];
-};
-type HistoryRequestOptions = {
-    query?: Record<string, number | string | undefined>;
-};
-type RequestFetch = <T>(
-    request: string,
-    options?: HistoryRequestOptions
-) => Promise<T>;
-
-function buildHistoryQuery(cursor: string) {
-    return {
-        limit: REQUEST_LIMIT,
-        cursor: cursor || undefined
-    };
-}
+const REQUEST_LIMIT = 100;
 
 function getHistorySortTimestamp(item: LookupHistoryListItem) {
     if (
@@ -61,118 +36,81 @@ function compareHistoryItemsByTimeDescending(
 ) {
     const leftTimestamp = getHistorySortTimestamp(left);
     const rightTimestamp = getHistorySortTimestamp(right);
-
     if (leftTimestamp === rightTimestamp) {
         return 0;
     }
-
     return leftTimestamp > rightTimestamp ? -1 : 1;
+}
+
+function dedupeHistoryItems(items: LookupHistoryListItem[]) {
+    const seen = new Set<string>();
+    return items.filter((item) => {
+        if (seen.has(item.id)) {
+            return false;
+        }
+        seen.add(item.id);
+        return true;
+    });
 }
 
 function mergeHistoryPage(
     currentItems: readonly LookupHistoryListItem[],
     pageItems: readonly LookupHistoryListItem[]
 ) {
-    const windowStart = Math.max(currentItems.length - REQUEST_LIMIT, 0);
-    const stableItems = currentItems.slice(0, windowStart);
-    const sortableItems = [
-        ...currentItems.slice(windowStart),
-        ...pageItems
-    ].sort(compareHistoryItemsByTimeDescending);
-
-    return [...stableItems, ...sortableItems];
-}
-
-async function fetchTrainHistoryPage(
-    requestFetch: RequestFetch,
-    target: LookupTarget,
-    cursor: string
-) {
-    const response = await requestFetch<
-        TrackerApiResponse<TrainHistoryResponse>
-    >(`/api/v1/history/train/${encodeURIComponent(target.code)}`, {
-        query: buildHistoryQuery(cursor)
-    });
-
-    if (!response.ok) {
-        throw {
-            data: response
-        };
-    }
-
-    const items = await hydrateTrainHistoryRecords(
-        requestFetch,
-        target.code,
-        response.data.items
+    return dedupeHistoryItems([...currentItems, ...pageItems]).sort(
+        compareHistoryItemsByTimeDescending
     );
-
-    return {
-        response: response.data,
-        items: toLookupHistoryListItems('train', items)
-    } satisfies HistoryPageResult;
-}
-
-async function fetchEmuHistoryPage(
-    requestFetch: RequestFetch,
-    target: LookupTarget,
-    cursor: string
-) {
-    const response = await requestFetch<TrackerApiResponse<EmuHistoryResponse>>(
-        `/api/v1/history/emu/${encodeURIComponent(target.code)}`,
-        {
-            query: buildHistoryQuery(cursor)
-        }
-    );
-
-    if (!response.ok) {
-        throw {
-            data: response
-        };
-    }
-
-    const items = await hydrateEmuHistoryRecords(
-        requestFetch,
-        response.data.items
-    );
-
-    return {
-        response: response.data,
-        items: toLookupHistoryListItems('emu', items)
-    } satisfies HistoryPageResult;
 }
 
 async function fetchPage(
-    requestFetch: RequestFetch,
     target: LookupTarget,
     cursor: string
-) {
-    return target.type === 'train'
-        ? fetchTrainHistoryPage(requestFetch, target, cursor)
-        : fetchEmuHistoryPage(requestFetch, target, cursor);
+): Promise<LookupHistoryPageResult> {
+    if (target.type === 'train') {
+        return fetchTrainHistoryPage(target.code, {
+            cursor: cursor || undefined,
+            limit: REQUEST_LIMIT
+        });
+    }
+
+    return fetchEmuHistoryPage(target.code, {
+        cursor: cursor || undefined,
+        limit: REQUEST_LIMIT
+    });
 }
 
 function isResponseForTarget(
     target: LookupTarget,
-    response: HistoryPageResponse | null
+    response: LookupHistoryPageResult | null
 ) {
     if (!response) {
         return false;
     }
 
-    if (target.type === 'train') {
-        return 'trainCode' in response && response.trainCode === target.code;
+    const requestedCode = response.requestedTargetCode.trim().toUpperCase();
+    const targetCode = target.code.trim().toUpperCase();
+    if (requestedCode.length === 0) {
+        return response.emuCode === targetCode;
     }
 
-    return 'emuCode' in response && response.emuCode === target.code;
+    if (target.type === 'train') {
+        const requestedTrainCode = parseCanonicalTrainCode(requestedCode);
+        const targetTrainCode = parseCanonicalTrainCode(targetCode);
+        return (
+            requestedTrainCode !== null &&
+            targetTrainCode !== null &&
+            requestedTrainCode.prefix === targetTrainCode.prefix &&
+            requestedTrainCode.number === targetTrainCode.number
+        );
+    }
+
+    return requestedCode === targetCode;
 }
 
 export function useRecentHistoryList(
     targetSource: MaybeRefOrGetter<LookupTarget | null>
 ) {
-    const requestFetch: TrackedRequestFetch = import.meta.server
-        ? useTrackedRequestFetch()
-        : ($fetch as TrackedRequestFetch);
-    const extraPages = ref<LookupHistoryListItem[][]>([]);
+    const extraPages = ref<LookupHistoryPageResult[]>([]);
     const manualNextCursor = ref<string | null>(null);
     const isLoadingMore = ref(false);
     const loadMoreErrorMessage = ref('');
@@ -190,16 +128,14 @@ export function useRecentHistoryList(
     );
 
     const { data, error, pending, refresh } =
-        useAsyncData<HistoryPageResult | null>(
+        useAsyncData<LookupHistoryPageResult | null>(
             asyncDataKey,
             async () => {
                 const target = toValue(targetSource);
-
                 if (!target) {
                     return null;
                 }
-
-                return await fetchPage(requestFetch, target, '');
+                return await fetchPage(target, '');
             },
             {
                 watch: [targetKey],
@@ -209,23 +145,21 @@ export function useRecentHistoryList(
 
     const initialResponse = computed(() => {
         const target = toValue(targetSource);
-        const response = data.value?.response ?? null;
-
+        const response = data.value ?? null;
         if (!target || !isResponseForTarget(target, response)) {
             return null;
         }
-
         return response;
     });
 
     const initialItems = computed(() =>
-        initialResponse.value ? (data.value?.items ?? []) : []
+        initialResponse.value ? initialResponse.value.items : []
     );
 
     const items = computed(() =>
         extraPages.value.reduce(
             (mergedItems, pageItems) =>
-                mergeHistoryPage(mergedItems, pageItems),
+                mergeHistoryPage(mergedItems, pageItems.items),
             mergeHistoryPage([], initialItems.value)
         )
     );
@@ -234,17 +168,14 @@ export function useRecentHistoryList(
         if (manualNextCursor.value !== null) {
             return manualNextCursor.value;
         }
-
         return initialResponse.value?.nextCursor ?? '';
     });
 
     const state = computed<RecentAssignmentsState>(() => {
         const target = toValue(targetSource);
-
         if (!target) {
             return 'empty';
         }
-
         if (
             pending.value &&
             !initialResponse.value &&
@@ -252,19 +183,15 @@ export function useRecentHistoryList(
         ) {
             return 'loading';
         }
-
         if (error.value && items.value.length === 0) {
             return 'error';
         }
-
         if (items.value.length > 0) {
             return 'success';
         }
-
         if (initialResponse.value) {
             return 'empty';
         }
-
         return 'idle';
     });
 
@@ -275,7 +202,6 @@ export function useRecentHistoryList(
                 '历史记录加载失败，请稍后重试。'
             );
         }
-
         return loadMoreErrorMessage.value;
     });
 
@@ -288,31 +214,24 @@ export function useRecentHistoryList(
 
     const summary = computed(() => {
         const target = toValue(targetSource);
-
         if (!target) {
             return '';
         }
-
         if (state.value === 'loading') {
             return `正在加载 ${target.code} 的历史记录`;
         }
-
         if (state.value === 'success') {
             if (isLoadingMore.value) {
                 return `已加载 ${items.value.length} 条，正在继续加载更多记录`;
             }
-
             if (nextCursor.value) {
                 return `已加载 ${items.value.length} 条，滚动到底部可继续加载`;
             }
-
             return `共加载 ${items.value.length} 条历史记录`;
         }
-
         if (state.value === 'empty') {
             return '没有查询到历史记录';
         }
-
         return '';
     });
 
@@ -325,44 +244,36 @@ export function useRecentHistoryList(
 
     async function reload() {
         const target = toValue(targetSource);
-
         requestVersion.value += 1;
         resetTransientState();
-
         if (!target) {
             return;
         }
-
         await refresh();
     }
 
     async function loadMore() {
         const target = toValue(targetSource);
         const cursor = nextCursor.value;
-
         if (!target || !cursor || !canLoadMore.value) {
             return;
         }
 
         const currentRequestVersion = requestVersion.value;
-
         isLoadingMore.value = true;
         loadMoreErrorMessage.value = '';
 
         try {
-            const result = await fetchPage(requestFetch, target, cursor);
-
+            const result = await fetchPage(target, cursor);
             if (currentRequestVersion !== requestVersion.value) {
                 return;
             }
-
-            extraPages.value = [...extraPages.value, result.items];
-            manualNextCursor.value = result.response.nextCursor ?? '';
+            extraPages.value = [...extraPages.value, result];
+            manualNextCursor.value = result.nextCursor;
         } catch (loadMoreError) {
             if (currentRequestVersion !== requestVersion.value) {
                 return;
             }
-
             loadMoreErrorMessage.value = getApiErrorMessage(
                 loadMoreError,
                 '加载更多历史记录失败，请稍后重试。'

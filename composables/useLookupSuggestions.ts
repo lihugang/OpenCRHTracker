@@ -1,16 +1,12 @@
 import { computed, ref, toValue, watch, type MaybeRefOrGetter } from 'vue';
-import type { TrackerApiResponse } from '~/types/homepage';
-import type {
-    LookupIndexResponse,
-    LookupSuggestItem,
-    LookupSuggestionMode
-} from '~/types/lookup';
+import type { LookupSuggestItem, LookupSuggestionMode } from '~/types/lookup';
 import getApiErrorMessage from '~/utils/api/getApiErrorMessage';
 import getLookupSuggestIndex, {
     type LookupSuggestIndex
 } from '~/utils/lookup/lookupSuggestIndex';
 import { normalizeLookupCode } from '~/utils/lookup/lookupTarget';
 import { useRecentLookupSearches } from '~/composables/useRecentLookupSearches';
+import { fetchSearchIndex } from '~/utils/api/v2/domain/lookup';
 
 const MIN_QUERY_LENGTH = 2;
 const SUGGEST_LIMIT = 25;
@@ -25,17 +21,9 @@ async function loadLookupIndex() {
     }
 
     if (!indexRequest) {
-        indexRequest = $fetch<TrackerApiResponse<LookupIndexResponse>>(
-            '/api/v1/search'
-        )
-            .then((response) => {
-                if (!response.ok) {
-                    throw {
-                        data: response
-                    };
-                }
-
-                cachedIndex = response.data.items;
+        indexRequest = fetchSearchIndex()
+            .then((items) => {
+                cachedIndex = items;
                 return getLookupSuggestIndex(cachedIndex);
             })
             .finally(() => {

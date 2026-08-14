@@ -288,9 +288,6 @@
 </template>
 
 <script setup lang="ts">
-import useTrackedRequestFetch, {
-    type TrackedRequestFetch
-} from '~/composables/useTrackedRequestFetch';
 import type {
     AdminTrafficBucket,
     AdminTrafficMetricKey,
@@ -299,7 +296,7 @@ import type {
     AdminTrafficWindow,
     AdminTrafficWindowSummary
 } from '~/types/admin';
-import type { TrackerApiResponse } from '~/types/homepage';
+import { fetchAdminTraffic } from '~/utils/api/v2/domain/admin';
 import { useAdminDateQuery } from '~/composables/useAdminDateQuery';
 import getApiErrorMessage from '~/utils/api/getApiErrorMessage';
 import formatTrackerTimestamp from '~/utils/time/formatTrackerTimestamp';
@@ -308,9 +305,6 @@ definePageMeta({
     middleware: 'admin-required'
 });
 
-const requestFetch: TrackedRequestFetch = import.meta.server
-    ? useTrackedRequestFetch()
-    : ($fetch as TrackedRequestFetch);
 const { session } = useAuthState();
 const { selectedDateInput, todayDateInputValue } = await useAdminDateQuery();
 const selectedWindow = ref<AdminTrafficWindow>('3h');
@@ -334,19 +328,7 @@ const windowOptions = [
 }>;
 
 async function fetchTraffic() {
-    const response = await requestFetch<
-        TrackerApiResponse<AdminTrafficResponse>
-    >('/api/v1/admin/traffic', {
-        retry: 0
-    });
-
-    if (!response.ok) {
-        throw {
-            data: response
-        };
-    }
-
-    return response.data;
+    return fetchAdminTraffic();
 }
 
 const {

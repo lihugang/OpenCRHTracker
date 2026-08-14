@@ -3,9 +3,13 @@ import { getFeedbackTopicById } from '~/server/services/feedbackStore';
 import type { UserEventSubscriptionItem } from '~/server/services/userEventSubscriptionStore';
 import type {
     AuthEventSubscriptionItem,
-    AuthEventSubscriptionListResponse
-} from '~/types/auth';
-import { buildNotificationTargetPath } from '~/utils/notifications/target';
+    AuthEventSubscriptionListResult
+} from '~/server/types/authTargets';
+import { buildAuthEventTargetPath } from '~/server/utils/auth/eventTargets';
+import {
+    formatExternalEmuCode,
+    formatExternalTrainCode
+} from '~/server/utils/internal/boundaries';
 
 function canViewFeedbackSubscription(userId: string, topicId: number) {
     const topic = getFeedbackTopicById(topicId);
@@ -45,35 +49,27 @@ function resolveEventSubscriptionLabel(
     userId: string,
     item: UserEventSubscriptionItem
 ) {
-    if (item.targetType === 'train') {
+    if (item.kind === 'train') {
         return {
             canView: true,
-            label: `车次 ${item.targetId}`
+            label: `车次 ${formatExternalTrainCode(item.trainCode)}`
         };
     }
 
-    if (item.targetType === 'emu') {
+    if (item.kind === 'emu') {
         return {
             canView: true,
-            label: `车组 ${item.targetId}`
+            label: `车组 ${formatExternalEmuCode(item.emuId)}`
         };
     }
 
-    const topicId = Number(item.targetId);
-    if (!Number.isInteger(topicId) || topicId <= 0) {
-        return {
-            canView: false,
-            label: `反馈 #${item.targetId}`
-        };
-    }
-
-    const resolved = canViewFeedbackSubscription(userId, topicId);
+    const resolved = canViewFeedbackSubscription(userId, item.topicId);
     return {
         canView: resolved.canView,
         label:
             resolved.title.trim().length > 0
                 ? `反馈：${resolved.title}`
-                : `反馈 #${item.targetId}`
+                : `反馈 #${item.topicId}`
     };
 }
 
@@ -87,10 +83,14 @@ function toPublicEventSubscriptionItem(
     }
 
     return {
-        targetType: item.targetType,
-        targetId: item.targetId,
+        target:
+            item.kind === 'train'
+                ? { kind: 'train', trainCode: item.trainCode }
+                : item.kind === 'emu'
+                  ? { kind: 'emu', emuId: item.emuId }
+                  : { kind: 'feedback', topicId: item.topicId },
         label: resolved.label,
-        path: buildNotificationTargetPath(item),
+        path: buildAuthEventTargetPath(item),
         createdAt: item.createdAt,
         updatedAt: item.updatedAt
     };
@@ -99,7 +99,7 @@ function toPublicEventSubscriptionItem(
 export function createEventSubscriptionListResponse(
     userId: string,
     items: UserEventSubscriptionItem[]
-): AuthEventSubscriptionListResponse {
+): AuthEventSubscriptionListResult {
     return {
         userId,
         maxEntries: useConfig().user.pushSubscriptions.maxEventSubscriptions,

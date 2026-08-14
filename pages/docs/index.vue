@@ -1,6 +1,6 @@
 <template>
     <DocsShell
-        eyebrow="DOCS"
+        eyebrow="文档"
         title="文档"
         description="">
         <div class="grid gap-6 xl:grid-cols-3">
@@ -9,7 +9,7 @@
                     <div class="space-y-2">
                         <p
                             class="text-xs font-medium uppercase tracking-[0.2em] text-crh-blue/80">
-                            DEPLOY
+                            部署
                         </p>
                         <h2 class="text-2xl font-semibold text-slate-900">
                             私有部署
@@ -39,7 +39,7 @@
                     <div class="space-y-2">
                         <p
                             class="text-xs font-medium uppercase tracking-[0.2em] text-crh-blue/80">
-                            OAUTH
+                            授权
                         </p>
                         <h2 class="text-2xl font-semibold text-slate-900">
                             OAuth 文档
@@ -61,7 +61,7 @@
                     <div class="space-y-2">
                         <p
                             class="text-xs font-medium uppercase tracking-[0.2em] text-crh-blue/80">
-                            API
+                            接口
                         </p>
                         <h2 class="text-2xl font-semibold text-slate-900">
                             API 文档

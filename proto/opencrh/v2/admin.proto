@@ -1,0 +1,845 @@
+syntax = "proto3";
+
+package opencrh.v2;
+
+import "opencrh/v2/auth.proto";
+import "opencrh/v2/common.proto";
+import "opencrh/v2/identifiers.proto";
+import "opencrh/v2/mappings.proto";
+import "opencrh/v2/oauth.proto";
+
+enum AdminAnomalyType {
+  ADMIN_ANOMALY_TYPE_UNSPECIFIED = 0;
+  ADMIN_ANOMALY_TYPE_TRAIN_MULTI_EMU = 1;
+  ADMIN_ANOMALY_TYPE_TRAIN_COUPLED_MODEL_MISMATCH = 2;
+  ADMIN_ANOMALY_TYPE_TRAIN_NON_MULTIPLE_COUPLED = 3;
+  ADMIN_ANOMALY_TYPE_EMU_SINGLE_SHORT_ROUTE = 4;
+}
+
+enum AdminPassiveAlertLevel {
+  ADMIN_PASSIVE_ALERT_LEVEL_UNSPECIFIED = 0;
+  ADMIN_PASSIVE_ALERT_LEVEL_WARN = 1;
+  ADMIN_PASSIVE_ALERT_LEVEL_ERROR = 2;
+}
+
+enum AdminDailyRouteTimetableResolution {
+  ADMIN_DAILY_ROUTE_TIMETABLE_RESOLUTION_UNSPECIFIED = 0;
+  ADMIN_DAILY_ROUTE_TIMETABLE_RESOLUTION_EXACT = 1;
+  ADMIN_DAILY_ROUTE_TIMETABLE_RESOLUTION_LATEST_FALLBACK = 2;
+  ADMIN_DAILY_ROUTE_TIMETABLE_RESOLUTION_UNRESOLVED = 3;
+}
+
+enum AdminOfficialCirculationMatchType {
+  ADMIN_OFFICIAL_CIRCULATION_MATCH_TYPE_UNSPECIFIED = 0;
+  ADMIN_OFFICIAL_CIRCULATION_MATCH_TYPE_INTERNAL_CODE = 1;
+  ADMIN_OFFICIAL_CIRCULATION_MATCH_TYPE_ALL_CODE = 2;
+}
+
+enum AdminConfigFileTarget {
+  ADMIN_CONFIG_FILE_TARGET_UNSPECIFIED = 0;
+  ADMIN_CONFIG_FILE_TARGET_CONFIG = 1;
+  ADMIN_CONFIG_FILE_TARGET_EMU_LIST = 2;
+  ADMIN_CONFIG_FILE_TARGET_QR_CODE = 3;
+  ADMIN_CONFIG_FILE_TARGET_STATION_COORD = 4;
+  ADMIN_CONFIG_FILE_TARGET_TRAIN_STYLE_MAPPING = 5;
+  ADMIN_CONFIG_FILE_TARGET_QRCODE_DETECTION = 6;
+  ADMIN_CONFIG_FILE_TARGET_SUPPLEMENT_TRAINS = 7;
+}
+
+enum AdminConfigFileAction {
+  ADMIN_CONFIG_FILE_ACTION_UNSPECIFIED = 0;
+  ADMIN_CONFIG_FILE_ACTION_RELOAD_LOCAL = 1;
+  ADMIN_CONFIG_FILE_ACTION_REFRESH_REMOTE = 2;
+}
+
+enum AdminServerMetricsWindow {
+  ADMIN_SERVER_METRICS_WINDOW_UNSPECIFIED = 0;
+  ADMIN_SERVER_METRICS_WINDOW_H4 = 1;
+  ADMIN_SERVER_METRICS_WINDOW_H24 = 2;
+}
+
+enum AdminMembershipCodeStatus {
+  ADMIN_MEMBERSHIP_CODE_STATUS_UNSPECIFIED = 0;
+  ADMIN_MEMBERSHIP_CODE_STATUS_UNUSED = 1;
+  ADMIN_MEMBERSHIP_CODE_STATUS_USED = 2;
+}
+
+enum AdminTrafficWindow {
+  ADMIN_TRAFFIC_WINDOW_UNSPECIFIED = 0;
+  ADMIN_TRAFFIC_WINDOW_H3 = 1;
+  ADMIN_TRAFFIC_WINDOW_H24 = 2;
+  ADMIN_TRAFFIC_WINDOW_D7 = 3;
+}
+
+message PostAdminAnomalyDeleteByTypeRequest {
+  string date = 1;
+  AdminAnomalyType type = 2;
+}
+
+message PostAdminAnomalyDeleteByTypeData {
+  string date = 1;
+  AdminAnomalyType type = 2;
+  bool was_today = 3;
+  uint32 matched_items = 4;
+  uint32 matched_routes = 5;
+  uint32 deleted_daily_routes = 6;
+  uint32 deleted_probe_status_rows = 7;
+  uint32 skipped_routes = 8;
+}
+
+message PostAdminAnomalyDeleteByTypeResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    PostAdminAnomalyDeleteByTypeData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message PostAdminAnomalyDeleteRouteRequest {
+  string date = 1;
+  uint32 route_id = 2;
+}
+
+message PostAdminAnomalyDeleteRouteData {
+  string date = 1;
+  uint32 route_id = 2;
+  bool was_today = 3;
+  bool deleted_daily_route = 4;
+  uint32 deleted_probe_status_rows = 5;
+  bool cleared_runtime_train_key = 6;
+  repeated string cleared_runtime_emu_codes = 7;
+  uint32 cleared_detection_groups = 8;
+}
+
+message PostAdminAnomalyDeleteRouteResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    PostAdminAnomalyDeleteRouteData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message AdminAnomalyRouteRecord {
+  uint32 id = 1;
+  string train_code = 2;
+  string emu_code = 3;
+  string start_station = 4;
+  string end_station = 5;
+  int64 start_at = 6;
+  int64 end_at = 7;
+  uint32 duration_seconds = 8;
+}
+
+message AdminAnomalyTypeCount {
+  AdminAnomalyType type = 1;
+  string label = 2;
+  uint32 count = 3;
+}
+
+message AdminAnomalyItem {
+  AdminAnomalyType type = 1;
+  string subject_code = 2;
+  string title = 3;
+  string summary = 4;
+  repeated string train_codes = 5;
+  repeated string emu_codes = 6;
+  optional uint32 duration_seconds = 7;
+  repeated AdminAnomalyRouteRecord routes = 8;
+}
+
+message GetAdminAnomalyScanRequest {}
+
+message GetAdminAnomalyScanData {
+  string date = 1;
+  uint32 total = 2;
+  repeated AdminAnomalyTypeCount counts = 3;
+  repeated AdminAnomalyItem items = 4;
+}
+
+message GetAdminAnomalyScanResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    GetAdminAnomalyScanData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message AdminConfigFileItem {
+  AdminConfigFileTarget target = 1;
+  string title = 2;
+  string description = 3;
+  string file_path = 4;
+  optional string provider = 5;
+  bool exists = 6;
+  optional int64 modified_at = 7;
+  bool editable = 8;
+  repeated AdminConfigFileAction supported_actions = 9;
+}
+
+message GetAdminConfigFilesRequest {}
+
+message GetAdminConfigFilesData {
+  int64 as_of = 1;
+  repeated AdminConfigFileItem items = 2;
+}
+
+message GetAdminConfigFilesResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    GetAdminConfigFilesData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message PostAdminConfigFilesRequest {
+  AdminConfigFileTarget target = 1;
+  AdminConfigFileAction action = 2;
+}
+
+message PostAdminConfigFilesData {
+  AdminConfigFileTarget target = 1;
+  AdminConfigFileAction action = 2;
+  string summary = 3;
+  AdminConfigFileItem item = 4;
+}
+
+message PostAdminConfigFilesResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    PostAdminConfigFilesData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message GetAdminConfigFileRequest {}
+
+message GetAdminConfigFileData {
+  string content = 1;
+  string revision = 2;
+  string file_path = 3;
+  int64 modified_at = 4;
+}
+
+message GetAdminConfigFileResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    GetAdminConfigFileData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message PutAdminConfigFileRequest {
+  AdminConfigFileTarget target = 1;
+  string content = 2;
+  string expected_revision = 3;
+}
+
+message PutAdminConfigFileData {
+  string summary = 1;
+  string revision = 2;
+  int64 modified_at = 3;
+  AdminConfigFileItem item = 4;
+}
+
+message PutAdminConfigFileResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    PutAdminConfigFileData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message AdminDailyRouteRecord {
+  uint32 id = 1;
+  uint32 service_day = 2;
+  TrainCode train_code = 3;
+  uint32 emu_id = 4;
+  optional uint32 timetable_id = 5;
+  string start_station = 6;
+  string end_station = 7;
+  int64 start_at = 8;
+  int64 end_at = 9;
+}
+
+message GetAdminDailyRoutesRequest {}
+
+message GetAdminDailyRoutesData {
+  string date = 1;
+  string train_code = 2;
+  string emu_code = 3;
+  uint32 total = 4;
+  repeated AdminDailyRouteRecord items = 5;
+  map<uint32, string> emu_code_mappings = 6;
+  map<uint32, HistoricalTimetableSummary> timetable_mappings = 7;
+}
+
+message GetAdminDailyRoutesResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    GetAdminDailyRoutesData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message PostAdminDailyRoutesRequest {
+  string date = 1;
+  string train_code = 2;
+  string emu_code = 3;
+  optional uint32 timetable_id = 4;
+}
+
+message PostAdminDailyRoutesData {
+  string date = 1;
+  string train_code = 2;
+  string emu_code = 3;
+  optional uint32 timetable_id = 4;
+  optional AdminDailyRouteRecord created_record = 5;
+  bool inserted = 6;
+  map<uint32, string> emu_code_mappings = 7;
+  map<uint32, HistoricalTimetableSummary> timetable_mappings = 8;
+}
+
+message PostAdminDailyRoutesResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    PostAdminDailyRoutesData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message DeleteAdminDailyRouteRequest {}
+
+message DeleteAdminDailyRouteData {
+  string date = 1;
+  uint32 route_id = 2;
+  bool was_today = 3;
+  bool deleted_daily_route = 4;
+  uint32 deleted_probe_status_rows = 5;
+  bool cleared_runtime_train_key = 6;
+  repeated string cleared_runtime_emu_codes = 7;
+  uint32 cleared_detection_groups = 8;
+}
+
+message DeleteAdminDailyRouteResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    DeleteAdminDailyRouteData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message AdminDailyRouteTimetableCandidate {
+  optional uint32 timetable_id = 1;
+  uint32 service_day_start = 2;
+  uint32 service_day_end_exclusive = 3;
+  string start_station = 4;
+  string end_station = 5;
+  int64 start_at = 6;
+  int64 end_at = 7;
+  AdminDailyRouteTimetableResolution resolution = 8;
+  bool is_default = 9;
+}
+
+message GetAdminDailyRoutesTimetablesRequest {}
+
+message GetAdminDailyRoutesTimetablesData {
+  string date = 1;
+  string train_code = 2;
+  optional uint32 default_timetable_id = 3;
+  repeated AdminDailyRouteTimetableCandidate items = 4;
+  map<uint32, HistoricalTimetableSummary> timetable_mappings = 5;
+}
+
+message GetAdminDailyRoutesTimetablesResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    GetAdminDailyRoutesTimetablesData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message AdminMembershipCodeBatchSummary {
+  string batch_id = 1;
+  string group_id = 2;
+  string group_name = 3;
+  uint32 duration_days = 4;
+  uint32 quantity = 5;
+  string created_by = 6;
+  int64 created_at = 7;
+}
+
+message AdminMembershipCodeItem {
+  AdminMembershipCodeBatchSummary batch = 1;
+  string code = 2;
+  AdminMembershipCodeStatus status = 3;
+  optional int64 used_at = 4;
+  optional string used_by = 5;
+}
+
+message GetAdminMembershipCodesRequest {}
+
+message GetAdminMembershipCodesData {
+  int64 as_of = 1;
+  uint32 total = 2;
+  uint32 used_count = 3;
+  uint32 unused_count = 4;
+  uint32 limit = 5;
+  string next_cursor = 6;
+  repeated SponsorshipGroupCatalogItem catalog = 7;
+  repeated AdminMembershipCodeItem items = 8;
+}
+
+message GetAdminMembershipCodesResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    GetAdminMembershipCodesData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message PostAdminMembershipCodesRequest {
+  string group_id = 1;
+  uint32 quantity = 2;
+  uint32 duration_days = 3;
+}
+
+message PostAdminMembershipCodesData {
+  AdminMembershipCodeBatchSummary batch = 1;
+}
+
+message PostAdminMembershipCodesResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    PostAdminMembershipCodesData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message GetAdminOauthClientsRequest {}
+
+message GetAdminOauthClientsData {
+  repeated OAuthClientPublicItem items = 1;
+}
+
+message GetAdminOauthClientsResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    GetAdminOauthClientsData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message AdminOauthClientScopeReview {
+  string scope = 1;
+  OAuthClientScopeReviewStatus review_status = 2;
+}
+
+message AdminOauthClientAdminGrants {
+  optional bool notification_send = 1;
+}
+
+message PatchAdminOauthClientRequest {
+  string client_id = 1;
+  OAuthClientStatus status = 2;
+  optional bool is_trusted = 3;
+  repeated AdminOauthClientScopeReview scope_reviews = 4;
+  AdminOauthClientAdminGrants admin_grants = 5;
+}
+
+message PatchAdminOauthClientData {
+  OAuthClientPublicItem client = 1;
+}
+
+message PatchAdminOauthClientResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    PatchAdminOauthClientData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message PostAdminOauthClientRevokeTokensRequest {
+  string client_id = 1;
+}
+
+message PostAdminOauthClientRevokeTokensData {
+  uint32 revoked_count = 1;
+}
+
+message PostAdminOauthClientRevokeTokensResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    PostAdminOauthClientRevokeTokensData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message AdminOfficialCirculationNodePreview {
+  string internal_code = 1;
+  repeated string all_codes = 2;
+  string start_station = 3;
+  string end_station = 4;
+  int64 start_at = 5;
+  int64 end_at = 6;
+}
+
+message AdminOfficialCirculationSearchItem {
+  string entry_key = 1;
+  repeated AdminOfficialCirculationMatchType matched_by = 2;
+  repeated string matched_codes = 3;
+  int64 refreshed_at = 4;
+  uint32 node_count = 5;
+  repeated AdminOfficialCirculationNodePreview nodes = 6;
+}
+
+message GetAdminOfficialCirculationsRequest {}
+
+message GetAdminOfficialCirculationsData {
+  string keyword = 1;
+  string normalized_keyword = 2;
+  string file_path = 3;
+  optional int64 modified_at = 4;
+  uint32 total = 5;
+  repeated AdminOfficialCirculationSearchItem items = 6;
+}
+
+message GetAdminOfficialCirculationsResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    GetAdminOfficialCirculationsData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message DeleteAdminOfficialCirculationRequest {}
+
+message DeleteAdminOfficialCirculationData {
+  string entry_key = 1;
+  repeated string deleted_keys = 2;
+  uint32 deleted_key_count = 3;
+  optional int64 modified_at = 4;
+}
+
+message DeleteAdminOfficialCirculationResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    DeleteAdminOfficialCirculationData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message AdminPassiveAlertItem {
+  string id = 1;
+  int64 timestamp = 2;
+  AdminPassiveAlertLevel level = 3;
+  string logger = 4;
+  string message = 5;
+}
+
+message AdminAlertLoggerCount {
+  string logger = 1;
+  uint32 count = 2;
+}
+
+message AdminPassiveAlertTypeCount {
+  string type = 1;
+  uint32 count = 2;
+}
+
+message GetAdminPassiveAlertsRequest {}
+
+message GetAdminPassiveAlertsData {
+  string date = 1;
+  optional string log_file = 2;
+  string cursor = 3;
+  string next_cursor = 4;
+  uint32 limit = 5;
+  uint32 total = 6;
+  uint32 filtered_total = 7;
+  uint32 warn_count = 8;
+  uint32 error_count = 9;
+  repeated AdminAlertLoggerCount top_loggers = 10;
+  repeated AdminPassiveAlertTypeCount type_counts = 11;
+  repeated AdminPassiveAlertItem items = 12;
+}
+
+message GetAdminPassiveAlertsResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    GetAdminPassiveAlertsData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message AdminServerMetricsPeak {
+  int64 start_at = 1;
+  int64 end_at = 2;
+  double value = 3;
+}
+
+message AdminServerMetricsBucket {
+  int64 start_at = 1;
+  int64 end_at = 2;
+  uint32 system_sample_count = 3;
+  optional double cpu_percent = 4;
+  optional double memory_used_ratio = 5;
+  optional double memory_used_bytes = 6;
+  optional double memory_total_bytes = 7;
+  optional double load_1m = 8;
+  uint32 ssr_request_count = 9;
+  optional double ssr_avg_duration_ms = 10;
+  optional double ssr_p50_duration_ms = 11;
+  optional double ssr_p75_duration_ms = 12;
+  optional double ssr_p95_duration_ms = 13;
+  uint32 api_request_count = 14;
+  optional double api_avg_duration_ms = 15;
+  optional double api_p50_duration_ms = 16;
+  optional double api_p75_duration_ms = 17;
+  optional double api_p95_duration_ms = 18;
+}
+
+message AdminServerMetricsTopRoute {
+  string path = 1;
+  uint32 request_count = 2;
+  optional double avg_duration_ms = 3;
+  optional double p50_duration_ms = 4;
+  optional double p75_duration_ms = 5;
+  optional double p95_duration_ms = 6;
+}
+
+message AdminServerMetricsWindowSummary {
+  AdminServerMetricsWindow key = 1;
+  string label = 2;
+  uint32 bucket_seconds = 3;
+  uint32 bucket_count = 4;
+  uint32 coverage_seconds = 5;
+  bool is_partial = 6;
+  optional AdminServerMetricsBucket latest = 7;
+  map<string, AdminServerMetricsPeak> peaks = 8;
+  AdminServerMetricsTopRouteList top_routes = 9;
+  repeated AdminServerMetricsBucket buckets = 10;
+}
+
+message AdminServerMetricsTopRouteList {
+  repeated AdminServerMetricsTopRoute ssr = 1;
+  repeated AdminServerMetricsTopRoute api = 2;
+}
+
+message GetAdminServerMetricsRequest {}
+
+message GetAdminServerMetricsData {
+  int64 started_at = 1;
+  int64 as_of = 2;
+  optional int64 last_sample_at = 3;
+  bool load_average_supported = 4;
+  repeated AdminServerMetricsWindowSummary windows = 5;
+}
+
+message GetAdminServerMetricsResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    GetAdminServerMetricsData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message AdminTaskOverviewCouplingScanOptionGroup {
+  string bureau = 1;
+  repeated string models = 2;
+}
+
+message GetAdminTasksRequest {}
+
+message GetAdminTasksData {
+  int64 as_of = 1;
+  optional int64 next_task_id = 2;
+  uint32 remaining_total = 3;
+  uint32 remaining_within_10_minutes = 4;
+  uint32 remaining_within_30_minutes = 5;
+  uint32 remaining_within_1_hour = 6;
+  repeated AdminTaskOverviewCouplingScanOptionGroup coupling_scan_options = 7;
+}
+
+message GetAdminTasksResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    GetAdminTasksData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message AdminRegenerateDailyExportTask {
+  string date = 1;
+}
+
+message AdminRefreshRouteInfoNowTask {
+  repeated string train_codes = 1;
+}
+
+message AdminRefreshTrainCirculationNowTask {
+  string train_code = 1;
+}
+
+message AdminRefreshAllRoutesAndRequeueProbeNowTask {}
+
+message AdminDetectCoupledEmuGroupNowTask {
+  string bureau = 1;
+  string model = 2;
+}
+
+message AdminRunQrcodeDetectionNowTask {}
+
+message AdminDispatchStationBoardTasksNowTask {}
+
+message PostAdminTasksRequest {
+  oneof task {
+    AdminRegenerateDailyExportTask regenerate_daily_export = 1;
+    AdminRefreshRouteInfoNowTask refresh_route_info_now = 2;
+    AdminRefreshTrainCirculationNowTask refresh_train_circulation_now = 3;
+    AdminRefreshAllRoutesAndRequeueProbeNowTask refresh_all_routes_and_requeue_probe_now = 4;
+    AdminDetectCoupledEmuGroupNowTask detect_coupled_emu_group_now = 5;
+    AdminRunQrcodeDetectionNowTask run_qrcode_detection_now = 6;
+    AdminDispatchStationBoardTasksNowTask dispatch_station_board_tasks_now = 7;
+  }
+}
+
+message AdminCreatedTask {
+  uint32 task_id = 1;
+  string executor = 2;
+  int64 execution_time = 3;
+}
+
+message PostAdminTasksData {
+  string type = 1;
+  uint32 created_count = 2;
+  repeated AdminCreatedTask created_tasks = 3;
+  string summary = 4;
+  optional string date = 5;
+  repeated string normalized_train_codes = 6;
+}
+
+message PostAdminTasksResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    PostAdminTasksData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message AdminTimetableHistoryCoverageSummary {
+  uint32 coverage_id = 1;
+  uint32 timetable_id = 2;
+  uint32 service_day_start = 3;
+  uint32 service_day_end_exclusive = 4;
+  string start_station = 5;
+  string end_station = 6;
+  uint32 stop_count = 7;
+}
+
+message AdminTimetableHistoryCoverageMergeCandidate {
+  uint32 coverage_id = 1;
+  AdminTimetableHistoryCoverageSummary previous = 2;
+  AdminTimetableHistoryCoverageSummary middle = 3;
+  AdminTimetableHistoryCoverageSummary next = 4;
+  uint32 merged_service_day_start = 5;
+  uint32 merged_service_day_end_exclusive = 6;
+}
+
+message GetAdminTimetableHistoryMergeCandidatesRequest {}
+
+message GetAdminTimetableHistoryMergeCandidatesData {
+  string train_code = 1;
+  uint32 total = 2;
+  repeated AdminTimetableHistoryCoverageMergeCandidate items = 3;
+  map<uint32, HistoricalTimetableSummary> timetable_mappings = 4;
+}
+
+message GetAdminTimetableHistoryMergeCandidatesResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    GetAdminTimetableHistoryMergeCandidatesData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message DeleteAdminTimetableHistoryCoverageRequest {}
+
+message DeleteAdminTimetableHistoryCoverageData {
+  string train_code = 1;
+  repeated uint32 deleted_coverage_ids = 2;
+  AdminTimetableHistoryCoverageSummary previous = 3;
+  AdminTimetableHistoryCoverageSummary middle = 4;
+  AdminTimetableHistoryCoverageSummary next = 5;
+  AdminTimetableHistoryCoverageSummary merged = 6;
+  map<uint32, HistoricalTimetableSummary> timetable_mappings = 7;
+}
+
+message DeleteAdminTimetableHistoryCoverageResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    DeleteAdminTimetableHistoryCoverageData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message AdminTrafficMetricTotals {
+  uint32 web_requests = 1;
+  uint32 api_calls = 2;
+  uint32 unique_visitors = 3;
+  uint32 active_users = 4;
+}
+
+message AdminTrafficBucket {
+  int64 start_at = 1;
+  int64 end_at = 2;
+  uint32 web_requests = 3;
+  uint32 api_calls = 4;
+  uint32 unique_visitors = 5;
+  uint32 active_users = 6;
+}
+
+message AdminTrafficWindowSummary {
+  AdminTrafficWindow key = 1;
+  string label = 2;
+  uint32 bucket_seconds = 3;
+  uint32 bucket_count = 4;
+  uint32 coverage_seconds = 5;
+  bool is_partial = 6;
+  repeated string estimated_metrics = 7;
+  AdminTrafficMetricTotals totals = 8;
+  map<string, AdminServerMetricsPeak> peaks = 9;
+  repeated AdminTrafficBucket buckets = 10;
+}
+
+message GetAdminTrafficRequest {}
+
+message GetAdminTrafficData {
+  int64 started_at = 1;
+  int64 as_of = 2;
+  repeated AdminTrafficWindowSummary windows = 3;
+}
+
+message GetAdminTrafficResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    GetAdminTrafficData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message PostAdminWebappTokensRevokeAllRequest {}
+
+message PostAdminWebappTokensRevokeAllData {
+  string issuer = 1;
+  uint32 revoked_count = 2;
+  int64 revoked_at = 3;
+  bool revoked_current_session = 4;
+}
+
+message PostAdminWebappTokensRevokeAllResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    PostAdminWebappTokensRevokeAllData data = 2;
+    ApiError error = 3;
+  }
+}

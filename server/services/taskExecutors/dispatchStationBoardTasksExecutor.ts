@@ -29,6 +29,11 @@ import {
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
 import uniqueNormalizedCodes from '~/server/utils/12306/uniqueNormalizedCodes';
+import {
+    serviceDateToDay,
+    serviceDayToShanghaiDayStartUnixSeconds,
+    type ServiceDay
+} from '~/server/utils/date/serviceDay';
 import fetchAllStations from '~/server/utils/12306/network/fetchAllStations';
 import {
     getCurrentTrainProvenanceTaskRunId,
@@ -116,18 +121,16 @@ function collectStationCandidates(
     );
 }
 
-function collectIncrementalStationCandidates(serviceDate: string) {
+function collectIncrementalStationCandidates(serviceDate: ServiceDay) {
     const queueEntries = listScheduleRouteRefreshQueueEntries(serviceDate);
-    const targetTrainCodes = uniqueNormalizedCodes(
-        queueEntries.map((entry) => entry.trainCode)
-    );
+    const targetTrainCodes = queueEntries.map((entry) => entry.trainCode);
     const initialItems = listScheduleCandidateItemsForCodes('published', {
         aliasCodes: targetTrainCodes
     });
     const items = listScheduleCandidateItemsForCodes('published', {
         aliasCodes: targetTrainCodes,
-        internalCodes: uniqueNormalizedCodes(
-            initialItems.map((item) => item.internalCode)
+        internalCodes: initialItems.flatMap((item) =>
+            item.internalCode ? [item.internalCode] : []
         )
     });
 
@@ -145,7 +148,7 @@ function collectIncrementalStationCandidates(serviceDate: string) {
     };
 }
 
-function isFullSweepDue(serviceDate: string, intervalDays: number) {
+function isFullSweepDue(serviceDate: ServiceDay, intervalDays: number) {
     const lastFullSweepDate = loadStationBoardLastFullSweepDate();
     if (!lastFullSweepDate) {
         return {
@@ -156,8 +159,8 @@ function isFullSweepDue(serviceDate: string, intervalDays: number) {
     }
 
     const elapsedDays = Math.floor(
-        (getShanghaiDayStartUnixSeconds(serviceDate) -
-            getShanghaiDayStartUnixSeconds(lastFullSweepDate)) /
+        (serviceDayToShanghaiDayStartUnixSeconds(serviceDate) -
+            serviceDayToShanghaiDayStartUnixSeconds(lastFullSweepDate)) /
             SHANGHAI_DAY_SECONDS
     );
     return {
@@ -187,7 +190,7 @@ function buildResolvedStationCandidateKey(
 }
 
 function maybeRecordDispatchResult(input: {
-    serviceDate: string;
+    serviceDate: ServiceDay;
     candidateGroupCount: number;
     selectedStations: string[];
     createdTaskCount: number;
@@ -226,8 +229,9 @@ export function enqueueStationBoardDispatchTask(
     );
 }
 
-async function executeDispatchStationBoardTasks(rawArgs: unknown) {
-    const args = parseTaskArgs(rawArgs);
+async function executeDispatchStationBoardTasks(
+    args: StationBoardDispatchTaskArgs
+) {
     const config = useConfig();
     const scheduleFilePath = getScheduleDatabaseFilePath();
     const published = loadPublishedScheduleStateSummary();
@@ -236,13 +240,14 @@ async function executeDispatchStationBoardTasks(rawArgs: unknown) {
         return;
     }
 
-    const currentDate = getCurrentDateString();
+    const currentDate = serviceDateToDay(getCurrentDateString());
     if (published.date !== currentDate) {
         logger.warn(
             `skip_non_current_schedule scheduleDate=${published.date} currentDate=${currentDate} file=${scheduleFilePath}`
         );
         return;
     }
+    const publishedDateText = published.date;
 
     const fullSweepState = isFullSweepDue(
         published.date,
@@ -282,7 +287,7 @@ async function executeDispatchStationBoardTasks(rawArgs: unknown) {
 
     if (stationCandidates.length === 0) {
         maybeRecordDispatchResult({
-            serviceDate: published.date,
+            serviceDate: publishedDateText,
             candidateGroupCount: 0,
             selectedStations: [],
             createdTaskCount: 0,
@@ -385,7 +390,7 @@ async function executeDispatchStationBoardTasks(rawArgs: unknown) {
         }
         dispatchedStationKeys.add(stationKey);
         const taskKey = buildStationBoardTaskKey(
-            published.date,
+            publishedDateText,
             resolvedStationTelecode
         );
         const pendingTask = pendingTasks.get(taskKey) ?? null;
@@ -402,7 +407,7 @@ async function executeDispatchStationBoardTasks(rawArgs: unknown) {
         }
 
         const stationBoardTask = enqueueOrReuseStationBoardFetchTask({
-            serviceDate: published.date,
+            serviceDate: publishedDateText,
             stationName,
             stationTelecode: resolvedStationTelecode,
             executionTime,
@@ -422,7 +427,7 @@ async function executeDispatchStationBoardTasks(rawArgs: unknown) {
     }
 
     maybeRecordDispatchResult({
-        serviceDate: published.date,
+        serviceDate: publishedDateText,
         candidateGroupCount: stationCandidates.length,
         selectedStations,
         createdTaskCount: createdTasks,
@@ -446,10 +451,10 @@ export function registerDispatchStationBoardTasksExecutor() {
         return;
     }
 
-    registerTaskExecutor(
-        DISPATCH_STATION_BOARD_TASKS_EXECUTOR,
-        executeDispatchStationBoardTasks
-    );
+    registerTaskExecutor(DISPATCH_STATION_BOARD_TASKS_EXECUTOR, {
+        parse: parseTaskArgs,
+        execute: executeDispatchStationBoardTasks
+    });
     registered = true;
     logger.info(`registered executor=${DISPATCH_STATION_BOARD_TASKS_EXECUTOR}`);
 }

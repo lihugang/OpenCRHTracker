@@ -1,9 +1,7 @@
 import { computed, onMounted } from 'vue';
-import useTrackedRequestFetch, {
-    type TrackedRequestFetch
-} from '~/composables/useTrackedRequestFetch';
 import type { AuthMeResponse, AuthSession } from '~/types/auth';
-import type { TrackerApiResponse } from '~/types/homepage';
+import { V2ApiError } from '~/utils/api/v2/V2ApiError';
+import { fetchAuthMe } from '~/utils/api/v2/domain/auth';
 
 function toAuthSession(payload: AuthMeResponse): AuthSession {
     return {
@@ -36,38 +34,17 @@ export default function useAuthState() {
     }
 
     async function refreshSession() {
-        const requestFetch: TrackedRequestFetch = import.meta.server
-            ? useTrackedRequestFetch()
-            : ($fetch as TrackedRequestFetch);
-
         refreshPendingCount.value += 1;
 
         try {
-            const response = await requestFetch<
-                TrackerApiResponse<AuthMeResponse>
-            >('/api/v1/auth/me', {
-                retry: 0
-            });
-
-            if (response.ok) {
-                setSession(toAuthSession(response.data));
-                return session.value;
-            }
-
-            clearSession();
-            return null;
+            const data = await fetchAuthMe();
+            setSession(toAuthSession(data));
+            return session.value;
         } catch (error) {
-            const status =
-                typeof error === 'object' &&
-                error !== null &&
-                'response' in error &&
-                typeof (error as { response?: { status?: unknown } }).response
-                    ?.status === 'number'
-                    ? (error as { response: { status: number } }).response
-                          .status
-                    : 0;
-
-            if (status === 401 || status === 403) {
+            if (
+                error instanceof V2ApiError &&
+                (error.status === 401 || error.status === 403)
+            ) {
                 clearSession();
                 return null;
             }

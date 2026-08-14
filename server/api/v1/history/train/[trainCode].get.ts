@@ -1,17 +1,20 @@
 import { defineEventHandler, getQuery, getRouterParam } from 'h3';
-import {
-    buildNextCursor,
-    listHistoryLightByTrainPaged
-} from '~/server/services/emuRoutesStore';
+import { getTrainHistory } from '~/server/domain/history';
 import getPerRecordCost from '~/server/utils/api/cost/getPerRecordCost';
 import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';
-import parseOptionalTimestamp from '~/server/utils/api/query/parseOptionalTimestamp';
 import parseCursor from '~/server/utils/api/query/parseCursor';
+import parseOptionalTimestamp from '~/server/utils/api/query/parseOptionalTimestamp';
 import parseLimit from '~/server/utils/api/query/parseLimit';
 import { getHistoryResponseCacheControlMaxAge } from '~/server/utils/api/response/getResponseCacheControlMaxAge';
 import setCacheControl from '~/server/utils/api/response/setCacheControl';
 import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
+import {
+    formatExternalEmuCode,
+    formatExternalServiceDate,
+    parseExternalCursor,
+    parseExternalTrainCodeOrThrow
+} from '~/server/utils/internal/boundaries';
 
 export default defineEventHandler(async (event) => {
     return executeApi(
@@ -42,15 +45,18 @@ export default defineEventHandler(async (event) => {
             const query = getQuery(event);
             const start = parseOptionalTimestamp(query.start, 'start');
             const end = parseOptionalTimestamp(query.end, 'end');
-            const cursor = parseCursor(query.cursor, 'cursor');
+            const cursor = parseExternalCursor(query.cursor, 'cursor');
             const limit = parseLimit(event);
-            const rows = listHistoryLightByTrainPaged(
-                trainCode,
-                start ?? 0,
-                end ?? Number.MAX_SAFE_INTEGER,
+            const result = getTrainHistory({
+                trainCode: parseExternalTrainCodeOrThrow(
+                    trainCode,
+                    'trainCode'
+                ),
+                start: start ?? 0,
+                end: end ?? Number.MAX_SAFE_INTEGER,
                 cursor,
                 limit
-            );
+            });
 
             return {
                 trainCode,
@@ -58,12 +64,15 @@ export default defineEventHandler(async (event) => {
                 end,
                 cursor: typeof query.cursor === 'string' ? query.cursor : '',
                 limit,
-                nextCursor: buildNextCursor(rows, limit),
-                items: rows.map((row) => ({
+                nextCursor:
+                    result.nextCursor === null
+                        ? ''
+                        : `${formatExternalServiceDate(result.nextCursor.serviceDate)}:${result.nextCursor.id}`,
+                items: result.items.map((row) => ({
                     id: String(row.id),
-                    serviceDate: row.service_date,
-                    timetableId: row.timetable_id,
-                    emuCode: row.emu_code
+                    serviceDate: formatExternalServiceDate(row.serviceDay),
+                    timetableId: row.timetableId,
+                    emuCode: formatExternalEmuCode(row.emuId)
                 }))
             };
         }

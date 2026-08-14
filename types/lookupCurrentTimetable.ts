@@ -10,7 +10,7 @@ export type LookupCurrentTimetableViewState =
     | 'empty'
     | 'success';
 export type CirculationPdfState = 'idle' | 'loading' | 'ready' | 'error';
-export type TimetableSourceKey = 'current' | `history:${number}`;
+export type TimetableSourceKey = 'current' | `timetable:${number}`;
 export type CirculationExportFormat = 'pdf' | 'png';
 
 export interface DisplayTimetableStop {
@@ -38,14 +38,16 @@ export interface DisplayCirculationNode {
 export interface TimetableSourceOption {
     value: TimetableSourceKey;
     label: string;
+    disabled?: boolean;
 }
 
 export interface HistoricalTimetableOption {
     sourceKey: TimetableSourceKey;
-    historyId: number;
+    coverageId: number;
+    timetableId: number;
     serviceDateStart: string;
     serviceDateEndExclusive: string;
-    isCurrent: boolean;
+    content: HistoricalTimetableData | null;
 }
 
 export interface DisplayTimetableData {

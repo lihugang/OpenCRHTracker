@@ -1,16 +1,15 @@
 import { defineEventHandler, getRouterParam } from 'h3';
 import useConfig from '~/server/config';
-import { getReferenceModelsByTrainCodes } from '~/server/services/referenceModelIndexStore';
-import { getPreferredTrainCirculation } from '~/server/services/trainCirculationIndexStore';
-import { getTodayScheduleTimetableByTrainCode } from '~/server/services/todayScheduleCache';
-import { getSupplementTrainTimetableByTrainCode } from '~/server/services/supplementTrainRegistryStore';
+import { getCurrentTrainTimetable } from '~/server/domain/timetable';
 import getFixedCost from '~/server/utils/api/cost/getFixedCost';
 import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';
 import setCacheControl from '~/server/utils/api/response/setCacheControl';
 import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
-import type { CurrentTrainTimetableData } from '~/types/lookup';
-import resolveBureauNameByCode from '~/utils/railway/resolveBureauNameByCode';
+import {
+    formatExternalTrainCode,
+    parseExternalTrainCodeOrThrow
+} from '~/server/utils/internal/boundaries';
 
 export default defineEventHandler(async (event) => {
     const cacheMaxAge = useConfig().api.cache.timetableMaxAgeSeconds;
@@ -34,49 +33,33 @@ export default defineEventHandler(async (event) => {
                 'trainCode 不能为空'
             );
 
-            const scheduleTimetable =
-                getTodayScheduleTimetableByTrainCode(trainCode);
-            const supplementTimetable = scheduleTimetable
-                ? null
-                : getSupplementTrainTimetableByTrainCode(trainCode);
-            const timetable = scheduleTimetable ?? supplementTimetable;
-            ensure(
-                timetable && timetable.stops.length > 0,
-                404,
-                'not_found',
-                '当前暂无时刻表'
+            const timetable = await getCurrentTrainTimetable(
+                parseExternalTrainCodeOrThrow(trainCode, 'trainCode')
             );
 
-            const response: CurrentTrainTimetableData = {
+            return {
                 updatedAt: timetable.updatedAt,
                 requestTrainCode: trainCode,
-                trainCode: timetable.trainCode,
-                internalCode: timetable.trainInternalCode,
-                allCodes: [...timetable.allCodes],
+                trainCode: formatExternalTrainCode(timetable.trainCode),
+                internalCode: timetable.internalCode,
+                allCodes: timetable.allCodes.map(formatExternalTrainCode),
                 bureauCode: timetable.bureauCode,
-                bureauName: resolveBureauNameByCode(timetable.bureauCode),
+                bureauName: timetable.bureauName,
                 trainDepartment: timetable.trainDepartment,
                 passengerDepartment: timetable.passengerDepartment,
-                referenceModels: await getReferenceModelsByTrainCodes(
-                    timetable.allCodes
-                ),
+                referenceModels: timetable.referenceModels,
                 startStation: timetable.startStation,
                 endStation: timetable.endStation,
                 startAt: timetable.startAt,
                 endAt: timetable.endAt,
-                circulation:
-                    supplementTimetable !== null
-                        ? null
-                        : getPreferredTrainCirculation({
-                              trainInternalCode: timetable.trainInternalCode,
-                              allCodes: timetable.allCodes
-                          }),
+                circulation: timetable.circulation,
                 stops: timetable.stops.map((stop) => ({
-                    ...stop
+                    ...stop,
+                    stationTrainCode: formatExternalTrainCode(
+                        stop.stationTrainCode
+                    )
                 }))
             };
-
-            return response;
         }
     );
 });

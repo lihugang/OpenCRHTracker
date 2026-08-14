@@ -4,7 +4,12 @@ import type {
     AuthSubscriptionItem,
     AuthSubscriptionListResponse
 } from '~/types/auth';
-import type { TrackerApiResponse } from '~/types/homepage';
+import {
+    deleteAuthSubscription,
+    fetchAuthSubscriptions,
+    patchAuthSubscription,
+    putAuthSubscriptions
+} from '~/utils/api/v2/domain/auth';
 import getApiErrorMessage from '~/utils/api/getApiErrorMessage';
 
 type SubscriptionState = 'idle' | 'loading' | 'success' | 'error';
@@ -483,37 +488,6 @@ export function useSubscriptionDevices() {
                 : 'unsupported';
     }
 
-    async function executeSubscriptionRequest(
-        path: string,
-        options?: {
-            method?: 'GET' | 'PUT' | 'PATCH' | 'DELETE';
-            body?: Record<string, unknown>;
-        }
-    ) {
-        const response = await useNuxtApp().$csrfFetch<
-            TrackerApiResponse<AuthSubscriptionListResponse>
-        >(path, {
-            ...options,
-            retry: 0
-        });
-
-        if (
-            !response ||
-            typeof response !== 'object' ||
-            typeof response.ok !== 'boolean'
-        ) {
-            throw new Error('订阅设备接口未返回有效数据。');
-        }
-
-        if (!response.ok) {
-            throw {
-                data: response
-            };
-        }
-
-        return response.data;
-    }
-
     async function syncCurrentDeviceState(
         runWithTimeout?: SubscriptionTimeoutRunner
     ) {
@@ -569,11 +543,9 @@ export function useSubscriptionDevices() {
         errorMessage.value = '';
 
         try {
-            const response = await executeSubscriptionRequest(
-                '/api/v1/auth/subscriptions'
-            );
+            const data = await fetchAuthSubscriptions();
 
-            applySubscriptionResponse(response);
+            applySubscriptionResponse(data);
             state.value = 'success';
         } catch (error) {
             state.value = 'error';
@@ -645,18 +617,12 @@ export function useSubscriptionDevices() {
                 );
             }
 
-            const response = await executeSubscriptionRequest(
-                '/api/v1/auth/subscriptions',
-                {
-                    method: 'PUT',
-                    body: {
-                        name: buildDefaultDeviceName(),
-                        subscription: getPushSubscriptionPayload(subscription)
-                    }
-                }
-            );
+            const data = await putAuthSubscriptions({
+                name: buildDefaultDeviceName(),
+                subscription: getPushSubscriptionPayload(subscription)
+            });
 
-            applySubscriptionResponse(response);
+            applySubscriptionResponse(data);
             currentEndpoint.value = subscription.endpoint;
             state.value = 'success';
             return true;
@@ -704,11 +670,9 @@ export function useSubscriptionDevices() {
             }
 
             try {
-                const response = await executeSubscriptionRequest(
-                    '/api/v1/auth/subscriptions'
-                );
+                const data = await fetchAuthSubscriptions();
 
-                applySubscriptionResponse(response);
+                applySubscriptionResponse(data);
                 state.value = 'success';
             } catch (error) {
                 state.value = 'error';
@@ -761,17 +725,9 @@ export function useSubscriptionDevices() {
         errorMessage.value = '';
 
         try {
-            const response = await executeSubscriptionRequest(
-                `/api/v1/auth/subscriptions/${encodeURIComponent(id)}`,
-                {
-                    method: 'PATCH',
-                    body: {
-                        name
-                    }
-                }
-            );
+            const data = await patchAuthSubscription(id, name);
 
-            applySubscriptionResponse(response);
+            applySubscriptionResponse(data);
             state.value = 'success';
             return true;
         } catch (error) {
@@ -794,14 +750,9 @@ export function useSubscriptionDevices() {
         errorMessage.value = '';
 
         try {
-            const response = await executeSubscriptionRequest(
-                `/api/v1/auth/subscriptions/${encodeURIComponent(item.id)}`,
-                {
-                    method: 'DELETE'
-                }
-            );
+            const data = await deleteAuthSubscription(item.id);
 
-            applySubscriptionResponse(response);
+            applySubscriptionResponse(data);
             state.value = 'success';
 
             if (import.meta.client && currentEndpoint.value === item.endpoint) {

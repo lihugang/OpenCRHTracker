@@ -8,8 +8,15 @@ import {
     type ProbeStatusRow,
     listProbeStatusByTrainCode
 } from '~/server/services/probeStatusStore';
-import normalizeCode from '~/server/utils/12306/normalizeCode';
-import { formatShanghaiDateString } from '~/server/utils/date/getCurrentDateString';
+import {
+    trainCodeKey,
+    type TrainCodeParts
+} from '~/server/utils/12306/trainCode';
+import {
+    unixSecondsToServiceDay,
+    type ServiceDay
+} from '~/server/utils/date/serviceDay';
+import type { EmuId } from '~/server/libs/database/emu';
 
 export type ProbeTrackingMutationTable = 'daily_emu_routes' | 'probe_status';
 
@@ -25,9 +32,9 @@ export interface ProbeTrackingMutation {
     table: ProbeTrackingMutationTable;
     action: ProbeTrackingMutationAction;
     id: number | null;
-    trainCode: string;
-    emuCode: string;
-    serviceDate: string;
+    trainCode: TrainCodeParts;
+    emuId: EmuId;
+    serviceDate: ServiceDay;
     timetableId: number | null;
     startAt: number | null;
     previousStatus: number | null;
@@ -36,8 +43,8 @@ export interface ProbeTrackingMutation {
 }
 
 export interface PersistTrackingRowsInput {
-    trainCodes: string[];
-    emuCodes: string[];
+    trainCodes: TrainCodeParts[];
+    emuIds: EmuId[];
     startStation: string;
     endStation: string;
     startAt: number;
@@ -45,22 +52,21 @@ export interface PersistTrackingRowsInput {
     status: ProbeStatusValue;
 }
 
-function getServiceDate(startAt: number) {
-    return startAt > 0 ? formatShanghaiDateString(startAt * 1000) : '';
+function getServiceDate(startAt: number): ServiceDay {
+    return unixSecondsToServiceDay(startAt);
 }
 
 function findProbeRow(
     rows: ProbeStatusRow[],
-    trainCode: string,
-    emuCode: string
+    trainCode: TrainCodeParts,
+    emuId: EmuId
 ) {
-    const normalizedTrainCode = normalizeCode(trainCode);
-    const normalizedEmuCode = normalizeCode(emuCode);
+    const trainKey = trainCodeKey(trainCode);
     return (
         rows.find(
             (row) =>
-                row.train_code === normalizedTrainCode &&
-                row.emu_code === normalizedEmuCode
+                trainCodeKey(row.train_code) === trainKey &&
+                Number(row.emu_id) === Number(emuId)
         ) ?? null
     );
 }
@@ -72,45 +78,35 @@ export function persistProbeTrackingRows(
     const serviceDate = getServiceDate(input.startAt);
 
     for (const trainCode of input.trainCodes) {
-        const normalizedTrainCode = normalizeCode(trainCode);
-        if (normalizedTrainCode.length === 0) {
-            continue;
-        }
-
         const previousProbeRows = listProbeStatusByTrainCode(
-            normalizedTrainCode,
+            trainCode,
             input.startAt
         );
 
-        for (const emuCode of input.emuCodes) {
-            const normalizedEmuCode = normalizeCode(emuCode);
-            if (normalizedEmuCode.length === 0) {
-                continue;
-            }
-
+        for (const emuId of input.emuIds) {
             const previousProbeRow = findProbeRow(
                 previousProbeRows,
-                normalizedTrainCode,
-                normalizedEmuCode
+                trainCode,
+                emuId
             );
             const probeAction = ensureProbeStatus(
-                normalizedTrainCode,
-                normalizedEmuCode,
+                trainCode,
+                emuId,
                 input.startAt,
                 input.status
             );
             const nextProbeRow = findProbeRow(
-                listProbeStatusByTrainCode(normalizedTrainCode, input.startAt),
-                normalizedTrainCode,
-                normalizedEmuCode
+                listProbeStatusByTrainCode(trainCode, input.startAt),
+                trainCode,
+                emuId
             );
 
             mutations.push({
                 table: 'probe_status',
                 action: probeAction,
                 id: nextProbeRow?.id ?? previousProbeRow?.id ?? null,
-                trainCode: normalizedTrainCode,
-                emuCode: normalizedEmuCode,
+                trainCode,
+                emuId,
                 serviceDate:
                     nextProbeRow?.service_date ??
                     previousProbeRow?.service_date ??
@@ -130,14 +126,14 @@ export function persistProbeTrackingRows(
 
             const previousRouteRow =
                 listDailyRoutesByTrainCodeInRange(
-                    normalizedTrainCode,
+                    trainCode,
                     input.startAt,
                     input.startAt + 1
-                ).find((row) => row.emu_code === normalizedEmuCode) ?? null;
+                ).find((row) => Number(row.emu_id) === Number(emuId)) ?? null;
 
             insertDailyEmuRoute(
-                normalizedTrainCode,
-                normalizedEmuCode,
+                trainCode,
+                emuId,
                 input.startStation,
                 input.endStation,
                 input.startAt,
@@ -146,17 +142,17 @@ export function persistProbeTrackingRows(
 
             const nextRouteRow =
                 listDailyRoutesByTrainCodeInRange(
-                    normalizedTrainCode,
+                    trainCode,
                     input.startAt,
                     input.startAt + 1
-                ).find((row) => row.emu_code === normalizedEmuCode) ?? null;
+                ).find((row) => Number(row.emu_id) === Number(emuId)) ?? null;
 
             mutations.push({
                 table: 'daily_emu_routes',
                 action: previousRouteRow ? 'updated' : 'created',
                 id: nextRouteRow?.id ?? previousRouteRow?.id ?? null,
-                trainCode: normalizedTrainCode,
-                emuCode: normalizedEmuCode,
+                trainCode,
+                emuId,
                 serviceDate:
                     nextRouteRow?.service_date ??
                     previousRouteRow?.service_date ??

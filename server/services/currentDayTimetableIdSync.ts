@@ -1,4 +1,4 @@
-import { useEmuDatabase } from '~/server/libs/database/emu';
+import { useEmuDatabase, type EmuId } from '~/server/libs/database/emu';
 import { createPreparedSqlStore } from '~/server/libs/database/prepared';
 import { listDailyRoutesByTrainCodeInRange } from '~/server/services/emuRoutesStore';
 import { resolveTimetableIdByTrainCodeAndServiceDate } from '~/server/services/historicalTimetableResolver';
@@ -7,15 +7,21 @@ import {
     ProbeStatusValue,
     type ProbeStatusRow
 } from '~/server/services/probeStatusStore';
-import { getShanghaiDayStartUnixSeconds } from '~/server/utils/date/shanghaiDateTime';
+import {
+    serviceDayToShanghaiDayStartUnixSeconds,
+    type ServiceDay
+} from '~/server/utils/date/serviceDay';
+import {
+    trainCodeKey,
+    type TrainCodeParts
+} from '~/server/utils/12306/trainCode';
 import importSqlBatch from '~/server/utils/sql/importSqlBatch';
-import uniqueNormalizedCodes from '~/server/utils/12306/uniqueNormalizedCodes';
 
 interface DailySyncRow {
     id: number;
-    train_code: string;
-    emu_code: string;
-    service_date: string;
+    train_code: TrainCodeParts;
+    emu_id: EmuId;
+    service_date: ServiceDay;
     timetable_id: number | null;
 }
 
@@ -31,7 +37,7 @@ type MaintenanceSqlKey =
 
 interface DailySyncAction {
     keeperId: number;
-    emuCode: string;
+    emuId: EmuId;
     timetableId: number;
     needsUpdate: boolean;
     deleteIds: number[];
@@ -80,6 +86,10 @@ function chooseKeeperRow<TRow extends DailySyncRow>(
     })[0]!;
 }
 
+function buildGroupKey<TRow extends DailySyncRow>(row: TRow): string {
+    return `${trainCodeKey(row.train_code)}:${Number(row.emu_id)}:${row.service_date}`;
+}
+
 function buildDailySyncActions(
     rows: readonly DailySyncRow[],
     targetTimetableId: number
@@ -88,9 +98,7 @@ function buildDailySyncActions(
     const groupedRows = new Map<string, DailySyncRow[]>();
 
     for (const row of rows) {
-        const groupKey = [row.train_code, row.emu_code, row.service_date].join(
-            '|'
-        );
+        const groupKey = buildGroupKey(row);
         const existing = groupedRows.get(groupKey);
         if (existing) {
             existing.push(row);
@@ -113,7 +121,7 @@ function buildDailySyncActions(
 
         actions.push({
             keeperId: keeper.id,
-            emuCode: keeper.emu_code,
+            emuId: keeper.emu_id,
             timetableId: targetTimetableId,
             needsUpdate,
             deleteIds
@@ -131,9 +139,7 @@ function buildProbeSyncActions(
     const groupedRows = new Map<string, ProbeSyncRow[]>();
 
     for (const row of rows) {
-        const groupKey = [row.train_code, row.emu_code, row.service_date].join(
-            '|'
-        );
+        const groupKey = buildGroupKey(row);
         const existing = groupedRows.get(groupKey);
         if (existing) {
             existing.push(row);
@@ -163,7 +169,7 @@ function buildProbeSyncActions(
 
         actions.push({
             keeperId: keeper.id,
-            emuCode: keeper.emu_code,
+            emuId: keeper.emu_id,
             timetableId: targetTimetableId,
             needsUpdate,
             deleteIds,
@@ -175,10 +181,19 @@ function buildProbeSyncActions(
 }
 
 export function syncCurrentDayTimetableIdsForTrainCodes(
-    serviceDate: string,
-    trainCodes: readonly string[]
+    serviceDate: ServiceDay,
+    trainCodes: readonly TrainCodeParts[]
 ): CurrentDayTimetableIdSyncResult {
-    const normalizedTrainCodes = uniqueNormalizedCodes([...trainCodes]);
+    const seenTrainCodes = new Set<string>();
+    const normalizedTrainCodes: TrainCodeParts[] = [];
+    for (const trainCode of trainCodes) {
+        const key = trainCodeKey(trainCode);
+        if (seenTrainCodes.has(key)) {
+            continue;
+        }
+        seenTrainCodes.add(key);
+        normalizedTrainCodes.push(trainCode);
+    }
     const result: CurrentDayTimetableIdSyncResult = {
         scannedTrainCodes: normalizedTrainCodes.length,
         changedTrainCodes: 0,
@@ -188,11 +203,11 @@ export function syncCurrentDayTimetableIdsForTrainCodes(
         deletedProbeRows: 0
     };
 
-    if (!/^\d{8}$/.test(serviceDate) || normalizedTrainCodes.length === 0) {
+    if (normalizedTrainCodes.length === 0) {
         return result;
     }
 
-    const dayStartAt = getShanghaiDayStartUnixSeconds(serviceDate);
+    const dayStartAt = serviceDayToShanghaiDayStartUnixSeconds(serviceDate);
     const dayEndAtExclusive = dayStartAt + DAY_SECONDS;
     const syncTransaction = useEmuDatabase().transaction(() => {
         for (const trainCode of normalizedTrainCodes) {
@@ -212,7 +227,7 @@ export function syncCurrentDayTimetableIdsForTrainCodes(
             ).map<DailySyncRow>((row) => ({
                 id: row.id,
                 train_code: row.train_code,
-                emu_code: row.emu_code,
+                emu_id: row.emu_id,
                 service_date: row.service_date,
                 timetable_id: row.timetable_id
             }));
@@ -223,7 +238,7 @@ export function syncCurrentDayTimetableIdsForTrainCodes(
             ).map<ProbeSyncRow>((row: ProbeStatusRow) => ({
                 id: row.id,
                 train_code: row.train_code,
-                emu_code: row.emu_code,
+                emu_id: row.emu_id,
                 service_date: row.service_date,
                 timetable_id: row.timetable_id,
                 status: row.status
@@ -256,7 +271,7 @@ export function syncCurrentDayTimetableIdsForTrainCodes(
                 if (action.needsUpdate) {
                     maintenanceStatements.run(
                         'updateDailyEmuRouteAliasById',
-                        action.emuCode,
+                        action.emuId,
                         action.timetableId,
                         action.keeperId
                     );
@@ -276,7 +291,7 @@ export function syncCurrentDayTimetableIdsForTrainCodes(
                 if (action.needsUpdate) {
                     maintenanceStatements.run(
                         'updateProbeStatusAliasById',
-                        action.emuCode,
+                        action.emuId,
                         action.timetableId,
                         action.status,
                         action.keeperId

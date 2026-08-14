@@ -1,6 +1,11 @@
-import normalizeCode from '~/server/utils/12306/normalizeCode';
-import { formatShanghaiDateString } from '~/server/utils/date/getCurrentDateString';
-import { getShanghaiDayStartUnixSeconds } from '~/server/utils/date/shanghaiDateTime';
+import type { TrainCodeParts } from '~/server/utils/12306/trainCode';
+import { parseTrainCode } from '~/server/utils/12306/trainCode';
+import {
+    serviceDayToShanghaiDayStartUnixSeconds,
+    unixSecondsToServiceDay,
+    type ServiceDay
+} from '~/server/utils/date/serviceDay';
+import { parseInternalJson } from '~/server/utils/internal/storageValues';
 import {
     getLatestTimetableHistoryCoverageByTrainCodeAtOrBeforeDate,
     getTimetableHistoryContentById,
@@ -12,7 +17,7 @@ interface StoredCanonicalTimetableStop {
     stationName: string;
     arriveAt: number | null;
     departAt: number | null;
-    stationTrainCode: string;
+    stationTrainCode: TrainCodeParts;
 }
 
 interface StoredCanonicalTimetablePayload {
@@ -24,7 +29,7 @@ export interface HistoricalTimetableStop {
     stationName: string;
     arriveAt: number | null;
     departAt: number | null;
-    stationTrainCode: string;
+    stationTrainCode: TrainCodeParts;
     isStart: boolean;
     isEnd: boolean;
 }
@@ -47,7 +52,7 @@ export interface HistoricalTimetableSummary {
 }
 
 export interface HydratedHistoricalRouteSummary {
-    service_date: string;
+    service_date: ServiceDay;
     timetable_id: number | null;
     start_station_name: string | null;
     end_station_name: string | null;
@@ -56,13 +61,13 @@ export interface HydratedHistoricalRouteSummary {
 }
 
 export interface TimetableIdentityLink {
-    serviceDate: string;
+    serviceDate: ServiceDay;
     timetableId: number | null;
     resolution: 'exact' | 'latest_fallback' | 'unresolved';
 }
 
 export interface HistoricalRouteSummaryMatchInput {
-    serviceDate: string;
+    serviceDate: ServiceDay;
     startStationName: string;
     endStationName: string;
     startAt: number;
@@ -91,7 +96,9 @@ function normalizeStationText(value: string | null | undefined) {
 function parseStoredCanonicalPayload(
     rawJson: string
 ): StoredCanonicalTimetablePayload {
-    const parsed = JSON.parse(rawJson) as { stops?: unknown };
+    const parsed = parseInternalJson(rawJson, 'internal') as {
+        stops?: unknown;
+    };
     const rawStops = Array.isArray(parsed.stops) ? parsed.stops : [];
     const stops: StoredCanonicalTimetableStop[] = [];
 
@@ -113,10 +120,26 @@ function parseStoredCanonicalPayload(
             stationName,
             arriveAt: normalizeOptionalInteger(stop.arriveAt),
             departAt: normalizeOptionalInteger(stop.departAt),
-            stationTrainCode:
-                typeof stop.stationTrainCode === 'string'
-                    ? stop.stationTrainCode.trim().toUpperCase()
-                    : ''
+            stationTrainCode: (() => {
+                if (
+                    typeof stop.stationTrainCode === 'object' &&
+                    stop.stationTrainCode !== null
+                ) {
+                    const row = stop.stationTrainCode as {
+                        prefix?: unknown;
+                        number?: unknown;
+                    };
+                    const parsed = parseTrainCode(
+                        `${String(row.prefix ?? '')}${String(row.number ?? '')}`
+                    );
+                    if (parsed) {
+                        return parsed;
+                    }
+                }
+                throw new Error(
+                    `invalid_stored_station_train_code stationNo=${stationNo} stationName=${stationName}`
+                );
+            })()
         });
     }
 
@@ -149,16 +172,15 @@ function buildHistoricalTimetableContent(contentId: number, rawJson: string) {
     } satisfies HistoricalTimetableContent;
 }
 
-function getServiceDateFromUnixSeconds(startAt: number) {
-    return formatShanghaiDateString(startAt * 1000);
-}
-
-function buildAbsoluteTimestamp(serviceDate: string, offset: number | null) {
+function buildAbsoluteTimestamp(
+    serviceDate: ServiceDay,
+    offset: number | null
+) {
     if (offset === null) {
         return null;
     }
 
-    return getShanghaiDayStartUnixSeconds(serviceDate) + offset;
+    return serviceDayToShanghaiDayStartUnixSeconds(serviceDate) + offset;
 }
 
 export function getHistoricalTimetableContent(
@@ -221,10 +243,10 @@ export function listHistoricalTimetableSummariesByIds(
 }
 
 export function hydrateHistoricalRouteSummary(
-    serviceDate: string,
+    serviceDate: ServiceDay,
     timetableId: number | null
 ): HydratedHistoricalRouteSummary {
-    if (!/^\d{8}$/.test(serviceDate) || timetableId === null) {
+    if (timetableId === null) {
         return {
             service_date: serviceDate,
             timetable_id: timetableId,
@@ -258,10 +280,10 @@ export function hydrateHistoricalRouteSummary(
 }
 
 export function resolveTimetableIdentityLink(
-    trainCode: string,
+    trainCode: TrainCodeParts,
     startAt: number
 ): TimetableIdentityLink {
-    const serviceDate = getServiceDateFromUnixSeconds(startAt);
+    const serviceDate = unixSecondsToServiceDay(startAt);
     const exactTimetableId = resolveTimetableIdByTrainCodeAndServiceDate(
         trainCode,
         serviceDate
@@ -276,7 +298,7 @@ export function resolveTimetableIdentityLink(
 
     const latestCoverage =
         getLatestTimetableHistoryCoverageByTrainCodeAtOrBeforeDate(
-            normalizeCode(trainCode),
+            trainCode,
             serviceDate
         );
     if (latestCoverage) {
@@ -295,23 +317,23 @@ export function resolveTimetableIdentityLink(
 }
 
 export function resolveTimetableIdByTrainCodeAndServiceDate(
-    trainCode: string,
-    serviceDate: string
+    trainCode: TrainCodeParts,
+    serviceDate: ServiceDay
 ) {
     const coverage = getTimetableHistoryCoverageByTrainCodeAtDate(
-        normalizeCode(trainCode),
+        trainCode,
         serviceDate
     );
     return coverage?.content_id ?? null;
 }
 
 export function resolveTimetableIdByTrainCodeAndStartAt(
-    trainCode: string,
+    trainCode: TrainCodeParts,
     startAt: number
 ) {
     return resolveTimetableIdByTrainCodeAndServiceDate(
         trainCode,
-        getServiceDateFromUnixSeconds(startAt)
+        unixSecondsToServiceDay(startAt)
     );
 }
 
@@ -335,12 +357,12 @@ export function doesHistoricalRouteSummaryMatch(
 }
 
 export function resolveFallbackTimetableIdByLatestSummary(
-    trainCode: string,
+    trainCode: TrainCodeParts,
     input: HistoricalRouteSummaryMatchInput
 ) {
     const latestCoverage =
         getLatestTimetableHistoryCoverageByTrainCodeAtOrBeforeDate(
-            normalizeCode(trainCode),
+            trainCode,
             input.serviceDate
         );
     if (!latestCoverage) {

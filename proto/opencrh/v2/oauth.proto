@@ -1,0 +1,199 @@
+syntax = "proto3";
+
+package opencrh.v2;
+
+import "opencrh/v2/common.proto";
+
+enum OAuthClientStatus {
+  O_AUTH_CLIENT_STATUS_OAUTH_CLIENT_STATUS_UNSPECIFIED = 0;
+  O_AUTH_CLIENT_STATUS_ACTIVE = 1;
+  O_AUTH_CLIENT_STATUS_DISABLED = 2;
+}
+
+enum OAuthClientScopeReviewStatus {
+  O_AUTH_CLIENT_SCOPE_REVIEW_STATUS_OAUTH_CLIENT_SCOPE_REVIEW_STATUS_UNSPECIFIED = 0;
+  O_AUTH_CLIENT_SCOPE_REVIEW_STATUS_PENDING = 1;
+  O_AUTH_CLIENT_SCOPE_REVIEW_STATUS_APPROVED = 2;
+  O_AUTH_CLIENT_SCOPE_REVIEW_STATUS_REJECTED = 3;
+}
+
+message OAuthClientRedirectUriItem {
+  string value = 1;
+}
+
+message OAuthClientScopeRequestItem {
+  string scope = 1;
+  OAuthClientScopeReviewStatus review_status = 2;
+  optional string reviewed_by = 3;
+  optional int64 reviewed_at = 4;
+}
+
+message OAuthClientAdminGrants {
+  bool notification_send = 1;
+  optional string notification_send_updated_by = 2;
+  optional int64 notification_send_updated_at = 3;
+}
+
+message OAuthClientPublicItem {
+  string client_id = 1;
+  string owner_user_id = 2;
+  string name = 3;
+  optional string description = 4;
+  optional string homepage_url = 5;
+  OAuthClientStatus status = 6;
+  bool is_trusted = 7;
+  int64 created_at = 8;
+  int64 updated_at = 9;
+  repeated OAuthClientRedirectUriItem redirect_uris = 10;
+  repeated OAuthClientScopeRequestItem scope_requests = 11;
+  OAuthClientAdminGrants admin_grants = 12;
+}
+
+message GetOauthClientsData {
+  repeated OAuthClientPublicItem items = 1;
+  repeated string allowed_scopes = 2;
+}
+
+message GetOauthAuthorizeContextRequest {}
+
+message OauthAuthorizeContextClient {
+  string client_id = 1;
+  string name = 2;
+  optional string description = 3;
+  optional string homepage_url = 4;
+  string owner_user_id = 5;
+  bool is_trusted = 6;
+}
+
+message OauthAuthorizeContextSession {
+  string user_id = 1;
+  int64 active_from = 2;
+}
+
+message OauthAuthorizeContextRequest {
+  string response_type = 1;
+  string client_id = 2;
+  string redirect_uri = 3;
+  repeated string scope = 4;
+  string state = 5;
+  string code_challenge = 6;
+  string code_challenge_method = 7;
+  string nonce = 8;
+}
+
+message OauthAuthorizeRedirect {
+  string location = 1;
+}
+
+message OauthAuthorizeInvalidRequest {
+  string error = 1;
+  string reason = 2;
+  string message = 3;
+}
+
+message OauthAuthorizeConsent {
+  OauthAuthorizeContextClient client = 1;
+  OauthAuthorizeContextRequest request = 2;
+  OauthAuthorizeContextSession session = 3;
+  repeated string scopes = 4;
+  bool has_pending_scopes = 5;
+  bool requires_owner_bypass = 6;
+}
+
+message GetOauthAuthorizeContextData {
+  oneof result {
+    OauthAuthorizeRedirect redirect = 1;
+    OauthAuthorizeInvalidRequest invalid_request = 2;
+    OauthAuthorizeConsent consent = 3;
+  }
+}
+
+message GetOauthAuthorizeContextResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    GetOauthAuthorizeContextData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message GetOauthClientsRequest {}
+
+message GetOauthClientsResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    GetOauthClientsData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message PostOauthClientsRequest {
+  string name = 1;
+  optional string description = 2;
+  optional string homepage_url = 3;
+  repeated string redirect_uris = 4;
+  repeated string requested_scopes = 5;
+}
+
+message PostOauthClientsData {
+  OAuthClientPublicItem client = 1;
+}
+
+message PostOauthClientsResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    PostOauthClientsData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message GetOauthClientRequest {}
+
+message GetOauthClientData {
+  OAuthClientPublicItem client = 1;
+}
+
+message GetOauthClientResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    GetOauthClientData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message PatchOauthClientRequest {
+  string client_id = 1;
+  string name = 2;
+  optional string description = 3;
+  optional string homepage_url = 4;
+  repeated string redirect_uris = 5;
+  repeated string requested_scopes = 6;
+  optional OAuthClientStatus status = 7;
+  optional bool is_trusted = 8;
+}
+
+message PatchOauthClientData {
+  OAuthClientPublicItem client = 1;
+}
+
+message PatchOauthClientResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    PatchOauthClientData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message DeleteOauthClientRequest {}
+
+message DeleteOauthClientData {
+  bool deleted = 1;
+  string client_id = 2;
+}
+
+message DeleteOauthClientResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    DeleteOauthClientData data = 2;
+    ApiError error = 3;
+  }
+}

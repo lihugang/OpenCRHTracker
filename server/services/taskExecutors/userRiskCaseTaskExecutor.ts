@@ -26,8 +26,10 @@ function parseArguments(value: unknown): UserRiskCaseTaskArguments {
 }
 
 export function registerUserRiskCaseTaskExecutor() {
-    registerTaskExecutor(USER_RISK_TASK_EXECUTOR, async (value) => {
-        const args = parseArguments(value);
-        executeQueuedUserRiskCase(args.riskCaseId);
+    registerTaskExecutor(USER_RISK_TASK_EXECUTOR, {
+        parse: parseArguments,
+        execute: async (args) => {
+            executeQueuedUserRiskCase(args.riskCaseId);
+        }
     });
 }

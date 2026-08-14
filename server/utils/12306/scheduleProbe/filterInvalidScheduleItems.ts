@@ -1,10 +1,13 @@
-import normalizeCode from '~/server/utils/12306/normalizeCode';
+import {
+    trainCodeKey,
+    type TrainCodeParts
+} from '~/server/utils/12306/trainCode';
 import type { ScheduleItem, ScheduleState } from './types';
 
 export interface RemovedInvalidScheduleItem {
-    code: string;
+    code: TrainCodeParts;
     internalCode: string;
-    allCodes: string[];
+    allCodes: TrainCodeParts[];
     startAt: number | null;
     endAt: number | null;
     reason: 'invalid_route_time' | 'invalid_stop_time';
@@ -27,13 +30,15 @@ function buildRemovedItem(
     reason: RemovedInvalidScheduleItem['reason']
 ): RemovedInvalidScheduleItem {
     return {
-        code: normalizeCode(item.code),
-        internalCode: normalizeCode(item.internalCode),
+        code: item.code,
+        internalCode: item.internalCode,
         allCodes: [
-            ...new Set(
-                [item.code, ...item.allCodes]
-                    .map((code) => normalizeCode(code))
-                    .filter((code) => code.length > 0)
+            ...[item.code, ...item.allCodes].filter(
+                (code, index, codes) =>
+                    codes.findIndex(
+                        (candidate) =>
+                            trainCodeKey(candidate) === trainCodeKey(code)
+                    ) === index
             )
         ],
         startAt: item.startAt,
@@ -84,7 +89,11 @@ export function filterInvalidScheduleItems(state: ScheduleState): {
                 failedEnrichCodes: state.progress.failedEnrichCodes.filter(
                     (code) =>
                         !removedItems.some((item) =>
-                            item.allCodes.includes(normalizeCode(code))
+                            item.allCodes.some(
+                                (removedCode) =>
+                                    trainCodeKey(removedCode) ===
+                                    trainCodeKey(code)
+                            )
                         )
                 )
             }

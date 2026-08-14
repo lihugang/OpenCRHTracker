@@ -327,14 +327,17 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import useTrackedRequestFetch from '~/composables/useTrackedRequestFetch';
 import { useAdminDateQuery } from '~/composables/useAdminDateQuery';
 import type {
     OAuthClientPublicItem,
     OAuthClientScopeReviewStatus,
     OAuthClientStatus
 } from '~/types/auth';
-import type { TrackerApiResponse } from '~/types/homepage';
+import {
+    fetchAdminOauthClients,
+    revokeAdminOauthClientTokens,
+    updateAdminOauthClient
+} from '~/utils/api/v2/domain/admin';
 import getApiErrorMessage from '~/utils/api/getApiErrorMessage';
 import formatTrackerTimestamp from '~/utils/time/formatTrackerTimestamp';
 
@@ -343,15 +346,10 @@ definePageMeta({
 });
 
 const { session } = useAuthState();
-const requestFetch = useTrackedRequestFetch();
 const { selectedDateInput, todayDateInputValue } = await useAdminDateQuery();
 
 async function fetchClients() {
-    return await requestFetch<
-        TrackerApiResponse<{ items: OAuthClientPublicItem[] }>
-    >('/api/v1/admin/oauth/clients', {
-        retry: 0
-    });
+    return fetchAdminOauthClients();
 }
 
 const { data, status, error, refresh } = await useAsyncData(
@@ -359,13 +357,11 @@ const { data, status, error, refresh } = await useAsyncData(
     fetchClients
 );
 
-const items = computed(() => (data.value?.ok ? data.value.data.items : []));
+const items = computed(() => data.value?.items ?? []);
 const errorMessage = computed(() =>
     error.value
         ? getApiErrorMessage(error.value, '加载 OAuth 客户端失败。')
-        : !data.value || data.value.ok
-          ? ''
-          : data.value.data
+        : ''
 );
 
 async function patchClient(
@@ -382,73 +378,26 @@ async function patchClient(
         }>;
     }>
 ) {
-    const { data, error } = await useCsrfFetch<
-        TrackerApiResponse<{ client: OAuthClientPublicItem }>
-    >(`/api/v1/admin/oauth/clients/${encodeURIComponent(item.clientId)}`, {
-        method: 'PATCH',
-        body: {
-            status: overrides.status ?? item.status,
-            isTrusted: overrides.isTrusted ?? item.isTrusted,
-            adminGrants: overrides.adminGrants ?? {
-                notificationSend: item.adminGrants.notificationSend
-            },
-            scopeReviews:
-                overrides.scopeReviews ??
-                item.scopeRequests.map((scope) => ({
-                    scope: scope.scope,
-                    reviewStatus: scope.reviewStatus
-                }))
+    await updateAdminOauthClient({
+        clientId: item.clientId,
+        status: overrides.status ?? item.status,
+        isTrusted: overrides.isTrusted ?? item.isTrusted,
+        adminGrants: overrides.adminGrants ?? {
+            notificationSend: item.adminGrants.notificationSend
         },
-        retry: 0,
-        key: `admin:oauth-client:patch:${item.clientId}:${Date.now()}`,
-        watch: false,
-        server: false
+        scopeReviews:
+            overrides.scopeReviews ??
+            item.scopeRequests.map((scope) => ({
+                scope: scope.scope,
+                reviewStatus: scope.reviewStatus
+            }))
     });
-
-    if (error.value) {
-        throw error.value;
-    }
-
-    const response = data.value;
-    if (!response) {
-        throw new Error('Missing admin OAuth client update response');
-    }
-
-    if (!response.ok) {
-        throw {
-            data: response
-        };
-    }
 
     await refresh();
 }
 
 async function revokeTokens(item: OAuthClientPublicItem) {
-    const { data, error } = await useCsrfFetch<TrackerApiResponse<number>>(
-        `/api/v1/admin/oauth/clients/${encodeURIComponent(item.clientId)}/revoke-tokens`,
-        {
-            method: 'POST',
-            retry: 0,
-            key: `admin:oauth-client:revoke:${item.clientId}:${Date.now()}`,
-            watch: false,
-            server: false
-        }
-    );
-
-    if (error.value) {
-        throw error.value;
-    }
-
-    const response = data.value;
-    if (!response) {
-        throw new Error('Missing admin OAuth client revoke response');
-    }
-
-    if (!response.ok) {
-        throw {
-            data: response
-        };
-    }
+    await revokeAdminOauthClientTokens(item.clientId);
 
     await refresh();
 }

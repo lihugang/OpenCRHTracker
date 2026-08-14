@@ -1,17 +1,8 @@
-import {
-    computed,
-    onMounted,
-    ref,
-    toValue,
-    watch,
-    type MaybeRefOrGetter
-} from 'vue';
-import type { TrackedRequestFetch } from '~/composables/useTrackedRequestFetch';
-import type { TrackerApiResponse } from '~/types/homepage';
+import { computed, ref, toValue, watch, type MaybeRefOrGetter } from 'vue';
 import type {
+    CurrentTrainTimetableData,
     HistoricalTimetableData,
-    RecentAssignmentsState,
-    TrainTimetableHistoryListResponse
+    RecentAssignmentsState
 } from '~/types/lookup';
 import type {
     HistoricalTimetableOption,
@@ -19,35 +10,112 @@ import type {
     TimetableSourceKey,
     TimetableSourceOption
 } from '~/types/lookupCurrentTimetable';
+import { fetchTrainTimetableHistory } from '~/utils/api/v2/domain/lookup';
+import { epochServiceDayToShanghaiDayStartUnixSeconds } from '~/utils/api/v2/mappers/serviceDay';
 import getApiErrorMessage from '~/utils/api/getApiErrorMessage';
-import {
-    fetchHistoricalTimetableContentWithCache,
-    getHistoricalTimetableContentMemoryCacheValue,
-    setHistoricalTimetableContentMemoryCacheValue
-} from '~/utils/lookup/historicalTimetableContentCache';
 import {
     formatHistoryOptionLabel,
     formatServiceDateLabel
 } from '~/utils/lookup/timetableDisplay';
 
-const HISTORY_LIST_LIMIT = 200;
+interface ComparableTimetableStop {
+    stationNo: number;
+    stationName: string;
+    stationTrainCode: string;
+    arriveOffset: number | null;
+    departOffset: number | null;
+    isStart: boolean;
+    isEnd: boolean;
+}
+
+function normalizeComparableText(value: string | null | undefined) {
+    return typeof value === 'string' ? value.trim().toUpperCase() : '';
+}
+
+function normalizeCurrentStops(
+    timetable: CurrentTrainTimetableData | null
+): ComparableTimetableStop[] | null {
+    if (!timetable || timetable.serviceDay === null) {
+        return null;
+    }
+
+    const dayStart = epochServiceDayToShanghaiDayStartUnixSeconds(
+        timetable.serviceDay
+    );
+    if (dayStart === null) {
+        return null;
+    }
+
+    return timetable.stops.map((stop) => ({
+        stationNo: stop.stationNo,
+        stationName: normalizeComparableText(stop.stationName),
+        stationTrainCode: normalizeComparableText(stop.stationTrainCode),
+        arriveOffset: stop.arriveAt === null ? null : stop.arriveAt - dayStart,
+        departOffset: stop.departAt === null ? null : stop.departAt - dayStart,
+        isStart: stop.isStart,
+        isEnd: stop.isEnd
+    }));
+}
+
+function normalizeHistoricalStops(
+    content: HistoricalTimetableData | null
+): ComparableTimetableStop[] | null {
+    if (!content) {
+        return null;
+    }
+
+    return content.stops.map((stop) => ({
+        stationNo: stop.stationNo,
+        stationName: normalizeComparableText(stop.stationName),
+        stationTrainCode: normalizeComparableText(stop.stationTrainCode),
+        arriveOffset: stop.arriveOffset,
+        departOffset: stop.departOffset,
+        isStart: stop.isStart,
+        isEnd: stop.isEnd
+    }));
+}
+
+function areTimetablesEqual(
+    current: CurrentTrainTimetableData | null,
+    historical: HistoricalTimetableData | null
+) {
+    const currentStops = normalizeCurrentStops(current);
+    const historicalStops = normalizeHistoricalStops(historical);
+    if (!currentStops || !historicalStops) {
+        return false;
+    }
+    if (currentStops.length !== historicalStops.length) {
+        return false;
+    }
+
+    return currentStops.every((stop, index) => {
+        const other = historicalStops[index]!;
+        return (
+            stop.stationNo === other.stationNo &&
+            stop.stationName === other.stationName &&
+            stop.stationTrainCode === other.stationTrainCode &&
+            stop.arriveOffset === other.arriveOffset &&
+            stop.departOffset === other.departOffset &&
+            stop.isStart === other.isStart &&
+            stop.isEnd === other.isEnd
+        );
+    });
+}
 
 export default function useLookupTimetableHistory(options: {
     modelValue: MaybeRefOrGetter<boolean>;
     normalizedTrainCode: MaybeRefOrGetter<string>;
     currentState: MaybeRefOrGetter<RecentAssignmentsState>;
     isCurrentTimetableAvailable: MaybeRefOrGetter<boolean>;
-    requestFetch: TrackedRequestFetch;
+    currentTimetable: MaybeRefOrGetter<CurrentTrainTimetableData | null>;
+    requestedTimetableId?: MaybeRefOrGetter<number | null>;
 }) {
-    const historyContentCacheVersion = ref(0);
     const historyLoadingState = ref<LookupTimetableLoadState>('idle');
     const historyErrorMessage = ref('');
     const historyItems = ref<HistoricalTimetableOption[]>([]);
     const selectedTimetableSourceKey = ref<TimetableSourceKey>('current');
-    const historyContentState = ref<LookupTimetableLoadState>('idle');
-    const historyContentErrorMessage = ref('');
+    const hiddenTimetableIds = ref<Set<number>>(new Set());
     let historyListRequestToken = 0;
-    let historyContentLoadToken = 0;
 
     const isCurrentView = computed(
         () => selectedTimetableSourceKey.value === 'current'
@@ -61,7 +129,6 @@ export default function useLookupTimetableHistory(options: {
         if (isCurrentView.value) {
             return null;
         }
-
         return (
             historyItems.value.find(
                 (item) => item.sourceKey === selectedTimetableSourceKey.value
@@ -69,26 +136,15 @@ export default function useLookupTimetableHistory(options: {
         );
     });
 
-    const selectedHistoricalContent = computed(() => {
-        historyContentCacheVersion.value;
-
-        const selected = selectedHistoricalItem.value;
-        if (!selected) {
-            return null;
-        }
-
-        return (
-            getHistoricalTimetableContentMemoryCacheValue(selected.historyId) ??
-            null
-        );
-    });
+    const selectedHistoricalContent = computed(
+        () => selectedHistoricalItem.value?.content ?? null
+    );
 
     const currentTimetableOptionLabel = computed(() => {
         const latestCoverage = latestHistoricalCoverage.value;
         if (!latestCoverage) {
             return '当前时刻表';
         }
-
         const startLabel = formatServiceDateLabel(
             latestCoverage.serviceDateStart
         );
@@ -96,7 +152,6 @@ export default function useLookupTimetableHistory(options: {
     });
 
     const historyTimetableOptions = computed<TimetableSourceOption[]>(() => {
-        const items = historyItems.value;
         const sourceOptions: TimetableSourceOption[] = [];
 
         if (toValue(options.isCurrentTimetableAvailable)) {
@@ -106,14 +161,14 @@ export default function useLookupTimetableHistory(options: {
             });
         }
 
-        const historicalItems = toValue(options.isCurrentTimetableAvailable)
-            ? items.slice(1)
-            : items;
-
-        for (const item of historicalItems) {
+        for (const item of historyItems.value) {
+            if (hiddenTimetableIds.value.has(item.timetableId)) {
+                continue;
+            }
             sourceOptions.push({
                 value: item.sourceKey,
-                label: formatHistoryOptionLabel(item)
+                label: formatHistoryOptionLabel(item),
+                disabled: item.content === null
             });
         }
 
@@ -121,25 +176,94 @@ export default function useLookupTimetableHistory(options: {
     });
 
     const shouldShowHistoryTimetableSelector = computed(
-        () => historyTimetableOptions.value.length > 1
+        () =>
+            historyTimetableOptions.value.length > 1 ||
+            historyTimetableOptions.value.some((option) => option.disabled)
     );
 
-    function setHistoryContentCacheValue(
-        historyId: number,
-        value: HistoricalTimetableData | null
-    ) {
-        setHistoricalTimetableContentMemoryCacheValue(historyId, value);
-        historyContentCacheVersion.value += 1;
-    }
-
     function resetHistoryViewState() {
-        historyContentLoadToken += 1;
+        historyListRequestToken += 1;
         historyLoadingState.value = 'idle';
         historyErrorMessage.value = '';
         historyItems.value = [];
         selectedTimetableSourceKey.value = 'current';
-        historyContentState.value = 'idle';
-        historyContentErrorMessage.value = '';
+        hiddenTimetableIds.value = new Set();
+    }
+
+    function resolveInitialSelection() {
+        const current = toValue(options.currentTimetable);
+        const items = historyItems.value;
+        const requestedId = toValue(options.requestedTimetableId) ?? null;
+        const requestedItem =
+            requestedId === null
+                ? null
+                : (items.find((item) => item.timetableId === requestedId) ??
+                  null);
+
+        if (requestedItem?.content) {
+            if (
+                requestedItem.content &&
+                current &&
+                areTimetablesEqual(current, requestedItem.content)
+            ) {
+                selectedTimetableSourceKey.value = 'current';
+                hiddenTimetableIds.value = new Set([requestedItem.timetableId]);
+                return;
+            }
+
+            selectedTimetableSourceKey.value = requestedItem.sourceKey;
+            hiddenTimetableIds.value = new Set();
+            return;
+        }
+
+        if (toValue(options.isCurrentTimetableAvailable)) {
+            selectedTimetableSourceKey.value = 'current';
+            hiddenTimetableIds.value = new Set();
+            return;
+        }
+
+        if (
+            toValue(options.currentState) === 'idle' ||
+            toValue(options.currentState) === 'loading'
+        ) {
+            selectedTimetableSourceKey.value = 'current';
+            hiddenTimetableIds.value = new Set();
+            return;
+        }
+
+        selectedTimetableSourceKey.value =
+            items.find((item) => item.content)?.sourceKey ?? 'current';
+        hiddenTimetableIds.value = new Set();
+    }
+
+    function syncSelectionWithData() {
+        const currentAvailable = toValue(options.isCurrentTimetableAvailable);
+        const selectedExists = historyItems.value.some(
+            (item) => item.sourceKey === selectedTimetableSourceKey.value
+        );
+
+        if (currentAvailable) {
+            if (
+                !selectedExists &&
+                selectedTimetableSourceKey.value !== 'current'
+            ) {
+                selectedTimetableSourceKey.value = 'current';
+            }
+            return;
+        }
+
+        if (
+            toValue(options.currentState) !== 'empty' &&
+            historyItems.value.length === 0
+        ) {
+            return;
+        }
+
+        if (!selectedExists || selectedTimetableSourceKey.value === 'current') {
+            selectedTimetableSourceKey.value =
+                historyItems.value.find((item) => item.content)?.sourceKey ??
+                'current';
+        }
     }
 
     async function fetchHistoricalTimetableList() {
@@ -158,45 +282,11 @@ export default function useLookupTimetableHistory(options: {
         historyLoadingState.value = 'loading';
         historyErrorMessage.value = '';
         historyItems.value = [];
-        historyContentState.value = 'idle';
-        historyContentErrorMessage.value = '';
         selectedTimetableSourceKey.value = 'current';
+        hiddenTimetableIds.value = new Set();
 
         try {
-            const items: TrainTimetableHistoryListResponse['items'] = [];
-            let cursor = '';
-
-            while (true) {
-                const response = await options.requestFetch<
-                    TrackerApiResponse<TrainTimetableHistoryListResponse>
-                >(
-                    `/api/v1/timetable/train/${encodeURIComponent(requestTrainCode)}/history`,
-                    {
-                        query: {
-                            cursor: cursor.length > 0 ? cursor : undefined,
-                            limit: HISTORY_LIST_LIMIT
-                        }
-                    }
-                );
-
-                if (
-                    requestToken !== historyListRequestToken ||
-                    requestTrainCode !== toValue(options.normalizedTrainCode)
-                ) {
-                    return;
-                }
-
-                if (!response.ok) {
-                    throw new Error(response.data);
-                }
-
-                items.push(...response.data.items);
-                cursor = response.data.nextCursor;
-                if (cursor.length === 0) {
-                    break;
-                }
-            }
-
+            const result = await fetchTrainTimetableHistory(requestTrainCode);
             if (
                 requestToken !== historyListRequestToken ||
                 requestTrainCode !== toValue(options.normalizedTrainCode)
@@ -204,15 +294,9 @@ export default function useLookupTimetableHistory(options: {
                 return;
             }
 
-            historyItems.value = items.map((item) => ({
-                sourceKey: `history:${item.historyId}` as TimetableSourceKey,
-                historyId: item.historyId,
-                serviceDateStart: item.serviceDateStart,
-                serviceDateEndExclusive: item.serviceDateEndExclusive,
-                isCurrent: false
-            }));
-
+            historyItems.value = result.items;
             historyLoadingState.value = 'ready';
+            resolveInitialSelection();
         } catch (error) {
             if (
                 requestToken !== historyListRequestToken ||
@@ -226,90 +310,6 @@ export default function useLookupTimetableHistory(options: {
                 error,
                 '历史时刻表加载失败，请稍后重试。'
             );
-        }
-    }
-
-    async function fetchHistoricalTimetableContent(historyId: number) {
-        const loadToken = ++historyContentLoadToken;
-        const cached = getHistoricalTimetableContentMemoryCacheValue(historyId);
-        if (cached !== undefined) {
-            historyContentState.value = cached ? 'ready' : 'error';
-            historyContentErrorMessage.value = cached
-                ? ''
-                : '历史时刻表加载失败，请稍后重试。';
-            historyContentCacheVersion.value += 1;
-            return cached;
-        }
-
-        const requestTrainCode = toValue(options.normalizedTrainCode);
-        if (requestTrainCode.length === 0) {
-            setHistoryContentCacheValue(historyId, null);
-            historyContentState.value = 'error';
-            historyContentErrorMessage.value =
-                '历史时刻表加载失败，请稍后重试。';
-            return null;
-        }
-
-        historyContentState.value = 'loading';
-        historyContentErrorMessage.value = '';
-
-        const timetable = await fetchHistoricalTimetableContentWithCache(
-            options.requestFetch,
-            requestTrainCode,
-            historyId
-        );
-
-        if (
-            loadToken !== historyContentLoadToken ||
-            requestTrainCode !== toValue(options.normalizedTrainCode)
-        ) {
-            return null;
-        }
-
-        historyContentCacheVersion.value += 1;
-        if (!timetable) {
-            historyContentState.value = 'error';
-            historyContentErrorMessage.value =
-                '历史时刻表加载失败，请稍后重试。';
-            return null;
-        }
-
-        historyContentState.value = 'ready';
-        historyContentErrorMessage.value = '';
-        return timetable;
-    }
-
-    function ensureHistoricalContentLoaded() {
-        if (isCurrentView.value || !toValue(options.modelValue)) {
-            return;
-        }
-
-        const selected = selectedHistoricalItem.value;
-        if (!selected) {
-            return;
-        }
-
-        void fetchHistoricalTimetableContent(selected.historyId);
-    }
-
-    function syncSelectionWithData() {
-        if (toValue(options.isCurrentTimetableAvailable)) {
-            selectedTimetableSourceKey.value = 'current';
-            return;
-        }
-
-        if (
-            toValue(options.currentState) !== 'empty' ||
-            historyItems.value.length === 0
-        ) {
-            return;
-        }
-
-        const selectedExists = historyItems.value.some(
-            (item) => item.sourceKey === selectedTimetableSourceKey.value
-        );
-        if (!selectedExists || selectedTimetableSourceKey.value === 'current') {
-            selectedTimetableSourceKey.value = historyItems.value[0]!.sourceKey;
         }
     }
 
@@ -338,44 +338,43 @@ export default function useLookupTimetableHistory(options: {
 
     watch(
         [
-            () => toValue(options.currentState),
+            () => toValue(options.currentTimetable),
             () => toValue(options.isCurrentTimetableAvailable),
-            () => historyItems.value,
-            () => historyLoadingState.value
+            () => toValue(options.currentState),
+            () => historyItems.value.length
         ],
         () => {
+            if (historyLoadingState.value !== 'ready') {
+                return;
+            }
+
+            const requestedId = toValue(options.requestedTimetableId) ?? null;
+            if (requestedId !== null) {
+                resolveInitialSelection();
+                return;
+            }
+
             syncSelectionWithData();
-            ensureHistoricalContentLoaded();
         },
-        { immediate: true, deep: true }
+        { immediate: true, deep: false }
     );
 
     watch(
-        () => selectedTimetableSourceKey.value,
+        () => toValue(options.requestedTimetableId),
         () => {
-            historyContentLoadToken += 1;
-            historyContentState.value = 'idle';
-            historyContentErrorMessage.value = '';
-            ensureHistoricalContentLoaded();
+            if (historyLoadingState.value === 'ready') {
+                resolveInitialSelection();
+            }
         }
     );
-
-    onMounted(() => {
-        if (
-            toValue(options.modelValue) &&
-            toValue(options.normalizedTrainCode).length > 0
-        ) {
-            void fetchHistoricalTimetableList();
-        }
-    });
 
     return {
         historyLoadingState,
         historyErrorMessage,
         historyItems,
         selectedTimetableSourceKey,
-        historyContentState,
-        historyContentErrorMessage,
+        historyContentState: historyLoadingState,
+        historyContentErrorMessage: historyErrorMessage,
         isCurrentView,
         selectedHistoricalItem,
         selectedHistoricalContent,

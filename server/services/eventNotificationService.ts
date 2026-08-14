@@ -17,16 +17,19 @@ import {
     buildFeedbackStatusUpdatedNotification
 } from '~/server/utils/notifications/templates/feedbackTopicUpdated';
 import { buildTrainStatusUpdatedNotification } from '~/server/utils/notifications/templates/trainStatusUpdated';
+import type { TrainCodeParts } from '~/server/utils/12306/trainCode';
+import type { EmuId } from '~/server/libs/database/emu';
+import {
+    formatExternalEmuCode,
+    formatExternalTrainCode
+} from '~/server/utils/internal/boundaries';
 import type { FeedbackStatus, FeedbackVisibility } from '~/types/feedback';
-import type {
-    NotificationPayload,
-    NotificationTarget,
-    NotificationTargetType
-} from '~/types/notifications';
+import type { NotificationPayload } from '~/types/notifications';
+import type { AuthEventTarget } from '~/server/types/authTargets';
 
 interface LookupStatusNotificationCandidate {
-    targetType: Extract<NotificationTargetType, 'train' | 'emu'>;
-    targetId: string;
+    targetType: 'train' | 'emu';
+    targetId: TrainCodeParts | EmuId;
     startAt: number;
     previousStatus: number;
     nextStatus: ProbeStatusValue;
@@ -44,21 +47,22 @@ function buildLookupStatusNotificationPayload(
     candidate: LookupStatusNotificationCandidate
 ): NotificationPayload {
     if (candidate.targetType === 'train') {
+        const targetId = candidate.targetId as TrainCodeParts;
         return buildTrainStatusUpdatedNotification(
-            candidate.targetId,
+            formatExternalTrainCode(targetId),
             candidate.startAt,
-            listProbeStatusByTrainCode(
-                candidate.targetId,
-                candidate.startAt
-            ).map((row) => row.emu_code)
+            listProbeStatusByTrainCode(targetId, candidate.startAt).map((row) =>
+                formatExternalEmuCode(row.emu_id)
+            )
         );
     }
 
+    const targetId = candidate.targetId as EmuId;
     return buildEmuStatusUpdatedNotification(
-        candidate.targetId,
+        formatExternalEmuCode(targetId),
         candidate.startAt,
-        listProbeStatusByEmuCode(candidate.targetId, candidate.startAt).map(
-            (row) => row.train_code
+        listProbeStatusByEmuCode(targetId, candidate.startAt).map((row) =>
+            formatExternalTrainCode(row.train_code)
         )
     );
 }
@@ -101,7 +105,7 @@ function canReceiveFeedbackNotification(
 }
 
 async function sendNotificationToTargetSubscribers(
-    target: NotificationTarget,
+    target: AuthEventTarget,
     payload: NotificationPayload,
     options: {
         excludeUserIds?: string[];
@@ -133,7 +137,7 @@ async function sendNotificationToTargetSubscribers(
                 const message =
                     error instanceof Error ? error.message : String(error);
                 logger.error(
-                    `event_notification_send_failed userId=${userId} targetType=${target.targetType} targetId=${target.targetId} message=${message}`
+                    `event_notification_send_failed userId=${userId} targetKind=${target.kind} targetKey=${target.kind === 'train' ? formatExternalTrainCode(target.trainCode) : target.kind === 'emu' ? formatExternalEmuCode(target.emuId) : String(target.topicId)} message=${message}`
                 );
             }
         })
@@ -159,7 +163,13 @@ export async function notifyLookupStatusChanges(
         }
 
         uniqueCandidates.set(
-            `${candidate.targetType}:${candidate.targetId}:${candidate.startAt}:${candidate.nextStatus}`,
+            `${candidate.targetType}:${
+                candidate.targetType === 'train'
+                    ? formatExternalTrainCode(
+                          candidate.targetId as TrainCodeParts
+                      )
+                    : formatExternalEmuCode(candidate.targetId as EmuId)
+            }:${candidate.startAt}:${candidate.nextStatus}`,
             candidate
         );
     }
@@ -169,10 +179,15 @@ export async function notifyLookupStatusChanges(
             const payload = buildLookupStatusNotificationPayload(candidate);
 
             await sendNotificationToTargetSubscribers(
-                {
-                    targetType: candidate.targetType,
-                    targetId: candidate.targetId
-                },
+                candidate.targetType === 'train'
+                    ? {
+                          kind: 'train',
+                          trainCode: candidate.targetId as TrainCodeParts
+                      }
+                    : {
+                          kind: 'emu',
+                          emuId: candidate.targetId as EmuId
+                      },
                 payload
             );
         })
@@ -181,10 +196,7 @@ export async function notifyLookupStatusChanges(
 
 export function autoSubscribeFeedbackTopic(userId: string, topicId: number) {
     try {
-        upsertUserEventSubscription(userId, {
-            targetType: 'feedback',
-            targetId: String(topicId)
-        });
+        upsertUserEventSubscription(userId, { kind: 'feedback', topicId });
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         logger.warn(
@@ -202,10 +214,7 @@ export async function notifyFeedbackReply(
     accessTarget: FeedbackAccessTarget
 ) {
     await sendNotificationToTargetSubscribers(
-        {
-            targetType: 'feedback',
-            targetId: String(topicId)
-        },
+        { kind: 'feedback', topicId },
         buildFeedbackReplyNotification(
             topicId,
             topicTitle,
@@ -227,10 +236,7 @@ export async function notifyFeedbackStatusUpdated(
     accessTarget: FeedbackAccessTarget
 ) {
     await sendNotificationToTargetSubscribers(
-        {
-            targetType: 'feedback',
-            targetId: String(topicId)
-        },
+        { kind: 'feedback', topicId },
         buildFeedbackStatusUpdatedNotification(topicId, topicTitle, status),
         {
             canReceiveUserId: (userId) =>
@@ -245,10 +251,7 @@ export async function notifyFeedbackHidden(
     accessTarget: FeedbackAccessTarget
 ) {
     await sendNotificationToTargetSubscribers(
-        {
-            targetType: 'feedback',
-            targetId: String(topicId)
-        },
+        { kind: 'feedback', topicId },
         buildFeedbackHiddenNotification(topicId, topicTitle),
         {
             canReceiveUserId: (userId) =>

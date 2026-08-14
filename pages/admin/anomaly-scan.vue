@@ -441,9 +441,6 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import UiBottomSheet from '~/components/ui/UiBottomSheet.vue';
 import UiModal from '~/components/ui/UiModal.vue';
-import useTrackedRequestFetch, {
-    type TrackedRequestFetch
-} from '~/composables/useTrackedRequestFetch';
 import {
     fromAdminDateInputValue,
     useAdminDateQuery
@@ -455,7 +452,11 @@ import type {
     AdminAnomalyScanResponse,
     AdminAnomalyType
 } from '~/types/admin';
-import type { TrackerApiResponse } from '~/types/homepage';
+import {
+    bulkDeleteAdminAnomaly,
+    deleteAdminAnomalyRoute,
+    fetchAdminAnomalyScan
+} from '~/utils/api/v2/domain/admin';
 import getApiErrorMessage from '~/utils/api/getApiErrorMessage';
 import formatTrackerTimestamp from '~/utils/time/formatTrackerTimestamp';
 
@@ -476,9 +477,6 @@ interface BulkDeleteAction {
     buttonLabel: string;
 }
 
-const requestFetch: TrackedRequestFetch = import.meta.server
-    ? useTrackedRequestFetch()
-    : ($fetch as TrackedRequestFetch);
 const { session } = useAuthState();
 const { selectedDateInput, selectedDateYmd, todayDateInputValue } =
     await useAdminDateQuery();
@@ -614,22 +612,9 @@ async function runAnomalyScan() {
     anomalyScanErrorMessage.value = '';
 
     try {
-        const response = await requestFetch<
-            TrackerApiResponse<AdminAnomalyScanResponse>
-        >('/api/v1/admin/anomaly-scan', {
-            retry: 0,
-            query: {
-                date: selectedDateYmd.value
-            }
+        anomalyScanData.value = await fetchAdminAnomalyScan({
+            query: { date: selectedDateYmd.value }
         });
-
-        if (!response.ok) {
-            throw {
-                data: response
-            };
-        }
-
-        anomalyScanData.value = response.data;
         anomalyScanStatus.value = 'success';
     } catch (error) {
         anomalyScanErrorMessage.value = getApiErrorMessage(
@@ -746,37 +731,14 @@ async function confirmDeleteRoute() {
     anomalyActionSuccessMessage.value = '';
 
     try {
-        const { data, error } = await useCsrfFetch<
-            TrackerApiResponse<AdminAnomalyDeleteRouteResponse>
-        >('/api/v1/admin/anomaly-actions/delete-route', {
-            method: 'POST',
-            body: {
-                date: selectedDateYmd.value,
-                routeId: targetRoute.id
-            },
-            key: `admin:anomaly-delete:${targetRoute.id}:${Date.now()}`,
-            watch: false,
-            server: false
-        });
+        const response = await deleteAdminAnomalyRoute(
+            selectedDateYmd.value,
+            Number(targetRoute.id)
+        );
 
-        if (error.value) {
-            throw error.value;
-        }
-
-        const response = data.value;
-        if (!response) {
-            throw new Error('Missing anomaly delete response');
-        }
-
-        if (!response.ok) {
-            throw {
-                data: response
-            };
-        }
-
-        anomalyActionSuccessMessage.value = response.data.wasToday
-            ? `已删除异常交路，并清理 ${response.data.deletedProbeStatusRows} 条匹配的 probe status 与相关 probe 运行态。`
-            : `已删除异常交路，并清理 ${response.data.deletedProbeStatusRows} 条匹配的 probe status。`;
+        anomalyActionSuccessMessage.value = response.wasToday
+            ? `已删除异常交路，并清理 ${response.deletedProbeStatusRows} 条匹配的 probe status 与相关 probe 运行态。`
+            : `已删除异常交路，并清理 ${response.deletedProbeStatusRows} 条匹配的 probe status。`;
 
         isDeleteRouteDialogOpen.value = false;
         pendingDeleteRouteContext.value = null;
@@ -796,22 +758,9 @@ async function runAnomalyScanAfterBulkDelete() {
     anomalyScanErrorMessage.value = '';
 
     try {
-        const response = await requestFetch<
-            TrackerApiResponse<AdminAnomalyScanResponse>
-        >('/api/v1/admin/anomaly-scan', {
-            retry: 0,
-            query: {
-                date: selectedDateYmd.value
-            }
+        anomalyScanData.value = await fetchAdminAnomalyScan({
+            query: { date: selectedDateYmd.value }
         });
-
-        if (!response.ok) {
-            throw {
-                data: response
-            };
-        }
-
-        anomalyScanData.value = response.data;
         anomalyScanStatus.value = 'success';
     } catch (error) {
         anomalyScanErrorMessage.value = getApiErrorMessage(
@@ -833,40 +782,17 @@ async function confirmBulkDelete() {
     anomalyActionSuccessMessage.value = '';
 
     try {
-        const { data, error } = await useCsrfFetch<
-            TrackerApiResponse<AdminAnomalyBulkDeleteResponse>
-        >('/api/v1/admin/anomaly-actions/delete-by-type', {
-            method: 'POST',
-            body: {
-                date: selectedDateYmd.value,
-                type: targetType
-            },
-            key: `admin:anomaly-delete-by-type:${targetType}:${selectedDateYmd.value}:${Date.now()}`,
-            watch: false,
-            server: false
-        });
-
-        if (error.value) {
-            throw error.value;
-        }
-
-        const response = data.value;
-        if (!response) {
-            throw new Error('Missing anomaly bulk delete response');
-        }
-
-        if (!response.ok) {
-            throw {
-                data: response
-            };
-        }
+        const response = await bulkDeleteAdminAnomaly(
+            selectedDateYmd.value,
+            targetType
+        );
 
         anomalyActionSuccessMessage.value =
             `已删除 ${getAnomalyTypeLabel(targetType)}：` +
-            `${response.data.deletedDailyRoutes} 条异常交路，` +
-            `${response.data.deletedProbeStatusRows} 条 probe status。` +
-            (response.data.skippedRoutes > 0
-                ? `另有 ${response.data.skippedRoutes} 条已不存在，已跳过。`
+            `${response.deletedDailyRoutes} 条异常交路，` +
+            `${response.deletedProbeStatusRows} 条 probe status。` +
+            (response.skippedRoutes > 0
+                ? `另有 ${response.skippedRoutes} 条已不存在，已跳过。`
                 : '');
 
         isBulkDeleteDialogOpen.value = false;

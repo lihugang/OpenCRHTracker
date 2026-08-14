@@ -1,7 +1,10 @@
 import getLogger from '~/server/libs/log4js';
 import useConfig from '~/server/config';
 import { rebuildTrainCirculationIndex } from '~/server/services/trainCirculationIndexStore';
-import { registerTaskExecutor } from '~/server/services/taskExecutorRegistry';
+import {
+    parseEmptyTaskArgs,
+    registerTaskExecutor
+} from '~/server/services/taskExecutorRegistry';
 import { enqueueTask } from '~/server/services/taskQueue';
 import {
     formatShanghaiDateTime,
@@ -71,12 +74,10 @@ export function registerRebuildTrainCirculationIndexTaskExecutor() {
         return;
     }
 
-    registerTaskExecutor(
-        REBUILD_TRAIN_CIRCULATION_INDEX_TASK_EXECUTOR,
-        async () => {
-            await executeRebuildTrainCirculationIndexTask();
-        }
-    );
+    registerTaskExecutor(REBUILD_TRAIN_CIRCULATION_INDEX_TASK_EXECUTOR, {
+        parse: parseEmptyTaskArgs,
+        execute: async () => executeRebuildTrainCirculationIndexTask()
+    });
     registered = true;
     logger.info(
         `registered executor=${REBUILD_TRAIN_CIRCULATION_INDEX_TASK_EXECUTOR}`

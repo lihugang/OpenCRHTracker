@@ -1,10 +1,11 @@
 import ApiRequestError from '~/server/utils/api/errors/ApiRequestError';
 import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
-import getDayTimestampRange from '~/server/utils/date/getDayTimestampRange';
 import {
-    getShanghaiDayStartUnixSeconds,
-    SHANGHAI_DAY_SECONDS
-} from '~/server/utils/date/shanghaiDateTime';
+    serviceDayToShanghaiDayStartUnixSeconds,
+    serviceDateToDay,
+    type ServiceDay
+} from '~/server/utils/date/serviceDay';
+import { SHANGHAI_DAY_SECONDS } from '~/server/utils/date/shanghaiDateTime';
 import {
     deleteDailyRouteById,
     getDailyRecordById,
@@ -16,7 +17,6 @@ import {
 import { getHistoricalTimetableSummary } from '~/server/services/historicalTimetableResolver';
 import {
     listLatestTimetableHistoryCoveragesByTrainCodeAtOrBeforeDate,
-    formatTimetableHistoryServiceDate,
     type TimetableHistoryCoverageRow
 } from '~/server/services/timetableHistoryStore';
 import {
@@ -32,8 +32,14 @@ import {
 } from '~/server/services/probeRuntimeState';
 import { deleteProbeStatusByTrainCodeAndEmuCodeAtServiceDate } from '~/server/services/probeStatusStore';
 import { getTodayScheduleProbeGroupByTrainCode } from '~/server/services/todayScheduleCache';
-import normalizeCode from '~/server/utils/12306/normalizeCode';
+import { type TrainCodeParts } from '~/server/utils/12306/trainCode';
+import type { EmuId } from '~/server/libs/database/emu';
 import parseEmuCode from '~/server/utils/12306/parseEmuCode';
+import {
+    formatExternalEmuCode,
+    formatExternalServiceDate,
+    formatExternalTrainCode
+} from '~/server/utils/internal/boundaries';
 import type {
     AdminDailyRouteCreateResponse,
     AdminDailyRouteDeleteResponse,
@@ -44,32 +50,14 @@ import type {
 } from '~/types/admin';
 
 const TIMETABLE_CANDIDATE_LIMIT = 12;
-
-function assertServiceDate(date: string) {
-    if (!/^\d{8}$/.test(date)) {
-        throw new ApiRequestError(400, 'invalid_param', 'date 必须是 YYYYMMDD');
-    }
-}
-
-function assertCode(value: string, fieldName: string) {
-    const normalized = normalizeCode(value);
-    if (normalized.length === 0) {
-        throw new ApiRequestError(
-            400,
-            'invalid_param',
-            `${fieldName} 不能为空`
-        );
-    }
-
-    return normalized;
-}
+const DAY_SECONDS = 24 * 60 * 60;
 
 function toAdminDailyRouteRecord(row: DailyEmuRouteRow): AdminDailyRouteRecord {
     return {
         id: String(row.id),
-        serviceDate: row.service_date,
-        trainCode: row.train_code,
-        emuCode: row.emu_code,
+        serviceDate: formatExternalServiceDate(row.service_date),
+        trainCode: formatExternalTrainCode(row.train_code),
+        emuCode: formatExternalEmuCode(row.emu_id),
         timetableId: row.timetable_id,
         startStation: row.start_station_name,
         endStation: row.end_station_name,
@@ -83,12 +71,16 @@ function sortDailyRouteRows(left: DailyEmuRouteRow, right: DailyEmuRouteRow) {
         return left.start_at - right.start_at;
     }
 
-    if (left.train_code !== right.train_code) {
-        return left.train_code.localeCompare(right.train_code, 'zh-Hans-CN');
+    const leftTrainCode = formatExternalTrainCode(left.train_code);
+    const rightTrainCode = formatExternalTrainCode(right.train_code);
+    if (leftTrainCode !== rightTrainCode) {
+        return leftTrainCode.localeCompare(rightTrainCode, 'zh-Hans-CN');
     }
 
-    if (left.emu_code !== right.emu_code) {
-        return left.emu_code.localeCompare(right.emu_code, 'zh-Hans-CN');
+    const leftEmuCode = formatExternalEmuCode(left.emu_id);
+    const rightEmuCode = formatExternalEmuCode(right.emu_id);
+    if (leftEmuCode !== rightEmuCode) {
+        return leftEmuCode.localeCompare(rightEmuCode, 'zh-Hans-CN');
     }
 
     return left.id - right.id;
@@ -110,8 +102,8 @@ function dedupeDailyRouteRows(rows: DailyEmuRouteRow[]) {
     return deduped;
 }
 
-function collectDetectionGroupsFromEmuCodes(
-    emuCodes: string[],
+function collectDetectionGroupsFromEmuIds(
+    emuIds: EmuId[],
     assets: Awaited<ReturnType<typeof loadProbeAssets>>
 ) {
     const detectionGroups = new Map<
@@ -119,7 +111,8 @@ function collectDetectionGroupsFromEmuCodes(
         { bureau: string; model: string }
     >();
 
-    for (const emuCode of emuCodes) {
+    for (const emuId of emuIds) {
+        const emuCode = formatExternalEmuCode(emuId);
         const parsedEmuCode = parseEmuCode(emuCode);
         if (!parsedEmuCode?.trainSetNo) {
             continue;
@@ -144,12 +137,22 @@ function collectDetectionGroupsFromEmuCodes(
     return Array.from(detectionGroups.values());
 }
 
-function resolveRowsForQuery(date: string, trainCode: string, emuCode: string) {
-    const dayRange = getDayTimestampRange(date);
-    const normalizedTrainCode = normalizeCode(trainCode);
-    const normalizedEmuCode = normalizeCode(emuCode);
+function getDayRange(serviceDate: ServiceDay) {
+    const startAt = serviceDayToShanghaiDayStartUnixSeconds(serviceDate);
+    return {
+        startAt,
+        endAtExclusive: startAt + DAY_SECONDS
+    };
+}
 
-    if (normalizedTrainCode.length === 0 && normalizedEmuCode.length === 0) {
+function resolveRowsForQuery(
+    serviceDate: ServiceDay,
+    trainCode: TrainCodeParts | null,
+    emuId: EmuId | null
+) {
+    const dayRange = getDayRange(serviceDate);
+
+    if (!trainCode && !emuId) {
         throw new ApiRequestError(
             400,
             'invalid_param',
@@ -157,35 +160,34 @@ function resolveRowsForQuery(date: string, trainCode: string, emuCode: string) {
         );
     }
 
-    if (normalizedTrainCode.length > 0 && normalizedEmuCode.length > 0) {
+    if (trainCode && emuId) {
         return listDailyRoutesByTrainCodeInRange(
-            normalizedTrainCode,
+            trainCode,
             dayRange.startAt,
-            dayRange.endAt + 1
+            dayRange.endAtExclusive
         )
-            .filter((row) => row.emu_code === normalizedEmuCode)
+            .filter((row) => Number(row.emu_id) === Number(emuId))
             .sort(sortDailyRouteRows);
     }
 
-    const rows =
-        normalizedTrainCode.length > 0
-            ? listDailyRoutesByTrainCodeInRange(
-                  normalizedTrainCode,
-                  dayRange.startAt,
-                  dayRange.endAt + 1
-              )
-            : listDailyRoutesByEmuCodeInRange(
-                  normalizedEmuCode,
-                  dayRange.startAt,
-                  dayRange.endAt + 1
-              );
+    const rows = trainCode
+        ? listDailyRoutesByTrainCodeInRange(
+              trainCode,
+              dayRange.startAt,
+              dayRange.endAtExclusive
+          )
+        : listDailyRoutesByEmuCodeInRange(
+              emuId!,
+              dayRange.startAt,
+              dayRange.endAtExclusive
+          );
 
     return dedupeDailyRouteRows(rows).sort(sortDailyRouteRows);
 }
 
 function getCoverageResolution(
     coverage: TimetableHistoryCoverageRow,
-    serviceDate: number
+    serviceDate: ServiceDay
 ) {
     return coverage.service_date_start <= serviceDate &&
         coverage.service_date_end_exclusive > serviceDate
@@ -195,7 +197,7 @@ function getCoverageResolution(
 
 function buildCandidateFromCoverage(
     coverage: TimetableHistoryCoverageRow,
-    date: string,
+    serviceDate: ServiceDay,
     isDefault: boolean
 ): AdminDailyRouteTimetableCandidate | null {
     const summary = getHistoricalTimetableSummary(coverage.content_id);
@@ -203,13 +205,13 @@ function buildCandidateFromCoverage(
         return null;
     }
 
-    const dayStartAt = getShanghaiDayStartUnixSeconds(date);
+    const dayStartAt = serviceDayToShanghaiDayStartUnixSeconds(serviceDate);
     return {
         timetableId: coverage.content_id,
-        serviceDateStart: formatTimetableHistoryServiceDate(
+        serviceDateStart: formatExternalServiceDate(
             coverage.service_date_start
         ),
-        serviceDateEndExclusive: formatTimetableHistoryServiceDate(
+        serviceDateEndExclusive: formatExternalServiceDate(
             coverage.service_date_end_exclusive
         ),
         startStation: summary.startStation ?? '',
@@ -224,15 +226,16 @@ function buildCandidateFromCoverage(
                   (summary.endOffset < (summary.startOffset ?? 0)
                       ? SHANGHAI_DAY_SECONDS
                       : 0),
-        resolution: getCoverageResolution(coverage, Number.parseInt(date, 10)),
+        resolution: getCoverageResolution(coverage, serviceDate),
         isDefault
     };
 }
 
 function buildUnresolvedCandidate(
-    date: string,
+    serviceDate: ServiceDay,
     isDefault: boolean
 ): AdminDailyRouteTimetableCandidate {
+    const date = formatExternalServiceDate(serviceDate);
     return {
         timetableId: null,
         serviceDateStart: date,
@@ -247,43 +250,38 @@ function buildUnresolvedCandidate(
 }
 
 export function searchAdminDailyRoutes(
-    date: string,
-    trainCode: string,
-    emuCode: string
+    serviceDate: ServiceDay,
+    trainCode: TrainCodeParts | null,
+    emuId: EmuId | null
 ): AdminDailyRouteSearchResponse {
-    assertServiceDate(date);
-    const normalizedTrainCode = normalizeCode(trainCode);
-    const normalizedEmuCode = normalizeCode(emuCode);
-    const items = resolveRowsForQuery(
-        date,
-        normalizedTrainCode,
-        normalizedEmuCode
-    ).map(toAdminDailyRouteRecord);
+    const items = resolveRowsForQuery(serviceDate, trainCode, emuId).map(
+        toAdminDailyRouteRecord
+    );
 
     return {
-        date,
-        trainCode: normalizedTrainCode,
-        emuCode: normalizedEmuCode,
+        date: formatExternalServiceDate(serviceDate),
+        trainCode: trainCode ? formatExternalTrainCode(trainCode) : '',
+        emuCode: emuId ? formatExternalEmuCode(emuId) : '',
         total: items.length,
         items
     };
 }
 
 export function listAdminDailyRouteTimetableCandidates(
-    date: string,
-    trainCode: string
+    serviceDate: ServiceDay,
+    trainCode: TrainCodeParts
 ): AdminDailyRouteTimetableCandidatesResponse {
-    assertServiceDate(date);
-    const normalizedTrainCode = assertCode(trainCode, 'trainCode');
     const coverages =
         listLatestTimetableHistoryCoveragesByTrainCodeAtOrBeforeDate(
-            normalizedTrainCode,
-            date,
+            trainCode,
+            serviceDate,
             TIMETABLE_CANDIDATE_LIMIT
         );
 
     const candidates = coverages
-        .map((coverage) => buildCandidateFromCoverage(coverage, date, false))
+        .map((coverage) =>
+            buildCandidateFromCoverage(coverage, serviceDate, false)
+        )
         .filter((item): item is AdminDailyRouteTimetableCandidate =>
             Boolean(item)
         );
@@ -293,27 +291,24 @@ export function listAdminDailyRouteTimetableCandidates(
     }
 
     if (candidates.length === 0) {
-        candidates.push(buildUnresolvedCandidate(date, true));
+        candidates.push(buildUnresolvedCandidate(serviceDate, true));
     }
 
     const defaultCandidate = candidates.find((item) => item.isDefault) ?? null;
     return {
-        date,
-        trainCode: normalizedTrainCode,
+        date: formatExternalServiceDate(serviceDate),
+        trainCode: formatExternalTrainCode(trainCode),
         defaultTimetableId: defaultCandidate?.timetableId ?? null,
         items: candidates
     };
 }
 
 export function createAdminDailyRoute(
-    date: string,
-    trainCode: string,
-    emuCode: string,
+    serviceDate: ServiceDay,
+    trainCode: TrainCodeParts,
+    emuId: EmuId,
     timetableId: number | null
 ): AdminDailyRouteCreateResponse {
-    assertServiceDate(date);
-    const normalizedTrainCode = assertCode(trainCode, 'trainCode');
-    const normalizedEmuCode = assertCode(emuCode, 'emuCode');
     if (
         timetableId !== null &&
         (!Number.isInteger(timetableId) || timetableId <= 0)
@@ -326,8 +321,8 @@ export function createAdminDailyRoute(
     }
 
     const candidates = listAdminDailyRouteTimetableCandidates(
-        date,
-        normalizedTrainCode
+        serviceDate,
+        trainCode
     );
     const matchingCandidate = candidates.items.find(
         (item) => item.timetableId === timetableId
@@ -341,18 +336,18 @@ export function createAdminDailyRoute(
     }
 
     const insertedId = insertDailyEmuRouteWithIdentity(
-        normalizedTrainCode,
-        normalizedEmuCode,
-        date,
+        trainCode,
+        emuId,
+        serviceDate,
         timetableId
     );
     const createdRecord =
         insertedId > 0 ? getDailyRecordById(insertedId) : null;
 
     return {
-        date,
-        trainCode: normalizedTrainCode,
-        emuCode: normalizedEmuCode,
+        date: formatExternalServiceDate(serviceDate),
+        trainCode: formatExternalTrainCode(trainCode),
+        emuCode: formatExternalEmuCode(emuId),
         timetableId,
         createdRecord: createdRecord
             ? toAdminDailyRouteRecord(createdRecord)
@@ -379,39 +374,40 @@ export async function deleteAdminDailyRoute(
         throw new ApiRequestError(409, 'conflict', '日记录删除失败');
     }
 
-    const wasToday = route.service_date === getCurrentDateString();
+    const today = serviceDateToDay(getCurrentDateString());
+    const wasToday = route.service_date === today;
     let deletedProbeStatusRows = 0;
     let clearedRuntimeTrainKey = false;
-    let clearedRuntimeEmuCodes: string[] = [];
+    let clearedRuntimeEmuIds: EmuId[] = [];
     let clearedDetectionGroups = 0;
 
     if (wasToday) {
         deletedProbeStatusRows =
             deleteProbeStatusByTrainCodeAndEmuCodeAtServiceDate(
                 route.train_code,
-                route.emu_code,
+                route.emu_id,
                 route.service_date
             );
 
         const trainGroup = getTodayScheduleProbeGroupByTrainCode(
             route.train_code
-        ) ?? {
-            trainKey: buildTrainKey(route.train_code, '', route.start_at)
-        };
-        const trainKey = trainGroup.trainKey;
+        );
+        const trainKey =
+            trainGroup?.trainKey ??
+            buildTrainKey(route.train_code, null, route.start_at);
 
         clearedRuntimeTrainKey = hasQueriedTrainKey(trainKey);
         clearQueriedTrainKey(trainKey);
 
-        const affectedEmuCodes = new Set<string>([route.emu_code]);
-        clearedRuntimeEmuCodes = clearRunningEmuStateByTrainKey(trainKey);
-        for (const emuCode of clearedRuntimeEmuCodes) {
-            affectedEmuCodes.add(emuCode);
+        const affectedEmuIds = new Set<EmuId>([route.emu_id]);
+        clearedRuntimeEmuIds = clearRunningEmuStateByTrainKey(trainKey);
+        for (const emuId of clearedRuntimeEmuIds) {
+            affectedEmuIds.add(emuId);
         }
 
         const assets = await loadProbeAssets();
-        const detectionGroups = collectDetectionGroupsFromEmuCodes(
-            Array.from(affectedEmuCodes),
+        const detectionGroups = collectDetectionGroupsFromEmuIds(
+            Array.from(affectedEmuIds),
             assets
         );
         for (const detectionGroup of detectionGroups) {
@@ -424,13 +420,13 @@ export async function deleteAdminDailyRoute(
     }
 
     return {
-        date: route.service_date,
+        date: formatExternalServiceDate(route.service_date),
         routeId,
         wasToday,
         deletedDailyRoute: true,
         deletedProbeStatusRows,
         clearedRuntimeTrainKey,
-        clearedRuntimeEmuCodes,
+        clearedRuntimeEmuCodes: clearedRuntimeEmuIds.map(formatExternalEmuCode),
         clearedDetectionGroups
     };
 }

@@ -9,13 +9,19 @@ import {
     recordCurrentTrainProvenanceEventsForTrainCodes
 } from '~/server/services/trainProvenanceRecorder';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
+import {
+    formatTrainCode,
+    trainCodeKey,
+    type TrainCodeParts
+} from '~/server/utils/12306/trainCode';
 import fetchRouteInfo from '~/server/utils/12306/network/fetchRouteInfo';
 import queryWithRetry from '~/server/utils/12306/scheduleProbe/queryWithRetry';
 import { normalizeRouteGroupDayOffsets } from '~/server/utils/12306/scheduleProbe/normalizeRouteDayOffsets';
 import {
     buildCodeIndex,
     buildGroupIndex,
-    getGroupKey
+    getGroupKey,
+    uniqueTrainCodes
 } from '~/server/utils/12306/scheduleProbe/taskHelpers';
 import {
     toScheduleStationMap,
@@ -23,7 +29,6 @@ import {
 } from '~/server/utils/12306/scheduleProbe/mapRouteStops';
 import uniqueNormalizedCodes from '~/server/utils/12306/uniqueNormalizedCodes';
 import { appendRouteRefreshQueueTrainCodes } from '~/server/utils/12306/scheduleProbe/stateStore';
-import { LEGACY_SCHEDULE_JSON_PATH } from '~/server/utils/12306/scheduleProbe/constants';
 import {
     getScheduleDatabaseFilePath,
     listScheduleCandidateItemRecordsForCodes,
@@ -32,6 +37,7 @@ import {
     type ScheduleItemRecord
 } from '~/server/utils/12306/scheduleProbe/sqliteStore';
 import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
+import { serviceDateToDay } from '~/server/utils/date/serviceDay';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
 import {
     createEmptyStationPlatformInfoRefreshResult,
@@ -56,7 +62,7 @@ const logger = getLogger('task-executor:refresh-route-batch');
 let registered = false;
 
 interface RefreshRouteBatchTaskArgs {
-    codes: string[];
+    codes: TrainCodeParts[];
 }
 
 export interface RefreshRouteBatchResult {
@@ -71,8 +77,8 @@ export interface RefreshRouteBatchResult {
 interface RefreshRouteGroupUpdate {
     changed: boolean;
     attempts: number;
-    codes: string[];
-    allCodes: string[];
+    codes: TrainCodeParts[];
+    allCodes: TrainCodeParts[];
     bureauCode: string;
     trainStyle: string;
     trainDepartment: string;
@@ -102,16 +108,24 @@ function parseTaskArgs(
     }
 
     const deduplication = new Set<string>();
-    const codes: string[] = [];
-    for (const value of maybeCodes) {
-        if (typeof value !== 'string') {
+    const codes: TrainCodeParts[] = [];
+    for (const [index, value] of maybeCodes.entries()) {
+        if (
+            value === null ||
+            typeof value !== 'object' ||
+            typeof (value as { prefix?: unknown }).prefix !== 'string' ||
+            typeof (value as { number?: unknown }).number !== 'number'
+        ) {
+            throw new Error(
+                `task arguments codes[${index}] must be a train code object`
+            );
+        }
+        const normalized = value as TrainCodeParts;
+        const key = trainCodeKey(normalized);
+        if (deduplication.has(key)) {
             continue;
         }
-        const normalized = normalizeCode(value);
-        if (normalized.length === 0 || deduplication.has(normalized)) {
-            continue;
-        }
-        deduplication.add(normalized);
+        deduplication.add(key);
         codes.push(normalized);
         if (codes.length >= maxBatchSize) {
             break;
@@ -123,7 +137,7 @@ function parseTaskArgs(
 
 function getStopPrimaryMetadataKey(stop: ScheduleStop) {
     const stationTelecode = normalizeCode(stop.stationTelecode);
-    const stationTrainCode = normalizeCode(stop.stationTrainCode);
+    const stationTrainCode = trainCodeKey(stop.stationTrainCode);
     if (stationTelecode.length === 0 || stationTrainCode.length === 0) {
         return '';
     }
@@ -210,7 +224,7 @@ function applyGroupUpdate(
     const codeIndex = buildCodeIndex(items);
     let applied = false;
     for (const code of update.codes) {
-        const itemIndex = codeIndex.get(code);
+        const itemIndex = codeIndex.get(trainCodeKey(code));
         if (itemIndex === undefined) {
             continue;
         }
@@ -227,7 +241,7 @@ function applyGroupUpdate(
         item.endAt = update.endAt;
         item.lastRouteRefreshAt = update.lastRouteRefreshAt;
         item.stops = mergeStopMetadata(update.stops, item.stops);
-        if (item.internalCode.length === 0 && update.internalCode.length > 0) {
+        if (!item.internalCode && update.internalCode) {
             item.internalCode = update.internalCode;
         }
         applied = true;
@@ -237,12 +251,20 @@ function applyGroupUpdate(
 }
 
 function getRefreshRouteGroupTrainCodes(update: RefreshRouteGroupUpdate) {
-    return uniqueNormalizedCodes([...update.codes, ...update.allCodes]);
+    const seen = new Set<string>();
+    return [...update.codes, ...update.allCodes].filter((code) => {
+        const key = trainCodeKey(code);
+        if (seen.has(key)) {
+            return false;
+        }
+        seen.add(key);
+        return true;
+    });
 }
 
 function recordRefreshRouteGroupSucceeded(
-    serviceDate: string,
-    requestedCodes: string[],
+    serviceDate: ScheduleState['date'],
+    requestedCodes: TrainCodeParts[],
     update: RefreshRouteGroupUpdate
 ) {
     const trainCodes = getRefreshRouteGroupTrainCodes(update);
@@ -271,8 +293,8 @@ function recordRefreshRouteGroupSucceeded(
 }
 
 function recordRefreshRouteGroupFailed(
-    serviceDate: string,
-    requestedCodes: string[],
+    serviceDate: ScheduleState['date'],
+    requestedCodes: TrainCodeParts[],
     update: RefreshRouteGroupUpdate,
     result: string,
     errorMessage = ''
@@ -299,11 +321,12 @@ function recordRefreshRouteGroupFailed(
 }
 
 export async function refreshRouteBatchForCodes(
-    codes: readonly string[]
+    codes: readonly TrainCodeParts[]
 ): Promise<RefreshRouteBatchResult> {
     const config = useConfig();
     const retryAttempts = config.spider.scheduleProbe.retryAttempts;
-    const requestedCodes = uniqueNormalizedCodes([...codes]);
+    const requestedTrainCodes = uniqueTrainCodes([...codes]);
+    const requestedCodes = requestedTrainCodes;
     if (requestedCodes.length === 0) {
         markCurrentTrainProvenanceTaskSkipped('empty_codes');
         logger.info('skip empty_codes');
@@ -317,7 +340,6 @@ export async function refreshRouteBatchForCodes(
         };
     }
 
-    const scheduleStorePath = LEGACY_SCHEDULE_JSON_PATH;
     const scheduleFilePath = getScheduleDatabaseFilePath();
     const published = loadScheduleStateSummaryByKind('published');
     if (!published) {
@@ -332,7 +354,7 @@ export async function refreshRouteBatchForCodes(
             stationBoardQueueAppendedCount: 0
         };
     }
-    const currentDate = getCurrentDateString();
+    const currentDate = serviceDateToDay(getCurrentDateString());
     if (published.date !== currentDate) {
         markCurrentTrainProvenanceTaskSkipped('schedule_not_current');
         logger.warn(
@@ -350,15 +372,24 @@ export async function refreshRouteBatchForCodes(
 
     const initialRecords = listScheduleCandidateItemRecordsForCodes(
         'published',
-        { aliasCodes: requestedCodes }
+        { aliasCodes: requestedTrainCodes }
     );
-    const groupInternalCodes = uniqueNormalizedCodes(
-        initialRecords.map((record) => record.item.internalCode)
-    );
+    const groupInternalCodes: string[] = [];
+    const groupInternalCodeKeys = new Set<string>();
+    for (const record of initialRecords) {
+        if (!record.item.internalCode) {
+            continue;
+        }
+        const key = normalizeCode(record.item.internalCode);
+        if (!groupInternalCodeKeys.has(key)) {
+            groupInternalCodeKeys.add(key);
+            groupInternalCodes.push(record.item.internalCode);
+        }
+    }
     const targetRecords = listScheduleCandidateItemRecordsForCodes(
         'published',
         {
-            aliasCodes: requestedCodes,
+            aliasCodes: requestedTrainCodes,
             internalCodes: groupInternalCodes
         }
     );
@@ -376,8 +407,8 @@ export async function refreshRouteBatchForCodes(
     let mutated = false;
     let stationUpdates: ScheduleStationMap = {};
 
-    for (const code of requestedCodes) {
-        const itemIndex = codeIndex.get(code);
+    for (const code of requestedTrainCodes) {
+        const itemIndex = codeIndex.get(trainCodeKey(code));
         if (itemIndex === undefined) {
             continue;
         }
@@ -423,7 +454,7 @@ export async function refreshRouteBatchForCodes(
                 }
             );
             logger.debug(
-                `refresh_failed code=${item.code} attempts=${routeResult.attempts} groupSize=${groupItemIndexes.length}`
+                `refresh_failed code=${formatTrainCode(item.code)} attempts=${routeResult.attempts} groupSize=${groupItemIndexes.length}`
             );
             continue;
         }
@@ -439,8 +470,7 @@ export async function refreshRouteBatchForCodes(
         const nextStartStation = routeResult.data.route.startStation.trim();
         const nextEndStation = routeResult.data.route.endStation.trim();
         const refreshedAt = getNowSeconds();
-        const refreshedInternalCode =
-            routeResult.data.route.internalCode.trim();
+        const refreshedInternalCode = routeResult.data.route.internalCode;
         const nextAllCodes = [...routeResult.data.route.allCodes];
         const nextBureauCode = routeResult.data.route.bureauCode.trim();
         const nextTrainStyle = routeResult.data.route.trainStyle.trim();
@@ -461,7 +491,7 @@ export async function refreshRouteBatchForCodes(
         const shiftSeconds = normalizeRouteGroupDayOffsets([normalizedRoute]);
         if (shiftSeconds > 0) {
             logger.info(
-                `normalize_route_day_offsets groupKey=${groupKey} trainCode=${item.code} shiftSeconds=${shiftSeconds} groupSize=${groupItemIndexes.length}`
+                `normalize_route_day_offsets groupKey=${groupKey} trainCode=${formatTrainCode(item.code)} shiftSeconds=${shiftSeconds} groupSize=${groupItemIndexes.length}`
             );
         }
         const normalizedStartAt = normalizedRoute.startAt;
@@ -495,10 +525,7 @@ export async function refreshRouteBatchForCodes(
             groupItem.stops = mergedStops.map((stop) => ({
                 ...stop
             }));
-            if (
-                groupItem.internalCode.length === 0 &&
-                refreshedInternalCode.length > 0
-            ) {
+            if (!groupItem.internalCode && refreshedInternalCode) {
                 groupItem.internalCode = refreshedInternalCode;
             }
         }
@@ -508,9 +535,7 @@ export async function refreshRouteBatchForCodes(
         groupUpdates.push({
             changed: false,
             attempts: routeResult.attempts,
-            codes: groupItemIndexes.map((index) =>
-                normalizeCode(targetItems[index]!.code)
-            ),
+            codes: groupItemIndexes.map((index) => targetItems[index]!.code),
             allCodes: nextAllCodes,
             bureauCode: nextBureauCode,
             trainStyle: nextTrainStyle,
@@ -531,7 +556,7 @@ export async function refreshRouteBatchForCodes(
     }
 
     if (mutated) {
-        const updatedCodes = uniqueNormalizedCodes(
+        const updatedCodes = uniqueTrainCodes(
             groupUpdates.flatMap((update) => update.codes)
         );
         const latestRecords = listScheduleCandidateItemRecordsForCodes(
@@ -540,7 +565,7 @@ export async function refreshRouteBatchForCodes(
         );
         const latestItems = latestRecords.map((record) => record.item);
         const appliedGroupUpdates: RefreshRouteGroupUpdate[] = [];
-        const appliedConfirmedTrainCodes: string[] = [];
+        const appliedConfirmedTrainCodes: TrainCodeParts[] = [];
         for (const update of groupUpdates) {
             if (applyGroupUpdate(latestItems, update)) {
                 appliedGroupUpdates.push(update);
@@ -557,13 +582,13 @@ export async function refreshRouteBatchForCodes(
         if (appliedGroupUpdates.length > 0) {
             const itemIndexByCode = new Map(
                 latestRecords.map((record) => [
-                    normalizeCode(record.item.code),
+                    trainCodeKey(record.item.code),
                     record.itemIndex
                 ])
             );
             const recordsToSave: ScheduleItemRecord[] = latestItems.map(
                 (item) => ({
-                    itemIndex: itemIndexByCode.get(normalizeCode(item.code))!,
+                    itemIndex: itemIndexByCode.get(trainCodeKey(item.code))!,
                     item
                 })
             );
@@ -608,12 +633,12 @@ export async function refreshRouteBatchForCodes(
                     `history_sync date=${published.date} confirmedGroups=${syncResult.confirmedGroups} confirmedTrainCodes=${syncResult.confirmedTrainCodes} skippedGroups=${syncResult.skippedGroups} createdContents=${syncResult.createdContents} insertedCoverages=${syncResult.insertedCoverages} updatedCoverages=${syncResult.updatedCoverages} deletedCoverages=${syncResult.deletedCoverages} noopedCoverages=${syncResult.noopedCoverages}`
                 );
                 const timetableChangedTrainCodes = new Set(
-                    syncResult.timetableChangedTrainCodes
+                    syncResult.timetableChangedTrainCodes.map(trainCodeKey)
                 );
                 const appliedChangedGroupUpdates = appliedGroupUpdates.filter(
                     (update) =>
                         update.codes.some((code) =>
-                            timetableChangedTrainCodes.has(code)
+                            timetableChangedTrainCodes.has(trainCodeKey(code))
                         )
                 );
                 for (const update of appliedChangedGroupUpdates) {
@@ -622,7 +647,6 @@ export async function refreshRouteBatchForCodes(
                 changed += appliedChangedGroupUpdates.length;
 
                 const appendedQueueEntries = appendRouteRefreshQueueTrainCodes(
-                    scheduleStorePath,
                     published.date,
                     syncResult.timetableChangedTrainCodes,
                     getNowSeconds()
@@ -662,7 +686,7 @@ export async function refreshRouteBatchForCodes(
                     }
                 ];
                 for (const batch of stationPlatformRefreshBatches) {
-                    const trainCodes = uniqueNormalizedCodes(
+                    const trainCodes = uniqueTrainCodes(
                         batch.updates.flatMap((update) => update.codes)
                     );
                     if (trainCodes.length === 0) {
@@ -737,9 +761,9 @@ export async function refreshRouteBatchForCodes(
     };
 }
 
-async function executeRefreshRouteBatchTaskInternal(rawArgs: unknown) {
-    const batchSize = useConfig().spider.scheduleProbe.refresh.batchSize;
-    const args = parseTaskArgs(rawArgs, batchSize);
+async function executeRefreshRouteBatchTaskInternal(
+    args: RefreshRouteBatchTaskArgs
+) {
     const result = await refreshRouteBatchForCodes(args.codes);
     if (result.stationBoardQueueAppendedCount > 0) {
         const taskId = enqueueStationBoardDispatchTask('auto');
@@ -749,17 +773,18 @@ async function executeRefreshRouteBatchTaskInternal(rawArgs: unknown) {
     }
 }
 
-async function executeRefreshRouteBatchTask(rawArgs: unknown) {
-    await executeRefreshRouteBatchTaskInternal(rawArgs);
-}
-
 export function registerRefreshRouteBatchTaskExecutor() {
     if (registered) {
         return;
     }
 
-    registerTaskExecutor(REFRESH_ROUTE_BATCH_TASK_EXECUTOR, async (args) => {
-        await executeRefreshRouteBatchTask(args);
+    registerTaskExecutor(REFRESH_ROUTE_BATCH_TASK_EXECUTOR, {
+        parse: (raw) =>
+            parseTaskArgs(
+                raw,
+                useConfig().spider.scheduleProbe.refresh.batchSize
+            ),
+        execute: executeRefreshRouteBatchTaskInternal
     });
     registered = true;
     logger.info(`registered executor=${REFRESH_ROUTE_BATCH_TASK_EXECUTOR}`);

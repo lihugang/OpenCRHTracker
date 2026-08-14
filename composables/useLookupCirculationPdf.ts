@@ -13,8 +13,8 @@ import type {
 } from 'pdfjs-dist/types/src/display/api';
 import useLookupCirculationAssetExport from '~/composables/useLookupCirculationAssetExport';
 import useLookupCirculationPdfFullscreenControls from '~/composables/useLookupCirculationPdfFullscreenControls';
-import type { TrackerApiResponse } from '~/types/homepage';
 import type { CirculationPdfState } from '~/types/lookupCurrentTimetable';
+import { fetchTrainCirculationImageRaw } from '~/utils/api/v2/domain/lookup';
 import getApiErrorMessage from '~/utils/api/getApiErrorMessage';
 import { normalizeComparableCode } from '~/utils/lookup/timetableDisplay';
 
@@ -773,28 +773,6 @@ export default function useLookupCirculationPdf(options: {
         void requestFullscreenRender(activeRequestToken);
     }
 
-    async function createPreviewHttpError(response: Response) {
-        const fallbackMessage = `HTTP ${response.status}`;
-
-        try {
-            const payload = (await response.json()) as Partial<
-                TrackerApiResponse<never>
-            >;
-            if (
-                payload &&
-                payload.ok === false &&
-                typeof payload.data === 'string' &&
-                payload.data.length > 0
-            ) {
-                return new Error(payload.data);
-            }
-        } catch {
-            // Ignore malformed error bodies and keep the HTTP fallback.
-        }
-
-        return new Error(fallbackMessage);
-    }
-
     async function loadPreview(requestTrainCode: string) {
         if (!import.meta.client) {
             return;
@@ -809,25 +787,20 @@ export default function useLookupCirculationPdf(options: {
         });
 
         try {
-            const response = await fetch(
-                `/api/v1/timetable/train/${encodeURIComponent(requestTrainCode)}/circulation/image?format=pdf&binary=true`,
-                {
-                    credentials: 'same-origin'
-                }
-            );
+            const pdfArrayBuffer = (await fetchTrainCirculationImageRaw(
+                requestTrainCode,
+                'pdf',
+                'arrayBuffer'
+            )) as ArrayBuffer;
             if (activeRequestToken !== requestToken) {
                 return;
             }
 
-            if (!response.ok) {
-                throw await createPreviewHttpError(response);
+            const pdfBytes = new Uint8Array(pdfArrayBuffer);
+            if (pdfBytes.byteLength === 0) {
+                throw new Error('交路图 PDF 响应为空');
             }
-
-            const pdfBytes = new Uint8Array(await response.arrayBuffer());
-            if (
-                activeRequestToken !== requestToken ||
-                pdfBytes.byteLength === 0
-            ) {
+            if (activeRequestToken !== requestToken) {
                 return;
             }
 

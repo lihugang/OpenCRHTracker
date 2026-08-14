@@ -65,7 +65,7 @@ export default defineNuxtConfig({
             '/oauth/token': {
                 csurf: false
             },
-            '/api/v1/notifications/send': {
+            '/api/v2/notifications/send': {
                 csurf: false
             }
         },

@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package opencrh.v2;
+
+import "opencrh/v2/identifiers.proto";
+
+// Historical timetable summaries and resource mapping blocks.
+
+message TimetableStop {
+  uint32 station_no = 1;
+  string station_name = 2;
+  optional int64 arrive_offset = 3;
+  optional int64 depart_offset = 4;
+  TrainCode station_train_code = 5;
+  bool is_start = 6;
+  bool is_end = 7;
+}
+
+message HistoricalTimetableSummary {
+  optional string start_station = 1;
+  optional string end_station = 2;
+  optional int64 start_offset = 3;
+  optional int64 end_offset = 4;
+}
+
+message HistoricalTimetableContent {
+  uint32 timetable_id = 1;
+  optional string start_station = 2;
+  optional string end_station = 3;
+  optional int64 start_offset = 4;
+  optional int64 end_offset = 5;
+  repeated TimetableStop stops = 6;
+}

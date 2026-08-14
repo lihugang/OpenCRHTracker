@@ -1,14 +1,17 @@
 import getLogger from '~/server/libs/log4js';
 import { listLatestDailyRoutesByTrainCode } from '~/server/services/emuRoutesStore';
 import { getTodayScheduleProbeGroups } from '~/server/services/todayScheduleCache';
-import normalizeCode from '~/server/utils/12306/normalizeCode';
-import uniqueNormalizedCodes from '~/server/utils/12306/uniqueNormalizedCodes';
+import {
+    trainCodeKey,
+    type TrainCodeParts
+} from '~/server/utils/12306/trainCode';
+import type { EmuId } from '~/server/libs/database/emu';
 import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
 
 interface HistoricalRecentTrainEmuIndexCache {
     currentDate: string;
     scheduleFingerprint: string;
-    trainToEmuCodes: Map<string, string[]>;
+    trainToEmuIds: Map<string, EmuId[]>;
 }
 
 const logger = getLogger('historical-recent-train-emu-index');
@@ -16,58 +19,66 @@ const LATEST_RECORD_LIMIT = 2;
 
 let cached: HistoricalRecentTrainEmuIndexCache | null = null;
 
-function collectCurrentScheduleTrainCodes() {
-    const trainCodes = new Set<string>();
+function collectCurrentScheduleTrainCodes(): TrainCodeParts[] {
+    const seen = new Set<string>();
+    const trainCodes: TrainCodeParts[] = [];
 
     for (const group of getTodayScheduleProbeGroups().values()) {
-        for (const trainCode of uniqueNormalizedCodes([
-            group.trainCode,
-            ...group.allCodes
-        ])) {
-            trainCodes.add(trainCode);
+        for (const trainCode of [group.trainCode, ...group.allCodes]) {
+            const key = trainCodeKey(trainCode);
+            if (seen.has(key)) {
+                continue;
+            }
+            seen.add(key);
+            trainCodes.push(trainCode);
         }
     }
 
-    return Array.from(trainCodes.values()).sort((left, right) =>
-        left.localeCompare(right)
+    return trainCodes.sort((left, right) =>
+        trainCodeKey(left).localeCompare(trainCodeKey(right))
     );
 }
 
-function buildScheduleFingerprint(trainCodes: string[]) {
-    return trainCodes.join('|');
+function buildScheduleFingerprint(trainCodes: TrainCodeParts[]) {
+    return trainCodes.map(trainCodeKey).join('|');
 }
 
 function rebuildCache(): HistoricalRecentTrainEmuIndexCache {
     const currentDate = getCurrentDateString();
     const trainCodes = collectCurrentScheduleTrainCodes();
     const scheduleFingerprint = buildScheduleFingerprint(trainCodes);
-    const trainToEmuCodes = new Map<string, string[]>();
+    const trainToEmuIds = new Map<string, EmuId[]>();
 
     for (const trainCode of trainCodes) {
         const latestRows = listLatestDailyRoutesByTrainCode(
             trainCode,
             LATEST_RECORD_LIMIT
         );
-        const emuCodes = uniqueNormalizedCodes(
-            latestRows
-                .map((row) => normalizeCode(row.emu_code))
-                .filter((emuCode) => emuCode.length > 0)
-        );
+        const seenEmuIds = new Set<number>();
+        const emuIds: EmuId[] = [];
+        for (const row of latestRows) {
+            const emuId = Number(row.emu_id);
+            if (seenEmuIds.has(emuId)) {
+                continue;
+            }
+            seenEmuIds.add(emuId);
+            emuIds.push(row.emu_id);
+        }
 
-        if (emuCodes.length > 0) {
-            trainToEmuCodes.set(trainCode, emuCodes);
+        if (emuIds.length > 0) {
+            trainToEmuIds.set(trainCodeKey(trainCode), emuIds);
         }
     }
 
     const nextCache: HistoricalRecentTrainEmuIndexCache = {
         currentDate,
         scheduleFingerprint,
-        trainToEmuCodes
+        trainToEmuIds
     };
 
     cached = nextCache;
     logger.info(
-        `rebuilt currentDate=${currentDate} trainCodes=${trainCodes.length} matchedTrainCodes=${trainToEmuCodes.size} latestRecordLimit=${LATEST_RECORD_LIMIT}`
+        `rebuilt currentDate=${currentDate} trainCodes=${trainCodes.length} matchedTrainCodes=${trainToEmuIds.size} latestRecordLimit=${LATEST_RECORD_LIMIT}`
     );
     return nextCache;
 }
@@ -93,12 +104,7 @@ export function warmHistoricalRecentTrainEmuIndex(): void {
 }
 
 export function getHistoricalRecentEmuCodesByTrainCode(
-    trainCode: string
-): string[] {
-    const normalizedTrainCode = normalizeCode(trainCode);
-    if (normalizedTrainCode.length === 0) {
-        return [];
-    }
-
-    return getActiveCache().trainToEmuCodes.get(normalizedTrainCode) ?? [];
+    trainCode: TrainCodeParts
+): EmuId[] {
+    return getActiveCache().trainToEmuIds.get(trainCodeKey(trainCode)) ?? [];
 }

@@ -1,13 +1,24 @@
 import { useTrainProvenanceDatabase } from '~/server/libs/database/trainProvenance';
+import { asEmuId, type EmuId } from '~/server/libs/database/emu';
 import { createPreparedSqlStore } from '~/server/libs/database/prepared';
 import useConfig from '~/server/config';
 import importSqlBatch from '~/server/utils/sql/importSqlBatch';
-import normalizeCode from '~/server/utils/12306/normalizeCode';
-import uniqueNormalizedCodes from '~/server/utils/12306/uniqueNormalizedCodes';
-import getCurrentDateString, {
-    formatShanghaiDateString
-} from '~/server/utils/date/getCurrentDateString';
+import {
+    trainCodeKey,
+    type TrainCodeParts
+} from '~/server/utils/12306/trainCode';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
+import {
+    parseInternalJson,
+    parseInternalJsonField,
+    stringifyInternalJson,
+    stringifyInternalJsonField
+} from '~/server/utils/internal/storageValues';
+import {
+    asServiceDay,
+    unixSecondsToServiceDay,
+    type ServiceDay
+} from '~/server/utils/date/serviceDay';
 
 export type TrainProvenanceTaskRunStatus =
     | 'running'
@@ -78,10 +89,11 @@ interface TrainProvenanceTaskRunRow {
     status: TrainProvenanceTaskRunStatus;
     error_message: string;
     task_args_json: string;
-    service_date: string;
-    primary_train_code: string;
+    service_date: number;
+    primary_train_prefix: string;
+    primary_train_number: number;
     primary_start_at: number | null;
-    primary_emu_code: string;
+    primary_emu_id: number | null;
 }
 
 interface TrainProvenanceEventRow {
@@ -91,12 +103,14 @@ interface TrainProvenanceEventRow {
     executor: string;
     task_status: TrainProvenanceTaskRunStatus;
     created_at: number;
-    service_date: string;
-    train_code: string;
+    service_date: number;
+    train_prefix: string;
+    train_number: number;
     start_at: number | null;
-    emu_code: string;
-    related_train_code: string;
-    related_emu_code: string;
+    emu_id: number | null;
+    related_train_prefix: string;
+    related_train_number: number;
+    related_emu_id: number | null;
     event_type: string;
     result: string;
     linked_scheduler_task_id: number | null;
@@ -108,16 +122,18 @@ interface CouplingScanCandidateRow {
     id: number;
     task_run_id: number;
     candidate_order: number;
-    service_date: string;
+    service_date: number;
     bureau: string;
     model: string;
-    candidate_emu_code: string;
+    candidate_emu_id: number;
     status: string;
     reason: string;
-    scanned_train_code: string;
+    scanned_train_prefix: string;
+    scanned_train_number: number;
     scanned_internal_code: string;
     scanned_start_at: number | null;
-    matched_train_code: string;
+    matched_train_prefix: string;
+    matched_train_number: number;
     matched_start_at: number | null;
     train_repeat: string;
     detail_json: string;
@@ -126,7 +142,7 @@ interface CouplingScanCandidateRow {
 
 interface RequestHourlyStatRow {
     bucket_start: number;
-    service_date: string;
+    service_date: number;
     request_type: string;
     is_success: number;
     request_count: number;
@@ -135,7 +151,7 @@ interface RequestHourlyStatRow {
 
 interface StationBoardDispatchResultRow {
     task_run_id: number;
-    service_date: string;
+    service_date: number;
     candidate_group_count: number;
     selected_station_count: number;
     selected_stations_json: string;
@@ -149,7 +165,7 @@ interface StationBoardDispatchResultRow {
 
 interface StationBoardFetchResultRow {
     task_run_id: number;
-    service_date: string;
+    service_date: number;
     parent_scheduler_task_id: number | null;
     station_name: string;
     station_telecode: string;
@@ -165,9 +181,10 @@ interface StationBoardFetchResultRow {
 interface StationPlatformRefreshResultRow {
     id: number;
     task_run_id: number;
-    service_date: string;
+    service_date: number;
     start_at: number | null;
-    primary_train_code: string;
+    primary_train_prefix: string;
+    primary_train_number: number;
     train_codes_json: string;
     trigger: StationPlatformRefreshTrigger;
     status: StationPlatformRefreshStatus;
@@ -189,7 +206,7 @@ interface StationPlatformRefreshEntryRow {
     station_name: string;
     station_telecode: string;
     station_no: number;
-    train_date: string;
+    train_date: number;
     station_train_codes_json: string;
     attempted_train_codes_json: string;
     status: StationPlatformRefreshEntryStatus;
@@ -209,10 +226,10 @@ export interface TrainProvenanceTaskRunRecord {
     status: TrainProvenanceTaskRunStatus;
     errorMessage: string;
     taskArgs: unknown;
-    serviceDate: string;
-    primaryTrainCode: string;
+    serviceDate: ServiceDay;
+    primaryTrainCode: TrainCodeParts | null;
     primaryStartAt: number | null;
-    primaryEmuCode: string;
+    primaryEmuId: EmuId | null;
 }
 
 export interface TrainProvenanceEventRecord {
@@ -222,12 +239,12 @@ export interface TrainProvenanceEventRecord {
     executor: string;
     taskStatus: TrainProvenanceTaskRunStatus;
     createdAt: number;
-    serviceDate: string;
-    trainCode: string;
+    serviceDate: ServiceDay;
+    trainCode: TrainCodeParts | null;
     startAt: number | null;
-    emuCode: string;
-    relatedTrainCode: string;
-    relatedEmuCode: string;
+    emuId: EmuId | null;
+    relatedTrainCode: TrainCodeParts | null;
+    relatedEmuId: EmuId | null;
     eventType: string;
     result: string;
     linkedSchedulerTaskId: number | null;
@@ -239,16 +256,16 @@ export interface CouplingScanCandidateRecord {
     id: number;
     taskRunId: number;
     candidateOrder: number;
-    serviceDate: string;
+    serviceDate: ServiceDay;
     bureau: string;
     model: string;
-    candidateEmuCode: string;
+    candidateEmuId: EmuId;
     status: string;
     reason: string;
-    scannedTrainCode: string;
+    scannedTrainCode: TrainCodeParts | null;
     scannedInternalCode: string;
     scannedStartAt: number | null;
-    matchedTrainCode: string;
+    matchedTrainCode: TrainCodeParts | null;
     matchedStartAt: number | null;
     trainRepeat: string;
     detail: unknown;
@@ -257,7 +274,7 @@ export interface CouplingScanCandidateRecord {
 
 export interface TrainProvenanceRequestHourlyStatRecord {
     bucketStart: number;
-    serviceDate: string;
+    serviceDate: ServiceDay;
     requestType: string;
     isSuccess: boolean;
     requestCount: number;
@@ -266,7 +283,7 @@ export interface TrainProvenanceRequestHourlyStatRecord {
 
 export interface StationBoardDispatchResultRecord {
     taskRunId: number;
-    serviceDate: string;
+    serviceDate: ServiceDay;
     candidateGroupCount: number;
     selectedStationCount: number;
     selectedStations: unknown;
@@ -280,7 +297,7 @@ export interface StationBoardDispatchResultRecord {
 
 export interface StationBoardFetchResultRecord {
     taskRunId: number;
-    serviceDate: string;
+    serviceDate: ServiceDay;
     parentSchedulerTaskId: number | null;
     stationName: string;
     stationTelecode: string;
@@ -301,9 +318,9 @@ export interface StationPlatformRefreshEntryRecord {
     stationName: string;
     stationTelecode: string;
     stationNo: number;
-    trainDate: string;
-    stationTrainCodes: string[];
-    attemptedTrainCodes: string[];
+    trainDate: ServiceDay;
+    stationTrainCodes: TrainCodeParts[];
+    attemptedTrainCodes: TrainCodeParts[];
     status: StationPlatformRefreshEntryStatus;
     platformNo: number | null;
     wicket: string | null;
@@ -314,10 +331,10 @@ export interface StationPlatformRefreshEntryRecord {
 export interface StationPlatformRefreshResultRecord {
     id: number;
     taskRunId: number;
-    serviceDate: string;
+    serviceDate: ServiceDay;
     startAt: number | null;
-    primaryTrainCode: string;
-    trainCodes: string[];
+    primaryTrainCode: TrainCodeParts | null;
+    trainCodes: TrainCodeParts[];
     trigger: StationPlatformRefreshTrigger;
     status: StationPlatformRefreshStatus;
     candidateCount: number;
@@ -337,22 +354,22 @@ export interface StartTrainProvenanceTaskRunInput {
     executionTime: number;
     startedAt: number;
     taskArgs: unknown;
-    serviceDate?: string;
-    primaryTrainCode?: string;
+    serviceDate: ServiceDay;
+    primaryTrainCode: TrainCodeParts | null;
     primaryStartAt?: number | null;
-    primaryEmuCode?: string;
+    primaryEmuId?: EmuId | null;
 }
 
 export interface RecordTrainProvenanceEventInput {
     taskRunId: number;
     sequenceNo: number;
     createdAt?: number;
-    serviceDate?: string;
-    trainCode?: string;
+    serviceDate: ServiceDay;
+    trainCode?: TrainCodeParts | null;
     startAt?: number | null;
-    emuCode?: string;
-    relatedTrainCode?: string;
-    relatedEmuCode?: string;
+    emuId?: EmuId | null;
+    relatedTrainCode?: TrainCodeParts | null;
+    relatedEmuId?: EmuId | null;
     eventType: string;
     result?: string;
     linkedSchedulerTaskId?: number | null;
@@ -362,16 +379,16 @@ export interface RecordTrainProvenanceEventInput {
 export interface RecordCouplingScanCandidateInput {
     taskRunId: number;
     candidateOrder: number;
-    serviceDate?: string;
+    serviceDate: ServiceDay;
     bureau?: string;
     model?: string;
-    candidateEmuCode: string;
+    candidateEmuId: EmuId;
     status: string;
     reason?: string;
-    scannedTrainCode?: string;
+    scannedTrainCode?: TrainCodeParts | null;
     scannedInternalCode?: string;
     scannedStartAt?: number | null;
-    matchedTrainCode?: string;
+    matchedTrainCode?: TrainCodeParts | null;
     matchedStartAt?: number | null;
     trainRepeat?: string;
     detail?: unknown;
@@ -386,7 +403,7 @@ export interface Record12306RequestHourlyStatInput {
 
 export interface RecordStationBoardDispatchResultInput {
     taskRunId: number;
-    serviceDate: string;
+    serviceDate: ServiceDay;
     candidateGroupCount: number;
     selectedStations: unknown;
     createdTaskCount: number;
@@ -399,7 +416,7 @@ export interface RecordStationBoardDispatchResultInput {
 
 export interface RecordStationBoardFetchResultInput {
     taskRunId: number;
-    serviceDate: string;
+    serviceDate: ServiceDay;
     parentSchedulerTaskId?: number | null;
     stationName: string;
     stationTelecode: string;
@@ -418,9 +435,9 @@ export interface RecordStationPlatformRefreshEntryInput {
     stationName: string;
     stationTelecode: string;
     stationNo: number;
-    trainDate: string;
-    stationTrainCodes: string[];
-    attemptedTrainCodes: string[];
+    trainDate: ServiceDay;
+    stationTrainCodes: TrainCodeParts[];
+    attemptedTrainCodes: TrainCodeParts[];
     status: StationPlatformRefreshEntryStatus;
     platformNo?: number | null;
     wicket?: string | null;
@@ -430,10 +447,10 @@ export interface RecordStationPlatformRefreshEntryInput {
 
 export interface RecordStationPlatformRefreshResultInput {
     taskRunId: number;
-    serviceDate: string;
+    serviceDate: ServiceDay;
     startAt?: number | null;
-    primaryTrainCode: string;
-    trainCodes: string[];
+    primaryTrainCode: TrainCodeParts;
+    trainCodes: TrainCodeParts[];
     trigger: StationPlatformRefreshTrigger;
     status: StationPlatformRefreshStatus;
     entries: RecordStationPlatformRefreshEntryInput[];
@@ -459,55 +476,70 @@ const trainProvenanceStatements = createPreparedSqlStore<TrainProvenanceSqlKey>(
 let lastCleanupAt = 0;
 
 function parseJson(text: string): unknown {
-    try {
-        return JSON.parse(text);
-    } catch {
-        return null;
-    }
-}
-
-function parseNormalizedCodes(text: string): string[] {
-    const value = parseJson(text);
-    return Array.isArray(value)
-        ? uniqueNormalizedCodes(
-              value.filter((item): item is string => typeof item === 'string')
-          )
-        : [];
+    return parseInternalJson(text);
 }
 
 function stringifyJson(value: unknown): string {
-    try {
-        return JSON.stringify(value ?? null);
-    } catch {
-        return JSON.stringify({
-            error: 'unserializable_payload'
-        });
-    }
+    return stringifyInternalJson(value ?? null);
 }
 
-function normalizeOptionalInteger(value: unknown): number | null {
-    return typeof value === 'number' && Number.isInteger(value) && value >= 0
-        ? value
-        : null;
+function stringifyTrainCodes(value: readonly TrainCodeParts[]): string {
+    return stringifyInternalJsonField(value, 'trainCodes');
 }
 
-function normalizeServiceDate(
-    serviceDate: string | undefined,
-    startAt?: number | null
-): string {
-    if (typeof serviceDate === 'string' && /^\d{8}$/.test(serviceDate)) {
-        return serviceDate;
+function uniqueTrainCodeValues(
+    values: readonly TrainCodeParts[]
+): TrainCodeParts[] {
+    const seen = new Set<string>();
+    const result: TrainCodeParts[] = [];
+    for (const value of values) {
+        const key = trainCodeKey(value);
+        if (seen.has(key)) {
+            continue;
+        }
+        seen.add(key);
+        result.push(value);
     }
+    return result;
+}
 
-    if (
-        typeof startAt === 'number' &&
-        Number.isInteger(startAt) &&
-        startAt > 0
-    ) {
-        return formatShanghaiDateString(startAt * 1000);
+function parseTrainCodes(text: string): TrainCodeParts[] {
+    const value = parseInternalJsonField(text, 'trainCodes');
+    return Array.isArray(value)
+        ? value.map((item) => {
+              if (
+                  typeof item !== 'object' ||
+                  item === null ||
+                  typeof (item as { prefix?: unknown }).prefix !== 'string' ||
+                  typeof (item as { number?: unknown }).number !== 'number'
+              ) {
+                  throw new Error('invalid_internal_train_code');
+              }
+              return item as TrainCodeParts;
+          })
+        : [];
+}
+
+function toTrainCodeOrNull(
+    prefix: string,
+    number: number
+): TrainCodeParts | null {
+    if (prefix.length === 0 && number === 0) {
+        return null;
     }
+    return { prefix, number };
+}
 
-    return getCurrentDateString();
+function normalizeOptionalInteger(
+    value: number | null | undefined
+): number | null {
+    if (value === null || value === undefined) {
+        return null;
+    }
+    if (!Number.isInteger(value) || value < 0) {
+        throw new Error(`invalid_integer ${value}`);
+    }
+    return value;
 }
 
 function toTaskRunRecord(
@@ -523,10 +555,14 @@ function toTaskRunRecord(
         status: row.status,
         errorMessage: row.error_message,
         taskArgs: parseJson(row.task_args_json),
-        serviceDate: row.service_date,
-        primaryTrainCode: row.primary_train_code,
+        serviceDate: asServiceDay(row.service_date),
+        primaryTrainCode: toTrainCodeOrNull(
+            row.primary_train_prefix,
+            row.primary_train_number
+        ),
         primaryStartAt: row.primary_start_at,
-        primaryEmuCode: row.primary_emu_code
+        primaryEmuId:
+            row.primary_emu_id === null ? null : asEmuId(row.primary_emu_id)
     };
 }
 
@@ -540,12 +576,16 @@ function toEventRecord(
         executor: row.executor,
         taskStatus: row.task_status,
         createdAt: row.created_at,
-        serviceDate: row.service_date,
-        trainCode: row.train_code,
+        serviceDate: asServiceDay(row.service_date),
+        trainCode: toTrainCodeOrNull(row.train_prefix, row.train_number),
         startAt: row.start_at,
-        emuCode: row.emu_code,
-        relatedTrainCode: row.related_train_code,
-        relatedEmuCode: row.related_emu_code,
+        emuId: row.emu_id === null ? null : asEmuId(row.emu_id),
+        relatedTrainCode: toTrainCodeOrNull(
+            row.related_train_prefix,
+            row.related_train_number
+        ),
+        relatedEmuId:
+            row.related_emu_id === null ? null : asEmuId(row.related_emu_id),
         eventType: row.event_type,
         result: row.result,
         linkedSchedulerTaskId: row.linked_scheduler_task_id,
@@ -561,16 +601,22 @@ function toCouplingScanCandidateRecord(
         id: row.id,
         taskRunId: row.task_run_id,
         candidateOrder: row.candidate_order,
-        serviceDate: row.service_date,
+        serviceDate: asServiceDay(row.service_date),
         bureau: row.bureau,
         model: row.model,
-        candidateEmuCode: row.candidate_emu_code,
+        candidateEmuId: asEmuId(row.candidate_emu_id),
         status: row.status,
         reason: row.reason,
-        scannedTrainCode: row.scanned_train_code,
+        scannedTrainCode: toTrainCodeOrNull(
+            row.scanned_train_prefix,
+            row.scanned_train_number
+        ),
         scannedInternalCode: row.scanned_internal_code,
         scannedStartAt: row.scanned_start_at,
-        matchedTrainCode: row.matched_train_code,
+        matchedTrainCode: toTrainCodeOrNull(
+            row.matched_train_prefix,
+            row.matched_train_number
+        ),
         matchedStartAt: row.matched_start_at,
         trainRepeat: row.train_repeat,
         detail: parseJson(row.detail_json),
@@ -583,7 +629,7 @@ function toRequestHourlyStatRecord(
 ): TrainProvenanceRequestHourlyStatRecord {
     return {
         bucketStart: row.bucket_start,
-        serviceDate: row.service_date,
+        serviceDate: asServiceDay(row.service_date),
         requestType: row.request_type,
         isSuccess: row.is_success === 1,
         requestCount: row.request_count,
@@ -600,7 +646,7 @@ function toStationBoardDispatchResultRecord(
 ): StationBoardDispatchResultRecord {
     return {
         taskRunId: row.task_run_id,
-        serviceDate: row.service_date,
+        serviceDate: asServiceDay(row.service_date),
         candidateGroupCount: row.candidate_group_count,
         selectedStationCount: row.selected_station_count,
         selectedStations: parseJson(row.selected_stations_json),
@@ -618,7 +664,7 @@ function toStationBoardFetchResultRecord(
 ): StationBoardFetchResultRecord {
     return {
         taskRunId: row.task_run_id,
-        serviceDate: row.service_date,
+        serviceDate: asServiceDay(row.service_date),
         parentSchedulerTaskId: row.parent_scheduler_task_id,
         stationName: row.station_name,
         stationTelecode: row.station_telecode,
@@ -643,11 +689,9 @@ function toStationPlatformRefreshEntryRecord(
         stationName: row.station_name,
         stationTelecode: row.station_telecode,
         stationNo: row.station_no,
-        trainDate: row.train_date,
-        stationTrainCodes: parseNormalizedCodes(row.station_train_codes_json),
-        attemptedTrainCodes: parseNormalizedCodes(
-            row.attempted_train_codes_json
-        ),
+        trainDate: asServiceDay(row.train_date),
+        stationTrainCodes: parseTrainCodes(row.station_train_codes_json),
+        attemptedTrainCodes: parseTrainCodes(row.attempted_train_codes_json),
         status: row.status,
         platformNo: row.platform_no,
         wicket: row.wicket,
@@ -663,10 +707,13 @@ function toStationPlatformRefreshResultRecord(
     return {
         id: row.id,
         taskRunId: row.task_run_id,
-        serviceDate: row.service_date,
+        serviceDate: asServiceDay(row.service_date),
         startAt: row.start_at,
-        primaryTrainCode: row.primary_train_code,
-        trainCodes: parseNormalizedCodes(row.train_codes_json),
+        primaryTrainCode: toTrainCodeOrNull(
+            row.primary_train_prefix,
+            row.primary_train_number
+        ),
+        trainCodes: parseTrainCodes(row.train_codes_json),
         trigger: row.trigger,
         status: row.status,
         candidateCount: row.candidate_count,
@@ -721,10 +768,8 @@ export function startTrainProvenanceTaskRun(
 ): TrainProvenanceTaskRunRecord {
     maybeCleanupExpiredTrainProvenance(input.startedAt);
 
-    const serviceDate = normalizeServiceDate(
-        input.serviceDate,
-        input.primaryStartAt ?? null
-    );
+    const serviceDate = input.serviceDate;
+    const primaryTrain = input.primaryTrainCode;
     trainProvenanceStatements.run(
         'upsertTaskRunStart',
         input.schedulerTaskId,
@@ -733,9 +778,10 @@ export function startTrainProvenanceTaskRun(
         input.startedAt,
         stringifyJson(input.taskArgs),
         serviceDate,
-        normalizeCode(input.primaryTrainCode ?? ''),
+        primaryTrain?.prefix ?? '',
+        primaryTrain?.number ?? 0,
         normalizeOptionalInteger(input.primaryStartAt),
-        normalizeCode(input.primaryEmuCode ?? '')
+        input.primaryEmuId ?? null
     );
 
     const row = trainProvenanceStatements.get<TrainProvenanceTaskRunRow>(
@@ -772,18 +818,23 @@ export function recordTrainProvenanceEvent(
 ) {
     const createdAt = input.createdAt ?? getNowSeconds();
     maybeCleanupExpiredTrainProvenance(createdAt);
+    const eventTrain = input.trainCode ?? null;
+    const relatedTrain = input.relatedTrainCode ?? null;
+    const eventServiceDate = input.serviceDate;
 
     trainProvenanceStatements.run(
         'insertProvenanceEvent',
         input.taskRunId,
         input.sequenceNo,
         createdAt,
-        normalizeServiceDate(input.serviceDate, input.startAt ?? null),
-        normalizeCode(input.trainCode ?? ''),
+        eventServiceDate,
+        eventTrain?.prefix ?? '',
+        eventTrain?.number ?? 0,
         normalizeOptionalInteger(input.startAt),
-        normalizeCode(input.emuCode ?? ''),
-        normalizeCode(input.relatedTrainCode ?? ''),
-        normalizeCode(input.relatedEmuCode ?? ''),
+        input.emuId ?? null,
+        relatedTrain?.prefix ?? '',
+        relatedTrain?.number ?? 0,
+        input.relatedEmuId ?? null,
         input.eventType.trim(),
         input.result?.trim() ?? '',
         normalizeOptionalInteger(input.linkedSchedulerTaskId),
@@ -796,21 +847,26 @@ export function recordCouplingScanCandidate(
 ) {
     const createdAt = input.createdAt ?? getNowSeconds();
     maybeCleanupExpiredTrainProvenance(createdAt);
+    const candidateServiceDate = input.serviceDate;
+    const candidateTrain = input.scannedTrainCode ?? null;
+    const matchedTrain = input.matchedTrainCode ?? null;
 
     trainProvenanceStatements.run(
         'insertCouplingScanCandidate',
         input.taskRunId,
         input.candidateOrder,
-        normalizeServiceDate(input.serviceDate, input.scannedStartAt ?? null),
+        candidateServiceDate,
         (input.bureau ?? '').trim(),
-        normalizeCode(input.model ?? ''),
-        normalizeCode(input.candidateEmuCode),
+        (input.model ?? '').trim(),
+        input.candidateEmuId,
         input.status.trim(),
         input.reason?.trim() ?? '',
-        normalizeCode(input.scannedTrainCode ?? ''),
-        normalizeCode(input.scannedInternalCode ?? ''),
+        candidateTrain?.prefix ?? '',
+        candidateTrain?.number ?? 0,
+        input.scannedInternalCode?.trim() ?? '',
         normalizeOptionalInteger(input.scannedStartAt),
-        normalizeCode(input.matchedTrainCode ?? ''),
+        matchedTrain?.prefix ?? '',
+        matchedTrain?.number ?? 0,
         normalizeOptionalInteger(input.matchedStartAt),
         input.trainRepeat?.trim() ?? '',
         stringifyJson(input.detail),
@@ -828,7 +884,7 @@ export function record12306RequestHourlyStat(
     trainProvenanceStatements.run(
         'incrementRequestHourlyStat',
         bucketStart,
-        formatShanghaiDateString(bucketStart * 1000),
+        unixSecondsToServiceDay(bucketStart),
         input.requestType,
         input.isSuccess ? 1 : 0,
         timestamp
@@ -844,7 +900,7 @@ export function recordStationBoardDispatchResult(
     trainProvenanceStatements.run(
         'insertStationBoardDispatchResult',
         input.taskRunId,
-        normalizeServiceDate(input.serviceDate),
+        input.serviceDate,
         input.candidateGroupCount,
         Array.isArray(input.selectedStations)
             ? input.selectedStations.length
@@ -868,10 +924,10 @@ export function recordStationBoardFetchResult(
     trainProvenanceStatements.run(
         'insertStationBoardFetchResult',
         input.taskRunId,
-        normalizeServiceDate(input.serviceDate),
+        input.serviceDate,
         normalizeOptionalInteger(input.parentSchedulerTaskId),
         input.stationName.trim(),
-        normalizeCode(input.stationTelecode),
+        input.stationTelecode.trim().toUpperCase(),
         input.resultStatus.trim(),
         input.rowCount,
         input.parsedEntryCount,
@@ -886,12 +942,12 @@ export function recordStationPlatformRefreshResult(
     input: RecordStationPlatformRefreshResultInput
 ): number {
     const createdAt = input.createdAt ?? getNowSeconds();
-    const trainCodes = uniqueNormalizedCodes([
+    const trainCodes = uniqueTrainCodeValues([
         input.primaryTrainCode,
         ...input.trainCodes
     ]);
-    const primaryTrainCode =
-        normalizeCode(input.primaryTrainCode) || trainCodes[0] || '';
+    const primaryTrain = input.primaryTrainCode;
+    const serviceDate = input.serviceDate;
     const updatedCount = input.entries.filter(
         (entry) => entry.status === 'updated'
     ).length;
@@ -915,10 +971,11 @@ export function recordStationPlatformRefreshResult(
         const result = trainProvenanceStatements.run(
             'insertStationPlatformRefreshResult',
             input.taskRunId,
-            normalizeServiceDate(input.serviceDate, input.startAt ?? null),
+            serviceDate,
             normalizeOptionalInteger(input.startAt),
-            primaryTrainCode,
-            stringifyJson(trainCodes),
+            primaryTrain.prefix,
+            primaryTrain.number,
+            stringifyTrainCodes(trainCodes),
             input.trigger,
             input.status,
             input.entries.length,
@@ -941,13 +998,13 @@ export function recordStationPlatformRefreshResult(
                     : 0,
                 entry.lookupType.trim(),
                 entry.stationName.trim(),
-                normalizeCode(entry.stationTelecode),
+                entry.stationTelecode.trim().toUpperCase(),
                 Number.isInteger(entry.stationNo)
                     ? Math.max(0, entry.stationNo)
                     : 0,
-                entry.trainDate.trim(),
-                stringifyJson(uniqueNormalizedCodes(entry.stationTrainCodes)),
-                stringifyJson(uniqueNormalizedCodes(entry.attemptedTrainCodes)),
+                entry.trainDate,
+                stringifyTrainCodes(entry.stationTrainCodes),
+                stringifyTrainCodes(entry.attemptedTrainCodes),
                 entry.status,
                 normalizeOptionalInteger(entry.platformNo),
                 entry.wicket?.trim() || null,
@@ -976,19 +1033,19 @@ export function getTrainProvenanceTaskRunById(taskRunId: number) {
 }
 
 export function listTrainProvenanceTaskRunsByDateAndExecutor(
-    date: string,
+    serviceDate: ServiceDay,
     executor: string
 ) {
     maybeCleanupExpiredTrainProvenance();
     const normalizedExecutor = executor.trim();
-    if (!/^\d{8}$/.test(date) || normalizedExecutor.length === 0) {
+    if (normalizedExecutor.length === 0) {
         return [];
     }
 
     return trainProvenanceStatements
         .all<TrainProvenanceTaskRunRow>(
             'selectTaskRunsByDateAndExecutor',
-            date,
+            serviceDate,
             normalizedExecutor
         )
         .map(toTaskRunRecord);
@@ -1007,28 +1064,22 @@ export function getStationBoardDispatchResultByTaskRunId(taskRunId: number) {
     return row ? toStationBoardDispatchResultRecord(row) : null;
 }
 
-export function listStationBoardDispatchResultsByDate(date: string) {
+export function listStationBoardDispatchResultsByDate(serviceDate: ServiceDay) {
     maybeCleanupExpiredTrainProvenance();
-    if (!/^\d{8}$/.test(date)) {
-        return [];
-    }
 
     return trainProvenanceStatements
         .all<StationBoardDispatchResultRow>(
             'selectStationBoardDispatchResultsByDate',
-            date
+            serviceDate
         )
         .map(toStationBoardDispatchResultRecord);
 }
 
 export function listStationBoardFetchResultsByParentSchedulerTaskId(
-    date: string,
+    serviceDate: ServiceDay,
     parentSchedulerTaskId: number
 ) {
     maybeCleanupExpiredTrainProvenance();
-    if (!/^\d{8}$/.test(date)) {
-        return [];
-    }
     if (
         !Number.isInteger(parentSchedulerTaskId) ||
         parentSchedulerTaskId <= 0
@@ -1039,7 +1090,7 @@ export function listStationBoardFetchResultsByParentSchedulerTaskId(
     return trainProvenanceStatements
         .all<StationBoardFetchResultRow>(
             'selectStationBoardFetchResultsByParentSchedulerTaskId',
-            date,
+            serviceDate,
             parentSchedulerTaskId
         )
         .map(toStationBoardFetchResultRecord);
@@ -1082,41 +1133,35 @@ export function getStationPlatformRefreshResultById(resultId: number) {
 }
 
 export function listTrainProvenanceDepartureStartAts(
-    date: string,
-    trainCode: string
+    serviceDate: ServiceDay,
+    trainCode: TrainCodeParts
 ): number[] {
     maybeCleanupExpiredTrainProvenance();
-    const normalizedTrainCode = normalizeCode(trainCode);
-    if (!/^\d{8}$/.test(date) || normalizedTrainCode.length === 0) {
-        return [];
-    }
 
     return trainProvenanceStatements
         .all<{ start_at: number }>(
             'selectDepartureStartAtsByDateAndTrainCode',
-            date,
-            normalizedTrainCode
+            serviceDate,
+            trainCode.prefix,
+            trainCode.number
         )
         .map((row) => row.start_at)
         .filter((value) => Number.isInteger(value));
 }
 
 export function listTrainProvenanceEventsByDateAndTrainCode(
-    date: string,
-    trainCode: string,
+    serviceDate: ServiceDay,
+    trainCode: TrainCodeParts,
     startAt: number | null
 ) {
     maybeCleanupExpiredTrainProvenance();
-    const normalizedTrainCode = normalizeCode(trainCode);
-    if (!/^\d{8}$/.test(date) || normalizedTrainCode.length === 0) {
-        return [];
-    }
 
     return trainProvenanceStatements
         .all<TrainProvenanceEventRow>(
             'selectEventsByDateAndTrainCode',
-            date,
-            normalizedTrainCode,
+            serviceDate,
+            trainCode.prefix,
+            trainCode.number,
             normalizeOptionalInteger(startAt),
             normalizeOptionalInteger(startAt)
         )

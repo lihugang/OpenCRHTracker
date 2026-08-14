@@ -1,0 +1,57 @@
+syntax = "proto3";
+
+package opencrh.v2;
+
+import "opencrh/v2/common.proto";
+import "opencrh/v2/identifiers.proto";
+import "opencrh/v2/mappings.proto";
+
+// Train timetable history, history detail, and circulation image.
+
+message GetTrainTimetableHistoryRequest {}
+
+message TrainTimetableHistoryCoverage {
+  uint32 coverage_id = 1;
+  uint32 timetable_id = 2;
+  uint32 service_day_start = 3;
+  uint32 service_day_end_exclusive = 4;
+}
+
+message GetTrainTimetableHistoryData {
+  TrainCode train_code = 1;
+  repeated TrainTimetableHistoryCoverage items = 2;
+  map<uint32, HistoricalTimetableContent> timetable_mappings = 3;
+}
+
+message GetTrainTimetableHistoryResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    GetTrainTimetableHistoryData data = 2;
+    ApiError error = 3;
+  }
+}
+
+enum TrainCirculationImageFormat {
+  TRAIN_CIRCULATION_IMAGE_FORMAT_UNSPECIFIED = 0;
+  TRAIN_CIRCULATION_IMAGE_FORMAT_PNG = 1;
+  TRAIN_CIRCULATION_IMAGE_FORMAT_PDF = 2;
+}
+
+message GetTrainCirculationImageRequest {}
+
+message GetTrainCirculationImageData {
+  TrainCode request_train_code = 1;
+  TrainCode train_code = 2;
+  string document_id = 3;
+  string image_url = 4;
+  optional bytes content = 5;
+  optional string binary_content_type = 6;
+}
+
+message GetTrainCirculationImageResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    GetTrainCirculationImageData data = 2;
+    ApiError error = 3;
+  }
+}

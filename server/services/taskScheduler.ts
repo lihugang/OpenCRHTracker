@@ -12,6 +12,7 @@ import {
 } from '~/server/services/idleTaskEstimator';
 import { runWithTrainProvenanceTaskContext } from '~/server/services/trainProvenanceRecorder';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
+import { parseInternalJson } from '~/server/utils/internal/storageValues';
 
 const logger = getLogger('task-scheduler');
 type TaskSqlKey = 'completeTask' | 'selectTasks';
@@ -38,7 +39,7 @@ function parseTaskArguments(rawArguments: string):
     try {
         return {
             ok: true,
-            argumentsValue: JSON.parse(rawArguments)
+            argumentsValue: parseInternalJson(rawArguments)
         };
     } catch (error) {
         return {

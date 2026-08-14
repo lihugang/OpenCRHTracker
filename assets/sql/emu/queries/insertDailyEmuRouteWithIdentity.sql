@@ -1,7 +1,8 @@
 INSERT INTO daily_emu_routes (
-    train_code,
-    emu_code,
+    train_prefix,
+    train_number,
+    emu_id,
     service_date,
     timetable_id
-) VALUES (?, ?, ?, ?)
+) VALUES (?, ?, ?, ?, ?)
 ON CONFLICT DO NOTHING;

@@ -8,8 +8,9 @@ import {
 import { getTodayScheduleTimetableByTrainCode } from '~/server/services/todayScheduleCache';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
 import { appendRouteRefreshQueueTrainCodes } from '~/server/utils/12306/scheduleProbe/stateStore';
-import { LEGACY_SCHEDULE_JSON_PATH } from '~/server/utils/12306/scheduleProbe/constants';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
+import { formatExternalTrainCode } from '~/server/utils/internal/boundaries';
+import type { TrainCodeParts } from '~/server/utils/12306/trainCode';
 
 export const REFRESH_TRAIN_CIRCULATION_TASK_EXECUTOR =
     'refresh_train_circulation';
@@ -19,7 +20,7 @@ const logger = getLogger('task-executor:refresh-train-circulation');
 let registered = false;
 
 interface RefreshTrainCirculationTaskArgs {
-    trainCode: string;
+    trainCode: TrainCodeParts;
 }
 
 function parseTaskArgs(raw: unknown): RefreshTrainCirculationTaskArgs {
@@ -27,19 +28,25 @@ function parseTaskArgs(raw: unknown): RefreshTrainCirculationTaskArgs {
         throw new Error('task arguments must be an object');
     }
 
-    const trainCode = normalizeCode(
-        String((raw as { trainCode?: unknown }).trainCode ?? '')
-    );
-    if (trainCode.length === 0) {
-        throw new Error('task arguments trainCode must be a non-empty string');
+    const rawTrainCode = (raw as { trainCode?: unknown }).trainCode;
+    if (
+        rawTrainCode === null ||
+        typeof rawTrainCode !== 'object' ||
+        typeof (rawTrainCode as { prefix?: unknown }).prefix !== 'string' ||
+        typeof (rawTrainCode as { number?: unknown }).number !== 'number'
+    ) {
+        throw new Error('task arguments trainCode must be a train code object');
     }
 
     return {
-        trainCode
+        trainCode: {
+            prefix: (rawTrainCode as { prefix: string }).prefix,
+            number: (rawTrainCode as { number: number }).number
+        }
     };
 }
 
-function resolveDepartureStationName(trainCode: string) {
+function resolveDepartureStationName(trainCode: TrainCodeParts) {
     const timetable = getTodayScheduleTimetableByTrainCode(trainCode);
     if (!timetable) {
         throw new Error(
@@ -64,26 +71,27 @@ function resolveDepartureStationName(trainCode: string) {
     throw new Error('该车次当前缺少始发站信息，请先执行线路刷新');
 }
 
-async function executeRefreshTrainCirculationTask(rawArgs: unknown) {
-    const args = parseTaskArgs(rawArgs);
+async function executeRefreshTrainCirculationTask(
+    args: RefreshTrainCirculationTaskArgs
+) {
     const readiness = rescheduleTaskUntilScheduleReady(
         REFRESH_TRAIN_CIRCULATION_TASK_EXECUTOR,
         args
     );
     if (!readiness.ready) {
         logger.info(
-            `schedule_refresh_pending_reschedule executor=${REFRESH_TRAIN_CIRCULATION_TASK_EXECUTOR} trainCode=${args.trainCode} reason=${readiness.state.reason} nextExecutionTime=${readiness.nextExecutionTime ?? 'null'} taskId=${readiness.rescheduledTaskId ?? 'null'} action=${readiness.action ?? 'null'}`
+            `schedule_refresh_pending_reschedule executor=${REFRESH_TRAIN_CIRCULATION_TASK_EXECUTOR} trainCode=${formatExternalTrainCode(args.trainCode)} reason=${readiness.state.reason} nextExecutionTime=${readiness.nextExecutionTime ?? 'null'} taskId=${readiness.rescheduledTaskId ?? 'null'} action=${readiness.action ?? 'null'}`
         );
         return;
     }
     const serviceDate = readiness.state.publishedDate;
 
-    const stationName = resolveDepartureStationName(args.trainCode);
+    const trainCode = args.trainCode;
+    const stationName = resolveDepartureStationName(trainCode);
     const executionTime = getNowSeconds();
     const appendedQueueEntries = appendRouteRefreshQueueTrainCodes(
-        LEGACY_SCHEDULE_JSON_PATH,
         serviceDate,
-        [args.trainCode],
+        [trainCode],
         executionTime
     );
     const telecodeResolution =
@@ -107,7 +115,7 @@ async function executeRefreshTrainCirculationTask(rawArgs: unknown) {
     });
 
     logger.info(
-        `done trainCode=${args.trainCode} stationName=${stationName} stationTelecode=${telecodeResolution.stationTelecode} action=${stationBoardTask.action} stationBoardTaskId=${stationBoardTask.schedulerTaskId} queueAppended=${appendedQueueEntries.length}`
+        `done trainCode=${formatExternalTrainCode(args.trainCode)} stationName=${stationName} stationTelecode=${telecodeResolution.stationTelecode} action=${stationBoardTask.action} stationBoardTaskId=${stationBoardTask.schedulerTaskId} queueAppended=${appendedQueueEntries.length}`
     );
 }
 
@@ -116,12 +124,10 @@ export function registerRefreshTrainCirculationTaskExecutor() {
         return;
     }
 
-    registerTaskExecutor(
-        REFRESH_TRAIN_CIRCULATION_TASK_EXECUTOR,
-        async (args) => {
-            await executeRefreshTrainCirculationTask(args);
-        }
-    );
+    registerTaskExecutor(REFRESH_TRAIN_CIRCULATION_TASK_EXECUTOR, {
+        parse: parseTaskArgs,
+        execute: executeRefreshTrainCirculationTask
+    });
     registered = true;
     logger.info(
         `registered executor=${REFRESH_TRAIN_CIRCULATION_TASK_EXECUTOR}`

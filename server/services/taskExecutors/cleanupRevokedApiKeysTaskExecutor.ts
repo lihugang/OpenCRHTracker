@@ -1,7 +1,10 @@
 import getLogger from '~/server/libs/log4js';
 import useConfig from '~/server/config';
 import { deleteRevokedApiKeysBefore } from '~/server/services/authStore';
-import { registerTaskExecutor } from '~/server/services/taskExecutorRegistry';
+import {
+    parseEmptyTaskArgs,
+    registerTaskExecutor
+} from '~/server/services/taskExecutorRegistry';
 import { enqueueTask } from '~/server/services/taskQueue';
 import {
     formatShanghaiDateTime,
@@ -74,8 +77,9 @@ export function registerCleanupRevokedApiKeysTaskExecutor(): void {
         return;
     }
 
-    registerTaskExecutor(CLEANUP_REVOKED_API_KEYS_TASK_EXECUTOR, async () => {
-        await executeCleanupRevokedApiKeysTask();
+    registerTaskExecutor(CLEANUP_REVOKED_API_KEYS_TASK_EXECUTOR, {
+        parse: parseEmptyTaskArgs,
+        execute: async () => executeCleanupRevokedApiKeysTask()
     });
     registered = true;
     logger.info(

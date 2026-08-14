@@ -1,11 +1,5 @@
 import { defineEventHandler, getQuery, getRouterParam, setHeader } from 'h3';
-import {
-    countDailyExportItems,
-    getDailyExportContentType,
-    getDailyExportFileName,
-    readDailyExportText,
-    type DailyExportFormat
-} from '~/server/services/dailyExportStore';
+import { getDailyExport } from '~/server/domain/exports';
 import getFixedCost from '~/server/utils/api/cost/getFixedCost';
 import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';
@@ -13,13 +7,6 @@ import { getDailyResponseCacheControlMaxAge } from '~/server/utils/api/response/
 import setCacheControl from '~/server/utils/api/response/setCacheControl';
 import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
 import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
-
-interface DailyExportResponseData {
-    date: string;
-    format: DailyExportFormat;
-    total: number;
-    content: string;
-}
 
 function parseBinaryFlag(value: unknown): boolean {
     if (value === undefined) {
@@ -54,12 +41,12 @@ export default defineEventHandler(async (event) => {
                 setHeader(
                     successEvent,
                     'Content-Type',
-                    getDailyExportContentType(data.format)
+                    'text/csv; charset=utf-8'
                 );
                 setHeader(
                     successEvent,
                     'Content-Disposition',
-                    `attachment; filename="${data.date}.${data.format}"`
+                    `attachment; filename="${data.date}.csv"`
                 );
                 return data.content;
             },
@@ -69,12 +56,9 @@ export default defineEventHandler(async (event) => {
                     getDailyResponseCacheControlMaxAge(data.date)
                 )
         },
-        async (): Promise<DailyExportResponseData> => {
+        async () => {
             const date = getRouterParam(event, 'date');
             const query = getQuery(event);
-            const format = (
-                typeof query.format === 'string' ? query.format : 'csv'
-            ) as DailyExportFormat;
 
             try {
                 parseBinaryFlag(query.binary);
@@ -88,30 +72,21 @@ export default defineEventHandler(async (event) => {
                 'invalid_param',
                 'date 必须是 YYYYMMDD'
             );
-            ensure(
-                format === 'csv' || format === 'jsonl',
-                400,
-                'invalid_param',
-                'format 必须是 csv 或 jsonl'
-            );
-
-            const missingMessage = `${getDailyExportFileName(date, format)} 未生成`;
 
             ensure(
                 date < getCurrentDateString(),
                 404,
                 'not_found',
-                missingMessage
+                `${date}.csv 未生成`
             );
 
-            const content = readDailyExportText(date, format);
-            ensure(content !== null, 404, 'not_found', missingMessage);
+            const result = getDailyExport(date);
 
             return {
                 date,
-                format,
-                total: countDailyExportItems(format, content),
-                content
+                format: 'csv',
+                total: result.total,
+                content: result.content
             };
         }
     );

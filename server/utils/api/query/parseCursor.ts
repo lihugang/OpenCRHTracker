@@ -16,7 +16,7 @@ export default function parseCursor(
         throw new ApiRequestError(
             400,
             'invalid_param',
-            `${label} 蹇呴』鏄瓧绗︿覆`
+            `${label} 必须是字符串`
         );
     }
 
@@ -25,7 +25,7 @@ export default function parseCursor(
         throw new ApiRequestError(
             400,
             'invalid_param',
-            `${label} 蹇呴』鏄?"serviceDate:id" 鏍煎紡`
+            `${label} 必须是 "serviceDate:id" 格式`
         );
     }
 
@@ -35,7 +35,7 @@ export default function parseCursor(
         throw new ApiRequestError(
             400,
             'invalid_param',
-            `${label} 鍖呭惈闈炴硶鏁板瓧`
+            `${label} 包含非法数字`
         );
     }
 

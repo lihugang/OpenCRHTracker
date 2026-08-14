@@ -750,19 +750,18 @@ import {
     ref,
     watch
 } from 'vue';
-import useTrackedRequestFetch, {
-    type TrackedRequestFetch
-} from '~/composables/useTrackedRequestFetch';
 import type {
-    CreateFeedbackTopicResponse,
     FeedbackPrimaryType,
     FeedbackSecondaryType,
     FeedbackStatus,
-    FeedbackTopicListItem,
     FeedbackTopicListResponse,
+    FeedbackTopicListItem,
     FeedbackVisibility
 } from '~/types/feedback';
-import type { TrackerApiResponse } from '~/types/homepage';
+import {
+    createFeedbackTopic,
+    fetchFeedbackTopics
+} from '~/utils/api/v2/domain/feedback';
 import UiBottomSheet from '~/components/ui/UiBottomSheet.vue';
 import UiButton from '~/components/ui/UiButton.vue';
 import UiCard from '~/components/ui/UiCard.vue';
@@ -830,9 +829,6 @@ interface TravelCodeQrWorkerResponseMessage {
     error?: string;
 }
 
-const requestFetch: TrackedRequestFetch = import.meta.server
-    ? useTrackedRequestFetch()
-    : ($fetch as TrackedRequestFetch);
 const route = useRoute();
 const { session, isAuthenticated } = useAuthState();
 const { officialOrigin, shouldShowUnofficialWarning } = useOfficialInstance();
@@ -1512,10 +1508,7 @@ async function handleTravelCodeImageChange(event: Event) {
 }
 
 async function fetchTopicList(cursor = '') {
-    const response = await requestFetch<
-        TrackerApiResponse<FeedbackTopicListResponse>
-    >('/api/v1/feedback/topics', {
-        retry: 0,
+    return fetchFeedbackTopics({
         query: {
             view: currentView.value,
             primaryType: filterPrimaryType.value || undefined,
@@ -1525,14 +1518,6 @@ async function fetchTopicList(cursor = '') {
             limit: 20
         }
     });
-
-    if (!response.ok) {
-        throw {
-            data: response
-        };
-    }
-
-    return response.data;
 }
 
 async function loadTopics(reset = true) {
@@ -1685,42 +1670,19 @@ async function submitTopic() {
             secondaryType,
             composerForm.details
         );
-        const { data, error } = await useCsrfFetch<
-            TrackerApiResponse<CreateFeedbackTopicResponse>
-        >('/api/v1/feedback/topics', {
-            method: 'POST',
-            body: {
-                primaryType: composerForm.primaryType,
-                secondaryType,
-                visibility: isSecurityCategory.value
-                    ? 'private'
-                    : isAuthenticated.value
-                      ? composerForm.visibility
-                      : 'public',
-                body: requestBody
-            },
-            key: 'feedback:create:' + Date.now(),
-            watch: false,
-            server: false
+        const response = await createFeedbackTopic({
+            primaryType: composerForm.primaryType,
+            secondaryType,
+            visibility: isSecurityCategory.value
+                ? 'private'
+                : isAuthenticated.value
+                  ? composerForm.visibility
+                  : 'public',
+            body: requestBody
         });
 
-        if (error.value) {
-            throw error.value;
-        }
-
-        const response = data.value;
-        if (!response) {
-            throw new Error('Missing feedback response');
-        }
-
-        if (!response.ok) {
-            throw {
-                data: response
-            };
-        }
-
         isComposerOpen.value = false;
-        await navigateTo('/feedback/' + response.data.id);
+        await navigateTo('/feedback/' + response.id);
     } catch (error) {
         createErrorMessage.value = getApiErrorMessage(
             error,

@@ -1,12 +1,17 @@
 import { computed, watch } from 'vue';
-import type { AuthFavoritesResponse, AuthSession } from '~/types/auth';
-import type { TrackerApiResponse } from '~/types/homepage';
+import type { AuthSession } from '~/types/auth';
 import type {
     FavoriteLookupInput,
     FavoriteLookupItem,
     LookupSuggestItem
 } from '~/types/lookup';
 import type { NotificationTarget } from '~/types/notifications';
+import {
+    deleteAuthFavorite,
+    fetchAuthFavorites,
+    putAuthFavorite
+} from '~/utils/api/v2/domain/auth';
+import { resolveEmuIdByCode } from '~/utils/api/v2/domain/lookup';
 import getApiErrorMessage from '~/utils/api/getApiErrorMessage';
 import {
     buildLookupItemKeyFromItem,
@@ -91,37 +96,6 @@ export function useFavoriteLookups() {
         pendingKeys.value = [];
     }
 
-    async function executeFavoriteRequest(
-        path: string,
-        options?: {
-            method?: 'GET' | 'PUT' | 'DELETE';
-            body?: object;
-        }
-    ) {
-        const response = await useNuxtApp().$csrfFetch<
-            TrackerApiResponse<AuthFavoritesResponse>
-        >(path, {
-            ...options,
-            retry: 0
-        });
-
-        if (
-            !response ||
-            typeof response !== 'object' ||
-            typeof response.ok !== 'boolean'
-        ) {
-            throw new Error('收藏接口未返回有效数据。');
-        }
-
-        if (!response.ok) {
-            throw {
-                data: response
-            };
-        }
-
-        return response;
-    }
-
     async function refresh(force = false) {
         if (!import.meta.client) {
             reset();
@@ -149,13 +123,11 @@ export function useFavoriteLookups() {
         errorMessage.value = '';
 
         try {
-            const response = await executeFavoriteRequest(
-                '/api/v1/auth/favorites'
-            );
+            const data = await fetchAuthFavorites();
 
-            replaceItems(response.data.items);
-            loadedUserId.value = response.data.userId;
-            maxEntries.value = response.data.maxEntries;
+            replaceItems(data.items);
+            loadedUserId.value = data.userId;
+            maxEntries.value = data.maxEntries;
             state.value = 'success';
         } catch (error) {
             state.value = 'error';
@@ -198,17 +170,19 @@ export function useFavoriteLookups() {
         ]);
 
         try {
-            const response = await executeFavoriteRequest(
-                '/api/v1/auth/favorites',
-                {
-                    method: 'PUT',
-                    body: normalizedItem
-                }
+            const emuId =
+                normalizedItem.type === 'emu'
+                    ? await resolveEmuIdByCode(normalizedItem.code)
+                    : null;
+            const data = await putAuthFavorite(
+                normalizedItem,
+                emuId,
+                normalizedItem.tags
             );
 
-            replaceItems(response.data.items);
-            loadedUserId.value = response.data.userId;
-            maxEntries.value = response.data.maxEntries;
+            replaceItems(data.items);
+            loadedUserId.value = data.userId;
+            maxEntries.value = data.maxEntries;
             state.value = 'success';
             errorMessage.value = '';
 
@@ -242,17 +216,15 @@ export function useFavoriteLookups() {
         );
 
         try {
-            const response = await executeFavoriteRequest(
-                '/api/v1/auth/favorites',
-                {
-                    method: 'DELETE',
-                    body: target
-                }
-            );
+            const emuId =
+                target.type === 'emu'
+                    ? await resolveEmuIdByCode(target.code)
+                    : null;
+            const data = await deleteAuthFavorite(target, emuId);
 
-            replaceItems(response.data.items);
-            loadedUserId.value = response.data.userId;
-            maxEntries.value = response.data.maxEntries;
+            replaceItems(data.items);
+            loadedUserId.value = data.userId;
+            maxEntries.value = data.maxEntries;
             if (relatedEventSubscriptionTarget) {
                 removeLocalEventSubscription(relatedEventSubscriptionTarget);
             }

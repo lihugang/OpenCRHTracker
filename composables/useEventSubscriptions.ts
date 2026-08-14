@@ -3,8 +3,13 @@ import type {
     AuthEventSubscriptionListResponse,
     AuthSession
 } from '~/types/auth';
-import type { TrackerApiResponse } from '~/types/homepage';
 import type { NotificationTarget } from '~/types/notifications';
+import {
+    deleteAuthEventSubscription,
+    fetchAuthEventSubscriptions,
+    putAuthEventSubscription
+} from '~/utils/api/v2/domain/auth';
+import { resolveEmuIdByCode } from '~/utils/api/v2/domain/lookup';
 import getApiErrorMessage from '~/utils/api/getApiErrorMessage';
 import {
     buildNotificationTargetKey,
@@ -126,37 +131,6 @@ export function useEventSubscriptions() {
         pendingKeys.value = [];
     }
 
-    async function executeEventSubscriptionRequest(
-        path: string,
-        options?: {
-            method?: 'GET' | 'PUT' | 'DELETE';
-            body?: Record<string, unknown>;
-        }
-    ) {
-        const response = await useNuxtApp().$csrfFetch<
-            TrackerApiResponse<AuthEventSubscriptionListResponse>
-        >(path, {
-            ...options,
-            retry: 0
-        });
-
-        if (
-            !response ||
-            typeof response !== 'object' ||
-            typeof response.ok !== 'boolean'
-        ) {
-            throw new Error('订阅对象接口未返回有效数据。');
-        }
-
-        if (!response.ok) {
-            throw {
-                data: response
-            };
-        }
-
-        return response.data;
-    }
-
     async function refresh(force = false) {
         if (!import.meta.client) {
             reset();
@@ -184,13 +158,11 @@ export function useEventSubscriptions() {
         errorMessage.value = '';
 
         try {
-            const response = await executeEventSubscriptionRequest(
-                '/api/v1/auth/event-subscriptions'
-            );
+            const data = await fetchAuthEventSubscriptions();
 
-            replaceItems(response.items);
-            loadedUserId.value = response.userId;
-            maxEntries.value = response.maxEntries;
+            replaceItems(data.items);
+            loadedUserId.value = data.userId;
+            maxEntries.value = data.maxEntries;
             state.value = 'success';
         } catch (error) {
             state.value = 'error';
@@ -257,20 +229,18 @@ export function useEventSubscriptions() {
         ]);
 
         try {
-            const response = await executeEventSubscriptionRequest(
-                '/api/v1/auth/event-subscriptions',
-                {
-                    method: 'PUT',
-                    body: {
-                        targetType: normalizedTarget.targetType,
-                        targetId: normalizedTarget.targetId
-                    }
-                }
+            const emuId =
+                normalizedTarget.targetType === 'emu'
+                    ? await resolveEmuIdByCode(normalizedTarget.targetId)
+                    : null;
+            const data = await putAuthEventSubscription(
+                normalizedTarget,
+                emuId
             );
 
-            replaceItems(response.items);
-            loadedUserId.value = response.userId;
-            maxEntries.value = response.maxEntries;
+            replaceItems(data.items);
+            loadedUserId.value = data.userId;
+            maxEntries.value = data.maxEntries;
             state.value = 'success';
             errorMessage.value = '';
             return true;
@@ -312,20 +282,18 @@ export function useEventSubscriptions() {
         );
 
         try {
-            const response = await executeEventSubscriptionRequest(
-                '/api/v1/auth/event-subscriptions',
-                {
-                    method: 'DELETE',
-                    body: {
-                        targetType: normalizedTarget.targetType,
-                        targetId: normalizedTarget.targetId
-                    }
-                }
+            const emuId =
+                normalizedTarget.targetType === 'emu'
+                    ? await resolveEmuIdByCode(normalizedTarget.targetId)
+                    : null;
+            const data = await deleteAuthEventSubscription(
+                normalizedTarget,
+                emuId
             );
 
-            replaceItems(response.items);
-            loadedUserId.value = response.userId;
-            maxEntries.value = response.maxEntries;
+            replaceItems(data.items);
+            loadedUserId.value = data.userId;
+            maxEntries.value = data.maxEntries;
             state.value = 'success';
             errorMessage.value = '';
             return true;

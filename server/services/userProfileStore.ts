@@ -7,16 +7,14 @@ import ApiRequestError from '~/server/utils/api/errors/ApiRequestError';
 import importSqlBatch from '~/server/utils/sql/importSqlBatch';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
 import type {
-    FavoriteLookupInput,
-    FavoriteLookupItem,
-    LookupSuggestItem
-} from '~/types/lookup';
+    AuthFavoriteItem,
+    AuthFavoriteTarget
+} from '~/server/types/authTargets';
 import {
-    buildLookupItemKeyFromItem,
-    isLookupTargetType,
-    normalizeFavoriteLookupInput,
-    normalizeFavoriteLookupItem
-} from '~/utils/lookup/lookupFavorite';
+    authFavoriteTargetKey,
+    normalizeAuthFavoriteTags,
+    normalizeAuthFavoriteTarget
+} from '~/server/utils/auth/favoriteTargets';
 
 interface UserProfileRow {
     user_id: string;
@@ -25,9 +23,7 @@ interface UserProfileRow {
 }
 
 interface UserProfileFavoriteValue extends Record<string, unknown> {
-    type?: unknown;
-    code?: unknown;
-    subtitle?: unknown;
+    target?: unknown;
     tags?: unknown;
     starredAt?: unknown;
 }
@@ -113,8 +109,8 @@ export interface UpsertUserSubscriptionResult {
 }
 
 export interface UserProfileData {
-    version: 1;
-    favorites: FavoriteLookupItem[];
+    version: 2;
+    favorites: AuthFavoriteItem[];
     subscriptions: UserProfileSubscriptionItem[];
     userPreference: UserProfilePreference;
     qqBinding: QqBindingData;
@@ -147,7 +143,7 @@ const userProfileCache = new LRUCache<string, UserProfileData>({
 
 function createDefaultUserProfileData(): UserProfileData {
     return {
-        version: 1,
+        version: 2,
         favorites: [],
         subscriptions: [],
         userPreference: {
@@ -234,19 +230,28 @@ function toQqBindingData(value: unknown): QqBindingData {
     };
 }
 
-function toFavoriteLookupItem(
+function toAuthFavoriteItem(
     value: UserProfileFavoriteValue
-): FavoriteLookupItem | null {
-    if (!isLookupTargetType(value.type) || typeof value.code !== 'string') {
+): AuthFavoriteItem | null {
+    const target = normalizeAuthFavoriteTarget(value.target);
+    if (!target) {
         return null;
     }
 
-    return normalizeFavoriteLookupItem({
-        type: value.type,
-        code: value.code,
-        tags: value.tags,
-        starredAt: value.starredAt
-    } as FavoriteLookupItem);
+    const starredAt = value.starredAt;
+    if (
+        typeof starredAt !== 'number' ||
+        !Number.isInteger(starredAt) ||
+        starredAt <= 0
+    ) {
+        return null;
+    }
+
+    return {
+        target,
+        tags: normalizeAuthFavoriteTags(value.tags),
+        starredAt
+    };
 }
 
 function toUserProfileSubscriptionItem(
@@ -332,9 +337,9 @@ function normalizeUserProfileData(value: unknown): UserProfileData {
                       return null;
                   }
 
-                  return toFavoriteLookupItem(item as UserProfileFavoriteValue);
+                  return toAuthFavoriteItem(item as UserProfileFavoriteValue);
               })
-              .filter((item): item is FavoriteLookupItem => item !== null)
+              .filter((item): item is AuthFavoriteItem => item !== null)
               .sort((left, right) => right.starredAt - left.starredAt)
         : [];
     const subscriptions = Array.isArray(raw.subscriptions)
@@ -359,7 +364,7 @@ function normalizeUserProfileData(value: unknown): UserProfileData {
         : [];
     const userPreference = toUserProfilePreference(raw.userPreference);
     return {
-        version: 1,
+        version: 2,
         favorites,
         subscriptions,
         userPreference,
@@ -481,7 +486,7 @@ export function mutateQqBindingData(
             }
         }
         const nextProfile: UserProfileData = {
-            version: 1,
+            version: 2,
             favorites: profile.favorites,
             subscriptions: profile.subscriptions,
             userPreference: profile.userPreference,
@@ -501,13 +506,15 @@ export function updateQqBindingData(userId: string, qqBinding: QqBindingData) {
 
 export function upsertUserFavoriteLookup(
     userId: string,
-    item: FavoriteLookupInput
-): FavoriteLookupItem[] {
-    const normalizedItem = normalizeFavoriteLookupInput(item);
-    if (!normalizedItem) {
+    target: AuthFavoriteTarget,
+    tags: string[]
+): AuthFavoriteItem[] {
+    const normalizedTarget = normalizeAuthFavoriteTarget(target);
+    if (!normalizedTarget) {
         throw new ApiRequestError(400, 'invalid_param', '收藏项无效');
     }
 
+    const normalizedTags = normalizeAuthFavoriteTags(tags);
     const maxEntries = useConfig().user.favorites.maxEntries;
     const now = getNowSeconds();
 
@@ -516,9 +523,9 @@ export function upsertUserFavoriteLookup(
         const profile = row
             ? parseUserProfileData(row.data_json)
             : createDefaultUserProfileData();
-        const favoriteKey = buildLookupItemKeyFromItem(normalizedItem);
+        const favoriteKey = authFavoriteTargetKey(normalizedTarget);
         const favorites = profile.favorites.filter(
-            (favorite) => buildLookupItemKeyFromItem(favorite) !== favoriteKey
+            (favorite) => authFavoriteTargetKey(favorite.target) !== favoriteKey
         );
         const alreadyExists = favorites.length !== profile.favorites.length;
 
@@ -532,14 +539,15 @@ export function upsertUserFavoriteLookup(
 
         const nextFavorites = [
             {
-                ...normalizedItem,
+                target: normalizedTarget,
+                tags: normalizedTags,
                 starredAt: now
             },
             ...favorites
         ];
 
         const nextProfile: UserProfileData = {
-            version: 1,
+            version: 2,
             favorites: nextFavorites,
             subscriptions: profile.subscriptions,
             userPreference: profile.userPreference,
@@ -555,19 +563,14 @@ export function upsertUserFavoriteLookup(
 
 export function removeUserFavoriteLookup(
     userId: string,
-    target: Pick<LookupSuggestItem, 'type' | 'code'>
-) {
-    const normalizedTarget = normalizeFavoriteLookupInput({
-        type: target.type,
-        code: target.code,
-        tags: []
-    });
-
+    target: AuthFavoriteTarget
+): AuthFavoriteItem[] {
+    const normalizedTarget = normalizeAuthFavoriteTarget(target);
     if (!normalizedTarget) {
         throw new ApiRequestError(400, 'invalid_param', '收藏项无效');
     }
 
-    const targetKey = buildLookupItemKeyFromItem(normalizedTarget);
+    const targetKey = authFavoriteTargetKey(normalizedTarget);
     const now = getNowSeconds();
 
     const transaction = useUsersDatabase().transaction(() => {
@@ -576,7 +579,7 @@ export function removeUserFavoriteLookup(
             ? parseUserProfileData(row.data_json)
             : createDefaultUserProfileData();
         const nextFavorites = profile.favorites.filter(
-            (favorite) => buildLookupItemKeyFromItem(favorite) !== targetKey
+            (favorite) => authFavoriteTargetKey(favorite.target) !== targetKey
         );
 
         if (nextFavorites.length === profile.favorites.length) {
@@ -584,7 +587,7 @@ export function removeUserFavoriteLookup(
         }
 
         const nextProfile: UserProfileData = {
-            version: 1,
+            version: 2,
             favorites: nextFavorites,
             subscriptions: profile.subscriptions,
             userPreference: profile.userPreference,
@@ -643,7 +646,7 @@ export function upsertUserSubscription(
             )
         ].sort((left, right) => right.updatedAt - left.updatedAt);
         const nextProfile: UserProfileData = {
-            version: 1,
+            version: 2,
             favorites: profile.favorites,
             subscriptions: nextSubscriptions,
             userPreference: profile.userPreference,
@@ -693,7 +696,7 @@ export function renameUserSubscription(
             )
             .sort((left, right) => right.updatedAt - left.updatedAt);
         const nextProfile: UserProfileData = {
-            version: 1,
+            version: 2,
             favorites: profile.favorites,
             subscriptions: nextSubscriptions,
             userPreference: profile.userPreference,
@@ -724,7 +727,7 @@ export function removeUserSubscription(userId: string, subscriptionId: string) {
         }
 
         const nextProfile: UserProfileData = {
-            version: 1,
+            version: 2,
             favorites: profile.favorites,
             subscriptions: nextSubscriptions,
             userPreference: profile.userPreference,
@@ -770,7 +773,7 @@ export function removeUserSubscriptionsByEndpoints(
         }
 
         const nextProfile: UserProfileData = {
-            version: 1,
+            version: 2,
             favorites: profile.favorites,
             subscriptions: nextSubscriptions,
             userPreference: profile.userPreference,
@@ -800,7 +803,7 @@ export function updateUserPreference(
             ...nextPreference
         };
         const nextProfile: UserProfileData = {
-            version: 1,
+            version: 2,
             favorites: profile.favorites,
             subscriptions: profile.subscriptions,
             userPreference,

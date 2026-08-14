@@ -1,10 +1,11 @@
 import { defineEventHandler, getQuery, getRouterParam } from 'h3';
 import useConfig from '~/server/config';
-import { getReferenceModelsByTrainCodes } from '~/server/services/referenceModelIndexStore';
 import {
-    getTodayStationTimetableByStationNameWithSupplement,
-    type TodayScheduleStationIndexRow
-} from '~/server/services/todayScheduleCache';
+    buildStationTimetableNextCursor,
+    findStationTimetableStartIndex,
+    getStationTimetableItems,
+    getStationTimetableRows
+} from '~/server/domain/timetable';
 import getPerRecordCost from '~/server/utils/api/cost/getPerRecordCost';
 import ApiRequestError from '~/server/utils/api/errors/ApiRequestError';
 import executeApi from '~/server/utils/api/executor/executeApi';
@@ -12,15 +13,12 @@ import ensure from '~/server/utils/api/executor/ensure';
 import parseLimit from '~/server/utils/api/query/parseLimit';
 import setCacheControl from '~/server/utils/api/response/setCacheControl';
 import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
-import type { StationTimetableResponse } from '~/types/lookup';
-
-interface StationTimetableCursor {
-    clockSortAt: number;
-    sortAt: number;
-    trainCode: string;
-    stationNo: number;
-    startAt: number;
-}
+import {
+    formatExternalTrainCode,
+    parseExternalTrainCodeOrThrow
+} from '~/server/utils/internal/boundaries';
+import type { TrainCodeParts } from '~/server/utils/12306/trainCode';
+import type { StationTimetableCursorDomain } from '~/server/domain/timetable';
 
 export default defineEventHandler(async (event) => {
     const cacheMaxAge = useConfig().api.cache.timetableMaxAgeSeconds;
@@ -49,52 +47,40 @@ export default defineEventHandler(async (event) => {
             const query = getQuery(event);
             const cursor = parseStationTimetableCursor(query.cursor, 'cursor');
             const limit = parseLimit(event);
-            const rows =
-                getTodayStationTimetableByStationNameWithSupplement(
-                    stationName
-                );
-
-            ensure(rows.length > 0, 404, 'not_found', '当前暂无该车站的时刻表');
+            const rows = getStationTimetableRows(stationName);
 
             const startIndex =
-                cursor === null ? 0 : findStartIndexFromCursor(rows, cursor);
+                cursor === null
+                    ? 0
+                    : findStationTimetableStartIndex(rows, cursor);
             const pageRows = rows.slice(startIndex, startIndex + limit);
             const lastRow = pageRows.at(-1);
+            const hasMore = startIndex + pageRows.length < rows.length;
             const nextCursor =
-                startIndex + pageRows.length < rows.length && lastRow
-                    ? buildNextCursor(lastRow)
+                hasMore && lastRow
+                    ? formatStationCursor(
+                          buildStationTimetableNextCursor(lastRow)
+                      )
                     : '';
-            const referenceModelsByCodeSet = new Map<
-                string,
-                Awaited<ReturnType<typeof getReferenceModelsByTrainCodes>>
-            >();
+            const domainItems = await getStationTimetableItems(pageRows);
 
-            const items = await Promise.all(
-                pageRows.map(async (row) => ({
-                    trainCode: row.trainCode,
-                    allCodes: [...row.allCodes],
+            return {
+                stationName,
+                cursor: typeof query.cursor === 'string' ? query.cursor : '',
+                limit,
+                nextCursor,
+                items: domainItems.map((row) => ({
+                    trainCode: formatExternalTrainCode(row.trainCode),
+                    allCodes: row.allCodes.map(formatExternalTrainCode),
                     arriveAt: row.arriveAt,
                     departAt: row.departAt,
                     platformNo: row.platformNo,
                     startStation: row.startStation,
                     endStation: row.endStation,
                     updatedAt: row.updatedAt,
-                    referenceModels: await getReferenceModelsForRow(
-                        row,
-                        referenceModelsByCodeSet
-                    )
+                    referenceModels: row.referenceModels
                 }))
-            );
-
-            const response: StationTimetableResponse = {
-                stationName,
-                cursor: typeof query.cursor === 'string' ? query.cursor : '',
-                limit,
-                nextCursor,
-                items
             };
-
-            return response;
         }
     );
 });
@@ -111,30 +97,10 @@ function decodeStationName(rawStationName: string | undefined) {
     }
 }
 
-async function getReferenceModelsForRow(
-    row: TodayScheduleStationIndexRow,
-    referenceModelsByCodeSet: Map<
-        string,
-        Awaited<ReturnType<typeof getReferenceModelsByTrainCodes>>
-    >
-) {
-    const cacheKey = [...row.allCodes]
-        .sort((left, right) => left.localeCompare(right))
-        .join('|');
-    const cachedReferenceModels = referenceModelsByCodeSet.get(cacheKey);
-    if (cachedReferenceModels) {
-        return cachedReferenceModels;
-    }
-
-    const referenceModels = await getReferenceModelsByTrainCodes(row.allCodes);
-    referenceModelsByCodeSet.set(cacheKey, referenceModels);
-    return referenceModels;
-}
-
 function parseStationTimetableCursor(
     raw: unknown,
     label: string
-): StationTimetableCursor | null {
+): StationTimetableCursorDomain | null {
     if (raw === undefined || raw === null || raw === '') {
         return null;
     }
@@ -165,7 +131,15 @@ function parseStationTimetableCursor(
     ] = match;
     const clockSortAt = Number(clockSortAtText);
     const sortAt = Number(sortAtText);
-    const trainCode = trainCodeText?.trim()?.toUpperCase() ?? '';
+    let trainCode: TrainCodeParts;
+    try {
+        trainCode = parseExternalTrainCodeOrThrow(
+            trainCodeText,
+            `${label}.trainCode`
+        );
+    } catch {
+        throw new ApiRequestError(400, 'invalid_param', `${label} 包含非法值`);
+    }
     const stationNo = Number(stationNoText);
     const startAt = Number(startAtText);
 
@@ -174,7 +148,6 @@ function parseStationTimetableCursor(
         clockSortAt < 0 ||
         !Number.isInteger(sortAt) ||
         sortAt < 0 ||
-        trainCode.length === 0 ||
         !Number.isInteger(stationNo) ||
         stationNo <= 0 ||
         !Number.isInteger(startAt) ||
@@ -192,53 +165,12 @@ function parseStationTimetableCursor(
     };
 }
 
-function buildNextCursor(row: TodayScheduleStationIndexRow) {
+function formatStationCursor(cursor: StationTimetableCursorDomain) {
     return [
-        row.clockSortAt,
-        row.sortAt,
-        row.trainCode,
-        row.stationNo,
-        row.startAt
+        cursor.clockSortAt,
+        cursor.sortAt,
+        formatExternalTrainCode(cursor.trainCode),
+        cursor.stationNo,
+        cursor.startAt
     ].join(':');
-}
-
-function findStartIndexFromCursor(
-    rows: TodayScheduleStationIndexRow[],
-    cursor: StationTimetableCursor
-) {
-    const exactIndex = rows.findIndex(
-        (row) => compareRowWithCursor(row, cursor) === 0
-    );
-    if (exactIndex >= 0) {
-        return exactIndex + 1;
-    }
-
-    const nextIndex = rows.findIndex(
-        (row) => compareRowWithCursor(row, cursor) > 0
-    );
-    return nextIndex >= 0 ? nextIndex : rows.length;
-}
-
-function compareRowWithCursor(
-    row: TodayScheduleStationIndexRow,
-    cursor: StationTimetableCursor
-) {
-    if (row.clockSortAt !== cursor.clockSortAt) {
-        return row.clockSortAt - cursor.clockSortAt;
-    }
-
-    if (row.sortAt !== cursor.sortAt) {
-        return row.sortAt - cursor.sortAt;
-    }
-
-    const trainCodeCompare = row.trainCode.localeCompare(cursor.trainCode);
-    if (trainCodeCompare !== 0) {
-        return trainCodeCompare;
-    }
-
-    if (row.stationNo !== cursor.stationNo) {
-        return row.stationNo - cursor.stationNo;
-    }
-
-    return row.startAt - cursor.startAt;
 }

@@ -10,7 +10,7 @@
         },
         "version": {
             "type": "integer",
-            "const": 7
+            "const": 8
         },
         "stations": {
             "type": "object",
@@ -52,6 +52,15 @@
         }
     },
     "definitions": {
+        "trainCode": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "prefix": { "type": "string", "pattern": "^[A-Z]?$" },
+                "number": { "type": "integer", "minimum": 0, "maximum": 9999 }
+            },
+            "required": ["prefix", "number"]
+        },
         "prefixRule": {
             "type": "object",
             "additionalProperties": false,
@@ -125,7 +134,7 @@
                     "minimum": 0
                 },
                 "stationTrainCode": {
-                    "type": "string"
+                    "$ref": "#/definitions/trainCode"
                 },
                 "wicket": {
                     "type": "string"
@@ -202,8 +211,7 @@
             "additionalProperties": false,
             "properties": {
                 "code": {
-                    "type": "string",
-                    "minLength": 1
+                    "$ref": "#/definitions/trainCode"
                 },
                 "internalCode": {
                     "type": "string"
@@ -211,8 +219,7 @@
                 "allCodes": {
                     "type": "array",
                     "items": {
-                        "type": "string",
-                        "minLength": 1
+                        "$ref": "#/definitions/trainCode"
                     },
                     "minItems": 1
                 },
@@ -307,12 +314,11 @@
             "additionalProperties": false,
             "properties": {
                 "trainCode": {
-                    "type": "string",
-                    "minLength": 1
+                    "$ref": "#/definitions/trainCode"
                 },
                 "serviceDate": {
-                    "type": "string",
-                    "pattern": "^[0-9]{8}$"
+                    "type": "integer",
+                    "minimum": 0
                 },
                 "enqueuedAt": {
                     "type": "integer",
@@ -336,8 +342,7 @@
                 "allCodes": {
                     "type": "array",
                     "items": {
-                        "type": "string",
-                        "minLength": 1
+                        "$ref": "#/definitions/trainCode"
                     }
                 },
                 "startStation": {
@@ -391,12 +396,12 @@
             "additionalProperties": false,
             "properties": {
                 "date": {
-                    "type": "string",
-                    "minLength": 1
+                    "type": "integer",
+                    "minimum": 0
                 },
                 "lastBuildDate": {
-                    "type": "string",
-                    "minLength": 0
+                    "type": "integer",
+                    "minimum": 0
                 },
                 "status": {
                     "type": "string",
@@ -488,7 +493,7 @@
                         "failedEnrichCodes": {
                             "type": "array",
                             "items": {
-                                "type": "string"
+                                "$ref": "#/definitions/trainCode"
                             }
                         },
                         "counters": {

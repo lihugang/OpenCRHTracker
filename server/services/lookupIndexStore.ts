@@ -2,10 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import useConfig from '~/server/config';
 import { parseEmuListAssetText } from '~/server/services/probeAssetStore';
-import {
-    ensureScheduleDocumentMigrated,
-    getScheduleStateVersion
-} from '~/server/utils/12306/scheduleProbe/stateStore';
+import { getScheduleStateVersion } from '~/server/utils/12306/scheduleProbe/stateStore';
 import {
     getScheduleDatabaseFilePath,
     listScheduleStationLookupRows,
@@ -14,6 +11,7 @@ import {
 } from '~/server/utils/12306/scheduleProbe/sqliteStore';
 import { listSupplementTrainLookupRows } from '~/server/services/supplementTrainRegistryStore';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
+import { serviceDateToDay } from '~/server/utils/date/serviceDay';
 import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
 import type { LookupSuggestItem } from '~/types/lookup';
 
@@ -83,27 +81,22 @@ function buildEmuSubtitle(record: { bureau: string; depot: string }) {
 function loadTrainItems() {
     const deduplicated = new Map<string, LookupSuggestItem>();
 
-    if (ensureScheduleDocumentMigrated()) {
-        const activeSummary = resolveActiveScheduleStateSummary(
-            getCurrentDateString()
-        );
-        if (activeSummary) {
-            for (const row of listScheduleTrainLookupRows(activeSummary.kind)) {
-                const code = normalizeCode(row.itemCode);
-                if (!code || deduplicated.has(code)) {
-                    continue;
-                }
-
-                deduplicated.set(code, {
-                    type: 'train',
-                    code,
-                    subtitle: buildTrainSubtitle(
-                        row.startStation,
-                        row.endStation
-                    ),
-                    tags: []
-                });
+    const activeSummary = resolveActiveScheduleStateSummary(
+        getCurrentDateString()
+    );
+    if (activeSummary) {
+        for (const row of listScheduleTrainLookupRows(activeSummary.kind)) {
+            const code = normalizeCode(row.itemCode);
+            if (!code || deduplicated.has(code)) {
+                continue;
             }
+
+            deduplicated.set(code, {
+                type: 'train',
+                code,
+                subtitle: buildTrainSubtitle(row.startStation, row.endStation),
+                tags: []
+            });
         }
     }
 
@@ -125,13 +118,12 @@ function loadTrainItems() {
 }
 
 function loadStationItems() {
-    if (!ensureScheduleDocumentMigrated()) {
-        return [];
-    }
-
     const currentDate = getCurrentDateString();
     const activeSummary = resolveActiveScheduleStateSummary(currentDate);
-    if (!activeSummary || activeSummary.date !== currentDate) {
+    if (
+        !activeSummary ||
+        activeSummary.date !== serviceDateToDay(currentDate)
+    ) {
         return [];
     }
 

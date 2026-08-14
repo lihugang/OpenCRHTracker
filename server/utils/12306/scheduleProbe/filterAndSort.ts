@@ -1,9 +1,13 @@
 import { getRuleByCode } from './rules';
 import type { ScheduleItem, ScheduleProbePrefixRule } from './types';
+import {
+    formatTrainCode,
+    type TrainCodeParts
+} from '~/server/utils/12306/trainCode';
 
 interface RawTrainCodeItem {
     route: {
-        code: string;
+        code: TrainCodeParts;
         internalCode: string;
     };
 }
@@ -18,7 +22,6 @@ export function normalizeTrainCodeItems(
         if (!match) {
             continue;
         }
-
         normalized.push({
             code: match.normalizedCode,
             internalCode: item.route.internalCode,
@@ -55,7 +58,9 @@ export function sortScheduleItems(
         const bMatch = getRuleByCode(b.code, rules);
 
         if (!aMatch && !bMatch) {
-            return a.code.localeCompare(b.code);
+            return formatTrainCode(a.code).localeCompare(
+                formatTrainCode(b.code)
+            );
         }
         if (!aMatch) {
             return 1;
@@ -75,6 +80,6 @@ export function sortScheduleItems(
         if (aMatch.no !== bMatch.no) {
             return aMatch.no - bMatch.no;
         }
-        return a.code.localeCompare(b.code);
+        return formatTrainCode(a.code).localeCompare(formatTrainCode(b.code));
     });
 }

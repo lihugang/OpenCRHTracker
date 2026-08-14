@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS schedule_states (
     kind TEXT PRIMARY KEY CHECK(kind IN ('published', 'building')),
-    date TEXT NOT NULL,
+    date INTEGER NOT NULL CHECK(date >= 0),
     status TEXT NOT NULL,
     phase TEXT NOT NULL,
     generated_at INTEGER NOT NULL,

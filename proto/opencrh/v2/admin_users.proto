@@ -1,0 +1,281 @@
+syntax = "proto3";
+
+package opencrh.v2;
+
+import "opencrh/v2/auth.proto";
+import "opencrh/v2/common.proto";
+
+message GetAdminUsersRequest {}
+
+message AdminUserListItem {
+  string user_id = 1;
+  int64 created_at = 2;
+  optional int64 last_login_at = 3;
+  bool is_banned = 4;
+  bool is_admin = 5;
+  uint32 api_remain_cost = 6;
+  repeated SponsorshipGroupSummary sponsorship_groups = 7;
+  SponsorshipEffectiveQuota effective_quota = 8;
+}
+
+message GetAdminUsersData {
+  uint32 total_users = 1;
+  uint32 banned_users = 2;
+  int64 as_of = 3;
+  repeated AdminUserListItem items = 4;
+}
+
+message GetAdminUsersResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    GetAdminUsersData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message GetAdminUserMembershipsData {
+  string user_id = 1;
+  int64 as_of = 2;
+  repeated UserMembershipItem items = 3;
+  repeated SponsorshipGroupCatalogItem catalog = 4;
+  repeated string account_scopes = 5;
+  SponsorshipEffectiveQuota effective_quota = 6;
+  SponsorshipQuotaBreakdown quota_breakdown = 7;
+}
+
+message GetAdminUserMembershipsRequest {}
+
+message GetAdminUserMembershipsResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    GetAdminUserMembershipsData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message PutAdminUserMembershipRequest {
+  string user_id = 1;
+  string group_id = 2;
+  int64 starts_at = 3;
+  uint32 duration_days = 4;
+}
+
+message PutAdminUserMembershipData {
+  string user_id = 1;
+  int64 as_of = 2;
+  repeated UserMembershipItem items = 3;
+  repeated SponsorshipGroupCatalogItem catalog = 4;
+  repeated string account_scopes = 5;
+  SponsorshipEffectiveQuota effective_quota = 6;
+  SponsorshipQuotaBreakdown quota_breakdown = 7;
+}
+
+message PutAdminUserMembershipResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    PutAdminUserMembershipData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message DeleteAdminUserMembershipRequest {}
+
+message DeleteAdminUserMembershipData {
+  string user_id = 1;
+  int64 as_of = 2;
+  repeated UserMembershipItem items = 3;
+  repeated SponsorshipGroupCatalogItem catalog = 4;
+  repeated string account_scopes = 5;
+  SponsorshipEffectiveQuota effective_quota = 6;
+  SponsorshipQuotaBreakdown quota_breakdown = 7;
+}
+
+message DeleteAdminUserMembershipResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    DeleteAdminUserMembershipData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message AdminQqBanListItem {
+  string qq_number = 1;
+  int64 added_at = 2;
+  string added_by = 3;
+}
+
+message PostAdminQqBanEntryRequest {
+  string qq_number = 1;
+}
+
+message PostAdminQqBanEntryData {
+  bool created = 1;
+  AdminQqBanListItem item = 2;
+}
+
+message PostAdminQqBanEntryResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    PostAdminQqBanEntryData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message DeleteAdminQqBanEntryRequest {}
+
+message DeleteAdminQqBanEntryData {
+  string qq_number = 1;
+  bool removed = 2;
+}
+
+message DeleteAdminQqBanEntryResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    DeleteAdminQqBanEntryData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message PostAdminUsersQuotaResetRequest {
+  string user_id = 1;
+}
+
+message PostAdminUsersQuotaResetData {
+  string user_id = 1;
+  uint32 api_remain_cost = 2;
+  SponsorshipEffectiveQuota effective_quota = 3;
+}
+
+message PostAdminUsersQuotaResetResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    PostAdminUsersQuotaResetData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message PostAdminUsersRiskClearRequest {
+  string user_id = 1;
+}
+
+message PostAdminUsersRiskClearData {
+  string user_id = 1;
+  optional uint32 risk_case_id = 2;
+  bool changed = 3;
+  optional int64 exemption_expires_at = 4;
+  int64 cleared_at = 5;
+}
+
+message PostAdminUsersRiskClearResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    PostAdminUsersRiskClearData data = 2;
+    ApiError error = 3;
+  }
+}
+
+enum AdminUserBanAction {
+  ADMIN_USER_BAN_ACTION_UNSPECIFIED = 0;
+  ADMIN_USER_BAN_ACTION_BAN = 1;
+  ADMIN_USER_BAN_ACTION_UNBAN = 2;
+}
+
+enum AdminUserBanActionStatus {
+  ADMIN_USER_BAN_ACTION_STATUS_UNSPECIFIED = 0;
+  ADMIN_USER_BAN_ACTION_STATUS_PENDING = 1;
+  ADMIN_USER_BAN_ACTION_STATUS_SUCCEEDED = 2;
+  ADMIN_USER_BAN_ACTION_STATUS_FAILED = 3;
+  ADMIN_USER_BAN_ACTION_STATUS_SKIPPED = 4;
+}
+
+enum AdminUserBanActionSource {
+  ADMIN_USER_BAN_ACTION_SOURCE_UNSPECIFIED = 0;
+  ADMIN_USER_BAN_ACTION_SOURCE_ADMIN_MANUAL = 1;
+  ADMIN_USER_BAN_ACTION_SOURCE_QQ_BAN_LIST = 2;
+  ADMIN_USER_BAN_ACTION_SOURCE_FINGERPRINT_MATCH = 3;
+}
+
+enum AdminUserRiskCaseStatus {
+  ADMIN_USER_RISK_CASE_STATUS_UNSPECIFIED = 0;
+  ADMIN_USER_RISK_CASE_STATUS_PENDING = 1;
+  ADMIN_USER_RISK_CASE_STATUS_ACTIVE = 2;
+  ADMIN_USER_RISK_CASE_STATUS_ESCALATING = 3;
+  ADMIN_USER_RISK_CASE_STATUS_ESCALATED = 4;
+  ADMIN_USER_RISK_CASE_STATUS_FAILED = 5;
+  ADMIN_USER_RISK_CASE_STATUS_CLEARED = 6;
+}
+
+message AdminUserBanActionItem {
+  uint32 id = 1;
+  string user_id = 2;
+  AdminUserBanAction action = 3;
+  AdminUserBanActionStatus status = 4;
+  AdminUserBanActionSource source = 5;
+  string reason = 6;
+  optional string actor_user_id = 7;
+  optional string qq_number = 8;
+  optional string ip_address = 9;
+  optional string user_agent = 10;
+  optional uint32 matched_action_id = 11;
+  optional bool changed = 12;
+  int64 requested_at = 13;
+  optional int64 completed_at = 14;
+  optional string error_message = 15;
+}
+
+message AdminUserRiskCaseItem {
+  uint32 id = 1;
+  string user_id = 2;
+  AdminUserRiskCaseStatus status = 3;
+  optional uint32 fingerprint_id = 4;
+  uint32 matched_action_id = 5;
+  string ip_address = 6;
+  string user_agent = 7;
+  optional string qq_number = 8;
+  optional uint32 ban_action_id = 9;
+  int64 detected_at = 10;
+  int64 updated_at = 11;
+  optional int64 escalated_at = 12;
+  optional int64 cleared_at = 13;
+  optional string cleared_by = 14;
+  optional string error_message = 15;
+}
+
+message GetAdminUsersSecurityRequest {}
+
+message GetAdminUsersSecurityData {
+  int64 as_of = 1;
+  uint32 ban_correlation_window_seconds = 2;
+  repeated AdminQqBanListItem qq_ban_list = 3;
+  repeated AdminUserBanActionItem ban_actions = 4;
+  repeated AdminUserRiskCaseItem risk_cases = 5;
+}
+
+message GetAdminUsersSecurityResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    GetAdminUsersSecurityData data = 2;
+    ApiError error = 3;
+  }
+}
+
+message PostAdminUsersStatusRequest {
+  string user_id = 1;
+  optional bool banned = 2;
+}
+
+message PostAdminUsersStatusData {
+  string user_id = 1;
+  bool is_banned = 2;
+  bool changed = 3;
+  uint32 revoked_webapp_api_key_count = 4;
+  int64 updated_at = 5;
+}
+
+message PostAdminUsersStatusResponse {
+  ApiMeta meta = 1;
+  oneof outcome {
+    PostAdminUsersStatusData data = 2;
+    ApiError error = 3;
+  }
+}

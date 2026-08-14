@@ -249,20 +249,19 @@
 </template>
 
 <script setup lang="ts">
-import useTrackedRequestFetch, {
-    type TrackedRequestFetch
-} from '~/composables/useTrackedRequestFetch';
 import { useAdminDateQuery } from '~/composables/useAdminDateQuery';
 import type {
     AdminConfigFileAction,
-    AdminConfigFileActionRequest,
     AdminConfigFileActionResponse,
     AdminConfigFileItem,
     AdminConfigFilesResponse,
     AdminConfigFileTarget,
     AdminRuntimeConfigUpdateResponse
 } from '~/types/admin';
-import type { TrackerApiResponse } from '~/types/homepage';
+import {
+    createAdminConfigFile,
+    fetchAdminConfigFiles
+} from '~/utils/api/v2/domain/admin';
 import getApiErrorMessage from '~/utils/api/getApiErrorMessage';
 import formatTrackerTimestamp from '~/utils/time/formatTrackerTimestamp';
 
@@ -272,9 +271,6 @@ definePageMeta({
 
 type ActionMessageTone = 'success' | 'error';
 
-const requestFetch: TrackedRequestFetch = import.meta.server
-    ? useTrackedRequestFetch()
-    : ($fetch as TrackedRequestFetch);
 const { session } = useAuthState();
 const { selectedDateInput, todayDateInputValue } = await useAdminDateQuery();
 
@@ -294,19 +290,7 @@ const actionMessages = ref<
 >({});
 
 async function fetchConfigFiles() {
-    const response = await requestFetch<
-        TrackerApiResponse<AdminConfigFilesResponse>
-    >('/api/v1/admin/config-files', {
-        retry: 0
-    });
-
-    if (!response.ok) {
-        throw {
-            data: response
-        };
-    }
-
-    return response.data;
+    return fetchAdminConfigFiles();
 }
 
 const {
@@ -361,34 +345,11 @@ function openEditor(target: AdminConfigFileTarget) {
     isConfigFileEditorOpen.value = true;
 }
 
-async function postConfigFileAction(body: AdminConfigFileActionRequest) {
-    const { data, error } = await useCsrfFetch<
-        TrackerApiResponse<AdminConfigFileActionResponse>
-    >('/api/v1/admin/config-files', {
-        method: 'POST',
-        retry: 0,
-        body,
-        key: `admin:config-files:${body.target}:${body.action}:${Date.now()}`,
-        watch: false,
-        server: false
-    });
-
-    if (error.value) {
-        throw error.value;
-    }
-
-    const response = data.value;
-    if (!response) {
-        throw new Error('Missing admin config file action response');
-    }
-
-    if (!response.ok) {
-        throw {
-            data: response
-        };
-    }
-
-    return response.data;
+async function postConfigFileAction(body: {
+    target: AdminConfigFileTarget;
+    action: AdminConfigFileAction;
+}) {
+    return createAdminConfigFile(body.target, body.action);
 }
 
 function patchConfigFileItem(nextItem: AdminConfigFileItem) {

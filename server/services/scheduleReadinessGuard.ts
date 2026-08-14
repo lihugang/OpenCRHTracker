@@ -5,12 +5,15 @@ import {
 } from '~/server/services/taskQueue';
 import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
-import { ensureScheduleDocumentMigrated } from '~/server/utils/12306/scheduleProbe/stateStore';
 import {
     loadScheduleStateSummaries,
     type ScheduleStateSummary
 } from '~/server/utils/12306/scheduleProbe/sqliteStore';
 import type { ScheduleState } from '~/server/utils/12306/scheduleProbe/types';
+import {
+    serviceDateToDay,
+    type ServiceDay
+} from '~/server/utils/date/serviceDay';
 
 export type ScheduleReadinessReason =
     | 'schedule_not_found'
@@ -22,18 +25,18 @@ export type ScheduleReadinessReason =
 export interface ScheduleReadinessPendingState {
     ready: false;
     reason: ScheduleReadinessReason;
-    currentDate: string;
-    publishedDate: string | null;
+    currentDate: ServiceDay;
+    publishedDate: ServiceDay | null;
     publishedStatus: ScheduleState['status'] | null;
     publishedPhase: ScheduleState['progress']['phase'] | null;
-    buildingDate: string | null;
+    buildingDate: ServiceDay | null;
     buildingStatus: ScheduleState['status'] | null;
 }
 
 export interface ScheduleReadinessReadyState {
     ready: true;
-    currentDate: string;
-    publishedDate: string;
+    currentDate: ServiceDay;
+    publishedDate: ServiceDay;
 }
 
 export type ScheduleReadinessState =
@@ -62,7 +65,7 @@ export type ScheduleReadinessRescheduleResult =
 
 function buildPendingState(
     reason: ScheduleReadinessReason,
-    currentDate: string,
+    currentDate: ServiceDay,
     published: ScheduleStateSummary | null,
     building: ScheduleStateSummary | null
 ): ScheduleReadinessPendingState {
@@ -79,9 +82,8 @@ function buildPendingState(
 }
 
 export function getScheduleReadinessState(): ScheduleReadinessState {
-    const currentDate = getCurrentDateString();
-    const migrated = ensureScheduleDocumentMigrated();
-    const summaries = migrated ? loadScheduleStateSummaries() : [];
+    const currentDate = serviceDateToDay(getCurrentDateString());
+    const summaries = loadScheduleStateSummaries();
     const published =
         summaries.find((summary) => summary.kind === 'published') ?? null;
     const building =

@@ -1,9 +1,14 @@
 import type { TrackerApiFailure } from '~/types/homepage';
+import { V2ApiError } from '~/utils/api/v2/V2ApiError';
 
 export default function getApiErrorMessage(
     error: unknown,
-    fallback = '璇锋眰澶辫触锛岃绋嶅悗閲嶈瘯銆?'
+    fallback = '请求失败，请稍后重试。'
 ) {
+    if (error instanceof V2ApiError) {
+        return error.userMessage;
+    }
+
     if (typeof error === 'object' && error !== null) {
         const candidate = error as {
             data?: unknown;

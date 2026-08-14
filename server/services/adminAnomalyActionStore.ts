@@ -1,6 +1,10 @@
 import ApiRequestError from '~/server/utils/api/errors/ApiRequestError';
 import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
-import getDayTimestampRange from '~/server/utils/date/getDayTimestampRange';
+import {
+    serviceDateToDay,
+    serviceDayToShanghaiDayStartUnixSeconds,
+    type ServiceDay
+} from '~/server/utils/date/serviceDay';
 import {
     deleteDailyRouteById,
     getDailyRecordById
@@ -26,6 +30,11 @@ import type {
     AdminAnomalyType
 } from '~/types/admin';
 import parseEmuCode from '~/server/utils/12306/parseEmuCode';
+import type { EmuId } from '~/server/libs/database/emu';
+import {
+    formatExternalEmuCode,
+    formatExternalServiceDate
+} from '~/server/utils/internal/boundaries';
 
 const ADMIN_ANOMALY_TYPES: readonly AdminAnomalyType[] = [
     'train_multi_emu',
@@ -33,6 +42,7 @@ const ADMIN_ANOMALY_TYPES: readonly AdminAnomalyType[] = [
     'train_non_multiple_coupled',
     'emu_single_short_route'
 ];
+const DAY_SECONDS = 24 * 60 * 60;
 
 interface DeleteDailyRouteResult {
     deletedDailyRoute: boolean;
@@ -40,8 +50,8 @@ interface DeleteDailyRouteResult {
     route: NonNullable<ReturnType<typeof getDailyRecordById>> | null;
 }
 
-function collectDetectionGroupsFromEmuCodes(
-    emuCodes: string[],
+function collectDetectionGroupsFromEmuIds(
+    emuIds: EmuId[],
     assets: Awaited<ReturnType<typeof loadProbeAssets>>
 ) {
     const detectionGroups = new Map<
@@ -49,7 +59,8 @@ function collectDetectionGroupsFromEmuCodes(
         { bureau: string; model: string }
     >();
 
-    for (const emuCode of emuCodes) {
+    for (const emuId of emuIds) {
+        const emuCode = formatExternalEmuCode(emuId);
         const parsedEmuCode = parseEmuCode(emuCode);
         if (!parsedEmuCode?.trainSetNo) {
             continue;
@@ -84,25 +95,26 @@ function ensureAdminAnomalyType(
 
 function doesRouteBelongToDate(
     route: NonNullable<ReturnType<typeof getDailyRecordById>>,
-    date: string
+    serviceDate: ServiceDay
 ) {
-    const dayRange = getDayTimestampRange(date);
+    const dayStartAt = serviceDayToShanghaiDayStartUnixSeconds(serviceDate);
     return (
-        route.start_at >= dayRange.startAt && route.start_at <= dayRange.endAt
+        route.start_at >= dayStartAt &&
+        route.start_at <= dayStartAt + DAY_SECONDS - 1
     );
 }
 
 function assertRouteBelongsToDate(
     route: NonNullable<ReturnType<typeof getDailyRecordById>>,
-    date: string
+    serviceDate: ServiceDay
 ) {
-    if (!doesRouteBelongToDate(route, date)) {
+    if (!doesRouteBelongToDate(route, serviceDate)) {
         throw new ApiRequestError(400, 'invalid_param', '该交路不属于所选日期');
     }
 }
 
 function deleteDailyRouteAndProbeStatus(
-    date: string,
+    serviceDate: ServiceDay,
     numericRouteId: number,
     failWhenMissing: boolean
 ): DeleteDailyRouteResult {
@@ -119,7 +131,7 @@ function deleteDailyRouteAndProbeStatus(
         };
     }
 
-    if (!doesRouteBelongToDate(route, date)) {
+    if (!doesRouteBelongToDate(route, serviceDate)) {
         if (failWhenMissing) {
             throw new ApiRequestError(
                 400,
@@ -151,7 +163,7 @@ function deleteDailyRouteAndProbeStatus(
     const deletedProbeStatusRows =
         deleteProbeStatusByTrainCodeAndEmuCodeAtStartAt(
             route.train_code,
-            route.emu_code,
+            route.emu_id,
             route.start_at
         );
 
@@ -172,44 +184,46 @@ function normalizeRouteId(routeId: string) {
 }
 
 export async function deleteAnomalyRoute(
-    date: string,
+    serviceDate: ServiceDay,
     routeId: string
 ): Promise<AdminAnomalyDeleteRouteResponse> {
     const numericRouteId = normalizeRouteId(routeId);
 
     const deleteResult = deleteDailyRouteAndProbeStatus(
-        date,
+        serviceDate,
         numericRouteId,
         true
     );
 
-    const wasToday = date === getCurrentDateString();
+    const wasToday = serviceDate === serviceDateToDay(getCurrentDateString());
     let clearedRuntimeTrainKey = false;
-    let clearedRuntimeEmuCodes: string[] = [];
+    let clearedRuntimeEmuIds: EmuId[] = [];
     let clearedDetectionGroups = 0;
 
     if (wasToday) {
         const route = deleteResult.route;
-        const trainCode = route?.train_code ?? '';
-        const emuCode = route?.emu_code ?? '';
-        const startAt = route?.start_at ?? 0;
-        const trainGroup = getTodayScheduleProbeGroupByTrainCode(trainCode) ?? {
-            trainKey: buildTrainKey(trainCode, '', startAt)
-        };
-        const trainKey = trainGroup.trainKey;
+        const trainKey = route
+            ? (getTodayScheduleProbeGroupByTrainCode(route.train_code)
+                  ?.trainKey ??
+              buildTrainKey(route.train_code, null, route.start_at))
+            : '';
 
-        clearedRuntimeTrainKey = hasQueriedTrainKey(trainKey);
-        clearQueriedTrainKey(trainKey);
+        if (trainKey.length > 0) {
+            clearedRuntimeTrainKey = hasQueriedTrainKey(trainKey);
+            clearQueriedTrainKey(trainKey);
+        }
 
-        const affectedEmuCodes = new Set<string>(emuCode ? [emuCode] : []);
-        clearedRuntimeEmuCodes = clearRunningEmuStateByTrainKey(trainKey);
-        for (const emuCode of clearedRuntimeEmuCodes) {
-            affectedEmuCodes.add(emuCode);
+        const affectedEmuIds = new Set<EmuId>(route ? [route.emu_id] : []);
+        clearedRuntimeEmuIds = route
+            ? clearRunningEmuStateByTrainKey(trainKey)
+            : [];
+        for (const emuId of clearedRuntimeEmuIds) {
+            affectedEmuIds.add(emuId);
         }
 
         const assets = await loadProbeAssets();
-        const detectionGroups = collectDetectionGroupsFromEmuCodes(
-            Array.from(affectedEmuCodes),
+        const detectionGroups = collectDetectionGroupsFromEmuIds(
+            Array.from(affectedEmuIds),
             assets
         );
         for (const detectionGroup of detectionGroups) {
@@ -222,24 +236,24 @@ export async function deleteAnomalyRoute(
     }
 
     return {
-        date,
+        date: formatExternalServiceDate(serviceDate),
         routeId,
         wasToday,
         deletedDailyRoute: true,
         deletedProbeStatusRows: deleteResult.deletedProbeStatusRows,
         clearedRuntimeTrainKey,
-        clearedRuntimeEmuCodes,
+        clearedRuntimeEmuCodes: clearedRuntimeEmuIds.map(formatExternalEmuCode),
         clearedDetectionGroups
     };
 }
 
 export async function deleteAnomalyRoutesByType(
-    date: string,
+    serviceDate: ServiceDay,
     type: string
 ): Promise<AdminAnomalyBulkDeleteResponse> {
     ensureAdminAnomalyType(type);
 
-    if (date === getCurrentDateString()) {
+    if (serviceDate === serviceDateToDay(getCurrentDateString())) {
         throw new ApiRequestError(
             400,
             'invalid_param',
@@ -247,7 +261,7 @@ export async function deleteAnomalyRoutesByType(
         );
     }
 
-    const scanResult = await scanDailyAnomalies(date);
+    const scanResult = await scanDailyAnomalies(serviceDate);
     const matchedItems = scanResult.items.filter((item) => item.type === type);
     const routeIds = Array.from(
         new Set(
@@ -264,7 +278,11 @@ export async function deleteAnomalyRoutesByType(
 
     const deleteTransaction = useEmuDatabase().transaction(() => {
         for (const routeId of routeIds) {
-            const result = deleteDailyRouteAndProbeStatus(date, routeId, false);
+            const result = deleteDailyRouteAndProbeStatus(
+                serviceDate,
+                routeId,
+                false
+            );
 
             if (!result.deletedDailyRoute) {
                 skippedRoutes += 1;
@@ -279,7 +297,7 @@ export async function deleteAnomalyRoutesByType(
     deleteTransaction();
 
     return {
-        date,
+        date: formatExternalServiceDate(serviceDate),
         type,
         wasToday: false,
         matchedItems: matchedItems.length,

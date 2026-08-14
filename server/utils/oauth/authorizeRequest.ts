@@ -1,6 +1,9 @@
 import { getQuery, type H3Event } from 'h3';
 import type {
+    OAuthAuthorizeContextClient,
     OAuthAuthorizeContextResponse,
+    OAuthAuthorizeContextSession,
+    OAuthAuthorizeInvalidReason,
     OAuthAuthorizeRequest
 } from '~/types/auth';
 import {
@@ -34,6 +37,34 @@ export type OAuthAuthorizeDecisionResult =
           type: 'error';
           statusCode: number;
           statusMessage: string;
+      };
+
+export interface OAuthAuthorizeSessionContext {
+    userId: string;
+    activeFrom: number;
+    scopes: string[];
+}
+
+export type OAuthAuthorizeContextDecisionResult =
+    | {
+          mode: 'redirect';
+          location: string;
+          continuationId?: string;
+      }
+    | {
+          mode: 'error';
+          error: 'invalid_request';
+          reason: OAuthAuthorizeInvalidReason;
+          message: string;
+      }
+    | {
+          mode: 'consent';
+          client: OAuthAuthorizeContextClient;
+          request: OAuthAuthorizeRequest;
+          session: OAuthAuthorizeContextSession;
+          scopes: string[];
+          hasPendingScopes: boolean;
+          requiresOwnerBypass: boolean;
       };
 
 function parseScopeValue(scope: unknown) {
@@ -89,10 +120,13 @@ export function buildRedirectUrl(
 }
 
 function canSessionAuthorizeRequest(
-    session: NonNullable<ReturnType<typeof getValidApiKey>>,
+    session: OAuthAuthorizeSessionContext | null,
     request: ReturnType<typeof validateAuthorizeRequest>
 ) {
     if (!request.ok) {
+        return null;
+    }
+    if (!session) {
         return null;
     }
 
@@ -103,21 +137,31 @@ function canSessionAuthorizeRequest(
     return authorizeValidatedRequestForUser(request.data, session.userId);
 }
 
-function resolveAuthorizeSession(event: H3Event) {
+export function resolveAuthorizeSession(
+    event: H3Event
+): OAuthAuthorizeSessionContext | null {
     const authCookie = readAuthCookie(event);
     const session = authCookie ? getValidApiKey(authCookie) : undefined;
     if (session && isUserBanned(session.userId)) {
         clearAuthCookie(event);
-        return undefined;
+        return null;
     }
 
-    return session;
+    if (!session) {
+        return null;
+    }
+
+    return {
+        userId: session.userId,
+        activeFrom: session.activeFrom,
+        scopes: session.scopes
+    };
 }
 
-export function getAuthorizeContext(
-    event: H3Event,
-    authorizeRequest: OAuthAuthorizeRequest
-): OAuthAuthorizeContextResponse {
+export function getAuthorizeContextDecision(
+    authorizeRequest: OAuthAuthorizeRequest,
+    session: OAuthAuthorizeSessionContext | null
+): OAuthAuthorizeContextDecisionResult {
     const validated = validateAuthorizeRequest(authorizeRequest);
     if (!validated.ok) {
         return {
@@ -128,16 +172,15 @@ export function getAuthorizeContext(
         };
     }
 
-    const session = resolveAuthorizeSession(event);
     if (!session) {
         const continuationId = createOauthLoginContinuation({
             authorizeRequest
         });
-        setOauthContinuationCookie(event, continuationId);
 
         return {
             mode: 'redirect',
-            location: '/login?oauth=1'
+            location: '/login?oauth=1',
+            continuationId
         };
     }
 
@@ -207,6 +250,21 @@ export function getAuthorizeContext(
         hasPendingScopes: authorized.hasPendingScopes,
         requiresOwnerBypass: authorized.requiresOwnerBypass
     };
+}
+
+export function getAuthorizeContext(
+    event: H3Event,
+    authorizeRequest: OAuthAuthorizeRequest
+): OAuthAuthorizeContextResponse {
+    const session = resolveAuthorizeSession(event);
+    const decision = getAuthorizeContextDecision(authorizeRequest, session);
+    if (decision.mode === 'redirect' && decision.continuationId) {
+        setOauthContinuationCookie(event, decision.continuationId);
+    }
+    if (decision.mode === 'redirect') {
+        return { mode: 'redirect', location: decision.location };
+    }
+    return decision;
 }
 
 export function applyAuthorizeDecision(

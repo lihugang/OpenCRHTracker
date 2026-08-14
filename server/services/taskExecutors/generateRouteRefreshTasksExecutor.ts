@@ -1,7 +1,10 @@
 import getLogger from '~/server/libs/log4js';
 import useConfig from '~/server/config';
 import { estimateIdleTaskDurationMs } from '~/server/services/idleTaskEstimator';
-import { registerTaskExecutor } from '~/server/services/taskExecutorRegistry';
+import {
+    parseEmptyTaskArgs,
+    registerTaskExecutor
+} from '~/server/services/taskExecutorRegistry';
 import {
     enqueueTask,
     enqueueTasks,
@@ -16,9 +19,15 @@ import {
     getGroupKey,
     splitIntoBatches
 } from '~/server/utils/12306/scheduleProbe/taskHelpers';
+import {
+    parseExternalTrainCodeOrThrow,
+    parseExternalTrainCode
+} from '~/server/utils/internal/boundaries';
 import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
+import { serviceDateToDay } from '~/server/utils/date/serviceDay';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
 import { REFRESH_ROUTE_BATCH_TASK_EXECUTOR } from './refreshRouteBatchTaskExecutor';
+import type { TrainCodeParts } from '~/server/utils/12306/trainCode';
 
 export const GENERATE_ROUTE_REFRESH_TASKS_EXECUTOR =
     'generate_route_refresh_tasks';
@@ -77,7 +86,7 @@ async function executeGenerateRouteRefreshTasks() {
         return;
     }
 
-    const currentDate = getCurrentDateString();
+    const currentDate = serviceDateToDay(getCurrentDateString());
     if (published.date !== currentDate) {
         const selfTaskId = enqueueSelfTask(
             nextSelfExecutionTime,
@@ -93,11 +102,11 @@ async function executeGenerateRouteRefreshTasks() {
     const ttlSeconds = config.spider.scheduleProbe.refresh.ttlHours * 60 * 60;
     const batchSize = config.spider.scheduleProbe.refresh.batchSize;
     const groupDeduplication = new Set<string>();
-    const staleCodes: string[] = [];
+    const staleCodes: TrainCodeParts[] = [];
 
     for (const item of listScheduleItemsByStateKind('published')) {
         const groupKey = getGroupKey({
-            code: item.itemCode,
+            code: parseExternalTrainCodeOrThrow(item.itemCode),
             internalCode: item.internalCode
         });
         if (groupDeduplication.has(groupKey)) {
@@ -113,7 +122,7 @@ async function executeGenerateRouteRefreshTasks() {
         }
 
         groupDeduplication.add(groupKey);
-        staleCodes.push(item.itemCode);
+        staleCodes.push(parseExternalTrainCodeOrThrow(item.itemCode));
     }
 
     let created = 0;
@@ -157,8 +166,9 @@ export function registerGenerateRouteRefreshTasksExecutor() {
         return;
     }
 
-    registerTaskExecutor(GENERATE_ROUTE_REFRESH_TASKS_EXECUTOR, async () => {
-        await executeGenerateRouteRefreshTasks();
+    registerTaskExecutor(GENERATE_ROUTE_REFRESH_TASKS_EXECUTOR, {
+        parse: parseEmptyTaskArgs,
+        execute: async () => executeGenerateRouteRefreshTasks()
     });
     registered = true;
     logger.info(`registered executor=${GENERATE_ROUTE_REFRESH_TASKS_EXECUTOR}`);

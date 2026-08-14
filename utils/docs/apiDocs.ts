@@ -1,4 +1,4 @@
-import developerDocsOpenApi from '~/utils/docs/openApi';
+import developerDocsOpenApi from '~/utils/docs/generated/openApi';
 import type {
     DocsApiCostDisplay,
     DocsApiEndpoint,
@@ -17,391 +17,8 @@ import type {
     OpenApiSchema
 } from '~/types/docs';
 
-const DAILY_RECORD_ITEM_SCHEMA: OpenApiSchema = {
-    type: 'object',
-    required: ['id', 'serviceDate', 'timetableId', 'emuCode', 'trainCode'],
-    properties: {
-        id: {
-            type: 'string',
-            example: '681107'
-        },
-        serviceDate: {
-            type: 'string',
-            pattern: '^\\d{8}$',
-            example: '20260503'
-        },
-        timetableId: {
-            type: 'integer',
-            nullable: true,
-            example: 5096
-        },
-        emuCode: {
-            type: 'string',
-            example: 'CRH380A-2844'
-        },
-        trainCode: {
-            type: 'string',
-            example: 'C9607'
-        }
-    }
-};
-
-const DAILY_RECORDS_RESPONSE_SCHEMA: OpenApiSchema = {
-    type: 'object',
-    required: ['ok', 'data', 'error'],
-    properties: {
-        ok: {
-            type: 'boolean',
-            example: true
-        },
-        data: {
-            type: 'object',
-            required: ['date', 'cursor', 'limit', 'nextCursor', 'items'],
-            properties: {
-                date: {
-                    type: 'string',
-                    example: '20260503'
-                },
-                cursor: {
-                    type: 'string',
-                    example: ''
-                },
-                limit: {
-                    type: 'integer',
-                    example: 2
-                },
-                nextCursor: {
-                    type: 'string',
-                    example: '20260503:681106'
-                },
-                items: {
-                    type: 'array',
-                    items: DAILY_RECORD_ITEM_SCHEMA
-                }
-            }
-        },
-        error: {
-            type: 'string',
-            example: ''
-        }
-    }
-};
-
-const TRAIN_HISTORY_ITEM_SCHEMA: OpenApiSchema = {
-    type: 'object',
-    required: ['id', 'serviceDate', 'timetableId', 'emuCode'],
-    properties: {
-        id: {
-            type: 'string',
-            example: '674559'
-        },
-        serviceDate: {
-            type: 'string',
-            pattern: '^\\d{8}$',
-            example: '20260503'
-        },
-        timetableId: {
-            type: 'integer',
-            nullable: true,
-            example: 2524
-        },
-        emuCode: {
-            type: 'string',
-            example: 'CRH1A-1156'
-        }
-    }
-};
-
-const TRAIN_HISTORY_RESPONSE_SCHEMA: OpenApiSchema = {
-    type: 'object',
-    required: ['ok', 'data', 'error'],
-    properties: {
-        ok: {
-            type: 'boolean',
-            example: true
-        },
-        data: {
-            type: 'object',
-            required: ['trainCode', 'cursor', 'limit', 'nextCursor', 'items'],
-            properties: {
-                trainCode: {
-                    type: 'string',
-                    example: 'D3319'
-                },
-                start: {
-                    type: 'integer',
-                    nullable: true,
-                    example: null
-                },
-                end: {
-                    type: 'integer',
-                    nullable: true,
-                    example: null
-                },
-                cursor: {
-                    type: 'string',
-                    example: ''
-                },
-                limit: {
-                    type: 'integer',
-                    example: 2
-                },
-                nextCursor: {
-                    type: 'string',
-                    example: '20260503:674558'
-                },
-                items: {
-                    type: 'array',
-                    items: TRAIN_HISTORY_ITEM_SCHEMA
-                }
-            }
-        },
-        error: {
-            type: 'string',
-            example: ''
-        }
-    }
-};
-
-const EMU_HISTORY_ITEM_SCHEMA: OpenApiSchema = {
-    type: 'object',
-    required: ['id', 'serviceDate', 'timetableId', 'trainCode'],
-    properties: {
-        id: {
-            type: 'string',
-            example: '680922'
-        },
-        serviceDate: {
-            type: 'string',
-            pattern: '^\\d{8}$',
-            example: '20260503'
-        },
-        timetableId: {
-            type: 'integer',
-            nullable: true,
-            example: 10196
-        },
-        trainCode: {
-            type: 'string',
-            example: 'C2233'
-        }
-    }
-};
-
-const EMU_HISTORY_RESPONSE_SCHEMA: OpenApiSchema = {
-    type: 'object',
-    required: ['ok', 'data', 'error'],
-    properties: {
-        ok: {
-            type: 'boolean',
-            example: true
-        },
-        data: {
-            type: 'object',
-            required: ['emuCode', 'cursor', 'limit', 'nextCursor', 'items'],
-            properties: {
-                emuCode: {
-                    type: 'string',
-                    example: 'CR400BF-5028'
-                },
-                start: {
-                    type: 'integer',
-                    nullable: true,
-                    example: null
-                },
-                end: {
-                    type: 'integer',
-                    nullable: true,
-                    example: null
-                },
-                cursor: {
-                    type: 'string',
-                    example: ''
-                },
-                limit: {
-                    type: 'integer',
-                    example: 2
-                },
-                nextCursor: {
-                    type: 'string',
-                    example: '20260503:680009'
-                },
-                items: {
-                    type: 'array',
-                    items: EMU_HISTORY_ITEM_SCHEMA
-                }
-            }
-        },
-        error: {
-            type: 'string',
-            example: ''
-        }
-    }
-};
-
-const RECORDS_DAILY_EXAMPLES = [
-    {
-        id: 'daily-first-page',
-        label: '第一页',
-        summary: '不额外携带身份信息，直接读取某一天的第一页数据。',
-        authMode: 'anonymous',
-        query: {
-            date: '20260503',
-            limit: '2'
-        }
-    },
-    {
-        id: 'daily-next-page',
-        label: '下一页',
-        summary: '复用服务端返回的 cursor，继续读取下一页每日记录。',
-        authMode: 'anonymous',
-        query: {
-            date: '20260503',
-            limit: '2',
-            cursor: '20260503:681106'
-        }
-    }
-] as const;
-
-const HISTORY_TRAIN_EXAMPLES = [
-    {
-        id: 'train-first-page',
-        label: '第一页',
-        summary: '读取单个车次最新的历史担当记录。',
-        authMode: 'anonymous',
-        pathParams: {
-            trainCode: 'D3319'
-        },
-        query: {
-            limit: '2'
-        }
-    },
-    {
-        id: 'train-cursor',
-        label: '游标翻页',
-        summary: '使用 cursor 继续读取同一车次的后续历史记录。',
-        authMode: 'anonymous',
-        pathParams: {
-            trainCode: 'D3319'
-        },
-        query: {
-            limit: '2',
-            cursor: '20260503:674558'
-        }
-    }
-] as const;
-
-const HISTORY_EMU_EXAMPLES = [
-    {
-        id: 'emu-first-page',
-        label: '第一页',
-        summary: '读取单一车组最新的历史担当记录。',
-        authMode: 'anonymous',
-        pathParams: {
-            emuCode: 'CR400BF-5028'
-        },
-        query: {
-            limit: '2'
-        }
-    },
-    {
-        id: 'emu-cursor',
-        label: '游标翻页',
-        summary: '使用 cursor 继续读取同一车组的后续历史记录。',
-        authMode: 'anonymous',
-        pathParams: {
-            emuCode: 'CR400BF-5028'
-        },
-        query: {
-            limit: '2',
-            cursor: '20260503:680009'
-        }
-    }
-] as const;
-
-const RECORDS_DAILY_RESPONSE_EXAMPLE = {
-    ok: true,
-    data: {
-        date: '20260503',
-        cursor: '',
-        limit: 2,
-        nextCursor: '20260503:681106',
-        items: [
-            {
-                id: '681107',
-                serviceDate: '20260503',
-                timetableId: 5096,
-                emuCode: 'CRH380A-2844',
-                trainCode: 'C9607'
-            },
-            {
-                id: '681106',
-                serviceDate: '20260503',
-                timetableId: 5096,
-                emuCode: 'CRH380A-2844',
-                trainCode: 'C9606'
-            }
-        ]
-    },
-    error: ''
-} as const;
-
-const HISTORY_TRAIN_RESPONSE_EXAMPLE = {
-    ok: true,
-    data: {
-        trainCode: 'D3319',
-        start: null,
-        end: null,
-        cursor: '',
-        limit: 2,
-        nextCursor: '20260503:674558',
-        items: [
-            {
-                id: '674559',
-                serviceDate: '20260503',
-                timetableId: 2524,
-                emuCode: 'CRH1A-1156'
-            },
-            {
-                id: '674558',
-                serviceDate: '20260503',
-                timetableId: 2524,
-                emuCode: 'CRH1A-1151'
-            }
-        ]
-    },
-    error: ''
-} as const;
-
-const HISTORY_EMU_RESPONSE_EXAMPLE = {
-    ok: true,
-    data: {
-        emuCode: 'CR400BF-5028',
-        start: null,
-        end: null,
-        cursor: '',
-        limit: 2,
-        nextCursor: '20260503:680009',
-        items: [
-            {
-                id: '680922',
-                serviceDate: '20260503',
-                timetableId: 10196,
-                trainCode: 'C2233'
-            },
-            {
-                id: '680009',
-                serviceDate: '20260503',
-                timetableId: 10191,
-                trainCode: 'C2228'
-            }
-        ]
-    },
-    error: ''
-} as const;
-
 export const DEFAULT_DOCS_API_RUNTIME_CONFIG: DocsApiRuntimeConfig = {
-    versionPrefix: '/api/v1',
+    versionPrefix: '/api/v2',
     apiKeyHeader: 'authorization',
     authCookieName: 'token',
     timestampUnit: 'seconds',
@@ -415,9 +32,9 @@ export const DEFAULT_DOCS_API_RUNTIME_CONFIG: DocsApiRuntimeConfig = {
         maxLimit: 200
     },
     quota: {
-        anonymousMaxTokens: 25,
-        userMaxTokens: 1000,
-        refillAmount: 5,
+        anonymousMaxTokens: 160,
+        userMaxTokens: 2000,
+        refillAmount: 10,
         refillIntervalSeconds: 300
     },
     cost: {
@@ -432,48 +49,33 @@ export const DEFAULT_DOCS_API_RUNTIME_CONFIG: DocsApiRuntimeConfig = {
             trainCirculationImage: 20,
             trainCirculationImageFailure: 2,
             timetableTrainHistory: 1,
-            exportDailyIndex: 2,
-            exportDaily: 50
+            exportDailyIndex: 10,
+            exportDaily: 400
         },
         perRecord: {
             recordsDaily: {
-                unitCost: 0.05,
+                unitCost: 0.1,
                 rounding: 'ceil'
             },
             timetableTrainHistory: {
-                unitCost: 0.05,
+                unitCost: 0.1,
                 rounding: 'ceil'
             },
             timetableStation: {
-                unitCost: 0.05,
+                unitCost: 0.1,
                 rounding: 'ceil'
             },
             historyTrain: {
-                unitCost: 0.05,
+                unitCost: 0.1,
                 rounding: 'ceil'
             },
             historyEmu: {
-                unitCost: 0.05,
+                unitCost: 0.1,
                 rounding: 'ceil'
             }
         }
     }
 };
-
-const PUBLIC_DOCS_API_SLUGS = new Set<string>([
-    'auth-me',
-    'records-daily',
-    'timetable-train-current',
-    'timetable-train-circulation-image',
-    'timetable-train-history',
-    'timetable-train-history-detail',
-    'timetable-station',
-    'history-train',
-    'history-emu',
-    'allocation-emu',
-    'exports-daily-index',
-    'exports-daily-date'
-]);
 
 function isReference(value: unknown): value is OpenApiReference {
     return (
@@ -586,83 +188,16 @@ function resolveResponse(
     };
 }
 
-function overrideJsonResponseContent(
-    response: DocsResolvedResponse,
-    schema: OpenApiSchema,
-    example: unknown
-): DocsResolvedResponse {
-    return {
-        ...response,
-        content: response.content.map((content) =>
-            content.contentType === 'application/json'
-                ? {
-                      ...content,
-                      schema,
-                      example
-                  }
-                : content
-        )
-    };
-}
-
-function normalizeEndpoint(endpoint: DocsApiEndpoint): DocsApiEndpoint {
-    switch (endpoint.slug) {
-        case 'records-daily':
-            return {
-                ...endpoint,
-                examples: [...RECORDS_DAILY_EXAMPLES],
-                responses: endpoint.responses.map((response) =>
-                    response.statusCode === '200'
-                        ? overrideJsonResponseContent(
-                              response,
-                              DAILY_RECORDS_RESPONSE_SCHEMA,
-                              RECORDS_DAILY_RESPONSE_EXAMPLE
-                          )
-                        : response
-                )
-            };
-        case 'history-train':
-            return {
-                ...endpoint,
-                examples: [...HISTORY_TRAIN_EXAMPLES],
-                responses: endpoint.responses.map((response) =>
-                    response.statusCode === '200'
-                        ? overrideJsonResponseContent(
-                              response,
-                              TRAIN_HISTORY_RESPONSE_SCHEMA,
-                              HISTORY_TRAIN_RESPONSE_EXAMPLE
-                          )
-                        : response
-                )
-            };
-        case 'history-emu':
-            return {
-                ...endpoint,
-                examples: [...HISTORY_EMU_EXAMPLES],
-                responses: endpoint.responses.map((response) =>
-                    response.statusCode === '200'
-                        ? overrideJsonResponseContent(
-                              response,
-                              EMU_HISTORY_RESPONSE_SCHEMA,
-                              HISTORY_EMU_RESPONSE_EXAMPLE
-                          )
-                        : response
-                )
-            };
-        default:
-            return endpoint;
-    }
-}
-
 function createEndpoint(
     method: OpenApiHttpMethod,
     path: string,
     operation: OpenApiOperation
 ): DocsApiEndpoint {
-    return normalizeEndpoint({
+    return {
         slug: operation['x-slug'],
         method,
         operationId: operation.operationId,
+        sortOrder: operation['x-sort-order'],
         group: operation['x-group'],
         tag: operation.tags[0] ?? operation['x-group'],
         path,
@@ -680,8 +215,10 @@ function createEndpoint(
                 (left, right) =>
                     Number(left.statusCode) - Number(right.statusCode)
             ),
-        examples: operation['x-examples']
-    });
+        examples: operation['x-examples'],
+        usageScenarios: operation['x-usage-scenarios'] ?? [],
+        faq: operation['x-faq'] ?? []
+    };
 }
 
 function readOperation(pathItem: OpenApiPathItem, method: OpenApiHttpMethod) {
@@ -710,10 +247,9 @@ const endpointList = Object.entries(developerDocsOpenApi.paths)
             }
         );
     })
-    .filter((endpoint) => PUBLIC_DOCS_API_SLUGS.has(endpoint.slug))
     .sort((left, right) => {
-        if (left.group !== right.group) {
-            return left.group.localeCompare(right.group);
+        if (left.sortOrder !== right.sortOrder) {
+            return left.sortOrder - right.sortOrder;
         }
 
         return left.slug.localeCompare(right.slug);
@@ -732,11 +268,9 @@ const tagDescriptionMap = new Map(
 
 const FIXED_COST_ENDPOINT_KEYS = {
     'auth-me': 'authMe',
-    'oauth-clients-create': 'authCreateOauthClient',
     'allocation-emu': 'allocationEmu',
     'timetable-train-current': 'timetableTrainCurrent',
     'timetable-train-circulation-image': 'trainCirculationImage',
-    'timetable-train-history-detail': 'timetableTrainHistory',
     'exports-daily-index': 'exportDailyIndex',
     'exports-daily-date': 'exportDaily'
 } as const satisfies Record<

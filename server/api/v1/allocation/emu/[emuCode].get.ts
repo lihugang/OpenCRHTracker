@@ -1,13 +1,13 @@
 import { defineEventHandler, getRouterParam } from 'h3';
 import useConfig from '~/server/config';
-import { loadProbeAssets } from '~/server/services/probeAssetStore';
+import { getEmuAllocation } from '~/server/domain/allocation';
 import getFixedCost from '~/server/utils/api/cost/getFixedCost';
 import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';
 import setCacheControl from '~/server/utils/api/response/setCacheControl';
 import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
-import type { EmuAllocationProfileResponse } from '~/types/lookup';
+import { formatExternalEmuCode } from '~/server/utils/internal/boundaries';
 
 export default defineEventHandler(async (event) => {
     const cacheMaxAge = useConfig().api.cache.searchIndexMaxAgeSeconds;
@@ -39,54 +39,35 @@ export default defineEventHandler(async (event) => {
                 'emuCode 不能为空'
             );
 
-            const assets = await loadProbeAssets();
-            const canonicalEmuCode =
-                assets.canonicalEmuCodeByAnyCode.get(requestEmuCode) ??
-                requestEmuCode;
-            const record = assets.emuList.find(
-                (item) =>
-                    normalizeCode(`${item.model}-${item.trainSetNo}`) ===
-                    canonicalEmuCode
-            );
+            const profile = await getEmuAllocation(requestEmuCode);
 
-            ensure(
-                record,
-                404,
-                'allocation_not_found',
-                '未找到该动车组配属信息'
-            );
-
-            const response: EmuAllocationProfileResponse = {
+            return {
                 requestEmuCode,
-                emuCode: canonicalEmuCode,
-                model: record.model,
-                trainSetNo: record.trainSetNo,
-                bureau: record.bureau,
-                trainDepot: record.trainDepot,
-                depot: record.depot,
-                subModel: record.subModel,
-                customType: record.customType,
-                trainsetManufacturer: record.trainsetManufacturer,
-                trailerManufacturer: record.trailerManufacturer,
-                manufactureMonth: record.manufactureMonth,
-                designMaxSpeed: record.designMaxSpeed,
-                operatingMaxSpeed: record.operatingMaxSpeed,
-                isPublic: record.isPublic,
-                railwayTravelCodeEnabled: record.railwayTravelCodeEnabled,
-                firstClassPowerLegrest: record.firstClassPowerLegrest,
-                toiletStatus: record.toiletStatus,
-                socketLocation: record.socketLocation,
-                businessSeatType: record.businessSeatType,
-                modelRemark: record.modelRemark,
-                note: record.note,
-                tags: [...record.tags],
-                alias: [...record.alias],
-                coachLayouts: record.coachLayouts.map((layout) => ({
-                    ...layout
-                }))
+                emuCode: formatExternalEmuCode(profile.emuId),
+                model: profile.model,
+                trainSetNo: profile.trainSetNo,
+                bureau: profile.bureau,
+                trainDepot: profile.trainDepot,
+                depot: profile.depot,
+                subModel: profile.subModel,
+                customType: profile.customType,
+                trainsetManufacturer: profile.trainsetManufacturer,
+                trailerManufacturer: profile.trailerManufacturer,
+                manufactureMonth: profile.manufactureMonth,
+                designMaxSpeed: profile.designMaxSpeed,
+                operatingMaxSpeed: profile.operatingMaxSpeed,
+                isPublic: profile.isPublic,
+                railwayTravelCodeEnabled: profile.railwayTravelCodeEnabled,
+                firstClassPowerLegrest: profile.firstClassPowerLegrest,
+                toiletStatus: profile.toiletStatus,
+                socketLocation: profile.socketLocation,
+                businessSeatType: profile.businessSeatType,
+                modelRemark: profile.modelRemark,
+                note: profile.note,
+                tags: profile.tags,
+                alias: profile.alias,
+                coachLayouts: profile.coachLayouts
             };
-
-            return response;
         }
     );
 });

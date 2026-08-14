@@ -101,9 +101,8 @@
 <script setup lang="ts">
 import UiModal from '~/components/ui/UiModal.vue';
 import { useAdminDateQuery } from '~/composables/useAdminDateQuery';
-import type { AdminRevokeAllWebappTokensResponse } from '~/types/admin';
-import type { TrackerApiResponse } from '~/types/homepage';
 import getApiErrorMessage from '~/utils/api/getApiErrorMessage';
+import { revokeAllAdminWebappTokens } from '~/utils/api/v2/domain/admin';
 
 definePageMeta({
     middleware: 'admin-required'
@@ -155,33 +154,11 @@ async function confirmRevokeAllWebappTokens() {
     revokeErrorMessage.value = '';
 
     try {
-        const { data, error } = await useCsrfFetch<
-            TrackerApiResponse<AdminRevokeAllWebappTokensResponse>
-        >('/api/v1/admin/webapp-tokens/revoke-all', {
-            method: 'POST',
-            key: `admin:webapp-tokens:revoke-all:${Date.now()}`,
-            watch: false,
-            server: false
-        });
-
-        if (error.value) {
-            throw error.value;
-        }
-
-        const response = data.value;
-        if (!response) {
-            throw new Error('Missing revoke-all-webapp-tokens response');
-        }
-
-        if (!response.ok) {
-            throw {
-                data: response
-            };
-        }
+        const response = await revokeAllAdminWebappTokens();
 
         isConfirmDialogOpen.value = false;
 
-        if (response.data.revokedCurrentSession) {
+        if (response.revokedCurrentSession) {
             clearSession();
             await navigateTo('/login');
             return;

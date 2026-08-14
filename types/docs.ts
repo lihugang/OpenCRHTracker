@@ -98,6 +98,11 @@ export interface DocsApiExample {
     body?: unknown;
 }
 
+export interface DocsApiFaqItem {
+    question: string;
+    answer: string;
+}
+
 export interface OpenApiOperation {
     operationId: string;
     tags: string[];
@@ -113,6 +118,8 @@ export interface OpenApiOperation {
     'x-auth-modes': DocsAuthMode[];
     'x-required-scopes': string[];
     'x-examples': DocsApiExample[];
+    'x-usage-scenarios'?: string[];
+    'x-faq'?: DocsApiFaqItem[];
 }
 
 export interface OpenApiPathItem {
@@ -160,6 +167,7 @@ export interface DocsApiEndpoint {
     slug: string;
     method: OpenApiHttpMethod;
     operationId: string;
+    sortOrder: number;
     group: string;
     tag: string;
     path: string;
@@ -171,6 +179,8 @@ export interface DocsApiEndpoint {
     requestBody: OpenApiRequestBody | null;
     responses: DocsResolvedResponse[];
     examples: DocsApiExample[];
+    usageScenarios: string[];
+    faq: DocsApiFaqItem[];
 }
 
 export interface DocsApiGroup {

@@ -4,15 +4,17 @@ INSERT INTO coupling_scan_candidates (
     service_date,
     bureau,
     model,
-    candidate_emu_code,
+    candidate_emu_id,
     status,
     reason,
-    scanned_train_code,
+    scanned_train_prefix,
+    scanned_train_number,
     scanned_internal_code,
     scanned_start_at,
-    matched_train_code,
+    matched_train_prefix,
+    matched_train_number,
     matched_start_at,
     train_repeat,
     detail_json,
     created_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
