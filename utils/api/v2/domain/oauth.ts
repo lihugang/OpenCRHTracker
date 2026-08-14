@@ -203,6 +203,7 @@ export async function updateOauthClient(
     >(
         PatchOauthClient,
         {
+            params: { clientId },
             body: {
                 clientId,
                 name: input.name,

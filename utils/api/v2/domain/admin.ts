@@ -1093,6 +1093,7 @@ export async function updateAdminConfigFile(
     >(
         PutAdminConfigFile,
         {
+            params: { target },
             body: {
                 target: toConfigFileTarget(target),
                 content,
@@ -1237,6 +1238,7 @@ export async function updateAdminOauthClient(input: {
     >(
         PatchAdminOauthClient,
         {
+            params: { clientId: input.clientId },
             body: {
                 clientId: input.clientId,
                 status: input.status === 'active' ? 1 : 2,
@@ -1271,9 +1273,13 @@ export async function revokeAdminOauthClientTokens(clientId: string) {
     const result = await requestV2<
         PostAdminOauthClientRevokeTokensData,
         { revokedCount: number }
-    >(PostAdminOauthClientRevokeTokens, { body: { clientId } }, (data) => ({
-        revokedCount: data.revokedCount
-    }));
+    >(
+        PostAdminOauthClientRevokeTokens,
+        { params: { clientId }, body: { clientId } },
+        (data) => ({
+            revokedCount: data.revokedCount
+        })
+    );
     return requireSuccess(PostAdminOauthClientRevokeTokens, result);
 }
 

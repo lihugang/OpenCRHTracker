@@ -368,6 +368,7 @@ export async function replyFeedbackTopic(
     >(
         PostFeedbackTopicMessage,
         {
+            params: { id: String(topicId) },
             body: {
                 topicId,
                 body,
@@ -395,6 +396,7 @@ export async function updateFeedbackTopic(
     >(
         PatchFeedbackTopic,
         {
+            params: { id: String(topicId) },
             body: {
                 topicId,
                 ...(patch.primaryType === undefined
@@ -423,6 +425,10 @@ export async function deleteFeedbackTopic(topicId: number) {
     const result = await requestV2<
         DeleteFeedbackTopicData,
         DeleteFeedbackTopicResponse
-    >(DeleteFeedbackTopic, { body: { topicId } }, mapDeleteTopic);
+    >(
+        DeleteFeedbackTopic,
+        { params: { id: String(topicId) }, body: { topicId } },
+        mapDeleteTopic
+    );
     return requireSuccess(DeleteFeedbackTopic, result);
 }

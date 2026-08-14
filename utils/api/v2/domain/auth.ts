@@ -967,7 +967,10 @@ export async function patchAuthSubscription(
         AuthSubscriptionListResponse
     >(
         PatchAuthSubscription,
-        { body: { subscriptionId, name } },
+        {
+            params: { id: subscriptionId },
+            body: { subscriptionId, name }
+        },
         mapSubscriptionListData
     );
     return requireSuccess(PatchAuthSubscription, result);

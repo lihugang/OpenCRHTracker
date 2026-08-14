@@ -67,13 +67,21 @@ function resolveFetchForMethod(entry: V2ClientOperation): TrackedRequestFetch {
 }
 
 function buildV2Url(entry: V2ClientOperation, input: V2RequestInput) {
-    let path = entry.pathTemplate;
-    for (const [key, value] of Object.entries(input.params ?? {})) {
-        if (value === undefined || value === null) {
-            continue;
+    const path = entry.pathTemplate.replace(
+        /:([A-Za-z0-9_]+)/g,
+        (_placeholder, key: string) => {
+            const value = input.params?.[key];
+            if (value === undefined || value === null || value === '') {
+                throw new V2ApiError(
+                    entry.operationName,
+                    null,
+                    'missing_path_param',
+                    `请求缺少路径参数：${key}`
+                );
+            }
+            return encodeURIComponent(String(value));
         }
-        path = path.replaceAll(`:${key}`, encodeURIComponent(String(value)));
-    }
+    );
 
     const search = new URLSearchParams();
     for (const [key, value] of Object.entries(input.query ?? {})) {

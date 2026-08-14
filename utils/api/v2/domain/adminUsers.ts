@@ -373,6 +373,7 @@ export async function putAdminUserMembership(
     >(
         PutAdminUserMembership,
         {
+            params: { userId, groupId },
             body: {
                 userId,
                 groupId,
