@@ -43,6 +43,7 @@ const AUTH_SKIPPED_FILE = resolve(
     repoRoot,
     'data/migrate-auth-v2-skipped.jsonl'
 );
+const EMU_CODE_MAPPING_TABLE = 'emu_code_mapping';
 
 const TRAIN_KEYS = new Set([
     'trainCode',
@@ -347,6 +348,10 @@ function jsonSemanticKey(column) {
     )
         return 'trainCodes';
     return '';
+}
+
+function isRebuiltTable(kind, table) {
+    return kind === 'EMUTracked' && table === EMU_CODE_MAPPING_TABLE;
 }
 
 function createTarget(kind, path) {
@@ -698,6 +703,24 @@ function copySqliteSequences(source, target) {
         .prepare('SELECT name, seq FROM sqlite_sequence')
         .all();
     if (sourceSequences.length === 0) return;
+    const targetSequences = new Map(
+        target
+            .prepare('SELECT name, seq FROM sqlite_sequence')
+            .all()
+            .map((row) => [row.name, Number(row.seq)])
+    );
+    const insertSequence = target.prepare(
+        'INSERT OR REPLACE INTO sqlite_sequence(name, seq) VALUES (?, ?)'
+    );
+    const updateSequence = target.prepare(
+        readFileSync(
+            resolve(
+                repoRoot,
+                'assets/sql/emu/maintenance/updateSqliteSequence.sql'
+            ),
+            'utf8'
+        )
+    );
     for (const row of sourceSequences) {
         const targetTable = target
             .prepare(
@@ -705,11 +728,52 @@ function copySqliteSequences(source, target) {
             )
             .get(row.name);
         if (!targetTable) continue;
-        target
-            .prepare(
-                'INSERT OR REPLACE INTO sqlite_sequence(name, seq) VALUES (?, ?)'
+        const current = targetSequences.get(row.name);
+        const sequence = Math.max(Number(row.seq), current ?? 0);
+        if (current === undefined) insertSequence.run(row.name, sequence);
+        else updateSequence.run(sequence, row.name);
+        targetSequences.set(row.name, sequence);
+    }
+}
+
+function validateEmuCodeMapping(target, mapping) {
+    const rows = target
+        .prepare(
+            readFileSync(
+                resolve(
+                    repoRoot,
+                    'assets/sql/emu/exports/selectExportEmuCodeMappings.sql'
+                ),
+                'utf8'
             )
-            .run(row.name, row.seq);
+        )
+        .all();
+    if (rows.length !== mapping.size) {
+        throw new Error(
+            `emu_code_mapping_count_mismatch expected=${mapping.size} actual=${rows.length}`
+        );
+    }
+    const expectedById = new Map(
+        [...mapping].map(([emuCode, id]) => [id, emuCode])
+    );
+    for (const row of rows) {
+        const expected = expectedById.get(Number(row.id));
+        if (expected !== row.emu_code) {
+            throw new Error(
+                `emu_code_mapping_mismatch id=${String(row.id)} expected=${String(expected)} actual=${String(row.emu_code)}`
+            );
+        }
+    }
+    const sequences = target
+        .prepare('SELECT name, seq FROM sqlite_sequence')
+        .all()
+        .filter((row) => row.name === EMU_CODE_MAPPING_TABLE);
+    const sequence = Math.max(0, ...sequences.map((row) => Number(row.seq)));
+    const maximumId = Math.max(0, ...rows.map((row) => Number(row.id)));
+    if (sequence < maximumId) {
+        throw new Error(
+            `emu_code_mapping_sequence_invalid sequence=${sequence} maximumId=${maximumId}`
+        );
     }
 }
 
@@ -812,6 +876,7 @@ function validateTarget(source, target, kind, copiedCounts, mapping) {
         if (kind === 'users' && table === 'user_event_subscriptions') {
             continue;
         }
+        if (isRebuiltTable(kind, table)) continue;
         const sourceCount = source
             .prepare(`SELECT COUNT(*) AS count FROM ${JSON.stringify(table)}`)
             .get().count;
@@ -827,6 +892,7 @@ function validateTarget(source, target, kind, copiedCounts, mapping) {
             );
         }
     }
+    if (kind === 'EMUTracked') validateEmuCodeMapping(target, mapping);
     const foreignKeyErrors = target.prepare('PRAGMA foreign_key_check').all();
     if (foreignKeyErrors.length > 0)
         throw new Error(
@@ -1291,11 +1357,13 @@ function migrate(options) {
                     );
                     for (const [emu, id] of mapping) insertMapping.run(id, emu);
                 }
-                for (const table of sourceTables)
+                for (const table of sourceTables) {
+                    if (isRebuiltTable(kind, table)) continue;
                     copiedCounts.set(
                         table,
                         copyTable(source, output, table, mapping, kind)
                     );
+                }
                 copySqliteSequences(source, output);
             });
             tx();
