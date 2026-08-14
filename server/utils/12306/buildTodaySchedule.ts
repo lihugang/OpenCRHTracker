@@ -96,15 +96,17 @@ function listStationPlatformTaskCandidatesFromBuildState(
             return [];
         }
 
-        return [{
-            trainCode: item.code,
-            trainInternalCode: item.internalCode,
-            startAt: toUnixSecondsFromShanghaiDayOffset(
-                state.date,
-                item.startAt
-            ),
-            stopCount: item.stops.length
-        }];
+        return [
+            {
+                trainCode: item.code,
+                trainInternalCode: item.internalCode,
+                startAt: toUnixSecondsFromShanghaiDayOffset(
+                    state.date,
+                    item.startAt
+                ),
+                stopCount: item.stops.length
+            }
+        ];
     });
 }
 

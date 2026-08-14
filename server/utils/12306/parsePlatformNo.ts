@@ -41,7 +41,9 @@ function parseChinesePlatformNo(text: string): number | null {
         return 10 + chineseDigitValues[teenMatch[1]!]!;
     }
 
-    const tensMatch = text.match(/^([二三四五六七八九])十([一二三四五六七八九])?$/);
+    const tensMatch = text.match(
+        /^([二三四五六七八九])十([一二三四五六七八九])?$/
+    );
     if (!tensMatch) {
         return null;
     }
