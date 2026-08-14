@@ -8,6 +8,7 @@ import {
     type TodayScheduleStationIndexRow
 } from '~/server/services/todayScheduleCache';
 import { getSupplementTrainTimetableByTrainCode } from '~/server/services/supplementTrainRegistryStore';
+import { refreshMissingOrExpiredStationPlatformInfoForTrainCodes } from '~/server/services/stationPlatformInfoService';
 import {
     getHistoricalTimetableContent,
     type HistoricalTimetableContent,
@@ -68,10 +69,19 @@ export async function getCurrentTrainTimetable(
     const supplementTimetable = scheduleTimetable
         ? null
         : getSupplementTrainTimetableByTrainCode(trainCode);
-    const timetable = scheduleTimetable ?? supplementTimetable;
+    let timetable = scheduleTimetable ?? supplementTimetable;
 
     if (!timetable || timetable.stops.length === 0) {
         throw new ApiRequestError(404, 'not_found', '当前暂无时刻表');
+    }
+
+    if (scheduleTimetable) {
+        await refreshMissingOrExpiredStationPlatformInfoForTrainCodes({
+            serviceDate: getTodayScheduleServiceDay(),
+            trainCodes: scheduleTimetable.allCodes
+        });
+        timetable =
+            getTodayScheduleTimetableByTrainCode(trainCode) ?? timetable;
     }
 
     return {
