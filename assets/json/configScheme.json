@@ -97,6 +97,11 @@
                             "type": "integer",
                             "minimum": 1,
                             "default": 30
+                        },
+                        "onDemandCooldownHours": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "default": 4
                         }
                     }
                 },

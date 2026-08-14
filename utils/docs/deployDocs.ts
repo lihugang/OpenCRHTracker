@@ -223,6 +223,18 @@ export const deployDocsSections: DocsContentSection[] = [
                         ]
                     },
                     {
+                        path: 'spider.stationPlatformInfo.onDemandCooldownHours',
+                        valueType: 'integer',
+                        required: false,
+                        description:
+                            '当前车次时刻表接口触发站台补全后的车次级冷却时间，单位小时；省略时默认 4，设为 0 可关闭任务完成后的冷却。',
+                        notes: [
+                            '只有确实存在缺失或过期站台并开始补全时才计时；成功、空响应、请求失败和写库失败都会占用冷却。',
+                            '同一服务日期下的车次别名共享冷却；同时到达的请求仍会复用同一个进行中任务。',
+                            '冷却状态只保存在当前 Node.js 进程内，进程重启后清空，多实例部署时各实例独立计时。'
+                        ]
+                    },
+                    {
                         path: 'spider.scheduleProbe.dailyTimeHHmm',
                         valueType: 'string(HHmm)',
                         required: true,
@@ -1301,7 +1313,7 @@ export const deployDocsSections: DocsContentSection[] = [
                     '提高 api.permissions.anonymousScopes、quota 或 cost 前，先确认你准备公开暴露的接口范围和限额策略。',
                     '修改 spider.scheduleProbe.prefixRules、task.referenceModel.dailyTimesHHmm、task.circulation.dailyTimesHHmm 或 task.scheduler 参数后，重启后应观察首轮任务执行是否符合预期。',
                     '修改 spider.rateLimit.stationBoard 或 task.circulation.stationBoard 后，重启后应关注车站大屏相关抓取、重试与交路推断任务是否按预期工作。',
-                    '修改 spider.stationPlatformInfo.ttlDays 后需要重启；应同时关注 fetch_station_exit_info 和 fetch_station_transport_info 的请求量与失败统计。'
+                    '修改 spider.stationPlatformInfo.ttlDays 或 spider.stationPlatformInfo.onDemandCooldownHours 后需要重启；应同时关注 fetch_station_exit_info 和 fetch_station_transport_info 的请求量与失败统计。'
                 ]
             }
         ]

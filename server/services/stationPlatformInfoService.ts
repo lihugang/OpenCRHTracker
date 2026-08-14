@@ -47,6 +47,7 @@ import type { StationPlatformRefreshEntryStatus } from '~/server/services/trainP
 
 const logger = getLogger('station-platform-info-service');
 const DAY_SECONDS = 24 * 60 * 60;
+const HOUR_SECONDS = 60 * 60;
 const PLATFORM_FALLBACK_WINDOW_SECONDS = 4 * 60 * 60;
 
 interface StationPlatformInfoCandidate {
@@ -1145,10 +1146,13 @@ function shouldRefreshMissingOrExpiredStop(
     );
 }
 
-const inFlightCurrentTrainRefreshes = new Map<
-    string,
-    Promise<StationPlatformInfoRefreshResult>
->();
+interface CurrentTrainRefreshState {
+    lastAttemptAt: number;
+    inFlight: Promise<StationPlatformInfoRefreshResult> | null;
+}
+
+const currentTrainRefreshStates = new Map<string, CurrentTrainRefreshState>();
+let nextCurrentTrainRefreshCleanupAt = 0;
 
 function getCurrentTrainRefreshKey(
     serviceDate: ServiceDay,
@@ -1158,7 +1162,28 @@ function getCurrentTrainRefreshKey(
     return `${serviceDate}:${codes.join(',')}`;
 }
 
-async function refreshMissingOrExpiredStationPlatformInfo(
+function cleanupCurrentTrainRefreshStates(
+    now: number,
+    cooldownSeconds: number
+) {
+    if (now < nextCurrentTrainRefreshCleanupAt) {
+        return;
+    }
+
+    const expiresAt = now - cooldownSeconds;
+    for (const [key, state] of currentTrainRefreshStates) {
+        if (
+            state.inFlight === null &&
+            (cooldownSeconds <= 0 || state.lastAttemptAt <= expiresAt)
+        ) {
+            currentTrainRefreshStates.delete(key);
+        }
+    }
+    nextCurrentTrainRefreshCleanupAt =
+        now + Math.max(HOUR_SECONDS, cooldownSeconds);
+}
+
+export async function refreshMissingOrExpiredStationPlatformInfoForTrainCodes(
     input: ForceRefreshStationPlatformInfoForTrainCodesInput
 ): Promise<StationPlatformInfoRefreshResult> {
     const serviceDate = input.serviceDate;
@@ -1166,12 +1191,14 @@ async function refreshMissingOrExpiredStationPlatformInfo(
         return createEmptyStationPlatformInfoRefreshResult();
     }
 
-    const expiresAt = getPlatformInfoExpiresAt(getNowSeconds());
-    let built: BuiltStationPlatformInfoCandidates = {
-        localRowCount: 0,
-        skippedRowCount: 0,
-        candidates: []
-    };
+    const now = getNowSeconds();
+    const expiresAt = getPlatformInfoExpiresAt(now);
+    const cooldownSeconds =
+        useConfig().spider.stationPlatformInfo.onDemandCooldownHours *
+        HOUR_SECONDS;
+    cleanupCurrentTrainRefreshStates(now, cooldownSeconds);
+
+    let built: BuiltStationPlatformInfoCandidates;
 
     try {
         built = buildCandidatesForTrainCodes(
@@ -1179,34 +1206,55 @@ async function refreshMissingOrExpiredStationPlatformInfo(
             input.trainCodes,
             (stop) => shouldRefreshMissingOrExpiredStop(stop, expiresAt)
         );
-        return await refreshCandidates(built, expiresAt, false, {
-            requirePlatformNo: true,
-            allowCacheFallback: false
-        });
     } catch (error) {
-        return createFailedStationPlatformInfoRefreshResult(built, error);
+        return createFailedStationPlatformInfoRefreshResult(
+            {
+                localRowCount: 0,
+                skippedRowCount: 0,
+                candidates: []
+            },
+            error
+        );
     }
-}
 
-export async function refreshMissingOrExpiredStationPlatformInfoForTrainCodes(
-    input: ForceRefreshStationPlatformInfoForTrainCodesInput
-): Promise<StationPlatformInfoRefreshResult> {
-    const key = getCurrentTrainRefreshKey(
-        input.serviceDate,
-        input.trainCodes
+    if (built.candidates.length === 0) {
+        return createEmptyStationPlatformInfoRefreshResult();
+    }
+
+    const attemptAt = getNowSeconds();
+    const key = getCurrentTrainRefreshKey(serviceDate, input.trainCodes);
+    const existing = currentTrainRefreshStates.get(key);
+    if (existing?.inFlight) {
+        return existing.inFlight;
+    }
+    if (
+        existing &&
+        cooldownSeconds > 0 &&
+        attemptAt - existing.lastAttemptAt < cooldownSeconds
+    ) {
+        return createEmptyStationPlatformInfoRefreshResult();
+    }
+
+    const refresh = refreshCandidates(built, expiresAt, false, {
+        requirePlatformNo: true,
+        allowCacheFallback: false
+    }).catch((error) =>
+        createFailedStationPlatformInfoRefreshResult(built, error)
     );
-    const existing = inFlightCurrentTrainRefreshes.get(key);
-    if (existing) {
-        return existing;
-    }
-
-    const refresh = refreshMissingOrExpiredStationPlatformInfo(input);
-    inFlightCurrentTrainRefreshes.set(key, refresh);
+    const state: CurrentTrainRefreshState = {
+        lastAttemptAt: attemptAt,
+        inFlight: refresh
+    };
+    currentTrainRefreshStates.set(key, state);
     try {
         return await refresh;
     } finally {
-        if (inFlightCurrentTrainRefreshes.get(key) === refresh) {
-            inFlightCurrentTrainRefreshes.delete(key);
+        if (currentTrainRefreshStates.get(key) === state) {
+            if (cooldownSeconds <= 0) {
+                currentTrainRefreshStates.delete(key);
+            } else {
+                state.inFlight = null;
+            }
         }
     }
 }

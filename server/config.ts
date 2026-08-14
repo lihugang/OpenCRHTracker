@@ -24,6 +24,7 @@ interface ScheduleProbeRefreshConfig {
 
 interface StationPlatformInfoConfig {
     ttlDays: number;
+    onDemandCooldownHours: number;
 }
 
 interface ScheduleProbeProbeConfig {
@@ -1566,6 +1567,14 @@ function validateConfig(raw: unknown): Config {
                         : spiderStationPlatformInfo.ttlDays,
                     'spider.stationPlatformInfo.ttlDays',
                     1
+                ),
+                onDemandCooldownHours: asInteger(
+                    spiderStationPlatformInfo.onDemandCooldownHours ===
+                        undefined
+                        ? 4
+                        : spiderStationPlatformInfo.onDemandCooldownHours,
+                    'spider.stationPlatformInfo.onDemandCooldownHours',
+                    0
                 )
             },
             scheduleProbe: {

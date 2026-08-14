@@ -19,7 +19,8 @@
             }
         },
         "stationPlatformInfo": {
-            "ttlDays": 30
+            "ttlDays": 30,
+            "onDemandCooldownHours": 4
         },
         "scheduleProbe": {
             "dailyTimeHHmm": "0000",
