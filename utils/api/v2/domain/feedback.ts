@@ -1,4 +1,4 @@
-import { fromJson, toJson } from '@bufbuild/protobuf';
+import { fromJson } from '@bufbuild/protobuf';
 import { StructSchema } from '@bufbuild/protobuf/wkt';
 import type {
     DeleteFeedbackTopicData,
@@ -128,7 +128,7 @@ function mapMessage(item: {
     authorName: string;
     body: string;
     createdAt: bigint | number;
-    meta?: unknown;
+    meta?: Record<string, unknown>;
 }): FeedbackMessage {
     return {
         id: item.id,
@@ -136,12 +136,7 @@ function mapMessage(item: {
         authorName: item.authorName,
         body: item.body,
         createdAt: protoInt64ToNumber(item.createdAt) ?? 0,
-        meta: item.meta
-            ? (toJson(StructSchema, item.meta as never) as Record<
-                  string,
-                  unknown
-              >)
-            : {}
+        meta: item.meta ?? {}
     };
 }
 
