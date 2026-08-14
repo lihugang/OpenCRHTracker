@@ -792,7 +792,7 @@ function bindTableResizeObserver() {
 }
 
 function isTimetableSourceKey(value: string): value is TimetableSourceKey {
-    return value === 'current' || /^timetable:\d+$/.test(value);
+    return value === 'current' || /^coverage:\d+$/.test(value);
 }
 
 function handleSourceKeyUpdate(value: string) {

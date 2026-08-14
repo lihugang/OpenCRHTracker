@@ -150,14 +150,11 @@ export function formatServiceDateLabel(serviceDate: string) {
 
 export function formatHistoryOptionLabel(item: HistoricalTimetableOption) {
     const startLabel = formatServiceDateLabel(item.serviceDateStart);
-    const endLabel = formatServiceDateLabel(item.serviceDateEndExclusive);
     if (startLabel.length === 0) {
         return '';
     }
 
-    return endLabel.length > 0
-        ? `${startLabel} - ${endLabel}`
-        : `${startLabel}起`;
+    return `${startLabel}起`;
 }
 
 export function formatStopWicket(stop: DisplayTimetableStop) {

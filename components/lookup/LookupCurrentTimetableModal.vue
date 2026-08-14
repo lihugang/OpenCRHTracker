@@ -142,6 +142,7 @@ const props = defineProps<{
     trainCode: string;
     displayCodes?: string[];
     requestedTimetableId?: number | null;
+    requestedServiceDate?: string | null;
 }>();
 
 const emit = defineEmits<{
@@ -177,7 +178,8 @@ const {
     currentState: state,
     isCurrentTimetableAvailable,
     currentTimetable: timetable,
-    requestedTimetableId: computed(() => props.requestedTimetableId ?? null)
+    requestedTimetableId: computed(() => props.requestedTimetableId ?? null),
+    requestedServiceDate: computed(() => props.requestedServiceDate ?? null)
 });
 
 const {

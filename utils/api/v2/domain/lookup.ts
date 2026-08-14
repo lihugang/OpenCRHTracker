@@ -484,30 +484,22 @@ function mapTimetableHistory(
         );
     }
 
-    const rawItems = data.items.map<HistoricalTimetableOption>((item) => ({
-        coverageId: item.coverageId,
-        timetableId: item.timetableId,
-        serviceDateStart: epochServiceDayToDateString(item.serviceDayStart),
-        serviceDateEndExclusive: epochServiceDayToDateString(
-            item.serviceDayEndExclusive
-        ),
-        sourceKey: `timetable:${item.timetableId}`,
-        content: contentById.get(item.timetableId) ?? null
-    }));
-
-    const items: HistoricalTimetableOption[] = [];
-    for (const item of rawItems) {
-        const previous = items[items.length - 1];
-        if (
-            previous &&
-            previous.timetableId === item.timetableId &&
-            previous.serviceDateEndExclusive === item.serviceDateStart
-        ) {
-            previous.serviceDateEndExclusive = item.serviceDateEndExclusive;
-            continue;
-        }
-        items.push({ ...item });
-    }
+    const items = data.items
+        .map<HistoricalTimetableOption>((item) => ({
+            coverageId: item.coverageId,
+            timetableId: item.timetableId,
+            serviceDateStart: epochServiceDayToDateString(item.serviceDayStart),
+            serviceDateEndExclusive: epochServiceDayToDateString(
+                item.serviceDayEndExclusive
+            ),
+            sourceKey: `coverage:${item.coverageId}`,
+            content: contentById.get(item.timetableId) ?? null
+        }))
+        .sort(
+            (left, right) =>
+                right.serviceDateStart.localeCompare(left.serviceDateStart) ||
+                right.coverageId - left.coverageId
+        );
 
     return {
         trainCode: formatProtoTrainCode(data.trainCode),

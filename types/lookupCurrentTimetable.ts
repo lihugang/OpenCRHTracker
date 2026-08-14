@@ -10,7 +10,7 @@ export type LookupCurrentTimetableViewState =
     | 'empty'
     | 'success';
 export type CirculationPdfState = 'idle' | 'loading' | 'ready' | 'error';
-export type TimetableSourceKey = 'current' | `timetable:${number}`;
+export type TimetableSourceKey = 'current' | `coverage:${number}`;
 export type CirculationExportFormat = 'pdf' | 'png';
 
 export interface DisplayTimetableStop {
