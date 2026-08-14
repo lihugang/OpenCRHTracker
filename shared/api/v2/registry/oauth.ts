@@ -23,7 +23,7 @@ export const OAUTH_V2_OPERATIONS = {
         requestSchema: GetOauthAuthorizeContextRequestSchema,
         responseSchema: GetOauthAuthorizeContextResponseSchema,
         bodyMode: 'none',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     GetOauthClients: {
         operationName: 'GetOauthClients',
@@ -32,7 +32,7 @@ export const OAUTH_V2_OPERATIONS = {
         requestSchema: GetOauthClientsRequestSchema,
         responseSchema: GetOauthClientsResponseSchema,
         bodyMode: 'none',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     PostOauthClients: {
         operationName: 'PostOauthClients',
@@ -41,7 +41,7 @@ export const OAUTH_V2_OPERATIONS = {
         requestSchema: PostOauthClientsRequestSchema,
         responseSchema: PostOauthClientsResponseSchema,
         bodyMode: 'optional',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     GetOauthClient: {
         operationName: 'GetOauthClient',
@@ -50,7 +50,7 @@ export const OAUTH_V2_OPERATIONS = {
         requestSchema: GetOauthClientRequestSchema,
         responseSchema: GetOauthClientResponseSchema,
         bodyMode: 'none',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     PatchOauthClient: {
         operationName: 'PatchOauthClient',
@@ -59,7 +59,7 @@ export const OAUTH_V2_OPERATIONS = {
         requestSchema: PatchOauthClientRequestSchema,
         responseSchema: PatchOauthClientResponseSchema,
         bodyMode: 'optional',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     DeleteOauthClient: {
         operationName: 'DeleteOauthClient',
@@ -68,12 +68,11 @@ export const OAUTH_V2_OPERATIONS = {
         requestSchema: DeleteOauthClientRequestSchema,
         responseSchema: DeleteOauthClientResponseSchema,
         bodyMode: 'none',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     }
 } satisfies Record<string, V2ClientOperation>;
 
-export const GetOauthAuthorizeContext =
-    OAUTH_V2_OPERATIONS.GetOauthAuthorizeContext;
+export const GetOauthAuthorizeContext = OAUTH_V2_OPERATIONS.GetOauthAuthorizeContext;
 export const GetOauthClients = OAUTH_V2_OPERATIONS.GetOauthClients;
 export const PostOauthClients = OAUTH_V2_OPERATIONS.PostOauthClients;
 export const GetOauthClient = OAUTH_V2_OPERATIONS.GetOauthClient;

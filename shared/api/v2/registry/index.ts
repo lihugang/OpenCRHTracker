@@ -20,7 +20,7 @@ export const V2_CLIENT_OPERATIONS = {
     ...LOOKUP_V2_OPERATIONS,
     ...NOTIFICATIONS_V2_OPERATIONS,
     ...OAUTH_V2_OPERATIONS,
-    ...SYSTEM_V2_OPERATIONS
+    ...SYSTEM_V2_OPERATIONS,
 } as const;
 
 export type V2ClientOperationName = keyof typeof V2_CLIENT_OPERATIONS;

@@ -31,7 +31,7 @@ export const LOOKUP_V2_OPERATIONS = {
         requestSchema: GetEmuAllocationRequestSchema,
         responseSchema: GetEmuAllocationResponseSchema,
         bodyMode: 'none',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     GetSearchIndex: {
         operationName: 'GetSearchIndex',
@@ -40,7 +40,7 @@ export const LOOKUP_V2_OPERATIONS = {
         requestSchema: GetSearchIndexRequestSchema,
         responseSchema: GetSearchIndexResponseSchema,
         bodyMode: 'none',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     GetCurrentTrainTimetable: {
         operationName: 'GetCurrentTrainTimetable',
@@ -49,7 +49,7 @@ export const LOOKUP_V2_OPERATIONS = {
         requestSchema: GetCurrentTrainTimetableRequestSchema,
         responseSchema: GetCurrentTrainTimetableResponseSchema,
         bodyMode: 'none',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     GetStationTimetable: {
         operationName: 'GetStationTimetable',
@@ -58,7 +58,7 @@ export const LOOKUP_V2_OPERATIONS = {
         requestSchema: GetStationTimetableRequestSchema,
         responseSchema: GetStationTimetableResponseSchema,
         bodyMode: 'none',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     GetDailyRecords: {
         operationName: 'GetDailyRecords',
@@ -67,7 +67,7 @@ export const LOOKUP_V2_OPERATIONS = {
         requestSchema: GetDailyRecordsRequestSchema,
         responseSchema: GetDailyRecordsResponseSchema,
         bodyMode: 'none',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     GetTrainHistory: {
         operationName: 'GetTrainHistory',
@@ -76,7 +76,7 @@ export const LOOKUP_V2_OPERATIONS = {
         requestSchema: GetTrainHistoryRequestSchema,
         responseSchema: GetTrainHistoryResponseSchema,
         bodyMode: 'none',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     GetEmuHistory: {
         operationName: 'GetEmuHistory',
@@ -85,7 +85,7 @@ export const LOOKUP_V2_OPERATIONS = {
         requestSchema: GetEmuHistoryRequestSchema,
         responseSchema: GetEmuHistoryResponseSchema,
         bodyMode: 'none',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     GetTrainTimetableHistory: {
         operationName: 'GetTrainTimetableHistory',
@@ -94,7 +94,7 @@ export const LOOKUP_V2_OPERATIONS = {
         requestSchema: GetTrainTimetableHistoryRequestSchema,
         responseSchema: GetTrainTimetableHistoryResponseSchema,
         bodyMode: 'none',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     GetTrainCirculationImage: {
         operationName: 'GetTrainCirculationImage',
@@ -104,19 +104,16 @@ export const LOOKUP_V2_OPERATIONS = {
         responseSchema: GetTrainCirculationImageResponseSchema,
         bodyMode: 'none',
         responseKind: 'raw',
-        rawContentTypes: ['image/png', 'application/pdf']
+        rawContentTypes: ['image/png', 'application/pdf'],
     }
 } satisfies Record<string, V2ClientOperation>;
 
 export const GetEmuAllocation = LOOKUP_V2_OPERATIONS.GetEmuAllocation;
 export const GetSearchIndex = LOOKUP_V2_OPERATIONS.GetSearchIndex;
-export const GetCurrentTrainTimetable =
-    LOOKUP_V2_OPERATIONS.GetCurrentTrainTimetable;
+export const GetCurrentTrainTimetable = LOOKUP_V2_OPERATIONS.GetCurrentTrainTimetable;
 export const GetStationTimetable = LOOKUP_V2_OPERATIONS.GetStationTimetable;
 export const GetDailyRecords = LOOKUP_V2_OPERATIONS.GetDailyRecords;
 export const GetTrainHistory = LOOKUP_V2_OPERATIONS.GetTrainHistory;
 export const GetEmuHistory = LOOKUP_V2_OPERATIONS.GetEmuHistory;
-export const GetTrainTimetableHistory =
-    LOOKUP_V2_OPERATIONS.GetTrainTimetableHistory;
-export const GetTrainCirculationImage =
-    LOOKUP_V2_OPERATIONS.GetTrainCirculationImage;
+export const GetTrainTimetableHistory = LOOKUP_V2_OPERATIONS.GetTrainTimetableHistory;
+export const GetTrainCirculationImage = LOOKUP_V2_OPERATIONS.GetTrainCirculationImage;

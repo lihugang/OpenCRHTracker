@@ -29,7 +29,7 @@ export const ADMINPROVENANCE_V2_OPERATIONS = {
         requestSchema: GetAdminTrainProvenanceRequestSchema,
         responseSchema: GetAdminTrainProvenanceResponseSchema,
         bodyMode: 'none',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     GetAdminTrainProvenanceCouplingScan: {
         operationName: 'GetAdminTrainProvenanceCouplingScan',
@@ -38,7 +38,7 @@ export const ADMINPROVENANCE_V2_OPERATIONS = {
         requestSchema: GetAdminTrainProvenanceCouplingScanRequestSchema,
         responseSchema: GetAdminTrainProvenanceCouplingScanResponseSchema,
         bodyMode: 'none',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     GetAdminTrainProvenanceCouplingScanTasks: {
         operationName: 'GetAdminTrainProvenanceCouplingScanTasks',
@@ -47,7 +47,7 @@ export const ADMINPROVENANCE_V2_OPERATIONS = {
         requestSchema: GetAdminTrainProvenanceCouplingScanTasksRequestSchema,
         responseSchema: GetAdminTrainProvenanceCouplingScanTasksResponseSchema,
         bodyMode: 'none',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     GetAdminTrainProvenanceQrcodeScan: {
         operationName: 'GetAdminTrainProvenanceQrcodeScan',
@@ -56,7 +56,7 @@ export const ADMINPROVENANCE_V2_OPERATIONS = {
         requestSchema: GetAdminTrainProvenanceQrcodeScanRequestSchema,
         responseSchema: GetAdminTrainProvenanceQrcodeScanResponseSchema,
         bodyMode: 'none',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     GetAdminTrainProvenanceQrcodeScanTasks: {
         operationName: 'GetAdminTrainProvenanceQrcodeScanTasks',
@@ -65,7 +65,7 @@ export const ADMINPROVENANCE_V2_OPERATIONS = {
         requestSchema: GetAdminTrainProvenanceQrcodeScanTasksRequestSchema,
         responseSchema: GetAdminTrainProvenanceQrcodeScanTasksResponseSchema,
         bodyMode: 'none',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     GetAdminTrainProvenanceRequestStats: {
         operationName: 'GetAdminTrainProvenanceRequestStats',
@@ -74,7 +74,7 @@ export const ADMINPROVENANCE_V2_OPERATIONS = {
         requestSchema: GetAdminTrainProvenanceRequestStatsRequestSchema,
         responseSchema: GetAdminTrainProvenanceRequestStatsResponseSchema,
         bodyMode: 'none',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     GetAdminTrainProvenanceStationBoard: {
         operationName: 'GetAdminTrainProvenanceStationBoard',
@@ -83,7 +83,7 @@ export const ADMINPROVENANCE_V2_OPERATIONS = {
         requestSchema: GetAdminTrainProvenanceStationBoardRequestSchema,
         responseSchema: GetAdminTrainProvenanceStationBoardResponseSchema,
         bodyMode: 'none',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     GetAdminTrainProvenanceStationBoardTasks: {
         operationName: 'GetAdminTrainProvenanceStationBoardTasks',
@@ -92,36 +92,25 @@ export const ADMINPROVENANCE_V2_OPERATIONS = {
         requestSchema: GetAdminTrainProvenanceStationBoardTasksRequestSchema,
         responseSchema: GetAdminTrainProvenanceStationBoardTasksResponseSchema,
         bodyMode: 'none',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     GetAdminTrainProvenanceStationPlatformRefresh: {
         operationName: 'GetAdminTrainProvenanceStationPlatformRefresh',
         method: 'GET',
         pathTemplate: '/api/v2/admin/train-provenance/station-platform-refresh',
-        requestSchema:
-            GetAdminTrainProvenanceStationPlatformRefreshRequestSchema,
-        responseSchema:
-            GetAdminTrainProvenanceStationPlatformRefreshResponseSchema,
+        requestSchema: GetAdminTrainProvenanceStationPlatformRefreshRequestSchema,
+        responseSchema: GetAdminTrainProvenanceStationPlatformRefreshResponseSchema,
         bodyMode: 'none',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     }
 } satisfies Record<string, V2ClientOperation>;
 
-export const GetAdminTrainProvenance =
-    ADMINPROVENANCE_V2_OPERATIONS.GetAdminTrainProvenance;
-export const GetAdminTrainProvenanceCouplingScan =
-    ADMINPROVENANCE_V2_OPERATIONS.GetAdminTrainProvenanceCouplingScan;
-export const GetAdminTrainProvenanceCouplingScanTasks =
-    ADMINPROVENANCE_V2_OPERATIONS.GetAdminTrainProvenanceCouplingScanTasks;
-export const GetAdminTrainProvenanceQrcodeScan =
-    ADMINPROVENANCE_V2_OPERATIONS.GetAdminTrainProvenanceQrcodeScan;
-export const GetAdminTrainProvenanceQrcodeScanTasks =
-    ADMINPROVENANCE_V2_OPERATIONS.GetAdminTrainProvenanceQrcodeScanTasks;
-export const GetAdminTrainProvenanceRequestStats =
-    ADMINPROVENANCE_V2_OPERATIONS.GetAdminTrainProvenanceRequestStats;
-export const GetAdminTrainProvenanceStationBoard =
-    ADMINPROVENANCE_V2_OPERATIONS.GetAdminTrainProvenanceStationBoard;
-export const GetAdminTrainProvenanceStationBoardTasks =
-    ADMINPROVENANCE_V2_OPERATIONS.GetAdminTrainProvenanceStationBoardTasks;
-export const GetAdminTrainProvenanceStationPlatformRefresh =
-    ADMINPROVENANCE_V2_OPERATIONS.GetAdminTrainProvenanceStationPlatformRefresh;
+export const GetAdminTrainProvenance = ADMINPROVENANCE_V2_OPERATIONS.GetAdminTrainProvenance;
+export const GetAdminTrainProvenanceCouplingScan = ADMINPROVENANCE_V2_OPERATIONS.GetAdminTrainProvenanceCouplingScan;
+export const GetAdminTrainProvenanceCouplingScanTasks = ADMINPROVENANCE_V2_OPERATIONS.GetAdminTrainProvenanceCouplingScanTasks;
+export const GetAdminTrainProvenanceQrcodeScan = ADMINPROVENANCE_V2_OPERATIONS.GetAdminTrainProvenanceQrcodeScan;
+export const GetAdminTrainProvenanceQrcodeScanTasks = ADMINPROVENANCE_V2_OPERATIONS.GetAdminTrainProvenanceQrcodeScanTasks;
+export const GetAdminTrainProvenanceRequestStats = ADMINPROVENANCE_V2_OPERATIONS.GetAdminTrainProvenanceRequestStats;
+export const GetAdminTrainProvenanceStationBoard = ADMINPROVENANCE_V2_OPERATIONS.GetAdminTrainProvenanceStationBoard;
+export const GetAdminTrainProvenanceStationBoardTasks = ADMINPROVENANCE_V2_OPERATIONS.GetAdminTrainProvenanceStationBoardTasks;
+export const GetAdminTrainProvenanceStationPlatformRefresh = ADMINPROVENANCE_V2_OPERATIONS.GetAdminTrainProvenanceStationPlatformRefresh;

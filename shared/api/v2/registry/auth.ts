@@ -65,7 +65,7 @@ export const AUTH_V2_OPERATIONS = {
         requestSchema: GetAuthMeRequestSchema,
         responseSchema: GetAuthMeResponseSchema,
         bodyMode: 'none',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     GetAuthApiKeys: {
         operationName: 'GetAuthApiKeys',
@@ -74,7 +74,7 @@ export const AUTH_V2_OPERATIONS = {
         requestSchema: GetAuthApiKeysRequestSchema,
         responseSchema: GetAuthApiKeysResponseSchema,
         bodyMode: 'none',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     PostAuthApiKeys: {
         operationName: 'PostAuthApiKeys',
@@ -83,7 +83,7 @@ export const AUTH_V2_OPERATIONS = {
         requestSchema: PostAuthApiKeysRequestSchema,
         responseSchema: PostAuthApiKeysResponseSchema,
         bodyMode: 'optional',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     DeleteAuthApiKey: {
         operationName: 'DeleteAuthApiKey',
@@ -92,7 +92,7 @@ export const AUTH_V2_OPERATIONS = {
         requestSchema: DeleteAuthApiKeyRequestSchema,
         responseSchema: DeleteAuthApiKeyResponseSchema,
         bodyMode: 'none',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     GetAuthAuthorizations: {
         operationName: 'GetAuthAuthorizations',
@@ -101,7 +101,7 @@ export const AUTH_V2_OPERATIONS = {
         requestSchema: GetAuthAuthorizationsRequestSchema,
         responseSchema: GetAuthAuthorizationsResponseSchema,
         bodyMode: 'none',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     DeleteAuthAuthorization: {
         operationName: 'DeleteAuthAuthorization',
@@ -110,7 +110,7 @@ export const AUTH_V2_OPERATIONS = {
         requestSchema: DeleteAuthAuthorizationRequestSchema,
         responseSchema: DeleteAuthAuthorizationResponseSchema,
         bodyMode: 'none',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     GetAuthEventSubscriptions: {
         operationName: 'GetAuthEventSubscriptions',
@@ -119,7 +119,7 @@ export const AUTH_V2_OPERATIONS = {
         requestSchema: GetAuthEventSubscriptionsRequestSchema,
         responseSchema: GetAuthEventSubscriptionsResponseSchema,
         bodyMode: 'none',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     PutAuthEventSubscriptions: {
         operationName: 'PutAuthEventSubscriptions',
@@ -128,7 +128,7 @@ export const AUTH_V2_OPERATIONS = {
         requestSchema: PutAuthEventSubscriptionsRequestSchema,
         responseSchema: PutAuthEventSubscriptionsResponseSchema,
         bodyMode: 'optional',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     DeleteAuthEventSubscriptions: {
         operationName: 'DeleteAuthEventSubscriptions',
@@ -137,7 +137,7 @@ export const AUTH_V2_OPERATIONS = {
         requestSchema: DeleteAuthEventSubscriptionsRequestSchema,
         responseSchema: DeleteAuthEventSubscriptionsResponseSchema,
         bodyMode: 'optional',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     GetAuthFavorites: {
         operationName: 'GetAuthFavorites',
@@ -146,7 +146,7 @@ export const AUTH_V2_OPERATIONS = {
         requestSchema: GetAuthFavoritesRequestSchema,
         responseSchema: GetAuthFavoritesResponseSchema,
         bodyMode: 'none',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     PutAuthFavorites: {
         operationName: 'PutAuthFavorites',
@@ -155,7 +155,7 @@ export const AUTH_V2_OPERATIONS = {
         requestSchema: PutAuthFavoritesRequestSchema,
         responseSchema: PutAuthFavoritesResponseSchema,
         bodyMode: 'optional',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     DeleteAuthFavorites: {
         operationName: 'DeleteAuthFavorites',
@@ -164,7 +164,7 @@ export const AUTH_V2_OPERATIONS = {
         requestSchema: DeleteAuthFavoritesRequestSchema,
         responseSchema: DeleteAuthFavoritesResponseSchema,
         bodyMode: 'optional',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     PostAuthLogin: {
         operationName: 'PostAuthLogin',
@@ -173,7 +173,7 @@ export const AUTH_V2_OPERATIONS = {
         requestSchema: PostAuthLoginRequestSchema,
         responseSchema: PostAuthLoginResponseSchema,
         bodyMode: 'required',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     PostAuthRegister: {
         operationName: 'PostAuthRegister',
@@ -182,7 +182,7 @@ export const AUTH_V2_OPERATIONS = {
         requestSchema: PostAuthRegisterRequestSchema,
         responseSchema: PostAuthRegisterResponseSchema,
         bodyMode: 'required',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     PostAuthLogout: {
         operationName: 'PostAuthLogout',
@@ -191,7 +191,7 @@ export const AUTH_V2_OPERATIONS = {
         requestSchema: PostAuthLogoutRequestSchema,
         responseSchema: PostAuthLogoutResponseSchema,
         bodyMode: 'none',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     GetAuthMemberships: {
         operationName: 'GetAuthMemberships',
@@ -200,7 +200,7 @@ export const AUTH_V2_OPERATIONS = {
         requestSchema: GetAuthMembershipsRequestSchema,
         responseSchema: GetAuthMembershipsResponseSchema,
         bodyMode: 'none',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     PostAuthRedeemMembership: {
         operationName: 'PostAuthRedeemMembership',
@@ -209,7 +209,7 @@ export const AUTH_V2_OPERATIONS = {
         requestSchema: PostAuthRedeemMembershipRequestSchema,
         responseSchema: PostAuthRedeemMembershipResponseSchema,
         bodyMode: 'optional',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     PatchAuthPassword: {
         operationName: 'PatchAuthPassword',
@@ -218,7 +218,7 @@ export const AUTH_V2_OPERATIONS = {
         requestSchema: PatchAuthPasswordRequestSchema,
         responseSchema: PatchAuthPasswordResponseSchema,
         bodyMode: 'required',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     PostAuthSendQqBindingCode: {
         operationName: 'PostAuthSendQqBindingCode',
@@ -227,7 +227,7 @@ export const AUTH_V2_OPERATIONS = {
         requestSchema: PostAuthSendQqBindingCodeRequestSchema,
         responseSchema: PostAuthSendQqBindingCodeResponseSchema,
         bodyMode: 'required',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     PostAuthUnbindQqBinding: {
         operationName: 'PostAuthUnbindQqBinding',
@@ -236,7 +236,7 @@ export const AUTH_V2_OPERATIONS = {
         requestSchema: PostAuthUnbindQqBindingRequestSchema,
         responseSchema: PostAuthUnbindQqBindingResponseSchema,
         bodyMode: 'none',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     PostAuthVerifyQqBinding: {
         operationName: 'PostAuthVerifyQqBinding',
@@ -245,7 +245,7 @@ export const AUTH_V2_OPERATIONS = {
         requestSchema: PostAuthVerifyQqBindingRequestSchema,
         responseSchema: PostAuthVerifyQqBindingResponseSchema,
         bodyMode: 'required',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     GetAuthSettings: {
         operationName: 'GetAuthSettings',
@@ -254,7 +254,7 @@ export const AUTH_V2_OPERATIONS = {
         requestSchema: GetAuthSettingsRequestSchema,
         responseSchema: GetAuthSettingsResponseSchema,
         bodyMode: 'none',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     PatchAuthSettings: {
         operationName: 'PatchAuthSettings',
@@ -263,7 +263,7 @@ export const AUTH_V2_OPERATIONS = {
         requestSchema: PatchAuthSettingsRequestSchema,
         responseSchema: PatchAuthSettingsResponseSchema,
         bodyMode: 'optional',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     GetAuthSubscriptions: {
         operationName: 'GetAuthSubscriptions',
@@ -272,7 +272,7 @@ export const AUTH_V2_OPERATIONS = {
         requestSchema: GetAuthSubscriptionsRequestSchema,
         responseSchema: GetAuthSubscriptionsResponseSchema,
         bodyMode: 'none',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     PutAuthSubscriptions: {
         operationName: 'PutAuthSubscriptions',
@@ -281,7 +281,7 @@ export const AUTH_V2_OPERATIONS = {
         requestSchema: PutAuthSubscriptionsRequestSchema,
         responseSchema: PutAuthSubscriptionsResponseSchema,
         bodyMode: 'optional',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     DeleteAuthSubscription: {
         operationName: 'DeleteAuthSubscription',
@@ -290,7 +290,7 @@ export const AUTH_V2_OPERATIONS = {
         requestSchema: DeleteAuthSubscriptionRequestSchema,
         responseSchema: DeleteAuthSubscriptionResponseSchema,
         bodyMode: 'none',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     PatchAuthSubscription: {
         operationName: 'PatchAuthSubscription',
@@ -299,7 +299,7 @@ export const AUTH_V2_OPERATIONS = {
         requestSchema: PatchAuthSubscriptionRequestSchema,
         responseSchema: PatchAuthSubscriptionResponseSchema,
         bodyMode: 'required',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     }
 } satisfies Record<string, V2ClientOperation>;
 
@@ -308,14 +308,10 @@ export const GetAuthApiKeys = AUTH_V2_OPERATIONS.GetAuthApiKeys;
 export const PostAuthApiKeys = AUTH_V2_OPERATIONS.PostAuthApiKeys;
 export const DeleteAuthApiKey = AUTH_V2_OPERATIONS.DeleteAuthApiKey;
 export const GetAuthAuthorizations = AUTH_V2_OPERATIONS.GetAuthAuthorizations;
-export const DeleteAuthAuthorization =
-    AUTH_V2_OPERATIONS.DeleteAuthAuthorization;
-export const GetAuthEventSubscriptions =
-    AUTH_V2_OPERATIONS.GetAuthEventSubscriptions;
-export const PutAuthEventSubscriptions =
-    AUTH_V2_OPERATIONS.PutAuthEventSubscriptions;
-export const DeleteAuthEventSubscriptions =
-    AUTH_V2_OPERATIONS.DeleteAuthEventSubscriptions;
+export const DeleteAuthAuthorization = AUTH_V2_OPERATIONS.DeleteAuthAuthorization;
+export const GetAuthEventSubscriptions = AUTH_V2_OPERATIONS.GetAuthEventSubscriptions;
+export const PutAuthEventSubscriptions = AUTH_V2_OPERATIONS.PutAuthEventSubscriptions;
+export const DeleteAuthEventSubscriptions = AUTH_V2_OPERATIONS.DeleteAuthEventSubscriptions;
 export const GetAuthFavorites = AUTH_V2_OPERATIONS.GetAuthFavorites;
 export const PutAuthFavorites = AUTH_V2_OPERATIONS.PutAuthFavorites;
 export const DeleteAuthFavorites = AUTH_V2_OPERATIONS.DeleteAuthFavorites;
@@ -323,15 +319,11 @@ export const PostAuthLogin = AUTH_V2_OPERATIONS.PostAuthLogin;
 export const PostAuthRegister = AUTH_V2_OPERATIONS.PostAuthRegister;
 export const PostAuthLogout = AUTH_V2_OPERATIONS.PostAuthLogout;
 export const GetAuthMemberships = AUTH_V2_OPERATIONS.GetAuthMemberships;
-export const PostAuthRedeemMembership =
-    AUTH_V2_OPERATIONS.PostAuthRedeemMembership;
+export const PostAuthRedeemMembership = AUTH_V2_OPERATIONS.PostAuthRedeemMembership;
 export const PatchAuthPassword = AUTH_V2_OPERATIONS.PatchAuthPassword;
-export const PostAuthSendQqBindingCode =
-    AUTH_V2_OPERATIONS.PostAuthSendQqBindingCode;
-export const PostAuthUnbindQqBinding =
-    AUTH_V2_OPERATIONS.PostAuthUnbindQqBinding;
-export const PostAuthVerifyQqBinding =
-    AUTH_V2_OPERATIONS.PostAuthVerifyQqBinding;
+export const PostAuthSendQqBindingCode = AUTH_V2_OPERATIONS.PostAuthSendQqBindingCode;
+export const PostAuthUnbindQqBinding = AUTH_V2_OPERATIONS.PostAuthUnbindQqBinding;
+export const PostAuthVerifyQqBinding = AUTH_V2_OPERATIONS.PostAuthVerifyQqBinding;
 export const GetAuthSettings = AUTH_V2_OPERATIONS.GetAuthSettings;
 export const PatchAuthSettings = AUTH_V2_OPERATIONS.PatchAuthSettings;
 export const GetAuthSubscriptions = AUTH_V2_OPERATIONS.GetAuthSubscriptions;

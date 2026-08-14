@@ -1481,11 +1481,11 @@ export const developerDocsOpenApi: OpenApiDocument = {
                         name: 'cursor',
                         in: 'query',
                         description:
-                            '分页游标，格式为 serviceDay:id（例如 20679:681106）。第一页不需要传，翻页时直接复用上一页响应里的 nextCursor。serviceDay 是按上海时间自 1970-01-01 起的天数（epoch day），不是日期字符串。',
+                            '分页游标，格式为 serviceDay:id（例如 20679:1894995）。第一页不需要传，翻页时直接复用上一页响应里的 nextCursor。serviceDay 是按上海时间自 1970-01-01 起的天数（epoch day），不是日期字符串。',
                         schema: {
                             type: 'string'
                         },
-                        example: '20679:681106'
+                        example: '20679:1894995'
                     }
                 ],
                 security: [
@@ -1526,49 +1526,48 @@ export const developerDocsOpenApi: OpenApiDocument = {
                                     }
                                 },
                                 example: {
-                                    meta: {
-                                        remain: 159,
-                                        cost: 2
-                                    },
+                                    ok: true,
                                     data: {
                                         serviceDay: 20679,
                                         cursor: '',
                                         limit: 2,
-                                        nextCursor: '20679:681106',
+                                        nextCursor: '20679:1894995',
                                         items: [
                                             {
-                                                id: 681107,
+                                                id: 1894996,
                                                 serviceDay: 20679,
-                                                timetableId: 5096,
-                                                emuId: 2844,
+                                                timetableId: 1075,
+                                                emuId: 3378,
                                                 trainCode: {
-                                                    prefix: 'C',
-                                                    number: 9607
+                                                    prefix: 'G',
+                                                    number: 7309
                                                 }
                                             },
                                             {
-                                                id: 681106,
+                                                id: 1894995,
                                                 serviceDay: 20679,
-                                                timetableId: 5096,
-                                                emuId: 2844,
+                                                timetableId: 1075,
+                                                emuId: 3522,
                                                 trainCode: {
-                                                    prefix: 'C',
-                                                    number: 9606
+                                                    prefix: 'G',
+                                                    number: 7309
                                                 }
                                             }
                                         ],
                                         emuCodeMappings: {
-                                            '2844': 'CRH380A-2844'
+                                            '3378': 'CRH380B-3602',
+                                            '3522': 'CRH380B-3752'
                                         },
                                         timetableMappings: {
-                                            '5096': {
-                                                startStation: '北京南',
-                                                endStation: '天津',
-                                                startOffset: 0,
-                                                endOffset: 1800
+                                            '1075': {
+                                                startStation: '上海南',
+                                                endStation: '杭州东',
+                                                startOffset: 82500,
+                                                endOffset: 85320
                                             }
                                         }
-                                    }
+                                    },
+                                    error: ''
                                 }
                             }
                         }
@@ -1763,7 +1762,7 @@ export const developerDocsOpenApi: OpenApiDocument = {
                         query: {
                             date: '20260814',
                             limit: '2',
-                            cursor: '20679:681106'
+                            cursor: '20679:1894995'
                         }
                     }
                 ],
@@ -1841,12 +1840,9 @@ export const developerDocsOpenApi: OpenApiDocument = {
                                     }
                                 },
                                 example: {
-                                    meta: {
-                                        remain: 159,
-                                        cost: 1
-                                    },
+                                    ok: true,
                                     data: {
-                                        updatedAt: 1786670000,
+                                        updatedAt: 1786672375,
                                         requestTrainCode: {
                                             prefix: 'G',
                                             number: 2492
@@ -1874,12 +1870,11 @@ export const developerDocsOpenApi: OpenApiDocument = {
                                         ],
                                         startStation: '包头',
                                         endStation: '北京北',
-                                        startAt: 1786665600,
-                                        endAt: 1786672800,
-                                        serviceDay: 20679,
+                                        startAt: 1786663920,
+                                        endAt: 1786675800,
                                         circulation: {
                                             source: 'official',
-                                            refreshAt: 1786668000,
+                                            refreshAt: 1786622308,
                                             nodes: [
                                                 {
                                                     internalCode:
@@ -1892,7 +1887,7 @@ export const developerDocsOpenApi: OpenApiDocument = {
                                                     ],
                                                     startStation: '包头',
                                                     endStation: '北京北',
-                                                    startAt: 28800,
+                                                    startAt: 27120,
                                                     endAt: 39000
                                                 },
                                                 {
@@ -1908,35 +1903,111 @@ export const developerDocsOpenApi: OpenApiDocument = {
                                                     endStation: '包头',
                                                     startAt: 42840,
                                                     endAt: 56220
+                                                },
+                                                {
+                                                    internalCode:
+                                                        '33000G249608',
+                                                    allCodes: [
+                                                        {
+                                                            prefix: 'G',
+                                                            number: 2496
+                                                        }
+                                                    ],
+                                                    startStation: '包头',
+                                                    endStation: '北京北',
+                                                    startAt: 58560,
+                                                    endAt: 73080
+                                                },
+                                                {
+                                                    internalCode:
+                                                        '24000G249109',
+                                                    allCodes: [
+                                                        {
+                                                            prefix: 'G',
+                                                            number: 2491
+                                                        }
+                                                    ],
+                                                    startStation: '北京北',
+                                                    endStation: '包头',
+                                                    startAt: 117120,
+                                                    endAt: 130020
+                                                },
+                                                {
+                                                    internalCode:
+                                                        '33000G249408',
+                                                    allCodes: [
+                                                        {
+                                                            prefix: 'G',
+                                                            number: 2494
+                                                        }
+                                                    ],
+                                                    startStation: '包头',
+                                                    endStation: '北京北',
+                                                    startAt: 131640,
+                                                    endAt: 145560
+                                                },
+                                                {
+                                                    internalCode:
+                                                        '24000G249505',
+                                                    allCodes: [
+                                                        {
+                                                            prefix: 'G',
+                                                            number: 2495
+                                                        }
+                                                    ],
+                                                    startStation: '北京北',
+                                                    endStation: '包头',
+                                                    startAt: 147300,
+                                                    endAt: 159120
+                                                },
+                                                {
+                                                    internalCode:
+                                                        '33000D67580J',
+                                                    allCodes: [
+                                                        {
+                                                            prefix: 'D',
+                                                            number: 6758
+                                                        }
+                                                    ],
+                                                    startStation: '包头',
+                                                    endStation: '呼和浩特东',
+                                                    startAt: 160680,
+                                                    endAt: 165300
                                                 }
-                                            ]
+                                            ],
+                                            metadata: {
+                                                validationState: 'raw_official',
+                                                originalOfficialEntryKey:
+                                                    '33000G249608',
+                                                matchedInferredRouteId:
+                                                    'circulation_fb7bd969'
+                                            }
                                         },
                                         stops: [
                                             {
                                                 stationNo: 1,
                                                 stationName: '包头',
-                                                arriveAt: 1786665600,
-                                                departAt: 1786665600,
+                                                departAt: 1786663920,
                                                 stationTrainCode: {
                                                     prefix: 'G',
                                                     number: 2492
                                                 },
                                                 wicket: '一层2检票口',
                                                 distance: 0,
-                                                platformNo: 2,
+                                                platformNo: 1,
                                                 isStart: true,
                                                 isEnd: false
                                             },
                                             {
                                                 stationNo: 2,
                                                 stationName: '呼和浩特',
-                                                arriveAt: 1786669200,
-                                                departAt: 1786669500,
+                                                arriveAt: 1786667460,
+                                                departAt: 1786667760,
                                                 stationTrainCode: {
                                                     prefix: 'G',
                                                     number: 2492
                                                 },
-                                                wicket: '4检票口',
+                                                wicket: '3检票口,4检票口',
                                                 distance: 165,
                                                 platformNo: 4,
                                                 isStart: false,
@@ -1945,18 +2016,21 @@ export const developerDocsOpenApi: OpenApiDocument = {
                                             {
                                                 stationNo: 3,
                                                 stationName: '北京北',
-                                                arriveAt: 1786672800,
-                                                departAt: 1786672800,
+                                                arriveAt: 1786675800,
                                                 stationTrainCode: {
                                                     prefix: 'G',
                                                     number: 2492
                                                 },
-                                                wicket: '',
+                                                wicket: '1检票口',
+                                                distance: 633,
+                                                platformNo: 4,
                                                 isStart: false,
                                                 isEnd: true
                                             }
-                                        ]
-                                    }
+                                        ],
+                                        serviceDay: 20679
+                                    },
+                                    error: ''
                                 }
                             }
                         }
@@ -2729,10 +2803,7 @@ export const developerDocsOpenApi: OpenApiDocument = {
                                     }
                                 },
                                 example: {
-                                    meta: {
-                                        remain: 159,
-                                        cost: 2
-                                    },
+                                    ok: true,
                                     data: {
                                         trainCode: {
                                             prefix: 'G',
@@ -2743,13 +2814,7 @@ export const developerDocsOpenApi: OpenApiDocument = {
                                                 coverageId: 6845,
                                                 timetableId: 5479,
                                                 serviceDayStart: 20575,
-                                                serviceDayEndExclusive: 20576
-                                            },
-                                            {
-                                                coverageId: 6846,
-                                                timetableId: 5480,
-                                                serviceDayStart: 20576,
-                                                serviceDayEndExclusive: 20577
+                                                serviceDayEndExclusive: 20680
                                             }
                                         ],
                                         timetableMappings: {
@@ -2763,7 +2828,6 @@ export const developerDocsOpenApi: OpenApiDocument = {
                                                     {
                                                         stationNo: 1,
                                                         stationName: '汉口',
-                                                        arriveOffset: 47340,
                                                         departOffset: 47340,
                                                         stationTrainCode: {
                                                             prefix: 'G',
@@ -2773,10 +2837,69 @@ export const developerDocsOpenApi: OpenApiDocument = {
                                                         isEnd: false
                                                     },
                                                     {
+                                                        stationNo: 2,
+                                                        stationName: '许昌东',
+                                                        arriveOffset: 53040,
+                                                        departOffset: 53760,
+                                                        stationTrainCode: {
+                                                            prefix: 'G',
+                                                            number: 512
+                                                        },
+                                                        isStart: false,
+                                                        isEnd: false
+                                                    },
+                                                    {
+                                                        stationNo: 3,
+                                                        stationName: '郑州东',
+                                                        arriveOffset: 55140,
+                                                        departOffset: 55320,
+                                                        stationTrainCode: {
+                                                            prefix: 'G',
+                                                            number: 512
+                                                        },
+                                                        isStart: false,
+                                                        isEnd: false
+                                                    },
+                                                    {
+                                                        stationNo: 4,
+                                                        stationName: '高邑西',
+                                                        arriveOffset: 60120,
+                                                        departOffset: 60240,
+                                                        stationTrainCode: {
+                                                            prefix: 'G',
+                                                            number: 512
+                                                        },
+                                                        isStart: false,
+                                                        isEnd: false
+                                                    },
+                                                    {
+                                                        stationNo: 5,
+                                                        stationName: '石家庄',
+                                                        arriveOffset: 61140,
+                                                        departOffset: 61320,
+                                                        stationTrainCode: {
+                                                            prefix: 'G',
+                                                            number: 512
+                                                        },
+                                                        isStart: false,
+                                                        isEnd: false
+                                                    },
+                                                    {
+                                                        stationNo: 6,
+                                                        stationName: '保定东',
+                                                        arriveOffset: 63420,
+                                                        departOffset: 63540,
+                                                        stationTrainCode: {
+                                                            prefix: 'G',
+                                                            number: 512
+                                                        },
+                                                        isStart: false,
+                                                        isEnd: false
+                                                    },
+                                                    {
                                                         stationNo: 7,
                                                         stationName: '北京西',
                                                         arriveOffset: 66060,
-                                                        departOffset: 66060,
                                                         stationTrainCode: {
                                                             prefix: 'G',
                                                             number: 512
@@ -2787,7 +2910,8 @@ export const developerDocsOpenApi: OpenApiDocument = {
                                                 ]
                                             }
                                         }
-                                    }
+                                    },
+                                    error: ''
                                 }
                             }
                         }
@@ -3033,11 +3157,11 @@ export const developerDocsOpenApi: OpenApiDocument = {
                         name: 'cursor',
                         in: 'query',
                         description:
-                            '分页游标，格式为 serviceDay:id（例如 20679:681106）。第一页不需要传，翻页时直接复用上一页响应里的 nextCursor。serviceDay 是按上海时间自 1970-01-01 起的天数（epoch day），不是日期字符串。',
+                            '分页游标，格式为 serviceDay:id（例如 20679:6292081551810740）。第一页不需要传，翻页时直接复用上一页响应里的 nextCursor。serviceDay 是按上海时间自 1970-01-01 起的天数（epoch day），不是日期字符串。',
                         schema: {
                             type: 'string'
                         },
-                        example: '20679:681106'
+                        example: '20679:6292081551810740'
                     }
                 ],
                 security: [
@@ -3078,42 +3202,38 @@ export const developerDocsOpenApi: OpenApiDocument = {
                                     }
                                 },
                                 example: {
-                                    meta: {
-                                        remain: 159,
-                                        cost: 1
-                                    },
+                                    ok: true,
                                     data: {
                                         stationName: '北京南',
                                         cursor: '',
                                         limit: 1,
-                                        nextCursor: '20679:22440',
+                                        nextCursor: '20679:6292081551810740',
                                         items: [
                                             {
                                                 trainCode: {
-                                                    prefix: 'C',
-                                                    number: 2001
+                                                    prefix: 'G',
+                                                    number: 9418
                                                 },
                                                 allCodes: [
                                                     {
-                                                        prefix: 'C',
-                                                        number: 2001
+                                                        prefix: 'G',
+                                                        number: 9418
                                                     }
                                                 ],
-                                                arriveAt: 1786669200,
-                                                departAt: 1786669200,
-                                                platformNo: 2,
-                                                startStation: '北京南',
-                                                endStation: '天津',
-                                                updatedAt: 1786650000,
+                                                arriveAt: 1786723260,
+                                                startStation: '天津西',
+                                                endStation: '北京南',
+                                                updatedAt: 1786717003,
                                                 referenceModels: [
                                                     {
-                                                        model: 'CR400BF-S',
+                                                        model: 'CR400AF-B',
                                                         weightedShare: 1
                                                     }
                                                 ]
                                             }
                                         ]
-                                    }
+                                    },
+                                    error: ''
                                 }
                             }
                         }
@@ -3351,7 +3471,7 @@ export const developerDocsOpenApi: OpenApiDocument = {
                         },
                         query: {
                             limit: '1',
-                            cursor: '20679:22440'
+                            cursor: '20679:6292081551810740'
                         }
                     }
                 ],
@@ -3429,11 +3549,11 @@ export const developerDocsOpenApi: OpenApiDocument = {
                         name: 'cursor',
                         in: 'query',
                         description:
-                            '分页游标，格式为 serviceDay:id（例如 20679:681106）。第一页不需要传，翻页时直接复用上一页响应里的 nextCursor。serviceDay 是按上海时间自 1970-01-01 起的天数（epoch day），不是日期字符串。',
+                            '分页游标，格式为 serviceDay:id（例如 20678:1858368）。第一页不需要传，翻页时直接复用上一页响应里的 nextCursor。serviceDay 是按上海时间自 1970-01-01 起的天数（epoch day），不是日期字符串。',
                         schema: {
                             type: 'string'
                         },
-                        example: '20679:681106'
+                        example: '20678:1858368'
                     }
                 ],
                 security: [
@@ -3474,10 +3594,7 @@ export const developerDocsOpenApi: OpenApiDocument = {
                                     }
                                 },
                                 example: {
-                                    meta: {
-                                        remain: 159,
-                                        cost: 2
-                                    },
+                                    ok: true,
                                     data: {
                                         trainCode: {
                                             prefix: 'G',
@@ -3485,24 +3602,24 @@ export const developerDocsOpenApi: OpenApiDocument = {
                                         },
                                         cursor: '',
                                         limit: 2,
-                                        nextCursor: '20679:496651',
+                                        nextCursor: '20678:1858368',
                                         items: [
                                             {
-                                                id: 512596,
+                                                id: 1886130,
                                                 serviceDay: 20679,
                                                 timetableId: 5479,
-                                                emuId: 5156
+                                                emuId: 1540
                                             },
                                             {
-                                                id: 496651,
+                                                id: 1858368,
                                                 serviceDay: 20678,
                                                 timetableId: 5479,
-                                                emuId: 5159
+                                                emuId: 1544
                                             }
                                         ],
                                         emuCodeMappings: {
-                                            '5156': 'CR400BF-A-5156',
-                                            '5159': 'CR400BF-A-5159'
+                                            '1540': 'CR400BF-AZ-0518',
+                                            '1544': 'CR400BF-AZ-5253'
                                         },
                                         timetableMappings: {
                                             '5479': {
@@ -3512,7 +3629,8 @@ export const developerDocsOpenApi: OpenApiDocument = {
                                                 endOffset: 66060
                                             }
                                         }
-                                    }
+                                    },
+                                    error: ''
                                 }
                             }
                         }
@@ -3709,7 +3827,7 @@ export const developerDocsOpenApi: OpenApiDocument = {
                         },
                         query: {
                             limit: '2',
-                            cursor: '20679:496651'
+                            cursor: '20678:1858368'
                         }
                     }
                 ],
@@ -3787,14 +3905,11 @@ export const developerDocsOpenApi: OpenApiDocument = {
                                     }
                                 },
                                 example: {
-                                    meta: {
-                                        remain: 159,
-                                        cost: 1
-                                    },
+                                    ok: true,
                                     data: {
-                                        emuId: 2214,
+                                        emuId: 954,
                                         emuCodeMappings: {
-                                            '2214': 'CR400AF-C-2214'
+                                            '954': 'CR400AF-C-2214'
                                         },
                                         model: 'CR400AF-C',
                                         trainSetNo: '2214',
@@ -3807,13 +3922,13 @@ export const developerDocsOpenApi: OpenApiDocument = {
                                         trailerManufacturer: '中车青岛四方',
                                         manufactureMonth: '2020-09',
                                         designMaxSpeed: 350,
-                                        operatingMaxSpeed: 350,
+                                        operatingMaxSpeed: 310,
                                         isPublic: true,
                                         railwayTravelCodeEnabled: true,
                                         firstClassPowerLegrest: true,
                                         toiletStatus: '蹲厕、马桶均有',
                                         socketLocation:
-                                            '洗手台，首末排侧面；一二等座：坐垫接缝处，前排座椅后背(USB Type A)',
+                                            '洗手台（插座）；二等座：坐垫接缝处（插座、USB Type A），前排座椅后背（USB Type A）；一等座：座椅扶手前端（插座、USB Type A），前排座椅后背（USB Type A）',
                                         businessSeatType: '鱼骨式',
                                         modelRemark:
                                             '本车座椅靠背硬度较大，可能导致一定程度不适。',
@@ -3832,6 +3947,66 @@ export const developerDocsOpenApi: OpenApiDocument = {
                                                 hasAccessibleFacility: false
                                             },
                                             {
+                                                coachNo: 2,
+                                                coachTypeCode: 'ZE',
+                                                coachTypeName: '二等座车',
+                                                capacity: 90,
+                                                hasPower: true,
+                                                hasPantograph: false,
+                                                hasLargeLuggageArea: false,
+                                                hasAccessibleFacility: false
+                                            },
+                                            {
+                                                coachNo: 3,
+                                                coachTypeCode: 'ZE',
+                                                coachTypeName: '二等座车',
+                                                capacity: 90,
+                                                hasPower: false,
+                                                hasPantograph: true,
+                                                hasLargeLuggageArea: false,
+                                                hasAccessibleFacility: false
+                                            },
+                                            {
+                                                coachNo: 4,
+                                                coachTypeCode: 'ZE',
+                                                coachTypeName: '二等座车',
+                                                capacity: 75,
+                                                hasPower: true,
+                                                hasPantograph: false,
+                                                hasLargeLuggageArea: true,
+                                                hasAccessibleFacility: true
+                                            },
+                                            {
+                                                coachNo: 5,
+                                                coachTypeCode: 'ZEC',
+                                                coachTypeName: '二等座车/餐车',
+                                                capacity: 63,
+                                                hasPower: true,
+                                                hasPantograph: false,
+                                                hasLargeLuggageArea: false,
+                                                hasAccessibleFacility: false
+                                            },
+                                            {
+                                                coachNo: 6,
+                                                coachTypeCode: 'ZE',
+                                                coachTypeName: '二等座车',
+                                                capacity: 90,
+                                                hasPower: false,
+                                                hasPantograph: true,
+                                                hasLargeLuggageArea: false,
+                                                hasAccessibleFacility: false
+                                            },
+                                            {
+                                                coachNo: 7,
+                                                coachTypeCode: 'ZE',
+                                                coachTypeName: '二等座车',
+                                                capacity: 90,
+                                                hasPower: true,
+                                                hasPantograph: false,
+                                                hasLargeLuggageArea: false,
+                                                hasAccessibleFacility: false
+                                            },
+                                            {
                                                 coachNo: 8,
                                                 coachTypeCode: 'ZES',
                                                 coachTypeName: '二等/商务座车',
@@ -3842,7 +4017,8 @@ export const developerDocsOpenApi: OpenApiDocument = {
                                                 hasAccessibleFacility: false
                                             }
                                         ]
-                                    }
+                                    },
+                                    error: ''
                                 }
                             }
                         }
@@ -4141,11 +4317,11 @@ export const developerDocsOpenApi: OpenApiDocument = {
                         name: 'cursor',
                         in: 'query',
                         description:
-                            '分页游标，格式为 serviceDay:id（例如 20679:681106）。第一页不需要传，翻页时直接复用上一页响应里的 nextCursor。serviceDay 是按上海时间自 1970-01-01 起的天数（epoch day），不是日期字符串。',
+                            '分页游标，格式为 serviceDay:id（例如 20679:1880201）。第一页不需要传，翻页时直接复用上一页响应里的 nextCursor。serviceDay 是按上海时间自 1970-01-01 起的天数（epoch day），不是日期字符串。',
                         schema: {
                             type: 'string'
                         },
-                        example: '20679:681106'
+                        example: '20679:1880201'
                     }
                 ],
                 security: [
@@ -4186,47 +4362,45 @@ export const developerDocsOpenApi: OpenApiDocument = {
                                     }
                                 },
                                 example: {
-                                    meta: {
-                                        remain: 159,
-                                        cost: 2
-                                    },
+                                    ok: true,
                                     data: {
-                                        emuId: 5156,
+                                        emuId: 1500,
                                         cursor: '',
                                         limit: 2,
-                                        nextCursor: '20679:528424',
+                                        nextCursor: '20679:1880201',
                                         items: [
                                             {
-                                                id: 528425,
+                                                id: 1880202,
                                                 serviceDay: 20679,
-                                                timetableId: 6373,
+                                                timetableId: 18287,
                                                 trainCode: {
                                                     prefix: 'G',
-                                                    number: 1824
+                                                    number: 240
                                                 }
                                             },
                                             {
-                                                id: 528424,
+                                                id: 1880201,
                                                 serviceDay: 20679,
-                                                timetableId: 6373,
+                                                timetableId: 18287,
                                                 trainCode: {
                                                     prefix: 'G',
-                                                    number: 1821
+                                                    number: 237
                                                 }
                                             }
                                         ],
                                         emuCodeMappings: {
-                                            '5156': 'CR400BF-A-5156'
+                                            '1500': 'CR400BF-A-5156'
                                         },
                                         timetableMappings: {
-                                            '6373': {
-                                                startStation: '北京西',
-                                                endStation: '广州南',
-                                                startOffset: 3600,
-                                                endOffset: 25200
+                                            '18287': {
+                                                startStation: '上海虹桥',
+                                                endStation: '成都东',
+                                                startOffset: 32640,
+                                                endOffset: 70500
                                             }
                                         }
-                                    }
+                                    },
+                                    error: ''
                                 }
                             }
                         }
@@ -4423,7 +4597,7 @@ export const developerDocsOpenApi: OpenApiDocument = {
                         },
                         query: {
                             limit: '2',
-                            cursor: '20679:528424'
+                            cursor: '20679:1880201'
                         }
                     }
                 ],
@@ -4443,7 +4617,7 @@ export const developerDocsOpenApi: OpenApiDocument = {
                 ]
             }
         },
-        '/exports/daily/index': {
+        '/exports/daily': {
             get: {
                 operationId: 'GetDailyExportIndex',
                 tags: ['Exports'],

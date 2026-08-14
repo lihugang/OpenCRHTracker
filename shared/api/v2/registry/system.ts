@@ -17,7 +17,7 @@ export const SYSTEM_V2_OPERATIONS = {
         requestSchema: GetHealthRequestSchema,
         responseSchema: GetHealthResponseSchema,
         bodyMode: 'none',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     GetDebugEchoError: {
         operationName: 'GetDebugEchoError',
@@ -26,7 +26,7 @@ export const SYSTEM_V2_OPERATIONS = {
         requestSchema: GetDebugEchoErrorRequestSchema,
         responseSchema: GetDebugEchoErrorResponseSchema,
         bodyMode: 'none',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     GetExposedConfig: {
         operationName: 'GetExposedConfig',
@@ -35,7 +35,7 @@ export const SYSTEM_V2_OPERATIONS = {
         requestSchema: GetExposedConfigRequestSchema,
         responseSchema: GetExposedConfigResponseSchema,
         bodyMode: 'none',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     }
 } satisfies Record<string, V2ClientOperation>;
 

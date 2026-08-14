@@ -63,7 +63,7 @@ export const ADMIN_V2_OPERATIONS = {
         requestSchema: PostAdminAnomalyDeleteByTypeRequestSchema,
         responseSchema: PostAdminAnomalyDeleteByTypeResponseSchema,
         bodyMode: 'optional',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     PostAdminAnomalyDeleteRoute: {
         operationName: 'PostAdminAnomalyDeleteRoute',
@@ -72,7 +72,7 @@ export const ADMIN_V2_OPERATIONS = {
         requestSchema: PostAdminAnomalyDeleteRouteRequestSchema,
         responseSchema: PostAdminAnomalyDeleteRouteResponseSchema,
         bodyMode: 'optional',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     GetAdminAnomalyScan: {
         operationName: 'GetAdminAnomalyScan',
@@ -81,7 +81,7 @@ export const ADMIN_V2_OPERATIONS = {
         requestSchema: GetAdminAnomalyScanRequestSchema,
         responseSchema: GetAdminAnomalyScanResponseSchema,
         bodyMode: 'none',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     GetAdminConfigFiles: {
         operationName: 'GetAdminConfigFiles',
@@ -90,7 +90,7 @@ export const ADMIN_V2_OPERATIONS = {
         requestSchema: GetAdminConfigFilesRequestSchema,
         responseSchema: GetAdminConfigFilesResponseSchema,
         bodyMode: 'none',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     PostAdminConfigFiles: {
         operationName: 'PostAdminConfigFiles',
@@ -99,7 +99,7 @@ export const ADMIN_V2_OPERATIONS = {
         requestSchema: PostAdminConfigFilesRequestSchema,
         responseSchema: PostAdminConfigFilesResponseSchema,
         bodyMode: 'optional',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     GetAdminConfigFile: {
         operationName: 'GetAdminConfigFile',
@@ -108,7 +108,7 @@ export const ADMIN_V2_OPERATIONS = {
         requestSchema: GetAdminConfigFileRequestSchema,
         responseSchema: GetAdminConfigFileResponseSchema,
         bodyMode: 'none',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     PutAdminConfigFile: {
         operationName: 'PutAdminConfigFile',
@@ -117,7 +117,7 @@ export const ADMIN_V2_OPERATIONS = {
         requestSchema: PutAdminConfigFileRequestSchema,
         responseSchema: PutAdminConfigFileResponseSchema,
         bodyMode: 'optional',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     GetAdminDailyRoutes: {
         operationName: 'GetAdminDailyRoutes',
@@ -126,7 +126,7 @@ export const ADMIN_V2_OPERATIONS = {
         requestSchema: GetAdminDailyRoutesRequestSchema,
         responseSchema: GetAdminDailyRoutesResponseSchema,
         bodyMode: 'none',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     PostAdminDailyRoutes: {
         operationName: 'PostAdminDailyRoutes',
@@ -135,7 +135,7 @@ export const ADMIN_V2_OPERATIONS = {
         requestSchema: PostAdminDailyRoutesRequestSchema,
         responseSchema: PostAdminDailyRoutesResponseSchema,
         bodyMode: 'optional',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     DeleteAdminDailyRoute: {
         operationName: 'DeleteAdminDailyRoute',
@@ -144,7 +144,7 @@ export const ADMIN_V2_OPERATIONS = {
         requestSchema: DeleteAdminDailyRouteRequestSchema,
         responseSchema: DeleteAdminDailyRouteResponseSchema,
         bodyMode: 'none',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     GetAdminDailyRoutesTimetables: {
         operationName: 'GetAdminDailyRoutesTimetables',
@@ -153,7 +153,7 @@ export const ADMIN_V2_OPERATIONS = {
         requestSchema: GetAdminDailyRoutesTimetablesRequestSchema,
         responseSchema: GetAdminDailyRoutesTimetablesResponseSchema,
         bodyMode: 'none',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     GetAdminMembershipCodes: {
         operationName: 'GetAdminMembershipCodes',
@@ -162,7 +162,7 @@ export const ADMIN_V2_OPERATIONS = {
         requestSchema: GetAdminMembershipCodesRequestSchema,
         responseSchema: GetAdminMembershipCodesResponseSchema,
         bodyMode: 'none',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     PostAdminMembershipCodes: {
         operationName: 'PostAdminMembershipCodes',
@@ -171,7 +171,7 @@ export const ADMIN_V2_OPERATIONS = {
         requestSchema: PostAdminMembershipCodesRequestSchema,
         responseSchema: PostAdminMembershipCodesResponseSchema,
         bodyMode: 'optional',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     GetAdminOauthClients: {
         operationName: 'GetAdminOauthClients',
@@ -180,7 +180,7 @@ export const ADMIN_V2_OPERATIONS = {
         requestSchema: GetAdminOauthClientsRequestSchema,
         responseSchema: GetAdminOauthClientsResponseSchema,
         bodyMode: 'none',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     PatchAdminOauthClient: {
         operationName: 'PatchAdminOauthClient',
@@ -189,7 +189,7 @@ export const ADMIN_V2_OPERATIONS = {
         requestSchema: PatchAdminOauthClientRequestSchema,
         responseSchema: PatchAdminOauthClientResponseSchema,
         bodyMode: 'optional',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     PostAdminOauthClientRevokeTokens: {
         operationName: 'PostAdminOauthClientRevokeTokens',
@@ -198,7 +198,7 @@ export const ADMIN_V2_OPERATIONS = {
         requestSchema: PostAdminOauthClientRevokeTokensRequestSchema,
         responseSchema: PostAdminOauthClientRevokeTokensResponseSchema,
         bodyMode: 'none',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     GetAdminOfficialCirculations: {
         operationName: 'GetAdminOfficialCirculations',
@@ -207,7 +207,7 @@ export const ADMIN_V2_OPERATIONS = {
         requestSchema: GetAdminOfficialCirculationsRequestSchema,
         responseSchema: GetAdminOfficialCirculationsResponseSchema,
         bodyMode: 'none',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     DeleteAdminOfficialCirculation: {
         operationName: 'DeleteAdminOfficialCirculation',
@@ -216,7 +216,7 @@ export const ADMIN_V2_OPERATIONS = {
         requestSchema: DeleteAdminOfficialCirculationRequestSchema,
         responseSchema: DeleteAdminOfficialCirculationResponseSchema,
         bodyMode: 'none',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     GetAdminPassiveAlerts: {
         operationName: 'GetAdminPassiveAlerts',
@@ -225,7 +225,7 @@ export const ADMIN_V2_OPERATIONS = {
         requestSchema: GetAdminPassiveAlertsRequestSchema,
         responseSchema: GetAdminPassiveAlertsResponseSchema,
         bodyMode: 'none',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     GetAdminServerMetrics: {
         operationName: 'GetAdminServerMetrics',
@@ -234,7 +234,7 @@ export const ADMIN_V2_OPERATIONS = {
         requestSchema: GetAdminServerMetricsRequestSchema,
         responseSchema: GetAdminServerMetricsResponseSchema,
         bodyMode: 'none',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     GetAdminTasks: {
         operationName: 'GetAdminTasks',
@@ -243,7 +243,7 @@ export const ADMIN_V2_OPERATIONS = {
         requestSchema: GetAdminTasksRequestSchema,
         responseSchema: GetAdminTasksResponseSchema,
         bodyMode: 'none',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     PostAdminTasks: {
         operationName: 'PostAdminTasks',
@@ -252,7 +252,7 @@ export const ADMIN_V2_OPERATIONS = {
         requestSchema: PostAdminTasksRequestSchema,
         responseSchema: PostAdminTasksResponseSchema,
         bodyMode: 'optional',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     GetAdminTimetableHistoryMergeCandidates: {
         operationName: 'GetAdminTimetableHistoryMergeCandidates',
@@ -261,7 +261,7 @@ export const ADMIN_V2_OPERATIONS = {
         requestSchema: GetAdminTimetableHistoryMergeCandidatesRequestSchema,
         responseSchema: GetAdminTimetableHistoryMergeCandidatesResponseSchema,
         bodyMode: 'none',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     DeleteAdminTimetableHistoryCoverage: {
         operationName: 'DeleteAdminTimetableHistoryCoverage',
@@ -270,7 +270,7 @@ export const ADMIN_V2_OPERATIONS = {
         requestSchema: DeleteAdminTimetableHistoryCoverageRequestSchema,
         responseSchema: DeleteAdminTimetableHistoryCoverageResponseSchema,
         bodyMode: 'none',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     GetAdminTraffic: {
         operationName: 'GetAdminTraffic',
@@ -279,7 +279,7 @@ export const ADMIN_V2_OPERATIONS = {
         requestSchema: GetAdminTrafficRequestSchema,
         responseSchema: GetAdminTrafficResponseSchema,
         bodyMode: 'none',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     PostAdminWebappTokensRevokeAll: {
         operationName: 'PostAdminWebappTokensRevokeAll',
@@ -288,14 +288,12 @@ export const ADMIN_V2_OPERATIONS = {
         requestSchema: PostAdminWebappTokensRevokeAllRequestSchema,
         responseSchema: PostAdminWebappTokensRevokeAllResponseSchema,
         bodyMode: 'none',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     }
 } satisfies Record<string, V2ClientOperation>;
 
-export const PostAdminAnomalyDeleteByType =
-    ADMIN_V2_OPERATIONS.PostAdminAnomalyDeleteByType;
-export const PostAdminAnomalyDeleteRoute =
-    ADMIN_V2_OPERATIONS.PostAdminAnomalyDeleteRoute;
+export const PostAdminAnomalyDeleteByType = ADMIN_V2_OPERATIONS.PostAdminAnomalyDeleteByType;
+export const PostAdminAnomalyDeleteRoute = ADMIN_V2_OPERATIONS.PostAdminAnomalyDeleteRoute;
 export const GetAdminAnomalyScan = ADMIN_V2_OPERATIONS.GetAdminAnomalyScan;
 export const GetAdminConfigFiles = ADMIN_V2_OPERATIONS.GetAdminConfigFiles;
 export const PostAdminConfigFiles = ADMIN_V2_OPERATIONS.PostAdminConfigFiles;
@@ -304,28 +302,19 @@ export const PutAdminConfigFile = ADMIN_V2_OPERATIONS.PutAdminConfigFile;
 export const GetAdminDailyRoutes = ADMIN_V2_OPERATIONS.GetAdminDailyRoutes;
 export const PostAdminDailyRoutes = ADMIN_V2_OPERATIONS.PostAdminDailyRoutes;
 export const DeleteAdminDailyRoute = ADMIN_V2_OPERATIONS.DeleteAdminDailyRoute;
-export const GetAdminDailyRoutesTimetables =
-    ADMIN_V2_OPERATIONS.GetAdminDailyRoutesTimetables;
-export const GetAdminMembershipCodes =
-    ADMIN_V2_OPERATIONS.GetAdminMembershipCodes;
-export const PostAdminMembershipCodes =
-    ADMIN_V2_OPERATIONS.PostAdminMembershipCodes;
+export const GetAdminDailyRoutesTimetables = ADMIN_V2_OPERATIONS.GetAdminDailyRoutesTimetables;
+export const GetAdminMembershipCodes = ADMIN_V2_OPERATIONS.GetAdminMembershipCodes;
+export const PostAdminMembershipCodes = ADMIN_V2_OPERATIONS.PostAdminMembershipCodes;
 export const GetAdminOauthClients = ADMIN_V2_OPERATIONS.GetAdminOauthClients;
 export const PatchAdminOauthClient = ADMIN_V2_OPERATIONS.PatchAdminOauthClient;
-export const PostAdminOauthClientRevokeTokens =
-    ADMIN_V2_OPERATIONS.PostAdminOauthClientRevokeTokens;
-export const GetAdminOfficialCirculations =
-    ADMIN_V2_OPERATIONS.GetAdminOfficialCirculations;
-export const DeleteAdminOfficialCirculation =
-    ADMIN_V2_OPERATIONS.DeleteAdminOfficialCirculation;
+export const PostAdminOauthClientRevokeTokens = ADMIN_V2_OPERATIONS.PostAdminOauthClientRevokeTokens;
+export const GetAdminOfficialCirculations = ADMIN_V2_OPERATIONS.GetAdminOfficialCirculations;
+export const DeleteAdminOfficialCirculation = ADMIN_V2_OPERATIONS.DeleteAdminOfficialCirculation;
 export const GetAdminPassiveAlerts = ADMIN_V2_OPERATIONS.GetAdminPassiveAlerts;
 export const GetAdminServerMetrics = ADMIN_V2_OPERATIONS.GetAdminServerMetrics;
 export const GetAdminTasks = ADMIN_V2_OPERATIONS.GetAdminTasks;
 export const PostAdminTasks = ADMIN_V2_OPERATIONS.PostAdminTasks;
-export const GetAdminTimetableHistoryMergeCandidates =
-    ADMIN_V2_OPERATIONS.GetAdminTimetableHistoryMergeCandidates;
-export const DeleteAdminTimetableHistoryCoverage =
-    ADMIN_V2_OPERATIONS.DeleteAdminTimetableHistoryCoverage;
+export const GetAdminTimetableHistoryMergeCandidates = ADMIN_V2_OPERATIONS.GetAdminTimetableHistoryMergeCandidates;
+export const DeleteAdminTimetableHistoryCoverage = ADMIN_V2_OPERATIONS.DeleteAdminTimetableHistoryCoverage;
 export const GetAdminTraffic = ADMIN_V2_OPERATIONS.GetAdminTraffic;
-export const PostAdminWebappTokensRevokeAll =
-    ADMIN_V2_OPERATIONS.PostAdminWebappTokensRevokeAll;
+export const PostAdminWebappTokensRevokeAll = ADMIN_V2_OPERATIONS.PostAdminWebappTokensRevokeAll;

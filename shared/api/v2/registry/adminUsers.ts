@@ -31,7 +31,7 @@ export const ADMINUSERS_V2_OPERATIONS = {
         requestSchema: GetAdminUsersRequestSchema,
         responseSchema: GetAdminUsersResponseSchema,
         bodyMode: 'none',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     GetAdminUserMemberships: {
         operationName: 'GetAdminUserMemberships',
@@ -40,7 +40,7 @@ export const ADMINUSERS_V2_OPERATIONS = {
         requestSchema: GetAdminUserMembershipsRequestSchema,
         responseSchema: GetAdminUserMembershipsResponseSchema,
         bodyMode: 'none',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     PutAdminUserMembership: {
         operationName: 'PutAdminUserMembership',
@@ -49,7 +49,7 @@ export const ADMINUSERS_V2_OPERATIONS = {
         requestSchema: PutAdminUserMembershipRequestSchema,
         responseSchema: PutAdminUserMembershipResponseSchema,
         bodyMode: 'optional',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     DeleteAdminUserMembership: {
         operationName: 'DeleteAdminUserMembership',
@@ -58,7 +58,7 @@ export const ADMINUSERS_V2_OPERATIONS = {
         requestSchema: DeleteAdminUserMembershipRequestSchema,
         responseSchema: DeleteAdminUserMembershipResponseSchema,
         bodyMode: 'none',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     PostAdminQqBanEntry: {
         operationName: 'PostAdminQqBanEntry',
@@ -67,7 +67,7 @@ export const ADMINUSERS_V2_OPERATIONS = {
         requestSchema: PostAdminQqBanEntryRequestSchema,
         responseSchema: PostAdminQqBanEntryResponseSchema,
         bodyMode: 'required',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     DeleteAdminQqBanEntry: {
         operationName: 'DeleteAdminQqBanEntry',
@@ -76,7 +76,7 @@ export const ADMINUSERS_V2_OPERATIONS = {
         requestSchema: DeleteAdminQqBanEntryRequestSchema,
         responseSchema: DeleteAdminQqBanEntryResponseSchema,
         bodyMode: 'none',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     PostAdminUsersQuotaReset: {
         operationName: 'PostAdminUsersQuotaReset',
@@ -85,7 +85,7 @@ export const ADMINUSERS_V2_OPERATIONS = {
         requestSchema: PostAdminUsersQuotaResetRequestSchema,
         responseSchema: PostAdminUsersQuotaResetResponseSchema,
         bodyMode: 'optional',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     PostAdminUsersRiskClear: {
         operationName: 'PostAdminUsersRiskClear',
@@ -94,7 +94,7 @@ export const ADMINUSERS_V2_OPERATIONS = {
         requestSchema: PostAdminUsersRiskClearRequestSchema,
         responseSchema: PostAdminUsersRiskClearResponseSchema,
         bodyMode: 'optional',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     GetAdminUsersSecurity: {
         operationName: 'GetAdminUsersSecurity',
@@ -103,7 +103,7 @@ export const ADMINUSERS_V2_OPERATIONS = {
         requestSchema: GetAdminUsersSecurityRequestSchema,
         responseSchema: GetAdminUsersSecurityResponseSchema,
         bodyMode: 'none',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     PostAdminUsersStatus: {
         operationName: 'PostAdminUsersStatus',
@@ -112,25 +112,17 @@ export const ADMINUSERS_V2_OPERATIONS = {
         requestSchema: PostAdminUsersStatusRequestSchema,
         responseSchema: PostAdminUsersStatusResponseSchema,
         bodyMode: 'optional',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     }
 } satisfies Record<string, V2ClientOperation>;
 
 export const GetAdminUsers = ADMINUSERS_V2_OPERATIONS.GetAdminUsers;
-export const GetAdminUserMemberships =
-    ADMINUSERS_V2_OPERATIONS.GetAdminUserMemberships;
-export const PutAdminUserMembership =
-    ADMINUSERS_V2_OPERATIONS.PutAdminUserMembership;
-export const DeleteAdminUserMembership =
-    ADMINUSERS_V2_OPERATIONS.DeleteAdminUserMembership;
+export const GetAdminUserMemberships = ADMINUSERS_V2_OPERATIONS.GetAdminUserMemberships;
+export const PutAdminUserMembership = ADMINUSERS_V2_OPERATIONS.PutAdminUserMembership;
+export const DeleteAdminUserMembership = ADMINUSERS_V2_OPERATIONS.DeleteAdminUserMembership;
 export const PostAdminQqBanEntry = ADMINUSERS_V2_OPERATIONS.PostAdminQqBanEntry;
-export const DeleteAdminQqBanEntry =
-    ADMINUSERS_V2_OPERATIONS.DeleteAdminQqBanEntry;
-export const PostAdminUsersQuotaReset =
-    ADMINUSERS_V2_OPERATIONS.PostAdminUsersQuotaReset;
-export const PostAdminUsersRiskClear =
-    ADMINUSERS_V2_OPERATIONS.PostAdminUsersRiskClear;
-export const GetAdminUsersSecurity =
-    ADMINUSERS_V2_OPERATIONS.GetAdminUsersSecurity;
-export const PostAdminUsersStatus =
-    ADMINUSERS_V2_OPERATIONS.PostAdminUsersStatus;
+export const DeleteAdminQqBanEntry = ADMINUSERS_V2_OPERATIONS.DeleteAdminQqBanEntry;
+export const PostAdminUsersQuotaReset = ADMINUSERS_V2_OPERATIONS.PostAdminUsersQuotaReset;
+export const PostAdminUsersRiskClear = ADMINUSERS_V2_OPERATIONS.PostAdminUsersRiskClear;
+export const GetAdminUsersSecurity = ADMINUSERS_V2_OPERATIONS.GetAdminUsersSecurity;
+export const PostAdminUsersStatus = ADMINUSERS_V2_OPERATIONS.PostAdminUsersStatus;

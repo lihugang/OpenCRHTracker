@@ -23,7 +23,7 @@ export const FEEDBACK_V2_OPERATIONS = {
         requestSchema: GetFeedbackTopicsRequestSchema,
         responseSchema: GetFeedbackTopicsResponseSchema,
         bodyMode: 'none',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     PostFeedbackTopics: {
         operationName: 'PostFeedbackTopics',
@@ -32,7 +32,7 @@ export const FEEDBACK_V2_OPERATIONS = {
         requestSchema: PostFeedbackTopicsRequestSchema,
         responseSchema: PostFeedbackTopicsResponseSchema,
         bodyMode: 'optional',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     GetFeedbackTopic: {
         operationName: 'GetFeedbackTopic',
@@ -41,7 +41,7 @@ export const FEEDBACK_V2_OPERATIONS = {
         requestSchema: GetFeedbackTopicRequestSchema,
         responseSchema: GetFeedbackTopicResponseSchema,
         bodyMode: 'none',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     PatchFeedbackTopic: {
         operationName: 'PatchFeedbackTopic',
@@ -50,7 +50,7 @@ export const FEEDBACK_V2_OPERATIONS = {
         requestSchema: PatchFeedbackTopicRequestSchema,
         responseSchema: PatchFeedbackTopicResponseSchema,
         bodyMode: 'optional',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     DeleteFeedbackTopic: {
         operationName: 'DeleteFeedbackTopic',
@@ -59,7 +59,7 @@ export const FEEDBACK_V2_OPERATIONS = {
         requestSchema: DeleteFeedbackTopicRequestSchema,
         responseSchema: DeleteFeedbackTopicResponseSchema,
         bodyMode: 'none',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     PostFeedbackTopicMessage: {
         operationName: 'PostFeedbackTopicMessage',
@@ -68,7 +68,7 @@ export const FEEDBACK_V2_OPERATIONS = {
         requestSchema: PostFeedbackTopicMessageRequestSchema,
         responseSchema: PostFeedbackTopicMessageResponseSchema,
         bodyMode: 'optional',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     }
 } satisfies Record<string, V2ClientOperation>;
 
@@ -77,5 +77,4 @@ export const PostFeedbackTopics = FEEDBACK_V2_OPERATIONS.PostFeedbackTopics;
 export const GetFeedbackTopic = FEEDBACK_V2_OPERATIONS.GetFeedbackTopic;
 export const PatchFeedbackTopic = FEEDBACK_V2_OPERATIONS.PatchFeedbackTopic;
 export const DeleteFeedbackTopic = FEEDBACK_V2_OPERATIONS.DeleteFeedbackTopic;
-export const PostFeedbackTopicMessage =
-    FEEDBACK_V2_OPERATIONS.PostFeedbackTopicMessage;
+export const PostFeedbackTopicMessage = FEEDBACK_V2_OPERATIONS.PostFeedbackTopicMessage;

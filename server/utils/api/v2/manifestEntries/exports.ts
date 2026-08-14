@@ -22,7 +22,7 @@ export const EXPORTS_MANIFEST_ENTRIES = {
     GetDailyExportIndex: defineV2Operation({
         operationName: 'GetDailyExportIndex',
         method: 'GET',
-        pathTemplate: '/api/v2/exports/daily/index',
+        pathTemplate: '/api/v2/exports/daily',
         requestSchema: GetDailyExportIndexRequestSchema,
         dataSchema: GetDailyExportIndexDataSchema,
         responseSchema: GetDailyExportIndexResponseSchema,

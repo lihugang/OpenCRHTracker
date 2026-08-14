@@ -13,9 +13,8 @@ export const NOTIFICATIONS_V2_OPERATIONS = {
         requestSchema: PostNotificationsSendRequestSchema,
         responseSchema: PostNotificationsSendResponseSchema,
         bodyMode: 'required',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     }
 } satisfies Record<string, V2ClientOperation>;
 
-export const PostNotificationsSend =
-    NOTIFICATIONS_V2_OPERATIONS.PostNotificationsSend;
+export const PostNotificationsSend = NOTIFICATIONS_V2_OPERATIONS.PostNotificationsSend;

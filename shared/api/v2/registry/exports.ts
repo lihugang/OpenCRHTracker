@@ -11,11 +11,11 @@ export const EXPORTS_V2_OPERATIONS = {
     GetDailyExportIndex: {
         operationName: 'GetDailyExportIndex',
         method: 'GET',
-        pathTemplate: '/api/v2/exports/daily/index',
+        pathTemplate: '/api/v2/exports/daily',
         requestSchema: GetDailyExportIndexRequestSchema,
         responseSchema: GetDailyExportIndexResponseSchema,
         bodyMode: 'none',
-        responseKind: 'protobuf'
+        responseKind: 'protobuf',
     },
     GetDailyExport: {
         operationName: 'GetDailyExport',
@@ -25,7 +25,7 @@ export const EXPORTS_V2_OPERATIONS = {
         responseSchema: GetDailyExportResponseSchema,
         bodyMode: 'none',
         responseKind: 'raw',
-        rawContentTypes: ['text/csv']
+        rawContentTypes: ['text/csv'],
     }
 } satisfies Record<string, V2ClientOperation>;
 
