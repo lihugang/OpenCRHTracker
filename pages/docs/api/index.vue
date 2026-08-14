@@ -3,130 +3,15 @@
         eyebrow="文档"
         title="API 文档"
         description="面向开发者的 v2 API 文档，覆盖鉴权、每日记录、历史查询、时刻表、配属与导出接口，并附带可交互的调试器。">
-        <div
-            class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]">
-            <UiCard :show-accent-bar="false">
-                <div class="space-y-3">
-                    <p
-                        class="text-xs font-medium uppercase tracking-[0.18em] text-crh-blue/80">
-                        基础路径
-                    </p>
-                    <p class="text-sm leading-6 text-slate-600">
-                        所有 v2 API 接口都以
-                    </p>
-
-                    <p class="font-mono text-sm text-slate-700">
-                        {{ apiConfig.versionPrefix }}
-                    </p>
-
-                    <p class="text-sm leading-6 text-slate-600">
-                        作为基础路径。
-                    </p>
-                </div>
-            </UiCard>
-
-            <UiCard :show-accent-bar="false">
-                <div class="space-y-3">
-                    <p
-                        class="text-xs font-medium uppercase tracking-[0.18em] text-crh-blue/80">
-                        鉴权方式
-                    </p>
-                    <p class="text-sm leading-6 text-slate-600">
-                        大部分查询接口默认都支持匿名访问；需要读取账户信息或更高额度的接口，则使用
-                        API Key
-                        或登录会话。请打开用户页并切换到“开发”页，点击“签发”按钮获取您的
-                        API Key。
-                    </p>
-                    <p class="font-mono text-xs text-slate-500">
-                        API Key 请求头：{{ apiConfig.apiKeyHeader }}
-                    </p>
-                    <p class="text-sm leading-6 text-slate-600">
-                        如果你要让第三方应用接入用户登录流程，请阅读
-                        <NuxtLink
-                            to="/docs/oauth"
-                            class="font-semibold text-crh-blue transition hover:text-slate-900">
-                            OAuth 文档
-                        </NuxtLink>
-                        。
-                    </p>
-                </div>
-            </UiCard>
-
-            <UiCard :show-accent-bar="false">
-                <div class="space-y-3">
-                    <p
-                        class="text-xs font-medium uppercase tracking-[0.18em] text-crh-blue/80">
-                        额度响应头
-                    </p>
-                    <p class="text-sm leading-6 text-slate-600">
-                        每次响应都可能通过响应头返回剩余额度、本次扣费和重试等待时间；
-                        响应体里的 meta
-                        字段也会带上同样的信息。由于大部分查询接口都使用了
-                        Cloudflare
-                        的缓存层，具体配额使用情况请以鉴权接口返回的结果为准。
-                    </p>
-                    <div class="space-y-2 font-mono text-xs text-slate-500">
-                        <p>{{ apiConfig.headers.remain }}</p>
-                        <p>{{ apiConfig.headers.cost }}</p>
-                        <p>{{ apiConfig.headers.retryAfter }}</p>
-                    </div>
-                </div>
-            </UiCard>
-
-            <UiCard :show-accent-bar="false">
-                <div class="space-y-3">
-                    <p
-                        class="text-xs font-medium uppercase tracking-[0.18em] text-crh-blue/80">
-                        访问额度
-                    </p>
-                    <p class="text-sm leading-6 text-slate-600">
-                        游客默认可用额度上限为
-                        {{ apiConfig.quota.anonymousMaxTokens }}
-                        点，登录用户默认可用额度上限为
-                        {{ apiConfig.quota.userMaxTokens }}
-                        点。同一用户下签发的所有 API Key
-                        都共享同一份用户级额度，切换 Key
-                        不会额外增加额度。额度会按配置的恢复周期自动补充，默认每
-                        {{ apiConfig.quota.refillIntervalSeconds }} 秒恢复
-                        {{ apiConfig.quota.refillAmount }}
-                        点，补充后不会超过当前用户上限。如果默认额度不够，你可以在反馈里说明需求，向管理员申请更多额度。
-                    </p>
-                </div>
-            </UiCard>
-        </div>
-
         <UiCard :show-accent-bar="false">
-            <div class="space-y-4">
+            <div class="space-y-6">
                 <div class="space-y-2">
                     <p
                         class="text-xs font-medium uppercase tracking-[0.2em] text-crh-blue/80">
-                        响应约定
+                        接口约定
                     </p>
                     <h2 class="text-2xl font-semibold text-slate-900">
-                        v2 统一响应结构
-                    </h2>
-                    <p class="text-sm leading-6 text-slate-600">
-                        v2 的成功响应统一使用 meta + data 这层包装，失败时返回
-                        meta + error（包含 code 和 message）；不再使用 v1 的 ok
-                        字段。 支持分页的查询接口还会额外返回 cursor、limit 和
-                        nextCursor。
-                    </p>
-                </div>
-
-                <DocsCodeBlock :code="responseEnvelopeExample" />
-                <DocsCodeBlock :code="responseErrorExample" />
-            </div>
-        </UiCard>
-
-        <UiCard :show-accent-bar="false">
-            <div class="space-y-5">
-                <div class="space-y-2">
-                    <p
-                        class="text-xs font-medium uppercase tracking-[0.2em] text-crh-blue/80">
-                        约定
-                    </p>
-                    <h2 class="text-2xl font-semibold text-slate-900">
-                        v2 接口约定
+                        调用前先看这里
                     </h2>
                     <p class="text-sm leading-6 text-slate-600">
                         在调用下面的接口之前，先花一分钟了解这些约定，可以少踩很多坑。
@@ -135,9 +20,45 @@
 
                 <div class="grid gap-4 md:grid-cols-2">
                     <div
-                        v-for="item in conventions"
+                        v-for="item in basics"
                         :key="item.title"
                         class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-4 py-4">
+                        <p class="text-sm font-semibold text-slate-900">
+                            {{ item.title }}
+                        </p>
+                        <p class="mt-2 text-sm leading-6 text-slate-600">
+                            <template v-if="item.title === '基础路径'">
+                                所有 v2 接口都以
+                                <code
+                                    class="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs text-slate-700">
+                                    {{ apiConfig.versionPrefix }}
+                                </code>
+                                作为基础路径，页面里展示的接口路径会自动拼接上前缀。
+                            </template>
+                            <template v-else>
+                                {{ item.description }}
+                                <NuxtLink
+                                    v-if="item.linkTo"
+                                    :to="item.linkTo"
+                                    class="font-semibold text-crh-blue transition hover:text-slate-900">
+                                    {{ item.linkText }}
+                                </NuxtLink>
+                                <span v-if="item.linkTo">。</span>
+                            </template>
+                        </p>
+                    </div>
+                </div>
+
+                <div class="grid gap-4 xl:grid-cols-2">
+                    <DocsCodeBlock :code="responseEnvelopeExample" />
+                    <DocsCodeBlock :code="responseErrorExample" />
+                </div>
+
+                <div class="grid gap-4 md:grid-cols-2">
+                    <div
+                        v-for="item in conventions"
+                        :key="item.title"
+                        class="rounded-[1rem] border border-slate-200 bg-white/80 px-4 py-4">
                         <p class="text-sm font-semibold text-slate-900">
                             {{ item.title }}
                         </p>
@@ -278,18 +199,49 @@ const responseErrorExample = [
     '    }',
     '}'
 ].join('\n');
-const conventions = [
+const basics = [
     {
         title: '基础路径',
-        description:
-            '所有接口都以 ' +
-            apiConfig.value.versionPrefix +
-            ' 开头，文档里展示的路径会自动拼接上前缀。'
+        description: ''
     },
     {
-        title: '字段命名',
+        title: '鉴权方式',
         description:
-            'JSON 字段统一使用小驼峰命名，例如 serviceDayStart；不要使用 v1 的下划线命名。'
+            '大部分查询接口支持匿名访问；需要读取账户信息或更高额度的接口，使用 API Key 或登录会话。API Key 通过 ' +
+            apiConfig.value.apiKeyHeader +
+            ' 请求头以 Bearer 方式传递，在用户页的“开发”页即可签发。第三方应用接入登录流程请看',
+        linkTo: '/docs/oauth',
+        linkText: 'OAuth 文档'
+    },
+    {
+        title: '额度与响应头',
+        description:
+            '游客默认上限 ' +
+            apiConfig.value.quota.anonymousMaxTokens +
+            ' 点，登录用户默认上限 ' +
+            apiConfig.value.quota.userMaxTokens +
+            ' 点，同一用户的所有 API Key 共享同一份额度；额度每 ' +
+            apiConfig.value.quota.refillIntervalSeconds +
+            ' 秒恢复 ' +
+            apiConfig.value.quota.refillAmount +
+            ' 点。每次响应的 meta 字段和响应头（' +
+            apiConfig.value.headers.remain +
+            '、' +
+            apiConfig.value.headers.cost +
+            '、' +
+            apiConfig.value.headers.retryAfter +
+            '）都会带上剩余额度、本次扣费和重试等待时间。'
+    },
+    {
+        title: '响应结构',
+        description:
+            '成功时返回 meta + data，失败时返回 meta + error（包含 code 和 message）。支持分页的接口还会返回 cursor、limit 和 nextCursor。'
+    }
+];
+const conventions = [
+    {
+        title: '字段命名',
+        description: 'JSON 字段统一使用小驼峰命名，例如 serviceDayStart。'
     },
     {
         title: '可选字段会省略',

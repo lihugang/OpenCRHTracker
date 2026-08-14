@@ -631,7 +631,7 @@ export const deployDocsSections: DocsContentSection[] = [
                             'OAuth 访问密钥的有效期，单位秒；会写入复用的签名 API Key 记录，并影响现有访问密钥资源访问链路的过期判断。',
                         notes: [
                             '必须为正整数。',
-                            '访问密钥会直接作为现有 /api/v1/* 接口的 Bearer Token 使用，因此过期时间会影响第三方应用访问所有受访问域保护资源的可用窗口。',
+                            '访问密钥会直接作为现有 /api/v2/* 接口的 Bearer Token 使用，因此过期时间会影响第三方应用访问所有受访问域保护资源的可用窗口。',
                             '暂不支持刷新令牌，过期后需要重新走授权流程。'
                         ]
                     },
@@ -752,7 +752,7 @@ export const deployDocsSections: DocsContentSection[] = [
                         path: 'api.versionPrefix',
                         valueType: 'string',
                         required: true,
-                        description: 'API 统一前缀，例如 /api/v1。'
+                        description: 'API 统一前缀，例如 /api/v2。'
                     },
                     {
                         path: 'api.apiKeyHeader',
@@ -794,7 +794,7 @@ export const deployDocsSections: DocsContentSection[] = [
                         valueType: 'object',
                         required: true,
                         description:
-                            'OAuth 授权流程的限流配置，对应 GET /api/v1/oauth/authorize/context 与 POST /oauth/authorize。',
+                            'OAuth 授权流程的限流配置，对应 GET /api/v2/oauth/authorize/context 与 POST /oauth/authorize。',
                         notes: [
                             '这两个入口共用同一个限流桶，便于限制授权页探测和频繁同意/拒绝操作。',
                             '当前默认建议值为 20 分钟 20 次。'
@@ -853,9 +853,9 @@ export const deployDocsSections: DocsContentSection[] = [
                         description:
                             '反馈接口后端校验使用的长度限制配置，分别控制创建反馈正文、回复正文和管理员修改标题时的最小/最大长度。',
                         notes: [
-                            'createBody 对应 POST /api/v1/feedback/topics 的正文长度范围。',
-                            'replyBody 对应 POST /api/v1/feedback/topics/[id]/messages 的正文长度范围。',
-                            'title 对应 PATCH /api/v1/feedback/topics/[id] 的标题长度范围。'
+                            'createBody 对应 POST /api/v2/feedback/topics 的正文长度范围。',
+                            'replyBody 对应 POST /api/v2/feedback/topics/[id]/messages 的正文长度范围。',
+                            'title 对应 PATCH /api/v2/feedback/topics/[id] 的标题长度范围。'
                         ]
                     },
                     {
@@ -872,7 +872,7 @@ export const deployDocsSections: DocsContentSection[] = [
                             '当前日、历史、搜索索引、时刻表和全站地图接口成功响应的缓存时长。',
                         notes: [
                             'sitemapMaxAgeSeconds 用于控制 /sitemap.xml 响应的 Cache-Control max-age。',
-                            'timetableMaxAgeSeconds 用于控制 /api/v1/timetable/train/*/current、/api/v1/timetable/train/*/history/* 和 /api/v1/timetable/station/* 成功响应的 Cache-Control max-age。'
+                            'timetableMaxAgeSeconds 用于控制 /api/v2/timetable/train/{trainCode}/current、/api/v2/timetable/train/{trainCode}/history 和 /api/v2/timetable/station/{stationName} 成功响应的 Cache-Control max-age。'
                         ]
                     },
                     {
@@ -1401,7 +1401,7 @@ export const deployDocsSections: DocsContentSection[] = [
         blocks: [
             {
                 type: 'paragraph',
-                text: '动车组清单文件默认建议放在 data/emu_list.json，实际路径由配置文件中的 data.assets.EMUList.file 决定。默认远程来源为 https://allocation.crhdata.top/api/v1/allocation/export.json，文件内容使用 allocation export JSON 范式。GET /api/v1/allocation/emu/{emuCode} 会读取这个资产返回单一车组的配属信息。'
+                text: '动车组清单文件默认建议放在 data/emu_list.json，实际路径由配置文件中的 data.assets.EMUList.file 决定。默认远程来源为 https://allocation.crhdata.top/api/v1/allocation/export.json，文件内容使用 allocation export JSON 范式。GET /api/v2/allocation/emu/{emuCode} 会读取这个资产返回单一车组的配属信息。'
             },
             {
                 type: 'code',

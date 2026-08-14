@@ -43,7 +43,7 @@
                                     class="max-w-3xl text-xs leading-5 text-sky-700">
                                     慢路径会优先按动态路由模板聚合，例如
                                     /train/:code 和
-                                    /api/v1/feedback/topics/:id。
+                                    /api/v2/feedback/topics/:id。
                                 </p>
                             </div>
 
