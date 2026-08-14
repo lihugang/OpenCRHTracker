@@ -137,6 +137,7 @@ export interface BuildScheduleResult {
     resumed: boolean;
     date: string;
     file: string;
+    stationPlatformTaskCandidates: BuildScheduleStationPlatformTaskCandidate[];
     stats: {
         apiCalls: number;
         apiRetries: number;
@@ -148,4 +149,11 @@ export interface BuildScheduleResult {
     };
     failedKeywords: string[];
     failedEnrichCodes: string[];
+}
+
+export interface BuildScheduleStationPlatformTaskCandidate {
+    trainCode: TrainCodeParts;
+    trainInternalCode: string;
+    startAt: number;
+    stopCount: number;
 }

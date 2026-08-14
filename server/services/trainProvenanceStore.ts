@@ -36,7 +36,10 @@ export type TrainProvenanceRequestStatType =
     | 'fetch_station_exit_info'
     | 'fetch_station_transport_info';
 
-export type StationPlatformRefreshTrigger = 'route_refresh' | 'station_board';
+export type StationPlatformRefreshTrigger =
+    | 'route_refresh'
+    | 'station_board'
+    | 'scheduled_task';
 
 export type StationPlatformRefreshStatus =
     | 'success'

@@ -425,7 +425,11 @@ function getStringArray(value: unknown): string[] {
 function isStationPlatformRefreshTrigger(
     value: unknown
 ): value is AdminStationPlatformRefreshSummary['trigger'] {
-    return value === 'route_refresh' || value === 'station_board';
+    return (
+        value === 'route_refresh' ||
+        value === 'station_board' ||
+        value === 'scheduled_task'
+    );
 }
 
 function isTrainProvenanceOutcomeStatus(
@@ -1914,7 +1918,11 @@ function formatStationPlatformRefreshEventSummary(
 ) {
     const detail = extractStationPlatformRefreshSummary(event);
     const sourceText =
-        detail?.trigger === 'station_board' ? '车站大屏补充' : '线路刷新后';
+        detail?.trigger === 'station_board'
+            ? '车站大屏补充'
+            : detail?.trigger === 'scheduled_task'
+              ? '定时站台任务'
+              : '线路刷新后';
     if (!detail) {
         return `${sourceText}站台信息更新：${event.result || '未知结果'}`;
     }

@@ -12,6 +12,8 @@ import {
 } from '~/server/utils/date/shanghaiDateTime';
 import { DISPATCH_DAILY_PROBE_TASKS_EXECUTOR } from '~/server/services/taskExecutors/dispatchDailyProbeTasksExecutor';
 import { enqueueStationBoardDispatchTask } from '~/server/services/taskExecutors/dispatchStationBoardTasksExecutor';
+import { scheduleStationPlatformTasksForEnrichedTrains } from '~/server/services/stationPlatformTaskScheduling';
+import { serviceDateToDay } from '~/server/utils/date/serviceDay';
 
 export const BUILD_SCHEDULE_TASK_EXECUTOR = 'build_today_schedule';
 
@@ -38,8 +40,13 @@ async function executeBuildScheduleTask() {
     try {
         const result = await buildTodaySchedule();
         buildSucceeded = true;
+        const stationPlatformTaskResult =
+            scheduleStationPlatformTasksForEnrichedTrains(
+                serviceDateToDay(result.date),
+                result.stationPlatformTaskCandidates
+            );
         logger.info(
-            `success ok=${result.ok} date=${result.date} uniqueItems=${result.stats.uniqueItems} failedKeywords=${result.failedKeywords.length} failedEnrichCodes=${result.failedEnrichCodes.length}`
+            `success ok=${result.ok} date=${result.date} uniqueItems=${result.stats.uniqueItems} failedKeywords=${result.failedKeywords.length} failedEnrichCodes=${result.failedEnrichCodes.length} stationPlatformTasksCreated=${stationPlatformTaskResult.createdTaskIds.length} stationPlatformTasksReused=${stationPlatformTaskResult.reusedTaskIds.length}`
         );
     } catch (error) {
         caughtError = error;

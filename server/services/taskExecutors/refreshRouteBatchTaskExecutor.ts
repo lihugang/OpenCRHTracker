@@ -5,7 +5,6 @@ import { registerTaskExecutor } from '~/server/services/taskExecutorRegistry';
 import { syncConfirmedTimetableHistoryForScheduleStateKind } from '~/server/services/timetableHistoryStore';
 import {
     markCurrentTrainProvenanceTaskSkipped,
-    recordCurrentStationPlatformRefreshResults,
     recordCurrentTrainProvenanceEventsForTrainCodes
 } from '~/server/services/trainProvenanceRecorder';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
@@ -39,11 +38,6 @@ import {
 import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
 import { serviceDateToDay } from '~/server/utils/date/serviceDay';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
-import {
-    createEmptyStationPlatformInfoRefreshResult,
-    forceRefreshStationPlatformInfoForTrainCodes,
-    refreshStationPlatformInfoForTrainCodes
-} from '~/server/services/stationPlatformInfoService';
 import {
     toShanghaiDayOffsetFromUnixSeconds,
     toUnixSecondsFromShanghaiDayOffset
@@ -670,68 +664,6 @@ export async function refreshRouteBatchForCodes(
                         requestedCodes,
                         update
                     );
-                }
-                const stationPlatformRefreshBatches = [
-                    {
-                        reason: 'route_changed',
-                        updates: appliedChangedGroupUpdates,
-                        refresh: forceRefreshStationPlatformInfoForTrainCodes
-                    },
-                    {
-                        reason: 'cache_expired',
-                        updates: appliedGroupUpdates.filter(
-                            (update) => !update.changed
-                        ),
-                        refresh: refreshStationPlatformInfoForTrainCodes
-                    }
-                ];
-                for (const batch of stationPlatformRefreshBatches) {
-                    const trainCodes = uniqueTrainCodes(
-                        batch.updates.flatMap((update) => update.codes)
-                    );
-                    if (trainCodes.length === 0) {
-                        continue;
-                    }
-
-                    const fallbackRouteReferences = batch.updates.map(
-                        (update) => ({
-                            trainCodes: getRefreshRouteGroupTrainCodes(update),
-                            startAt: toUnixSecondsFromShanghaiDayOffset(
-                                published.date,
-                                update.startAt
-                            )
-                        })
-                    );
-                    try {
-                        const stationPlatformResult = await batch.refresh({
-                            serviceDate: published.date,
-                            trainCodes
-                        });
-                        recordCurrentStationPlatformRefreshResults({
-                            serviceDate: published.date,
-                            trigger: 'route_refresh',
-                            result: stationPlatformResult,
-                            fallbackRouteReferences
-                        });
-                        logger.info(
-                            `station_platform_info_refresh date=${published.date} reason=${batch.reason} trainCodes=${trainCodes.length} localRows=${stationPlatformResult.localRowCount} candidates=${stationPlatformResult.candidateCount} cacheHits=${stationPlatformResult.cacheHitCount} requests=${stationPlatformResult.requestCount} data=${stationPlatformResult.dataCount} failedTrains=${stationPlatformResult.failedTrainCount} cacheFallbacks=${stationPlatformResult.cacheFallbackCount} updatedCacheEntries=${stationPlatformResult.updatedCacheEntryCount} updatedStops=${stationPlatformResult.updatedStopCount}`
-                        );
-                    } catch (error) {
-                        const message =
-                            error instanceof Error
-                                ? `${error.name}: ${error.message}`
-                                : String(error);
-                        recordCurrentStationPlatformRefreshResults({
-                            serviceDate: published.date,
-                            trigger: 'route_refresh',
-                            result: createEmptyStationPlatformInfoRefreshResult(),
-                            fallbackRouteReferences,
-                            errorMessage: message
-                        });
-                        logger.warn(
-                            `station_platform_info_refresh_failed date=${published.date} reason=${batch.reason} trainCodes=${trainCodes.length} error=${message}`
-                        );
-                    }
                 }
             } else {
                 for (const update of appliedGroupUpdates) {

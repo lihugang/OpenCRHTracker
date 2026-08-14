@@ -10,6 +10,7 @@ import {
     formatExternalServiceDate,
     formatExternalTrainCodes
 } from '~/server/utils/internal/boundaries';
+import { toUnixSecondsFromShanghaiDayOffset } from '~/server/utils/date/shanghaiDateTime';
 import {
     getScheduleDatabaseFilePath,
     syncPublishedScheduleSnapshotFromItems
@@ -24,6 +25,7 @@ import {
 } from './scheduleProbe/stateStore';
 import type {
     BuildScheduleResult,
+    BuildScheduleStationPlatformTaskCandidate,
     ScheduleState,
     ScheduleProbeRuntimeConfig
 } from './scheduleProbe/types';
@@ -31,13 +33,15 @@ import type {
 function buildResultFromState(
     state: ScheduleState,
     resumed: boolean,
-    file: string
+    file: string,
+    stationPlatformTaskCandidates: BuildScheduleStationPlatformTaskCandidate[] = []
 ): BuildScheduleResult {
     return {
         ok: state.status === 'done',
         resumed,
         date: formatExternalServiceDate(state.date),
         file,
+        stationPlatformTaskCandidates,
         stats: {
             apiCalls: state.progress.counters.apiCalls,
             apiRetries: state.progress.counters.apiRetries,
@@ -54,14 +58,14 @@ function buildResultFromState(
     };
 }
 
-function listConfirmedTrainCodesFromBuildState(state: ScheduleState) {
+function listEnrichedItemsFromBuildState(state: ScheduleState) {
     const startedAtSeconds = Math.floor(state.startedAtMs / 1000);
     if (!Number.isInteger(startedAtSeconds) || startedAtSeconds <= 0) {
         return [];
     }
 
-    const confirmedGroupKeys = new Set<string>();
-    const confirmedTrainCodes: TrainCodeParts[] = [];
+    const enrichedGroupKeys = new Set<string>();
+    const enrichedItems: ScheduleState['items'] = [];
 
     for (const item of state.items) {
         if (
@@ -73,15 +77,39 @@ function listConfirmedTrainCodesFromBuildState(state: ScheduleState) {
         }
 
         const groupKey = getGroupKey(item);
-        if (confirmedGroupKeys.has(groupKey)) {
+        if (enrichedGroupKeys.has(groupKey)) {
             continue;
         }
 
-        confirmedGroupKeys.add(groupKey);
-        confirmedTrainCodes.push(item.code);
+        enrichedGroupKeys.add(groupKey);
+        enrichedItems.push(item);
     }
 
-    return confirmedTrainCodes;
+    return enrichedItems;
+}
+
+function listStationPlatformTaskCandidatesFromBuildState(
+    state: ScheduleState
+): BuildScheduleStationPlatformTaskCandidate[] {
+    return listEnrichedItemsFromBuildState(state).flatMap((item) => {
+        if (item.startAt === null) {
+            return [];
+        }
+
+        return [{
+            trainCode: item.code,
+            trainInternalCode: item.internalCode,
+            startAt: toUnixSecondsFromShanghaiDayOffset(
+                state.date,
+                item.startAt
+            ),
+            stopCount: item.stops.length
+        }];
+    });
+}
+
+function listConfirmedTrainCodesFromBuildState(state: ScheduleState) {
+    return listEnrichedItemsFromBuildState(state).map((item) => item.code);
 }
 
 function syncBuildConfirmedTimetableHistory(
@@ -164,6 +192,8 @@ export default async function buildTodaySchedule(): Promise<BuildScheduleResult>
     if (publishPending) {
         const confirmedTrainCodes =
             listConfirmedTrainCodesFromBuildState(state);
+        const stationPlatformTaskCandidates =
+            listStationPlatformTaskCandidatesFromBuildState(state);
         const promotedState = promoteBuildingScheduleState(state);
         syncBuildConfirmedTimetableHistory(
             logger,
@@ -176,7 +206,8 @@ export default async function buildTodaySchedule(): Promise<BuildScheduleResult>
         return buildResultFromState(
             promotedState,
             resumed,
-            scheduleDatabasePath
+            scheduleDatabasePath,
+            stationPlatformTaskCandidates
         );
     }
 
@@ -201,6 +232,8 @@ export default async function buildTodaySchedule(): Promise<BuildScheduleResult>
     }
 
     const confirmedTrainCodes = listConfirmedTrainCodesFromBuildState(state);
+    const stationPlatformTaskCandidates =
+        listStationPlatformTaskCandidatesFromBuildState(state);
     const promotedState = promoteBuildingScheduleState(state);
     syncBuildConfirmedTimetableHistory(
         logger,
@@ -212,5 +245,10 @@ export default async function buildTodaySchedule(): Promise<BuildScheduleResult>
         `finish runId=${runId} status=${promotedState.status} date=${promotedState.date} durationMs=${promotedState.stats.durationMs} apiCalls=${promotedState.progress.counters.apiCalls} apiRetries=${promotedState.progress.counters.apiRetries} processedKeywords=${promotedState.progress.discoverProcessed.length} pendingKeywords=${promotedState.progress.discoverQueue.length} rawItems=${promotedState.stats.rawItems} uniqueItems=${promotedState.stats.uniqueItems} failedKeywords=${promotedState.progress.failedKeywords.length} failedEnrichCodes=${promotedState.progress.failedEnrichCodes.length}`
     );
 
-    return buildResultFromState(promotedState, resumed, scheduleDatabasePath);
+    return buildResultFromState(
+        promotedState,
+        resumed,
+        scheduleDatabasePath,
+        stationPlatformTaskCandidates
+    );
 }

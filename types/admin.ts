@@ -843,7 +843,8 @@ export type AdminTrainProvenanceOutcomeStatus =
 
 export type AdminStationPlatformRefreshTrigger =
     | 'route_refresh'
-    | 'station_board';
+    | 'station_board'
+    | 'scheduled_task';
 
 export type AdminStationPlatformRefreshStatus =
     AdminTrainProvenanceOutcomeStatus;
