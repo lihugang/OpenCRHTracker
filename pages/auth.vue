@@ -164,8 +164,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import type { AuthSession } from '~/types/auth';
-import type { TrackerApiResponse } from '~/types/homepage';
+import { login, register } from '~/utils/api/v2/domain/auth';
 import getApiErrorMessage from '~/utils/api/getApiErrorMessage';
 import hashPasswordDigest from '~/utils/auth/hashPasswordDigest';
 import safeFocus from '~/utils/safeFocus';
@@ -382,38 +381,11 @@ async function submitAuth() {
 
     try {
         const passwordDigest = await hashPasswordDigest(password.value);
-        const endpoint = isLogin.value
-            ? '/api/v1/auth/login'
-            : '/api/v1/auth/register';
-        const { data, error } = await useCsrfFetch<
-            TrackerApiResponse<AuthSession>
-        >(endpoint, {
-            method: 'POST',
-            body: {
-                username: username.value,
-                passwordDigest
-            },
-            key: `auth:${isLogin.value ? 'login' : 'register'}:${Date.now()}`,
-            watch: false,
-            server: false
-        });
+        const session = isLogin.value
+            ? await login(username.value, passwordDigest)
+            : await register(username.value, passwordDigest);
 
-        if (error.value) {
-            throw error.value;
-        }
-
-        const response = data.value;
-        if (!response) {
-            throw new Error('Missing auth response');
-        }
-
-        if (!response.ok) {
-            throw {
-                data: response
-            };
-        }
-
-        setSession(response.data);
+        setSession(session);
         password.value = '';
         confirmPassword.value = '';
         setStatus(

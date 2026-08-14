@@ -81,7 +81,7 @@ import {
     PutAuthSubscriptionsRequestSchema,
     PutAuthSubscriptionsDataSchema,
     PutAuthSubscriptionsResponseSchema
-} from '~/server/generated/proto/opencrh/v2/auth_pb';
+} from '#shared/generated/proto/opencrh/v2/auth_pb';
 import {
     deleteAuthApiKeyV2Adapter,
     deleteAuthAuthorizationV2Adapter,

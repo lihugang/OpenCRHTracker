@@ -1,11 +1,7 @@
-import {
-    listDailyRecordLightPaged
-} from '~/server/services/emuRoutesStore';
+import { listDailyRecordLightPaged } from '~/server/services/emuRoutesStore';
 import type { EmuId } from '~/server/libs/database/emu';
 import type { ServiceDay } from '~/server/utils/date/serviceDay';
-import {
-    serviceDayToShanghaiDayStartUnixSeconds
-} from '~/server/utils/date/serviceDay';
+import { serviceDayToShanghaiDayStartUnixSeconds } from '~/server/utils/date/serviceDay';
 import type { TrainCodeParts } from '~/server/utils/12306/trainCode';
 import type { ExternalCursorPoint } from '~/server/utils/internal/boundaries';
 

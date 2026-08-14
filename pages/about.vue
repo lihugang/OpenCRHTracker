@@ -165,15 +165,11 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import AboutFontLicenseModal from '~/components/about/AboutFontLicenseModal.vue';
-import useTrackedRequestFetch, {
-    type TrackedRequestFetch
-} from '~/composables/useTrackedRequestFetch';
 import type {
-    AboutExposedConfigData,
     AboutFontLicenseName,
     AboutFriendLinkDefinition
 } from '~/types/about';
-import type { TrackerApiResponse } from '~/types/homepage';
+import { fetchExposedConfig } from '~/utils/api/v2/domain/system';
 import { aboutFriendLinks } from '~/utils/about/friendLinks';
 import {
     aboutFontLicenseNames,
@@ -184,29 +180,24 @@ const MOBILE_QUERY = '(max-width: 767px)';
 const { isOfficialInstance, isDevelopment } = useOfficialInstance();
 const authorSponsorUrl = 'https://ifdian.net/a/lihugang';
 
-const requestFetch: TrackedRequestFetch = useTrackedRequestFetch();
 const activeFontLicenseName = ref<AboutFontLicenseName | null>(null);
 const isMobileLayout = ref(false);
 let mediaQueryList: MediaQueryList | null = null;
 
-const { data: exposedConfigResponse } = await useAsyncData(
+const { data: exposedConfigData } = await useAsyncData(
     'about-exposed-config',
-    () =>
-        requestFetch<TrackerApiResponse<AboutExposedConfigData>>(
-            '/api/v1/exposed-config'
-        ),
+    () => fetchExposedConfig(),
     {
         default: () => null
     }
 );
 
 const aboutConfig = computed(() => {
-    const response = exposedConfigResponse.value;
-    if (!response || !response.ok) {
+    if (!exposedConfigData.value) {
         return null;
     }
 
-    return response.data.about;
+    return exposedConfigData.value.about;
 });
 
 const schedulerPollIntervalMinutes = computed(() => {

@@ -744,28 +744,29 @@
 </template>
 
 <script setup lang="ts">
-import useTrackedRequestFetch, {
-    type TrackedRequestFetch
-} from '~/composables/useTrackedRequestFetch';
 import {
     fromAdminDateInputValue,
     useAdminDateQuery
 } from '~/composables/useAdminDateQuery';
 import type {
-    AdminDailyRouteCreateResponse,
-    AdminDailyRouteDeleteResponse,
     AdminDailyRouteRecord,
     AdminDailyRouteSearchResponse,
     AdminDailyRouteTimetableCandidate,
     AdminDailyRouteTimetableCandidatesResponse,
     AdminDailyRouteTimetableResolution,
     AdminTimetableHistoryCoverageMergeCandidate,
-    AdminTimetableHistoryCoverageMergeResponse,
     AdminTimetableHistoryCoverageSummary,
     AdminTimetableHistoryMergeCandidatesResponse
 } from '~/types/admin';
-import type { TrackerApiResponse } from '~/types/homepage';
 import getApiErrorMessage from '~/utils/api/getApiErrorMessage';
+import {
+    createAdminDailyRoute,
+    deleteAdminDailyRoute,
+    deleteAdminTimetableHistoryCoverage,
+    fetchAdminDailyRoutes,
+    fetchAdminDailyRoutesTimetables,
+    fetchAdminTimetableHistoryMergeCandidates
+} from '~/utils/api/v2/domain/admin';
 import { normalizeLookupCode } from '~/utils/lookup/lookupTarget';
 import formatTrackerTimestamp from '~/utils/time/formatTrackerTimestamp';
 
@@ -773,9 +774,6 @@ definePageMeta({
     middleware: 'admin-required'
 });
 
-const requestFetch: TrackedRequestFetch = import.meta.server
-    ? useTrackedRequestFetch()
-    : ($fetch as TrackedRequestFetch);
 const { session } = useAuthState();
 const { selectedDateInput, todayDateInputValue } = await useAdminDateQuery();
 
@@ -917,10 +915,7 @@ async function searchDeleteRoutes() {
     deleteSuccessMessage.value = '';
 
     try {
-        const response = await requestFetch<
-            TrackerApiResponse<AdminDailyRouteSearchResponse>
-        >('/api/v1/admin/daily-routes', {
-            retry: 0,
+        deleteSearchData.value = await fetchAdminDailyRoutes({
             query: {
                 date: deleteDateYmd.value,
                 trainCode: normalizedTrainCode.value,
@@ -928,13 +923,6 @@ async function searchDeleteRoutes() {
             }
         });
 
-        if (!response.ok) {
-            throw {
-                data: response
-            };
-        }
-
-        deleteSearchData.value = response.data;
         deleteSearchStatus.value = 'success';
     } catch (error) {
         deleteErrorMessage.value = getApiErrorMessage(error, '检索记录失败。');
@@ -962,24 +950,15 @@ async function loadTimetableCandidates() {
     createErrorMessage.value = '';
 
     try {
-        const response = await requestFetch<
-            TrackerApiResponse<AdminDailyRouteTimetableCandidatesResponse>
-        >('/api/v1/admin/daily-routes/timetables', {
-            retry: 0,
+        const response = await fetchAdminDailyRoutesTimetables({
             query: {
                 date: createDateYmd.value,
                 trainCode: normalizedTrainCode.value
             }
         });
 
-        if (!response.ok) {
-            throw {
-                data: response
-            };
-        }
-
-        candidateData.value = response.data;
-        selectedTimetableId.value = response.data.defaultTimetableId;
+        candidateData.value = response;
+        selectedTimetableId.value = response.defaultTimetableId;
         candidateStatus.value = 'success';
     } catch (error) {
         candidateErrorMessage.value = getApiErrorMessage(
@@ -1000,38 +979,16 @@ async function createDailyRoute() {
     createErrorMessage.value = '';
 
     try {
-        const { data, error } = await useCsrfFetch<
-            TrackerApiResponse<AdminDailyRouteCreateResponse>
-        >('/api/v1/admin/daily-routes', {
-            method: 'POST',
-            body: {
-                date: createDateYmd.value,
-                trainCode: normalizedTrainCode.value,
-                emuCode: normalizedEmuCode.value,
-                timetableId: selectedTimetableId.value
-            },
-            key: `admin:daily-route-create:${Date.now()}`,
-            watch: false,
-            server: false
+        const response = await createAdminDailyRoute({
+            date: createDateYmd.value,
+            trainCode: normalizedTrainCode.value,
+            emuCode: normalizedEmuCode.value,
+            ...(selectedTimetableId.value === null
+                ? {}
+                : { timetableId: selectedTimetableId.value })
         });
-
-        if (error.value) {
-            throw error.value;
-        }
-
-        const response = data.value;
-        if (!response) {
-            throw new Error('Missing daily route create response');
-        }
-
-        if (!response.ok) {
-            throw {
-                data: response
-            };
-        }
-
-        createSuccessMessage.value = response.data.inserted
-            ? `已添加 ${response.data.trainCode} / ${response.data.emuCode} 的记录。`
+        createSuccessMessage.value = response.inserted
+            ? `已添加 ${response.trainCode} / ${response.emuCode} 的记录。`
             : '记录未写入，请检查是否与现有数据冲突。';
         createStatus.value = 'success';
         await refreshDeleteSearchIfMatchingCreate();
@@ -1055,22 +1012,10 @@ async function scanTimetableMergeCandidates(options?: {
     }
 
     try {
-        const response = await requestFetch<
-            TrackerApiResponse<AdminTimetableHistoryMergeCandidatesResponse>
-        >('/api/v1/admin/timetable-history/merge-candidates', {
-            retry: 0,
-            query: {
-                trainCode: normalizedTrainCode.value
-            }
-        });
-
-        if (!response.ok) {
-            throw {
-                data: response
-            };
-        }
-
-        timetableMergeData.value = response.data;
+        timetableMergeData.value =
+            await fetchAdminTimetableHistoryMergeCandidates(
+                normalizedTrainCode.value
+            );
         timetableMergeStatus.value = 'success';
     } catch (error) {
         timetableMergeErrorMessage.value = getApiErrorMessage(
@@ -1170,32 +1115,12 @@ async function confirmDeleteRoute() {
     deleteSuccessMessage.value = '';
 
     try {
-        const { data, error } = await useCsrfFetch<
-            TrackerApiResponse<AdminDailyRouteDeleteResponse>
-        >(`/api/v1/admin/daily-routes/${encodeURIComponent(targetRoute.id)}`, {
-            method: 'DELETE',
-            key: `admin:daily-route-delete:${targetRoute.id}:${Date.now()}`,
-            watch: false,
-            server: false
-        });
-
-        if (error.value) {
-            throw error.value;
-        }
-
-        const response = data.value;
-        if (!response) {
-            throw new Error('Missing daily route delete response');
-        }
-
-        if (!response.ok) {
-            throw {
-                data: response
-            };
-        }
-
-        deleteSuccessMessage.value = response.data.wasToday
-            ? `已删除记录，并清理 ${response.data.deletedProbeStatusRows} 条 probe status。`
+        const response = await deleteAdminDailyRoute(
+            targetRoute.serviceDate,
+            targetRoute.id
+        );
+        deleteSuccessMessage.value = response.wasToday
+            ? `已删除记录，并清理 ${response.deletedProbeStatusRows} 条 probe status。`
             : '已删除历史记录。';
         removeDeletedRoute(targetRoute.id);
         isDeleteDialogOpen.value = false;
@@ -1224,34 +1149,10 @@ async function confirmTimetableMerge() {
     timetableMergeSuccessMessage.value = '';
 
     try {
-        const { data, error } = await useCsrfFetch<
-            TrackerApiResponse<AdminTimetableHistoryCoverageMergeResponse>
-        >(
-            `/api/v1/admin/timetable-history/coverages/${encodeURIComponent(targetCandidate.coverageId)}`,
-            {
-                method: 'DELETE',
-                key: `admin:timetable-history-merge:${targetCandidate.coverageId}:${Date.now()}`,
-                watch: false,
-                server: false
-            }
+        const response = await deleteAdminTimetableHistoryCoverage(
+            targetCandidate.coverageId
         );
-
-        if (error.value) {
-            throw error.value;
-        }
-
-        const response = data.value;
-        if (!response) {
-            throw new Error('Missing timetable history merge response');
-        }
-
-        if (!response.ok) {
-            throw {
-                data: response
-            };
-        }
-
-        timetableMergeSuccessMessage.value = `已删除 coverage #${targetCandidate.coverageId}，并合并为 ${response.data.merged.serviceDateStart} 至 ${response.data.merged.serviceDateEndExclusive}。`;
+        timetableMergeSuccessMessage.value = `已删除 coverage #${targetCandidate.coverageId}，并合并为 ${response.merged.serviceDateStart} 至 ${response.merged.serviceDateEndExclusive}。`;
         isTimetableMergeDialogOpen.value = false;
         pendingTimetableMergeCandidate.value = null;
         await scanTimetableMergeCandidates({

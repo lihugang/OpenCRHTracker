@@ -10,9 +10,7 @@ export async function getHealthV2Adapter(ctx: V2OperationContext) {
     return getHealth();
 }
 
-export async function getDebugEchoErrorV2Adapter(
-    ctx: V2OperationContext
-) {
+export async function getDebugEchoErrorV2Adapter(ctx: V2OperationContext) {
     const statusCode = Number(ctx.query.status ?? '400');
     const errorCode =
         typeof ctx.query.code === 'string' && ctx.query.code.length > 0
@@ -20,9 +18,7 @@ export async function getDebugEchoErrorV2Adapter(
             : 'debug_error';
 
     ensure(
-        Number.isInteger(statusCode) &&
-            statusCode >= 400 &&
-            statusCode < 600,
+        Number.isInteger(statusCode) && statusCode >= 400 && statusCode < 600,
         400,
         'invalid_param',
         'status 必须是 400-599 的整数'
@@ -36,8 +32,6 @@ export async function getDebugEchoErrorV2Adapter(
     return {};
 }
 
-export async function getExposedConfigV2Adapter(
-    ctx: V2OperationContext
-) {
+export async function getExposedConfigV2Adapter(ctx: V2OperationContext) {
     return getExposedConfig();
 }

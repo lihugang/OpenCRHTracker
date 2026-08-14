@@ -1,9 +1,7 @@
 import { postNotificationsSend } from '~/server/domain/notifications';
 import type { V2OperationContext } from '~/server/utils/api/v2/V2Types';
 
-export async function postNotificationsSendV2Adapter(
-    ctx: V2OperationContext
-) {
+export async function postNotificationsSendV2Adapter(ctx: V2OperationContext) {
     const request = ctx.request as {
         title?: string;
         body?: string;

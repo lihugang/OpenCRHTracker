@@ -28,7 +28,9 @@ export function getAdminTrainProvenanceCouplingScan(taskRunId: number) {
     return getAdminCouplingScanDetail(taskRunId);
 }
 
-export function getAdminTrainProvenanceCouplingScanTasks(serviceDay: ServiceDay) {
+export function getAdminTrainProvenanceCouplingScanTasks(
+    serviceDay: ServiceDay
+) {
     return getAdminCouplingScanTaskList(serviceDay);
 }
 
@@ -51,10 +53,14 @@ export function getAdminTrainProvenanceStationBoard(taskRunId: number) {
     return getAdminStationBoardDispatchDetail(taskRunId);
 }
 
-export function getAdminTrainProvenanceStationBoardTasks(serviceDay: ServiceDay) {
+export function getAdminTrainProvenanceStationBoardTasks(
+    serviceDay: ServiceDay
+) {
     return getAdminStationBoardTaskList(serviceDay);
 }
 
-export function getAdminTrainProvenanceStationPlatformRefresh(resultId: number) {
+export function getAdminTrainProvenanceStationPlatformRefresh(
+    resultId: number
+) {
     return getAdminStationPlatformRefreshDetail(resultId);
 }

@@ -6,9 +6,9 @@ import {
     getCurrentTrainTimetable,
     getStationTimetable,
     getTrainCirculationImage,
-    getTrainTimetableHistory,
-    getTrainTimetableHistoryDetail
+    getTrainTimetableHistory
 } from '~/server/domain/timetable';
+import { getTodayScheduleServiceDay } from '~/server/services/todayScheduleCache';
 import ApiRequestError from '~/server/utils/api/errors/ApiRequestError';
 import ensure from '~/server/utils/api/executor/ensure';
 import parseLimit from '~/server/utils/api/query/parseLimit';
@@ -34,12 +34,11 @@ import {
     type GetSearchIndexRequest,
     type GetStationTimetableRequest,
     type GetTrainHistoryRequest
-} from '~/server/generated/proto/opencrh/v2/lookup_pb';
+} from '#shared/generated/proto/opencrh/v2/lookup_pb';
 import type {
     GetTrainCirculationImageRequest as TimetableCirculationRequest,
-    GetTrainTimetableHistoryDetailRequest,
     GetTrainTimetableHistoryRequest
-} from '~/server/generated/proto/opencrh/v2/timetable_pb';
+} from '#shared/generated/proto/opencrh/v2/timetable_pb';
 import type {
     TrainCirculation,
     TrainCirculationMetadata
@@ -304,6 +303,7 @@ export async function getCurrentTrainTimetableV2Adapter(
         endStation: timetable.endStation,
         startAt: timetable.startAt,
         endAt: timetable.endAt,
+        serviceDay: getTodayScheduleServiceDay(),
         ...(timetable.circulation === null
             ? {}
             : { circulation: toProtoCirculation(timetable.circulation) }),
@@ -478,43 +478,6 @@ export async function getTrainTimetableHistoryV2Adapter(
             timetableId: item.timetableId,
             serviceDayStart: item.serviceDayStart,
             serviceDayEndExclusive: item.serviceDayEndExclusive
-        }))
-    };
-}
-
-export async function getTrainTimetableHistoryDetailV2Adapter(
-    ctx: V2OperationContext
-) {
-    const rawTimetableId = ctx.params.timetableId;
-    const timetableId = Number(rawTimetableId);
-    ensure(
-        Number.isInteger(timetableId) && timetableId > 0,
-        400,
-        'invalid_param',
-        'timetableId 必须是正整数'
-    );
-
-    const content = getTrainTimetableHistoryDetail(timetableId);
-    return {
-        timetableId,
-        ...(content.startStation === null
-            ? {}
-            : { startStation: content.startStation }),
-        ...(content.endStation === null
-            ? {}
-            : { endStation: content.endStation }),
-        ...(content.startOffset === null
-            ? {}
-            : { startOffset: content.startOffset }),
-        ...(content.endOffset === null ? {} : { endOffset: content.endOffset }),
-        stops: content.stops.map((stop) => ({
-            stationNo: stop.stationNo,
-            stationName: stop.stationName,
-            ...(stop.arriveAt === null ? {} : { arriveOffset: stop.arriveAt }),
-            ...(stop.departAt === null ? {} : { departOffset: stop.departAt }),
-            stationTrainCode: toTrainCode(stop.stationTrainCode),
-            isStart: stop.isStart,
-            isEnd: stop.isEnd
         }))
     };
 }

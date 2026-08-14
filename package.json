@@ -12,7 +12,7 @@
         "typecheck": "nuxi typecheck",
         "typecheck:server": "pnpm exec tsc -p server/tsconfig.json --noEmit",
         "proto:generate": "pnpm exec buf format -w proto && pnpm exec buf generate proto --template proto/buf.gen.yaml",
-        "proto:check": "pnpm exec buf format --diff proto && pnpm exec buf lint proto && pnpm exec tsc -p server/generated/tsconfig.json --noEmit",
+        "proto:check": "pnpm exec buf format --diff proto && pnpm exec buf lint proto && pnpm exec tsc -p shared/generated/tsconfig.json --noEmit && node scripts/check-v2-client-registry.mjs",
         "exports:v2:migrate": "node scripts/exports-v2-migrate.mjs",
         "generate": "nuxt generate",
         "migrate:emu-storage-v2": "node scripts/migrate-emu-storage-v2.mjs",

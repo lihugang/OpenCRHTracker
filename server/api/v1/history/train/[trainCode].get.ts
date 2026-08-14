@@ -48,7 +48,10 @@ export default defineEventHandler(async (event) => {
             const cursor = parseExternalCursor(query.cursor, 'cursor');
             const limit = parseLimit(event);
             const result = getTrainHistory({
-                trainCode: parseExternalTrainCodeOrThrow(trainCode, 'trainCode'),
+                trainCode: parseExternalTrainCodeOrThrow(
+                    trainCode,
+                    'trainCode'
+                ),
                 start: start ?? 0,
                 end: end ?? Number.MAX_SAFE_INTEGER,
                 cursor,

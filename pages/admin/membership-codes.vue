@@ -413,15 +413,15 @@
 </template>
 
 <script setup lang="ts">
-import useTrackedRequestFetch, {
-    type TrackedRequestFetch
-} from '~/composables/useTrackedRequestFetch';
 import { useAdminDateQuery } from '~/composables/useAdminDateQuery';
 import type {
     AdminCreateMembershipCodeBatchResponse,
     AdminMembershipCodeListResponse
 } from '~/types/admin';
-import type { TrackerApiResponse } from '~/types/homepage';
+import {
+    createAdminMembershipCodeBatch,
+    fetchAdminMembershipCodes
+} from '~/utils/api/v2/domain/admin';
 import getApiErrorMessage from '~/utils/api/getApiErrorMessage';
 import formatTrackerTimestamp from '~/utils/time/formatTrackerTimestamp';
 
@@ -429,9 +429,6 @@ definePageMeta({
     middleware: 'admin-required'
 });
 
-const requestFetch: TrackedRequestFetch = import.meta.server
-    ? useTrackedRequestFetch()
-    : ($fetch as TrackedRequestFetch);
 const { session } = useAuthState();
 const { selectedDateInput, todayDateInputValue } = await useAdminDateQuery();
 
@@ -460,16 +457,7 @@ async function fetchCodes() {
     if (appliedBatchId.value) query.batchId = appliedBatchId.value;
     if (cursor.value) query.cursor = cursor.value;
 
-    const response = await requestFetch<
-        TrackerApiResponse<AdminMembershipCodeListResponse>
-    >('/api/v1/admin/membership-codes', {
-        query,
-        retry: 0
-    });
-    if (!response.ok) {
-        throw { data: response };
-    }
-    return response.data;
+    return fetchAdminMembershipCodes({ query });
 }
 
 const {
@@ -545,27 +533,12 @@ async function createBatch() {
 
     isCreating.value = true;
     try {
-        const { data, error } = await useCsrfFetch<
-            TrackerApiResponse<AdminCreateMembershipCodeBatchResponse>
-        >('/api/v1/admin/membership-codes', {
-            method: 'POST',
-            retry: 0,
-            body: {
-                groupId: createForm.groupId,
-                quantity,
-                durationDays
-            },
-            key: `admin:membership-codes:create:${Date.now()}`,
-            watch: false,
-            server: false
+        const response = await createAdminMembershipCodeBatch({
+            groupId: createForm.groupId,
+            quantity,
+            durationDays
         });
-        if (error.value) throw error.value;
-        const response = data.value;
-        if (!response)
-            throw new Error('Missing membership code batch response');
-        if (!response.ok) throw { data: response };
-
-        const batch = response.data.batch;
+        const batch = response.batch;
         createSuccessMessage.value = `已为 ${batch.groupName} 生成 ${formatNumber(batch.quantity)} 个 ${formatNumber(batch.durationDays)} 天兑换码。`;
         batchFilterInput.value = batch.batchId;
         appliedBatchId.value = batch.batchId;

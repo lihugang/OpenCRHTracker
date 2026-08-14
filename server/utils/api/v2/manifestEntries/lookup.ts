@@ -25,20 +25,17 @@ import {
     type GetDailyRecordsData,
     type GetTrainHistoryData,
     type GetEmuHistoryData
-} from '~/server/generated/proto/opencrh/v2/lookup_pb';
+} from '#shared/generated/proto/opencrh/v2/lookup_pb';
 import {
     GetTrainTimetableHistoryRequestSchema,
     GetTrainTimetableHistoryDataSchema,
     GetTrainTimetableHistoryResponseSchema,
-    GetTrainTimetableHistoryDetailRequestSchema,
-    GetTrainTimetableHistoryDetailDataSchema,
-    GetTrainTimetableHistoryDetailResponseSchema,
     GetTrainCirculationImageRequestSchema,
     GetTrainCirculationImageDataSchema,
     GetTrainCirculationImageResponseSchema,
     type GetTrainTimetableHistoryData,
     type GetTrainCirculationImageData
-} from '~/server/generated/proto/opencrh/v2/timetable_pb';
+} from '#shared/generated/proto/opencrh/v2/timetable_pb';
 import {
     getCurrentTrainTimetableV2Adapter,
     getDailyRecordsV2Adapter,
@@ -48,7 +45,6 @@ import {
     getStationTimetableV2Adapter,
     getTrainCirculationImageV2Adapter,
     getTrainHistoryV2Adapter,
-    getTrainTimetableHistoryDetailV2Adapter,
     getTrainTimetableHistoryV2Adapter
 } from '~/server/utils/api/v2/adapters/lookup';
 import { defineV2Operation } from '~/server/utils/api/v2/V2Types';
@@ -256,30 +252,13 @@ export const LOOKUP_MANIFEST_ENTRIES = {
         },
         bodyMode: 'none',
         mappings: {
-            timetable: (data) => [
+            timetableContent: (data) => [
                 ...(data as GetTrainTimetableHistoryData).items.map(
                     (item) => item.timetableId
                 )
             ]
         },
         handler: getTrainTimetableHistoryV2Adapter
-    }),
-    GetTrainTimetableHistoryDetail: defineV2Operation({
-        operationName: 'GetTrainTimetableHistoryDetail',
-        method: 'GET',
-        pathTemplate: '/api/v2/timetable/train/:trainCode/history/:timetableId',
-        requestSchema: GetTrainTimetableHistoryDetailRequestSchema,
-        dataSchema: GetTrainTimetableHistoryDetailDataSchema,
-        responseSchema: GetTrainTimetableHistoryDetailResponseSchema,
-        requiredScopes: [API_SCOPES.timetable.train.history.read],
-        cors: true,
-        cost: { kind: 'fixed', key: 'timetableTrainHistory' },
-        cacheHeaders: () => ({
-            cacheControl: `public, max-age=${IMMUTABLE_CACHE_SECONDS}, immutable`,
-            cdnCacheControl: `public, s-maxage=${IMMUTABLE_CACHE_SECONDS}, immutable`
-        }),
-        bodyMode: 'none',
-        handler: getTrainTimetableHistoryDetailV2Adapter
     }),
     GetTrainCirculationImage: defineV2Operation({
         operationName: 'GetTrainCirculationImage',

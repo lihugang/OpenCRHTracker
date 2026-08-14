@@ -131,9 +131,7 @@ export function parseFetchStationBoardTaskArgs(
             : null;
 
     if (serviceDate === null) {
-        throw new Error(
-            'task arguments serviceDate must be a v2 service day'
-        );
+        throw new Error('task arguments serviceDate must be a v2 service day');
     }
     if (stationName.length === 0) {
         throw new Error(
@@ -294,10 +292,7 @@ function buildOfficialCirculationEntry(
         const expandedOffset = expandedOffsets[index]!;
         const allCodes: TodayScheduleProbeGroup['allCodes'] = [];
         const seenCodeKeys = new Set<string>();
-        for (const code of [
-            currentGroup.trainCode,
-            ...currentGroup.allCodes
-        ]) {
+        for (const code of [currentGroup.trainCode, ...currentGroup.allCodes]) {
             const key = trainCodeKey(code);
             if (seenCodeKeys.has(key)) {
                 continue;

@@ -680,9 +680,6 @@
 </template>
 
 <script setup lang="ts">
-import useTrackedRequestFetch, {
-    type TrackedRequestFetch
-} from '~/composables/useTrackedRequestFetch';
 import type {
     AdminCreateTaskRequest,
     AdminCreateTaskResponse,
@@ -696,9 +693,9 @@ import type {
     AdminRefreshRouteInfoNowTaskRequest,
     AdminRegenerateDailyExportTaskRequest
 } from '~/types/admin';
-import type { TrackerApiResponse } from '~/types/homepage';
 import { useAdminDateQuery } from '~/composables/useAdminDateQuery';
 import getApiErrorMessage from '~/utils/api/getApiErrorMessage';
+import { createAdminTask, fetchAdminTasks } from '~/utils/api/v2/domain/admin';
 import formatTrackerTimestamp from '~/utils/time/formatTrackerTimestamp';
 
 definePageMeta({
@@ -762,9 +759,6 @@ const StatusPanel = defineComponent({
     }
 });
 
-const requestFetch: TrackedRequestFetch = import.meta.server
-    ? useTrackedRequestFetch()
-    : ($fetch as TrackedRequestFetch);
 const { session } = useAuthState();
 const { selectedDateInput, todayDateInputValue } = await useAdminDateQuery();
 
@@ -807,19 +801,7 @@ const qrcodeDetectionTaskErrorMessage = ref('');
 const qrcodeDetectionTaskResponse = ref<AdminCreateTaskResponse | null>(null);
 
 async function fetchTaskOverview() {
-    const response = await requestFetch<
-        TrackerApiResponse<AdminTaskOverviewResponse>
-    >('/api/v1/admin/tasks', {
-        retry: 0
-    });
-
-    if (!response.ok) {
-        throw {
-            data: response
-        };
-    }
-
-    return response.data;
+    return fetchAdminTasks();
 }
 
 const {
@@ -962,33 +944,7 @@ watch(selectedCouplingScanBureau, () => {
 });
 
 async function postAdminTask(body: AdminCreateTaskRequest) {
-    const { data, error } = await useCsrfFetch<
-        TrackerApiResponse<AdminCreateTaskResponse>
-    >('/api/v1/admin/tasks', {
-        method: 'POST',
-        retry: 0,
-        body,
-        key: `admin:tasks:create:${body.type}:${Date.now()}`,
-        watch: false,
-        server: false
-    });
-
-    if (error.value) {
-        throw error.value;
-    }
-
-    const response = data.value;
-    if (!response) {
-        throw new Error('Missing admin task creation response');
-    }
-
-    if (!response.ok) {
-        throw {
-            data: response
-        };
-    }
-
-    return response.data;
+    return createAdminTask(body);
 }
 
 async function refreshOverviewSilently() {

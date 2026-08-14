@@ -59,47 +59,31 @@
 </template>
 
 <script setup lang="ts">
-import useTrackedRequestFetch, {
-    type TrackedRequestFetch
-} from '~/composables/useTrackedRequestFetch';
-import type { TrackerApiResponse } from '~/types/homepage';
 import type {
     AuthMembershipRedeemResponse,
     AuthMembershipsResponse
 } from '~/types/membership';
+import { fetchAuthMemberships } from '~/utils/api/v2/domain/auth';
 import getApiErrorMessage from '~/utils/api/getApiErrorMessage';
 
 definePageMeta({
     middleware: 'auth-required'
 });
 
-const requestFetch: TrackedRequestFetch = import.meta.server
-    ? useTrackedRequestFetch()
-    : ($fetch as TrackedRequestFetch);
 const { session, setSession } = useAuthState();
 
 async function fetchMemberships() {
-    const response = await requestFetch<
-        TrackerApiResponse<AuthMembershipsResponse>
-    >('/api/v1/auth/memberships', {
-        retry: 0
-    });
-
-    if (!response.ok) {
-        throw {
-            data: response
-        };
-    }
+    const data = await fetchAuthMemberships();
 
     if (session.value) {
         setSession({
             ...session.value,
-            scopes: response.data.accountScopes,
-            dailyTokenLimit: response.data.effectiveQuota.tokenLimit
+            scopes: data.accountScopes,
+            dailyTokenLimit: data.effectiveQuota.tokenLimit
         });
     }
 
-    return response.data;
+    return data;
 }
 
 const {

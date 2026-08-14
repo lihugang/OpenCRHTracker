@@ -3,7 +3,7 @@ import {
     PostNotificationsSendRequestSchema,
     PostNotificationsSendDataSchema,
     PostNotificationsSendResponseSchema
-} from '~/server/generated/proto/opencrh/v2/notifications_pb';
+} from '#shared/generated/proto/opencrh/v2/notifications_pb';
 import { postNotificationsSendV2Adapter } from '~/server/utils/api/v2/adapters/notifications';
 import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
 

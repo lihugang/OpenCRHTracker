@@ -18,7 +18,7 @@ import {
     PostOauthClientsRequestSchema,
     PostOauthClientsDataSchema,
     PostOauthClientsResponseSchema
-} from '~/server/generated/proto/opencrh/v2/oauth_pb';
+} from '#shared/generated/proto/opencrh/v2/oauth_pb';
 import {
     deleteOauthClientV2Adapter,
     getOauthAuthorizeContextV2Adapter,

@@ -18,7 +18,10 @@ import {
     updateFeedbackTopicFields
 } from '~/server/services/feedbackStore';
 import { autoSubscribeFeedbackTopic } from '~/server/services/eventNotificationService';
-import { notifyFeedbackReply, notifyFeedbackStatusUpdated } from '~/server/services/eventNotificationService';
+import {
+    notifyFeedbackReply,
+    notifyFeedbackStatusUpdated
+} from '~/server/services/eventNotificationService';
 import {
     canManageFeedback,
     canReadFeedback,
@@ -70,7 +73,11 @@ export function getFeedbackTopics(
                 '当前身份无法查看全部反馈'
             );
         }
-        const result = listAllFeedbackTopics(filters, input.cursor, input.limit);
+        const result = listAllFeedbackTopics(
+            filters,
+            input.cursor,
+            input.limit
+        );
         return {
             view: 'all',
             ...filters,
@@ -139,9 +146,7 @@ export function postFeedbackTopics(
     );
     const isSecurityIssue =
         input.primaryType === 'website' && input.secondaryType === 'security';
-    const requestedVisibility = isSecurityIssue
-        ? 'private'
-        : input.visibility;
+    const requestedVisibility = isSecurityIssue ? 'private' : input.visibility;
 
     if (identity.type !== 'user' && requestedVisibility !== 'public') {
         throw new ApiRequestError(

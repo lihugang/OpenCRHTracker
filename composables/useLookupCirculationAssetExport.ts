@@ -1,5 +1,6 @@
 import { ref, toValue, type MaybeRefOrGetter } from 'vue';
 import type { CirculationExportFormat } from '~/types/lookupCurrentTimetable';
+import { fetchTrainCirculationImageRaw } from '~/utils/api/v2/domain/lookup';
 import getApiErrorMessage from '~/utils/api/getApiErrorMessage';
 import { normalizeComparableCode } from '~/utils/lookup/timetableDisplay';
 
@@ -19,26 +20,15 @@ export default function useLookupCirculationAssetExport(options: {
         return `${baseTrainCode}-circulation.${format}`;
     }
 
-    function buildAssetBinaryUrl(format: CirculationExportFormat) {
-        const requestTrainCode = normalizeComparableCode(
-            toValue(options.requestTrainCode)
-        );
-        if (requestTrainCode.length === 0) {
-            throw new Error('当前暂无可导出的交路图');
-        }
-
-        return `/api/v1/timetable/train/${encodeURIComponent(requestTrainCode)}/circulation/image?format=${encodeURIComponent(format)}&binary=true`;
-    }
-
-    async function fetchAssetBlob(url: string) {
-        const response = await fetch(url, {
-            credentials: 'same-origin'
-        });
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-        }
-
-        return await response.blob();
+    async function fetchAssetBlob(
+        format: CirculationExportFormat,
+        requestTrainCode: string
+    ) {
+        return (await fetchTrainCirculationImageRaw(
+            requestTrainCode,
+            format,
+            'blob'
+        )) as Blob;
     }
 
     async function triggerBrowserDownloadFromBlob(
@@ -61,27 +51,6 @@ export default function useLookupCirculationAssetExport(options: {
                 URL.revokeObjectURL(objectUrl);
             }, 1000);
         }
-    }
-
-    async function triggerBrowserDownloadFromUrl(
-        url: string,
-        fileName: string
-    ) {
-        const resolvedUrl = new URL(url, window.location.href);
-        if (resolvedUrl.origin !== window.location.origin) {
-            const blob = await fetchAssetBlob(resolvedUrl.toString());
-            await triggerBrowserDownloadFromBlob(blob, fileName);
-            return;
-        }
-
-        const anchor = document.createElement('a');
-        anchor.href = resolvedUrl.toString();
-        anchor.download = fileName;
-        anchor.rel = 'noopener';
-        anchor.style.display = 'none';
-        document.body.append(anchor);
-        anchor.click();
-        anchor.remove();
     }
 
     function isMobileDownloadContext() {
@@ -120,15 +89,15 @@ export default function useLookupCirculationAssetExport(options: {
     }
 
     async function shareAssetFile(
-        url: string,
         format: CirculationExportFormat,
-        fileName: string
+        fileName: string,
+        requestTrainCode: string
     ) {
         if (!import.meta.client || typeof navigator.share !== 'function') {
             return false;
         }
 
-        const blob = await fetchAssetBlob(url);
+        const blob = await fetchAssetBlob(format, requestTrainCode);
         const file = new File([blob], fileName, {
             type: format === 'pdf' ? 'application/pdf' : 'image/png'
         });
@@ -157,30 +126,32 @@ export default function useLookupCirculationAssetExport(options: {
         circulationExportErrorMessage.value = '';
 
         try {
-            const downloadUrl = buildAssetBinaryUrl(format);
             const fileName = getExportFileName(format);
-
-            if (!isMobileDownloadContext()) {
-                await triggerBrowserDownloadFromUrl(downloadUrl, fileName);
-                return;
+            const requestTrainCode = normalizeComparableCode(
+                toValue(options.requestTrainCode)
+            );
+            if (requestTrainCode.length === 0) {
+                throw new Error('当前暂无可导出的交路图');
             }
 
-            try {
-                const shared = await shareAssetFile(
-                    downloadUrl,
-                    format,
-                    fileName
-                );
-                if (shared) {
-                    return;
-                }
-            } catch (error) {
-                if (isUserCancelledShare(error)) {
-                    return;
+            if (isMobileDownloadContext()) {
+                try {
+                    const shared = await shareAssetFile(
+                        format,
+                        fileName,
+                        requestTrainCode
+                    );
+                    if (shared) {
+                        return;
+                    }
+                } catch (error) {
+                    if (isUserCancelledShare(error)) {
+                        return;
+                    }
                 }
             }
 
-            const blob = await fetchAssetBlob(downloadUrl);
+            const blob = await fetchAssetBlob(format, requestTrainCode);
             await triggerBrowserDownloadFromBlob(blob, fileName);
         } catch (error) {
             circulationExportErrorMessage.value = getApiErrorMessage(

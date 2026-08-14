@@ -11,7 +11,7 @@
         @update:model-value="emit('update:modelValue', $event)">
         <template #notice>
             <p
-                v-if="isCurrentView && notice && modelValue"
+                v-if="notice && modelValue"
                 class="text-sm leading-6 text-slate-700">
                 {{ notice }}
             </p>
@@ -792,7 +792,7 @@ function bindTableResizeObserver() {
 }
 
 function isTimetableSourceKey(value: string): value is TimetableSourceKey {
-    return value === 'current' || /^history:\d+$/.test(value);
+    return value === 'current' || /^timetable:\d+$/.test(value);
 }
 
 function handleSourceKeyUpdate(value: string) {

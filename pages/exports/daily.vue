@@ -150,30 +150,20 @@
 
                                     <div
                                         class="flex flex-wrap items-center gap-2">
-                                        <a
+                                        <button
                                             v-if="item.formats.includes('csv')"
-                                            :href="
-                                                getDownloadHref(
-                                                    item.date,
-                                                    'csv'
-                                                )
+                                            type="button"
+                                            :disabled="
+                                                downloadingDate === item.date
                                             "
+                                            @click="downloadCsv(item.date)"
                                             class="inline-flex items-center justify-center rounded-2xl bg-[linear-gradient(180deg,#00529b_0%,#004c92_100%)] px-4 py-2.5 text-sm font-semibold text-white shadow-[0_8px_20px_-12px_rgba(0,82,155,0.7)] transition hover:brightness-105">
-                                            下载 CSV
-                                        </a>
-                                        <a
-                                            v-if="
-                                                item.formats.includes('jsonl')
-                                            "
-                                            :href="
-                                                getDownloadHref(
-                                                    item.date,
-                                                    'jsonl'
-                                                )
-                                            "
-                                            class="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-crh-blue transition hover:border-crh-blue/20 hover:bg-blue-50">
-                                            下载 JSONL
-                                        </a>
+                                            {{
+                                                downloadingDate === item.date
+                                                    ? '下载中...'
+                                                    : '下载 CSV'
+                                            }}
+                                        </button>
                                     </div>
                                 </div>
                             </div>
@@ -189,14 +179,11 @@
 
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue';
-import useTrackedRequestFetch, {
-    type TrackedRequestFetch
-} from '~/composables/useTrackedRequestFetch';
-import type {
-    DailyExportFormat,
-    DailyExportIndexResponse
-} from '~/types/exports';
-import type { TrackerApiResponse } from '~/types/homepage';
+import type { DailyExportIndexResponse } from '~/types/exports';
+import {
+    fetchDailyExportCsv,
+    fetchDailyExportIndex
+} from '~/utils/api/v2/domain/exports';
 import getApiErrorMessage from '~/utils/api/getApiErrorMessage';
 
 definePageMeta({
@@ -205,11 +192,10 @@ definePageMeta({
 
 const route = useRoute();
 const router = useRouter();
-const requestFetch: TrackedRequestFetch = import.meta.server
-    ? useTrackedRequestFetch()
-    : ($fetch as TrackedRequestFetch);
 const exportListRef = ref<HTMLElement | null>(null);
 const lastScrolledTargetDate = ref('');
+const downloadingDate = ref('');
+const downloadErrorMessage = ref('');
 
 function readSingleQueryValue(value: unknown): string {
     if (Array.isArray(value)) {
@@ -239,37 +225,22 @@ const queryMonth = computed(() => parsePositiveInteger(route.query.month));
 const targetDateQuery = computed(() => parseDateQuery(route.query.date));
 
 const {
-    data: exportIndexResponse,
+    data: exportIndexData,
     status,
     error,
     refresh
 } = await useAsyncData(
     'daily-export-index',
     () =>
-        requestFetch<TrackerApiResponse<DailyExportIndexResponse>>(
-            '/api/v1/exports/daily',
-            {
-                query: {
-                    year: queryYear.value ?? undefined,
-                    month: queryMonth.value ?? undefined
-                },
-                retry: 0
-            }
+        fetchDailyExportIndex(
+            queryYear.value ?? undefined,
+            queryMonth.value ?? undefined
         ),
     {
         default: () => null,
         watch: [queryYear, queryMonth]
     }
 );
-
-const exportIndexData = computed(() => {
-    const response = exportIndexResponse.value;
-    if (!response || !response.ok) {
-        return null;
-    }
-
-    return response.data;
-});
 
 const isPending = computed(() => status.value === 'pending');
 const availableYears = computed(
@@ -303,10 +274,8 @@ const monthOptions = computed(() =>
 );
 
 const errorMessage = computed(() => {
-    const response = exportIndexResponse.value;
-
-    if (response && !response.ok) {
-        return response.data;
+    if (downloadErrorMessage.value) {
+        return downloadErrorMessage.value;
     }
 
     if (error.value) {
@@ -459,8 +428,29 @@ function isTargetDate(date: string) {
     return targetDateQuery.value === date;
 }
 
-function getDownloadHref(date: string, format: DailyExportFormat) {
-    return `/api/v1/exports/daily/${date}?format=${format}&binary=1`;
+async function downloadCsv(date: string) {
+    if (downloadingDate.value) {
+        return;
+    }
+
+    downloadingDate.value = date;
+    downloadErrorMessage.value = '';
+    try {
+        const blob = (await fetchDailyExportCsv(date, 'blob')) as Blob;
+        const objectUrl = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = objectUrl;
+        anchor.download = `${date}.csv`;
+        anchor.click();
+        window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+    } catch (downloadError) {
+        downloadErrorMessage.value = getApiErrorMessage(
+            downloadError,
+            'CSV 下载失败，请稍后重试。'
+        );
+    } finally {
+        downloadingDate.value = '';
+    }
 }
 </script>
 

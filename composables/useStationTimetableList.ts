@@ -1,73 +1,57 @@
 import { computed, ref, toValue, watch, type MaybeRefOrGetter } from 'vue';
-import useTrackedRequestFetch, {
-    type TrackedRequestFetch
-} from '~/composables/useTrackedRequestFetch';
-import type { TrackerApiResponse } from '~/types/homepage';
 import type {
     LookupTarget,
     RecentAssignmentsState,
-    StationTimetableRecord,
-    StationTimetableResponse
+    StationTimetableRecord
 } from '~/types/lookup';
+import {
+    fetchStationTimetablePage,
+    type StationTimetablePageResult
+} from '~/utils/api/v2/domain/lookup';
 import getApiErrorMessage from '~/utils/api/getApiErrorMessage';
 
-const REQUEST_LIMIT = 40;
+const REQUEST_LIMIT = 100;
 
-type RequestFetch = <T>(
-    request: string,
-    options?: {
-        query?: {
-            limit: number;
-            cursor?: string | undefined;
-        };
-    }
-) => Promise<T>;
+function buildStationRecordKey(item: StationTimetableRecord) {
+    return `${item.trainCode}:${item.arriveAt ?? ''}:${item.departAt ?? ''}`;
+}
 
-function buildStationQuery(cursor: string) {
-    return {
-        limit: REQUEST_LIMIT,
-        cursor: cursor || undefined
-    };
+function dedupeStationRecords(items: StationTimetableRecord[]) {
+    const seen = new Set<string>();
+    return items.filter((item) => {
+        const key = buildStationRecordKey(item);
+        if (seen.has(key)) {
+            return false;
+        }
+        seen.add(key);
+        return true;
+    });
 }
 
 async function fetchStationPage(
-    requestFetch: RequestFetch,
     target: LookupTarget,
     cursor: string
-) {
-    const response = await requestFetch<
-        TrackerApiResponse<StationTimetableResponse>
-    >(`/api/v1/timetable/station/${encodeURIComponent(target.code)}`, {
-        query: buildStationQuery(cursor)
+): Promise<StationTimetablePageResult> {
+    return fetchStationTimetablePage(target.code, {
+        cursor: cursor || undefined,
+        limit: REQUEST_LIMIT
     });
-
-    if (!response.ok) {
-        throw {
-            data: response
-        };
-    }
-
-    return response.data;
 }
 
 function isResponseForTarget(
     target: LookupTarget,
-    response: StationTimetableResponse | null
+    response: StationTimetablePageResult | null
 ) {
     if (!response || target.type !== 'station') {
         return false;
     }
-
     return response.stationName === target.code;
 }
 
 export function useStationTimetableList(
     targetSource: MaybeRefOrGetter<LookupTarget | null>
 ) {
-    const requestFetch: TrackedRequestFetch = import.meta.server
-        ? useTrackedRequestFetch()
-        : ($fetch as TrackedRequestFetch);
-    const extraItems = ref<StationTimetableRecord[]>([]);
+    const extraPages = ref<StationTimetablePageResult[]>([]);
     const manualNextCursor = ref<string | null>(null);
     const isLoadingMore = ref(false);
     const loadMoreErrorMessage = ref('');
@@ -85,16 +69,14 @@ export function useStationTimetableList(
     );
 
     const { data, error, pending, refresh } =
-        useAsyncData<StationTimetableResponse | null>(
+        useAsyncData<StationTimetablePageResult | null>(
             asyncDataKey,
             async () => {
                 const target = toValue(targetSource);
-
                 if (!target || target.type !== 'station') {
                     return null;
                 }
-
-                return await fetchStationPage(requestFetch, target, '');
+                return await fetchStationPage(target, '');
             },
             {
                 watch: [targetKey],
@@ -104,33 +86,32 @@ export function useStationTimetableList(
 
     const initialResponse = computed(() => {
         const target = toValue(targetSource);
-
         if (!target || !isResponseForTarget(target, data.value)) {
             return null;
         }
-
         return data.value;
     });
 
-    const initialItems = computed(() => initialResponse.value?.items ?? []);
-
-    const items = computed(() => [...initialItems.value, ...extraItems.value]);
+    const items = computed(() => {
+        const pageItems = extraPages.value.flatMap((page) => page.items);
+        return dedupeStationRecords([
+            ...(initialResponse.value?.items ?? []),
+            ...pageItems
+        ]);
+    });
 
     const nextCursor = computed(() => {
         if (manualNextCursor.value !== null) {
             return manualNextCursor.value;
         }
-
         return initialResponse.value?.nextCursor ?? '';
     });
 
     const state = computed<RecentAssignmentsState>(() => {
         const target = toValue(targetSource);
-
         if (!target || target.type !== 'station') {
             return 'empty';
         }
-
         if (
             pending.value &&
             !initialResponse.value &&
@@ -138,19 +119,15 @@ export function useStationTimetableList(
         ) {
             return 'loading';
         }
-
         if (error.value && items.value.length === 0) {
             return 'error';
         }
-
         if (items.value.length > 0) {
             return 'success';
         }
-
         if (initialResponse.value) {
             return 'empty';
         }
-
         return 'idle';
     });
 
@@ -161,7 +138,6 @@ export function useStationTimetableList(
                 '车站时刻表加载失败，请稍后重试。'
             );
         }
-
         return loadMoreErrorMessage.value;
     });
 
@@ -172,12 +148,10 @@ export function useStationTimetableList(
             !isLoadingMore.value
     );
 
-    const summary = computed(() => {
-        return '';
-    });
+    const summary = computed(() => '');
 
     function resetTransientState() {
-        extraItems.value = [];
+        extraPages.value = [];
         manualNextCursor.value = null;
         isLoadingMore.value = false;
         loadMoreErrorMessage.value = '';
@@ -185,21 +159,17 @@ export function useStationTimetableList(
 
     async function reload() {
         const target = toValue(targetSource);
-
         requestVersion.value += 1;
         resetTransientState();
-
         if (!target || target.type !== 'station') {
             return;
         }
-
         await refresh();
     }
 
     async function loadMore() {
         const target = toValue(targetSource);
         const cursor = nextCursor.value;
-
         if (
             !target ||
             target.type !== 'station' ||
@@ -210,28 +180,20 @@ export function useStationTimetableList(
         }
 
         const currentRequestVersion = requestVersion.value;
-
         isLoadingMore.value = true;
         loadMoreErrorMessage.value = '';
 
         try {
-            const response = await fetchStationPage(
-                requestFetch,
-                target,
-                cursor
-            );
-
+            const response = await fetchStationPage(target, cursor);
             if (currentRequestVersion !== requestVersion.value) {
                 return;
             }
-
-            extraItems.value = [...extraItems.value, ...response.items];
-            manualNextCursor.value = response.nextCursor ?? '';
+            extraPages.value = [...extraPages.value, response];
+            manualNextCursor.value = response.nextCursor;
         } catch (loadMoreError) {
             if (currentRequestVersion !== requestVersion.value) {
                 return;
             }
-
             loadMoreErrorMessage.value = getApiErrorMessage(
                 loadMoreError,
                 '加载更多车站时刻表失败，请稍后重试。'

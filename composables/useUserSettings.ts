@@ -1,14 +1,14 @@
 import { computed, watch } from 'vue';
-import useTrackedRequestFetch, {
-    type TrackedRequestFetch
-} from '~/composables/useTrackedRequestFetch';
 import type {
     AuthSession,
     AuthQqBindingStatus,
     AuthSettingsResponse,
     AuthUserPreference
 } from '~/types/auth';
-import type { TrackerApiResponse } from '~/types/homepage';
+import {
+    fetchAuthSettings,
+    updateAuthSettings
+} from '~/utils/api/v2/domain/auth';
 import getApiErrorMessage from '~/utils/api/getApiErrorMessage';
 
 type UserSettingsState = 'idle' | 'loading' | 'success' | 'error';
@@ -135,27 +135,10 @@ export function useUserSettings() {
         errorMessage.value = '';
 
         try {
-            const requestFetch: TrackedRequestFetch = import.meta.server
-                ? useTrackedRequestFetch()
-                : ($fetch as TrackedRequestFetch);
-            const response = await requestFetch<
-                TrackerApiResponse<AuthSettingsResponse>
-            >('/api/v1/auth/settings', {
-                retry: 0
-            });
-
-            if (!response.ok) {
-                throw {
-                    data: response
-                };
-            }
-
-            userPreference.value = normalizeUserPreference(
-                response.data.userPreference
-            );
-            qqBinding.value =
-                response.data.qqBinding ?? createDefaultQqBinding();
-            loadedUserId.value = response.data.userId;
+            const data = await fetchAuthSettings();
+            userPreference.value = normalizeUserPreference(data.userPreference);
+            qqBinding.value = data.qqBinding ?? createDefaultQqBinding();
+            loadedUserId.value = data.userId;
             state.value = 'success';
             errorMessage.value = '';
         } catch (error) {
@@ -185,28 +168,10 @@ export function useUserSettings() {
         errorMessage.value = '';
 
         try {
-            const response = await useNuxtApp().$csrfFetch<
-                TrackerApiResponse<AuthSettingsResponse>
-            >('/api/v1/auth/settings', {
-                method: 'PATCH',
-                body: {
-                    userPreference: requestedPreference
-                },
-                retry: 0
-            });
-
-            if (!response.ok) {
-                throw {
-                    data: response
-                };
-            }
-
-            userPreference.value = normalizeUserPreference(
-                response.data.userPreference
-            );
-            qqBinding.value =
-                response.data.qqBinding ?? createDefaultQqBinding();
-            loadedUserId.value = response.data.userId;
+            const data = await updateAuthSettings(requestedPreference);
+            userPreference.value = normalizeUserPreference(data.userPreference);
+            qqBinding.value = data.qqBinding ?? createDefaultQqBinding();
+            loadedUserId.value = data.userId;
             state.value = 'success';
             errorMessage.value = '';
 

@@ -36,6 +36,7 @@ export interface V2RawMediaSpec<TData> {
 export interface V2MappingsSpec<TData> {
     emuCode?: (data: TData) => readonly number[];
     timetable?: (data: TData) => readonly number[];
+    timetableContent?: (data: TData) => readonly number[];
 }
 
 export interface V2ManifestEntry<

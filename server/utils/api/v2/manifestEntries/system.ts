@@ -9,7 +9,7 @@ import {
     GetExposedConfigRequestSchema,
     GetExposedConfigDataSchema,
     GetExposedConfigResponseSchema
-} from '~/server/generated/proto/opencrh/v2/system_pb';
+} from '#shared/generated/proto/opencrh/v2/system_pb';
 import {
     getDebugEchoErrorV2Adapter,
     getExposedConfigV2Adapter,

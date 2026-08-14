@@ -80,8 +80,8 @@ function extractPrimaryTrainCode(taskArgs: unknown): TrainCodeParts | null {
     }
 
     if (Array.isArray(body.codes)) {
-        const firstCode = body.codes.find(
-            (item): item is TrainCodeParts => isTrainCodeParts(item)
+        const firstCode = body.codes.find((item): item is TrainCodeParts =>
+            isTrainCodeParts(item)
         );
         return firstCode ?? null;
     }
@@ -122,7 +122,10 @@ function extractServiceDate(
 ): ServiceDay {
     const body = extractObject(taskArgs);
     const rawServiceDate = body?.serviceDate ?? body?.date;
-    if (typeof rawServiceDate === 'number' && Number.isInteger(rawServiceDate)) {
+    if (
+        typeof rawServiceDate === 'number' &&
+        Number.isInteger(rawServiceDate)
+    ) {
         return asServiceDay(rawServiceDate);
     }
 

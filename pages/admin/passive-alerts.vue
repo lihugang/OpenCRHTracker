@@ -263,14 +263,11 @@
 </template>
 
 <script setup lang="ts">
-import useTrackedRequestFetch, {
-    type TrackedRequestFetch
-} from '~/composables/useTrackedRequestFetch';
 import type {
     AdminPassiveAlertLevel,
     AdminPassiveAlertsResponse
 } from '~/types/admin';
-import type { TrackerApiResponse } from '~/types/homepage';
+import { fetchAdminPassiveAlerts } from '~/utils/api/v2/domain/admin';
 import { useAdminDateQuery } from '~/composables/useAdminDateQuery';
 import getApiErrorMessage from '~/utils/api/getApiErrorMessage';
 import formatTrackerTimestamp from '~/utils/time/formatTrackerTimestamp';
@@ -281,9 +278,6 @@ definePageMeta({
 
 const PASSIVE_ALERT_PAGE_LIMIT = 50;
 
-const requestFetch: TrackedRequestFetch = import.meta.server
-    ? useTrackedRequestFetch()
-    : ($fetch as TrackedRequestFetch);
 const { session } = useAuthState();
 const { selectedDateInput, selectedDateYmd, todayDateInputValue } =
     await useAdminDateQuery();
@@ -339,10 +333,7 @@ useSiteSeo({
 });
 
 async function fetchPassiveAlerts(cursor = '') {
-    const response = await requestFetch<
-        TrackerApiResponse<AdminPassiveAlertsResponse>
-    >('/api/v1/admin/passive-alerts', {
-        retry: 0,
+    return fetchAdminPassiveAlerts({
         query: {
             date: selectedDateYmd.value,
             type: activeAlertType.value || undefined,
@@ -350,14 +341,6 @@ async function fetchPassiveAlerts(cursor = '') {
             limit: PASSIVE_ALERT_PAGE_LIMIT
         }
     });
-
-    if (!response.ok) {
-        throw {
-            data: response
-        };
-    }
-
-    return response.data;
 }
 
 async function loadPassiveAlerts(reset = true) {

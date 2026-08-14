@@ -483,9 +483,7 @@ function stringifyJson(value: unknown): string {
     return stringifyInternalJson(value ?? null);
 }
 
-function stringifyTrainCodes(
-    value: readonly TrainCodeParts[]
-): string {
+function stringifyTrainCodes(value: readonly TrainCodeParts[]): string {
     return stringifyInternalJsonField(value, 'trainCodes');
 }
 
@@ -564,9 +562,7 @@ function toTaskRunRecord(
         ),
         primaryStartAt: row.primary_start_at,
         primaryEmuId:
-            row.primary_emu_id === null
-                ? null
-                : asEmuId(row.primary_emu_id)
+            row.primary_emu_id === null ? null : asEmuId(row.primary_emu_id)
     };
 }
 
@@ -1068,9 +1064,7 @@ export function getStationBoardDispatchResultByTaskRunId(taskRunId: number) {
     return row ? toStationBoardDispatchResultRecord(row) : null;
 }
 
-export function listStationBoardDispatchResultsByDate(
-    serviceDate: ServiceDay
-) {
+export function listStationBoardDispatchResultsByDate(serviceDate: ServiceDay) {
     maybeCleanupExpiredTrainProvenance();
 
     return trainProvenanceStatements

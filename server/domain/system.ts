@@ -9,20 +9,13 @@ export function getHealth() {
     };
 }
 
-export function getDebugEchoError(input: {
-    status: number;
-    code: string;
-}) {
+export function getDebugEchoError(input: { status: number; code: string }) {
     const config = useConfig();
     if (!import.meta.dev || !config.api.debug.enableEchoError) {
         throw new ApiRequestError(404, 'not_found', '当前环境不可使用该接口');
     }
 
-    throw new ApiRequestError(
-        input.status,
-        input.code,
-        '这是调试错误返回'
-    );
+    throw new ApiRequestError(input.status, input.code, '这是调试错误返回');
 }
 
 export function getExposedConfig() {
@@ -63,10 +56,13 @@ export function getExposedConfig() {
                 minimumRequestCost: 1,
                 fixed: {
                     authMe: config.cost.fixed.authMe,
-                    authRedeemMembership: config.cost.fixed.authRedeemMembership,
-                    authCreateOauthClient: config.cost.fixed.authCreateOauthClient,
+                    authRedeemMembership:
+                        config.cost.fixed.authRedeemMembership,
+                    authCreateOauthClient:
+                        config.cost.fixed.authCreateOauthClient,
                     allocationEmu: config.cost.fixed.allocationEmu,
-                    timetableTrainCurrent: config.cost.fixed.timetableTrainCurrent,
+                    timetableTrainCurrent:
+                        config.cost.fixed.timetableTrainCurrent,
                     trainCirculationImageCacheHit:
                         config.cost.fixed.trainCirculationImageCacheHit,
                     trainCirculationImage:

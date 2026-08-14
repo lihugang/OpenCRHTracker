@@ -9,10 +9,7 @@ export function getAdminTasks() {
     return getAdminTaskOverview();
 }
 
-export function postAdminTasks(body: {
-    type?: unknown;
-    payload?: unknown;
-}) {
+export function postAdminTasks(body: { type?: unknown; payload?: unknown }) {
     return createAdminTask(parseAdminTaskRequestBody(body));
 }
 
@@ -31,7 +28,11 @@ function parseAdminTaskRequestBody(body: {
     const payload = asPlainObject(body.payload);
 
     if (payload === null) {
-        throw new ApiRequestError(400, 'invalid_param', 'payload 必须是 JSON 对象');
+        throw new ApiRequestError(
+            400,
+            'invalid_param',
+            'payload 必须是 JSON 对象'
+        );
     }
 
     switch (type) {

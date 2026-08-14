@@ -577,9 +577,6 @@
 </template>
 
 <script setup lang="ts">
-import useTrackedRequestFetch, {
-    type TrackedRequestFetch
-} from '~/composables/useTrackedRequestFetch';
 import type {
     AdminServerMetricsBucket,
     AdminServerMetricsPeak,
@@ -588,7 +585,7 @@ import type {
     AdminServerMetricsWindow,
     AdminServerMetricsWindowSummary
 } from '~/types/admin';
-import type { TrackerApiResponse } from '~/types/homepage';
+import { fetchAdminServerMetrics } from '~/utils/api/v2/domain/admin';
 import { useAdminDateQuery } from '~/composables/useAdminDateQuery';
 import getApiErrorMessage from '~/utils/api/getApiErrorMessage';
 import formatTrackerTimestamp from '~/utils/time/formatTrackerTimestamp';
@@ -677,9 +674,6 @@ interface LatencyMetricCard {
     topRoutes: AdminServerMetricsTopRoute[];
 }
 
-const requestFetch: TrackedRequestFetch = import.meta.server
-    ? useTrackedRequestFetch()
-    : ($fetch as TrackedRequestFetch);
 const { session } = useAuthState();
 const { selectedDateInput, todayDateInputValue } = await useAdminDateQuery();
 const selectedWindow = ref<AdminServerMetricsWindow>('4h');
@@ -699,19 +693,7 @@ const windowOptions = [
 }>;
 
 async function fetchServerMetrics() {
-    const response = await requestFetch<
-        TrackerApiResponse<AdminServerMetricsResponse>
-    >('/api/v1/admin/server-metrics', {
-        retry: 0
-    });
-
-    if (!response.ok) {
-        throw {
-            data: response
-        };
-    }
-
-    return response.data;
+    return fetchAdminServerMetrics();
 }
 
 const {

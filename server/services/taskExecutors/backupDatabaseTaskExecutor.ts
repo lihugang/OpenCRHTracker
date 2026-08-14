@@ -98,7 +98,9 @@ function enqueueNextDatabaseBackupTask(args: BackupDatabaseTaskArgs): void {
     );
 }
 
-async function executeBackupDatabaseTask(args: BackupDatabaseTaskArgs): Promise<void> {
+async function executeBackupDatabaseTask(
+    args: BackupDatabaseTaskArgs
+): Promise<void> {
     let caughtError: unknown = null;
 
     try {

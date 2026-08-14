@@ -335,11 +335,15 @@ import UiModal from '~/components/ui/UiModal.vue';
 import UiSelect from '~/components/ui/UiSelect.vue';
 import UiStatusBadge from '~/components/ui/UiStatusBadge.vue';
 import type { AdminUserListItem } from '~/types/admin';
-import type { TrackerApiResponse } from '~/types/homepage';
 import type {
     AdminUserMembershipsResponse,
     UserMembershipStatus
 } from '~/types/membership';
+import {
+    deleteAdminUserMembership,
+    fetchAdminUserMemberships,
+    putAdminUserMembership
+} from '~/utils/api/v2/domain/adminUsers';
 import getApiErrorMessage from '~/utils/api/getApiErrorMessage';
 import formatTrackerTimestamp from '~/utils/time/formatTrackerTimestamp';
 
@@ -457,23 +461,13 @@ async function loadDetails() {
     state.value = 'loading';
     loadError.value = '';
     try {
-        const response = await $fetch<
-            TrackerApiResponse<AdminUserMembershipsResponse>
-        >(
-            '/api/v1/admin/users/' +
-                encodeURIComponent(userId) +
-                '/memberships',
-            { retry: 0 }
-        );
-        if (!response.ok) {
-            throw { data: response };
-        }
+        const response = await fetchAdminUserMemberships(userId);
         if (!props.modelValue || props.user?.userId !== userId) {
             return;
         }
-        details.value = response.data;
+        details.value = response;
         state.value = 'success';
-        initializeForm(response.data);
+        initializeForm(response);
     } catch (error) {
         if (!props.modelValue || props.user?.userId !== userId) {
             return;
@@ -635,41 +629,14 @@ async function mutate(
     method: 'PUT' | 'DELETE',
     body?: { startsAt: number; durationDays: number }
 ) {
-    const { data, error } = await useCsrfFetch<
-        TrackerApiResponse<AdminUserMembershipsResponse>
-    >(
-        '/api/v1/admin/users/' +
-            encodeURIComponent(userId) +
-            '/memberships/' +
-            encodeURIComponent(groupId),
-        {
-            method,
-            retry: 0,
-            body,
-            key:
-                'admin:users:sponsorship:' +
-                method +
-                ':' +
-                userId +
-                ':' +
-                groupId +
-                ':' +
-                Date.now(),
-            watch: false,
-            server: false
-        }
-    );
-    if (error.value) {
-        throw error.value;
-    }
-    const response = data.value;
-    if (!response) {
-        throw new Error('Missing sponsorship mutation response');
-    }
-    if (!response.ok) {
-        throw { data: response };
-    }
-    return response.data;
+    return method === 'PUT'
+        ? putAdminUserMembership(
+              userId,
+              groupId,
+              body!.startsAt,
+              body!.durationDays
+          )
+        : deleteAdminUserMembership(userId, groupId);
 }
 
 function toShanghaiDateTimeLocalValue(timestamp: number) {

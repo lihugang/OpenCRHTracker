@@ -3509,9 +3509,6 @@
 <script setup lang="ts">
 import UiBottomSheet from '~/components/ui/UiBottomSheet.vue';
 import UiModal from '~/components/ui/UiModal.vue';
-import useTrackedRequestFetch, {
-    type TrackedRequestFetch
-} from '~/composables/useTrackedRequestFetch';
 import { useAdminDateQuery } from '~/composables/useAdminDateQuery';
 import type {
     AdminCouplingScanDetailResponse,
@@ -3542,7 +3539,17 @@ import type {
     AdminTrainRouteSnapshot,
     AdminTrainProvenanceTaskRunStatus
 } from '~/types/admin';
-import type { TrackerApiResponse } from '~/types/homepage';
+import {
+    fetchAdminTrainProvenance,
+    fetchAdminTrainProvenanceCouplingScan,
+    fetchAdminTrainProvenanceCouplingScanTasks,
+    fetchAdminTrainProvenanceQrcodeScan,
+    fetchAdminTrainProvenanceQrcodeScanTasks,
+    fetchAdminTrainProvenanceRequestStats,
+    fetchAdminTrainProvenanceStationBoard,
+    fetchAdminTrainProvenanceStationBoardTasks,
+    fetchAdminTrainProvenanceStationPlatformRefresh
+} from '~/utils/api/v2/domain/adminProvenance';
 import getApiErrorMessage from '~/utils/api/getApiErrorMessage';
 import formatShanghaiTime from '~/utils/time/formatShanghaiTime';
 import formatTrackerTimestamp from '~/utils/time/formatTrackerTimestamp';
@@ -3552,9 +3559,6 @@ definePageMeta({
 });
 
 const MOBILE_QUERY = '(max-width: 767px)';
-const requestFetch: TrackedRequestFetch = import.meta.server
-    ? useTrackedRequestFetch()
-    : ($fetch as TrackedRequestFetch);
 const route = useRoute();
 const router = useRouter();
 const { session } = useAuthState();
@@ -3699,100 +3703,45 @@ async function fetchTrainProvenance() {
         return null;
     }
 
-    const response = await requestFetch<
-        TrackerApiResponse<AdminTrainProvenanceResponse>
-    >('/api/v1/admin/train-provenance', {
-        retry: 0,
+    return fetchAdminTrainProvenance({
         query: {
             date: selectedDateYmd.value,
             trainCode: normalizedTrainCodeQuery.value,
             startAt: requestedStartAt.value ?? undefined
         }
     });
-
-    if (!response.ok) {
-        throw {
-            data: response
-        };
-    }
-
-    return response.data;
 }
 
 async function fetchTrainRequestStats() {
-    const response = await requestFetch<
-        TrackerApiResponse<AdminTrainDataRequestStatsResponse>
-    >('/api/v1/admin/train-provenance/request-stats', {
-        retry: 0,
+    return fetchAdminTrainProvenanceRequestStats({
         query: {
             date: selectedDateYmd.value
         }
     });
-
-    if (!response.ok) {
-        throw {
-            data: response
-        };
-    }
-
-    return response.data;
 }
 
 async function fetchCouplingScanTaskList() {
-    const response = await requestFetch<
-        TrackerApiResponse<AdminCouplingScanTaskListResponse>
-    >('/api/v1/admin/train-provenance/coupling-scan-tasks', {
-        retry: 0,
+    return fetchAdminTrainProvenanceCouplingScanTasks({
         query: {
             date: selectedDateYmd.value
         }
     });
-
-    if (!response.ok) {
-        throw {
-            data: response
-        };
-    }
-
-    return response.data;
 }
 
 async function fetchQrcodeScanTaskList(date: string) {
-    const response = await requestFetch<
-        TrackerApiResponse<AdminQrcodeScanTaskListResponse>
-    >('/api/v1/admin/train-provenance/qrcode-scan-tasks', {
-        retry: 0,
+    return fetchAdminTrainProvenanceQrcodeScanTasks({
         query: {
             date
         }
     });
-
-    if (!response.ok) {
-        throw {
-            data: response
-        };
-    }
-
-    return response.data;
 }
 
 async function fetchStationBoardTaskList(date: string) {
-    const response = await requestFetch<
-        TrackerApiResponse<AdminStationBoardTaskListResponse>
-    >('/api/v1/admin/train-provenance/station-board-tasks', {
-        retry: 0,
+    return fetchAdminTrainProvenanceStationBoardTasks({
         query: {
             date
         }
     });
-
-    if (!response.ok) {
-        throw {
-            data: response
-        };
-    }
-
-    return response.data;
 }
 
 const {
@@ -4286,22 +4235,13 @@ async function openCouplingScanDetail(taskRunId: number) {
     couplingDetailData.value = null;
 
     try {
-        const response = await requestFetch<
-            TrackerApiResponse<AdminCouplingScanDetailResponse>
-        >('/api/v1/admin/train-provenance/coupling-scan', {
-            retry: 0,
+        const response = await fetchAdminTrainProvenanceCouplingScan({
             query: {
                 taskRunId
             }
         });
 
-        if (!response.ok) {
-            throw {
-                data: response
-            };
-        }
-
-        couplingDetailData.value = response.data;
+        couplingDetailData.value = response;
         couplingDetailStatus.value = 'success';
     } catch (error) {
         couplingDetailErrorMessage.value = getApiErrorMessage(
@@ -4324,23 +4264,14 @@ async function openQrcodeScanDetail(detectedAt: string) {
     qrcodeScanDetailData.value = null;
 
     try {
-        const response = await requestFetch<
-            TrackerApiResponse<AdminQrcodeScanDetailResponse>
-        >('/api/v1/admin/train-provenance/qrcode-scan', {
-            retry: 0,
+        const response = await fetchAdminTrainProvenanceQrcodeScan({
             query: {
                 date: loadedDate,
                 detectedAt
             }
         });
 
-        if (!response.ok) {
-            throw {
-                data: response
-            };
-        }
-
-        qrcodeScanDetailData.value = response.data;
+        qrcodeScanDetailData.value = response;
         qrcodeScanDetailStatus.value = 'success';
     } catch (error) {
         qrcodeScanDetailErrorMessage.value = getApiErrorMessage(
@@ -4361,22 +4292,13 @@ async function openStationBoardDetail(taskRunId: number) {
     hideEmptyStationBoardCirculationRows.value = true;
 
     try {
-        const response = await requestFetch<
-            TrackerApiResponse<AdminStationBoardDispatchDetailResponse>
-        >('/api/v1/admin/train-provenance/station-board', {
-            retry: 0,
+        const response = await fetchAdminTrainProvenanceStationBoard({
             query: {
                 taskRunId
             }
         });
 
-        if (!response.ok) {
-            throw {
-                data: response
-            };
-        }
-
-        stationBoardDetailData.value = response.data;
+        stationBoardDetailData.value = response;
         stationBoardDetailStatus.value = 'success';
     } catch (error) {
         stationBoardDetailErrorMessage.value = getApiErrorMessage(
@@ -4398,22 +4320,13 @@ async function openStationPlatformRefreshDetail(resultId: number) {
     stationPlatformRefreshData.value = null;
 
     try {
-        const response = await requestFetch<
-            TrackerApiResponse<AdminStationPlatformRefreshDetailResponse>
-        >('/api/v1/admin/train-provenance/station-platform-refresh', {
-            retry: 0,
+        const response = await fetchAdminTrainProvenanceStationPlatformRefresh({
             query: {
                 resultId
             }
         });
 
-        if (!response.ok) {
-            throw {
-                data: response
-            };
-        }
-
-        stationPlatformRefreshData.value = response.data;
+        stationPlatformRefreshData.value = response;
         stationPlatformRefreshStatus.value = 'success';
     } catch (error) {
         stationPlatformRefreshErrorMessage.value = getApiErrorMessage(

@@ -27,7 +27,7 @@ import {
     GetAdminTrainProvenanceStationPlatformRefreshRequestSchema,
     GetAdminTrainProvenanceStationPlatformRefreshDataSchema,
     GetAdminTrainProvenanceStationPlatformRefreshResponseSchema
-} from '~/server/generated/proto/opencrh/v2/admin_provenance_pb';
+} from '#shared/generated/proto/opencrh/v2/admin_provenance_pb';
 import {
     getAdminTrainProvenanceCouplingScanTasksV2Adapter,
     getAdminTrainProvenanceCouplingScanV2Adapter,
@@ -150,7 +150,8 @@ export const ADMIN_PROVENANCE_MANIFEST_ENTRIES = {
         operationName: 'GetAdminTrainProvenanceStationPlatformRefresh',
         method: 'GET',
         pathTemplate: '/api/v2/admin/train-provenance/station-platform-refresh',
-        requestSchema: GetAdminTrainProvenanceStationPlatformRefreshRequestSchema,
+        requestSchema:
+            GetAdminTrainProvenanceStationPlatformRefreshRequestSchema,
         dataSchema: GetAdminTrainProvenanceStationPlatformRefreshDataSchema,
         responseSchema:
             GetAdminTrainProvenanceStationPlatformRefreshResponseSchema,

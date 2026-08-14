@@ -1,4 +1,7 @@
-import type { V2ResponseCodec, V2TransportFailure } from '~/server/utils/api/v2/V2Types';
+import type {
+    V2ResponseCodec,
+    V2TransportFailure
+} from '~/server/utils/api/v2/V2Types';
 
 interface AcceptEntry {
     type: string;
@@ -21,8 +24,10 @@ function parseAcceptList(
         }
 
         const [rawRange, ...params] = trimmed.split(';');
-        const [rawType, rawSubtype] =
-            (rawRange ?? '').trim().toLowerCase().split('/');
+        const [rawType, rawSubtype] = (rawRange ?? '')
+            .trim()
+            .toLowerCase()
+            .split('/');
         const type = rawType ?? '*';
         const subtype = rawSubtype ?? '*';
         let q = 1;
@@ -60,7 +65,11 @@ function matchSpecificity(
     return 0;
 }
 
-function qualityFor(entries: readonly AcceptEntry[], type: string, subtype: string) {
+function qualityFor(
+    entries: readonly AcceptEntry[],
+    type: string,
+    subtype: string
+) {
     let bestSpecificity = 0;
     let bestQuality = 0;
 
@@ -92,7 +101,8 @@ export function negotiateResponseCodec(
         const failure: V2TransportFailure = {
             statusCode: 406,
             errorCode: 'not_acceptable',
-            userMessage: 'Accept 不支持 application/json 或 application/x-protobuf'
+            userMessage:
+                'Accept 不支持 application/json 或 application/x-protobuf'
         };
         throw failure;
     }

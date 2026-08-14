@@ -156,7 +156,11 @@ export function listUserIdsSubscribedToTarget(target: AuthEventTarget) {
     return userEventSubscriptionStatements
         .all<{
             user_id: string;
-        }>('selectUserEventSubscriptionsByTarget', normalizedTarget.kind, authEventTargetKey(normalizedTarget))
+        }>(
+            'selectUserEventSubscriptionsByTarget',
+            normalizedTarget.kind,
+            authEventTargetKey(normalizedTarget)
+        )
         .map((row) => row.user_id);
 }
 

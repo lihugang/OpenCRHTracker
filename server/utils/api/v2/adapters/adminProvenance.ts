@@ -69,9 +69,7 @@ function toProtoTimelineEvent<
     };
 }
 
-function toProtoTaskRunSummary<T extends { serviceDate: string }>(
-    summary: T
-) {
+function toProtoTaskRunSummary<T extends { serviceDate: string }>(summary: T) {
     return {
         ...summary,
         serviceDay: toServiceDayOrZero(summary.serviceDate)

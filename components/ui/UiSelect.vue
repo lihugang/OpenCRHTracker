@@ -71,12 +71,13 @@
                         v-for="(option, index) in props.options"
                         :key="option.value"
                         type="button"
+                        :disabled="option.disabled"
                         role="option"
                         :aria-selected="
                             option.value === model ? 'true' : 'false'
                         "
                         :data-option-index="index"
-                        class="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm transition"
+                        class="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm transition disabled:cursor-not-allowed disabled:opacity-45"
                         :class="
                             index === activeIndex
                                 ? 'bg-blue-50 text-crh-blue'
@@ -85,7 +86,9 @@
                                   : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900'
                         "
                         @mousedown.prevent
-                        @mouseenter="activeIndex = index"
+                        @mouseenter="
+                            option.disabled ? undefined : (activeIndex = index)
+                        "
                         @click="selectOption(option.value)">
                         <span class="min-w-0 truncate font-medium">
                             {{ option.label }}
@@ -127,7 +130,8 @@
                     v-for="option in props.options"
                     :key="`sheet:${option.value}`"
                     type="button"
-                    class="flex w-full items-center justify-between gap-4 rounded-[1rem] border px-4 py-4 text-left transition"
+                    :disabled="option.disabled"
+                    class="flex w-full items-center justify-between gap-4 rounded-[1rem] border px-4 py-4 text-left transition disabled:cursor-not-allowed disabled:opacity-45"
                     :class="
                         option.value === model
                             ? 'border-crh-blue/20 bg-blue-50/80 text-crh-blue'
@@ -180,6 +184,7 @@ import {
 interface SelectOption {
     value: string;
     label: string;
+    disabled?: boolean;
 }
 
 const props = withDefaults(
@@ -239,13 +244,25 @@ const selectedLabel = computed(() => {
     return props.options[0]?.label ?? '';
 });
 
+function findEnabledOptionIndex(start: number, direction: 1 | -1) {
+    for (let step = 0; step < props.options.length; step += 1) {
+        const index =
+            (start + direction * step + props.options.length) %
+            props.options.length;
+        if (!props.options[index]?.disabled) {
+            return index;
+        }
+    }
+
+    return -1;
+}
+
 function syncActiveIndexToSelection() {
     activeIndex.value =
-        selectedIndex.value >= 0
+        selectedIndex.value >= 0 &&
+        !props.options[selectedIndex.value]?.disabled
             ? selectedIndex.value
-            : props.options.length > 0
-              ? 0
-              : -1;
+            : findEnabledOptionIndex(0, 1);
 }
 
 function close() {
@@ -278,6 +295,11 @@ async function toggleOpen() {
 }
 
 function selectOption(value: string) {
+    const option = props.options.find((item) => item.value === value);
+    if (option?.disabled) {
+        return;
+    }
+
     model.value = value;
     close();
     buttonRef.value?.focus({ preventScroll: true });
@@ -291,18 +313,21 @@ async function handleArrowOpen(direction: 1 | -1) {
     if (!isOpen.value) {
         await open();
         if (selectedIndex.value < 0) {
-            activeIndex.value = direction > 0 ? 0 : props.options.length - 1;
+            activeIndex.value = findEnabledOptionIndex(
+                direction > 0 ? 0 : props.options.length - 1,
+                direction
+            );
         }
         return;
     }
 
     activeIndex.value =
         activeIndex.value < 0
-            ? direction > 0
-                ? 0
-                : props.options.length - 1
-            : (activeIndex.value + direction + props.options.length) %
-              props.options.length;
+            ? findEnabledOptionIndex(
+                  direction > 0 ? 0 : props.options.length - 1,
+                  direction
+              )
+            : findEnabledOptionIndex(activeIndex.value + direction, direction);
 
     await nextTick();
     scrollActiveOptionIntoView();
@@ -332,7 +357,10 @@ function setBoundaryIndex(boundary: 'start' | 'end') {
         return;
     }
 
-    activeIndex.value = boundary === 'start' ? 0 : props.options.length - 1;
+    activeIndex.value = findEnabledOptionIndex(
+        boundary === 'start' ? 0 : props.options.length - 1,
+        boundary === 'start' ? 1 : -1
+    );
     void nextTick().then(scrollActiveOptionIntoView);
 }
 

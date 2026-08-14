@@ -11,9 +11,7 @@ function parseOptionalPositiveInteger(value: unknown): number | undefined {
     return parsed > 0 ? parsed : undefined;
 }
 
-export async function getDailyExportIndexV2Adapter(
-    ctx: V2OperationContext
-) {
+export async function getDailyExportIndexV2Adapter(ctx: V2OperationContext) {
     const result = getDailyExportIndex(
         parseOptionalPositiveInteger(ctx.query.year),
         parseOptionalPositiveInteger(ctx.query.month)
@@ -28,16 +26,9 @@ export async function getDailyExportIndexV2Adapter(
     };
 }
 
-export async function getDailyExportV2Adapter(
-    ctx: V2OperationContext
-) {
+export async function getDailyExportV2Adapter(ctx: V2OperationContext) {
     const date = typeof ctx.params.date === 'string' ? ctx.params.date : '';
-    ensure(
-        /^\d{8}$/.test(date),
-        400,
-        'invalid_param',
-        'date 必须是 YYYYMMDD'
-    );
+    ensure(/^\d{8}$/.test(date), 400, 'invalid_param', 'date 必须是 YYYYMMDD');
 
     const result = getDailyExport(date);
     return {

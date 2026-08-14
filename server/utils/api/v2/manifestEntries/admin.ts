@@ -78,7 +78,7 @@ import {
     PutAdminConfigFileRequestSchema,
     PutAdminConfigFileDataSchema,
     PutAdminConfigFileResponseSchema
-} from '~/server/generated/proto/opencrh/v2/admin_pb';
+} from '#shared/generated/proto/opencrh/v2/admin_pb';
 import {
     deleteAdminDailyRouteV2Adapter,
     deleteAdminOfficialCirculationV2Adapter,

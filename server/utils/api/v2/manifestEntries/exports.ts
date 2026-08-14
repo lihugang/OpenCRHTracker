@@ -6,7 +6,7 @@ import {
     GetDailyExportRequestSchema,
     GetDailyExportDataSchema,
     GetDailyExportResponseSchema
-} from '~/server/generated/proto/opencrh/v2/exports_pb';
+} from '#shared/generated/proto/opencrh/v2/exports_pb';
 import {
     getDailyExportIndexV2Adapter,
     getDailyExportV2Adapter
@@ -16,10 +16,7 @@ import {
     getDailyResponseCacheControlMaxAge,
     getMonthlyResponseCacheControlMaxAge
 } from '~/server/utils/api/response/getResponseCacheControlMaxAge';
-import {
-    asServiceDay,
-    dayToServiceDate
-} from '~/server/utils/date/serviceDay';
+import { asServiceDay, dayToServiceDate } from '~/server/utils/date/serviceDay';
 
 export const EXPORTS_MANIFEST_ENTRIES = {
     GetDailyExportIndex: defineV2Operation({

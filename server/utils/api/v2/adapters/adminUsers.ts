@@ -29,9 +29,7 @@ export async function getAdminUserMembershipsV2Adapter(
     return getAdminUserMemberships(userId);
 }
 
-export async function putAdminUserMembershipV2Adapter(
-    ctx: V2OperationContext
-) {
+export async function putAdminUserMembershipV2Adapter(ctx: V2OperationContext) {
     const userId = (ctx.params.userId ?? '').trim();
     const groupId = (ctx.params.groupId ?? '').trim();
     const request = ctx.request as {
@@ -39,12 +37,7 @@ export async function putAdminUserMembershipV2Adapter(
         durationDays?: number;
     };
     ensure(userId.length > 0, 400, 'invalid_param', 'userId 不能为空');
-    ensure(
-        groupId.length > 0,
-        400,
-        'invalid_param',
-        '赞助权益组 ID 不能为空'
-    );
+    ensure(groupId.length > 0, 400, 'invalid_param', '赞助权益组 ID 不能为空');
     if (
         typeof request.startsAt !== 'number' ||
         !Number.isSafeInteger(request.startsAt) ||
@@ -67,8 +60,7 @@ export async function putAdminUserMembershipV2Adapter(
             'durationDays 必须为正整数'
         );
     }
-    const expiresAt =
-        request.startsAt + request.durationDays * SECONDS_PER_DAY;
+    const expiresAt = request.startsAt + request.durationDays * SECONDS_PER_DAY;
     ensure(
         Number.isSafeInteger(expiresAt) &&
             expiresAt > request.startsAt &&
@@ -93,33 +85,17 @@ export async function deleteAdminUserMembershipV2Adapter(
     const userId = (ctx.params.userId ?? '').trim();
     const groupId = (ctx.params.groupId ?? '').trim();
     ensure(userId.length > 0, 400, 'invalid_param', 'userId 不能为空');
-    ensure(
-        groupId.length > 0,
-        400,
-        'invalid_param',
-        '赞助权益组 ID 不能为空'
-    );
-    return deleteAdminUserMembership(
-        userId,
-        groupId,
-        ctx.identity.id
-    );
+    ensure(groupId.length > 0, 400, 'invalid_param', '赞助权益组 ID 不能为空');
+    return deleteAdminUserMembership(userId, groupId, ctx.identity.id);
 }
 
-export async function postAdminQqBanEntryV2Adapter(
-    ctx: V2OperationContext
-) {
+export async function postAdminQqBanEntryV2Adapter(ctx: V2OperationContext) {
     const qqNumber = (ctx.request as { qqNumber?: string }).qqNumber ?? '';
     return postAdminQqBanEntry(qqNumber, ctx.identity.id);
 }
 
-export async function deleteAdminQqBanEntryV2Adapter(
-    ctx: V2OperationContext
-) {
-    return deleteAdminQqBanEntry(
-        ctx.params.qqNumber ?? '',
-        ctx.identity.id
-    );
+export async function deleteAdminQqBanEntryV2Adapter(ctx: V2OperationContext) {
+    return deleteAdminQqBanEntry(ctx.params.qqNumber ?? '', ctx.identity.id);
 }
 
 export async function postAdminUsersQuotaResetV2Adapter(
@@ -138,30 +114,19 @@ export async function postAdminUsersRiskClearV2Adapter(
     return postAdminUsersRiskClear(userId, ctx.identity.id);
 }
 
-export async function getAdminUsersSecurityV2Adapter(
-    ctx: V2OperationContext
-) {
+export async function getAdminUsersSecurityV2Adapter(ctx: V2OperationContext) {
     return getAdminUsersSecurity();
 }
 
-export async function postAdminUsersStatusV2Adapter(
-    ctx: V2OperationContext
-) {
+export async function postAdminUsersStatusV2Adapter(ctx: V2OperationContext) {
     const request = ctx.request as {
         userId?: string;
         banned?: boolean;
     };
     const userId = (request.userId ?? '').trim();
     ensure(userId.length > 0, 400, 'invalid_param', 'userId 不能为空');
-    if (
-        request.banned === undefined ||
-        typeof request.banned !== 'boolean'
-    ) {
-        throw new ApiRequestError(
-            400,
-            'invalid_param',
-            'banned 必须为布尔值'
-        );
+    if (request.banned === undefined || typeof request.banned !== 'boolean') {
+        throw new ApiRequestError(400, 'invalid_param', 'banned 必须为布尔值');
     }
     return postAdminUsersStatus(
         {

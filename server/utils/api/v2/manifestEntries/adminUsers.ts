@@ -30,7 +30,7 @@ import {
     PutAdminUserMembershipRequestSchema,
     PutAdminUserMembershipDataSchema,
     PutAdminUserMembershipResponseSchema
-} from '~/server/generated/proto/opencrh/v2/admin_users_pb';
+} from '#shared/generated/proto/opencrh/v2/admin_users_pb';
 import {
     deleteAdminQqBanEntryV2Adapter,
     deleteAdminUserMembershipV2Adapter,

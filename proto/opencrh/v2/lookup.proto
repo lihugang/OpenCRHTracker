@@ -176,6 +176,7 @@ message GetCurrentTrainTimetableData {
   int64 end_at = 14;
   optional TrainCirculation circulation = 15;
   repeated CurrentTrainTimetableStop stops = 16;
+  uint32 service_day = 17;
 }
 
 message GetCurrentTrainTimetableResponse {

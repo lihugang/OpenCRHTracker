@@ -51,11 +51,11 @@ import {
     AdminAnomalyTypeSchema,
     AdminConfigFileActionSchema,
     AdminConfigFileTargetSchema
-} from '~/server/generated/proto/opencrh/v2/admin_pb';
+} from '#shared/generated/proto/opencrh/v2/admin_pb';
 import {
     OAuthClientScopeReviewStatusSchema,
     OAuthClientStatusSchema
-} from '~/server/generated/proto/opencrh/v2/oauth_pb';
+} from '#shared/generated/proto/opencrh/v2/oauth_pb';
 import { enumJsonName } from '~/server/utils/api/v2/requestValidator';
 import { serviceDateToDay } from '~/server/utils/date/serviceDay';
 import ApiRequestError from '~/server/utils/api/errors/ApiRequestError';

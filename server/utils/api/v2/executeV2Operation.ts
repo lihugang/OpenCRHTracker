@@ -40,6 +40,7 @@ import {
 } from '~/server/utils/api/v2/negotiation';
 import {
     resolveEmuCodeMappings,
+    resolveTimetableContentMappings,
     resolveTimetableMappings
 } from '~/server/utils/api/v2/resourceMappings';
 import {
@@ -716,6 +717,17 @@ export default async function executeV2Operation(
         );
         if (timetableMappings !== undefined) {
             plainData = { ...plainData, timetableMappings };
+        }
+    }
+    if (entry.mappings?.timetableContent) {
+        const timetableContentMappings = resolveTimetableContentMappings(
+            entry.mappings.timetableContent(data as never)
+        );
+        if (timetableContentMappings !== undefined) {
+            plainData = {
+                ...plainData,
+                timetableMappings: timetableContentMappings
+            };
         }
     }
 

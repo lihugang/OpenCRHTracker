@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 
-// Generates the 100 thin /api/v2 route files from the authoritative
-// operation index (docs/api-v2-operation-index.md).
+// Generates the 99 thin /api/v2 route files from the authoritative
+// operation names and manifest entries. The client-safe registry and the
+// route generator share this source of truth so they cannot drift.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -11,26 +12,47 @@ const repoRoot = path.resolve(
     path.dirname(fileURLToPath(import.meta.url)),
     '..'
 );
-const indexPath = path.join(repoRoot, 'docs/api-v2-operation-index.md');
-const indexText = fs.readFileSync(indexPath, 'utf8');
+const operationNamesPath = path.join(
+    repoRoot,
+    'server/utils/api/v2/operationNames.ts'
+);
+const manifestDir = path.join(repoRoot, 'server/utils/api/v2/manifestEntries');
+const operationNamesText = fs.readFileSync(operationNamesPath, 'utf8');
 
-const rows = [];
-for (const line of indexText.split('\n')) {
-    if (!line.startsWith('|') || line.includes('---') || line.includes('Method')) {
-        continue;
+const operationNames = [];
+for (const line of operationNamesText.split('\n')) {
+    const match = line.match(/^\s*'([A-Za-z0-9]+)',?\s*$/);
+    if (match) {
+        operationNames.push(match[1]);
     }
-    const parts = line.split('|').map((part) => part.trim().replace(/`/g, ''));
-    const method = parts[1];
-    const apiPath = parts[2];
-    const operation = parts[3];
-    if (!method || !apiPath || !operation) {
-        continue;
-    }
-    rows.push({ method, apiPath, operation });
 }
 
-if (rows.length !== 100) {
-    throw new Error(`expected 100 operations, got ${rows.length}`);
+const entries = new Map();
+for (const fileName of fs.readdirSync(manifestDir)) {
+    if (!fileName.endsWith('.ts')) {
+        continue;
+    }
+
+    const fileText = fs.readFileSync(path.join(manifestDir, fileName), 'utf8');
+    const blockPattern =
+        /operationName:\s*'([A-Za-z0-9]+)'[\s\S]*?method:\s*'([A-Z]+)'[\s\S]*?pathTemplate:\s*'([^']+)'/g;
+    for (const match of fileText.matchAll(blockPattern)) {
+        entries.set(match[1], {
+            method: match[2],
+            pathTemplate: match[3]
+        });
+    }
+}
+
+const missingOperations = operationNames.filter((name) => !entries.has(name));
+if (missingOperations.length > 0) {
+    throw new Error(
+        `missing manifest entries for operations: ${missingOperations.join(', ')}`
+    );
+}
+
+if (operationNames.length !== 99) {
+    throw new Error(`expected 99 operations, got ${operationNames.length}`);
 }
 
 const methodSuffix = {
@@ -42,8 +64,11 @@ const methodSuffix = {
 };
 
 let generated = 0;
-for (const { method, apiPath, operation } of rows) {
-    const relative = apiPath.replace(/^\/api\/v2\//, '');
+for (const operation of operationNames) {
+    const { method, pathTemplate } = entries.get(operation);
+    const relative = pathTemplate
+        .replace(/^\/api\/v2\//, '')
+        .replace(/:([A-Za-z0-9_]+)/g, '[$1]');
     const segments = relative.split('/');
     const fileName = `${segments.at(-1)}.${methodSuffix[method]}.ts`;
     const dirPath = path.join(

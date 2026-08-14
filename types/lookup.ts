@@ -85,6 +85,7 @@ export interface StationTimetableResponse extends HistoryResponseBase<StationTim
 }
 
 export interface EmuAllocationProfileResponse {
+    emuId: number;
     requestEmuCode: string;
     emuCode: string;
     model: string;
@@ -132,17 +133,21 @@ export interface LookupHistoryListItem {
     code: string;
     startStation: string | null;
     endStation: string | null;
+    emuId: number | null;
 }
 
 export interface TrainTimetableHistoryListItem {
     id: number;
-    historyId: number;
+    coverageId: number;
+    timetableId: number;
     serviceDateStart: string;
     serviceDateEndExclusive: string;
 }
 
-export interface TrainTimetableHistoryListResponse extends HistoryResponseBase<TrainTimetableHistoryListItem> {
+export interface TrainTimetableHistoryListResponse {
     trainCode: string;
+    items: TrainTimetableHistoryListItem[];
+    timetableMappings: Record<number, HistoricalTimetableData>;
 }
 
 export interface CurrentTrainTimetableStop {
@@ -175,6 +180,26 @@ export interface HistoricalTimetableData {
     startOffset: number | null;
     endOffset: number | null;
     stops: HistoricalTimetableStop[];
+}
+
+export interface CurrentTrainTimetableData {
+    updatedAt: number | null;
+    requestTrainCode: string;
+    trainCode: string;
+    internalCode: string;
+    allCodes: string[];
+    bureauCode: string;
+    bureauName: string;
+    trainDepartment: string;
+    passengerDepartment: string;
+    referenceModels: ReferenceModelItem[];
+    startStation: string;
+    endStation: string;
+    startAt: number;
+    endAt: number;
+    serviceDay: number | null;
+    circulation: TrainCirculation | null;
+    stops: CurrentTrainTimetableStop[];
 }
 
 export interface TrainCirculationNode {
@@ -223,25 +248,6 @@ export interface TrainCirculation {
     refreshAt: number | null;
     nodes: TrainCirculationNode[];
     metadata?: TrainCirculationMetadata;
-}
-
-export interface CurrentTrainTimetableData {
-    updatedAt: number | null;
-    requestTrainCode: string;
-    trainCode: string;
-    internalCode: string;
-    allCodes: string[];
-    bureauCode: string;
-    bureauName: string;
-    trainDepartment: string;
-    passengerDepartment: string;
-    referenceModels: ReferenceModelItem[];
-    startStation: string;
-    endStation: string;
-    startAt: number;
-    endAt: number;
-    circulation: TrainCirculation | null;
-    stops: CurrentTrainTimetableStop[];
 }
 
 export interface TrainCirculationImageData {

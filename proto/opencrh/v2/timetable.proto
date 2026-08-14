@@ -20,32 +20,13 @@ message TrainTimetableHistoryCoverage {
 message GetTrainTimetableHistoryData {
   TrainCode train_code = 1;
   repeated TrainTimetableHistoryCoverage items = 2;
-  map<uint32, HistoricalTimetableSummary> timetable_mappings = 3;
+  map<uint32, HistoricalTimetableContent> timetable_mappings = 3;
 }
 
 message GetTrainTimetableHistoryResponse {
   ApiMeta meta = 1;
   oneof outcome {
     GetTrainTimetableHistoryData data = 2;
-    ApiError error = 3;
-  }
-}
-
-message GetTrainTimetableHistoryDetailRequest {}
-
-message GetTrainTimetableHistoryDetailData {
-  uint32 timetable_id = 1;
-  optional string start_station = 2;
-  optional string end_station = 3;
-  optional int64 start_offset = 4;
-  optional int64 end_offset = 5;
-  repeated TimetableStop stops = 6;
-}
-
-message GetTrainTimetableHistoryDetailResponse {
-  ApiMeta meta = 1;
-  oneof outcome {
-    GetTrainTimetableHistoryDetailData data = 2;
     ApiError error = 3;
   }
 }

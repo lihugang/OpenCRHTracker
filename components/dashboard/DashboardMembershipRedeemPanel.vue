@@ -75,8 +75,8 @@
 </template>
 
 <script setup lang="ts">
-import type { TrackerApiResponse } from '~/types/homepage';
 import type { AuthMembershipRedeemResponse } from '~/types/membership';
+import { redeemMembership } from '~/utils/api/v2/domain/auth';
 import getApiErrorMessage from '~/utils/api/getApiErrorMessage';
 import formatTrackerTimestamp from '~/utils/time/formatTrackerTimestamp';
 
@@ -100,33 +100,10 @@ async function redeem() {
     successResult.value = null;
 
     try {
-        const { data, error } = await useCsrfFetch<
-            TrackerApiResponse<AuthMembershipRedeemResponse>
-        >('/api/v1/auth/memberships/redeem', {
-            method: 'POST',
-            retry: 0,
-            body: {
-                code: normalizedCode
-            },
-            key: `membership:redeem:${Date.now()}`,
-            watch: false,
-            server: false
-        });
-
-        if (error.value) {
-            throw error.value;
-        }
-        const response = data.value;
-        if (!response) {
-            throw new Error('Missing membership redemption response');
-        }
-        if (!response.ok) {
-            throw { data: response };
-        }
-
-        successResult.value = response.data;
+        const response = await redeemMembership(normalizedCode);
+        successResult.value = response;
         code.value = '';
-        emit('redeemed', response.data);
+        emit('redeemed', response);
     } catch (error) {
         errorMessage.value = getApiErrorMessage(
             error,

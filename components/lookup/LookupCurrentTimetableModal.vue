@@ -54,7 +54,7 @@
                 :summary="timetableSummaryLabel"
                 :timetable="displayedTimetable"
                 :is-current-view="isCurrentView"
-                :notice="timetableNotice"
+                :notice="nonBlockingNotice"
                 :show-history-selector="shouldShowHistoryTimetableSelector"
                 :history-options="historyTimetableOptions"
                 :visible-columns="visibleColumns"
@@ -124,9 +124,6 @@ import useLookupCirculationDisplay from '~/composables/useLookupCirculationDispl
 import useLookupCirculationPdf from '~/composables/useLookupCirculationPdf';
 import useLookupTimetableDisplay from '~/composables/useLookupTimetableDisplay';
 import useLookupTimetableHistory from '~/composables/useLookupTimetableHistory';
-import useTrackedRequestFetch, {
-    type TrackedRequestFetch
-} from '~/composables/useTrackedRequestFetch';
 import type {
     LookupCurrentTimetableViewState,
     PersistedLookupTimetableSectionState
@@ -144,15 +141,13 @@ const props = defineProps<{
     modelValue: boolean;
     trainCode: string;
     displayCodes?: string[];
+    requestedTimetableId?: number | null;
 }>();
 
 const emit = defineEmits<{
     'update:modelValue': [value: boolean];
 }>();
 
-const requestFetch: TrackedRequestFetch = import.meta.server
-    ? useTrackedRequestFetch()
-    : ($fetch as TrackedRequestFetch);
 const { session } = useAuthState();
 
 const { state, timetable, errorMessage, normalizedTrainCode } =
@@ -181,7 +176,8 @@ const {
     normalizedTrainCode,
     currentState: state,
     isCurrentTimetableAvailable,
-    requestFetch
+    currentTimetable: timetable,
+    requestedTimetableId: computed(() => props.requestedTimetableId ?? null)
 });
 
 const {
@@ -290,10 +286,7 @@ const viewState = computed<LookupCurrentTimetableViewState>(() => {
     }
 
     if (isCurrentView.value) {
-        if (
-            state.value === 'loading' ||
-            historyLoadingState.value === 'loading'
-        ) {
+        if (state.value === 'loading') {
             return 'loading';
         }
 
@@ -301,35 +294,18 @@ const viewState = computed<LookupCurrentTimetableViewState>(() => {
             return 'error';
         }
 
-        if (
-            historyLoadingState.value === 'error' &&
-            historyItems.value.length === 0
-        ) {
-            return 'error';
-        }
-
-        if (state.value === 'empty' && historyItems.value.length === 0) {
+        if (state.value === 'empty') {
             return 'empty';
         }
 
         return 'loading';
     }
 
-    if (
-        historyLoadingState.value === 'loading' ||
-        historyContentState.value === 'loading'
-    ) {
+    if (historyLoadingState.value === 'loading') {
         return 'loading';
     }
 
-    if (historyContentState.value === 'error') {
-        return 'error';
-    }
-
-    if (
-        historyLoadingState.value === 'error' &&
-        historyItems.value.length === 0
-    ) {
+    if (historyLoadingState.value === 'error') {
         return 'error';
     }
 
@@ -337,7 +313,11 @@ const viewState = computed<LookupCurrentTimetableViewState>(() => {
         return 'empty';
     }
 
-    return 'loading';
+    if (historyItems.value.every((item) => item.content === null)) {
+        return isCurrentTimetableAvailable.value ? 'success' : 'empty';
+    }
+
+    return selectedHistoricalContent.value ? 'success' : 'empty';
 });
 
 const errorTitle = computed(() =>
@@ -351,6 +331,18 @@ const emptyDescription = computed(() =>
         ? '该车次今天没有可用的完整经停表。'
         : '该车次没有可用的历史时刻表数据。'
 );
+
+const nonBlockingNotice = computed(() => {
+    if (isCurrentView.value && historyErrorMessage.value) {
+        return `${timetableNotice.value}；历史时刻表加载失败：${historyErrorMessage.value}`;
+    }
+
+    if (!isCurrentView.value && errorMessage.value) {
+        return `${timetableNotice.value}；当前时刻表加载失败：${errorMessage.value}`;
+    }
+
+    return timetableNotice.value;
+});
 
 function setCirculationPdfCanvasContainer(
     element: Element | ComponentPublicInstance | null

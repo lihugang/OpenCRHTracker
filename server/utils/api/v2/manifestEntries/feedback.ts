@@ -18,7 +18,7 @@ import {
     PostFeedbackTopicsRequestSchema,
     PostFeedbackTopicsDataSchema,
     PostFeedbackTopicsResponseSchema
-} from '~/server/generated/proto/opencrh/v2/feedback_pb';
+} from '#shared/generated/proto/opencrh/v2/feedback_pb';
 import {
     deleteFeedbackTopicV2Adapter,
     getFeedbackTopicV2Adapter,

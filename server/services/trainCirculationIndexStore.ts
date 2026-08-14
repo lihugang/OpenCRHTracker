@@ -26,7 +26,10 @@ import {
 } from '~/server/utils/date/shanghaiDateTime';
 import murmurHash32 from '~/server/utils/hash/murmurHash32';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
-import { trainCodeKey, type TrainCodeParts } from '~/server/utils/12306/trainCode';
+import {
+    trainCodeKey,
+    type TrainCodeParts
+} from '~/server/utils/12306/trainCode';
 import {
     formatExternalEmuCode,
     formatExternalTrainCode,
@@ -247,8 +250,7 @@ function buildTrainCodeNodeMetaMap(
                 return null;
             }
             return (
-                nodeMetaByTrainCode.get(key) ??
-                buildFallbackNodeMeta(trainCode)
+                nodeMetaByTrainCode.get(key) ?? buildFallbackNodeMeta(trainCode)
             );
         }
     };

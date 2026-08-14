@@ -97,8 +97,7 @@ export const V2_OPERATION_NAMES = [
     'GetStationTimetable',
     'GetTrainCirculationImage',
     'GetCurrentTrainTimetable',
-    'GetTrainTimetableHistory',
-    'GetTrainTimetableHistoryDetail'
+    'GetTrainTimetableHistory'
 ] as const;
 
 export type V2OperationName = (typeof V2_OPERATION_NAMES)[number];

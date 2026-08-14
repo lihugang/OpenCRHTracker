@@ -13,7 +13,7 @@ import {
     FeedbackSecondaryTypeSchema,
     FeedbackStatusSchema,
     FeedbackVisibilitySchema
-} from '~/server/generated/proto/opencrh/v2/feedback_pb';
+} from '#shared/generated/proto/opencrh/v2/feedback_pb';
 import { enumJsonName } from '~/server/utils/api/v2/requestValidator';
 import {
     isValidFeedbackCategory,

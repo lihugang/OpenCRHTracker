@@ -60,7 +60,7 @@ import {
     type PutAuthSubscriptionsRequest,
     type DeleteAuthEventSubscriptionsRequest,
     type DeleteAuthFavoritesRequest
-} from '~/server/generated/proto/opencrh/v2/auth_pb';
+} from '#shared/generated/proto/opencrh/v2/auth_pb';
 import type {
     AuthEventTarget,
     AuthFavoriteTarget
