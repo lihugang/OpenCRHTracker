@@ -114,7 +114,7 @@ export const LOOKUP_MANIFEST_ENTRIES = {
     GetSearchIndex: defineV2Operation({
         operationName: 'GetSearchIndex',
         method: 'GET',
-        pathTemplate: '/api/v2/search/index',
+        pathTemplate: '/api/v2/search',
         requestSchema: GetSearchIndexRequestSchema,
         dataSchema: GetSearchIndexDataSchema,
         responseSchema: GetSearchIndexResponseSchema,

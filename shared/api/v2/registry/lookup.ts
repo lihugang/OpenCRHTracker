@@ -36,7 +36,7 @@ export const LOOKUP_V2_OPERATIONS = {
     GetSearchIndex: {
         operationName: 'GetSearchIndex',
         method: 'GET',
-        pathTemplate: '/api/v2/search/index',
+        pathTemplate: '/api/v2/search',
         requestSchema: GetSearchIndexRequestSchema,
         responseSchema: GetSearchIndexResponseSchema,
         bodyMode: 'none',
