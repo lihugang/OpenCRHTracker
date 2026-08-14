@@ -20,6 +20,7 @@ import {
     ensureExternalEmuId,
     formatExternalTrainCode,
     parseExternalServiceDate,
+    parseExternalEmuCode,
     parseExternalTrainCodeOrThrow
 } from '~/server/utils/internal/boundaries';
 import { formatV2Cursor, parseV2Cursor } from '~/server/utils/api/v2/v2Cursor';
@@ -118,7 +119,15 @@ export async function getTrainHistoryV2Adapter(ctx: V2OperationContext) {
 }
 
 export async function getEmuHistoryV2Adapter(ctx: V2OperationContext) {
-    const emuId = ensureExternalEmuId(ctx.params.emuCode);
+    const rawEmuCode = ctx.params.emuCode;
+    ensure(
+        typeof rawEmuCode === 'string' && rawEmuCode.trim().length > 0,
+        400,
+        'invalid_param',
+        'emuCode 不能为空'
+    );
+    const emuId = parseExternalEmuCode(rawEmuCode);
+    ensure(emuId !== null, 404, 'not_found', '未找到该动车组');
     const start = parseOptionalTimestamp(ctx.query.start, 'start');
     const end = parseOptionalTimestamp(ctx.query.end, 'end');
     const result = getEmuHistory({

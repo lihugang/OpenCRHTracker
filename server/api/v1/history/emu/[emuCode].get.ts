@@ -10,10 +10,10 @@ import { getHistoryResponseCacheControlMaxAge } from '~/server/utils/api/respons
 import setCacheControl from '~/server/utils/api/response/setCacheControl';
 import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
 import {
-    ensureExternalEmuId,
     formatExternalServiceDate,
     formatExternalTrainCode,
-    parseExternalCursor
+    parseExternalCursor,
+    parseExternalEmuCode
 } from '~/server/utils/internal/boundaries';
 
 export default defineEventHandler(async (event) => {
@@ -41,6 +41,15 @@ export default defineEventHandler(async (event) => {
                 'invalid_param',
                 'emuCode 不能为空'
             );
+            ensure(
+                emuCode.trim().length > 0,
+                400,
+                'invalid_param',
+                'emuCode 不能为空'
+            );
+
+            const emuId = parseExternalEmuCode(emuCode);
+            ensure(emuId !== null, 404, 'not_found', '未找到该动车组');
 
             const query = getQuery(event);
             const start = parseOptionalTimestamp(query.start, 'start');
@@ -48,7 +57,7 @@ export default defineEventHandler(async (event) => {
             const cursor = parseExternalCursor(query.cursor, 'cursor');
             const limit = parseLimit(event);
             const result = getEmuHistory({
-                emuId: ensureExternalEmuId(emuCode),
+                emuId,
                 start: start ?? 0,
                 end: end ?? Number.MAX_SAFE_INTEGER,
                 cursor,
