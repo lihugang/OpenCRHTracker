@@ -1,6 +1,7 @@
 import { setResponseStatus, type H3Event } from 'h3';
 import setCommonHeaders from '~/server/utils/api/response/setCommonHeaders';
 import type ResponseMeta from '~/server/utils/api/response/ResponseMeta';
+import { withV1DeprecationNotice } from '~/server/utils/api/v1/deprecation';
 
 export default function apiSuccess<T>(
     event: H3Event,
@@ -10,9 +11,9 @@ export default function apiSuccess<T>(
 ) {
     setCommonHeaders(event, meta);
     setResponseStatus(event, statusCode);
-    return {
-        ok: true,
+    return withV1DeprecationNotice(event, {
+        ok: true as const,
         data,
-        error: ''
-    };
+        error: '' as const
+    });
 }

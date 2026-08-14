@@ -5,6 +5,7 @@ import {
     setHeader
 } from 'h3';
 import { applyApiCorsPreflightHeaders } from '~/server/utils/api/cors/applyApiCorsHeaders';
+import { applyV1DeprecationHeaders } from '~/server/utils/api/v1/deprecation';
 
 function isOauthCorsPath(pathname: string) {
     return pathname === '/oauth/token' || pathname === '/oauth/userinfo';
@@ -17,6 +18,8 @@ function applyOauthCorsHeaders(pathname: string) {
 }
 
 export default defineEventHandler((event) => {
+    applyV1DeprecationHeaders(event);
+
     const pathname = getRequestURL(event).pathname;
     if (isOauthCorsPath(pathname)) {
         setHeader(event, 'Access-Control-Allow-Origin', '*');

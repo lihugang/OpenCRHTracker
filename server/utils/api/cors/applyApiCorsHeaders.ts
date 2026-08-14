@@ -1,5 +1,6 @@
 import { getHeader, setHeader, type H3Event } from 'h3';
 import useConfig from '~/server/config';
+import { V1_DEPRECATION_EXPOSED_HEADERS } from '~/server/utils/api/v1/deprecation';
 
 function resolveAllowMethods(event: H3Event) {
     const requestedMethod = getHeader(event, 'access-control-request-method');
@@ -34,6 +35,7 @@ export default function applyApiCorsHeaders(event: H3Event) {
             config.api.headers.remain,
             config.api.headers.cost,
             config.api.headers.retryAfter,
+            ...V1_DEPRECATION_EXPOSED_HEADERS,
             'Server-Timing'
         ].join(', ')
     );
