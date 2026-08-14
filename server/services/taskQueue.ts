@@ -44,6 +44,13 @@ export interface ReconcileSingletonTaskResult {
     reusedExecutionTime: number | null;
 }
 
+export interface ReconcilePendingTaskByExecutorAndArgsResult {
+    action: 'created' | 'reused';
+    taskId: number;
+    removedTaskIds: number[];
+    reusedExecutionTime: number | null;
+}
+
 export interface RemovePendingTasksByExecutorResult {
     removedTaskIds: number[];
 }
@@ -68,6 +75,11 @@ let reconcileSingletonTaskTransaction:
           task: NormalizedTaskInsert,
           nowSeconds: number
       ) => ReconcileSingletonTaskResult)
+    | null = null;
+let reconcilePendingTaskByExecutorAndArgsTransaction:
+    | ((
+          task: NormalizedTaskInsert
+      ) => ReconcilePendingTaskByExecutorAndArgsResult)
     | null = null;
 let removePendingTasksByExecutorTransaction:
     | ((executor: string) => RemovePendingTasksByExecutorResult)
@@ -236,6 +248,65 @@ function getReconcileSingletonTaskTransaction(): ReconcileSingletonTaskTransacti
     return reconcileSingletonTaskTransaction;
 }
 
+function getReconcilePendingTaskByExecutorAndArgsTransaction() {
+    if (reconcilePendingTaskByExecutorAndArgsTransaction) {
+        return reconcilePendingTaskByExecutorAndArgsTransaction;
+    }
+
+    const addTaskStatement = taskStatements.getStatement('addTask');
+    const completeTaskStatement = taskStatements.getStatement('completeTask');
+    const selectPendingTasksByExecutorStatement = taskStatements.getStatement(
+        'selectPendingTasksByExecutor'
+    );
+
+    reconcilePendingTaskByExecutorAndArgsTransaction =
+        useTaskDatabase().transaction(
+            (
+                task: NormalizedTaskInsert
+            ): ReconcilePendingTaskByExecutorAndArgsResult => {
+                const matchingTasks = (
+                    selectPendingTasksByExecutorStatement.all(
+                        task.executor
+                    ) as TaskRecord[]
+                ).filter(
+                    (existingTask) =>
+                        existingTask.arguments === task.argumentsJson
+                );
+
+                if (matchingTasks.length > 0) {
+                    const firstTask = matchingTasks[0]!;
+                    const removedTaskIds: number[] = [];
+                    for (const duplicateTask of matchingTasks.slice(1)) {
+                        completeTaskStatement.run(duplicateTask.id);
+                        removedTaskIds.push(duplicateTask.id);
+                    }
+                    return {
+                        action: 'reused',
+                        taskId: firstTask.id,
+                        removedTaskIds,
+                        reusedExecutionTime: firstTask.executionTime
+                    };
+                }
+
+                const inserted = addTaskStatement.run(
+                    task.executor,
+                    task.argumentsJson,
+                    task.executionTime,
+                    task.isIdle,
+                    task.expectedDurationMs
+                );
+                return {
+                    action: 'created',
+                    taskId: Number(inserted.lastInsertRowid),
+                    removedTaskIds: [],
+                    reusedExecutionTime: null
+                };
+            }
+        );
+
+    return reconcilePendingTaskByExecutorAndArgsTransaction;
+}
+
 function getRemovePendingTasksByExecutorTransaction(): RemovePendingTasksByExecutorTransaction {
     if (removePendingTasksByExecutorTransaction) {
         return removePendingTasksByExecutorTransaction;
@@ -382,6 +453,23 @@ export function reconcileSingletonPendingTask(
     return getReconcileSingletonTaskTransaction()(
         normalizedTask,
         getNowSeconds()
+    );
+}
+
+export function reconcilePendingTaskByExecutorAndArgs(
+    executor: string,
+    args: unknown,
+    executionTime: number,
+    options: EnqueueTaskOptions = {}
+): ReconcilePendingTaskByExecutorAndArgsResult {
+    const normalizedTask = normalizeTaskInsert(
+        executor,
+        args,
+        executionTime,
+        options
+    );
+    return getReconcilePendingTaskByExecutorAndArgsTransaction()(
+        normalizedTask
     );
 }
 

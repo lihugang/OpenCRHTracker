@@ -235,6 +235,17 @@ export const deployDocsSections: DocsContentSection[] = [
                         ]
                     },
                     {
+                        path: 'spider.stationPlatformInfo.stationOnDemandCooldownHours',
+                        valueType: 'integer',
+                        required: false,
+                        description:
+                            '车站时刻表请求生成站台补齐任务后的车站分页车次集合冷却时间，单位小时；省略时默认 4，设为 0 可关闭任务执行器冷却。',
+                        notes: [
+                            '任务由车站时刻表请求异步生成，执行器只处理任务参数中的车站和车次列表。',
+                            '冷却状态只保存在当前 Node.js 进程内；任务本身保存在任务数据库中，重复参数的等待或执行中任务会被复用。'
+                        ]
+                    },
+                    {
                         path: 'spider.scheduleProbe.dailyTimeHHmm',
                         valueType: 'string(HHmm)',
                         required: true,
@@ -884,7 +895,8 @@ export const deployDocsSections: DocsContentSection[] = [
                             '当前日、历史、搜索索引、时刻表和全站地图接口成功响应的缓存时长。',
                         notes: [
                             'sitemapMaxAgeSeconds 用于控制 /sitemap.xml 响应的 Cache-Control max-age。',
-                            'timetableMaxAgeSeconds 用于控制 /api/v2/timetable/train/{trainCode}/current、/api/v2/timetable/train/{trainCode}/history 和 /api/v2/timetable/station/{stationName} 成功响应的 Cache-Control max-age。'
+                            'timetableMaxAgeSeconds 用于控制 /api/v2/timetable/train/{trainCode}/current、/api/v2/timetable/train/{trainCode}/history 和没有空站台的 /api/v2/timetable/station/{stationName} 成功响应的 Cache-Control max-age。',
+                            '车站时刻表当前页只要存在空 platformNo，就改用 currentDayMaxAgeSeconds；当前默认值为 300 秒，便于异步补齐后重新读取。'
                         ]
                     },
                     {
@@ -1313,7 +1325,7 @@ export const deployDocsSections: DocsContentSection[] = [
                     '提高 api.permissions.anonymousScopes、quota 或 cost 前，先确认你准备公开暴露的接口范围和限额策略。',
                     '修改 spider.scheduleProbe.prefixRules、task.referenceModel.dailyTimesHHmm、task.circulation.dailyTimesHHmm 或 task.scheduler 参数后，重启后应观察首轮任务执行是否符合预期。',
                     '修改 spider.rateLimit.stationBoard 或 task.circulation.stationBoard 后，重启后应关注车站大屏相关抓取、重试与交路推断任务是否按预期工作。',
-                    '修改 spider.stationPlatformInfo.ttlDays 或 spider.stationPlatformInfo.onDemandCooldownHours 后需要重启；应同时关注 fetch_station_exit_info 和 fetch_station_transport_info 的请求量与失败统计。'
+                    '修改 spider.stationPlatformInfo.ttlDays、spider.stationPlatformInfo.onDemandCooldownHours 或 spider.stationPlatformInfo.stationOnDemandCooldownHours 后需要重启；应同时关注 fetch_station_exit_info 和 fetch_station_transport_info 的请求量与失败统计。'
                 ]
             }
         ]

@@ -170,6 +170,7 @@ export const crawlDocsSections: DocsContentSection[] = [
                     '如果保存后的车次组确有变化，任务会绕过 spider.stationPlatformInfo.ttlDays，强制刷新该车次经过的所有车站：始发站使用当前停站车次调用车站交通接驳接口并读取 arrivePlant，其余车站使用前一停站车次调用 getExit。请求失败不会回滚已经保存的路线。',
                     '常规车站大屏补全以本地数据库中的车次为准，只为缺少站台或缓存已过期的停站补全数据；始发站和其余车站分别使用上述两个接口。',
                     '当前车次时刻表接口也会同步尝试补全缺失或过期的站台；同一服务日期的车次别名共享 spider.stationPlatformInfo.onDemandCooldownHours 冷却，实际开始的成功或失败尝试都会计时，冷却仅保存在当前进程内。',
+                    '车站时刻表接口返回当前页后，会按车站名、电报码和当前页车次列表创建可去重的异步站台补齐任务；任务执行器使用 spider.stationPlatformInfo.stationOnDemandCooldownHours 做车次集合级冷却。当前页存在空 platformNo 时响应缓存使用 currentDayMaxAgeSeconds，否则使用 timetableMaxAgeSeconds。',
                     '两类站台查询共享 query 限速和正向缓存有效期；有效缓存可跨日期复用，过期缓存保留最后已知值并触发刷新，空响应和失败不会写入缓存或续期。'
                 ]
             },
@@ -183,6 +184,7 @@ export const crawlDocsSections: DocsContentSection[] = [
                     'spider.scheduleProbe.refresh.generateIntervalHours',
                     'spider.stationPlatformInfo.ttlDays',
                     'spider.stationPlatformInfo.onDemandCooldownHours',
+                    'spider.stationPlatformInfo.stationOnDemandCooldownHours',
                     'spider.scheduleProbe.retryAttempts'
                 ].join('\n')
             }

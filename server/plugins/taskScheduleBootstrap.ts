@@ -47,6 +47,7 @@ import {
 } from '~/server/services/taskExecutors/dispatchQrcodeDetectionTasksExecutor';
 import { registerFetchStationBoardTaskExecutor } from '~/server/services/taskExecutors/fetchStationBoardTaskExecutor';
 import { registerRefreshTrainStationPlatformTaskExecutor } from '~/server/services/taskExecutors/refreshTrainStationPlatformTaskExecutor';
+import { registerRefreshStationTimetablePlatformTaskExecutor } from '~/server/services/taskExecutors/refreshStationTimetablePlatformTaskExecutor';
 import { registerRefreshTrainCirculationTaskExecutor } from '~/server/services/taskExecutors/refreshTrainCirculationTaskExecutor';
 import { registerProbeTrainDepartureTaskExecutor } from '~/server/services/taskExecutors/probeTrainDepartureTaskExecutor';
 import { registerProbeQrcodeDetectionEmuTaskExecutor } from '~/server/services/taskExecutors/probeQrcodeDetectionEmuTaskExecutor';
@@ -285,6 +286,7 @@ export default defineNitroPlugin(async () => {
         registerDispatchQrcodeDetectionTasksExecutor();
         registerFetchStationBoardTaskExecutor();
         registerRefreshTrainStationPlatformTaskExecutor();
+        registerRefreshStationTimetablePlatformTaskExecutor();
         registerRefreshTrainCirculationTaskExecutor();
         registerProbeTrainDepartureTaskExecutor();
         registerProbeQrcodeDetectionEmuTaskExecutor();

@@ -426,6 +426,7 @@ function buildSupplementTimetable(
         return {
             stationNo: stop.stationNo,
             stationName: stop.stationName,
+            stationTelecode: '',
             arriveAt: toUnixSecondsFromShanghaiDayOffset(
                 date,
                 parseTimeAsTimestamp(stop.arriveAt)

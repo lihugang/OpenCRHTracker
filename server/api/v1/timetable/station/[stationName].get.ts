@@ -2,6 +2,7 @@ import { defineEventHandler, getQuery, getRouterParam } from 'h3';
 import useConfig from '~/server/config';
 import {
     buildStationTimetableNextCursor,
+    enqueueStationTimetablePlatformRefresh,
     findStationTimetableStartIndex,
     getStationTimetableItems,
     getStationTimetableRows
@@ -12,6 +13,7 @@ import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';
 import parseLimit from '~/server/utils/api/query/parseLimit';
 import setCacheControl from '~/server/utils/api/response/setCacheControl';
+import getStationTimetableCacheMaxAge from '~/server/utils/api/response/getStationTimetableCacheMaxAge';
 import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
 import {
     formatExternalTrainCode,
@@ -19,6 +21,7 @@ import {
 } from '~/server/utils/internal/boundaries';
 import type { TrainCodeParts } from '~/server/utils/12306/trainCode';
 import type { StationTimetableCursorDomain } from '~/server/domain/timetable';
+import { getTodayScheduleServiceDay } from '~/server/services/todayScheduleCache';
 
 export default defineEventHandler(async (event) => {
     const cacheMaxAge = useConfig().api.cache.timetableMaxAgeSeconds;
@@ -30,8 +33,11 @@ export default defineEventHandler(async (event) => {
             requiredScopes: [API_SCOPES.timetable.station.read],
             dynamicCostFromData: (data) =>
                 getPerRecordCost(data.items.length, 'timetableStation'),
-            successHeaders: (successEvent) =>
-                setCacheControl(successEvent, cacheMaxAge)
+            successHeaders: (successEvent, data) =>
+                setCacheControl(
+                    successEvent,
+                    getStationTimetableCacheMaxAge(data, cacheMaxAge)
+                )
         },
         async () => {
             const rawStationName = getRouterParam(event, 'stationName');
@@ -54,6 +60,10 @@ export default defineEventHandler(async (event) => {
                     ? 0
                     : findStationTimetableStartIndex(rows, cursor);
             const pageRows = rows.slice(startIndex, startIndex + limit);
+            enqueueStationTimetablePlatformRefresh(
+                getTodayScheduleServiceDay(),
+                pageRows
+            );
             const lastRow = pageRows.at(-1);
             const hasMore = startIndex + pageRows.length < rows.length;
             const nextCursor =

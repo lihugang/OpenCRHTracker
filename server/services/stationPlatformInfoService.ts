@@ -1131,6 +1131,53 @@ export async function refreshStationPlatformInfoForTrainCodes(
     }
 }
 
+export interface RefreshMissingOrExpiredStationPlatformInfoForStationTrainCodesInput {
+    serviceDate: ServiceDay;
+    stationName: string;
+    stationTelecode: string;
+    trainCodes: readonly TrainCodeParts[];
+}
+
+export async function refreshMissingOrExpiredStationPlatformInfoForStationTrainCodes(
+    input: RefreshMissingOrExpiredStationPlatformInfoForStationTrainCodesInput
+): Promise<StationPlatformInfoRefreshResult> {
+    const stationName = input.stationName.trim();
+    const stationTelecode = normalizeCode(input.stationTelecode);
+    if (
+        !hasMatchingPublishedSchedule(input.serviceDate) ||
+        stationName.length === 0 ||
+        stationTelecode.length === 0 ||
+        input.trainCodes.length === 0
+    ) {
+        return createEmptyStationPlatformInfoRefreshResult();
+    }
+
+    const now = getNowSeconds();
+    const expiresAt = getPlatformInfoExpiresAt(now);
+    let built: BuiltStationPlatformInfoCandidates = {
+        localRowCount: 0,
+        skippedRowCount: 0,
+        candidates: []
+    };
+
+    try {
+        built = buildCandidatesForTrainCodes(
+            input.serviceDate,
+            input.trainCodes,
+            (stop) =>
+                stop.stationName.trim() === stationName &&
+                normalizeCode(stop.stationTelecode) === stationTelecode &&
+                shouldRefreshMissingOrExpiredStop(stop, expiresAt)
+        );
+        return await refreshCandidates(built, expiresAt, false, {
+            requirePlatformNo: true,
+            allowCacheFallback: false
+        });
+    } catch (error) {
+        return createFailedStationPlatformInfoRefreshResult(built, error);
+    }
+}
+
 function shouldRefreshMissingOrExpiredStop(
     stop: ScheduleStop,
     expiresAt: number

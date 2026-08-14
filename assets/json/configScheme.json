@@ -102,6 +102,11 @@
                             "type": "integer",
                             "minimum": 0,
                             "default": 4
+                        },
+                        "stationOnDemandCooldownHours": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "default": 4
                         }
                     }
                 },

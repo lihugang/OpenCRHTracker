@@ -57,6 +57,7 @@ export interface TodayScheduleRoute {
 export interface TodayScheduleStop {
     stationNo: number;
     stationName: string;
+    stationTelecode: string;
     arriveAt: number | null;
     departAt: number | null;
     stationTrainCode: TrainCodeParts;
@@ -79,6 +80,7 @@ export interface TodayScheduleProbeGroup extends TodayScheduleRoute {
 export interface TodayScheduleStationIndexRow extends TodayScheduleRoute {
     trainKey: string;
     stationName: string;
+    stationTelecode: string;
     stationNo: number;
     arriveAt: number | null;
     departAt: number | null;
@@ -666,6 +668,7 @@ function toTodayScheduleStop(
     return {
         stationNo: stop.stationNo,
         stationName: stop.stationName.trim(),
+        stationTelecode: normalizeCode(stop.stationTelecode),
         arriveAt:
             stop.arriveAt === null
                 ? null
@@ -695,6 +698,7 @@ function toTodayScheduleStopFromStationRow(
     return {
         stationNo: row.stationNo,
         stationName: row.stationName.trim(),
+        stationTelecode: normalizeCode(row.stationTelecode),
         arriveAt:
             isStart || row.arriveAt === null
                 ? null
@@ -834,6 +838,7 @@ function upsertStationRow(
         startStation: group.startStation,
         endStation: group.endStation,
         stationName,
+        stationTelecode: normalizeCode(stop.stationTelecode),
         stationNo: stop.stationNo,
         arriveAt: stop.arriveAt,
         departAt: stop.departAt,
@@ -878,6 +883,8 @@ function mergeStationRow(
     }
 
     row.stationNo = Math.min(row.stationNo, stop.stationNo);
+    row.stationTelecode =
+        row.stationTelecode || normalizeCode(stop.stationTelecode);
     row.arriveAt = mergeNullableMin(row.arriveAt, stop.arriveAt);
     row.departAt = mergeNullableMax(row.departAt, stop.departAt);
     row.platformNo = row.platformNo ?? normalizePlatformNo(stop.platformNo);

@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import getLogger from '~/server/libs/log4js';
 import { getReferenceModelsByTrainCodes } from '~/server/services/referenceModelIndexStore';
 import { getPreferredTrainCirculation } from '~/server/services/trainCirculationIndexStore';
 import {
@@ -29,6 +30,9 @@ import type { TrainCodeParts } from '~/server/utils/12306/trainCode';
 import { formatExternalTrainCode } from '~/server/utils/internal/boundaries';
 import type { ServiceDay } from '~/server/utils/date/serviceDay';
 import type { ExternalCursorPoint } from '~/server/utils/internal/boundaries';
+import { enqueueStationTimetablePlatformTasks } from '~/server/services/stationTimetablePlatformTaskScheduling';
+
+const logger = getLogger('timetable-domain');
 
 export interface CurrentTimetableDomainStop {
     stationNo: number;
@@ -220,6 +224,22 @@ export function getStationTimetableRows(stationName: string) {
     return rows;
 }
 
+export function enqueueStationTimetablePlatformRefresh(
+    serviceDate: ServiceDay,
+    rows: readonly TodayScheduleStationIndexRow[]
+) {
+    try {
+        return enqueueStationTimetablePlatformTasks(serviceDate, rows);
+    } catch (error) {
+        const message =
+            error instanceof Error
+                ? `${error.name}: ${error.message}`
+                : String(error);
+        logger.warn(`enqueue_station_platform_refresh_failed error=${message}`);
+        return null;
+    }
+}
+
 export function findStationTimetableStartIndex(
     rows: readonly TodayScheduleStationIndexRow[],
     cursor: StationTimetableCursorDomain | null
@@ -304,6 +324,7 @@ export async function getStationTimetable(input: {
                   input.cursor.id
               );
     const pageRows = rows.slice(startIndex, startIndex + input.limit);
+    enqueueStationTimetablePlatformRefresh(serviceDay, pageRows);
     const lastRow = pageRows.at(-1);
     const hasMore = startIndex + pageRows.length < rows.length;
     const nextCursor =

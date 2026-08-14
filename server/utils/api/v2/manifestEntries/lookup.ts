@@ -1,4 +1,5 @@
 import useConfig from '~/server/config';
+import getStationTimetableCacheMaxAge from '~/server/utils/api/response/getStationTimetableCacheMaxAge';
 import {
     GetEmuAllocationRequestSchema,
     GetEmuAllocationDataSchema,
@@ -153,7 +154,7 @@ export const LOOKUP_MANIFEST_ENTRIES = {
             key: 'timetableStation',
             count: (data) => (data as { items: unknown[] }).items.length
         },
-        cache: () => useConfig().api.cache.timetableMaxAgeSeconds,
+        cache: (data) => getStationTimetableCacheMaxAge(data),
         bodyMode: 'none',
         handler: getStationTimetableV2Adapter
     }),
