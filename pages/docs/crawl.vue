@@ -1,6 +1,6 @@
 <template>
     <DocsShell
-        eyebrow="FLOW"
+        eyebrow="流程"
         title="数据抓取流程"
         description="说明 OpenCRHTracker 当前的数据抓取链路，便于开发者部署、联调和排障。">
         <UiCard :show-accent-bar="false">

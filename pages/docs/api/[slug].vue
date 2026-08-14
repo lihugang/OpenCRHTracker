@@ -1,6 +1,6 @@
 <template>
     <DocsShell
-        eyebrow="DOCS"
+        eyebrow="API 文档"
         :title="endpoint.summary"
         :description="endpoint.description">
         <UiCard variant="accent">
@@ -59,13 +59,72 @@
 
         <div class="space-y-6">
             <UiCard
+                v-if="endpoint.usageScenarios.length > 0"
+                :show-accent-bar="false">
+                <div class="space-y-4">
+                    <div class="space-y-2">
+                        <p
+                            class="text-xs font-medium uppercase tracking-[0.2em] text-crh-blue/80">
+                            场景
+                        </p>
+                        <h2 class="text-2xl font-semibold text-slate-900">
+                            适用场景
+                        </h2>
+                        <p class="text-sm leading-6 text-slate-600">
+                            这个接口适合用在什么地方？下面的场景可以帮你判断它是不是你要找的那个。
+                        </p>
+                    </div>
+
+                    <ul class="space-y-3">
+                        <li
+                            v-for="scenario in endpoint.usageScenarios"
+                            :key="'usage:' + scenario"
+                            class="rounded-[1rem] border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm leading-6 text-slate-700">
+                            {{ scenario }}
+                        </li>
+                    </ul>
+                </div>
+            </UiCard>
+
+            <UiCard
+                v-if="endpoint.faq.length > 0"
+                :show-accent-bar="false">
+                <div class="space-y-4">
+                    <div class="space-y-2">
+                        <p
+                            class="text-xs font-medium uppercase tracking-[0.2em] text-crh-blue/80">
+                            问答
+                        </p>
+                        <h2 class="text-2xl font-semibold text-slate-900">
+                            常见问题
+                        </h2>
+                        <p class="text-sm leading-6 text-slate-600">
+                            接入时最常遇到的疑问，先看看这里能不能解答。
+                        </p>
+                    </div>
+
+                    <div
+                        v-for="item in endpoint.faq"
+                        :key="'faq:' + item.question"
+                        class="space-y-2 rounded-[1rem] border border-slate-200 bg-white/80 px-4 py-4">
+                        <p class="text-sm font-semibold text-slate-900">
+                            {{ item.question }}
+                        </p>
+                        <p class="text-sm leading-6 text-slate-600">
+                            {{ item.answer }}
+                        </p>
+                    </div>
+                </div>
+            </UiCard>
+
+            <UiCard
                 v-if="costDisplay"
                 :show-accent-bar="false">
                 <div class="space-y-5">
                     <div class="space-y-2">
                         <p
                             class="text-xs font-medium uppercase tracking-[0.2em] text-crh-blue/80">
-                            COST
+                            扣费
                         </p>
                         <h2 class="text-2xl font-semibold text-slate-900">
                             扣费规则
@@ -339,7 +398,7 @@
 
         <UiModal
             :model-value="isPlaygroundOpen"
-            eyebrow="DOCS"
+            eyebrow="API 文档"
             title="试一试"
             :description="
                 '调试当前接口：' + apiConfig.versionPrefix + endpoint.path

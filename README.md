@@ -6,7 +6,7 @@
 [![Nuxt 4](https://img.shields.io/badge/Nuxt-4-00DC82?style=flat&logo=nuxt&logoColor=white)](https://nuxt.com/)
 [![Vue 3](https://img.shields.io/badge/Vue-3-4FC08D?style=flat&logo=vuedotjs&logoColor=white)](https://vuejs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![PWA Enabled](https://img.shields.io/badge/PWA-Enabled-5A0FC8?style=flat&logo=pwa&logoColor=white)](https://vite-pwa-org.netlify.app/frameworks/nuxt.html) [![Docs](https://img.shields.io/badge/Docs-Online-1F6FEB?style=flat&logo=gitbook&logoColor=white)](https://crh.lihugang.top/docs) [![OpenAPI 3.1](https://img.shields.io/badge/API-OpenAPI%203.1-6E40C9?style=flat&logo=swagger&logoColor=white)](https://crh.lihugang.top/docs/api)
+[![PWA Enabled](https://img.shields.io/badge/PWA-Enabled-5A0FC8?style=flat&logo=pwa&logoColor=white)](https://vite-pwa-org.netlify.app/frameworks/nuxt.html) [![Docs](https://img.shields.io/badge/Docs-Online-1F6FEB?style=flat&logo=gitbook&logoColor=white)](https://crh.lihugang.top/docs) [![OpenAPI 3.1](https://img.shields.io/badge/API-OpenAPI%203.1-6E40C9?style=flat&logo=swagger&logoColor=white)](https://crh.lihugang.top/docs/api/openapi.json)
 
 [![GitHub stars](https://img.shields.io/github/stars/lihugang/OpenCRHTracker?style=flat)](https://github.com/lihugang/OpenCRHTracker/stargazers)
 [![GitHub forks](https://img.shields.io/github/forks/lihugang/OpenCRHTracker?style=flat)](https://github.com/lihugang/OpenCRHTracker/network/members)

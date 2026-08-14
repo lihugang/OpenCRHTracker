@@ -24,6 +24,7 @@ export interface DocsContentBlock {
 
 export interface DocsContentSection {
     id: string;
+    eyebrow?: string;
     title: string;
     summary: string;
     blocks: DocsContentBlock[];
