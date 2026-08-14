@@ -1,4 +1,8 @@
-import type { DescMessage, Message } from '@bufbuild/protobuf';
+import type {
+    DescMessage,
+    Message,
+    MessageInitShape
+} from '@bufbuild/protobuf';
 import {
     DeleteAuthApiKey,
     DeleteAuthAuthorization,
@@ -101,11 +105,19 @@ function toTrainCodeInput(code: string) {
     return toProtoTrainCode(code);
 }
 
-function toFavoriteTargetBody(target: {
+type FavoriteTargetInput = NonNullable<
+    MessageInitShape<typeof PutAuthFavorites.requestSchema>['target']
+>;
+
+type EventSubscriptionTargetInput = NonNullable<
+    MessageInitShape<typeof PutAuthEventSubscriptions.requestSchema>['target']
+>;
+
+function toFavoriteTargetInput(target: {
     type: FavoriteLookupInput['type'];
     code: string;
     emuId?: number | null;
-}) {
+}): FavoriteTargetInput | null {
     if (target.type === 'train') {
         const train = toTrainCodeInput(target.code);
         return train ? { target: { case: 'train', value: train } } : null;
@@ -120,10 +132,10 @@ function toFavoriteTargetBody(target: {
     };
 }
 
-function toEventSubscriptionTargetBody(
+function toEventSubscriptionTargetInput(
     target: NotificationTarget,
     emuId?: number | null
-) {
+): EventSubscriptionTargetInput | null {
     if (target.targetType === 'train') {
         const train = toTrainCodeInput(target.targetId);
         return train ? { target: { case: 'train', value: train } } : null;
@@ -780,13 +792,17 @@ export async function putAuthFavorites(
     target: FavoriteLookupInput,
     emuId?: number | null
 ) {
-    const body = toFavoriteTargetBody({ ...target, emuId });
-    if (!body) {
+    const favoriteTarget = toFavoriteTargetInput({ ...target, emuId });
+    if (!favoriteTarget) {
         throw new Error('invalid_favorite_target');
     }
+    const body: MessageInitShape<typeof PutAuthFavorites.requestSchema> = {
+        target: favoriteTarget,
+        tags: target.tags
+    };
     const result = await requestV2<PutAuthFavoritesData, AuthFavoritesResponse>(
         PutAuthFavorites,
-        { body: { ...body, tags: target.tags } },
+        { body },
         mapFavoritesData
     );
     return requireSuccess(PutAuthFavorites, result);
@@ -811,10 +827,13 @@ export async function deleteAuthFavorites(
     target: Pick<FavoriteLookupInput, 'type' | 'code'>,
     emuId?: number | null
 ) {
-    const body = toFavoriteTargetBody({ ...target, emuId });
-    if (!body) {
+    const favoriteTarget = toFavoriteTargetInput({ ...target, emuId });
+    if (!favoriteTarget) {
         throw new Error('invalid_favorite_target');
     }
+    const body: MessageInitShape<typeof DeleteAuthFavorites.requestSchema> = {
+        target: favoriteTarget
+    };
     const result = await requestV2<GetAuthFavoritesData, AuthFavoritesResponse>(
         DeleteAuthFavorites,
         { body },
@@ -844,10 +863,15 @@ export async function putAuthEventSubscriptions(
     target: NotificationTarget,
     emuId?: number | null
 ) {
-    const body = toEventSubscriptionTargetBody(target, emuId);
-    if (!body) {
+    const subscriptionTarget = toEventSubscriptionTargetInput(target, emuId);
+    if (!subscriptionTarget) {
         throw new Error('invalid_event_subscription_target');
     }
+    const body: MessageInitShape<
+        typeof PutAuthEventSubscriptions.requestSchema
+    > = {
+        target: subscriptionTarget
+    };
     const result = await requestV2<
         PutAuthEventSubscriptionsData,
         AuthEventSubscriptionListResponse
@@ -866,10 +890,15 @@ export async function deleteAuthEventSubscriptions(
     target: NotificationTarget,
     emuId?: number | null
 ) {
-    const body = toEventSubscriptionTargetBody(target, emuId);
-    if (!body) {
+    const subscriptionTarget = toEventSubscriptionTargetInput(target, emuId);
+    if (!subscriptionTarget) {
         throw new Error('invalid_event_subscription_target');
     }
+    const body: MessageInitShape<
+        typeof DeleteAuthEventSubscriptions.requestSchema
+    > = {
+        target: subscriptionTarget
+    };
     const result = await requestV2<
         GetAuthEventSubscriptionsData,
         AuthEventSubscriptionListResponse
