@@ -3,7 +3,7 @@ import path from 'node:path';
 import tailwindcss from '@tailwindcss/vite';
 
 const externalizeNativeDeps = process.env.NUXT_EXTERNALIZE_NATIVE_DEPS === '1';
-const externalizedNativePackages = ['better-sqlite3'];
+const externalizedNativePackages = ['better-sqlite3', 'zstd-napi'];
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
     compatibilityDate: '2025-05-15',

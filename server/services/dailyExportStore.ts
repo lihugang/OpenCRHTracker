@@ -1,7 +1,13 @@
 import fs from 'fs';
 import path from 'path';
+import useConfig from '~/server/config';
 import type { DailyEmuRouteRow } from '~/server/services/emuRoutesStore';
-import { writeTextFileAtomically } from '~/server/utils/dataAssets/store';
+import {
+    assertDailyExportZstdRoundTrip,
+    compressDailyExportCsv,
+    decompressDailyExportCsv,
+    writeDailyExportZstdAtomically
+} from '~/server/utils/compression/dailyExportZstd.js';
 import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
 import {
     formatExternalEmuCode,
@@ -19,6 +25,19 @@ import {
 
 const UTF8_BOM = '\uFEFF';
 
+interface DailyExportFileSignature {
+    ino: number;
+    size: number;
+    mtimeMs: number;
+}
+
+interface DailyExportCacheEntry {
+    signature: DailyExportFileSignature;
+    result: DailyExportReadResult;
+}
+
+const dailyExportMemoryCache = new Map<string, DailyExportCacheEntry>();
+
 export interface DailyExportRecord {
     id: number;
     trainCode: string;
@@ -31,6 +50,11 @@ export interface DailyExportRecord {
 
 export interface DailyExportFileResult {
     filePath: string;
+    total: number;
+}
+
+export interface DailyExportReadResult {
+    content: string;
     total: number;
 }
 
@@ -161,11 +185,19 @@ function compareExportRecords(
 }
 
 export function getDailyExportFilePath(date: string): string {
-    return path.resolve('data/exports', `${date}.csv`);
+    return path.resolve('data/exports', getDailyExportCompressedFileName(date));
 }
 
 export function getDailyExportFileName(date: string): string {
     return `${date}.csv`;
+}
+
+export function getDailyExportCompressedFileName(date: string): string {
+    return `${getDailyExportFileName(date)}.zst`;
+}
+
+function getLegacyDailyExportFilePath(date: string): string {
+    return path.resolve('data/exports', getDailyExportFileName(date));
 }
 
 export function writeDailyExportFile(
@@ -174,8 +206,17 @@ export function writeDailyExportFile(
 ): DailyExportFileResult {
     const records = rows.map(toDailyExportRecord);
     const filePath = getDailyExportFilePath(date);
+    const source = Buffer.from(serializeCsv(records), 'utf8');
+    const compressed = compressDailyExportCsv(source);
 
-    writeTextFileAtomically(filePath, serializeCsv(records));
+    assertDailyExportZstdRoundTrip(source, compressed);
+    writeDailyExportZstdAtomically(filePath, compressed);
+
+    const legacyFilePath = getLegacyDailyExportFilePath(date);
+    if (fs.existsSync(legacyFilePath)) {
+        fs.unlinkSync(legacyFilePath);
+    }
+    dailyExportMemoryCache.delete(date);
 
     return {
         filePath,
@@ -183,13 +224,101 @@ export function writeDailyExportFile(
     };
 }
 
-export function readDailyExportText(date: string): string | null {
+function getDailyExportFileSignature(
+    filePath: string
+): DailyExportFileSignature | null {
+    try {
+        const stat = fs.statSync(filePath);
+        if (!stat.isFile()) {
+            return null;
+        }
+
+        return {
+            ino: stat.ino,
+            size: stat.size,
+            mtimeMs: stat.mtimeMs
+        };
+    } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+            return null;
+        }
+        throw error;
+    }
+}
+
+function signaturesMatch(
+    left: DailyExportFileSignature,
+    right: DailyExportFileSignature
+) {
+    return (
+        left.ino === right.ino &&
+        left.size === right.size &&
+        left.mtimeMs === right.mtimeMs
+    );
+}
+
+function isMemoryCacheEligible(date: string, cacheDays: number): boolean {
+    if (cacheDays === 0) {
+        return false;
+    }
+
+    const currentDay = Number(serviceDateToDay(getCurrentDateString()));
+    const requestedDay = Number(serviceDateToDay(date));
+    return requestedDay >= currentDay - cacheDays && requestedDay < currentDay;
+}
+
+function pruneDailyExportMemoryCache(cacheDays: number): void {
+    for (const date of dailyExportMemoryCache.keys()) {
+        if (!isMemoryCacheEligible(date, cacheDays)) {
+            dailyExportMemoryCache.delete(date);
+        }
+    }
+}
+
+export function readDailyExport(date: string): DailyExportReadResult | null {
     const filePath = getDailyExportFilePath(date);
-    if (!fs.existsSync(filePath)) {
+    const cacheDays = useConfig().task.dailyExport.memoryCacheDays;
+    pruneDailyExportMemoryCache(cacheDays);
+
+    const signature = getDailyExportFileSignature(filePath);
+    if (signature === null) {
+        dailyExportMemoryCache.delete(date);
         return null;
     }
 
-    return fs.readFileSync(filePath, 'utf8');
+    const cacheable = isMemoryCacheEligible(date, cacheDays);
+    const cached = cacheable ? dailyExportMemoryCache.get(date) : undefined;
+    if (cached && signaturesMatch(cached.signature, signature)) {
+        return cached.result;
+    }
+
+    let compressed: Buffer;
+    try {
+        compressed = fs.readFileSync(filePath);
+    } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+            dailyExportMemoryCache.delete(date);
+            return null;
+        }
+        throw error;
+    }
+
+    const content = decompressDailyExportCsv(compressed).toString('utf8');
+    const result = {
+        content,
+        total: countDailyExportItems(content)
+    };
+
+    if (cacheable) {
+        dailyExportMemoryCache.set(date, {
+            signature,
+            result
+        });
+    } else {
+        dailyExportMemoryCache.delete(date);
+    }
+
+    return result;
 }
 
 export function countDailyExportItems(content: string): number {
@@ -206,7 +335,7 @@ export function countDailyExportItems(content: string): number {
 }
 
 function parseDailyExportFileName(fileName: string): string | null {
-    const match = /^(\d{8})\.csv$/.exec(fileName);
+    const match = /^(\d{8})\.csv\.zst$/.exec(fileName);
     return match ? match[1]! : null;
 }
 

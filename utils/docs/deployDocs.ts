@@ -1125,6 +1125,17 @@ export const deployDocsSections: DocsContentSection[] = [
                         description: '每日导出任务的执行时间。'
                     },
                     {
+                        path: 'task.dailyExport.memoryCacheDays',
+                        valueType: 'integer',
+                        required: false,
+                        description:
+                            '解压后 CSV 的进程内缓存自然日数，默认值为 1，设为 0 可关闭。',
+                        notes: [
+                            '按上海自然日计算；值为 1 时只缓存昨天，不缓存今天。',
+                            '缓存会在对应日期第一次请求时生成，进程重启或压缩文件发生变化后重新生成。'
+                        ]
+                    },
+                    {
                         path: 'task.stationPlatformOverlap.dailyTimesHHmm',
                         valueType: 'array[string(HHmm)]',
                         required: true,
@@ -1339,6 +1350,33 @@ export const deployDocsSections: DocsContentSection[] = [
                     '修改 spider.rateLimit.stationBoard 或 task.circulation.stationBoard 后，重启后应关注车站大屏相关抓取、重试与交路推断任务是否按预期工作。',
                     '修改 spider.stationPlatformInfo.ttlDays、spider.stationPlatformInfo.onDemandCooldownHours 或 spider.stationPlatformInfo.stationOnDemandCooldownHours 后需要重启；应同时关注 fetch_station_exit_info 和 fetch_station_transport_info 的请求量与失败统计。'
                 ]
+            }
+        ]
+    },
+    {
+        id: 'daily-export-storage',
+        title: '迁移每日导出文件',
+        summary:
+            '每日导出使用固定 Zstandard 字典压缩存储，升级时需要转换已有 CSV。',
+        blocks: [
+            {
+                type: 'paragraph',
+                text: '新版本只识别 data/exports/YYYYMMDD.csv.zst，并使用 assets/zstd/csv.zdict 解压。API 对外仍返回 UTF-8 BOM CSV，下载文件名仍为 YYYYMMDD.csv。'
+            },
+            {
+                type: 'code',
+                language: 'bash',
+                code: 'pnpm run exports:zstd:migrate --dry-run\npnpm run exports:zstd:migrate'
+            },
+            {
+                type: 'paragraph',
+                text: '迁移脚本会逐个回读压缩结果并与源文件逐字节比较，验证成功后默认删除源 .csv；使用 --keep-source 可以保留源文件。脚本可重复运行，已存在的压缩文件只有在内容与源文件一致时才会被接受。'
+            },
+            {
+                type: 'code',
+                title: '无中断两阶段迁移',
+                language: 'bash',
+                code: 'pnpm run exports:zstd:migrate --keep-source\n# 部署并重启新版本后，再验证压缩文件并清理旧 CSV\npnpm run exports:zstd:migrate'
             }
         ]
     },

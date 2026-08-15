@@ -50,6 +50,9 @@ importers:
       web-push:
         specifier: ^3.6.7
         version: 3.6.7
+      zstd-napi:
+        specifier: 0.0.13
+        version: 0.0.13
     devDependencies:
       '@bufbuild/buf':
         specifier: 1.72.0
@@ -5119,6 +5122,10 @@ packages:
   zip-stream@6.0.1:
     resolution: {integrity: sha512-zK7YHHz4ZXpW89AHXUPbQVGKI7uvkd3hzusTdotCg1UxyaVtg0zFJSTfW/Dq5f7OBBVnq6cZIaC8Ti4hb6dtCA==}
     engines: {node: '>= 14'}
+
+  zstd-napi@0.0.13:
+    resolution: {integrity: sha512-ErGF+Ko1PsbooU6oC/sc/diiWKwVa0kd/5AkFSs7kg5kwcEuOtSzOy3xUOadXQlAVNab9TxsxaUk3hOq3cj/lA==}
+    engines: {node: ^12.22.0 || ^14.17.0 || ^15.12.0 || >=16}
 
 snapshots:
 
@@ -10700,3 +10707,9 @@ snapshots:
       archiver-utils: 5.0.2
       compress-commons: 6.0.2
       readable-stream: 4.7.0
+
+  zstd-napi@0.0.13:
+    dependencies:
+      '@types/node': 25.3.1
+      node-addon-api: 7.1.1
+      prebuild-install: 7.1.3

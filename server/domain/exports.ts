@@ -1,8 +1,7 @@
 import {
-    countDailyExportItems,
     getDailyExportFileName,
     listDailyExportIndex,
-    readDailyExportText
+    readDailyExport
 } from '~/server/services/dailyExportStore';
 import ApiRequestError from '~/server/utils/api/errors/ApiRequestError';
 import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
@@ -19,14 +18,14 @@ export function getDailyExport(date: string) {
         throw new ApiRequestError(404, 'not_found', missingMessage);
     }
 
-    const content = readDailyExportText(date);
-    if (content === null) {
+    const dailyExport = readDailyExport(date);
+    if (dailyExport === null) {
         throw new ApiRequestError(404, 'not_found', missingMessage);
     }
 
     return {
         serviceDay: serviceDateToDay(date),
-        total: countDailyExportItems(content),
-        content
+        total: dailyExport.total,
+        content: dailyExport.content
     };
 }

@@ -1530,6 +1530,11 @@
                         "dailyTimeHHmm": {
                             "type": "string",
                             "pattern": "^\\d{4}$"
+                        },
+                        "memoryCacheDays": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "default": 1
                         }
                     },
                     "required": [

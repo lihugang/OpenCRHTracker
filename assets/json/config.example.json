@@ -510,7 +510,8 @@
             "dailyTimeHHmm": "0000"
         },
         "dailyExport": {
-            "dailyTimeHHmm": "0000"
+            "dailyTimeHHmm": "0000",
+            "memoryCacheDays": 1
         },
         "stationPlatformOverlap": {
             "dailyTimesHHmm": [

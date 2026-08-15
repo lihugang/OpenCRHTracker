@@ -1,20 +1,19 @@
 #!/usr/bin/env node
 
-// Rebuilds historical data/exports/YYYYMMDD.csv files from the database for
+// Rebuilds historical data/exports/YYYYMMDD.csv.zst files from the database for
 // every service day actually present in daily_emu_routes. Never deletes old
 // JSONL files. Mirrors server/services/dailyExportStore.ts CSV generator;
 // keep in sync.
 
 import Database from 'better-sqlite3';
-import {
-    existsSync,
-    mkdirSync,
-    readFileSync,
-    renameSync,
-    writeFileSync
-} from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, unlinkSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+    assertDailyExportZstdRoundTrip,
+    compressDailyExportCsv,
+    writeDailyExportZstdAtomically
+} from '../server/utils/compression/dailyExportZstd.js';
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(scriptDir, '..');
@@ -380,11 +379,17 @@ function main() {
             continue;
         }
 
-        const content = serializeCsv(records);
-        const filePath = resolve(exportsDirectory, `${date}.csv`);
-        const tempPath = `${filePath}.tmp-${process.pid}`;
-        writeFileSync(tempPath, content, 'utf8');
-        renameSync(tempPath, filePath);
+        const source = Buffer.from(serializeCsv(records), 'utf8');
+        const compressed = compressDailyExportCsv(source);
+        assertDailyExportZstdRoundTrip(source, compressed);
+
+        const filePath = resolve(exportsDirectory, `${date}.csv.zst`);
+        writeDailyExportZstdAtomically(filePath, compressed);
+
+        const legacyFilePath = resolve(exportsDirectory, `${date}.csv`);
+        if (existsSync(legacyFilePath)) {
+            unlinkSync(legacyFilePath);
+        }
         console.log(
             `written date=${date} total=${records.length} filePath=${filePath}`
         );

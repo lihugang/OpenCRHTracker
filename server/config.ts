@@ -123,6 +123,7 @@ interface ApiKeyCleanupConfig {
 
 interface DailyExportTaskConfig {
     dailyTimeHHmm: string;
+    memoryCacheDays: number;
 }
 
 interface StationPlatformOverlapTaskConfig {
@@ -2274,7 +2275,15 @@ function validateConfig(raw: unknown): Config {
                 dailyTimeHHmm: asString(
                     taskDailyExport.dailyTimeHHmm,
                     'task.dailyExport.dailyTimeHHmm'
-                )
+                ),
+                memoryCacheDays:
+                    taskDailyExport.memoryCacheDays === undefined
+                        ? 1
+                        : asInteger(
+                              taskDailyExport.memoryCacheDays,
+                              'task.dailyExport.memoryCacheDays',
+                              0
+                          )
             },
             stationPlatformOverlap: {
                 dailyTimesHHmm: parseDailyTimesHHmm(

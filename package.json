@@ -16,6 +16,7 @@
         "docs:generate": "node scripts/generate-v2-docs.mjs",
         "docs:check": "node scripts/check-v2-docs.mjs",
         "exports:v2:migrate": "node scripts/exports-v2-migrate.mjs",
+        "exports:zstd:migrate": "node scripts/exports-zstd-migrate.mjs",
         "generate": "nuxt generate",
         "migrate:emu-storage-v2": "node scripts/migrate-emu-storage-v2.mjs",
         "migrate:internal-storage-v2": "node scripts/migrate-emu-storage-v2.mjs",
@@ -58,6 +59,7 @@
         "uuid": "^13.0.0",
         "vue": "^3.5.22",
         "vue-router": "^4.6.3",
-        "web-push": "^3.6.7"
+        "web-push": "^3.6.7",
+        "zstd-napi": "0.0.13"
     }
 }
