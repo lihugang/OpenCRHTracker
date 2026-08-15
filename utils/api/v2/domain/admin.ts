@@ -1,3 +1,4 @@
+import type { MessageInitShape } from '@bufbuild/protobuf';
 import type {
     AdminAnomalyItem,
     AdminAnomalyScanResponse,
@@ -21,6 +22,7 @@ import type {
     AdminTimetableHistoryCoverageMergeResponse,
     AdminServerMetricsResponse,
     AdminTaskOverviewResponse,
+    AdminCreateTaskRequest,
     AdminCreateTaskResponse,
     AdminRevokeAllWebappTokensResponse,
     AdminAnomalyBulkDeleteResponse,
@@ -1351,13 +1353,72 @@ export async function fetchAdminTasks(
     return requireSuccess(GetAdminTasks, result);
 }
 
-export async function createAdminTask(task: {
-    type: AdminCreateTaskResponse['type'];
-    payload: Record<string, unknown>;
-}) {
+function createAdminTaskRequestBody(
+    task: AdminCreateTaskRequest
+): MessageInitShape<typeof PostAdminTasks.requestSchema> {
+    switch (task.type) {
+        case 'regenerate_daily_export':
+            return {
+                task: {
+                    case: 'regenerateDailyExport',
+                    value: { date: task.payload.date }
+                }
+            };
+        case 'refresh_route_info_now':
+            return {
+                task: {
+                    case: 'refreshRouteInfoNow',
+                    value: { trainCodes: task.payload.trainCodes }
+                }
+            };
+        case 'refresh_train_circulation_now':
+            return {
+                task: {
+                    case: 'refreshTrainCirculationNow',
+                    value: { trainCode: task.payload.trainCode }
+                }
+            };
+        case 'refresh_all_routes_and_requeue_probe_now':
+            return {
+                task: {
+                    case: 'refreshAllRoutesAndRequeueProbeNow',
+                    value: {}
+                }
+            };
+        case 'detect_coupled_emu_group_now':
+            return {
+                task: {
+                    case: 'detectCoupledEmuGroupNow',
+                    value: {
+                        bureau: task.payload.bureau,
+                        model: task.payload.model
+                    }
+                }
+            };
+        case 'run_qrcode_detection_now':
+            return {
+                task: {
+                    case: 'runQrcodeDetectionNow',
+                    value: {}
+                }
+            };
+        case 'dispatch_station_board_tasks_now':
+            return {
+                task: {
+                    case: 'dispatchStationBoardTasksNow',
+                    value: {}
+                }
+            };
+        default:
+            task satisfies never;
+            throw new Error('Unsupported admin task type');
+    }
+}
+
+export async function createAdminTask(task: AdminCreateTaskRequest) {
     const result = await requestV2<PostAdminTasksData, AdminCreateTaskResponse>(
         PostAdminTasks,
-        { body: { task: { case: task.type, value: task.payload } } },
+        { body: createAdminTaskRequestBody(task) },
         mapCreateTask
     );
     return requireSuccess(PostAdminTasks, result);
