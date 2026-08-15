@@ -688,10 +688,10 @@ export default async function executeV2Operation(
     recordChargedUsage();
 
     if (entry.cache) {
-        setCacheControl(event, entry.cache(data as never));
+        setCacheControl(event, entry.cache(data as never, event));
     }
     if (entry.cacheHeaders) {
-        const headers = entry.cacheHeaders(data as never);
+        const headers = entry.cacheHeaders(data as never, event);
         setHeader(event, 'Cache-Control', headers.cacheControl);
         setHeader(event, 'CDN-Cache-Control', headers.cdnCacheControl);
     }

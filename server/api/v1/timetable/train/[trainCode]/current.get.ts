@@ -5,6 +5,9 @@ import getFixedCost from '~/server/utils/api/cost/getFixedCost';
 import executeApi from '~/server/utils/api/executor/executeApi';
 import ensure from '~/server/utils/api/executor/ensure';
 import setCacheControl from '~/server/utils/api/response/setCacheControl';
+import getCurrentTrainTimetableCacheMaxAge, {
+    setCurrentTrainTimetablePlatformRefreshTaskPending
+} from '~/server/utils/api/response/getCurrentTrainTimetableCacheMaxAge';
 import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
 import {
     formatExternalTrainCode,
@@ -21,7 +24,13 @@ export default defineEventHandler(async (event) => {
             requiredScopes: [API_SCOPES.timetable.train.current.read],
             fixedCost: getFixedCost('timetableTrainCurrent'),
             successHeaders: (successEvent) =>
-                setCacheControl(successEvent, cacheMaxAge)
+                setCacheControl(
+                    successEvent,
+                    getCurrentTrainTimetableCacheMaxAge(
+                        successEvent,
+                        cacheMaxAge
+                    )
+                )
         },
         async () => {
             const trainCode = getRouterParam(event, 'trainCode');
@@ -35,6 +44,10 @@ export default defineEventHandler(async (event) => {
 
             const timetable = await getCurrentTrainTimetable(
                 parseExternalTrainCodeOrThrow(trainCode, 'trainCode')
+            );
+            setCurrentTrainTimetablePlatformRefreshTaskPending(
+                event,
+                timetable.platformRefreshTaskPending
             );
 
             return {

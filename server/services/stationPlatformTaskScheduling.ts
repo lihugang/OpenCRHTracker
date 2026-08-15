@@ -1,6 +1,8 @@
 import useConfig from '~/server/config';
 import {
     reconcileFuturePendingTaskByExecutorAndArgs,
+    reconcilePendingTaskByExecutorAndArgs,
+    type ReconcilePendingTaskByExecutorAndArgsResult,
     type ReconcileSingletonTaskResult
 } from '~/server/services/taskQueue';
 import {
@@ -12,6 +14,7 @@ import {
     type ServiceDay
 } from '~/server/utils/date/serviceDay';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
+import type { TrainCodeParts } from '~/server/utils/12306/trainCode';
 import type { BuildScheduleStationPlatformTaskCandidate } from '~/server/utils/12306/scheduleProbe/types';
 
 const TEN_AM_SECONDS = 10 * 60 * 60;
@@ -20,6 +23,24 @@ const THIRTY_MINUTES_SECONDS = 30 * 60;
 export interface ScheduleStationPlatformTasksResult {
     createdTaskIds: number[];
     reusedTaskIds: number[];
+}
+
+export function enqueueMissingOrExpiredTrainStationPlatformTask(input: {
+    serviceDate: ServiceDay;
+    trainCode: TrainCodeParts;
+    trainInternalCode: string;
+}): ReconcilePendingTaskByExecutorAndArgsResult {
+    const args: RefreshTrainStationPlatformTaskArgs = {
+        serviceDate: input.serviceDate,
+        trainCode: input.trainCode,
+        trainInternalCode: input.trainInternalCode.trim(),
+        refreshMode: 'missing_or_expired'
+    };
+    return reconcilePendingTaskByExecutorAndArgs(
+        REFRESH_TRAIN_STATION_PLATFORM_TASK_EXECUTOR,
+        args,
+        getNowSeconds()
+    );
 }
 
 export function resolveStationPlatformTaskExecutionTime(

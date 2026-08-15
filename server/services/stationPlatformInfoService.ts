@@ -664,7 +664,11 @@ function resolvePlatformFromCirculation(
 }
 
 function resolvePlatformFromStationArrivals(
-    candidate: StationPlatformInfoCandidate
+    candidate: StationPlatformInfoCandidate,
+    stationRowsByStationName: Map<
+        string,
+        TodayScheduleStationIndexRow[]
+    >
 ): number | null {
     const startAt = getCandidateStartAt(candidate);
     const currentTrainNumbers = getCandidateTrainCodes(candidate)
@@ -675,7 +679,12 @@ function resolvePlatformFromStationArrivals(
     }
 
     const currentInternalCode = candidate.internalCode;
-    const rows = getTodayStationTimetableByStationName(candidate.stationName);
+    const stationNameKey = candidate.stationName.trim();
+    let rows = stationRowsByStationName.get(stationNameKey);
+    if (!rows) {
+        rows = getTodayStationTimetableByStationName(candidate.stationName);
+        stationRowsByStationName.set(stationNameKey, rows);
+    }
     const matches: Array<{
         row: TodayScheduleStationIndexRow;
         platformNo: number;
@@ -734,7 +743,11 @@ function resolvePlatformFromStationArrivals(
 }
 
 function resolveOriginPlatformFallback(
-    candidate: StationPlatformInfoCandidate
+    candidate: StationPlatformInfoCandidate,
+    stationRowsByStationName: Map<
+        string,
+        TodayScheduleStationIndexRow[]
+    >
 ): number | null {
     try {
         const circulation = getPreferredTrainCirculation({
@@ -754,7 +767,10 @@ function resolveOriginPlatformFallback(
             circulation
         );
         return circulation === null || currentIndex === 0
-            ? resolvePlatformFromStationArrivals(candidate)
+            ? resolvePlatformFromStationArrivals(
+                  candidate,
+                  stationRowsByStationName
+              )
             : null;
     } catch (error) {
         logger.warn(
@@ -820,6 +836,10 @@ async function refreshCandidates(
     const allowCacheFallback = options.allowCacheFallback ?? true;
     const updates: ScheduleStationPlatformInfoPersistInput[] = [];
     const entries: StationPlatformInfoRefreshEntry[] = [];
+    const stationRowsByStationName = new Map<
+        string,
+        TodayScheduleStationIndexRow[]
+    >();
     let cacheHitCount = 0;
     let cacheFallbackCount = 0;
     let requestCount = 0;
@@ -839,7 +859,10 @@ async function refreshCandidates(
                 freshCache.platformNo === 1
             ) {
                 const fallbackPlatformNo =
-                    resolveOriginPlatformFallback(candidate);
+                    resolveOriginPlatformFallback(
+                        candidate,
+                        stationRowsByStationName
+                    );
                 if (fallbackPlatformNo !== null) {
                     const fetchedAt = getNowSeconds();
                     updates.push({
@@ -906,7 +929,10 @@ async function refreshCandidates(
                 ) {
                     // 12306 returns platform 1 when this endpoint has no platform information.
                     const fallbackPlatformNo =
-                        resolveOriginPlatformFallback(candidate);
+                        resolveOriginPlatformFallback(
+                            candidate,
+                            stationRowsByStationName
+                        );
                     if (fallbackPlatformNo !== null) {
                         resolvedResult = {
                             platformNo: fallbackPlatformNo,
@@ -1237,6 +1263,23 @@ function shouldRefreshMissingOrExpiredStop(
         stop.stationPlatformInfoFetchedAt !== null &&
         stop.stationPlatformInfoFetchedAt !== undefined &&
         stop.stationPlatformInfoFetchedAt <= expiresAt
+    );
+}
+
+export function hasMissingOrExpiredStationPlatformInfoForTrainCodes(
+    input: ForceRefreshStationPlatformInfoForTrainCodesInput
+): boolean {
+    if (!hasMatchingPublishedSchedule(input.serviceDate)) {
+        return false;
+    }
+
+    const expiresAt = getPlatformInfoExpiresAt(getNowSeconds());
+    return (
+        buildCandidatesForTrainCodes(
+            input.serviceDate,
+            input.trainCodes,
+            (stop) => shouldRefreshMissingOrExpiredStop(stop, expiresAt)
+        ).candidates.length > 0
     );
 }
 

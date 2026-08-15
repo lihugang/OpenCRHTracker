@@ -6,6 +6,7 @@ import {
 } from '~/server/services/trainProvenanceRecorder';
 import {
     createEmptyStationPlatformInfoRefreshResult,
+    refreshMissingOrExpiredStationPlatformInfoForTrainCodes,
     refreshStationPlatformInfoForTrainCodes
 } from '~/server/services/stationPlatformInfoService';
 import {
@@ -36,6 +37,7 @@ export interface RefreshTrainStationPlatformTaskArgs {
     serviceDate: ServiceDay;
     trainCode: TrainCodeParts;
     trainInternalCode: string;
+    refreshMode?: 'missing_or_expired';
 }
 
 function parseTrainCode(value: unknown): TrainCodeParts | null {
@@ -69,6 +71,7 @@ export function parseRefreshTrainStationPlatformTaskArgs(
         serviceDate?: unknown;
         trainCode?: unknown;
         trainInternalCode?: unknown;
+        refreshMode?: unknown;
     };
     const serviceDate =
         typeof body.serviceDate === 'number'
@@ -79,6 +82,12 @@ export function parseRefreshTrainStationPlatformTaskArgs(
         typeof body.trainInternalCode === 'string'
             ? body.trainInternalCode.trim()
             : '';
+    const refreshMode =
+        body.refreshMode === undefined
+            ? undefined
+            : body.refreshMode === 'missing_or_expired'
+              ? body.refreshMode
+              : null;
 
     if (serviceDate === null) {
         throw new Error('task arguments serviceDate must be a service day');
@@ -86,11 +95,17 @@ export function parseRefreshTrainStationPlatformTaskArgs(
     if (trainCode === null) {
         throw new Error('task arguments trainCode must be valid');
     }
+    if (refreshMode === null) {
+        throw new Error(
+            'task arguments refreshMode must be missing_or_expired when provided'
+        );
+    }
 
     return {
         serviceDate,
         trainCode,
-        trainInternalCode
+        trainInternalCode,
+        ...(refreshMode === undefined ? {} : { refreshMode })
     };
 }
 
@@ -134,10 +149,18 @@ async function executeRefreshTrainStationPlatformTask(
     ];
 
     try {
-        const result = await refreshStationPlatformInfoForTrainCodes({
-            serviceDate: args.serviceDate,
-            trainCodes
-        });
+        const result =
+            args.refreshMode === 'missing_or_expired'
+                ? await refreshMissingOrExpiredStationPlatformInfoForTrainCodes(
+                      {
+                          serviceDate: args.serviceDate,
+                          trainCodes
+                      }
+                  )
+                : await refreshStationPlatformInfoForTrainCodes({
+                      serviceDate: args.serviceDate,
+                      trainCodes
+                  });
         recordCurrentStationPlatformRefreshResults({
             serviceDate: args.serviceDate,
             trigger: 'scheduled_task',

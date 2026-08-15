@@ -8,7 +8,7 @@ import {
     getTodayScheduleServiceDay,
     type TodayScheduleStationIndexRow
 } from '~/server/services/todayScheduleCache';
-import { refreshMissingOrExpiredStationPlatformInfoForTrainCodes } from '~/server/services/stationPlatformInfoService';
+import { hasMissingOrExpiredStationPlatformInfoForTrainCodes } from '~/server/services/stationPlatformInfoService';
 import {
     getHistoricalTimetableContent,
     type HistoricalTimetableContent,
@@ -30,6 +30,7 @@ import { formatExternalTrainCode } from '~/server/utils/internal/boundaries';
 import type { ServiceDay } from '~/server/utils/date/serviceDay';
 import type { ExternalCursorPoint } from '~/server/utils/internal/boundaries';
 import { enqueueStationTimetablePlatformTasks } from '~/server/services/stationTimetablePlatformTaskScheduling';
+import { enqueueMissingOrExpiredTrainStationPlatformTask } from '~/server/services/stationPlatformTaskScheduling';
 
 const logger = getLogger('timetable-domain');
 
@@ -47,6 +48,7 @@ export interface CurrentTimetableDomainStop {
 }
 
 export interface CurrentTimetableDomainResult {
+    platformRefreshTaskPending: boolean;
     updatedAt: number | null;
     requestTrainCode: TrainCodeParts;
     trainCode: TrainCodeParts;
@@ -68,19 +70,40 @@ export interface CurrentTimetableDomainResult {
 export async function getCurrentTrainTimetable(
     trainCode: TrainCodeParts
 ): Promise<CurrentTimetableDomainResult> {
-    let timetable = getTodayScheduleTimetableByTrainCode(trainCode);
+    const timetable = getTodayScheduleTimetableByTrainCode(trainCode);
 
     if (!timetable || timetable.stops.length === 0) {
         throw new ApiRequestError(404, 'not_found', '当前暂无时刻表');
     }
 
-    await refreshMissingOrExpiredStationPlatformInfoForTrainCodes({
-        serviceDate: getTodayScheduleServiceDay(),
-        trainCodes: timetable.allCodes
-    });
-    timetable = getTodayScheduleTimetableByTrainCode(trainCode) ?? timetable;
+    const serviceDate = getTodayScheduleServiceDay();
+    let platformRefreshTaskPending = false;
+    try {
+        if (
+            hasMissingOrExpiredStationPlatformInfoForTrainCodes({
+                serviceDate,
+                trainCodes: timetable.allCodes
+            })
+        ) {
+            enqueueMissingOrExpiredTrainStationPlatformTask({
+                serviceDate,
+                trainCode: timetable.trainCode,
+                trainInternalCode: timetable.trainInternalCode
+            });
+            platformRefreshTaskPending = true;
+        }
+    } catch (error) {
+        const message =
+            error instanceof Error
+                ? `${error.name}: ${error.message}`
+                : String(error);
+        logger.warn(
+            `enqueue_current_train_platform_refresh_failed trainCode=${formatExternalTrainCode(timetable.trainCode)} error=${message}`
+        );
+    }
 
     return {
+        platformRefreshTaskPending,
         updatedAt: timetable.updatedAt,
         requestTrainCode: trainCode,
         trainCode: timetable.trainCode,

@@ -57,8 +57,8 @@ export interface V2ManifestEntry<
     cors: boolean;
     cost: V2CostRule;
     failureCost?: number;
-    cache?: (data: unknown) => number;
-    cacheHeaders?: (data: unknown) => {
+    cache?: (data: unknown, event: H3Event) => number;
+    cacheHeaders?: (data: unknown, event: H3Event) => {
         cacheControl: string;
         cdnCacheControl: string;
     };

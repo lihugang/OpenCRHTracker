@@ -1,5 +1,6 @@
 import useConfig from '~/server/config';
 import getStationTimetableCacheMaxAge from '~/server/utils/api/response/getStationTimetableCacheMaxAge';
+import getCurrentTrainTimetableCacheMaxAge from '~/server/utils/api/response/getCurrentTrainTimetableCacheMaxAge';
 import {
     GetEmuAllocationRequestSchema,
     GetEmuAllocationDataSchema,
@@ -136,7 +137,11 @@ export const LOOKUP_MANIFEST_ENTRIES = {
         requiredScopes: [API_SCOPES.timetable.train.current.read],
         cors: true,
         cost: { kind: 'fixed', key: 'timetableTrainCurrent' },
-        cache: () => useConfig().api.cache.timetableMaxAgeSeconds,
+        cache: (_data, event) =>
+            getCurrentTrainTimetableCacheMaxAge(
+                event,
+                useConfig().api.cache.timetableMaxAgeSeconds
+            ),
         bodyMode: 'none',
         handler: getCurrentTrainTimetableV2Adapter
     }),

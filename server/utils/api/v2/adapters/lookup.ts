@@ -26,6 +26,9 @@ import {
 import { formatV2Cursor, parseV2Cursor } from '~/server/utils/api/v2/v2Cursor';
 import type { V2OperationContext } from '~/server/utils/api/v2/V2Types';
 import {
+    setCurrentTrainTimetablePlatformRefreshTaskPending
+} from '~/server/utils/api/response/getCurrentTrainTimetableCacheMaxAge';
+import {
     CirculationValidationState,
     TrainCirculationSource,
     type GetCurrentTrainTimetableRequest,
@@ -288,6 +291,10 @@ export async function getCurrentTrainTimetableV2Adapter(
         'trainCode'
     );
     const timetable = await getCurrentTrainTimetable(trainCode);
+    setCurrentTrainTimetablePlatformRefreshTaskPending(
+        ctx.event,
+        timetable.platformRefreshTaskPending
+    );
 
     return {
         ...(timetable.updatedAt === null
