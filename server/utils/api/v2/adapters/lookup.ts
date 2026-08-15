@@ -82,7 +82,8 @@ export async function getDailyRecordsV2Adapter(ctx: V2OperationContext) {
             serviceDay: item.serviceDay,
             ...optionalTimetableId(item.timetableId),
             emuId: item.emuId,
-            trainCode: toTrainCode(item.trainCode)
+            trainCode: toTrainCode(item.trainCode),
+            status: item.status
         }))
     };
 }
@@ -113,7 +114,8 @@ export async function getTrainHistoryV2Adapter(ctx: V2OperationContext) {
             id: item.id,
             serviceDay: item.serviceDay,
             ...optionalTimetableId(item.timetableId),
-            emuId: item.emuId
+            emuId: item.emuId,
+            status: item.status
         }))
     };
 }
@@ -149,7 +151,8 @@ export async function getEmuHistoryV2Adapter(ctx: V2OperationContext) {
             id: item.id,
             serviceDay: item.serviceDay,
             ...optionalTimetableId(item.timetableId),
-            trainCode: toTrainCode(item.trainCode)
+            trainCode: toTrainCode(item.trainCode),
+            status: item.status
         }))
     };
 }

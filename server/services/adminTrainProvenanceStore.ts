@@ -1,14 +1,13 @@
 import {
     listDailyRoutesByEmuCodeInRange,
+    listDailyRoutesByEmuCodeAndStartAt,
     listDailyRoutesByTrainCodeInRange,
     type DailyEmuRouteRow
 } from '~/server/services/emuRoutesStore';
 import {
-    listProbeStatusByEmuCode,
-    listProbeStatusByTrainCodeInRange,
-    ProbeStatusValue,
-    type ProbeStatusRow
-} from '~/server/services/probeStatusStore';
+    isConfirmedCoupled,
+    isConfirmedSingle
+} from '~/server/utils/emuRouteStatus';
 import {
     getStationBoardDispatchResultByTaskRunId,
     getStationBoardFetchResultByTaskRunId,
@@ -74,7 +73,6 @@ import type {
     AdminStationPlatformRefreshSummary,
     AdminTrainProvenanceOutcomeStatus,
     AdminDailyRouteTrackingRecord,
-    AdminProbeStatusRecord,
     AdminTrackingMutation,
     AdminTrackingMutationAction,
     AdminTrackingMutationSummary,
@@ -138,37 +136,15 @@ const STATION_BOARD_DISPATCH_TASK_EXECUTOR = 'dispatch_station_board_tasks';
 const STATION_BOARD_FETCH_TASK_EXECUTOR = 'fetch_station_board';
 
 function toLatestStatus(
-    rows: ProbeStatusRow[]
+    rows: DailyEmuRouteRow[]
 ): AdminTrainProvenanceLatestStatus {
-    const highestStatus = rows.reduce<number>(
-        (currentMax, row) =>
-            row.status > currentMax ? row.status : currentMax,
-        0
-    );
-
-    switch (highestStatus) {
-        case ProbeStatusValue.PendingCouplingDetection:
-            return 'pending';
-        case ProbeStatusValue.SingleFormationResolved:
-            return 'single';
-        case ProbeStatusValue.CoupledFormationResolved:
-            return 'coupled';
-        default:
-            return 'unknown';
+    if (rows.some((row) => isConfirmedCoupled(row.status))) {
+        return 'coupled';
     }
-}
-
-function toStatusLabel(status: number): AdminTrainProvenanceLatestStatus {
-    switch (status) {
-        case ProbeStatusValue.PendingCouplingDetection:
-            return 'pending';
-        case ProbeStatusValue.SingleFormationResolved:
-            return 'single';
-        case ProbeStatusValue.CoupledFormationResolved:
-            return 'coupled';
-        default:
-            return 'unknown';
+    if (rows.some((row) => isConfirmedSingle(row.status))) {
+        return 'single';
     }
+    return rows.length > 0 ? 'pending' : 'unknown';
 }
 
 function toDailyRouteTrackingRecord(
@@ -184,20 +160,7 @@ function toDailyRouteTrackingRecord(
         endStation: row.end_station_name,
         startAt: row.start_at,
         endAt: row.end_at,
-        isTimetableResolved: row.timetable_id !== null && row.start_at > 0
-    };
-}
-
-function toProbeStatusRecord(row: ProbeStatusRow): AdminProbeStatusRecord {
-    return {
-        id: row.id,
-        trainCode: formatExternalTrainCode(row.train_code),
-        emuCode: formatExternalEmuCode(row.emu_id),
-        serviceDate: formatExternalServiceDate(row.service_date),
-        timetableId: row.timetable_id,
         status: row.status,
-        statusLabel: toStatusLabel(row.status),
-        startAt: row.start_at,
         isTimetableResolved: row.timetable_id !== null && row.start_at > 0
     };
 }
@@ -205,7 +168,6 @@ function toProbeStatusRecord(row: ProbeStatusRow): AdminProbeStatusRecord {
 function toDeparture(
     startAt: number,
     routeRows: DailyEmuRouteRow[],
-    probeRows: ProbeStatusRow[],
     fallbackRoute: AdminTrainRouteSnapshot | null,
     fallbackEmuCodes: string[]
 ): AdminTrainProvenanceDeparture {
@@ -213,7 +175,6 @@ function toDeparture(
     const emuCodes = Array.from(
         new Set([
             ...routeRows.map((row) => formatExternalEmuCode(row.emu_id)),
-            ...probeRows.map((row) => formatExternalEmuCode(row.emu_id)),
             ...fallbackEmuCodes
         ])
     ).sort();
@@ -230,10 +191,9 @@ function toDeparture(
             '',
         endStation:
             firstRouteRow?.end_station_name || fallbackRoute?.endStation || '',
-        latestStatus: toLatestStatus(probeRows),
+        latestStatus: toLatestStatus(routeRows),
         emuCodes,
-        dailyRouteRows: routeRows.map(toDailyRouteTrackingRecord),
-        probeStatusRows: probeRows.map(toProbeStatusRecord)
+        dailyRouteRows: routeRows.map(toDailyRouteTrackingRecord)
     };
 }
 
@@ -496,7 +456,7 @@ function resolveEventOutcomeStatus(
 function isTrackingMutationTable(
     value: unknown
 ): value is AdminTrackingMutationTable {
-    return value === 'daily_emu_routes' || value === 'probe_status';
+    return value === 'daily_emu_routes';
 }
 
 function isTrackingMutationAction(
@@ -569,36 +529,6 @@ function buildTrackingMutationSummary(
                     mutation.table === 'daily_emu_routes' &&
                     (mutation.action === 'deleted' ||
                         mutation.action === 'cleared')
-            )
-            .reduce((total, mutation) => total + mutation.rowCount, 0),
-        probeStatusCreated: mutations
-            .filter(
-                (mutation) =>
-                    mutation.table === 'probe_status' &&
-                    mutation.action === 'created'
-            )
-            .reduce((total, mutation) => total + mutation.rowCount, 0),
-        probeStatusUpdated: mutations
-            .filter(
-                (mutation) =>
-                    mutation.table === 'probe_status' &&
-                    (mutation.action === 'updated' ||
-                        mutation.action === 'downgraded')
-            )
-            .reduce((total, mutation) => total + mutation.rowCount, 0),
-        probeStatusDeleted: mutations
-            .filter(
-                (mutation) =>
-                    mutation.table === 'probe_status' &&
-                    (mutation.action === 'deleted' ||
-                        mutation.action === 'cleared')
-            )
-            .reduce((total, mutation) => total + mutation.rowCount, 0),
-        probeStatusUnchanged: mutations
-            .filter(
-                (mutation) =>
-                    mutation.table === 'probe_status' &&
-                    mutation.action === 'unchanged'
             )
             .reduce((total, mutation) => total + mutation.rowCount, 0)
     };
@@ -1296,7 +1226,10 @@ function extractHistoricalReuseDetail(
             ? []
             : event.emuId === null
               ? []
-              : listProbeStatusByEmuCode(event.emuId, historicalStartAt);
+              : listDailyRoutesByEmuCodeAndStartAt(
+                    event.emuId,
+                    historicalStartAt
+                );
     const historicalTrainCodes = normalizeTrainCodeList([
         ...payloadTrainCodes,
         ...routeRows.map((row) => formatExternalTrainCode(row.train_code))
@@ -2485,11 +2418,6 @@ export function getAdminTrainProvenance(
         dayRangeStart,
         dayRangeEndExclusive
     );
-    const probeRows = listProbeStatusByTrainCodeInRange(
-        trainCode,
-        dayRangeStart,
-        dayRangeEndExclusive
-    );
     const timelineRecordsByStartAt = new Map<
         number,
         TrainProvenanceEventRecord[]
@@ -2506,8 +2434,7 @@ export function getAdminTrainProvenance(
     }
 
     const tableDepartureStartAts = [
-        ...routeRows.map((row) => row.start_at),
-        ...probeRows.map((row) => row.start_at)
+        ...routeRows.map((row) => row.start_at)
     ].filter((candidateStartAt) => candidateStartAt > 0);
     const departureStartAts = Array.from(
         new Set([...eventDepartureStartAts, ...tableDepartureStartAts])
@@ -2521,7 +2448,6 @@ export function getAdminTrainProvenance(
         return toDeparture(
             candidateStartAt,
             routeRows.filter((row) => row.start_at === candidateStartAt),
-            probeRows.filter((row) => row.start_at === candidateStartAt),
             fallback.route,
             fallback.emuCodes
         );

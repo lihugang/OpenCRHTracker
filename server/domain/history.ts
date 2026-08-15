@@ -12,6 +12,7 @@ export interface TrainHistoryDomainItem {
     serviceDay: ServiceDay;
     timetableId: number | null;
     emuId: EmuId;
+    status: number;
 }
 
 export interface EmuHistoryDomainItem {
@@ -19,6 +20,7 @@ export interface EmuHistoryDomainItem {
     serviceDay: ServiceDay;
     timetableId: number | null;
     trainCode: TrainCodeParts;
+    status: number;
 }
 
 export interface HistoryPageDomainResult<TItem> {
@@ -56,7 +58,8 @@ export function getTrainHistory(input: {
             id: row.id,
             serviceDay: row.service_date,
             timetableId: row.timetable_id,
-            emuId: row.emu_id
+            emuId: row.emu_id,
+            status: row.status
         })),
         cursor: input.cursor,
         limit: input.limit,
@@ -92,7 +95,8 @@ export function getEmuHistory(input: {
             id: row.id,
             serviceDay: row.service_date,
             timetableId: row.timetable_id,
-            trainCode: row.train_code
+            trainCode: row.train_code,
+            status: row.status
         })),
         cursor: input.cursor,
         limit: input.limit,

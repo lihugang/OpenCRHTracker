@@ -39,7 +39,8 @@ function toAnomalyRouteRecord(row: DailyEmuRouteRow): AdminAnomalyRouteRecord {
         endStation: row.end_station_name,
         startAt: row.start_at,
         endAt: row.end_at,
-        durationSeconds: Math.max(0, row.end_at - row.start_at)
+        durationSeconds: Math.max(0, row.end_at - row.start_at),
+        status: row.status
     };
 }
 

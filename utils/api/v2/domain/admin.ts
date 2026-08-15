@@ -159,7 +159,8 @@ function mapAnomalyScan(
                     endStation: route.endStation,
                     startAt: protoInt64ToNumber(route.startAt) ?? 0,
                     endAt: protoInt64ToNumber(route.endAt) ?? 0,
-                    durationSeconds: route.durationSeconds
+                    durationSeconds: route.durationSeconds,
+                    status: route.status
                 }))
             })
         )
@@ -174,7 +175,6 @@ function mapAnomalyDeleteRoute(
         routeId: String(data.routeId),
         wasToday: data.wasToday,
         deletedDailyRoute: data.deletedDailyRoute,
-        deletedProbeStatusRows: data.deletedProbeStatusRows,
         clearedRuntimeTrainKey: data.clearedRuntimeTrainKey,
         clearedRuntimeEmuCodes: data.clearedRuntimeEmuCodes,
         clearedDetectionGroups: data.clearedDetectionGroups
@@ -191,7 +191,6 @@ function mapAnomalyBulkDelete(
         matchedItems: data.matchedItems,
         matchedRoutes: data.matchedRoutes,
         deletedDailyRoutes: data.deletedDailyRoutes,
-        deletedProbeStatusRows: data.deletedProbeStatusRows,
         skippedRoutes: data.skippedRoutes
     };
 }
@@ -331,6 +330,7 @@ function mapDailyRouteRecord(
         endStation: string;
         startAt: bigint | number;
         endAt: bigint | number;
+        status: number;
     },
     emuCodeMappings: Record<string, string>
 ) {
@@ -343,7 +343,8 @@ function mapDailyRouteRecord(
         startStation: item.startStation,
         endStation: item.endStation,
         startAt: protoInt64ToNumber(item.startAt) ?? 0,
-        endAt: protoInt64ToNumber(item.endAt) ?? 0
+        endAt: protoInt64ToNumber(item.endAt) ?? 0,
+        status: item.status
     };
 }
 
@@ -385,7 +386,6 @@ function mapDailyRouteDelete(
         routeId: String(data.routeId),
         wasToday: data.wasToday,
         deletedDailyRoute: data.deletedDailyRoute,
-        deletedProbeStatusRows: data.deletedProbeStatusRows,
         clearedRuntimeTrainKey: data.clearedRuntimeTrainKey,
         clearedRuntimeEmuCodes: data.clearedRuntimeEmuCodes,
         clearedDetectionGroups: data.clearedDetectionGroups

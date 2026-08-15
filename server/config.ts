@@ -198,7 +198,7 @@ const ALLOWED_STARTUP_TASK_EXECUTORS = [
     'build_today_schedule',
     'generate_route_refresh_tasks',
     'dispatch_daily_probe_tasks',
-    'clear_daily_probe_status',
+    'clear_daily_probe_untrusted_records',
     'cleanup_revoked_api_keys',
     'export_daily_records',
     'rebuild_reference_model_index',

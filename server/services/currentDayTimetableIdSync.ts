@@ -2,11 +2,7 @@ import { useEmuDatabase, type EmuId } from '~/server/libs/database/emu';
 import { createPreparedSqlStore } from '~/server/libs/database/prepared';
 import { listDailyRoutesByTrainCodeInRange } from '~/server/services/emuRoutesStore';
 import { resolveTimetableIdByTrainCodeAndServiceDate } from '~/server/services/historicalTimetableResolver';
-import {
-    listProbeStatusByTrainCodeInRange,
-    ProbeStatusValue,
-    type ProbeStatusRow
-} from '~/server/services/probeStatusStore';
+import { mergeEmuRouteStatuses } from '~/server/utils/emuRouteStatus';
 import {
     serviceDayToShanghaiDayStartUnixSeconds,
     type ServiceDay
@@ -23,28 +19,20 @@ interface DailySyncRow {
     emu_id: EmuId;
     service_date: ServiceDay;
     timetable_id: number | null;
-}
-
-interface ProbeSyncRow extends DailySyncRow {
-    status: ProbeStatusValue;
+    status: number;
 }
 
 type MaintenanceSqlKey =
     | 'deleteDailyEmuRouteById'
-    | 'deleteProbeStatusById'
-    | 'updateDailyEmuRouteAliasById'
-    | 'updateProbeStatusAliasById';
+    | 'updateDailyEmuRouteAliasById';
 
 interface DailySyncAction {
     keeperId: number;
     emuId: EmuId;
     timetableId: number;
+    status: number;
     needsUpdate: boolean;
     deleteIds: number[];
-}
-
-interface ProbeSyncAction extends DailySyncAction {
-    status: ProbeStatusValue;
 }
 
 export interface CurrentDayTimetableIdSyncResult {
@@ -52,8 +40,6 @@ export interface CurrentDayTimetableIdSyncResult {
     changedTrainCodes: number;
     updatedDailyRows: number;
     deletedDailyRows: number;
-    updatedProbeRows: number;
-    deletedProbeRows: number;
 }
 
 const DAY_SECONDS = 24 * 60 * 60;
@@ -113,51 +99,8 @@ function buildDailySyncActions(
         const deleteIds = groupRows
             .filter((row) => row.id !== keeper.id)
             .map((row) => row.id);
-        const needsUpdate = keeper.timetable_id !== targetTimetableId;
-
-        if (!needsUpdate && deleteIds.length === 0) {
-            continue;
-        }
-
-        actions.push({
-            keeperId: keeper.id,
-            emuId: keeper.emu_id,
-            timetableId: targetTimetableId,
-            needsUpdate,
-            deleteIds
-        });
-    }
-
-    return actions;
-}
-
-function buildProbeSyncActions(
-    rows: readonly ProbeSyncRow[],
-    targetTimetableId: number
-) {
-    const actions: ProbeSyncAction[] = [];
-    const groupedRows = new Map<string, ProbeSyncRow[]>();
-
-    for (const row of rows) {
-        const groupKey = buildGroupKey(row);
-        const existing = groupedRows.get(groupKey);
-        if (existing) {
-            existing.push(row);
-            continue;
-        }
-
-        groupedRows.set(groupKey, [row]);
-    }
-
-    for (const groupRows of groupedRows.values()) {
-        const keeper = chooseKeeperRow(groupRows, targetTimetableId);
-        const deleteIds = groupRows
-            .filter((row) => row.id !== keeper.id)
-            .map((row) => row.id);
-        const nextStatus = groupRows.reduce<ProbeStatusValue>(
-            (currentMax, row) =>
-                row.status > currentMax ? row.status : currentMax,
-            ProbeStatusValue.PendingCouplingDetection
+        const nextStatus = mergeEmuRouteStatuses(
+            groupRows.map((row) => row.status)
         );
         const needsUpdate =
             keeper.timetable_id !== targetTimetableId ||
@@ -171,9 +114,9 @@ function buildProbeSyncActions(
             keeperId: keeper.id,
             emuId: keeper.emu_id,
             timetableId: targetTimetableId,
+            status: nextStatus,
             needsUpdate,
-            deleteIds,
-            status: nextStatus
+            deleteIds
         });
     }
 
@@ -198,9 +141,7 @@ export function syncCurrentDayTimetableIdsForTrainCodes(
         scannedTrainCodes: normalizedTrainCodes.length,
         changedTrainCodes: 0,
         updatedDailyRows: 0,
-        deletedDailyRows: 0,
-        updatedProbeRows: 0,
-        deletedProbeRows: 0
+        deletedDailyRows: 0
     };
 
     if (normalizedTrainCodes.length === 0) {
@@ -229,17 +170,6 @@ export function syncCurrentDayTimetableIdsForTrainCodes(
                 train_code: row.train_code,
                 emu_id: row.emu_id,
                 service_date: row.service_date,
-                timetable_id: row.timetable_id
-            }));
-            const probeRows = listProbeStatusByTrainCodeInRange(
-                trainCode,
-                dayStartAt,
-                dayEndAtExclusive
-            ).map<ProbeSyncRow>((row: ProbeStatusRow) => ({
-                id: row.id,
-                train_code: row.train_code,
-                emu_id: row.emu_id,
-                service_date: row.service_date,
                 timetable_id: row.timetable_id,
                 status: row.status
             }));
@@ -248,12 +178,8 @@ export function syncCurrentDayTimetableIdsForTrainCodes(
                 dailyRows,
                 targetTimetableId
             );
-            const probeActions = buildProbeSyncActions(
-                probeRows,
-                targetTimetableId
-            );
 
-            if (dailyActions.length === 0 && probeActions.length === 0) {
+            if (dailyActions.length === 0) {
                 continue;
             }
 
@@ -273,30 +199,10 @@ export function syncCurrentDayTimetableIdsForTrainCodes(
                         'updateDailyEmuRouteAliasById',
                         action.emuId,
                         action.timetableId,
-                        action.keeperId
-                    );
-                    result.updatedDailyRows += 1;
-                }
-            }
-
-            for (const action of probeActions) {
-                for (const deleteId of action.deleteIds) {
-                    maintenanceStatements.run(
-                        'deleteProbeStatusById',
-                        deleteId
-                    );
-                    result.deletedProbeRows += 1;
-                }
-
-                if (action.needsUpdate) {
-                    maintenanceStatements.run(
-                        'updateProbeStatusAliasById',
-                        action.emuId,
-                        action.timetableId,
                         action.status,
                         action.keeperId
                     );
-                    result.updatedProbeRows += 1;
+                    result.updatedDailyRows += 1;
                 }
             }
         }

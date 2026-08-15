@@ -4,6 +4,7 @@ SELECT
     train_number,
     emu_id,
     service_date,
-    timetable_id
+    timetable_id,
+    status
 FROM daily_emu_routes
 ORDER BY id ASC;

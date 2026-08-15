@@ -5,7 +5,6 @@ import { fileURLToPath } from 'node:url';
 
 const DEFAULT_CONFIG_PATH = 'data/config.json';
 const DAILY_LEGACY_BACKUP_TABLE = 'daily_emu_routes_legacy_pre_timetable_id';
-const PROBE_LEGACY_BACKUP_TABLE = 'probe_status_legacy_pre_timetable_id';
 const SHANGHAI_OFFSET_SECONDS = 8 * 60 * 60;
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
@@ -311,21 +310,8 @@ function createTimetableResolver(timetableDb) {
         };
     }
 
-    function resolveProbeRowTimetable(row) {
-        const serviceDate = formatShanghaiDateStringFromUnixSeconds(
-            row.start_at
-        );
-        const exactCoverage = getExactCoverage(row.train_code, serviceDate);
-        return {
-            serviceDate,
-            timetableId: exactCoverage?.content_id ?? null,
-            resolution: exactCoverage ? 'exact' : 'unresolved'
-        };
-    }
-
     return {
-        resolveDailyRowTimetable,
-        resolveProbeRowTimetable
+        resolveDailyRowTimetable
     };
 }
 
@@ -365,149 +351,6 @@ function createTableSummary(schema, backupExists) {
     };
 }
 
-function buildRowKey(row) {
-    return [
-        row.train_code,
-        row.emu_code,
-        row.service_date,
-        row.timetable_id === null ? 'null' : String(row.timetable_id)
-    ].join('|');
-}
-
-function buildLegacyStartAtKey(trainCode, emuCode, startAt) {
-    return [
-        normalizeCode(trainCode),
-        normalizeCode(emuCode),
-        String(startAt)
-    ].join('|');
-}
-
-function migrateLegacyDailyRows(legacyRows, resolver) {
-    const rowByBusinessKey = new Map();
-    const timetableIdByLegacyStartAtKey = new Map();
-    const summary = createTableSummary('legacy', false);
-
-    for (const row of legacyRows) {
-        summary.scannedRows += 1;
-
-        const resolved = resolver.resolveDailyRowTimetable(row);
-        if (resolved.resolution === 'exact') {
-            summary.exactMatches += 1;
-        } else if (resolved.resolution === 'fallback') {
-            summary.fallbackMatches += 1;
-        } else {
-            summary.unresolvedRows += 1;
-        }
-
-        const migratedRow = {
-            id: row.id,
-            train_code: normalizeCode(row.train_code),
-            emu_code: normalizeCode(row.emu_code),
-            service_date: resolved.serviceDate,
-            timetable_id: resolved.timetableId
-        };
-        const businessKey = buildRowKey(migratedRow);
-        const existingRow = rowByBusinessKey.get(businessKey);
-        if (!existingRow || migratedRow.id >= existingRow.id) {
-            rowByBusinessKey.set(businessKey, migratedRow);
-        }
-
-        if (resolved.timetableId !== null) {
-            const legacyStartAtKey = buildLegacyStartAtKey(
-                row.train_code,
-                row.emu_code,
-                row.start_at
-            );
-            const existingResolved =
-                timetableIdByLegacyStartAtKey.get(legacyStartAtKey);
-            if (!existingResolved || row.id >= existingResolved.sourceRowId) {
-                timetableIdByLegacyStartAtKey.set(legacyStartAtKey, {
-                    sourceRowId: row.id,
-                    timetableId: resolved.timetableId
-                });
-            }
-        }
-    }
-
-    summary.rebuiltRows = rowByBusinessKey.size;
-    summary.deduplicatedRows = summary.scannedRows - summary.rebuiltRows;
-    return {
-        rows: [...rowByBusinessKey.values()].sort(
-            (left, right) => left.id - right.id
-        ),
-        summary,
-        timetableIdByLegacyStartAtKey: new Map(
-            [...timetableIdByLegacyStartAtKey.entries()].map(([key, value]) => [
-                key,
-                value.timetableId
-            ])
-        )
-    };
-}
-
-function migrateLegacyProbeRows(
-    legacyRows,
-    resolver,
-    dailyFallbackTimetableIdByLegacyStartAtKey = new Map()
-) {
-    const rowByBusinessKey = new Map();
-    const summary = createTableSummary('legacy', false);
-
-    for (const row of legacyRows) {
-        summary.scannedRows += 1;
-
-        let resolved = resolver.resolveProbeRowTimetable(row);
-        if (resolved.resolution === 'unresolved') {
-            const fallbackTimetableId =
-                dailyFallbackTimetableIdByLegacyStartAtKey.get(
-                    buildLegacyStartAtKey(
-                        row.train_code,
-                        row.emu_code,
-                        row.start_at
-                    )
-                ) ?? null;
-            if (fallbackTimetableId !== null) {
-                resolved = {
-                    ...resolved,
-                    timetableId: fallbackTimetableId,
-                    resolution: 'fallback'
-                };
-            }
-        }
-
-        if (resolved.resolution === 'exact') {
-            summary.exactMatches += 1;
-        } else if (resolved.resolution === 'fallback') {
-            summary.fallbackMatches += 1;
-        } else {
-            summary.unresolvedRows += 1;
-        }
-
-        const migratedRow = {
-            id: row.id,
-            train_code: normalizeCode(row.train_code),
-            emu_code: normalizeCode(row.emu_code),
-            service_date: resolved.serviceDate,
-            timetable_id: resolved.timetableId,
-            status: row.status
-        };
-        const businessKey = buildRowKey(migratedRow);
-        const existingRow = rowByBusinessKey.get(businessKey);
-        if (!existingRow || migratedRow.id >= existingRow.id) {
-            rowByBusinessKey.set(businessKey, migratedRow);
-        }
-    }
-
-    summary.rebuiltRows = rowByBusinessKey.size;
-    summary.deduplicatedRows = summary.scannedRows - summary.rebuiltRows;
-    return {
-        rows: [...rowByBusinessKey.values()].sort(
-            (left, right) => left.id - right.id
-        ),
-        summary
-    };
-}
-
 function assertFileExists(filePath, label) {
     if (!existsSync(filePath)) {
         throw new Error(`${label} does not exist: ${filePath}`);
@@ -538,9 +381,6 @@ function main() {
     const selectDailyColumns = emuDb.prepare(
         loadSql('assets/sql/emu/migrations/selectDailyEmuRoutesColumns.sql')
     );
-    const selectProbeColumns = emuDb.prepare(
-        loadSql('assets/sql/emu/migrations/selectProbeStatusColumns.sql')
-    );
     const selectTableExists = emuDb.prepare(
         loadSql('assets/sql/emu/migrations/selectTableExists.sql')
     );
@@ -549,23 +389,13 @@ function main() {
         const dailyColumnNames = new Set(
             selectDailyColumns.all().map((row) => row.name)
         );
-        const probeColumnNames = new Set(
-            selectProbeColumns.all().map((row) => row.name)
-        );
         const dailySchema = detectSchema(
             dailyColumnNames,
             ['service_date', 'timetable_id'],
             ['start_station_name', 'end_station_name', 'start_at', 'end_at']
         );
-        const probeSchema = detectSchema(
-            probeColumnNames,
-            ['service_date', 'timetable_id', 'status'],
-            ['start_at', 'status']
-        );
         const dailyBackupExists =
             (selectTableExists.get(DAILY_LEGACY_BACKUP_TABLE) ?? null) !== null;
-        const probeBackupExists =
-            (selectTableExists.get(PROBE_LEGACY_BACKUP_TABLE) ?? null) !== null;
 
         const summary = {
             mode: options.apply ? 'apply' : 'dry-run',
@@ -576,135 +406,32 @@ function main() {
                 dailyEmuRoutes: createTableSummary(
                     dailySchema,
                     dailyBackupExists
-                ),
-                probeStatus: createTableSummary(probeSchema, probeBackupExists)
+                )
             }
         };
 
         const resolver = createTimetableResolver(timetableDb);
-        let migratedDailyRows = [];
-        let migratedProbeRows = [];
-        let dailyFallbackTimetableIdByLegacyStartAtKey = new Map();
 
         if (dailySchema === 'legacy') {
-            const selectLegacyDailyRows = emuDb.prepare(
-                loadSql(
-                    'assets/sql/emu/migrations/selectLegacyDailyEmuRoutesRows.sql'
-                )
+            throw new Error(
+                'Unsupported legacy daily_emu_routes schema: this script was retired for ' +
+                    'pre-v2 storage schemas (train_code/emu_code/start_at). Use ' +
+                    'scripts/migrate-emu-storage-v2.mjs on the old database first, then run ' +
+                    'this script against the current schema.'
             );
-            const result = migrateLegacyDailyRows(
-                selectLegacyDailyRows.all(),
-                resolver
-            );
-            migratedDailyRows = result.rows;
-            dailyFallbackTimetableIdByLegacyStartAtKey =
-                result.timetableIdByLegacyStartAtKey;
-            summary.tables.dailyEmuRoutes = {
-                ...summary.tables.dailyEmuRoutes,
-                ...result.summary,
-                backupExists: dailyBackupExists
-            };
-        }
-
-        if (probeSchema === 'legacy') {
-            const selectLegacyProbeRows = emuDb.prepare(
-                loadSql(
-                    'assets/sql/emu/migrations/selectLegacyProbeStatusRows.sql'
-                )
-            );
-            const result = migrateLegacyProbeRows(
-                selectLegacyProbeRows.all(),
-                resolver,
-                dailyFallbackTimetableIdByLegacyStartAtKey
-            );
-            migratedProbeRows = result.rows;
-            summary.tables.probeStatus = {
-                ...summary.tables.probeStatus,
-                ...result.summary,
-                backupExists: probeBackupExists
-            };
         }
 
         if (options.apply) {
-            if (dailySchema === 'unknown' || probeSchema === 'unknown') {
+            if (dailySchema === 'unknown') {
                 throw new Error(
                     'Cannot apply migration because one or more source tables use an unknown schema.'
                 );
             }
 
-            if (dailySchema === 'missing' || probeSchema === 'missing') {
+            if (dailySchema === 'missing') {
                 throw new Error(
                     'Cannot apply migration because one or more source tables are missing.'
                 );
-            }
-
-            if (dailySchema === 'legacy' && dailyBackupExists) {
-                throw new Error(
-                    `Backup table already exists: ${DAILY_LEGACY_BACKUP_TABLE}`
-                );
-            }
-
-            if (probeSchema === 'legacy' && probeBackupExists) {
-                throw new Error(
-                    `Backup table already exists: ${PROBE_LEGACY_BACKUP_TABLE}`
-                );
-            }
-
-            if (dailySchema === 'legacy' || probeSchema === 'legacy') {
-                const renameDailyTableSql = loadSql(
-                    'assets/sql/emu/migrations/renameDailyEmuRoutesToLegacyBackup.sql'
-                );
-                const renameProbeTableSql = loadSql(
-                    'assets/sql/emu/migrations/renameProbeStatusToLegacyBackup.sql'
-                );
-                const createDailyTableSql = loadSql(
-                    'assets/sql/emu/schema/createDailyEmuRoutesTable.sql'
-                );
-                const createProbeTableSql = loadSql(
-                    'assets/sql/emu/schema/createProbeStatusTable.sql'
-                );
-                const applyMigration = emuDb.transaction(() => {
-                    if (dailySchema === 'legacy') {
-                        emuDb.exec(renameDailyTableSql);
-                        emuDb.exec(createDailyTableSql);
-                        const insertMigratedDailyRow = emuDb.prepare(
-                            loadSql(
-                                'assets/sql/emu/migrations/insertMigratedDailyEmuRouteRow.sql'
-                            )
-                        );
-                        for (const row of migratedDailyRows) {
-                            insertMigratedDailyRow.run(
-                                row.id,
-                                row.train_code,
-                                row.emu_code,
-                                row.service_date,
-                                row.timetable_id
-                            );
-                        }
-                    }
-
-                    if (probeSchema === 'legacy') {
-                        emuDb.exec(renameProbeTableSql);
-                        emuDb.exec(createProbeTableSql);
-                        const insertMigratedProbeRow = emuDb.prepare(
-                            loadSql(
-                                'assets/sql/emu/migrations/insertMigratedProbeStatusRow.sql'
-                            )
-                        );
-                        for (const row of migratedProbeRows) {
-                            insertMigratedProbeRow.run(
-                                row.id,
-                                row.train_code,
-                                row.emu_code,
-                                row.service_date,
-                                row.timetable_id,
-                                row.status
-                            );
-                        }
-                    }
-                });
-
-                applyMigration();
             }
         }
 

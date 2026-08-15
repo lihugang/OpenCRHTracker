@@ -225,6 +225,7 @@ message DailyRecordItem {
   optional uint32 timetable_id = 3;
   uint32 emu_id = 4;
   TrainCode train_code = 5;
+  uint32 status = 6;
 }
 
 message GetDailyRecordsData {
@@ -252,6 +253,7 @@ message TrainHistoryRecord {
   uint32 service_day = 2;
   optional uint32 timetable_id = 3;
   uint32 emu_id = 4;
+  uint32 status = 5;
 }
 
 message GetTrainHistoryData {
@@ -281,6 +283,7 @@ message EmuHistoryRecord {
   uint32 service_day = 2;
   optional uint32 timetable_id = 3;
   TrainCode train_code = 4;
+  uint32 status = 5;
 }
 
 message GetEmuHistoryData {

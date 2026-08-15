@@ -8,6 +8,9 @@ import { fileURLToPath } from 'node:url';
 const DEFAULT_CONFIG_PATH = 'data/config.json';
 const DEFAULT_BATCH_SIZE = 2000;
 const SHANGHAI_OFFSET_SECONDS = 8 * 60 * 60;
+const DAY_SECONDS = 24 * 60 * 60;
+const EPOCH_SERVICE_DAY_START_SECONDS =
+    Date.UTC(1970, 0, 1, 0, 0, 0) / 1000 - SHANGHAI_OFFSET_SECONDS;
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(scriptDir, '..');
@@ -156,6 +159,19 @@ function getShanghaiDayStartUnixSeconds(serviceDate) {
     );
 }
 
+function dayNumberToServiceDate(dayNumber) {
+    if (!Number.isInteger(dayNumber) || dayNumber < 0) {
+        return '';
+    }
+    const timestampMs =
+        (EPOCH_SERVICE_DAY_START_SECONDS + dayNumber * DAY_SECONDS) * 1000;
+    const shifted = new Date(timestampMs + SHANGHAI_OFFSET_SECONDS * 1000);
+    const year = shifted.getUTCFullYear();
+    const month = String(shifted.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(shifted.getUTCDate()).padStart(2, '0');
+    return `${year}${month}${day}`;
+}
+
 function buildAbsoluteTimestamp(serviceDate, offset) {
     if (!Number.isInteger(offset) || offset < 0) {
         return null;
@@ -167,10 +183,6 @@ function buildAbsoluteTimestamp(serviceDate, offset) {
     }
 
     return dayStart + offset;
-}
-
-function escapeSqliteStringLiteral(value) {
-    return `'${String(value).replace(/'/g, "''")}'`;
 }
 
 function normalizeOptionalInteger(value) {
@@ -267,96 +279,110 @@ function createTimetableStartOffsetResolver(timetableDb) {
 
 function createOutputSchema(outputDb) {
     outputDb.exec(
+        loadSql('assets/sql/emu/schema/createEmuCodeMappingTable.sql')
+    );
+    outputDb.exec(
         loadSql('assets/sql/emu/schema/createDailyEmuRoutesTable.sql')
     );
-    outputDb.exec(loadSql('assets/sql/emu/schema/createProbeStatusTable.sql'));
-    outputDb.exec(`CREATE TABLE daily_emu_routes_sorted_stage (
-        original_id INTEGER NOT NULL,
-        train_code TEXT NOT NULL,
-        emu_code TEXT NOT NULL,
-        service_date TEXT NOT NULL,
-        timetable_id INTEGER NULL,
-        start_at INTEGER NOT NULL
-    );`);
-    outputDb.exec(`CREATE INDEX idx_daily_emu_routes_sorted_stage_start_at_original_id
-        ON daily_emu_routes_sorted_stage(start_at ASC, original_id ASC);`);
+    outputDb.exec(
+        loadSql(
+            'assets/sql/emu/migrations/createDailyEmuRoutesSortedStageForReorder.sql'
+        )
+    );
 }
 
 function createStatements(sourceDb, outputDb) {
     return {
-        selectDailyRoutesBatch: sourceDb.prepare(`SELECT
-                id,
-                train_code,
-                emu_code,
-                service_date,
-                timetable_id
-            FROM daily_emu_routes
-            WHERE id > ?
-            ORDER BY id ASC
-            LIMIT ?`),
+        selectEmuCodeMappings: sourceDb.prepare(
+            loadSql(
+                'assets/sql/emu/migrations/selectEmuCodeMappingsForReorder.sql'
+            )
+        ),
+        selectSourceEmuCodeMappingCount: sourceDb.prepare(
+            loadSql(
+                'assets/sql/emu/migrations/selectEmuCodeMappingCountForReorder.sql'
+            )
+        ),
+        selectOutputEmuCodeMappingCount: outputDb.prepare(
+            loadSql(
+                'assets/sql/emu/migrations/selectEmuCodeMappingCountForReorder.sql'
+            )
+        ),
+        insertEmuCodeMapping: outputDb.prepare(
+            loadSql(
+                'assets/sql/emu/migrations/insertEmuCodeMappingForReorder.sql'
+            )
+        ),
+        selectDailyRoutesBatch: sourceDb.prepare(
+            loadSql(
+                'assets/sql/emu/migrations/selectDailyRoutesBatchForReorder.sql'
+            )
+        ),
         selectDailyRoutesCount: sourceDb.prepare(
-            'SELECT COUNT(*) AS count FROM daily_emu_routes'
+            loadSql(
+                'assets/sql/emu/migrations/selectDailyRoutesCountForReorder.sql'
+            )
         ),
-        selectProbeStatusCount: sourceDb.prepare(
-            'SELECT COUNT(*) AS count FROM probe_status'
+        insertUnresolvedDailyRoute: outputDb.prepare(
+            loadSql(
+                'assets/sql/emu/migrations/insertUnresolvedDailyEmuRouteForReorder.sql'
+            )
         ),
-        selectProbeStatusBatch: sourceDb.prepare(`SELECT
-                id,
-                train_code,
-                emu_code,
-                service_date,
-                timetable_id,
-                status
-            FROM probe_status
-            WHERE id > ?
-            ORDER BY id ASC
-            LIMIT ?`),
-        insertUnresolvedDailyRoute:
-            outputDb.prepare(`INSERT INTO daily_emu_routes (
-                train_code,
-                emu_code,
-                service_date,
-                timetable_id
-            ) VALUES (?, ?, ?, ?)`),
-        insertStageDailyRoute:
-            outputDb.prepare(`INSERT INTO daily_emu_routes_sorted_stage (
-                original_id,
-                train_code,
-                emu_code,
-                service_date,
-                timetable_id,
-                start_at
-            ) VALUES (?, ?, ?, ?, ?, ?)`),
-        insertResolvedDailyRoutes:
-            outputDb.prepare(`INSERT INTO daily_emu_routes (
-                train_code,
-                emu_code,
-                service_date,
-                timetable_id
-            ) SELECT
-                train_code,
-                emu_code,
-                service_date,
-                timetable_id
-            FROM daily_emu_routes_sorted_stage
-            ORDER BY start_at ASC, original_id ASC`),
+        insertStageDailyRoute: outputDb.prepare(
+            loadSql(
+                'assets/sql/emu/migrations/insertStageDailyEmuRouteForReorder.sql'
+            )
+        ),
+        insertResolvedDailyRoutes: outputDb.prepare(
+            loadSql(
+                'assets/sql/emu/migrations/insertResolvedDailyEmuRoutesForReorder.sql'
+            )
+        ),
         dropStageTable: outputDb.prepare(
-            'DROP TABLE daily_emu_routes_sorted_stage'
+            loadSql(
+                'assets/sql/emu/migrations/dropDailyEmuRoutesSortedStageForReorder.sql'
+            )
         ),
-        insertProbeStatus: outputDb.prepare(`INSERT INTO probe_status (
-                train_code,
-                emu_code,
-                service_date,
-                timetable_id,
-                status
-            ) VALUES (?, ?, ?, ?, ?)`),
         selectOutputDailyRoutesCount: outputDb.prepare(
-            'SELECT COUNT(*) AS count FROM daily_emu_routes'
-        ),
-        selectOutputProbeStatusCount: outputDb.prepare(
-            'SELECT COUNT(*) AS count FROM probe_status'
+            loadSql(
+                'assets/sql/emu/migrations/selectOutputDailyRoutesCountForReorder.sql'
+            )
         )
     };
+}
+
+function copyEmuCodeMappings(outputDb, statements) {
+    const rows = statements.selectEmuCodeMappings.all();
+    const copyMappings = outputDb.transaction((mappingRows) => {
+        for (const row of mappingRows) {
+            statements.insertEmuCodeMapping.run(row.id, row.emu_code);
+        }
+    });
+    copyMappings(rows);
+
+    const sourceCount =
+        statements.selectSourceEmuCodeMappingCount.get()?.count ?? 0;
+    const outputCount =
+        statements.selectOutputEmuCodeMappingCount.get()?.count ?? 0;
+    if (sourceCount !== outputCount) {
+        throw new Error(
+            `emu_code_mapping row count mismatch source=${sourceCount} output=${outputCount}`
+        );
+    }
+}
+
+function requireRouteStatus(row) {
+    if (
+        typeof row.status !== 'number' ||
+        !Number.isInteger(row.status) ||
+        row.status < 0 ||
+        row.status > 0x1f
+    ) {
+        throw new Error(
+            `invalid_daily_emu_route_status id=${row.id} value=${String(row.status)}`
+        );
+    }
+    return row.status;
 }
 
 function buildStats(sourceEmuDbPath, timetableDbPath, outputDbPath, batchSize) {
@@ -369,7 +395,6 @@ function buildStats(sourceEmuDbPath, timetableDbPath, outputDbPath, batchSize) {
         resolvedDailyRoutes: 0,
         unresolvedDailyRoutes: 0,
         unresolvedReasons: new Map(),
-        copiedProbeStatus: 0,
         writtenDailyRoutes: 0,
         startedAtMs: Date.now()
     };
@@ -388,13 +413,16 @@ function reorderDailyRoutes(sourceDb, outputDb, resolver, statements, stats) {
     const writeBatch = outputDb.transaction((rows) => {
         for (const row of rows) {
             stats.scannedDailyRoutes += 1;
+            const status = requireRouteStatus(row);
 
             if (row.timetable_id === null) {
                 statements.insertUnresolvedDailyRoute.run(
-                    row.train_code,
-                    row.emu_code,
+                    row.train_prefix,
+                    row.train_number,
+                    row.emu_id,
                     row.service_date,
-                    row.timetable_id
+                    row.timetable_id,
+                    status
                 );
                 stats.unresolvedDailyRoutes += 1;
                 incrementReason(stats, 'null_timetable_id');
@@ -404,10 +432,12 @@ function reorderDailyRoutes(sourceDb, outputDb, resolver, statements, stats) {
             const resolution = resolver.resolveStartOffset(row.timetable_id);
             if (!resolution.ok) {
                 statements.insertUnresolvedDailyRoute.run(
-                    row.train_code,
-                    row.emu_code,
+                    row.train_prefix,
+                    row.train_number,
+                    row.emu_id,
                     row.service_date,
-                    row.timetable_id
+                    row.timetable_id,
+                    status
                 );
                 stats.unresolvedDailyRoutes += 1;
                 incrementReason(stats, resolution.reason);
@@ -415,15 +445,17 @@ function reorderDailyRoutes(sourceDb, outputDb, resolver, statements, stats) {
             }
 
             const startAt = buildAbsoluteTimestamp(
-                row.service_date,
+                dayNumberToServiceDate(row.service_date),
                 resolution.startOffset
             );
             if (startAt === null) {
                 statements.insertUnresolvedDailyRoute.run(
-                    row.train_code,
-                    row.emu_code,
+                    row.train_prefix,
+                    row.train_number,
+                    row.emu_id,
                     row.service_date,
-                    row.timetable_id
+                    row.timetable_id,
+                    status
                 );
                 stats.unresolvedDailyRoutes += 1;
                 incrementReason(stats, 'invalid_service_date');
@@ -432,10 +464,12 @@ function reorderDailyRoutes(sourceDb, outputDb, resolver, statements, stats) {
 
             statements.insertStageDailyRoute.run(
                 row.id,
-                row.train_code,
-                row.emu_code,
+                row.train_prefix,
+                row.train_number,
+                row.emu_id,
                 row.service_date,
                 row.timetable_id,
+                status,
                 startAt
             );
             stats.resolvedDailyRoutes += 1;
@@ -465,40 +499,6 @@ function reorderDailyRoutes(sourceDb, outputDb, resolver, statements, stats) {
         stats.unresolvedDailyRoutes + stats.resolvedDailyRoutes;
 }
 
-function copyProbeStatus(outputDb, statements, stats) {
-    let lastId = 0;
-
-    const writeBatch = outputDb.transaction((rows) => {
-        for (const row of rows) {
-            statements.insertProbeStatus.run(
-                row.train_code,
-                row.emu_code,
-                row.service_date,
-                row.timetable_id,
-                row.status
-            );
-            stats.copiedProbeStatus += 1;
-        }
-    });
-
-    while (true) {
-        const rows = statements.selectProbeStatusBatch.all(
-            lastId,
-            stats.batchSize
-        );
-        if (rows.length === 0) {
-            break;
-        }
-
-        writeBatch(rows);
-        lastId = rows[rows.length - 1].id;
-
-        if (rows.length < stats.batchSize) {
-            break;
-        }
-    }
-}
-
 function printSummary(stats, sourceCounts, outputCounts) {
     const durationMs = Date.now() - stats.startedAtMs;
     console.log(`Source EMU DB: ${stats.sourceEmuDbPath}`);
@@ -506,16 +506,13 @@ function printSummary(stats, sourceCounts, outputCounts) {
     console.log(`Output DB: ${stats.outputDbPath}`);
     console.log(`Batch size: ${stats.batchSize}`);
     console.log(`Source daily_emu_routes rows: ${sourceCounts.dailyRoutes}`);
-    console.log(`Source probe_status rows: ${sourceCounts.probeStatus}`);
     console.log(`Scanned daily_emu_routes rows: ${stats.scannedDailyRoutes}`);
     console.log(`Resolved daily_emu_routes rows: ${stats.resolvedDailyRoutes}`);
     console.log(
         `Unresolved daily_emu_routes rows: ${stats.unresolvedDailyRoutes}`
     );
     console.log(`Written daily_emu_routes rows: ${stats.writtenDailyRoutes}`);
-    console.log(`Copied probe_status rows: ${stats.copiedProbeStatus}`);
     console.log(`Output daily_emu_routes rows: ${outputCounts.dailyRoutes}`);
-    console.log(`Output probe_status rows: ${outputCounts.probeStatus}`);
     console.log(`Elapsed ms: ${durationMs}`);
 
     if (stats.unresolvedReasons.size === 0) {
@@ -580,31 +577,22 @@ function main() {
         createOutputSchema(outputDb);
 
         const statements = createStatements(sourceDb, outputDb);
+        copyEmuCodeMappings(outputDb, statements);
         const resolver = createTimetableStartOffsetResolver(timetableDb);
         const sourceCounts = {
-            dailyRoutes: statements.selectDailyRoutesCount.get()?.count ?? 0,
-            probeStatus: statements.selectProbeStatusCount.get()?.count ?? 0
+            dailyRoutes: statements.selectDailyRoutesCount.get()?.count ?? 0
         };
 
         reorderDailyRoutes(sourceDb, outputDb, resolver, statements, stats);
-        copyProbeStatus(outputDb, statements, stats);
 
         const outputCounts = {
             dailyRoutes:
-                statements.selectOutputDailyRoutesCount.get()?.count ?? 0,
-            probeStatus:
-                statements.selectOutputProbeStatusCount.get()?.count ?? 0
+                statements.selectOutputDailyRoutesCount.get()?.count ?? 0
         };
 
         if (sourceCounts.dailyRoutes !== outputCounts.dailyRoutes) {
             throw new Error(
                 `daily_emu_routes row count mismatch source=${sourceCounts.dailyRoutes} output=${outputCounts.dailyRoutes}`
-            );
-        }
-
-        if (sourceCounts.probeStatus !== outputCounts.probeStatus) {
-            throw new Error(
-                `probe_status row count mismatch source=${sourceCounts.probeStatus} output=${outputCounts.probeStatus}`
             );
         }
 

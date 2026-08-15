@@ -1,10 +1,12 @@
 import getLogger from '~/server/libs/log4js';
 import useConfig from '~/server/config';
 import {
-    listProbeStatusByEmuCode,
-    listProbeStatusByTrainCode,
-    ProbeStatusValue
-} from '~/server/services/probeStatusStore';
+    getEmuRouteStatusByEmuCode,
+    getEmuRouteStatusByTrainCode,
+    listDailyRoutesByEmuCodeAndStartAt,
+    listDailyRoutesByTrainCodeAndStartAt
+} from '~/server/services/emuRoutesStore';
+import { isConfirmed } from '~/server/utils/emuRouteStatus';
 import {
     listUserIdsSubscribedToTarget,
     upsertUserEventSubscription
@@ -19,6 +21,7 @@ import {
 import { buildTrainStatusUpdatedNotification } from '~/server/utils/notifications/templates/trainStatusUpdated';
 import type { TrainCodeParts } from '~/server/utils/12306/trainCode';
 import type { EmuId } from '~/server/libs/database/emu';
+import type { DailyEmuRouteRow } from '~/server/services/emuRoutesStore';
 import {
     formatExternalEmuCode,
     formatExternalTrainCode
@@ -27,12 +30,16 @@ import type { FeedbackStatus, FeedbackVisibility } from '~/types/feedback';
 import type { NotificationPayload } from '~/types/notifications';
 import type { AuthEventTarget } from '~/server/types/authTargets';
 
-interface LookupStatusNotificationCandidate {
+export interface LookupStatusNotificationCandidate {
     targetType: 'train' | 'emu';
     targetId: TrainCodeParts | EmuId;
     startAt: number;
     previousStatus: number;
-    nextStatus: ProbeStatusValue;
+    nextStatus: number;
+}
+
+export interface LookupStatusNotificationSnapshot {
+    candidates: Array<Omit<LookupStatusNotificationCandidate, 'nextStatus'>>;
 }
 
 interface FeedbackAccessTarget {
@@ -41,19 +48,23 @@ interface FeedbackAccessTarget {
     deletedAt: number | null;
 }
 
+interface PreparedLookupStatusNotificationCandidate {
+    candidate: LookupStatusNotificationCandidate;
+    routeRows: DailyEmuRouteRow[] | null;
+}
+
 const logger = getLogger('event-notification');
 
 function buildLookupStatusNotificationPayload(
-    candidate: LookupStatusNotificationCandidate
+    candidate: LookupStatusNotificationCandidate,
+    routeRows: DailyEmuRouteRow[]
 ): NotificationPayload {
     if (candidate.targetType === 'train') {
         const targetId = candidate.targetId as TrainCodeParts;
         return buildTrainStatusUpdatedNotification(
             formatExternalTrainCode(targetId),
             candidate.startAt,
-            listProbeStatusByTrainCode(targetId, candidate.startAt).map((row) =>
-                formatExternalEmuCode(row.emu_id)
-            )
+            routeRows.map((row) => formatExternalEmuCode(row.emu_id))
         );
     }
 
@@ -61,30 +72,151 @@ function buildLookupStatusNotificationPayload(
     return buildEmuStatusUpdatedNotification(
         formatExternalEmuCode(targetId),
         candidate.startAt,
-        listProbeStatusByEmuCode(targetId, candidate.startAt).map((row) =>
-            formatExternalTrainCode(row.train_code)
-        )
+        routeRows.map((row) => formatExternalTrainCode(row.train_code))
     );
 }
 
 function shouldNotifyLookupStatusChange(
     previousStatus: number,
-    nextStatus: ProbeStatusValue
+    nextStatus: number
 ) {
-    if (
-        nextStatus !== ProbeStatusValue.SingleFormationResolved &&
-        nextStatus !== ProbeStatusValue.CoupledFormationResolved
-    ) {
-        return false;
+    return previousStatus !== nextStatus && isConfirmed(nextStatus);
+}
+
+export function captureLookupStatusNotificationSnapshot(
+    trainCodes: TrainCodeParts[],
+    emuIds: EmuId[],
+    startAt: number
+): LookupStatusNotificationSnapshot {
+    const candidates: LookupStatusNotificationSnapshot['candidates'] = [];
+    const seenTrainCodes = new Set<string>();
+    for (const trainCode of trainCodes) {
+        const key = formatExternalTrainCode(trainCode);
+        if (seenTrainCodes.has(key)) {
+            continue;
+        }
+        seenTrainCodes.add(key);
+        candidates.push({
+            targetType: 'train',
+            targetId: trainCode,
+            startAt,
+            previousStatus: getEmuRouteStatusByTrainCode(trainCode, startAt)
+        });
     }
 
-    if (previousStatus < ProbeStatusValue.SingleFormationResolved) {
-        return true;
+    const seenEmuIds = new Set<number>();
+    for (const emuId of emuIds) {
+        const key = Number(emuId);
+        if (seenEmuIds.has(key)) {
+            continue;
+        }
+        seenEmuIds.add(key);
+        candidates.push({
+            targetType: 'emu',
+            targetId: emuId,
+            startAt,
+            previousStatus: getEmuRouteStatusByEmuCode(emuId, startAt)
+        });
     }
 
-    return (
-        previousStatus === ProbeStatusValue.SingleFormationResolved &&
-        nextStatus === ProbeStatusValue.CoupledFormationResolved
+    return { candidates };
+}
+
+export function resolveLookupStatusNotificationCandidates(
+    snapshot: LookupStatusNotificationSnapshot
+): LookupStatusNotificationCandidate[] {
+    return snapshot.candidates.map((candidate) => ({
+        ...candidate,
+        nextStatus:
+            candidate.targetType === 'train'
+                ? getEmuRouteStatusByTrainCode(
+                      candidate.targetId as TrainCodeParts,
+                      candidate.startAt
+                  )
+                : getEmuRouteStatusByEmuCode(
+                      candidate.targetId as EmuId,
+                      candidate.startAt
+                  )
+    }));
+}
+
+function buildLookupServiceInstanceKey(
+    candidate: LookupStatusNotificationCandidate,
+    routeRows: DailyEmuRouteRow[]
+): string {
+    if (candidate.targetType === 'emu') {
+        return `emu:${Number(candidate.targetId)}:${candidate.startAt}:${candidate.nextStatus}`;
+    }
+
+    const targetId = candidate.targetId as TrainCodeParts;
+    if (routeRows.length === 0) {
+        return `train:${formatExternalTrainCode(targetId)}:${candidate.startAt}:${candidate.nextStatus}`;
+    }
+
+    const routeIdentity = routeRows
+        .map(
+            (row) =>
+                `${Number(row.service_date)}:${row.timetable_id ?? 'unresolved'}:${Number(row.emu_id)}`
+        )
+        .sort()
+        .join(',');
+    return `train-service:${candidate.startAt}:${routeIdentity}:${candidate.nextStatus}`;
+}
+
+async function sendLookupNotificationGroup(
+    candidates: PreparedLookupStatusNotificationCandidate[]
+) {
+    const candidateByUserId = new Map<
+        string,
+        PreparedLookupStatusNotificationCandidate
+    >();
+    const payloadByCandidate = new Map<
+        PreparedLookupStatusNotificationCandidate,
+        NotificationPayload
+    >();
+    for (const preparedCandidate of candidates) {
+        const candidate = preparedCandidate.candidate;
+        const target: AuthEventTarget =
+            candidate.targetType === 'train'
+                ? {
+                      kind: 'train',
+                      trainCode: candidate.targetId as TrainCodeParts
+                  }
+                : { kind: 'emu', emuId: candidate.targetId as EmuId };
+        for (const userId of listUserIdsSubscribedToTarget(target)) {
+            if (!candidateByUserId.has(userId)) {
+                candidateByUserId.set(userId, preparedCandidate);
+            }
+        }
+    }
+
+    await Promise.all(
+        Array.from(candidateByUserId, async ([userId, preparedCandidate]) => {
+            const candidate = preparedCandidate.candidate;
+            try {
+                let payload = payloadByCandidate.get(preparedCandidate);
+                if (!payload) {
+                    const routeRows =
+                        preparedCandidate.routeRows ??
+                        listDailyRoutesByEmuCodeAndStartAt(
+                            candidate.targetId as EmuId,
+                            candidate.startAt
+                        );
+                    payload = buildLookupStatusNotificationPayload(
+                        candidate,
+                        routeRows
+                    );
+                    payloadByCandidate.set(preparedCandidate, payload);
+                }
+                await sendPushNotificationToUser(userId, payload);
+            } catch (error) {
+                const message =
+                    error instanceof Error ? error.message : String(error);
+                logger.error(
+                    `event_notification_send_failed userId=${userId} targetKind=${candidate.targetType} targetKey=${candidate.targetType === 'train' ? formatExternalTrainCode(candidate.targetId as TrainCodeParts) : formatExternalEmuCode(candidate.targetId as EmuId)} message=${message}`
+                );
+            }
+        })
     );
 }
 
@@ -147,9 +279,9 @@ async function sendNotificationToTargetSubscribers(
 export async function notifyLookupStatusChanges(
     candidates: LookupStatusNotificationCandidate[]
 ) {
-    const uniqueCandidates = new Map<
+    const groupedCandidates = new Map<
         string,
-        LookupStatusNotificationCandidate
+        PreparedLookupStatusNotificationCandidate[]
     >();
 
     for (const candidate of candidates) {
@@ -162,35 +294,21 @@ export async function notifyLookupStatusChanges(
             continue;
         }
 
-        uniqueCandidates.set(
-            `${candidate.targetType}:${
-                candidate.targetType === 'train'
-                    ? formatExternalTrainCode(
-                          candidate.targetId as TrainCodeParts
-                      )
-                    : formatExternalEmuCode(candidate.targetId as EmuId)
-            }:${candidate.startAt}:${candidate.nextStatus}`,
-            candidate
-        );
+        const routeRows =
+            candidate.targetType === 'train'
+                ? listDailyRoutesByTrainCodeAndStartAt(
+                      candidate.targetId as TrainCodeParts,
+                      candidate.startAt
+                  )
+                : null;
+        const key = buildLookupServiceInstanceKey(candidate, routeRows ?? []);
+        const group = groupedCandidates.get(key) ?? [];
+        group.push({ candidate, routeRows });
+        groupedCandidates.set(key, group);
     }
 
     await Promise.all(
-        Array.from(uniqueCandidates.values()).map(async (candidate) => {
-            const payload = buildLookupStatusNotificationPayload(candidate);
-
-            await sendNotificationToTargetSubscribers(
-                candidate.targetType === 'train'
-                    ? {
-                          kind: 'train',
-                          trainCode: candidate.targetId as TrainCodeParts
-                      }
-                    : {
-                          kind: 'emu',
-                          emuId: candidate.targetId as EmuId
-                      },
-                payload
-            );
-        })
+        Array.from(groupedCandidates.values(), sendLookupNotificationGroup)
     );
 }
 

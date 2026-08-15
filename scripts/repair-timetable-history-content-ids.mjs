@@ -350,7 +350,45 @@ function emuGroupKey(row, timetableId) {
     return `${row.train_prefix}:${row.train_number}:${row.emu_id}:${row.service_date}:${timetableId}`;
 }
 
-function buildEmuTablePlan(rows, contentReferenceMap, kind) {
+function mergeRouteStatuses(rows) {
+    let confirmed = false;
+    let position = 0x00;
+    let fault = false;
+    let hotSpare = false;
+
+    for (const row of rows) {
+        const status = Number(row.status);
+        if (!Number.isInteger(status) || status < 0) {
+            continue;
+        }
+        if ((status & 0x01) !== 0) {
+            confirmed = true;
+        }
+        const rowPosition = status & 0x06;
+        if (rowPosition === 0x06) {
+            position = 0x06;
+        } else if (rowPosition === 0x04 && position !== 0x06) {
+            position = 0x04;
+        } else if (rowPosition === 0x02 && position === 0x00) {
+            position = 0x02;
+        }
+        if ((status & 0x08) !== 0) {
+            fault = true;
+        }
+        if ((status & 0x10) !== 0) {
+            hotSpare = true;
+        }
+    }
+
+    return (
+        (confirmed ? 0x01 : 0x00) |
+        position |
+        (fault ? 0x08 : 0x00) |
+        (hotSpare ? 0x10 : 0x00)
+    );
+}
+
+function buildEmuTablePlan(rows, contentReferenceMap) {
     const groupsByKey = new Map();
     for (const row of rows) {
         if (row.timetable_id === null || row.timetable_id === undefined) {
@@ -377,12 +415,8 @@ function buildEmuTablePlan(rows, contentReferenceMap, kind) {
             }
             return left.id - right.id;
         })[0];
-        const status =
-            kind === 'probe'
-                ? Math.max(...rowsForKey.map((row) => row.status))
-                : null;
+        const status = mergeRouteStatuses(rowsForKey);
         actions.push({
-            kind,
             keeperId: keeper.id,
             timetableId: targetId,
             status,
@@ -390,8 +424,7 @@ function buildEmuTablePlan(rows, contentReferenceMap, kind) {
                 .filter((row) => row.id !== keeper.id)
                 .map((row) => row.id),
             needsUpdate:
-                keeper.timetable_id !== targetId ||
-                (kind === 'probe' && keeper.status !== status)
+                keeper.timetable_id !== targetId || keeper.status !== status
         });
     }
     return actions;
@@ -445,29 +478,14 @@ function loadEmuStatements(db, attached) {
                 `assets/sql/emu/maintenance/selectAllDailyEmuRoutes${prefix}.sql`
             )
         ),
-        selectProbe: db.prepare(
-            loadSql(
-                `assets/sql/emu/maintenance/selectAllProbeStatusRows${prefix}.sql`
-            )
-        ),
         updateDaily: db.prepare(
             loadSql(
                 `assets/sql/emu/maintenance/updateDailyEmuRouteTimetableId${prefix}.sql`
             )
         ),
-        updateProbe: db.prepare(
-            loadSql(
-                `assets/sql/emu/maintenance/updateProbeStatusTimetableId${prefix}.sql`
-            )
-        ),
         deleteDaily: db.prepare(
             loadSql(
                 `assets/sql/emu/maintenance/deleteDailyEmuRouteById${attached ? 'Attached' : ''}.sql`
-            )
-        ),
-        deleteProbe: db.prepare(
-            loadSql(
-                `assets/sql/emu/maintenance/deleteProbeStatusById${attached ? 'Attached' : ''}.sql`
             )
         )
     };
@@ -500,45 +518,30 @@ function analyze(historyStatements, emuStatements) {
         emuStatements.selectDaily,
         contentPlan.referenceMap
     );
-    const probeScan = scanAffectedEmuRows(
-        emuStatements.selectProbe,
-        contentPlan.referenceMap
-    );
     const coveragePlan = buildCoveragePlan(coverageRows, contentPlan.remap);
     const dailyPlan = buildEmuTablePlan(
         dailyScan.affectedRows,
-        contentPlan.referenceMap,
-        'daily'
-    );
-    const probePlan = buildEmuTablePlan(
-        probeScan.affectedRows,
-        contentPlan.referenceMap,
-        'probe'
+        contentPlan.referenceMap
     );
 
     return {
         contentRows,
         coverageRows,
         dailyScan,
-        probeScan,
         contentPlan,
         coveragePlan,
-        dailyPlan,
-        probePlan
+        dailyPlan
     };
 }
 
 function buildSummary(analysis, mode, paths, backupDir = null) {
-    const { contentRows, coverageRows, dailyScan, probeScan } = analysis;
-    const { contentPlan, coveragePlan, dailyPlan, probePlan } = analysis;
+    const { contentRows, coverageRows, dailyScan } = analysis;
+    const { contentPlan, coveragePlan, dailyPlan } = analysis;
     const hashMismatches = contentPlan.entries.filter(
         (entry) => entry.row.hash !== entry.actualHash
     ).length;
     const changedContentRows = contentPlan.updates.length;
     const dailyUpdated = dailyPlan.filter(
-        (action) => action.needsUpdate
-    ).length;
-    const probeUpdated = probePlan.filter(
         (action) => action.needsUpdate
     ).length;
     return {
@@ -562,13 +565,6 @@ function buildSummary(analysis, mode, paths, backupDir = null) {
         affectedDailyRows: dailyScan.affectedRows.length,
         dailyRowsToUpdate: dailyUpdated,
         dailyRowsToDelete: dailyPlan.reduce(
-            (count, action) => count + action.deleteIds.length,
-            0
-        ),
-        scannedProbeRows: probeScan.scannedRows,
-        affectedProbeRows: probeScan.affectedRows.length,
-        probeRowsToUpdate: probeUpdated,
-        probeRowsToDelete: probePlan.reduce(
             (count, action) => count + action.deleteIds.length,
             0
         ),
@@ -597,7 +593,7 @@ function buildSummary(analysis, mode, paths, backupDir = null) {
     };
 }
 
-function applyEmuPlan(statements, dailyPlan, probePlan) {
+function applyEmuPlan(statements, dailyPlan) {
     for (const action of dailyPlan) {
         for (const id of action.deleteIds) {
             statements.deleteDaily.run(id);
@@ -605,17 +601,7 @@ function applyEmuPlan(statements, dailyPlan, probePlan) {
     }
     for (const action of dailyPlan) {
         if (action.needsUpdate) {
-            statements.updateDaily.run(action.timetableId, action.keeperId);
-        }
-    }
-    for (const action of probePlan) {
-        for (const id of action.deleteIds) {
-            statements.deleteProbe.run(id);
-        }
-    }
-    for (const action of probePlan) {
-        if (action.needsUpdate) {
-            statements.updateProbe.run(
+            statements.updateDaily.run(
                 action.timetableId,
                 action.status,
                 action.keeperId
@@ -712,11 +698,6 @@ function validateAppliedState(historyStatements, emuStatements) {
         }
     }
     validateEmuReferences(emuStatements.selectDaily, contentIds, 'daily route');
-    validateEmuReferences(
-        emuStatements.selectProbe,
-        contentIds,
-        'probe status'
-    );
     return analysis;
 }
 
@@ -813,7 +794,7 @@ async function main() {
 
         await createBackups(paths, backupDir);
         const transaction = historyDb.transaction(() => {
-            applyEmuPlan(emuStatements, analysis.dailyPlan, analysis.probePlan);
+            applyEmuPlan(emuStatements, analysis.dailyPlan);
             applyHistoryPlan(historyStatements, analysis);
             validateAppliedState(historyStatements, emuStatements);
             const integrity = historyDb.pragma('integrity_check');

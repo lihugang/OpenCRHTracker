@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS daily_emu_routes (
     emu_id INTEGER NOT NULL REFERENCES emu_code_mapping(id),
     service_date INTEGER NOT NULL CHECK(service_date >= 0),
     timetable_id INTEGER NULL,
+    status INTEGER NOT NULL,
     UNIQUE(train_prefix, train_number, emu_id, service_date, timetable_id)
 );
 

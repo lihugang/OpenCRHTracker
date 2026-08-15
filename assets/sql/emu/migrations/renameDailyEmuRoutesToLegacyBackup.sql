@@ -1,2 +1,0 @@
-ALTER TABLE daily_emu_routes
-RENAME TO daily_emu_routes_legacy_pre_timetable_id;

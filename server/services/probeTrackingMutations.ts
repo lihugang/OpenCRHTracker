@@ -1,24 +1,16 @@
+import { useEmuDatabase } from '~/server/libs/database/emu';
 import {
-    insertDailyEmuRoute,
-    listDailyRoutesByTrainCodeInRange
+    listDailyRoutesByTrainCodeAndStartAt,
+    upsertDailyEmuRouteWithFormationStatus
 } from '~/server/services/emuRoutesStore';
-import {
-    ensureProbeStatus,
-    ProbeStatusValue,
-    type ProbeStatusRow,
-    listProbeStatusByTrainCode
-} from '~/server/services/probeStatusStore';
-import {
-    trainCodeKey,
-    type TrainCodeParts
-} from '~/server/utils/12306/trainCode';
+import type { TrainCodeParts } from '~/server/utils/12306/trainCode';
 import {
     unixSecondsToServiceDay,
     type ServiceDay
 } from '~/server/utils/date/serviceDay';
 import type { EmuId } from '~/server/libs/database/emu';
 
-export type ProbeTrackingMutationTable = 'daily_emu_routes' | 'probe_status';
+export type ProbeTrackingMutationTable = 'daily_emu_routes';
 
 export type ProbeTrackingMutationAction =
     | 'created'
@@ -49,26 +41,13 @@ export interface PersistTrackingRowsInput {
     endStation: string;
     startAt: number;
     endAt: number;
-    status: ProbeStatusValue;
+    status: number;
+    beforePersist?: () => void;
+    afterPersist?: () => void;
 }
 
 function getServiceDate(startAt: number): ServiceDay {
     return unixSecondsToServiceDay(startAt);
-}
-
-function findProbeRow(
-    rows: ProbeStatusRow[],
-    trainCode: TrainCodeParts,
-    emuId: EmuId
-) {
-    const trainKey = trainCodeKey(trainCode);
-    return (
-        rows.find(
-            (row) =>
-                trainCodeKey(row.train_code) === trainKey &&
-                Number(row.emu_id) === Number(emuId)
-        ) ?? null
-    );
 }
 
 export function persistProbeTrackingRows(
@@ -77,100 +56,55 @@ export function persistProbeTrackingRows(
     const mutations: ProbeTrackingMutation[] = [];
     const serviceDate = getServiceDate(input.startAt);
 
-    for (const trainCode of input.trainCodes) {
-        const previousProbeRows = listProbeStatusByTrainCode(
-            trainCode,
-            input.startAt
+    const transaction = useEmuDatabase().transaction(() => {
+        const previousRowsById = new Map(
+            input.trainCodes.flatMap((trainCode) =>
+                listDailyRoutesByTrainCodeAndStartAt(
+                    trainCode,
+                    input.startAt
+                ).map((row) => [row.id, row] as const)
+            )
         );
 
-        for (const emuId of input.emuIds) {
-            const previousProbeRow = findProbeRow(
-                previousProbeRows,
-                trainCode,
-                emuId
-            );
-            const probeAction = ensureProbeStatus(
-                trainCode,
-                emuId,
-                input.startAt,
-                input.status
-            );
-            const nextProbeRow = findProbeRow(
-                listProbeStatusByTrainCode(trainCode, input.startAt),
-                trainCode,
-                emuId
-            );
+        input.beforePersist?.();
 
-            mutations.push({
-                table: 'probe_status',
-                action: probeAction,
-                id: nextProbeRow?.id ?? previousProbeRow?.id ?? null,
-                trainCode,
-                emuId,
-                serviceDate:
-                    nextProbeRow?.service_date ??
-                    previousProbeRow?.service_date ??
-                    serviceDate,
-                timetableId:
-                    nextProbeRow?.timetable_id ??
-                    previousProbeRow?.timetable_id ??
-                    null,
-                startAt:
-                    nextProbeRow?.start_at ??
-                    previousProbeRow?.start_at ??
-                    input.startAt,
-                previousStatus: previousProbeRow?.status ?? null,
-                nextStatus: nextProbeRow?.status ?? input.status,
-                rowCount: 1
-            });
-
-            const previousRouteRow =
-                listDailyRoutesByTrainCodeInRange(
+        for (const trainCode of input.trainCodes) {
+            for (const emuId of input.emuIds) {
+                const upsertResult = upsertDailyEmuRouteWithFormationStatus(
                     trainCode,
+                    emuId,
                     input.startAt,
-                    input.startAt + 1
-                ).find((row) => Number(row.emu_id) === Number(emuId)) ?? null;
-
-            insertDailyEmuRoute(
-                trainCode,
-                emuId,
-                input.startStation,
-                input.endStation,
-                input.startAt,
-                input.endAt
-            );
-
-            const nextRouteRow =
-                listDailyRoutesByTrainCodeInRange(
+                    input.status
+                );
+                const previousRouteRow =
+                    previousRowsById.get(upsertResult.id) ?? null;
+                const previousStatus =
+                    previousRouteRow?.status ?? upsertResult.previousStatus;
+                const action =
+                    previousStatus === null
+                        ? 'created'
+                        : previousStatus === upsertResult.nextStatus
+                          ? 'unchanged'
+                          : 'updated';
+                mutations.push({
+                    table: 'daily_emu_routes',
+                    action,
+                    id: upsertResult.id,
                     trainCode,
-                    input.startAt,
-                    input.startAt + 1
-                ).find((row) => Number(row.emu_id) === Number(emuId)) ?? null;
-
-            mutations.push({
-                table: 'daily_emu_routes',
-                action: previousRouteRow ? 'updated' : 'created',
-                id: nextRouteRow?.id ?? previousRouteRow?.id ?? null,
-                trainCode,
-                emuId,
-                serviceDate:
-                    nextRouteRow?.service_date ??
-                    previousRouteRow?.service_date ??
+                    emuId,
                     serviceDate,
-                timetableId:
-                    nextRouteRow?.timetable_id ??
-                    previousRouteRow?.timetable_id ??
-                    null,
-                startAt:
-                    nextRouteRow?.start_at ??
-                    previousRouteRow?.start_at ??
-                    input.startAt,
-                previousStatus: null,
-                nextStatus: null,
-                rowCount: 1
-            });
+                    timetableId: upsertResult.timetableId,
+                    startAt: input.startAt,
+                    previousStatus,
+                    nextStatus: upsertResult.nextStatus,
+                    rowCount: 1
+                });
+            }
         }
-    }
 
+        input.afterPersist?.();
+    });
+
+    transaction();
     return mutations;
 }

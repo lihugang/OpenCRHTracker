@@ -1102,7 +1102,7 @@ export const deployDocsSections: DocsContentSection[] = [
                         required: false,
                         description: '启动时跳过的执行器列表。',
                         notes: [
-                            '只能使用 build_today_schedule、generate_route_refresh_tasks、dispatch_daily_probe_tasks、clear_daily_probe_status、cleanup_revoked_api_keys、export_daily_records、rebuild_reference_model_index、rebuild_train_circulation_index。',
+                            '只能使用 build_today_schedule、generate_route_refresh_tasks、dispatch_daily_probe_tasks、clear_daily_probe_untrusted_records、cleanup_revoked_api_keys、export_daily_records、rebuild_reference_model_index、rebuild_train_circulation_index。',
                             '为空数组表示全部启用。'
                         ]
                     },

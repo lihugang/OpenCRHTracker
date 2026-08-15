@@ -144,7 +144,7 @@ function syncBuildConfirmedTimetableHistory(
         confirmedTrainCodes
     );
     logger.info(
-        `timetable_id_sync date=${formatExternalServiceDate(promotedState.date)} scannedTrainCodes=${timetableIdSyncResult.scannedTrainCodes} changedTrainCodes=${timetableIdSyncResult.changedTrainCodes} updatedDailyRows=${timetableIdSyncResult.updatedDailyRows} deletedDailyRows=${timetableIdSyncResult.deletedDailyRows} updatedProbeRows=${timetableIdSyncResult.updatedProbeRows} deletedProbeRows=${timetableIdSyncResult.deletedProbeRows}`
+        `timetable_id_sync date=${formatExternalServiceDate(promotedState.date)} scannedTrainCodes=${timetableIdSyncResult.scannedTrainCodes} changedTrainCodes=${timetableIdSyncResult.changedTrainCodes} updatedDailyRows=${timetableIdSyncResult.updatedDailyRows} deletedDailyRows=${timetableIdSyncResult.deletedDailyRows}`
     );
 }
 

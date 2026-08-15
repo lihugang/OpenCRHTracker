@@ -20,33 +20,29 @@ import {
     markEmuCodesAssignedToday
 } from '~/server/services/probeRuntimeState';
 import {
-    deleteProbeStatusByTrainCodeInRange,
-    ensureProbeStatus,
-    getLatestResolvedProbeStatusByEmuCodeBefore,
-    getProbeStatusByEmuCodeValue,
-    getProbeStatusByTrainCodeValue,
-    listProbeStatusByEmuCode,
-    listProbeStatusByEmuCodeInRange,
-    listProbeStatusByTrainCode,
-    listProbeStatusByTrainCodeInRange,
-    updateProbeStatusByEmuCode,
-    ProbeStatusValue,
-    type ProbeStatusRow
-} from '~/server/services/probeStatusStore';
-import {
+    deleteProbeUntrustedRecordsByTrainCodeInRange,
     deleteProbeUntrustedRecordsByTrainCodeAndEmuCodeAtServiceDate,
     isProbeUntrustedRecord,
     markProbeUntrustedRecord
 } from '~/server/services/probeUntrustedRecordStore';
 import {
     deleteDailyRoutesByTrainCodeInRange,
-    insertDailyEmuRoute,
+    getLatestConfirmedDailyRouteByEmuCodeBefore,
+    listDailyRoutesByEmuCodeAndStartAt,
     listDailyRoutesByEmuCodeInRange,
+    listDailyRoutesByTrainCodeAndStartAt,
     listDailyRoutesByTrainCodeInRange,
+    updateDailyRouteFormationStatusByEmuCode,
     type DailyEmuRouteRow
 } from '~/server/services/emuRoutesStore';
+import {
+    EMU_ROUTE_STATUS_CONFIRMED_COUPLED_UNKNOWN,
+    EMU_ROUTE_STATUS_CONFIRMED_SINGLE,
+    EMU_ROUTE_STATUS_UNCONFIRMED_SINGLE,
+    isConfirmed,
+    isConfirmedCoupled
+} from '~/server/utils/emuRouteStatus';
 import { persistProbeTrackingRows } from '~/server/services/probeTrackingMutations';
-import { notifyLookupStatusChanges } from '~/server/services/eventNotificationService';
 import { registerTaskExecutor } from '~/server/services/taskExecutorRegistry';
 import { enqueueTask } from '~/server/services/taskQueue';
 import { DETECT_COUPLED_EMU_GROUP_TASK_EXECUTOR } from '~/server/services/taskExecutors/detectCoupledEmuGroupTaskExecutor';
@@ -116,12 +112,11 @@ interface CoupledDetectionTaskArgs {
 
 interface KnownStatusGroup {
     emuIds: EmuId[];
-    finalStatus: ProbeStatusValue;
+    finalStatus: number;
 }
 
 interface ClearedOverlapState {
     deletedDailyRouteRows: number;
-    deletedProbeStatusRows: number;
     clearedTrainKeys: string[];
     affectedEmuIds: EmuId[];
 }
@@ -160,7 +155,7 @@ interface TrainProvenanceConflictGroupPayload extends TrainProvenanceConflictCur
 }
 
 interface ClearedNotRunningState extends ClearedOverlapState {
-    downgradedProbeStatusRows: number;
+    downgradedRouteRows: number;
 }
 
 interface TodayTrainCodesValidationResult {
@@ -318,28 +313,6 @@ function isCurrentScheduleTask(startAt: number): boolean {
     const dayStart = getShanghaiDayStartUnixSeconds(currentDate);
     const nextDayStart = dayStart + 24 * 60 * 60;
     return startAt >= dayStart && startAt < nextDayStart;
-}
-
-function persistDailyRoutes(
-    trainCodes: TrainCodeParts[],
-    emuIds: EmuId[],
-    startStation: string,
-    endStation: string,
-    startAt: number,
-    endAt: number
-): void {
-    for (const trainCode of trainCodes) {
-        for (const emuId of emuIds) {
-            insertDailyEmuRoute(
-                trainCode,
-                emuId,
-                startStation,
-                endStation,
-                startAt,
-                endAt
-            );
-        }
-    }
 }
 
 function getCurrentDayWindow(): {
@@ -623,13 +596,13 @@ function collectOverlappingGroups(
     return Array.from(overlappingGroups.values());
 }
 
-function downgradeAffectedProbeStatuses(
+function downgradeAffectedRouteStatuses(
     emuIds: EmuId[],
     deletedTrainCodes: Set<string>,
     dayStart: number,
     nextDayStart: number
 ): number {
-    let downgradedProbeStatusRows = 0;
+    let downgradedRouteRows = 0;
 
     const seenEmuIds = new Set<number>();
     for (const emuId of emuIds) {
@@ -639,7 +612,7 @@ function downgradeAffectedProbeStatuses(
         }
         seenEmuIds.add(emuIdNumber);
         const startAts = new Set<number>();
-        for (const row of listProbeStatusByEmuCodeInRange(
+        for (const row of listDailyRoutesByEmuCodeInRange(
             emuId,
             dayStart,
             nextDayStart
@@ -652,15 +625,15 @@ function downgradeAffectedProbeStatuses(
         }
 
         for (const startAt of startAts) {
-            downgradedProbeStatusRows += updateProbeStatusByEmuCode(
+            downgradedRouteRows += updateDailyRouteFormationStatusByEmuCode(
                 emuId,
                 startAt,
-                ProbeStatusValue.PendingCouplingDetection
+                EMU_ROUTE_STATUS_UNCONFIRMED_SINGLE
             );
         }
     }
 
-    return downgradedProbeStatusRows;
+    return downgradedRouteRows;
 }
 
 function clearOverlappingGroups(
@@ -672,7 +645,6 @@ function clearOverlappingGroups(
     const affectedEmuIds = new Set<number>();
     const clearedTrainKeys: string[] = [];
     let deletedDailyRouteRows = 0;
-    let deletedProbeStatusRows = 0;
 
     for (const group of groups) {
         clearQueriedTrainKey(group.trainKey);
@@ -696,18 +668,13 @@ function clearOverlappingGroups(
                 dayStart,
                 nextDayStart
             ).forEach((row) => affectedEmuIds.add(Number(row.emu_id)));
-            listProbeStatusByTrainCodeInRange(
-                trainCode,
-                dayStart,
-                nextDayStart
-            ).forEach((row) => affectedEmuIds.add(Number(row.emu_id)));
 
             deletedDailyRouteRows += deleteDailyRoutesByTrainCodeInRange(
                 trainCode,
                 dayStart,
                 nextDayStart
             );
-            deletedProbeStatusRows += deleteProbeStatusByTrainCodeInRange(
+            deleteProbeUntrustedRecordsByTrainCodeInRange(
                 trainCode,
                 dayStart,
                 nextDayStart
@@ -727,7 +694,6 @@ function clearOverlappingGroups(
 
     return {
         deletedDailyRouteRows,
-        deletedProbeStatusRows,
         clearedTrainKeys,
         affectedEmuIds: Array.from(affectedEmuIds, (emuId) => emuId as EmuId)
     };
@@ -744,7 +710,6 @@ function clearNotRunningGroups(
     const deletedTrainCodes = new Set<string>();
     const clearedTrainKeys: string[] = [];
     let deletedDailyRouteRows = 0;
-    let deletedProbeStatusRows = 0;
 
     for (const group of groups) {
         clearQueriedTrainKey(group.trainKey);
@@ -766,18 +731,13 @@ function clearNotRunningGroups(
                 dayStart,
                 nextDayStart
             ).forEach((row) => affectedEmuIds.add(Number(row.emu_id)));
-            listProbeStatusByTrainCodeInRange(
-                trainCode,
-                dayStart,
-                nextDayStart
-            ).forEach((row) => affectedEmuIds.add(Number(row.emu_id)));
 
             deletedDailyRouteRows += deleteDailyRoutesByTrainCodeInRange(
                 trainCode,
                 dayStart,
                 nextDayStart
             );
-            deletedProbeStatusRows += deleteProbeStatusByTrainCodeInRange(
+            deleteProbeUntrustedRecordsByTrainCodeInRange(
                 trainCode,
                 dayStart,
                 nextDayStart
@@ -789,7 +749,7 @@ function clearNotRunningGroups(
         affectedEmuIds,
         (emuId) => emuId as EmuId
     );
-    const downgradedProbeStatusRows = downgradeAffectedProbeStatuses(
+    const downgradedRouteRows = downgradeAffectedRouteStatuses(
         normalizedAffectedEmuIds,
         deletedTrainCodes,
         dayStart,
@@ -808,10 +768,9 @@ function clearNotRunningGroups(
 
     return {
         deletedDailyRouteRows,
-        deletedProbeStatusRows,
         clearedTrainKeys,
         affectedEmuIds: normalizedAffectedEmuIds,
-        downgradedProbeStatusRows
+        downgradedRouteRows
     };
 }
 
@@ -847,25 +806,27 @@ function requeueCurrentProbeTaskWithOverlapDelay(
 }
 
 function collectKnownStatusGroup(
-    rows: ProbeStatusRow[],
+    rows: DailyEmuRouteRow[],
     currentEmuId: EmuId,
     startAt: number
 ): KnownStatusGroup {
     const emuIds = new Set<number>([Number(currentEmuId)]);
-    let finalStatus: ProbeStatusValue = rows.some(
-        (row) => row.status === ProbeStatusValue.CoupledFormationResolved
-    )
-        ? ProbeStatusValue.CoupledFormationResolved
-        : ProbeStatusValue.SingleFormationResolved;
+    const finalStatus = rows.some((row) => isConfirmedCoupled(row.status))
+        ? EMU_ROUTE_STATUS_CONFIRMED_COUPLED_UNKNOWN
+        : EMU_ROUTE_STATUS_CONFIRMED_SINGLE;
 
     for (const row of rows) {
         emuIds.add(Number(row.emu_id));
     }
 
-    if (finalStatus === ProbeStatusValue.CoupledFormationResolved) {
+    if (finalStatus === EMU_ROUTE_STATUS_CONFIRMED_COUPLED_UNKNOWN) {
+        const trainCodesByKey = new Map<string, TrainCodeParts>();
         for (const row of rows) {
-            const relatedRows = listProbeStatusByTrainCode(
-                row.train_code,
+            trainCodesByKey.set(trainCodeKey(row.train_code), row.train_code);
+        }
+        for (const trainCode of trainCodesByKey.values()) {
+            const relatedRows = listDailyRoutesByTrainCodeAndStartAt(
+                trainCode,
                 startAt
             );
             for (const relatedRow of relatedRows) {
@@ -881,27 +842,29 @@ function collectKnownStatusGroup(
 }
 
 function collectKnownStatusGroupForServiceDate(
-    rows: ProbeStatusRow[],
+    rows: DailyEmuRouteRow[],
     currentEmuId: EmuId,
     startAt: number,
     serviceDate: ServiceDay
 ): KnownStatusGroup {
     const { dayStart, nextDayStart } = getCurrentDayWindow();
     const emuIds = new Set<number>([Number(currentEmuId)]);
-    let finalStatus: ProbeStatusValue = rows.some(
-        (row) => row.status === ProbeStatusValue.CoupledFormationResolved
-    )
-        ? ProbeStatusValue.CoupledFormationResolved
-        : ProbeStatusValue.SingleFormationResolved;
+    const finalStatus = rows.some((row) => isConfirmedCoupled(row.status))
+        ? EMU_ROUTE_STATUS_CONFIRMED_COUPLED_UNKNOWN
+        : EMU_ROUTE_STATUS_CONFIRMED_SINGLE;
 
     for (const row of rows) {
         emuIds.add(Number(row.emu_id));
     }
 
-    if (finalStatus === ProbeStatusValue.CoupledFormationResolved) {
+    if (finalStatus === EMU_ROUTE_STATUS_CONFIRMED_COUPLED_UNKNOWN) {
+        const trainCodesByKey = new Map<string, TrainCodeParts>();
         for (const row of rows) {
-            const relatedRows = listProbeStatusByTrainCodeInRange(
-                row.train_code,
+            trainCodesByKey.set(trainCodeKey(row.train_code), row.train_code);
+        }
+        for (const trainCode of trainCodesByKey.values()) {
+            const relatedRows = listDailyRoutesByTrainCodeInRange(
+                trainCode,
                 dayStart,
                 nextDayStart
             ).filter(
@@ -925,15 +888,9 @@ function collectKnownStatusGroupForServiceDate(
 function getResolvedCurrentStatusRows(
     mainEmuId: EmuId,
     startAt: number
-): ProbeStatusRow[] {
-    const directRows = listProbeStatusByEmuCode(mainEmuId, startAt);
-    if (
-        directRows.some(
-            (row) =>
-                row.status === ProbeStatusValue.SingleFormationResolved ||
-                row.status === ProbeStatusValue.CoupledFormationResolved
-        )
-    ) {
+): DailyEmuRouteRow[] {
+    const directRows = listDailyRoutesByEmuCodeAndStartAt(mainEmuId, startAt);
+    if (directRows.some((row) => isConfirmed(row.status))) {
         return directRows;
     }
 
@@ -944,14 +901,13 @@ function getResolvedCurrentStatusRows(
 
     const { dayStart, nextDayStart } = getCurrentDayWindow();
     const serviceDate = unixSecondsToServiceDay(startAt);
-    return listProbeStatusByEmuCodeInRange(
+    return listDailyRoutesByEmuCodeInRange(
         mainEmuId,
         dayStart,
         nextDayStart
     ).filter(
         (row) =>
-            (row.status === ProbeStatusValue.SingleFormationResolved ||
-                row.status === ProbeStatusValue.CoupledFormationResolved) &&
+            isConfirmed(row.status) &&
             (row.start_at === startAt ||
                 (row.start_at === 0 && row.service_date === serviceDate))
     );
@@ -961,8 +917,8 @@ function collectResolvedRowsForAssignedEmuCodes(
     emuIds: EmuId[],
     dayStart: number,
     nextDayStart: number
-): ProbeStatusRow[] {
-    const rowsByKey = new Map<string, ProbeStatusRow>();
+): DailyEmuRouteRow[] {
+    const rowsByKey = new Map<string, DailyEmuRouteRow>();
 
     const seenEmuIds = new Set<number>();
     for (const emuId of emuIds) {
@@ -971,15 +927,12 @@ function collectResolvedRowsForAssignedEmuCodes(
             continue;
         }
         seenEmuIds.add(emuIdNumber);
-        for (const row of listProbeStatusByEmuCodeInRange(
+        for (const row of listDailyRoutesByEmuCodeInRange(
             emuId,
             dayStart,
             nextDayStart
         )) {
-            if (
-                row.status !== ProbeStatusValue.SingleFormationResolved &&
-                row.status !== ProbeStatusValue.CoupledFormationResolved
-            ) {
+            if (!isConfirmed(row.status)) {
                 continue;
             }
 
@@ -1072,7 +1025,7 @@ async function tryAutoMergeResolvedInternalGroup(
         trainKey,
         mergedTrainCodes,
         mergedEmuIds,
-        ProbeStatusValue.CoupledFormationResolved,
+        EMU_ROUTE_STATUS_CONFIRMED_COUPLED_UNKNOWN,
         nowSeconds
     );
     recordCurrentTrainProvenanceEventsForTrainCodes(mergedTrainCodes, {
@@ -1650,7 +1603,7 @@ async function tryResolveOverlappingRoutes(
             extraAffectedEmuCodesByTrainKey
         );
         logger.info(
-            `overlap_drop_not_running conflictEmuCode=${formatExternalEmuCode(mainEmuId)} droppedGroups=${formatTrainCodeGroups(notRunningGroups)} notRunningTrainCodes=${notRunningTrainCodes.map(formatTrainCode).join(',')} requestFailedTrainCodes=${requestFailedTrainCodes.map(formatTrainCode).join(',')} affectedEmuCodes=${clearedNotRunningState.affectedEmuIds.map(formatExternalEmuCode).join(',')} deletedDailyRouteRows=${clearedNotRunningState.deletedDailyRouteRows} deletedProbeStatusRows=${clearedNotRunningState.deletedProbeStatusRows} downgradedProbeStatusRows=${clearedNotRunningState.downgradedProbeStatusRows}`
+            `overlap_drop_not_running conflictEmuCode=${formatExternalEmuCode(mainEmuId)} droppedGroups=${formatTrainCodeGroups(notRunningGroups)} notRunningTrainCodes=${notRunningTrainCodes.map(formatTrainCode).join(',')} requestFailedTrainCodes=${requestFailedTrainCodes.map(formatTrainCode).join(',')} affectedEmuCodes=${clearedNotRunningState.affectedEmuIds.map(formatExternalEmuCode).join(',')} deletedDailyRouteRows=${clearedNotRunningState.deletedDailyRouteRows} downgradedRouteRows=${clearedNotRunningState.downgradedRouteRows}`
         );
         const allConflictGroups = [currentGroup, ...overlappingGroups];
         recordTrainProvenanceForEachGroup(notRunningGroups, (group) => ({
@@ -1681,10 +1634,7 @@ async function tryResolveOverlappingRoutes(
                 affectedEmuIds: clearedNotRunningState.affectedEmuIds,
                 deletedDailyRouteRows:
                     clearedNotRunningState.deletedDailyRouteRows,
-                deletedProbeStatusRows:
-                    clearedNotRunningState.deletedProbeStatusRows,
-                downgradedProbeStatusRows:
-                    clearedNotRunningState.downgradedProbeStatusRows
+                downgradedRouteRows: clearedNotRunningState.downgradedRouteRows
             }
         }));
 
@@ -1754,7 +1704,7 @@ async function tryResolveOverlappingRoutes(
         ? logger.error.bind(logger)
         : logger.info.bind(logger);
     overlapRequeueLog(
-        `overlap_requeue conflictEmuCode=${formatExternalEmuCode(mainEmuId)} conflictGroups=${formatTrainCodeGroups(overlappingGroups)} conflictTimeRanges=${formatOverlapTimeRanges(currentGroup, overlappingGroups)} notRunningTrainCodes=${notRunningTrainCodes.map(formatTrainCode).join(',')} requestFailedTrainCodes=${requestFailedTrainCodes.map(formatTrainCode).join(',')} requeuedGroups=${formatTrainCodeGroups(Array.from(impactedGroups.values()))} requeuedEmuCodes=${clearedState.affectedEmuIds.map(formatExternalEmuCode).join(',')} deletedDailyRouteRows=${clearedState.deletedDailyRouteRows} deletedProbeStatusRows=${clearedState.deletedProbeStatusRows} requeueTaskIds=${taskIds.join(',')}`
+        `overlap_requeue conflictEmuCode=${formatExternalEmuCode(mainEmuId)} conflictGroups=${formatTrainCodeGroups(overlappingGroups)} conflictTimeRanges=${formatOverlapTimeRanges(currentGroup, overlappingGroups)} notRunningTrainCodes=${notRunningTrainCodes.map(formatTrainCode).join(',')} requestFailedTrainCodes=${requestFailedTrainCodes.map(formatTrainCode).join(',')} requeuedGroups=${formatTrainCodeGroups(Array.from(impactedGroups.values()))} requeuedEmuCodes=${clearedState.affectedEmuIds.map(formatExternalEmuCode).join(',')} deletedDailyRouteRows=${clearedState.deletedDailyRouteRows} requeueTaskIds=${taskIds.join(',')}`
     );
     const impactedGroupItems = Array.from(impactedGroups.values());
     recordTrainProvenanceForEachGroup(impactedGroupItems, (group) => ({
@@ -1789,54 +1739,11 @@ async function tryResolveOverlappingRoutes(
             ),
             requeuedTaskIds: taskIds,
             affectedEmuIds: clearedState.affectedEmuIds,
-            deletedDailyRouteRows: clearedState.deletedDailyRouteRows,
-            deletedProbeStatusRows: clearedState.deletedProbeStatusRows
+            deletedDailyRouteRows: clearedState.deletedDailyRouteRows
         }
     }));
     markCurrentTrainProvenanceTaskSkipped('overlap_requeued');
     return true;
-}
-
-function collectLookupStatusNotificationCandidates(
-    allTrainCodes: TrainCodeParts[],
-    allEmuCodes: EmuId[],
-    startAt: number,
-    status: ProbeStatusValue
-) {
-    const seenTrainKeys = new Set<string>();
-    const uniqueTrainCodes = allTrainCodes.filter((trainCode) => {
-        const key = trainCodeKey(trainCode);
-        if (seenTrainKeys.has(key)) {
-            return false;
-        }
-        seenTrainKeys.add(key);
-        return true;
-    });
-    const seenEmuIds = new Set<number>();
-    const uniqueEmuIds = allEmuCodes.filter((emuId) => {
-        const key = Number(emuId);
-        if (seenEmuIds.has(key)) {
-            return false;
-        }
-        seenEmuIds.add(key);
-        return true;
-    });
-    return [
-        ...uniqueTrainCodes.map((targetId) => ({
-            targetType: 'train' as const,
-            targetId,
-            startAt,
-            previousStatus: getProbeStatusByTrainCodeValue(targetId, startAt),
-            nextStatus: status
-        })),
-        ...uniqueEmuIds.map((targetId) => ({
-            targetType: 'emu' as const,
-            targetId,
-            startAt,
-            previousStatus: getProbeStatusByEmuCodeValue(targetId, startAt),
-            nextStatus: status
-        }))
-    ];
 }
 
 function recordTrainProvenanceForEachGroup(
@@ -1864,8 +1771,9 @@ async function applyResolvedResult(
     trainKey: string,
     allTrainCodes: TrainCodeParts[],
     allEmuCodes: EmuId[],
-    status: ProbeStatusValue,
-    nowSeconds: number
+    status: number,
+    nowSeconds: number,
+    beforePersist?: () => void
 ): Promise<ProbeTrackingMutation[]> {
     return applyResolvedProbeResult({
         trainCode: args.trainCode,
@@ -1878,18 +1786,19 @@ async function applyResolvedResult(
         endAt: args.endAt,
         trainKey,
         status,
-        nowSeconds
+        nowSeconds,
+        beforePersist
     });
 }
 
-async function tryReuseHistoricalProbeStatus(
+async function tryReuseHistoricalRouteStatus(
     args: ProbeTrainDepartureTaskArgs,
     trainKey: string,
     mainEmuId: EmuId,
     allTrainCodes: TrainCodeParts[],
     nowSeconds: number
 ): Promise<boolean> {
-    const latestResolvedRow = getLatestResolvedProbeStatusByEmuCodeBefore(
+    const latestResolvedRow = getLatestConfirmedDailyRouteByEmuCodeBefore(
         mainEmuId,
         args.startAt
     );
@@ -1897,7 +1806,7 @@ async function tryReuseHistoricalProbeStatus(
         return false;
     }
 
-    const historicalRows = listProbeStatusByEmuCode(
+    const historicalRows = listDailyRoutesByEmuCodeAndStartAt(
         mainEmuId,
         latestResolvedRow.start_at
     );
@@ -1923,9 +1832,9 @@ async function tryReuseHistoricalProbeStatus(
     const allEmuCodes =
         knownGroup.emuIds.length > 0 ? knownGroup.emuIds : [mainEmuId];
     if (
-        latestResolvedRow.status ===
-            ProbeStatusValue.CoupledFormationResolved &&
-        (knownGroup.finalStatus !== ProbeStatusValue.CoupledFormationResolved ||
+        isConfirmedCoupled(latestResolvedRow.status) &&
+        (knownGroup.finalStatus !==
+            EMU_ROUTE_STATUS_CONFIRMED_COUPLED_UNKNOWN ||
             allEmuCodes.length <= 1)
     ) {
         recordCurrentTrainProvenanceEventsForTrainCodes(allTrainCodes, {
@@ -1965,7 +1874,8 @@ async function tryReuseHistoricalProbeStatus(
         emuId: mainEmuId,
         eventType: 'historical_reuse_selected',
         result:
-            knownGroup.finalStatus === ProbeStatusValue.CoupledFormationResolved
+            knownGroup.finalStatus ===
+            EMU_ROUTE_STATUS_CONFIRMED_COUPLED_UNKNOWN
                 ? 'coupled'
                 : 'single',
         payload: {
@@ -2438,7 +2348,7 @@ async function executeProbeTrainDepartureTaskInternal(
             trainKey,
             allTrainCodes,
             [mainEmuId],
-            ProbeStatusValue.SingleFormationResolved,
+            EMU_ROUTE_STATUS_CONFIRMED_SINGLE,
             nowSeconds
         );
         recordCurrentTrainProvenanceEventsForTrainCodes(allTrainCodes, {
@@ -2461,7 +2371,7 @@ async function executeProbeTrainDepartureTaskInternal(
             trainKey,
             allTrainCodes,
             [mainEmuId],
-            ProbeStatusValue.SingleFormationResolved,
+            EMU_ROUTE_STATUS_CONFIRMED_SINGLE,
             nowSeconds
         );
         recordCurrentTrainProvenanceEventsForTrainCodes(allTrainCodes, {
@@ -2498,13 +2408,6 @@ async function executeProbeTrainDepartureTaskInternal(
                   args.startAt,
                   serviceDate
               );
-        for (const emuCode of effectiveKnownGroup.emuIds) {
-            updateProbeStatusByEmuCode(
-                emuCode,
-                args.startAt,
-                effectiveKnownGroup.finalStatus
-            );
-        }
         const trackingMutations = await applyResolvedResult(
             args,
             trainKey,
@@ -2513,7 +2416,16 @@ async function executeProbeTrainDepartureTaskInternal(
                 ? effectiveKnownGroup.emuIds
                 : [mainEmuId],
             effectiveKnownGroup.finalStatus,
-            nowSeconds
+            nowSeconds,
+            () => {
+                for (const emuCode of effectiveKnownGroup.emuIds) {
+                    updateDailyRouteFormationStatusByEmuCode(
+                        emuCode,
+                        args.startAt,
+                        effectiveKnownGroup.finalStatus
+                    );
+                }
+            }
         );
         recordCurrentTrainProvenanceEventsForTrainCodes(allTrainCodes, {
             serviceDate,
@@ -2522,7 +2434,7 @@ async function executeProbeTrainDepartureTaskInternal(
             eventType: 'resolved_from_status',
             result:
                 effectiveKnownGroup.finalStatus ===
-                ProbeStatusValue.CoupledFormationResolved
+                EMU_ROUTE_STATUS_CONFIRMED_COUPLED_UNKNOWN
                     ? 'coupled'
                     : 'single',
             payload: {
@@ -2537,7 +2449,7 @@ async function executeProbeTrainDepartureTaskInternal(
     }
 
     if (
-        await tryReuseHistoricalProbeStatus(
+        await tryReuseHistoricalRouteStatus(
             args,
             trainKey,
             mainEmuId,
@@ -2555,7 +2467,7 @@ async function executeProbeTrainDepartureTaskInternal(
         endStation: args.endStation,
         startAt: args.startAt,
         endAt: args.endAt,
-        status: ProbeStatusValue.PendingCouplingDetection
+        status: EMU_ROUTE_STATUS_UNCONFIRMED_SINGLE
     });
     markEmuCodesAssignedToday(
         [mainEmuId],

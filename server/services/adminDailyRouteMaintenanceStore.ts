@@ -30,7 +30,8 @@ import {
     clearRunningEmuStateByTrainKey,
     hasQueriedTrainKey
 } from '~/server/services/probeRuntimeState';
-import { deleteProbeStatusByTrainCodeAndEmuCodeAtServiceDate } from '~/server/services/probeStatusStore';
+import { deleteProbeUntrustedRecordsByTrainCodeAndEmuCodeAtServiceDate } from '~/server/services/probeUntrustedRecordStore';
+import { EMU_ROUTE_STATUS_UNCONFIRMED_SINGLE } from '~/server/utils/emuRouteStatus';
 import { getTodayScheduleProbeGroupByTrainCode } from '~/server/services/todayScheduleCache';
 import { type TrainCodeParts } from '~/server/utils/12306/trainCode';
 import type { EmuId } from '~/server/libs/database/emu';
@@ -62,7 +63,8 @@ function toAdminDailyRouteRecord(row: DailyEmuRouteRow): AdminDailyRouteRecord {
         startStation: row.start_station_name,
         endStation: row.end_station_name,
         startAt: row.start_at,
-        endAt: row.end_at
+        endAt: row.end_at,
+        status: row.status
     };
 }
 
@@ -339,7 +341,8 @@ export function createAdminDailyRoute(
         trainCode,
         emuId,
         serviceDate,
-        timetableId
+        timetableId,
+        EMU_ROUTE_STATUS_UNCONFIRMED_SINGLE
     );
     const createdRecord =
         insertedId > 0 ? getDailyRecordById(insertedId) : null;
@@ -376,18 +379,16 @@ export async function deleteAdminDailyRoute(
 
     const today = serviceDateToDay(getCurrentDateString());
     const wasToday = route.service_date === today;
-    let deletedProbeStatusRows = 0;
     let clearedRuntimeTrainKey = false;
     let clearedRuntimeEmuIds: EmuId[] = [];
     let clearedDetectionGroups = 0;
 
     if (wasToday) {
-        deletedProbeStatusRows =
-            deleteProbeStatusByTrainCodeAndEmuCodeAtServiceDate(
-                route.train_code,
-                route.emu_id,
-                route.service_date
-            );
+        deleteProbeUntrustedRecordsByTrainCodeAndEmuCodeAtServiceDate(
+            route.train_code,
+            route.emu_id,
+            route.service_date
+        );
 
         const trainGroup = getTodayScheduleProbeGroupByTrainCode(
             route.train_code
@@ -424,7 +425,6 @@ export async function deleteAdminDailyRoute(
         routeId,
         wasToday,
         deletedDailyRoute: true,
-        deletedProbeStatusRows,
         clearedRuntimeTrainKey,
         clearedRuntimeEmuCodes: clearedRuntimeEmuIds.map(formatExternalEmuCode),
         clearedDetectionGroups

@@ -319,7 +319,7 @@
                 <div
                     class="rounded-[1rem] border border-amber-200 bg-amber-50/80 px-4 py-4 text-sm leading-6 text-amber-900">
                     该操作只会删除时刻表数据库中的这张官方交路表，不会删除
-                    `daily_emu_routes`、probe status 或其他运行数据。
+                    `daily_emu_routes` 或其他运行数据。
                 </div>
 
                 <p

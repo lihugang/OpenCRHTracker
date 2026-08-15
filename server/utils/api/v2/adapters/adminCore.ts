@@ -294,6 +294,7 @@ function toAdminDailyRouteRecord(record: {
     endStation: string;
     startAt: number;
     endAt: number;
+    status: number;
 }) {
     return {
         id: Number(record.id),
@@ -306,7 +307,8 @@ function toAdminDailyRouteRecord(record: {
         startStation: record.startStation,
         endStation: record.endStation,
         startAt: record.startAt,
-        endAt: record.endAt
+        endAt: record.endAt,
+        status: record.status
     };
 }
 

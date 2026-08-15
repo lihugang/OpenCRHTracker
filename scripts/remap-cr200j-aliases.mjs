@@ -6,6 +6,17 @@ import { fileURLToPath } from 'node:url';
 const DEFAULT_INPUT_PATH = 'data/emu_list.json';
 const DEFAULT_DB_PATH = 'data/emu.db';
 const MAX_CONFLICT_SAMPLES = 20;
+const STATUS_CONFIRMED_BIT = 0x01;
+const STATUS_POSITION_MASK = 0x06;
+const STATUS_POSITION_COUPLED_UNKNOWN = 0x02;
+const STATUS_POSITION_COUPLED_I = 0x04;
+const STATUS_POSITION_COUPLED_II = 0x06;
+const STATUS_FAULT_BIT = 0x08;
+const STATUS_HOT_SPARE_BIT = 0x10;
+const SHANGHAI_OFFSET_SECONDS = 8 * 60 * 60;
+const DAY_SECONDS = 24 * 60 * 60;
+const EPOCH_SERVICE_DAY_START_SECONDS =
+    Date.UTC(1970, 0, 1, 0, 0, 0) / 1000 - SHANGHAI_OFFSET_SECONDS;
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(scriptDir, '..');
@@ -105,8 +116,65 @@ function normalizeNullableTimetableId(value) {
     return Number.isInteger(value) && value > 0 ? value : null;
 }
 
-function normalizeStatus(value) {
-    return Number.isInteger(value) ? value : 0;
+function dayNumberToServiceDate(dayNumber) {
+    if (!Number.isInteger(dayNumber) || dayNumber < 0) {
+        return '';
+    }
+    const timestampMs =
+        (EPOCH_SERVICE_DAY_START_SECONDS + dayNumber * DAY_SECONDS) * 1000;
+    const shifted = new Date(timestampMs + SHANGHAI_OFFSET_SECONDS * 1000);
+    const year = shifted.getUTCFullYear();
+    const month = String(shifted.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(shifted.getUTCDate()).padStart(2, '0');
+    return `${year}${month}${day}`;
+}
+
+function formatTrainCode(row) {
+    return `${normalizeText(row.train_prefix)}${row.train_number}`;
+}
+
+function mergeRouteStatuses(rows) {
+    let confirmed = false;
+    let position = 0x00;
+    let fault = false;
+    let hotSpare = false;
+
+    for (const row of rows) {
+        const status = Number(row.status);
+        if (!Number.isInteger(status) || status < 0) {
+            continue;
+        }
+        if ((status & STATUS_CONFIRMED_BIT) !== 0) {
+            confirmed = true;
+        }
+        const rowPosition = status & STATUS_POSITION_MASK;
+        if (rowPosition === STATUS_POSITION_COUPLED_II) {
+            position = STATUS_POSITION_COUPLED_II;
+        } else if (
+            rowPosition === STATUS_POSITION_COUPLED_I &&
+            position !== STATUS_POSITION_COUPLED_II
+        ) {
+            position = STATUS_POSITION_COUPLED_I;
+        } else if (
+            rowPosition === STATUS_POSITION_COUPLED_UNKNOWN &&
+            position === 0x00
+        ) {
+            position = STATUS_POSITION_COUPLED_UNKNOWN;
+        }
+        if ((status & STATUS_FAULT_BIT) !== 0) {
+            fault = true;
+        }
+        if ((status & STATUS_HOT_SPARE_BIT) !== 0) {
+            hotSpare = true;
+        }
+    }
+
+    return (
+        (confirmed ? STATUS_CONFIRMED_BIT : 0x00) |
+        position |
+        (fault ? STATUS_FAULT_BIT : 0x00) |
+        (hotSpare ? STATUS_HOT_SPARE_BIT : 0x00)
+    );
 }
 
 function readEmuListRows(filePath) {
@@ -115,8 +183,14 @@ function readEmuListRows(filePath) {
     }
 
     const parsed = JSON.parse(readUtf8File(filePath));
-    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
-        throw new Error('Input file must contain an allocation export JSON object');
+    if (
+        parsed === null ||
+        typeof parsed !== 'object' ||
+        Array.isArray(parsed)
+    ) {
+        throw new Error(
+            'Input file must contain an allocation export JSON object'
+        );
     }
 
     const models = Array.isArray(parsed.trainset_models)
@@ -249,20 +323,19 @@ function buildSummarySkeleton(inputPath, dbPath, mapping, mode) {
         aliasHits: 0,
         unusedAliases: mapping.aliasCount,
         tables: {
-            dailyEmuRoutes: createTableSummary(),
-            probeStatus: createTableSummary()
+            dailyEmuRoutes: createTableSummary()
         }
     };
 }
 
-function buildTargetGroupKey(trainCode, emuCode, serviceDate) {
-    return [trainCode, emuCode, serviceDate].join('|');
+function buildTargetGroupKey(trainCode, emuId, serviceDate) {
+    return [trainCode, emuId, serviceDate].join('|');
 }
 
-function chooseKeeperRow(rows, canonicalEmuCode) {
+function chooseKeeperRow(rows, canonicalEmuId) {
     return [...rows].sort((left, right) => {
-        const leftIsCanonical = left.emu_code === canonicalEmuCode ? 1 : 0;
-        const rightIsCanonical = right.emu_code === canonicalEmuCode ? 1 : 0;
+        const leftIsCanonical = left.emu_id === canonicalEmuId ? 1 : 0;
+        const rightIsCanonical = right.emu_id === canonicalEmuId ? 1 : 0;
         if (leftIsCanonical !== rightIsCanonical) {
             return rightIsCanonical - leftIsCanonical;
         }
@@ -293,10 +366,10 @@ function analyzeTargetGroup(tableName, targetGroup, actions, tableSummary) {
                 table: tableName,
                 train_code: targetGroup.train_code,
                 service_date: targetGroup.service_date,
-                canonical_emu_code: targetGroup.canonical_emu_code,
+                canonical_emu_id: targetGroup.canonicalEmuId,
                 timetable_ids: distinctResolvedTimetableIds,
                 row_ids: targetGroup.rows.map((row) => row.id),
-                emu_codes: [...new Set(targetGroup.rows.map((row) => row.emu_code))]
+                emu_ids: [...new Set(targetGroup.rows.map((row) => row.emu_id))]
             });
         }
         return;
@@ -305,24 +378,17 @@ function analyzeTargetGroup(tableName, targetGroup, actions, tableSummary) {
     const nextTimetableId = distinctResolvedTimetableIds[0] ?? null;
     const keeper = chooseKeeperRow(
         targetGroup.rows,
-        targetGroup.canonical_emu_code
+        targetGroup.canonicalEmuId
     );
     const deleteIds = targetGroup.rows
         .filter((row) => row.id !== keeper.id)
         .map((row) => row.id);
-    const nextStatus =
-        tableName === 'probe_status'
-            ? targetGroup.rows.reduce(
-                  (currentMax, row) =>
-                      Math.max(currentMax, normalizeStatus(row.status)),
-                  0
-              )
-            : undefined;
+    const nextStatus = mergeRouteStatuses(targetGroup.rows);
 
     const needsUpdate =
-        keeper.emu_code !== targetGroup.canonical_emu_code ||
+        keeper.emu_id !== targetGroup.canonicalEmuId ||
         keeper.timetable_id !== nextTimetableId ||
-        (tableName === 'probe_status' && keeper.status !== nextStatus);
+        keeper.status !== nextStatus;
 
     if (needsUpdate) {
         tableSummary.updatedRows += 1;
@@ -335,7 +401,7 @@ function analyzeTargetGroup(tableName, targetGroup, actions, tableSummary) {
     if (needsUpdate || deleteIds.length > 0) {
         actions.push({
             keeperId: keeper.id,
-            canonicalEmuCode: targetGroup.canonical_emu_code,
+            canonicalEmuId: targetGroup.canonicalEmuId,
             timetableId: nextTimetableId,
             status: nextStatus,
             deleteIds
@@ -343,15 +409,22 @@ function analyzeTargetGroup(tableName, targetGroup, actions, tableSummary) {
     }
 }
 
-function analyzeTableRows(tableName, rows, aliasToCanonical) {
+function analyzeTableRows(
+    tableName,
+    rows,
+    aliasToCanonical,
+    emuIdToCode,
+    codeToEmuId
+) {
     const tableSummary = createTableSummary();
     const aliasHitCodes = new Set();
     const impactedTargetKeys = new Set();
     const normalizedRows = rows.map((row) => ({
         ...row,
-        train_code: normalizeText(row.train_code),
-        emu_code: normalizeText(row.emu_code),
-        service_date: normalizeServiceDate(row.service_date),
+        train_code: formatTrainCode(row),
+        emu_code: normalizeText(emuIdToCode.get(Number(row.emu_id)) ?? ''),
+        emu_id: Number(row.emu_id),
+        service_date: dayNumberToServiceDate(row.service_date),
         timetable_id: normalizeNullableTimetableId(row.timetable_id)
     }));
 
@@ -368,7 +441,7 @@ function analyzeTableRows(tableName, rows, aliasToCanonical) {
         impactedTargetKeys.add(
             buildTargetGroupKey(
                 row.train_code,
-                canonicalEmuCode,
+                codeToEmuId.get(canonicalEmuCode),
                 row.service_date
             )
         );
@@ -378,15 +451,19 @@ function analyzeTableRows(tableName, rows, aliasToCanonical) {
     for (const row of normalizedRows) {
         const aliasCanonicalEmuCode = aliasToCanonical.get(row.emu_code);
         if (aliasCanonicalEmuCode) {
+            const canonicalEmuId = codeToEmuId.get(aliasCanonicalEmuCode);
+            if (canonicalEmuId === undefined) {
+                continue;
+            }
             const targetGroupKey = buildTargetGroupKey(
                 row.train_code,
-                aliasCanonicalEmuCode,
+                canonicalEmuId,
                 row.service_date
             );
             const targetGroup = groupedRows.get(targetGroupKey) ?? {
                 train_code: row.train_code,
                 service_date: row.service_date,
-                canonical_emu_code: aliasCanonicalEmuCode,
+                canonicalEmuId,
                 rows: []
             };
             targetGroup.rows.push(row);
@@ -396,7 +473,7 @@ function analyzeTableRows(tableName, rows, aliasToCanonical) {
 
         const currentGroupKey = buildTargetGroupKey(
             row.train_code,
-            row.emu_code,
+            row.emu_id,
             row.service_date
         );
         if (!impactedTargetKeys.has(currentGroupKey)) {
@@ -406,7 +483,7 @@ function analyzeTableRows(tableName, rows, aliasToCanonical) {
         const targetGroup = groupedRows.get(currentGroupKey) ?? {
             train_code: row.train_code,
             service_date: row.service_date,
-            canonical_emu_code: row.emu_code,
+            canonicalEmuId: row.emu_id,
             rows: []
         };
         targetGroup.rows.push(row);
@@ -430,20 +507,11 @@ function validateCurrentSchema(statements) {
     const dailyColumnNames = new Set(
         statements.selectDailyColumns.all().map((row) => row.name)
     );
-    const probeColumnNames = new Set(
-        statements.selectProbeColumns.all().map((row) => row.name)
-    );
     const requiredDailyColumns = [
         'id',
-        'train_code',
-        'emu_code',
-        'service_date',
-        'timetable_id'
-    ];
-    const requiredProbeColumns = [
-        'id',
-        'train_code',
-        'emu_code',
+        'train_prefix',
+        'train_number',
+        'emu_id',
         'service_date',
         'timetable_id',
         'status'
@@ -457,15 +525,6 @@ function validateCurrentSchema(statements) {
             `Unsupported daily_emu_routes schema: missing ${missingDailyColumns.join(', ')}`
         );
     }
-
-    const missingProbeColumns = requiredProbeColumns.filter(
-        (name) => !probeColumnNames.has(name)
-    );
-    if (missingProbeColumns.length > 0) {
-        throw new Error(
-            `Unsupported probe_status schema: missing ${missingProbeColumns.join(', ')}`
-        );
-    }
 }
 
 function createStatements(db) {
@@ -473,30 +532,21 @@ function createStatements(db) {
         selectDailyColumns: db.prepare(
             loadSql('assets/sql/emu/migrations/selectDailyEmuRoutesColumns.sql')
         ),
-        selectProbeColumns: db.prepare(
-            loadSql('assets/sql/emu/migrations/selectProbeStatusColumns.sql')
-        ),
         selectDailyRows: db.prepare(
             loadSql(
                 'assets/sql/emu/maintenance/selectAllDailyEmuRoutesForAliasRemap.sql'
             )
         ),
-        selectProbeRows: db.prepare(
-            loadSql(
-                'assets/sql/emu/maintenance/selectAllProbeStatusRowsForAliasRemap.sql'
-            )
-        ),
         updateDailyRowById: db.prepare(
-            loadSql('assets/sql/emu/maintenance/updateDailyEmuRouteAliasById.sql')
+            loadSql(
+                'assets/sql/emu/maintenance/updateDailyEmuRouteAliasById.sql'
+            )
         ),
         deleteDailyRowById: db.prepare(
             loadSql('assets/sql/emu/maintenance/deleteDailyEmuRouteById.sql')
         ),
-        updateProbeRowById: db.prepare(
-            loadSql('assets/sql/emu/maintenance/updateProbeStatusAliasById.sql')
-        ),
-        deleteProbeRowById: db.prepare(
-            loadSql('assets/sql/emu/maintenance/deleteProbeStatusById.sql')
+        selectEmuCodeMapping: db.prepare(
+            loadSql('assets/sql/emu/exports/selectExportEmuCodeMappings.sql')
         )
     };
 }
@@ -506,39 +556,40 @@ function analyzeDatabase(db, aliasToCanonical, summary) {
     validateCurrentSchema(statements);
 
     const dailyRows = statements.selectDailyRows.all();
-    const probeRows = statements.selectProbeRows.all();
+    const emuIdToCode = new Map();
+    const codeToEmuId = new Map();
+    for (const row of statements.selectEmuCodeMapping.all()) {
+        const emuId = Number(row.id);
+        const emuCode = normalizeText(row.emu_code);
+        if (Number.isInteger(emuId) && emuId > 0 && emuCode.length > 0) {
+            emuIdToCode.set(emuId, emuCode);
+            if (!codeToEmuId.has(emuCode)) {
+                codeToEmuId.set(emuCode, emuId);
+            }
+        }
+    }
 
     const dailyAnalysis = analyzeTableRows(
         'daily_emu_routes',
         dailyRows,
-        aliasToCanonical
+        aliasToCanonical,
+        emuIdToCode,
+        codeToEmuId
     );
-    const probeAnalysis = analyzeTableRows(
-        'probe_status',
-        probeRows,
-        aliasToCanonical
-    );
-    const aliasHitCodes = new Set([
-        ...dailyAnalysis.aliasHitCodes,
-        ...probeAnalysis.aliasHitCodes
-    ]);
+    const aliasHitCodes = new Set([...dailyAnalysis.aliasHitCodes]);
 
     summary.tables.dailyEmuRoutes = dailyAnalysis.tableSummary;
-    summary.tables.probeStatus = probeAnalysis.tableSummary;
     summary.aliasHits = aliasHitCodes.size;
     summary.unusedAliases = aliasToCanonical.size - aliasHitCodes.size;
 
     return {
         statements,
         dailyActions: dailyAnalysis.actions,
-        probeActions: probeAnalysis.actions,
-        conflictGroups:
-            dailyAnalysis.tableSummary.conflictGroups +
-            probeAnalysis.tableSummary.conflictGroups
+        conflictGroups: dailyAnalysis.tableSummary.conflictGroups
     };
 }
 
-function applyActions(db, statements, dailyActions, probeActions) {
+function applyActions(db, statements, dailyActions) {
     const applyChanges = db.transaction(() => {
         for (const action of dailyActions) {
             for (const deleteId of action.deleteIds) {
@@ -546,19 +597,7 @@ function applyActions(db, statements, dailyActions, probeActions) {
             }
 
             statements.updateDailyRowById.run(
-                action.canonicalEmuCode,
-                action.timetableId,
-                action.keeperId
-            );
-        }
-
-        for (const action of probeActions) {
-            for (const deleteId of action.deleteIds) {
-                statements.deleteProbeRowById.run(deleteId);
-            }
-
-            statements.updateProbeRowById.run(
-                action.canonicalEmuCode,
+                action.canonicalEmuId,
                 action.timetableId,
                 action.status,
                 action.keeperId
@@ -599,12 +638,7 @@ function main() {
         }
 
         if (options.apply) {
-            applyActions(
-                db,
-                analysis.statements,
-                analysis.dailyActions,
-                analysis.probeActions
-            );
+            applyActions(db, analysis.statements, analysis.dailyActions);
         }
     } finally {
         db.close();

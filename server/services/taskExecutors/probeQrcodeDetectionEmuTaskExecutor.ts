@@ -39,7 +39,7 @@ import {
     type ServiceDay
 } from '~/server/utils/date/serviceDay';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
-import { ProbeStatusValue } from '~/server/services/probeStatusStore';
+import { EMU_ROUTE_STATUS_CONFIRMED_SINGLE } from '~/server/utils/emuRouteStatus';
 import type { EmuId } from '~/server/libs/database/emu';
 import {
     ensureExternalEmuId,
@@ -253,7 +253,7 @@ async function executeProbeQrcodeDetectionEmuTask(
             startAt: routeStartAt,
             endAt: routeEndAt,
             trainKey,
-            status: ProbeStatusValue.SingleFormationResolved,
+            status: EMU_ROUTE_STATUS_CONFIRMED_SINGLE,
             nowSeconds
         });
         recordCurrentTrainProvenanceEventsForTrainCodes(allTrainCodes, {

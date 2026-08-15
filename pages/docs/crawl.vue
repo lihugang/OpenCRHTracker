@@ -190,7 +190,7 @@ const taskFlowCode = [
     '      -> dispatch_daily_probe_tasks',
     '          -> probe_train_departure x N',
     '              -> ensure PendingCouplingDetection when needed',
-    '              -> insertDailyEmuRoute / updateProbeStatus',
+    '              -> persist daily_emu_routes status',
     '              -> queue detect_coupled_emu_group',
     '                  -> scan pending groups by bureau/model',
     '                  -> upgrade to CoupledFormationResolved or finalize single',

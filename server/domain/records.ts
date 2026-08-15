@@ -11,6 +11,7 @@ export interface DailyRecordDomainItem {
     timetableId: number | null;
     emuId: EmuId;
     trainCode: TrainCodeParts;
+    status: number;
 }
 
 export interface GetDailyRecordsDomainResult {
@@ -58,6 +59,7 @@ function toDailyRecordDomainItem(
         serviceDay: row.service_date,
         timetableId: row.timetable_id,
         emuId: row.emu_id,
-        trainCode: row.train_code
+        trainCode: row.train_code,
+        status: row.status
     };
 }

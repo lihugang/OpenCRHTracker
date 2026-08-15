@@ -239,17 +239,7 @@ function mapProvenance(
                 endStation: row.endStation,
                 startAt: protoInt64ToNumber(row.startAt) ?? 0,
                 endAt: protoInt64ToNumber(row.endAt) ?? 0,
-                isTimetableResolved: row.isTimetableResolved
-            })),
-            probeStatusRows: departure.probeStatusRows.map((row) => ({
-                id: row.id,
-                trainCode: row.trainCode,
-                emuCode: row.emuCode,
-                serviceDate: epochServiceDayToDateString(row.serviceDay),
-                timetableId: row.timetableId ?? null,
                 status: row.status,
-                statusLabel: mapLatestStatus(row.statusLabel),
-                startAt: protoInt64ToNumber(row.startAt) ?? 0,
                 isTimetableResolved: row.isTimetableResolved
             }))
         })),

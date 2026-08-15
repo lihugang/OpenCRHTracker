@@ -19,6 +19,7 @@ export interface AdminAnomalyRouteRecord {
     startAt: number;
     endAt: number;
     durationSeconds: number;
+    status: number;
 }
 
 export interface AdminAnomalyItem {
@@ -50,7 +51,6 @@ export interface AdminAnomalyDeleteRouteResponse {
     routeId: string;
     wasToday: boolean;
     deletedDailyRoute: boolean;
-    deletedProbeStatusRows: number;
     clearedRuntimeTrainKey: boolean;
     clearedRuntimeEmuCodes: string[];
     clearedDetectionGroups: number;
@@ -63,7 +63,6 @@ export interface AdminAnomalyBulkDeleteResponse {
     matchedItems: number;
     matchedRoutes: number;
     deletedDailyRoutes: number;
-    deletedProbeStatusRows: number;
     skippedRoutes: number;
 }
 
@@ -82,6 +81,7 @@ export interface AdminDailyRouteRecord {
     endStation: string;
     startAt: number;
     endAt: number;
+    status: number;
 }
 
 export interface AdminDailyRouteSearchResponse {
@@ -125,7 +125,6 @@ export interface AdminDailyRouteDeleteResponse {
     routeId: string;
     wasToday: boolean;
     deletedDailyRoute: boolean;
-    deletedProbeStatusRows: number;
     clearedRuntimeTrainKey: boolean;
     clearedRuntimeEmuCodes: string[];
     clearedDetectionGroups: number;
@@ -709,22 +708,11 @@ export interface AdminDailyRouteTrackingRecord {
     endStation: string;
     startAt: number;
     endAt: number;
-    isTimetableResolved: boolean;
-}
-
-export interface AdminProbeStatusRecord {
-    id: number;
-    trainCode: string;
-    emuCode: string;
-    serviceDate: string;
-    timetableId: number | null;
     status: number;
-    statusLabel: AdminTrainProvenanceLatestStatus;
-    startAt: number;
     isTimetableResolved: boolean;
 }
 
-export type AdminTrackingMutationTable = 'daily_emu_routes' | 'probe_status';
+export type AdminTrackingMutationTable = 'daily_emu_routes';
 
 export type AdminTrackingMutationAction =
     | 'created'
@@ -753,10 +741,6 @@ export interface AdminTrackingMutationSummary {
     dailyRouteCreated: number;
     dailyRouteUpdated: number;
     dailyRouteDeleted: number;
-    probeStatusCreated: number;
-    probeStatusUpdated: number;
-    probeStatusDeleted: number;
-    probeStatusUnchanged: number;
 }
 
 export interface AdminTrainProvenanceDeparture {
@@ -767,7 +751,6 @@ export interface AdminTrainProvenanceDeparture {
     latestStatus: AdminTrainProvenanceLatestStatus;
     emuCodes: string[];
     dailyRouteRows: AdminDailyRouteTrackingRecord[];
-    probeStatusRows: AdminProbeStatusRecord[];
 }
 
 export type AdminTrainProvenanceConflictState =

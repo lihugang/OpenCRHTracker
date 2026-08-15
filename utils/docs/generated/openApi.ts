@@ -276,9 +276,13 @@ export const developerDocsOpenApi: OpenApiDocument = {
                     },
                     trainCode: {
                         $ref: '#/components/schemas/TrainCode'
+                    },
+                    status: {
+                        type: 'integer',
+                        format: 'uint32'
                     }
                 },
-                required: ['id', 'serviceDay', 'emuId']
+                required: ['id', 'serviceDay', 'emuId', 'status']
             },
             TrainCode: {
                 type: 'object',
@@ -904,9 +908,13 @@ export const developerDocsOpenApi: OpenApiDocument = {
                     emuId: {
                         type: 'integer',
                         format: 'uint32'
+                    },
+                    status: {
+                        type: 'integer',
+                        format: 'uint32'
                     }
                 },
-                required: ['id', 'serviceDay', 'emuId']
+                required: ['id', 'serviceDay', 'emuId', 'status']
             },
             GetEmuAllocationData: {
                 type: 'object',
@@ -1133,9 +1141,13 @@ export const developerDocsOpenApi: OpenApiDocument = {
                     },
                     trainCode: {
                         $ref: '#/components/schemas/TrainCode'
+                    },
+                    status: {
+                        type: 'integer',
+                        format: 'uint32'
                     }
                 },
-                required: ['id', 'serviceDay']
+                required: ['id', 'serviceDay', 'status']
             },
             GetDailyExportIndexData: {
                 type: 'object',

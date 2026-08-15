@@ -6,7 +6,7 @@ import { ensureTaskDatabaseSchema } from '~/server/libs/database/task';
 import { ensureTrainProvenanceDatabaseSchema } from '~/server/libs/database/trainProvenance';
 import { estimateIdleTaskDurationMs } from '~/server/services/idleTaskEstimator';
 import { listDailyRecordsAll } from '~/server/services/emuRoutesStore';
-import { clearProbeStatus } from '~/server/services/probeStatusStore';
+import { clearProbeUntrustedRecords } from '~/server/services/probeUntrustedRecordStore';
 import { rehydrateProbeRuntimeState } from '~/server/services/probeRuntimeState';
 import type { TrainCodeParts } from '~/server/utils/12306/trainCode';
 import {
@@ -57,9 +57,9 @@ import { registerRefreshTrainCirculationTaskExecutor } from '~/server/services/t
 import { registerProbeTrainDepartureTaskExecutor } from '~/server/services/taskExecutors/probeTrainDepartureTaskExecutor';
 import { registerProbeQrcodeDetectionEmuTaskExecutor } from '~/server/services/taskExecutors/probeQrcodeDetectionEmuTaskExecutor';
 import {
-    CLEAR_DAILY_PROBE_STATUS_TASK_EXECUTOR,
-    registerClearDailyProbeStatusTaskExecutor
-} from '~/server/services/taskExecutors/clearDailyProbeStatusTaskExecutor';
+    CLEAR_DAILY_PROBE_UNTRUSTED_RECORDS_TASK_EXECUTOR,
+    registerClearDailyProbeUntrustedRecordsTaskExecutor
+} from '~/server/services/taskExecutors/clearDailyProbeUntrustedRecordsTaskExecutor';
 import {
     CLEANUP_REVOKED_API_KEYS_TASK_EXECUTOR,
     registerCleanupRevokedApiKeysTaskExecutor
@@ -101,7 +101,7 @@ const logger = getLogger('task-schedule-bootstrap');
 const STARTUP_EXECUTORS = [
     BUILD_SCHEDULE_TASK_EXECUTOR,
     GENERATE_ROUTE_REFRESH_TASKS_EXECUTOR,
-    CLEAR_DAILY_PROBE_STATUS_TASK_EXECUTOR,
+    CLEAR_DAILY_PROBE_UNTRUSTED_RECORDS_TASK_EXECUTOR,
     CLEANUP_REVOKED_API_KEYS_TASK_EXECUTOR,
     EXPORT_DAILY_RECORDS_TASK_EXECUTOR,
     REBUILD_REFERENCE_MODEL_INDEX_TASK_EXECUTOR,
@@ -127,7 +127,7 @@ function reconcileStartupTask(
     return result;
 }
 
-function catchUpOverdueProbeStatusClear(
+function catchUpOverdueProbeUntrustedClear(
     result: ReconcileSingletonTaskResult
 ): void {
     if (result.action !== 'replaced_overdue') {
@@ -135,9 +135,9 @@ function catchUpOverdueProbeStatusClear(
     }
 
     try {
-        const clearedRows = clearProbeStatus();
+        const clearedRows = clearProbeUntrustedRecords();
         logger.info(
-            `startup_probe_status_clear_catchup action=${result.action} removedTaskIds=${JSON.stringify(result.removedTaskIds)} futureTaskId=${result.taskId} clearedRows=${clearedRows}`
+            `startup_probe_untrusted_clear_catchup action=${result.action} removedTaskIds=${JSON.stringify(result.removedTaskIds)} futureTaskId=${result.taskId} clearedRows=${clearedRows}`
         );
     } catch (error) {
         const message =
@@ -145,7 +145,7 @@ function catchUpOverdueProbeStatusClear(
                 ? `${error.name}: ${error.message}`
                 : String(error);
         logger.error(
-            `startup_probe_status_clear_catchup_failed action=${result.action} removedTaskIds=${JSON.stringify(result.removedTaskIds)} futureTaskId=${result.taskId} error=${message}`
+            `startup_probe_untrusted_clear_catchup_failed action=${result.action} removedTaskIds=${JSON.stringify(result.removedTaskIds)} futureTaskId=${result.taskId} error=${message}`
         );
     }
 }
@@ -296,7 +296,7 @@ export default defineNitroPlugin(async () => {
         registerRefreshTrainCirculationTaskExecutor();
         registerProbeTrainDepartureTaskExecutor();
         registerProbeQrcodeDetectionEmuTaskExecutor();
-        registerClearDailyProbeStatusTaskExecutor();
+        registerClearDailyProbeUntrustedRecordsTaskExecutor();
         registerCleanupRevokedApiKeysTaskExecutor();
         registerExportDailyRecordsTaskExecutor();
         registerRebuildReferenceModelIndexTaskExecutor();
@@ -399,9 +399,18 @@ export default defineNitroPlugin(async () => {
             );
         }
 
+        const removedLegacyClearTasks = removePendingTasksByExecutor(
+            'clear_daily_probe_status'
+        );
+        if (removedLegacyClearTasks.removedTaskIds.length > 0) {
+            logger.info(
+                `startup_legacy_clear_task_removed executor=clear_daily_probe_status removedTaskIds=${JSON.stringify(removedLegacyClearTasks.removedTaskIds)}`
+            );
+        }
+
         if (
             !disabledStartupExecutors.has(
-                CLEAR_DAILY_PROBE_STATUS_TASK_EXECUTOR
+                CLEAR_DAILY_PROBE_UNTRUSTED_RECORDS_TASK_EXECUTOR
             )
         ) {
             const clearExecutionTime = getNextExecutionTimeInShanghaiSeconds(
@@ -409,12 +418,12 @@ export default defineNitroPlugin(async () => {
                 useConfig().spider.scheduleProbe.coupling.statusResetTimeHHmm
             );
             const clearTask = reconcileStartupTask(
-                CLEAR_DAILY_PROBE_STATUS_TASK_EXECUTOR,
+                CLEAR_DAILY_PROBE_UNTRUSTED_RECORDS_TASK_EXECUTOR,
                 clearExecutionTime
             );
-            catchUpOverdueProbeStatusClear(clearTask);
+            catchUpOverdueProbeUntrustedClear(clearTask);
             enqueuedStartupTasks.push(
-                `${CLEAR_DAILY_PROBE_STATUS_TASK_EXECUTOR}:${clearTask.taskId}`
+                `${CLEAR_DAILY_PROBE_UNTRUSTED_RECORDS_TASK_EXECUTOR}:${clearTask.taskId}`
             );
         }
 

@@ -861,8 +861,8 @@ const deleteDialogDescription = computed(() => {
 
     return pendingDeleteRoute.value.serviceDate ===
         fromAdminDateInputValue(todayDateInputValue)
-        ? '这会删除最终日记录，并同步清理今天同条 probe status 与内存运行态。'
-        : '这会删除历史最终日记录，不会清理 probe status 或内存运行态。';
+        ? '这会删除最终日记录，并同步清理今天匹配的 probe untrusted 记录与内存运行态。'
+        : '这会删除历史最终日记录及其状态，不会清理今天的内存运行态。';
 });
 const timetableMergeDialogDescription = computed(() => {
     const candidate = pendingTimetableMergeCandidate.value;
@@ -1120,7 +1120,7 @@ async function confirmDeleteRoute() {
             targetRoute.id
         );
         deleteSuccessMessage.value = response.wasToday
-            ? `已删除记录，并清理 ${response.deletedProbeStatusRows} 条 probe status。`
+            ? `已删除记录，并清理相关 probe 运行态（${response.clearedRuntimeEmuCodes.length} 个车组、${response.clearedDetectionGroups} 个检测组）。`
             : '已删除历史记录。';
         removeDeletedRoute(targetRoute.id);
         isDeleteDialogOpen.value = false;

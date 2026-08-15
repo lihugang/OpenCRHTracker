@@ -4,25 +4,21 @@ import {
     markEmuCodesAssignedToday,
     markQueriedTrainKey
 } from '~/server/services/probeRuntimeState';
-import {
-    ensureProbeStatus,
-    getProbeStatusByEmuCodeValue,
-    getProbeStatusByTrainCodeValue,
-    ProbeStatusValue,
-    updateProbeStatusByTrainCode
-} from '~/server/services/probeStatusStore';
+import { updateDailyRouteFormationStatusByTrainCode } from '~/server/services/emuRoutesStore';
+import { EMU_ROUTE_STATUS_UNCONFIRMED_SINGLE } from '~/server/utils/emuRouteStatus';
 import {
     persistProbeTrackingRows,
     type ProbeTrackingMutation
 } from '~/server/services/probeTrackingMutations';
-import { notifyLookupStatusChanges } from '~/server/services/eventNotificationService';
+import {
+    captureLookupStatusNotificationSnapshot,
+    notifyLookupStatusChanges,
+    resolveLookupStatusNotificationCandidates
+} from '~/server/services/eventNotificationService';
 import { enqueueTask } from '~/server/services/taskQueue';
 import { DETECT_COUPLED_EMU_GROUP_TASK_EXECUTOR } from '~/server/services/taskExecutors/detectCoupledEmuGroupTaskExecutor';
 import type { EmuListRecord } from '~/server/services/probeAssetStore';
-import {
-    trainCodeKey,
-    type TrainCodeParts
-} from '~/server/utils/12306/trainCode';
+import type { TrainCodeParts } from '~/server/utils/12306/trainCode';
 import type { EmuId } from '~/server/libs/database/emu';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
 
@@ -36,8 +32,10 @@ interface ApplyResolvedProbeResultInput {
     startAt: number;
     endAt: number;
     trainKey: string;
-    status: ProbeStatusValue;
+    status: number;
     nowSeconds: number;
+    beforePersist?: () => void;
+    afterPersist?: () => void;
 }
 
 interface ApplyPendingCouplingProbeResultInput extends Omit<
@@ -45,57 +43,13 @@ interface ApplyPendingCouplingProbeResultInput extends Omit<
     'status'
 > {}
 
-function collectLookupStatusNotificationCandidates(
-    allTrainCodes: TrainCodeParts[],
-    allEmuCodes: EmuId[],
-    startAt: number,
-    status: ProbeStatusValue
-) {
-    const seenTrainKeys = new Set<string>();
-    const uniqueTrainCodes = allTrainCodes.filter((trainCode) => {
-        const key = trainCodeKey(trainCode);
-        if (seenTrainKeys.has(key)) {
-            return false;
-        }
-        seenTrainKeys.add(key);
-        return true;
-    });
-    const seenEmuIds = new Set<number>();
-    const uniqueEmuIds = allEmuCodes.filter((emuId) => {
-        const key = Number(emuId);
-        if (seenEmuIds.has(key)) {
-            return false;
-        }
-        seenEmuIds.add(key);
-        return true;
-    });
-
-    return [
-        ...uniqueTrainCodes.map((targetId) => ({
-            targetType: 'train' as const,
-            targetId,
-            startAt,
-            previousStatus: getProbeStatusByTrainCodeValue(targetId, startAt),
-            nextStatus: status
-        })),
-        ...uniqueEmuIds.map((targetId) => ({
-            targetType: 'emu' as const,
-            targetId,
-            startAt,
-            previousStatus: getProbeStatusByEmuCodeValue(targetId, startAt),
-            nextStatus: status
-        }))
-    ];
-}
-
 export async function applyResolvedProbeResult(
     input: ApplyResolvedProbeResultInput
 ): Promise<ProbeTrackingMutation[]> {
-    const notificationCandidates = collectLookupStatusNotificationCandidates(
+    const notificationSnapshot = captureLookupStatusNotificationSnapshot(
         input.allTrainCodes,
         input.allEmuCodes,
-        input.startAt,
-        input.status
+        input.startAt
     );
     const groupKey = buildRunningEmuGroupKey(
         input.trainCode,
@@ -110,7 +64,9 @@ export async function applyResolvedProbeResult(
         endStation: input.endStation,
         startAt: input.startAt,
         endAt: input.endAt,
-        status: input.status
+        status: input.status,
+        beforePersist: input.beforePersist,
+        afterPersist: input.afterPersist
     });
     markEmuCodesAssignedToday(
         input.allEmuCodes,
@@ -120,32 +76,25 @@ export async function applyResolvedProbeResult(
         input.nowSeconds
     );
     markQueriedTrainKey(input.trainKey);
-    await notifyLookupStatusChanges(notificationCandidates);
+    await notifyLookupStatusChanges(
+        resolveLookupStatusNotificationCandidates(notificationSnapshot)
+    );
     return trackingMutations;
 }
 
 export async function applyPendingCouplingProbeResult(
     input: ApplyPendingCouplingProbeResultInput
 ): Promise<ProbeTrackingMutation[]> {
-    const notificationCandidates = collectLookupStatusNotificationCandidates(
+    const notificationSnapshot = captureLookupStatusNotificationSnapshot(
         input.allTrainCodes,
         input.allEmuCodes,
-        input.startAt,
-        ProbeStatusValue.PendingCouplingDetection
+        input.startAt
     );
     const groupKey = buildRunningEmuGroupKey(
         input.trainCode,
         input.trainInternalCode,
         input.startAt
     );
-
-    for (const trainCode of input.allTrainCodes) {
-        updateProbeStatusByTrainCode(
-            trainCode,
-            input.startAt,
-            ProbeStatusValue.PendingCouplingDetection
-        );
-    }
 
     const trackingMutations = persistProbeTrackingRows({
         trainCodes: input.allTrainCodes,
@@ -154,7 +103,16 @@ export async function applyPendingCouplingProbeResult(
         endStation: input.endStation,
         startAt: input.startAt,
         endAt: input.endAt,
-        status: ProbeStatusValue.PendingCouplingDetection
+        status: EMU_ROUTE_STATUS_UNCONFIRMED_SINGLE,
+        beforePersist: () => {
+            for (const trainCode of input.allTrainCodes) {
+                updateDailyRouteFormationStatusByTrainCode(
+                    trainCode,
+                    input.startAt,
+                    EMU_ROUTE_STATUS_UNCONFIRMED_SINGLE
+                );
+            }
+        }
     });
     markEmuCodesAssignedToday(
         input.allEmuCodes,
@@ -164,7 +122,9 @@ export async function applyPendingCouplingProbeResult(
         input.nowSeconds
     );
     markQueriedTrainKey(input.trainKey);
-    await notifyLookupStatusChanges(notificationCandidates);
+    await notifyLookupStatusChanges(
+        resolveLookupStatusNotificationCandidates(notificationSnapshot)
+    );
     return trackingMutations;
 }
 

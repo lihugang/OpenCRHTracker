@@ -41,7 +41,7 @@ export const crawlDocsSections: DocsContentSection[] = [
                     'build_today_schedule：负责生成今日时刻表，并在成功后补发 dispatch_daily_probe_tasks。',
                     'generate_route_refresh_tasks 与 refresh_route_batch：负责对时刻表中过期或缺失的线路信息做增量补刷。',
                     'dispatch_daily_probe_tasks 与 probe_train_departure：负责把今日的时刻表拆成发车探测任务，并在发车窗口内识别担当。',
-                    'clear_daily_probe_status、detect_coupled_emu_group、export_daily_records、rebuild_reference_model_index、rebuild_train_circulation_index 等任务会围绕状态清理、耦合检测、导出、参考车型索引刷新和交路索引重建继续运转。'
+                    'clear_daily_probe_untrusted_records、detect_coupled_emu_group、export_daily_records、rebuild_reference_model_index、rebuild_train_circulation_index 等任务会围绕状态清理、耦合检测、导出、参考车型索引刷新和交路索引重建继续运转。'
                 ]
             },
             {
@@ -56,7 +56,7 @@ export const crawlDocsSections: DocsContentSection[] = [
                     '  -> rehydrateProbeRuntimeState',
                     '  -> reconcile build_today_schedule',
                     '  -> reconcile generate_route_refresh_tasks',
-                    '  -> reconcile clear_daily_probe_status',
+                    '  -> reconcile clear_daily_probe_untrusted_records',
                     '  -> reconcile export_daily_records',
                     '  -> reconcile rebuild_reference_model_index',
                     '  -> reconcile rebuild_train_circulation_index'
@@ -254,8 +254,8 @@ export const crawlDocsSections: DocsContentSection[] = [
                 title: '主要依赖的状态与存储',
                 items: [
                     'probeRuntimeState：记录今天哪些车次组已经查过、哪些动车组已经分配过，用于去重和防止重复落盘。',
-                    'probeStatusStore：记录单编组、重联、待确认、冲突等列车状态，用于后续校正与回溯。',
-                    'emuRoutesStore：写入当天车次号与车组号的对应关系，形成记录。',
+                    'emuRouteStatus：提供状态位域编解码（确认位、编组位置位、故障位、热备位），daily_emu_routes.status 是唯一持久化状态来源。',
+                    'emuRoutesStore：写入当天车次号与车组号的对应关系，并在同一行上维护确认/编组状态，形成记录。',
                     'historicalRecentTrainEmuIndexStore 与 probeAssetStore：分别提供最近两日匹配线索和动车组资产，用于提高识别成功率与耦合检测能力。'
                 ]
             },
@@ -279,8 +279,8 @@ export const crawlDocsSections: DocsContentSection[] = [
                     '  -> probeEmuByTrainCodes(allCodes)',
                     '  -> compare historicalRecent index / runtime state',
                     '  -> verify seat code for historicalRecent-matched running trains',
-                    '  -> persist probe status',
-                    '  -> insertDailyEmuRoute',
+                    '  -> persist route status',
+                    '  -> persistProbeTrackingRows',
                     '  -> requeue overlap or queue detect_coupled_emu_group when needed'
                 ].join('\n')
             }
@@ -328,14 +328,13 @@ export const crawlDocsSections: DocsContentSection[] = [
                 language: 'text',
                 code: [
                     'probe_train_departure',
-                    '  -> ensureProbeStatus(..., PendingCouplingDetection)',
-                    '  -> insertDailyEmuRoute(mainEmuCode)',
+                    '  -> persistProbeTrackingRows(status=0x00 unconfirmed single)',
                     '  -> queue detect_coupled_emu_group',
                     'detect_coupled_emu_group',
                     '  -> load probe assets and pending tracked groups',
                     '  -> scan unassigned candidates by bureau/model',
                     '  -> persistResolvedTrackedGroup',
-                    '  -> upgrade to CoupledFormationResolved or finalize SingleFormationResolved',
+                    '  -> upgrade to 0x03 confirmed coupled or finalize 0x01 confirmed single',
                     '  -> persistBackfilledCoupledRoutes when coupled'
                 ].join('\n')
             },
@@ -477,7 +476,7 @@ export const crawlDocsSections: DocsContentSection[] = [
                 items: [
                     '时刻表有车次但没有 startAt/endAt：优先看 enrich 和 refresh_route_batch 是否连续失败。',
                     '当天没有记录：优先看 dispatch_daily_probe_tasks 是否执行，以及 probe_train_departure 是否因为重试信息耗尽或跨日被跳过。',
-                    '同一编组被多个车次抢占：优先看 overlapRetryDelaySeconds、probe status 清理以及 detect_coupled_emu_group 的后续结果。'
+                    '同一编组被多个车次抢占：优先看 overlapRetryDelaySeconds、probe untrusted 记录清理以及 detect_coupled_emu_group 的后续结果。'
                 ]
             }
         ]

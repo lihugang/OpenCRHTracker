@@ -128,6 +128,7 @@ export interface LookupHistoryListItem {
     id: string;
     serviceDate: string;
     timetableId: number | null;
+    status: number;
     startAt: number | null;
     endAt: number | null;
     code: string;

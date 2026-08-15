@@ -335,9 +335,9 @@
                 <div
                     v-if="isTodaySelected"
                     class="rounded-[1rem] border border-amber-200 bg-amber-50/80 px-4 py-4 text-sm leading-6 text-amber-900">
-                    因为当前处理日期是今天，确认后还会同步删除这条数据精确匹配的
-                    probe status，并清理对应的 probe 运行态；不会清理 today
-                    schedule 和 lookup。
+                    因为当前处理日期是今天，确认后还会清理这条数据精确匹配的
+                    probe untrusted 记录和对应的 probe 运行态；不会清理 today
+                    schedule 和 lookup。状态会随 daily_emu_routes 行一并删除。
                 </div>
 
                 <p
@@ -546,7 +546,7 @@ const isTodaySelected = computed(
 );
 const deleteRouteDialogDescription = computed(() =>
     isTodaySelected.value
-        ? '这会删除选中的异常交路，并同步清理该条数据对应的 probe status 与 probe 运行态。'
+        ? '这会删除选中的异常交路，并同步清理对应的 probe untrusted 记录与 probe 运行态。'
         : '这会永久删除选中的异常交路，请确认后再继续。'
 );
 const isBulkDeleting = computed(() => bulkDeletingType.value.length > 0);
@@ -737,8 +737,8 @@ async function confirmDeleteRoute() {
         );
 
         anomalyActionSuccessMessage.value = response.wasToday
-            ? `已删除异常交路，并清理 ${response.deletedProbeStatusRows} 条匹配的 probe status 与相关 probe 运行态。`
-            : `已删除异常交路，并清理 ${response.deletedProbeStatusRows} 条匹配的 probe status。`;
+            ? `已删除异常交路，并清理相关 probe 运行态（${response.clearedRuntimeEmuCodes.length} 个车组、${response.clearedDetectionGroups} 个检测组）。`
+            : '已删除异常交路。';
 
         isDeleteRouteDialogOpen.value = false;
         pendingDeleteRouteContext.value = null;
@@ -789,8 +789,7 @@ async function confirmBulkDelete() {
 
         anomalyActionSuccessMessage.value =
             `已删除 ${getAnomalyTypeLabel(targetType)}：` +
-            `${response.deletedDailyRoutes} 条异常交路，` +
-            `${response.deletedProbeStatusRows} 条 probe status。` +
+            `${response.deletedDailyRoutes} 条异常交路。` +
             (response.skippedRoutes > 0
                 ? `另有 ${response.skippedRoutes} 条已不存在，已跳过。`
                 : '');

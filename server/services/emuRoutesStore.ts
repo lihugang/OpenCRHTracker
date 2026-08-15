@@ -1,10 +1,21 @@
 import '~/server/libs/database/emu';
-import { asEmuId, type EmuId } from '~/server/libs/database/emu';
+import {
+    useEmuDatabase,
+    asEmuId,
+    type EmuId
+} from '~/server/libs/database/emu';
 import { createPreparedSqlStore } from '~/server/libs/database/prepared';
 import {
     hydrateHistoricalRouteSummary,
     resolveTimetableIdentityLink
 } from '~/server/services/historicalTimetableResolver';
+import {
+    decodeEmuRouteStatus,
+    EMU_ROUTE_STATUS_CONFIRMED,
+    mergeEmuRouteStatuses,
+    withFormationStatus,
+    type EmuRouteFormationStatusInput
+} from '~/server/utils/emuRouteStatus';
 import type { TrainCodeParts } from '~/server/utils/12306/trainCode';
 import {
     asServiceDay,
@@ -27,6 +38,7 @@ interface RawDailyEmuRouteRow {
     emu_id: number;
     service_date: number;
     timetable_id: number | null;
+    status: number;
 }
 
 export interface DailyEmuRouteLightRow {
@@ -35,6 +47,7 @@ export interface DailyEmuRouteLightRow {
     emu_id: EmuId;
     service_date: ServiceDay;
     timetable_id: number | null;
+    status: number;
 }
 
 export interface DailyEmuRouteRow extends DailyEmuRouteLightRow {
@@ -44,7 +57,16 @@ export interface DailyEmuRouteRow extends DailyEmuRouteLightRow {
     end_at: number;
 }
 
+export interface DailyEmuRouteUpsertResult {
+    id: number;
+    action: 'created' | 'updated' | 'unchanged';
+    timetableId: number | null;
+    previousStatus: number | null;
+    nextStatus: number;
+}
+
 function toInternalRow(row: RawDailyEmuRouteRow): DailyEmuRouteLightRow {
+    const status = decodeEmuRouteStatus(row.status) ? row.status : 0;
     return {
         id: row.id,
         train_code: {
@@ -53,7 +75,8 @@ function toInternalRow(row: RawDailyEmuRouteRow): DailyEmuRouteLightRow {
         },
         emu_id: asEmuId(row.emu_id),
         service_date: asServiceDay(row.service_date),
-        timetable_id: row.timetable_id
+        timetable_id: row.timetable_id,
+        status
     };
 }
 
@@ -66,16 +89,19 @@ type EmuRouteSqlKey =
     | 'deleteDailyRouteByTrainCodeAndEmuCodeAtServiceDate'
     | 'deleteDailyRouteByTrainCodeAndEmuCodeAtStartAt'
     | 'deleteDailyRoutesByTrainCodeInRange'
-    | 'insertDailyEmuRoute'
     | 'insertDailyEmuRouteWithIdentity'
+    | 'selectDailyEmuRouteByIdentity'
     | 'selectDailyRecordById'
+    | 'selectConfirmedDailyRoutesByEmuCodeBeforeCursor'
     | 'selectDailyRoutesByEmuCodeInRange'
     | 'selectDailyRoutesByTrainCodeInRange'
     | 'selectLatestDailyRoutesByTrainCode'
     | 'selectHistoryByEmuPaged'
     | 'selectHistoryByTrainPaged'
     | 'selectDailyRecordsPaged'
-    | 'selectDailyRecordsAll';
+    | 'selectDailyRecordsAll'
+    | 'updateDailyEmuRouteStatusById'
+    | 'updateDailyEmuRouteTimetableIdAndStatusById';
 
 const emuRouteSql = importSqlBatch('emu/queries') as Record<
     EmuRouteSqlKey,
@@ -91,6 +117,8 @@ const DEFAULT_CURSOR_POINT: CursorPoint = {
     serviceDate: serviceDateToDay('99991231'),
     id: Number.MAX_SAFE_INTEGER
 };
+
+const LATEST_CONFIRMED_ROUTE_SCAN_BATCH_SIZE = 128;
 
 function normalizeServiceDateFromTimestamp(timestampSeconds: number) {
     if (
@@ -231,6 +259,123 @@ function selectRawHistoryByEmuPaged(
     );
 }
 
+function toFormationStatusInput(status: number): EmuRouteFormationStatusInput {
+    const decoded = decodeEmuRouteStatus(status);
+    if (!decoded) {
+        throw new Error(`invalid_emu_route_status ${status}`);
+    }
+
+    return {
+        confirmed: decoded.confirmed,
+        formationPosition: decoded.formationPosition
+    };
+}
+
+function upsertDailyEmuRouteByServiceDate(
+    trainCode: TrainCodeParts,
+    emuId: EmuId,
+    serviceDate: ServiceDay,
+    timetableId: number | null,
+    status: number
+): DailyEmuRouteUpsertResult {
+    const formation = toFormationStatusInput(status);
+    const matchingRows =
+        emuRouteStatements.all<RawDailyEmuRouteRow>(
+            'selectDailyEmuRouteByIdentity',
+            trainCode.prefix,
+            trainCode.number,
+            emuId,
+            serviceDate,
+            timetableId
+        ) ?? [];
+    const existing =
+        matchingRows.find((row) => row.timetable_id === timetableId) ??
+        (timetableId !== null
+            ? matchingRows.find((row) => row.timetable_id === null)
+            : undefined) ??
+        null;
+
+    if (!existing) {
+        const result = emuRouteStatements.run(
+            'insertDailyEmuRouteWithIdentity',
+            trainCode.prefix,
+            trainCode.number,
+            emuId,
+            serviceDate,
+            timetableId,
+            status
+        );
+        return {
+            id: Number(result.lastInsertRowid),
+            action: 'created',
+            timetableId,
+            previousStatus: null,
+            nextStatus: status
+        };
+    }
+
+    const nextStatus = withFormationStatus(existing.status, formation);
+    if (nextStatus === null) {
+        throw new Error(`invalid_emu_route_status ${existing.status}`);
+    }
+
+    if (
+        existing.timetable_id === timetableId &&
+        existing.status === nextStatus
+    ) {
+        return {
+            id: existing.id,
+            action: 'unchanged',
+            timetableId,
+            previousStatus: existing.status,
+            nextStatus
+        };
+    }
+
+    if (existing.timetable_id === timetableId) {
+        emuRouteStatements.run(
+            'updateDailyEmuRouteStatusById',
+            nextStatus,
+            existing.id
+        );
+    } else {
+        emuRouteStatements.run(
+            'updateDailyEmuRouteTimetableIdAndStatusById',
+            timetableId,
+            nextStatus,
+            existing.id
+        );
+    }
+
+    return {
+        id: existing.id,
+        action: 'updated',
+        timetableId,
+        previousStatus: existing.status,
+        nextStatus
+    };
+}
+
+export function upsertDailyEmuRouteWithFormationStatus(
+    trainCode: TrainCodeParts,
+    emuId: EmuId,
+    startAt: number,
+    status: number
+): DailyEmuRouteUpsertResult {
+    if (!Number.isInteger(startAt) || startAt < 0) {
+        throw new Error('invalid_start_at');
+    }
+
+    const identityLink = resolveTimetableIdentityLink(trainCode, startAt);
+    return upsertDailyEmuRouteByServiceDate(
+        trainCode,
+        emuId,
+        identityLink.serviceDate,
+        identityLink.timetableId,
+        status
+    );
+}
+
 export function listHistoryByTrainPaged(
     trainCode: TrainCodeParts,
     startAt: number,
@@ -309,6 +454,46 @@ export function listDailyRoutesByTrainCodeInRange(
         .sort(sortRowsAscendingByStartAt);
 }
 
+function listDailyRoutesByStartAt(rows: DailyEmuRouteRow[], startAt: number) {
+    const serviceDate = normalizeServiceDateFromTimestamp(startAt);
+    const resolvedRows = rows.filter((row) => row.start_at === startAt);
+    if (resolvedRows.length > 0) {
+        return resolvedRows;
+    }
+
+    return rows.filter(
+        (row) => row.start_at === 0 && row.service_date === serviceDate
+    );
+}
+
+export function listDailyRoutesByTrainCodeAndStartAt(
+    trainCode: TrainCodeParts,
+    startAt: number
+): DailyEmuRouteRow[] {
+    if (!Number.isInteger(startAt) || startAt < 0) {
+        return [];
+    }
+
+    return listDailyRoutesByStartAt(
+        listDailyRoutesByTrainCodeInRange(trainCode, startAt, startAt + 1),
+        startAt
+    );
+}
+
+export function listDailyRoutesByEmuCodeAndStartAt(
+    emuId: EmuId,
+    startAt: number
+): DailyEmuRouteRow[] {
+    if (!Number.isInteger(startAt) || startAt < 0) {
+        return [];
+    }
+
+    return listDailyRoutesByStartAt(
+        listDailyRoutesByEmuCodeInRange(emuId, startAt, startAt + 1),
+        startAt
+    );
+}
+
 export function listLatestDailyRoutesByTrainCode(
     trainCode: TrainCodeParts,
     limit: number
@@ -351,38 +536,12 @@ export function listHistoryLightByEmuPaged(
     );
 }
 
-export function insertDailyEmuRoute(
-    trainCode: TrainCodeParts,
-    emuId: EmuId,
-    _startStationName: string,
-    _endStationName: string,
-    startAt: number,
-    _endAt: number
-): void {
-    const identityLink = resolveTimetableIdentityLink(trainCode, startAt);
-    emuRouteStatements.run(
-        'deleteDailyRouteByTrainCodeAndEmuCodeAtStartAt',
-        trainCode.prefix,
-        trainCode.number,
-        emuId,
-        identityLink.serviceDate
-    );
-
-    emuRouteStatements.run(
-        'insertDailyEmuRoute',
-        trainCode.prefix,
-        trainCode.number,
-        emuId,
-        identityLink.serviceDate,
-        identityLink.timetableId
-    );
-}
-
 export function insertDailyEmuRouteWithIdentity(
     trainCode: TrainCodeParts,
     emuId: EmuId,
     serviceDate: ServiceDay,
-    timetableId: number | null
+    timetableId: number | null,
+    status: number
 ): number {
     if (
         timetableId !== null &&
@@ -391,23 +550,14 @@ export function insertDailyEmuRouteWithIdentity(
         return 0;
     }
 
-    emuRouteStatements.run(
-        'deleteDailyRouteByTrainCodeAndEmuCodeAtServiceDate',
-        trainCode.prefix,
-        trainCode.number,
-        emuId,
-        serviceDate
-    );
-
-    const result = emuRouteStatements.run(
-        'insertDailyEmuRouteWithIdentity',
-        trainCode.prefix,
-        trainCode.number,
+    const result = upsertDailyEmuRouteByServiceDate(
+        trainCode,
         emuId,
         serviceDate,
-        timetableId
+        timetableId,
+        status
     );
-    return Number(result.lastInsertRowid);
+    return result.id;
 }
 
 export function deleteDailyRoutesByTrainCodeInRange(
@@ -447,6 +597,21 @@ export function deleteDailyRouteByTrainCodeAndEmuCodeAtStartAt(
     const serviceDate = normalizeServiceDateFromTimestamp(startAt);
     const result = emuRouteStatements.run(
         'deleteDailyRouteByTrainCodeAndEmuCodeAtStartAt',
+        trainCode.prefix,
+        trainCode.number,
+        emuId,
+        serviceDate
+    );
+    return result.changes;
+}
+
+export function deleteDailyRouteByTrainCodeAndEmuCodeAtServiceDate(
+    trainCode: TrainCodeParts,
+    emuId: EmuId,
+    serviceDate: ServiceDay
+): number {
+    const result = emuRouteStatements.run(
+        'deleteDailyRouteByTrainCodeAndEmuCodeAtServiceDate',
         trainCode.prefix,
         trainCode.number,
         emuId,
@@ -564,4 +729,145 @@ export function buildNextCursor(
 
     const last = rows[rows.length - 1]!;
     return `${dayToServiceDate(last.service_date)}:${last.id}`;
+}
+
+export function getEmuRouteStatusByTrainCode(
+    trainCode: TrainCodeParts,
+    startAt: number
+): number {
+    return mergeEmuRouteStatuses(
+        listDailyRoutesByTrainCodeAndStartAt(trainCode, startAt).map(
+            (row) => row.status
+        )
+    );
+}
+
+export function getEmuRouteStatusByEmuCode(
+    emuId: EmuId,
+    startAt: number
+): number {
+    return mergeEmuRouteStatuses(
+        listDailyRoutesByEmuCodeAndStartAt(emuId, startAt).map(
+            (row) => row.status
+        )
+    );
+}
+
+export function getLatestConfirmedDailyRouteByEmuCodeBefore(
+    emuId: EmuId,
+    startAtExclusive: number
+): DailyEmuRouteRow | null {
+    if (!Number.isInteger(startAtExclusive) || startAtExclusive < 0) {
+        return null;
+    }
+
+    const serviceDate = normalizeServiceDateFromTimestamp(startAtExclusive);
+    let cursorServiceDate = serviceDate;
+    let cursorId = Number.MAX_SAFE_INTEGER;
+    let latestRow: DailyEmuRouteRow | null = null;
+
+    for (;;) {
+        const rawRows = emuRouteStatements.all<RawDailyEmuRouteRow>(
+            'selectConfirmedDailyRoutesByEmuCodeBeforeCursor',
+            emuId,
+            EMU_ROUTE_STATUS_CONFIRMED,
+            cursorServiceDate,
+            cursorServiceDate,
+            cursorId,
+            LATEST_CONFIRMED_ROUTE_SCAN_BATCH_SIZE
+        );
+        if (rawRows.length === 0) {
+            break;
+        }
+
+        const rows = hydrateRows(rawRows);
+        for (const row of rows) {
+            if (
+                row.start_at > 0 &&
+                row.start_at < startAtExclusive &&
+                (latestRow === null ||
+                    row.start_at > latestRow.start_at ||
+                    (row.start_at === latestRow.start_at &&
+                        row.id > latestRow.id))
+            ) {
+                latestRow = row;
+            }
+        }
+
+        const lastRawRow = rawRows[rawRows.length - 1]!;
+        if (
+            latestRow !== null &&
+            Number(lastRawRow.service_date) < Number(latestRow.service_date)
+        ) {
+            break;
+        }
+
+        cursorServiceDate = asServiceDay(lastRawRow.service_date);
+        cursorId = lastRawRow.id;
+        if (rawRows.length < LATEST_CONFIRMED_ROUTE_SCAN_BATCH_SIZE) {
+            break;
+        }
+    }
+
+    return latestRow;
+}
+
+function updateRouteFormationStatus(
+    row: DailyEmuRouteRow,
+    status: number
+): boolean {
+    const nextStatus = withFormationStatus(
+        row.status,
+        toFormationStatusInput(status)
+    );
+    if (nextStatus === null || nextStatus === row.status) {
+        return false;
+    }
+
+    emuRouteStatements.run('updateDailyEmuRouteStatusById', nextStatus, row.id);
+    return true;
+}
+
+export function updateDailyRouteFormationStatusByTrainCode(
+    trainCode: TrainCodeParts,
+    startAt: number,
+    status: number
+): number {
+    return listDailyRoutesByTrainCodeAndStartAt(
+        trainCode,
+        startAt
+    ).reduce<number>(
+        (changes, row) =>
+            changes + (updateRouteFormationStatus(row, status) ? 1 : 0),
+        0
+    );
+}
+
+export function updateDailyRouteFormationStatusByEmuCode(
+    emuId: EmuId,
+    startAt: number,
+    status: number
+): number {
+    return listDailyRoutesByEmuCodeAndStartAt(emuId, startAt).reduce<number>(
+        (changes, row) =>
+            changes + (updateRouteFormationStatus(row, status) ? 1 : 0),
+        0
+    );
+}
+
+export function updateDailyRouteFormationStatusByTrainCodeAndEmuCode(
+    trainCode: TrainCodeParts,
+    emuId: EmuId,
+    startAt: number,
+    status: number
+): number {
+    const rows = listDailyRoutesByTrainCodeAndStartAt(trainCode, startAt);
+    const matchingRow = rows.find(
+        (row) => Number(row.emu_id) === Number(emuId)
+    );
+    if (!matchingRow) {
+        return 0;
+    }
+
+    return updateRouteFormationStatus(matchingRow, status) ? 1 : 0;
 }

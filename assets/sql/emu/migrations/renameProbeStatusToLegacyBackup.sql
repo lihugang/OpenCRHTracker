@@ -1,2 +1,0 @@
-ALTER TABLE probe_status
-RENAME TO probe_status_legacy_pre_timetable_id;

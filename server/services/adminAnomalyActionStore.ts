@@ -20,7 +20,7 @@ import {
     clearRunningEmuStateByTrainKey,
     hasQueriedTrainKey
 } from '~/server/services/probeRuntimeState';
-import { deleteProbeStatusByTrainCodeAndEmuCodeAtStartAt } from '~/server/services/probeStatusStore';
+import { deleteProbeUntrustedRecordsByTrainCodeAndEmuCodeAtServiceDate } from '~/server/services/probeUntrustedRecordStore';
 import { getTodayScheduleProbeGroupByTrainCode } from '~/server/services/todayScheduleCache';
 import { useEmuDatabase } from '~/server/libs/database/emu';
 import { scanDailyAnomalies } from '~/server/services/adminAnomalyStore';
@@ -46,7 +46,6 @@ const DAY_SECONDS = 24 * 60 * 60;
 
 interface DeleteDailyRouteResult {
     deletedDailyRoute: boolean;
-    deletedProbeStatusRows: number;
     route: NonNullable<ReturnType<typeof getDailyRecordById>> | null;
 }
 
@@ -113,7 +112,7 @@ function assertRouteBelongsToDate(
     }
 }
 
-function deleteDailyRouteAndProbeStatus(
+function deleteDailyRoute(
     serviceDate: ServiceDay,
     numericRouteId: number,
     failWhenMissing: boolean
@@ -126,7 +125,6 @@ function deleteDailyRouteAndProbeStatus(
 
         return {
             deletedDailyRoute: false,
-            deletedProbeStatusRows: 0,
             route: null
         };
     }
@@ -142,7 +140,6 @@ function deleteDailyRouteAndProbeStatus(
 
         return {
             deletedDailyRoute: false,
-            deletedProbeStatusRows: 0,
             route
         };
     }
@@ -155,21 +152,18 @@ function deleteDailyRouteAndProbeStatus(
 
         return {
             deletedDailyRoute: false,
-            deletedProbeStatusRows: 0,
             route
         };
     }
 
-    const deletedProbeStatusRows =
-        deleteProbeStatusByTrainCodeAndEmuCodeAtStartAt(
-            route.train_code,
-            route.emu_id,
-            route.start_at
-        );
+    deleteProbeUntrustedRecordsByTrainCodeAndEmuCodeAtServiceDate(
+        route.train_code,
+        route.emu_id,
+        route.service_date
+    );
 
     return {
         deletedDailyRoute: true,
-        deletedProbeStatusRows,
         route
     };
 }
@@ -189,11 +183,7 @@ export async function deleteAnomalyRoute(
 ): Promise<AdminAnomalyDeleteRouteResponse> {
     const numericRouteId = normalizeRouteId(routeId);
 
-    const deleteResult = deleteDailyRouteAndProbeStatus(
-        serviceDate,
-        numericRouteId,
-        true
-    );
+    const deleteResult = deleteDailyRoute(serviceDate, numericRouteId, true);
 
     const wasToday = serviceDate === serviceDateToDay(getCurrentDateString());
     let clearedRuntimeTrainKey = false;
@@ -240,7 +230,6 @@ export async function deleteAnomalyRoute(
         routeId,
         wasToday,
         deletedDailyRoute: true,
-        deletedProbeStatusRows: deleteResult.deletedProbeStatusRows,
         clearedRuntimeTrainKey,
         clearedRuntimeEmuCodes: clearedRuntimeEmuIds.map(formatExternalEmuCode),
         clearedDetectionGroups
@@ -273,16 +262,11 @@ export async function deleteAnomalyRoutesByType(
     );
 
     let deletedDailyRoutes = 0;
-    let deletedProbeStatusRows = 0;
     let skippedRoutes = 0;
 
     const deleteTransaction = useEmuDatabase().transaction(() => {
         for (const routeId of routeIds) {
-            const result = deleteDailyRouteAndProbeStatus(
-                serviceDate,
-                routeId,
-                false
-            );
+            const result = deleteDailyRoute(serviceDate, routeId, false);
 
             if (!result.deletedDailyRoute) {
                 skippedRoutes += 1;
@@ -290,7 +274,6 @@ export async function deleteAnomalyRoutesByType(
             }
 
             deletedDailyRoutes += 1;
-            deletedProbeStatusRows += result.deletedProbeStatusRows;
         }
     });
 
@@ -303,7 +286,6 @@ export async function deleteAnomalyRoutesByType(
         matchedItems: matchedItems.length,
         matchedRoutes: routeIds.length,
         deletedDailyRoutes,
-        deletedProbeStatusRows,
         skippedRoutes
     };
 }

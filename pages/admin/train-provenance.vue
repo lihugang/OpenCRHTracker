@@ -604,8 +604,6 @@
                                             class="text-xs leading-5 text-slate-500">
                                             daily_emu_routes
                                             {{ item.dailyRouteRows.length }} 行
-                                            / probe_status
-                                            {{ item.probeStatusRows.length }} 行
                                         </p>
                                     </div>
                                 </button>
@@ -625,7 +623,7 @@
                                     当前表快照
                                 </h3>
                                 <p class="text-sm leading-6 text-slate-600">
-                                    直接来自 daily_emu_routes 和 probe_status
+                                    直接来自 daily_emu_routes
                                     的当前记录；即使没有来源事件，这里也会显示表内状态。
                                 </p>
                             </div>
@@ -734,12 +732,12 @@
                                         class="flex items-center justify-between gap-3">
                                         <p
                                             class="text-sm font-semibold text-slate-900">
-                                            probe_status
+                                            route status
                                         </p>
                                         <span
                                             class="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
                                             {{
-                                                activeDeparture.probeStatusRows
+                                                activeDeparture.dailyRouteRows
                                                     .length
                                             }}
                                             行
@@ -747,11 +745,11 @@
                                     </div>
                                     <div
                                         v-if="
-                                            activeDeparture.probeStatusRows
+                                            activeDeparture.dailyRouteRows
                                                 .length === 0
                                         "
                                         class="mt-4 rounded-[0.75rem] bg-slate-50 px-3 py-3 text-sm text-slate-500">
-                                        当前班次没有 probe_status 记录。
+                                        当前班次没有 route status 记录。
                                     </div>
                                     <div
                                         v-else
@@ -784,8 +782,8 @@
                                             <tbody
                                                 class="divide-y divide-slate-100">
                                                 <tr
-                                                    v-for="row in activeDeparture.probeStatusRows"
-                                                    :key="`probe-status:${row.id}`">
+                                                    v-for="row in activeDeparture.dailyRouteRows"
+                                                    :key="`route-status:${row.id}`">
                                                     <td
                                                         class="px-3 py-2 font-mono text-xs text-slate-500">
                                                         {{ row.id }}
@@ -815,7 +813,7 @@
                                                     <td class="px-3 py-2">
                                                         {{
                                                             getDepartureStatusLabel(
-                                                                row.statusLabel
+                                                                row.status
                                                             )
                                                         }}
                                                         <span
@@ -1179,10 +1177,6 @@
                                                             }}
                                                         </p>
                                                         <p
-                                                            v-if="
-                                                                mutation.table ===
-                                                                'probe_status'
-                                                            "
                                                             class="text-xs leading-5 text-slate-500">
                                                             状态：{{
                                                                 formatMutationStatus(
@@ -4738,18 +4732,7 @@ function formatTrackingMutationTarget(mutation: AdminTrackingMutation) {
 }
 
 function formatMutationStatus(status: number | null) {
-    switch (status) {
-        case 1:
-            return '待重联确认';
-        case 2:
-            return '单组';
-        case 3:
-            return '重联';
-        case null:
-            return '--';
-        default:
-            return String(status);
-    }
+    return status === null ? '--' : getDepartureStatusLabel(status);
 }
 
 function formatTrackingMutationSummary(
@@ -4764,18 +4747,6 @@ function formatTrackingMutationSummary(
     }
     if (summary.dailyRouteDeleted > 0) {
         parts.push(`daily 删除 ${summary.dailyRouteDeleted}`);
-    }
-    if (summary.probeStatusCreated > 0) {
-        parts.push(`probe +${summary.probeStatusCreated}`);
-    }
-    if (summary.probeStatusUpdated > 0) {
-        parts.push(`probe 更新 ${summary.probeStatusUpdated}`);
-    }
-    if (summary.probeStatusDeleted > 0) {
-        parts.push(`probe 删除 ${summary.probeStatusDeleted}`);
-    }
-    if (summary.probeStatusUnchanged > 0) {
-        parts.push(`probe 未变 ${summary.probeStatusUnchanged}`);
     }
 
     return parts.length > 0 ? parts.join(' / ') : '无实际变更';
@@ -5190,7 +5161,26 @@ function getCandidateStatusLabel(status: string) {
     }
 }
 
-function getDepartureStatusLabel(status: AdminTrainProvenanceLatestStatus) {
+function getDepartureStatusLabel(
+    status: AdminTrainProvenanceLatestStatus | number
+) {
+    if (typeof status === 'number') {
+        const confirmed = (status & 0x01) !== 0;
+        const formation = status & 0x06;
+        const formationLabel =
+            formation === 0x00
+                ? '单组'
+                : formation === 0x02
+                  ? '重联'
+                  : formation === 0x04
+                    ? '重联 I 位'
+                    : '重联 II 位';
+        const flags = [
+            (status & 0x08) !== 0 ? '故障' : '',
+            (status & 0x10) !== 0 ? '热备' : ''
+        ].filter((value) => value.length > 0);
+        return `${confirmed ? '已确认' : '未确认'}${formationLabel}${flags.length > 0 ? ` / ${flags.join(' / ')}` : ''}`;
+    }
     switch (status) {
         case 'pending':
             return '待重联';

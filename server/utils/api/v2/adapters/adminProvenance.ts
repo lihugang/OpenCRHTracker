@@ -197,13 +197,6 @@ export async function getAdminTrainProvenanceV2Adapter(
                 ...(row.timetableId === null
                     ? {}
                     : { timetableId: row.timetableId })
-            })),
-            probeStatusRows: departure.probeStatusRows.map((row) => ({
-                ...row,
-                serviceDay: serviceDateToDay(row.serviceDate),
-                ...(row.timetableId === null
-                    ? {}
-                    : { timetableId: row.timetableId })
             }))
         }))
     };

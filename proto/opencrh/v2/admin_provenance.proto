@@ -69,18 +69,7 @@ message AdminDailyRouteTrackingRecord {
   int64 start_at = 8;
   int64 end_at = 9;
   bool is_timetable_resolved = 10;
-}
-
-message AdminProbeStatusRecord {
-  uint32 id = 1;
-  string train_code = 2;
-  string emu_code = 3;
-  uint32 service_day = 4;
-  optional uint32 timetable_id = 5;
-  uint32 status = 6;
-  AdminTrainProvenanceLatestStatus status_label = 7;
-  int64 start_at = 8;
-  bool is_timetable_resolved = 9;
+  uint32 status = 11;
 }
 
 message AdminTrainProvenanceDeparture {
@@ -91,7 +80,6 @@ message AdminTrainProvenanceDeparture {
   AdminTrainProvenanceLatestStatus latest_status = 5;
   repeated string emu_codes = 6;
   repeated AdminDailyRouteTrackingRecord daily_route_rows = 7;
-  repeated AdminProbeStatusRecord probe_status_rows = 8;
 }
 
 message AdminTrainRouteSnapshot {

@@ -83,7 +83,6 @@ message PostAdminAnomalyDeleteByTypeData {
   uint32 matched_items = 4;
   uint32 matched_routes = 5;
   uint32 deleted_daily_routes = 6;
-  uint32 deleted_probe_status_rows = 7;
   uint32 skipped_routes = 8;
 }
 
@@ -105,7 +104,6 @@ message PostAdminAnomalyDeleteRouteData {
   uint32 route_id = 2;
   bool was_today = 3;
   bool deleted_daily_route = 4;
-  uint32 deleted_probe_status_rows = 5;
   bool cleared_runtime_train_key = 6;
   repeated string cleared_runtime_emu_codes = 7;
   uint32 cleared_detection_groups = 8;
@@ -128,6 +126,7 @@ message AdminAnomalyRouteRecord {
   int64 start_at = 6;
   int64 end_at = 7;
   uint32 duration_seconds = 8;
+  uint32 status = 9;
 }
 
 message AdminAnomalyTypeCount {
@@ -259,6 +258,7 @@ message AdminDailyRouteRecord {
   string end_station = 7;
   int64 start_at = 8;
   int64 end_at = 9;
+  uint32 status = 10;
 }
 
 message GetAdminDailyRoutesRequest {}
@@ -314,7 +314,6 @@ message DeleteAdminDailyRouteData {
   uint32 route_id = 2;
   bool was_today = 3;
   bool deleted_daily_route = 4;
-  uint32 deleted_probe_status_rows = 5;
   bool cleared_runtime_train_key = 6;
   repeated string cleared_runtime_emu_codes = 7;
   uint32 cleared_detection_groups = 8;
