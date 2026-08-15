@@ -16,6 +16,11 @@ import {
 import { serviceDateToDay } from '~/server/utils/date/serviceDay';
 import ensure from '~/server/utils/api/executor/ensure';
 import type { V2OperationContext } from '~/server/utils/api/v2/V2Types';
+import type {
+    AdminTrainDataRequestHourBucket,
+    AdminTrainDataRequestSummary,
+    AdminTrainDataRequestTypeSummary
+} from '~/types/admin';
 
 function requireDate(ctx: V2OperationContext): string {
     const date =
@@ -98,6 +103,56 @@ function toProtoCouplingCandidate<
         occupiedRoutes: (candidate.occupiedRoutes ?? []).map(
             (route) => toProtoRouteSnapshot(route) ?? {}
         )
+    };
+}
+
+function toProtoRequestMetrics(summary: AdminTrainDataRequestSummary) {
+    return {
+        total: summary.total,
+        success: summary.success,
+        failure: summary.failure,
+        ...(summary.successRate === null
+            ? {}
+            : { successRate: summary.successRate })
+    };
+}
+
+function toProtoRequestComparison(summary: AdminTrainDataRequestSummary) {
+    return {
+        compareTotal: summary.compareTotal,
+        compareSuccess: summary.compareSuccess,
+        compareFailure: summary.compareFailure,
+        totalDelta: summary.totalDelta,
+        successDelta: summary.successDelta,
+        failureDelta: summary.failureDelta,
+        ...(summary.totalChangeRatio === null
+            ? {}
+            : { totalChangeRatio: summary.totalChangeRatio }),
+        ...(summary.successChangeRatio === null
+            ? {}
+            : { successChangeRatio: summary.successChangeRatio }),
+        ...(summary.failureChangeRatio === null
+            ? {}
+            : { failureChangeRatio: summary.failureChangeRatio })
+    };
+}
+
+function toProtoRequestTypeSummary(summary: AdminTrainDataRequestTypeSummary) {
+    return {
+        type: summary.type,
+        metrics: toProtoRequestMetrics(summary),
+        comparison: toProtoRequestComparison(summary)
+    };
+}
+
+function toProtoRequestHourBucket(bucket: AdminTrainDataRequestHourBucket) {
+    return {
+        hour: bucket.hour,
+        startAt: bucket.startAt,
+        endAt: bucket.endAt,
+        metrics: toProtoRequestMetrics(bucket),
+        comparison: toProtoRequestComparison(bucket),
+        types: bucket.types.map(toProtoRequestTypeSummary)
     };
 }
 
@@ -226,9 +281,20 @@ export async function getAdminTrainProvenanceQrcodeScanTasksV2Adapter(
 export async function getAdminTrainProvenanceRequestStatsV2Adapter(
     ctx: V2OperationContext
 ) {
-    return getAdminTrainProvenanceRequestStats(
+    const result = getAdminTrainProvenanceRequestStats(
         parseExternalServiceDate(requireDate(ctx))
     );
+    return {
+        enabled: result.enabled,
+        retentionDays: result.retentionDays,
+        date: result.date,
+        compareDate: result.compareDate,
+        asOf: result.asOf,
+        totals: toProtoRequestMetrics(result.totals),
+        comparison: toProtoRequestComparison(result.totals),
+        types: result.types.map(toProtoRequestTypeSummary),
+        hours: result.hours.map(toProtoRequestHourBucket)
+    };
 }
 
 export async function getAdminTrainProvenanceStationBoardV2Adapter(

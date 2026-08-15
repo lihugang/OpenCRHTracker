@@ -45,7 +45,14 @@ import {
 import type {
     AdminConfigFileAction,
     AdminConfigFileTarget,
-    AdminMembershipCodeStatus
+    AdminMembershipCodeStatus,
+    AdminServerMetricsBucket,
+    AdminServerMetricsPeak,
+    AdminServerMetricsTopRoute,
+    AdminServerMetricsWindow,
+    AdminServerMetricsWindowSummary,
+    AdminTrafficWindow,
+    AdminTrafficWindowSummary
 } from '~/types/admin';
 import {
     AdminAnomalyTypeSchema,
@@ -586,8 +593,144 @@ function parsePassiveAlertLimit(ctx: V2OperationContext) {
     return Math.min(value, parseLimit(ctx.event));
 }
 
+function toProtoServerMetricsBucket(bucket: AdminServerMetricsBucket) {
+    return {
+        startAt: bucket.startAt,
+        endAt: bucket.endAt,
+        systemSampleCount: bucket.systemSampleCount,
+        ...(bucket.cpuPercent === null
+            ? {}
+            : { cpuPercent: bucket.cpuPercent }),
+        ...(bucket.memoryUsedRatio === null
+            ? {}
+            : { memoryUsedRatio: bucket.memoryUsedRatio }),
+        ...(bucket.memoryUsedBytes === null
+            ? {}
+            : { memoryUsedBytes: bucket.memoryUsedBytes }),
+        ...(bucket.memoryTotalBytes === null
+            ? {}
+            : { memoryTotalBytes: bucket.memoryTotalBytes }),
+        ...(bucket.load1m === null ? {} : { load1m: bucket.load1m }),
+        ssrRequestCount: bucket.ssrRequestCount,
+        ...(bucket.ssrAvgDurationMs === null
+            ? {}
+            : { ssrAvgDurationMs: bucket.ssrAvgDurationMs }),
+        ...(bucket.ssrP50DurationMs === null
+            ? {}
+            : { ssrP50DurationMs: bucket.ssrP50DurationMs }),
+        ...(bucket.ssrP75DurationMs === null
+            ? {}
+            : { ssrP75DurationMs: bucket.ssrP75DurationMs }),
+        ...(bucket.ssrP95DurationMs === null
+            ? {}
+            : { ssrP95DurationMs: bucket.ssrP95DurationMs }),
+        apiRequestCount: bucket.apiRequestCount,
+        ...(bucket.apiAvgDurationMs === null
+            ? {}
+            : { apiAvgDurationMs: bucket.apiAvgDurationMs }),
+        ...(bucket.apiP50DurationMs === null
+            ? {}
+            : { apiP50DurationMs: bucket.apiP50DurationMs }),
+        ...(bucket.apiP75DurationMs === null
+            ? {}
+            : { apiP75DurationMs: bucket.apiP75DurationMs }),
+        ...(bucket.apiP95DurationMs === null
+            ? {}
+            : { apiP95DurationMs: bucket.apiP95DurationMs })
+    };
+}
+
+function toProtoServerMetricsWindow(key: AdminServerMetricsWindow) {
+    return key === '24h' ? 'h24' : 'h4';
+}
+
+function toProtoServerMetricsTopRoute(route: AdminServerMetricsTopRoute) {
+    return {
+        path: route.path,
+        requestCount: route.requestCount,
+        ...(route.avgDurationMs === null
+            ? {}
+            : { avgDurationMs: route.avgDurationMs }),
+        ...(route.p50DurationMs === null
+            ? {}
+            : { p50DurationMs: route.p50DurationMs }),
+        ...(route.p75DurationMs === null
+            ? {}
+            : { p75DurationMs: route.p75DurationMs }),
+        ...(route.p95DurationMs === null
+            ? {}
+            : { p95DurationMs: route.p95DurationMs })
+    };
+}
+
+function toProtoPeakMap(
+    peaks: AdminServerMetricsWindowSummary['peaks']
+): Record<string, AdminServerMetricsPeak> {
+    const entries: Array<[string, AdminServerMetricsPeak | null]> =
+        Object.entries(peaks);
+    return Object.fromEntries(
+        entries.filter(
+            (entry): entry is [string, AdminServerMetricsPeak] =>
+                entry[1] !== null
+        )
+    );
+}
+
+function toProtoTrafficPeakMap(
+    peaks: AdminTrafficWindowSummary['peaks']
+): Record<string, AdminServerMetricsPeak> {
+    const entries: Array<[string, AdminServerMetricsPeak | null]> = [
+        ['webRequestsBucket', peaks.webRequestsBucket],
+        ['apiCallsBucket', peaks.apiCallsBucket],
+        ['uniqueVisitorsBucket', peaks.uniqueVisitorsBucket],
+        ['activeUsersBucket', peaks.activeUsersBucket]
+    ];
+    return Object.fromEntries(
+        entries.filter(
+            (entry): entry is [string, AdminServerMetricsPeak] =>
+                entry[1] !== null
+        )
+    );
+}
+
+function toProtoTrafficWindow(key: AdminTrafficWindow) {
+    switch (key) {
+        case '3h':
+            return 'h3';
+        case '24h':
+            return 'h24';
+        case '7d':
+            return 'd7';
+    }
+}
+
 export async function getAdminServerMetricsV2Adapter(ctx: V2OperationContext) {
-    return getAdminServerMetrics();
+    const result = getAdminServerMetrics();
+    return {
+        startedAt: result.startedAt,
+        asOf: result.asOf,
+        ...(result.lastSampleAt === null
+            ? {}
+            : { lastSampleAt: result.lastSampleAt }),
+        loadAverageSupported: result.loadAverageSupported,
+        windows: result.windows.map((window) => ({
+            key: toProtoServerMetricsWindow(window.key),
+            label: window.label,
+            bucketSeconds: window.bucketSeconds,
+            bucketCount: window.bucketCount,
+            coverageSeconds: window.coverageSeconds,
+            isPartial: window.isPartial,
+            ...(window.latest === null
+                ? {}
+                : { latest: toProtoServerMetricsBucket(window.latest) }),
+            peaks: toProtoPeakMap(window.peaks),
+            topRoutes: {
+                ssr: window.topRoutes.ssr.map(toProtoServerMetricsTopRoute),
+                api: window.topRoutes.api.map(toProtoServerMetricsTopRoute)
+            },
+            buckets: window.buckets.map(toProtoServerMetricsBucket)
+        }))
+    };
 }
 
 export async function getAdminTasksV2Adapter(ctx: V2OperationContext) {
@@ -714,7 +857,23 @@ export async function deleteAdminTimetableHistoryCoverageV2Adapter(
 }
 
 export async function getAdminTrafficV2Adapter(ctx: V2OperationContext) {
-    return getAdminTraffic();
+    const result = getAdminTraffic();
+    return {
+        startedAt: result.startedAt,
+        asOf: result.asOf,
+        windows: result.windows.map((window) => ({
+            key: toProtoTrafficWindow(window.key),
+            label: window.label,
+            bucketSeconds: window.bucketSeconds,
+            bucketCount: window.bucketCount,
+            coverageSeconds: window.coverageSeconds,
+            isPartial: window.isPartial,
+            estimatedMetrics: window.estimatedMetrics,
+            totals: window.totals,
+            peaks: toProtoTrafficPeakMap(window.peaks),
+            buckets: window.buckets
+        }))
+    };
 }
 
 export async function postAdminWebappTokensRevokeAllV2Adapter(
