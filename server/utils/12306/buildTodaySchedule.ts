@@ -23,6 +23,8 @@ import {
     promoteBuildingScheduleState,
     saveBuildingScheduleState
 } from './scheduleProbe/stateStore';
+import { mergeSupplementTrainItems } from './scheduleProbe/mergeSupplementTrainItems';
+import { listSupplementTrainEntries } from '~/server/services/supplementTrainRegistryStore';
 import type {
     BuildScheduleResult,
     BuildScheduleStationPlatformTaskCandidate,
@@ -232,6 +234,16 @@ export default async function buildTodaySchedule(): Promise<BuildScheduleResult>
         );
         throw error;
     }
+
+    const supplementMergeResult = mergeSupplementTrainItems(
+        state,
+        listSupplementTrainEntries(),
+        runtimeConfig.prefixRules
+    );
+    saveBuildingScheduleState(state);
+    logger.info(
+        `supplement_trains_merged runId=${runId} addedItems=${supplementMergeResult.addedItems} skippedCollisions=${supplementMergeResult.skippedCollisions} uniqueItems=${state.stats.uniqueItems}`
+    );
 
     const confirmedTrainCodes = listConfirmedTrainCodesFromBuildState(state);
     const stationPlatformTaskCandidates =

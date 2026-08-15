@@ -9,7 +9,6 @@ import {
     listScheduleTrainLookupRows,
     resolveActiveScheduleStateSummary
 } from '~/server/utils/12306/scheduleProbe/sqliteStore';
-import { listSupplementTrainLookupRows } from '~/server/services/supplementTrainRegistryStore';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
 import { serviceDateToDay } from '~/server/utils/date/serviceDay';
 import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
@@ -20,8 +19,6 @@ interface LookupIndexCache {
     scheduleStateVersion: number;
     emuListFilePath: string;
     emuListMtimeMs: number;
-    supplementTrainsFilePath: string;
-    supplementTrainsMtimeMs: number;
     items: LookupSuggestItem[];
 }
 
@@ -100,20 +97,6 @@ function loadTrainItems() {
         }
     }
 
-    for (const row of listSupplementTrainLookupRows()) {
-        const code = normalizeCode(row.code);
-        if (!code || deduplicated.has(code)) {
-            continue;
-        }
-
-        deduplicated.set(code, {
-            type: 'train',
-            code,
-            subtitle: buildTrainSubtitle(row.startStation, row.endStation),
-            tags: []
-        });
-    }
-
     return Array.from(deduplicated.values());
 }
 
@@ -186,7 +169,6 @@ function rebuildCache() {
     const config = useConfig();
     const scheduleDatabasePath = getScheduleDatabaseFilePath();
     const emuListFilePath = config.data.assets.EMUList.file;
-    const supplementTrainsFilePath = config.data.assets.supplementTrains.file;
     const items = [
         ...loadTrainItems(),
         ...loadEmuItems(emuListFilePath),
@@ -198,8 +180,6 @@ function rebuildCache() {
         scheduleStateVersion: getScheduleStateVersion(),
         emuListFilePath,
         emuListMtimeMs: getFileMtimeMs(emuListFilePath),
-        supplementTrainsFilePath,
-        supplementTrainsMtimeMs: getFileMtimeMs(supplementTrainsFilePath),
         items
     };
 
@@ -211,19 +191,15 @@ export function getLookupIndex() {
     const config = useConfig();
     const scheduleDatabasePath = getScheduleDatabaseFilePath();
     const emuListFilePath = config.data.assets.EMUList.file;
-    const supplementTrainsFilePath = config.data.assets.supplementTrains.file;
     const scheduleStateVersion = getScheduleStateVersion();
     const emuListMtimeMs = getFileMtimeMs(emuListFilePath);
-    const supplementTrainsMtimeMs = getFileMtimeMs(supplementTrainsFilePath);
 
     if (
         cached &&
         cached.scheduleDatabasePath === scheduleDatabasePath &&
         cached.scheduleStateVersion === scheduleStateVersion &&
         cached.emuListFilePath === emuListFilePath &&
-        cached.emuListMtimeMs === emuListMtimeMs &&
-        cached.supplementTrainsFilePath === supplementTrainsFilePath &&
-        cached.supplementTrainsMtimeMs === supplementTrainsMtimeMs
+        cached.emuListMtimeMs === emuListMtimeMs
     ) {
         return cached.items;
     }

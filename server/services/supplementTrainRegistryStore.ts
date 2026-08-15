@@ -1,12 +1,5 @@
 import fs from 'fs';
 import getLogger from '~/server/libs/log4js';
-import getCurrentDateString from '~/server/utils/date/getCurrentDateString';
-import parseTimeAsTimestamp from '~/server/utils/date/parseTimeAsTimestamp';
-import { toUnixSecondsFromShanghaiDayOffset } from '~/server/utils/date/shanghaiDateTime';
-import {
-    serviceDateToDay,
-    type ServiceDay
-} from '~/server/utils/date/serviceDay';
 import {
     getAssetFilePath,
     writeTextFileAtomically
@@ -17,10 +10,6 @@ import {
     type TrainCodeParts
 } from '~/server/utils/12306/trainCode';
 import { parseExternalTrainCodeOrThrow } from '~/server/utils/internal/boundaries';
-import type {
-    TodayScheduleStop,
-    TodayScheduleTimetable
-} from '~/server/services/todayScheduleCache';
 
 const logger = getLogger('supplement-train-registry');
 
@@ -53,18 +42,10 @@ export interface SupplementTrainEntry {
     stops: SupplementTrainStopInput[];
 }
 
-export interface SupplementTrainLookupRow {
-    code: string;
-    canonicalCode: string;
-    startStation: string;
-    endStation: string;
-}
-
 interface SupplementTrainRegistry {
     filePath: string;
     fileMtimeMs: number;
     entriesByTrainCode: Map<string, SupplementTrainEntry>;
-    aliasesByCode: Map<string, string>;
     trainCodes: TrainCodeParts[];
 }
 
@@ -262,23 +243,15 @@ function buildRegistry(filePath: string): SupplementTrainRegistry {
     const text = fs.readFileSync(filePath, 'utf8');
     const entries = parseSupplementTrainsText(text);
     const entriesByTrainCode = new Map<string, SupplementTrainEntry>();
-    const aliasesByCode = new Map<string, string>();
 
     for (const entry of entries) {
         entriesByTrainCode.set(trainCodeKey(entry.trainCode), entry);
-        for (const alias of entry.aliases) {
-            const aliasKey = trainCodeKey(alias);
-            if (!aliasesByCode.has(aliasKey)) {
-                aliasesByCode.set(aliasKey, trainCodeKey(entry.trainCode));
-            }
-        }
     }
 
     return {
         filePath,
         fileMtimeMs: getFileMtimeMs(filePath),
         entriesByTrainCode,
-        aliasesByCode,
         trainCodes: entries.map((entry) => entry.trainCode)
     };
 }
@@ -313,7 +286,6 @@ function getActiveRegistry(): SupplementTrainRegistry {
             filePath,
             fileMtimeMs: -1,
             entriesByTrainCode: new Map(),
-            aliasesByCode: new Map(),
             trainCodes: []
         };
     }
@@ -333,40 +305,6 @@ export function invalidateSupplementTrainRegistryCache(): void {
     cached = null;
 }
 
-export function listSupplementTrainLookupRows(): SupplementTrainLookupRow[] {
-    const registry = getActiveRegistry();
-    const rows: SupplementTrainLookupRow[] = [];
-
-    for (const trainCode of registry.trainCodes) {
-        const entry = registry.entriesByTrainCode.get(trainCodeKey(trainCode));
-        if (!entry) {
-            continue;
-        }
-
-        const firstStop = entry.stops[0];
-        const lastStop = entry.stops[entry.stops.length - 1];
-        const startStation = firstStop?.stationName ?? '';
-        const endStation = lastStop?.stationName ?? '';
-
-        rows.push({
-            code: formatTrainCode(entry.trainCode),
-            canonicalCode: formatTrainCode(entry.trainCode),
-            startStation,
-            endStation
-        });
-        for (const alias of entry.aliases) {
-            rows.push({
-                code: formatTrainCode(alias),
-                canonicalCode: formatTrainCode(entry.trainCode),
-                startStation,
-                endStation
-            });
-        }
-    }
-
-    return rows;
-}
-
 export function listSupplementTrainEntries(): SupplementTrainEntry[] {
     const registry = getActiveRegistry();
     const entries: SupplementTrainEntry[] = [];
@@ -379,90 +317,4 @@ export function listSupplementTrainEntries(): SupplementTrainEntry[] {
     }
 
     return entries;
-}
-
-export function getSupplementTrainTimetableByTrainCode(
-    trainCode: TrainCodeParts
-): TodayScheduleTimetable | null {
-    const registry = getActiveRegistry();
-    const normalizedCode = trainCodeKey(trainCode);
-    if (normalizedCode.length === 0) {
-        return null;
-    }
-
-    const entry =
-        registry.entriesByTrainCode.get(normalizedCode) ??
-        (() => {
-            const canonicalCode = registry.aliasesByCode.get(normalizedCode);
-            if (!canonicalCode) {
-                return null;
-            }
-            return registry.entriesByTrainCode.get(canonicalCode) ?? null;
-        })();
-    if (!entry) {
-        return null;
-    }
-
-    return buildSupplementTimetable(
-        serviceDateToDay(getCurrentDateString()),
-        entry
-    );
-}
-
-function buildSupplementTimetable(
-    date: ServiceDay,
-    entry: SupplementTrainEntry
-): TodayScheduleTimetable {
-    const stops = [...entry.stops].sort(
-        (left, right) => left.stationNo - right.stationNo
-    );
-    const firstStop = stops[0]!;
-    const lastStop = stops[stops.length - 1]!;
-    const allCodes = [entry.trainCode, ...entry.aliases];
-    const timetableStops: TodayScheduleStop[] = stops.map((stop, index) => {
-        const isStart = index === 0;
-        const isEnd = index === stops.length - 1;
-
-        return {
-            stationNo: stop.stationNo,
-            stationName: stop.stationName,
-            stationTelecode: '',
-            arriveAt: toUnixSecondsFromShanghaiDayOffset(
-                date,
-                parseTimeAsTimestamp(stop.arriveAt)
-            ),
-            departAt: toUnixSecondsFromShanghaiDayOffset(
-                date,
-                parseTimeAsTimestamp(stop.departAt)
-            ),
-            stationTrainCode: entry.trainCode,
-            wicket: stop.wicket ?? '',
-            distance: stop.distance ?? null,
-            platformNo: stop.platformNo ?? null,
-            isStart,
-            isEnd
-        };
-    });
-
-    return {
-        trainCode: entry.trainCode,
-        trainInternalCode: `supplement_trains_${formatTrainCode(entry.trainCode)}`,
-        allCodes,
-        bureauCode: entry.bureauCode,
-        trainStyle: entry.trainStyle,
-        trainDepartment: entry.trainDepartment,
-        passengerDepartment: entry.passengerDepartment,
-        startAt: toUnixSecondsFromShanghaiDayOffset(
-            date,
-            parseTimeAsTimestamp(firstStop.departAt)
-        ),
-        endAt: toUnixSecondsFromShanghaiDayOffset(
-            date,
-            parseTimeAsTimestamp(lastStop.arriveAt)
-        ),
-        updatedAt: null,
-        startStation: firstStop.stationName,
-        endStation: lastStop.stationName,
-        stops: timetableStops
-    };
 }

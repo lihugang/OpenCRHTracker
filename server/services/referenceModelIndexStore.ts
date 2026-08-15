@@ -6,7 +6,6 @@ import {
     listDailyRecordsPaged,
     type DailyEmuRouteRow
 } from '~/server/services/emuRoutesStore';
-import { getSupplementTrainTimetableByTrainCode } from '~/server/services/supplementTrainRegistryStore';
 import { loadTrainStyleMapping } from '~/server/services/trainStyleMappingStore';
 import {
     formatShanghaiDateString,
@@ -124,17 +123,8 @@ async function getFallbackReferenceModelFromTimetableSources(
     for (const trainCode of trainCodes) {
         const route =
             scheduleRoutesByTrainCode.get(trainCodeKey(trainCode)) ?? null;
-        let trainStyle = route?.trainStyle.trim() ?? '';
-        let allCodes = route?.allCodes ?? [];
-
-        if (!route) {
-            const supplementTimetable =
-                getSupplementTrainTimetableByTrainCode(trainCode);
-            if (supplementTimetable) {
-                trainStyle = supplementTimetable.trainStyle.trim();
-                allCodes = supplementTimetable.allCodes;
-            }
-        }
+        const trainStyle = route?.trainStyle.trim() ?? '';
+        const allCodes = route?.allCodes ?? [];
 
         if (trainStyle.length === 0) {
             continue;

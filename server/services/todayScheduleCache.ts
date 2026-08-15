@@ -1,9 +1,5 @@
 import getLogger from '~/server/libs/log4js';
 import { buildTrainKey } from '~/server/services/probeRuntimeState';
-import {
-    getSupplementTrainTimetableByTrainCode,
-    listSupplementTrainEntries
-} from '~/server/services/supplementTrainRegistryStore';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
 import normalizeTimetableBoundaryStopTimes from '~/server/utils/12306/normalizeTimetableBoundaryStopTimes';
 import { getScheduleStateVersion } from '~/server/utils/12306/scheduleProbe/stateStore';
@@ -381,91 +377,6 @@ export function getTodayStationTimetableByStationName(
         }
     }
 
-    rows.sort(compareStationRows);
-    return rows;
-}
-
-export function getTodayStationTimetableByStationNameWithSupplement(
-    stationName: string
-): TodayScheduleStationIndexRow[] {
-    const scheduleRows = getTodayStationTimetableByStationName(stationName);
-    const normalizedStationName = stationName.trim();
-    if (normalizedStationName.length === 0) {
-        return [];
-    }
-
-    const scheduleCodeSet = new Set(getTodayScheduleCache().keys());
-
-    const supplementRowsByStationName = new Map<
-        string,
-        TodayScheduleStationIndexRow[]
-    >();
-    const supplementRowIndexesByStationName = new Map<
-        string,
-        Map<string, TodayScheduleStationIndexRow>
-    >();
-    const currentDate = serviceDateToDay(getCurrentDateString());
-
-    for (const entry of listSupplementTrainEntries()) {
-        const supplementTrainCode = entry.trainCode;
-        const supplementAliases = [supplementTrainCode, ...entry.aliases];
-        const collidesWithSchedule = supplementAliases.some((code) =>
-            scheduleCodeSet.has(trainCodeKey(code))
-        );
-        if (collidesWithSchedule) {
-            continue;
-        }
-
-        const timetable = getSupplementTrainTimetableByTrainCode(
-            entry.trainCode
-        );
-        if (!timetable) {
-            continue;
-        }
-
-        const matchingStop = timetable.stops.find(
-            (stop) => stop.stationName.trim() === normalizedStationName
-        );
-        if (!matchingStop) {
-            continue;
-        }
-
-        const group: TodayScheduleProbeGroup = {
-            trainKey: '',
-            trainCode: timetable.trainCode,
-            trainInternalCode: timetable.trainInternalCode,
-            allCodes: [...timetable.allCodes],
-            bureauCode: timetable.bureauCode,
-            trainStyle: timetable.trainStyle,
-            trainDepartment: timetable.trainDepartment,
-            passengerDepartment: timetable.passengerDepartment,
-            startAt: timetable.startAt,
-            endAt: timetable.endAt,
-            updatedAt: timetable.updatedAt,
-            startStation: timetable.startStation,
-            endStation: timetable.endStation
-        };
-        group.trainKey = buildTrainKey(
-            group.trainCode,
-            group.trainInternalCode,
-            group.startAt
-        );
-        upsertStationRow(
-            supplementRowsByStationName,
-            supplementRowIndexesByStationName,
-            currentDate,
-            normalizedStationName,
-            group,
-            timetable,
-            {
-                ...matchingStop
-            }
-        );
-    }
-
-    const supplementRows =
-        supplementRowsByStationName.get(normalizedStationName) ?? [];
-    const rows = [...scheduleRows, ...supplementRows];
     rows.sort(compareStationRows);
     return rows;
 }

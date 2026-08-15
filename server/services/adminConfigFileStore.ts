@@ -225,7 +225,7 @@ function buildConfigFileItem(
                   : target === 'trainStyleMapping'
                     ? '重载或刷新参考车型回退使用的 trainStyle 到车型名映射表。'
                     : target === 'supplementTrains'
-                      ? '重载或刷新 12306 未收录车次的补充时刻表数据，读取时合并进搜索与时刻表查询。'
+                      ? '重载或刷新 12306 未收录车次的补充时刻表数据，下一次构建今日时刻表时写入 schedule 数据库。'
                       : '重载或刷新线路时刻表下载使用的外部车站坐标回退文件。',
         filePath,
         provider: assetConfig.provider ?? null,
@@ -263,7 +263,6 @@ function reloadTrainStyleMappingAssetFromLocal(): void {
 function reloadSupplementTrainAssetFromLocal(): void {
     invalidateSupplementTrainRegistryCache();
     preloadSupplementTrainRegistryFromLocalFile();
-    invalidateLookupIndexCache();
 }
 
 function assertActionSupported(
@@ -388,7 +387,7 @@ async function reloadAssetFromLocal(
                   : target === 'trainStyleMapping'
                     ? '已重载本地车型映射表，后续参考车型回退会使用新的映射规则。'
                     : target === 'supplementTrains'
-                      ? '已重载本地补充车次，后续搜索与时刻表查询会使用新的补充数据。'
+                      ? '已重载本地补充车次，下一次构建今日时刻表时会同步到 schedule 数据库。'
                       : '已重载本地车站坐标文件，后续线路时刻表下载任务会使用新的坐标回退规则。',
         item
     };
@@ -486,7 +485,7 @@ async function refreshAssetFromRemote(
                   : target === 'trainStyleMapping'
                     ? '已从远程来源刷新车型映射表，后续参考车型回退会使用新的映射规则。'
                     : target === 'supplementTrains'
-                      ? '已从远程来源刷新补充车次，后续搜索与时刻表查询会使用新的补充数据。'
+                      ? '已从远程来源刷新补充车次，下一次构建今日时刻表时会同步到 schedule 数据库。'
                       : target === 'stationCoord'
                         ? '已从远程来源刷新车站坐标文件，后续线路时刻表下载任务会使用新的坐标回退规则。'
                         : `已从远程来源刷新固定车组畅行码检测计划，并同步未来派发任务。${qrcodeWarning}`,

@@ -1558,11 +1558,11 @@ export const deployDocsSections: DocsContentSection[] = [
         id: 'supplement-trains',
         title: 'supplement_trains.json',
         summary:
-            '为 12306 未收录车次提供补充时刻表，读取时合并进搜索建议与当前时刻表查询。',
+            '为 12306 未收录车次提供补充时刻表，构建今日时刻表时写入 schedule 数据库。',
         blocks: [
             {
                 type: 'paragraph',
-                text: '补充车次文件默认建议放在 data/supplement_trains.json，实际路径由配置文件中的 data.assets.supplementTrains.file 决定。仅当当前时刻表中查不到某车次时，系统才会读取本文件，按车次号或别名生成当日补充时刻表用于回退；当前时刻表命中时仍以数据库数据为准。'
+                text: '补充车次文件默认建议放在 data/supplement_trains.json，实际路径由配置文件中的 data.assets.supplementTrains.file 决定。每天构建今日时刻表时，系统会读取本文件并将未与官方车次或别名冲突的条目写入 schedule 数据库；官方 schedule 数据优先。'
             },
             {
                 type: 'code',
@@ -1597,7 +1597,7 @@ export const deployDocsSections: DocsContentSection[] = [
                         valueType: 'array<string>',
                         required: false,
                         description:
-                            '可选的别名列表，会参与搜索建议和时刻表查询回退，加载时自动去重。'
+                            '可选的别名列表，会写入 schedule 数据库并参与车次查询与搜索，加载时自动去重。'
                     },
                     {
                         path: 'items[].bureauCode',
@@ -1678,9 +1678,9 @@ export const deployDocsSections: DocsContentSection[] = [
                 type: 'list',
                 items: [
                     '文件缺失时服务会自动写入默认空列表内容并记录警告；文件解析失败时本次加载按空数据源处理，不阻断服务启动。',
-                    '管理员页面“配置文件”支持对该文件执行本地重载、远程刷新和在线编辑，操作后会重建搜索索引并立即生效。',
-                    '补充车次只作为当前时刻表查询的回退数据源，不会写入时刻表数据库，也不会参与历史记录或列车交路查询。',
-                    '使用补充时刻表时，接口返回的 internalCode 为 supplement_trains_<车次号>，updatedAt 为 null，circulation 为 null。'
+                    '管理员页面“配置文件”支持对该文件执行本地重载、远程刷新和在线编辑；配置变更会在下一次真正构建今日时刻表时生效。',
+                    '每次构建会按当前文件重写 supplement schedule items；从文件中删除的车次会在下一次构建时从 published schedule state 中移除。',
+                    '写入 schedule 数据库的 supplement item 使用 internalCode supplement_trains_<车次号>，不会被线路刷新确认，也不会生成历史时刻表 coverage。'
                 ]
             }
         ]

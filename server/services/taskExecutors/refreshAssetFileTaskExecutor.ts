@@ -29,7 +29,6 @@ import {
     preloadSupplementTrainRegistryFromLocalFile,
     validateSupplementTrainsText
 } from '~/server/services/supplementTrainRegistryStore';
-import { invalidateLookupIndexCache } from '~/server/services/lookupIndexStore';
 import { registerTaskExecutor } from '~/server/services/taskExecutorRegistry';
 import {
     enqueueTemporaryQrcodeDetectionProbeTasks,
@@ -230,7 +229,6 @@ function reloadTrainStyleMappingAssetOnly(): void {
 function reloadSupplementTrainAssetOnly(): void {
     invalidateSupplementTrainRegistryCache();
     preloadSupplementTrainRegistryFromLocalFile();
-    invalidateLookupIndexCache();
 }
 
 function enqueueNextRefreshTask(

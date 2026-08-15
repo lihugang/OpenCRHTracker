@@ -3,12 +3,11 @@ import getLogger from '~/server/libs/log4js';
 import { getReferenceModelsByTrainCodes } from '~/server/services/referenceModelIndexStore';
 import { getPreferredTrainCirculation } from '~/server/services/trainCirculationIndexStore';
 import {
+    getTodayStationTimetableByStationName,
     getTodayScheduleTimetableByTrainCode,
     getTodayScheduleServiceDay,
-    getTodayStationTimetableByStationNameWithSupplement,
     type TodayScheduleStationIndexRow
 } from '~/server/services/todayScheduleCache';
-import { getSupplementTrainTimetableByTrainCode } from '~/server/services/supplementTrainRegistryStore';
 import { refreshMissingOrExpiredStationPlatformInfoForTrainCodes } from '~/server/services/stationPlatformInfoService';
 import {
     getHistoricalTimetableContent,
@@ -69,24 +68,17 @@ export interface CurrentTimetableDomainResult {
 export async function getCurrentTrainTimetable(
     trainCode: TrainCodeParts
 ): Promise<CurrentTimetableDomainResult> {
-    const scheduleTimetable = getTodayScheduleTimetableByTrainCode(trainCode);
-    const supplementTimetable = scheduleTimetable
-        ? null
-        : getSupplementTrainTimetableByTrainCode(trainCode);
-    let timetable = scheduleTimetable ?? supplementTimetable;
+    let timetable = getTodayScheduleTimetableByTrainCode(trainCode);
 
     if (!timetable || timetable.stops.length === 0) {
         throw new ApiRequestError(404, 'not_found', '当前暂无时刻表');
     }
 
-    if (scheduleTimetable) {
-        await refreshMissingOrExpiredStationPlatformInfoForTrainCodes({
-            serviceDate: getTodayScheduleServiceDay(),
-            trainCodes: scheduleTimetable.allCodes
-        });
-        timetable =
-            getTodayScheduleTimetableByTrainCode(trainCode) ?? timetable;
-    }
+    await refreshMissingOrExpiredStationPlatformInfoForTrainCodes({
+        serviceDate: getTodayScheduleServiceDay(),
+        trainCodes: timetable.allCodes
+    });
+    timetable = getTodayScheduleTimetableByTrainCode(trainCode) ?? timetable;
 
     return {
         updatedAt: timetable.updatedAt,
@@ -105,13 +97,10 @@ export async function getCurrentTrainTimetable(
         endStation: timetable.endStation,
         startAt: timetable.startAt,
         endAt: timetable.endAt,
-        circulation:
-            supplementTimetable !== null
-                ? null
-                : getPreferredTrainCirculation({
-                      trainInternalCode: timetable.trainInternalCode,
-                      allCodes: timetable.allCodes
-                  }),
+        circulation: getPreferredTrainCirculation({
+            trainInternalCode: timetable.trainInternalCode,
+            allCodes: timetable.allCodes
+        }),
         stops: timetable.stops.map((stop) => ({
             stationNo: stop.stationNo,
             stationName: stop.stationName,
@@ -216,8 +205,7 @@ export interface StationTimetableDomainItem {
 }
 
 export function getStationTimetableRows(stationName: string) {
-    const rows =
-        getTodayStationTimetableByStationNameWithSupplement(stationName);
+    const rows = getTodayStationTimetableByStationName(stationName);
     if (rows.length === 0) {
         throw new ApiRequestError(404, 'not_found', '当前暂无该车站的时刻表');
     }
