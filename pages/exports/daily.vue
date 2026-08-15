@@ -185,6 +185,7 @@ import {
     fetchDailyExportIndex
 } from '~/utils/api/v2/domain/exports';
 import getApiErrorMessage from '~/utils/api/getApiErrorMessage';
+import { exportBlobFile } from '~/utils/clientFileExport';
 
 definePageMeta({
     middleware: 'auth-required'
@@ -437,12 +438,11 @@ async function downloadCsv(date: string) {
     downloadErrorMessage.value = '';
     try {
         const blob = (await fetchDailyExportCsv(date, 'blob')) as Blob;
-        const objectUrl = URL.createObjectURL(blob);
-        const anchor = document.createElement('a');
-        anchor.href = objectUrl;
-        anchor.download = `${date}.csv`;
-        anchor.click();
-        window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+        await exportBlobFile({
+            blob,
+            fileName: `${date}.csv`,
+            mimeType: 'text/csv'
+        });
     } catch (downloadError) {
         downloadErrorMessage.value = getApiErrorMessage(
             downloadError,
