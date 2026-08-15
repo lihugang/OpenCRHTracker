@@ -7,6 +7,7 @@ import useConfig, {
     reloadConfig
 } from '~/server/config';
 import getLogger from '~/server/libs/log4js';
+import { invalidateHistoricalTimetableContentCache } from '~/server/services/historicalTimetableResolver';
 import { invalidateLookupIndexCache } from '~/server/services/lookupIndexStore';
 import {
     invalidateProbeAssetsCache,
@@ -37,6 +38,7 @@ import {
     preloadSupplementTrainRegistryFromLocalFile,
     validateSupplementTrainsText
 } from '~/server/services/supplementTrainRegistryStore';
+import { invalidateTodayScheduleCache } from '~/server/services/todayScheduleCache';
 import { synchronizeQrcodeDetectionDispatchTasks } from '~/server/services/taskExecutors/dispatchQrcodeDetectionTasksExecutor';
 import { reloadQrcodeAssetAfterRefresh } from '~/server/services/taskExecutors/refreshAssetFileTaskExecutor';
 import { synchronizeDatabaseBackupTasks } from '~/server/services/taskExecutors/backupDatabaseTaskExecutor';
@@ -241,6 +243,8 @@ function resetSafeRuntimeCaches(): void {
     invalidateProbeAssetsCache();
     invalidateStationCoordAssetsCache();
     invalidateLookupIndexCache();
+    invalidateTodayScheduleCache();
+    invalidateHistoricalTimetableContentCache();
 }
 
 async function reloadQrcodeDetectionAfterAssetChange(): Promise<string> {

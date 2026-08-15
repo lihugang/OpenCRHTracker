@@ -1,3 +1,5 @@
+import { LRUCache } from 'lru-cache';
+import useConfig from '~/server/config';
 import type { TrainCodeParts } from '~/server/utils/12306/trainCode';
 import { parseTrainCode } from '~/server/utils/12306/trainCode';
 import {
@@ -74,10 +76,31 @@ export interface HistoricalRouteSummaryMatchInput {
     endAt: number;
 }
 
-const timetableContentCache = new Map<
+const MISSING_HISTORICAL_TIMETABLE_CONTENT = Symbol(
+    'missing-historical-timetable-content'
+);
+
+let timetableContentCache: LRUCache<
     number,
-    HistoricalTimetableContent | null
->();
+    HistoricalTimetableContent | typeof MISSING_HISTORICAL_TIMETABLE_CONTENT
+> | null = null;
+
+function getTimetableContentCache(): LRUCache<
+    number,
+    HistoricalTimetableContent | typeof MISSING_HISTORICAL_TIMETABLE_CONTENT
+> {
+    if (!timetableContentCache) {
+        timetableContentCache = new LRUCache({
+            max: useConfig().api.timetableCache.historicalContent.maxEntries
+        });
+    }
+
+    return timetableContentCache;
+}
+
+export function invalidateHistoricalTimetableContentCache(): void {
+    timetableContentCache = null;
+}
 
 function normalizeOptionalInteger(value: unknown): number | null {
     return typeof value === 'number' && Number.isInteger(value) && value >= 0
@@ -190,14 +213,18 @@ export function getHistoricalTimetableContent(
         return null;
     }
 
+    const timetableContentCache = getTimetableContentCache();
     const cached = timetableContentCache.get(timetableId);
     if (cached !== undefined) {
-        return cached;
+        return cached === MISSING_HISTORICAL_TIMETABLE_CONTENT ? null : cached;
     }
 
     const row = getTimetableHistoryContentById(timetableId);
     if (!row) {
-        timetableContentCache.set(timetableId, null);
+        timetableContentCache.set(
+            timetableId,
+            MISSING_HISTORICAL_TIMETABLE_CONTENT
+        );
         return null;
     }
 

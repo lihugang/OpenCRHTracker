@@ -1,3 +1,5 @@
+import { LRUCache } from 'lru-cache';
+import useConfig from '~/server/config';
 import getLogger from '~/server/libs/log4js';
 import { buildTrainKey } from '~/server/services/probeRuntimeState';
 import normalizeCode from '~/server/utils/12306/normalizeCode';
@@ -97,12 +99,18 @@ interface TodayScheduleCache {
     groupKeysByTrainCode: Map<string, string>;
     groupKeysByTrainInternalCode: Map<string, string>;
     dayOffsetShiftByItemCode: Map<string, number>;
+    timetablesByTrainCode: LRUCache<string, TodayScheduleTimetable>;
+    stationTimetablesByStationName: LRUCache<
+        string,
+        TodayScheduleStationIndexRow[]
+    >;
 }
 
 let cached: TodayScheduleCache | null = null;
 const logger = getLogger('today-schedule-cache');
 
 function rebuildCache(): TodayScheduleCache {
+    const timetableCacheConfig = useConfig().api.timetableCache;
     const currentDate = serviceDateToDay(getCurrentDateString());
     const routesByTrainCode = new Map<string, TodayScheduleRoute>();
     const groupsByTrainKey = new Map<string, TodayScheduleProbeGroup>();
@@ -231,7 +239,13 @@ function rebuildCache(): TodayScheduleCache {
         groupsByTrainKey,
         groupKeysByTrainCode,
         groupKeysByTrainInternalCode,
-        dayOffsetShiftByItemCode
+        dayOffsetShiftByItemCode,
+        timetablesByTrainCode: new LRUCache({
+            max: timetableCacheConfig.todayTrain.maxEntries
+        }),
+        stationTimetablesByStationName: new LRUCache({
+            max: timetableCacheConfig.todayStation.maxEntries
+        })
     };
     return cached;
 }
@@ -270,6 +284,12 @@ export function getTodayScheduleTimetableByTrainCode(
         return null;
     }
 
+    const cacheKey = trainCodeKey(route.trainCode);
+    const cachedTimetable = activeCache.timetablesByTrainCode.get(cacheKey);
+    if (cachedTimetable) {
+        return cachedTimetable;
+    }
+
     const itemCode =
         loadScheduleItemCodeByStateKindAndAlias(
             activeCache.activeStateKind,
@@ -297,10 +317,12 @@ export function getTodayScheduleTimetableByTrainCode(
         )
     );
 
-    return {
+    const timetable = {
         ...route,
         stops
     };
+    activeCache.timetablesByTrainCode.set(cacheKey, timetable);
+    return timetable;
 }
 
 export function getTodayStationTimetableByStationName(
@@ -313,6 +335,13 @@ export function getTodayStationTimetableByStationName(
         activeCache.activeStateKind === null
     ) {
         return [];
+    }
+
+    const cachedRows = activeCache.stationTimetablesByStationName.get(
+        normalizedStationName
+    );
+    if (cachedRows !== undefined) {
+        return cachedRows;
     }
 
     const stationRowsByStationName = new Map<
@@ -378,6 +407,7 @@ export function getTodayStationTimetableByStationName(
     }
 
     rows.sort(compareStationRows);
+    activeCache.stationTimetablesByStationName.set(normalizedStationName, rows);
     return rows;
 }
 

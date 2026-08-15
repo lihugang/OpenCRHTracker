@@ -378,6 +378,17 @@ export interface Config {
                 defaultTtlSeconds: number;
             };
         };
+        timetableCache: {
+            todayTrain: {
+                maxEntries: number;
+            };
+            todayStation: {
+                maxEntries: number;
+            };
+            historicalContent: {
+                maxEntries: number;
+            };
+        };
         payload: {
             maxStringLength: number;
         };
@@ -1257,6 +1268,51 @@ function validateConfig(raw: unknown): Config {
         'maxEntries',
         'defaultTtlSeconds'
     ]);
+    const apiTimetableCache =
+        api.timetableCache === undefined
+            ? {}
+            : asObject(api.timetableCache, 'api.timetableCache');
+    assertOnlyKeys(apiTimetableCache, 'api.timetableCache', [
+        'todayTrain',
+        'todayStation',
+        'historicalContent'
+    ]);
+    const apiTimetableCacheTodayTrain =
+        apiTimetableCache.todayTrain === undefined
+            ? {}
+            : asObject(
+                  apiTimetableCache.todayTrain,
+                  'api.timetableCache.todayTrain'
+              );
+    assertOnlyKeys(
+        apiTimetableCacheTodayTrain,
+        'api.timetableCache.todayTrain',
+        ['maxEntries']
+    );
+    const apiTimetableCacheTodayStation =
+        apiTimetableCache.todayStation === undefined
+            ? {}
+            : asObject(
+                  apiTimetableCache.todayStation,
+                  'api.timetableCache.todayStation'
+              );
+    assertOnlyKeys(
+        apiTimetableCacheTodayStation,
+        'api.timetableCache.todayStation',
+        ['maxEntries']
+    );
+    const apiTimetableCacheHistoricalContent =
+        apiTimetableCache.historicalContent === undefined
+            ? {}
+            : asObject(
+                  apiTimetableCache.historicalContent,
+                  'api.timetableCache.historicalContent'
+              );
+    assertOnlyKeys(
+        apiTimetableCacheHistoricalContent,
+        'api.timetableCache.historicalContent',
+        ['maxEntries']
+    );
     const apiPayload = asObject(api.payload, 'api.payload');
     const apiFeedback = asObject(api.feedback, 'api.feedback');
     const apiFeedbackValidation = asObject(
@@ -2037,6 +2093,29 @@ function validateConfig(raw: unknown): Config {
                     defaultTtlSeconds: asInteger(
                         apiAuthCacheMembership.defaultTtlSeconds,
                         'api.authCache.membership.defaultTtlSeconds',
+                        1
+                    )
+                }
+            },
+            timetableCache: {
+                todayTrain: {
+                    maxEntries: asInteger(
+                        apiTimetableCacheTodayTrain.maxEntries ?? 500,
+                        'api.timetableCache.todayTrain.maxEntries',
+                        1
+                    )
+                },
+                todayStation: {
+                    maxEntries: asInteger(
+                        apiTimetableCacheTodayStation.maxEntries ?? 25,
+                        'api.timetableCache.todayStation.maxEntries',
+                        1
+                    )
+                },
+                historicalContent: {
+                    maxEntries: asInteger(
+                        apiTimetableCacheHistoricalContent.maxEntries ?? 1000,
+                        'api.timetableCache.historicalContent.maxEntries',
                         1
                     )
                 }

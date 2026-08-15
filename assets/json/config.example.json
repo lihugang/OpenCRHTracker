@@ -288,6 +288,17 @@
                 "defaultTtlSeconds": 300
             }
         },
+        "timetableCache": {
+            "todayTrain": {
+                "maxEntries": 500
+            },
+            "todayStation": {
+                "maxEntries": 25
+            },
+            "historicalContent": {
+                "maxEntries": 1000
+            }
+        },
         "payload": {
             "maxStringLength": 16384
         },

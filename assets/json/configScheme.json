@@ -978,6 +978,45 @@
                         "userProfile"
                     ]
                 },
+                "timetableCache": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "todayTrain": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "maxEntries": {
+                                    "type": "integer",
+                                    "minimum": 1,
+                                    "default": 500
+                                }
+                            }
+                        },
+                        "todayStation": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "maxEntries": {
+                                    "type": "integer",
+                                    "minimum": 1,
+                                    "default": 25
+                                }
+                            }
+                        },
+                        "historicalContent": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "maxEntries": {
+                                    "type": "integer",
+                                    "minimum": 1,
+                                    "default": 1000
+                                }
+                            }
+                        }
+                    }
+                },
                 "payload": {
                     "type": "object",
                     "additionalProperties": false,
