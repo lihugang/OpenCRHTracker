@@ -1,4 +1,6 @@
 import '~/server/libs/database/timetableHistory';
+import { LRUCache } from 'lru-cache';
+import useConfig from '~/server/config';
 import { createPreparedSqlStore } from '~/server/libs/database/prepared';
 import { useTimetableHistoryDatabase } from '~/server/libs/database/timetableHistory';
 import {
@@ -124,6 +126,34 @@ const DEFAULT_TIMETABLE_HISTORY_CURSOR_POINT: TimetableHistoryCursorPoint = {
     id: Number.MAX_SAFE_INTEGER
 };
 
+let timetableHistoryCoverageCache: LRUCache<
+    string,
+    readonly TimetableHistoryCoverageRow[]
+> | null = null;
+
+function getTimetableHistoryCoverageCache(): LRUCache<
+    string,
+    readonly TimetableHistoryCoverageRow[]
+> {
+    if (!timetableHistoryCoverageCache) {
+        timetableHistoryCoverageCache = new LRUCache({
+            max: useConfig().api.timetableCache.historicalCoverage.maxEntries
+        });
+    }
+
+    return timetableHistoryCoverageCache;
+}
+
+function invalidateTimetableHistoryCoverageCacheByTrainCode(
+    trainCode: TrainCodeParts
+): void {
+    timetableHistoryCoverageCache?.delete(trainCodeKey(trainCode));
+}
+
+export function invalidateTimetableHistoryCoverageCache(): void {
+    timetableHistoryCoverageCache = null;
+}
+
 function decodeCoverageRow(
     row: RawTimetableHistoryCoverageRow
 ): TimetableHistoryCoverageRow {
@@ -167,27 +197,31 @@ export function getTimetableHistoryCoverageByTrainCodeAtDate(
     trainCode: TrainCodeParts,
     serviceDate: ServiceDay
 ) {
-    const row = timetableHistoryStatements.get<RawTimetableHistoryCoverageRow>(
-        'selectCoverageByTrainCodeAtDate',
-        trainCode.prefix,
-        trainCode.number,
-        serviceDate,
-        serviceDate
-    );
-    return row ? decodeCoverageRow(row) : null;
+    const rows = getCachedTimetableHistoryCoveragesByTrainCode(trainCode);
+    for (
+        let index = findLatestCoverageIndexAtOrBeforeDate(rows, serviceDate);
+        index >= 0;
+        index -= 1
+    ) {
+        const row = rows[index]!;
+        if (row.service_date_end_exclusive > serviceDate) {
+            return row;
+        }
+    }
+
+    return null;
 }
 
 export function getLatestTimetableHistoryCoverageByTrainCodeAtOrBeforeDate(
     trainCode: TrainCodeParts,
     serviceDate: ServiceDay
 ) {
-    const row = timetableHistoryStatements.get<RawTimetableHistoryCoverageRow>(
-        'selectLatestCoverageByTrainCodeAtOrBeforeDate',
-        trainCode.prefix,
-        trainCode.number,
+    const rows = getCachedTimetableHistoryCoveragesByTrainCode(trainCode);
+    const index = findLatestCoverageIndexAtOrBeforeDate(
+        rows,
         serviceDate
     );
-    return row ? decodeCoverageRow(row) : null;
+    return index >= 0 ? rows[index]! : null;
 }
 
 export function listTimetableHistoryCoveragesByTrainCodePaged(
@@ -215,13 +249,49 @@ export function listTimetableHistoryCoveragesByTrainCodePaged(
 export function listTimetableHistoryCoveragesByTrainCode(
     trainCode: TrainCodeParts
 ) {
-    return timetableHistoryStatements
+    return [...getCachedTimetableHistoryCoveragesByTrainCode(trainCode)];
+}
+
+function getCachedTimetableHistoryCoveragesByTrainCode(
+    trainCode: TrainCodeParts
+): readonly TimetableHistoryCoverageRow[] {
+    const cache = getTimetableHistoryCoverageCache();
+    const key = trainCodeKey(trainCode);
+    const cached = cache.get(key);
+    if (cached !== undefined) {
+        return cached;
+    }
+
+    const rows = timetableHistoryStatements
         .all<RawTimetableHistoryCoverageRow>(
             'selectCoveragesByTrainCode',
             trainCode.prefix,
             trainCode.number
         )
         .map(decodeCoverageRow);
+    cache.set(key, rows);
+    return rows;
+}
+
+function findLatestCoverageIndexAtOrBeforeDate(
+    rows: readonly TimetableHistoryCoverageRow[],
+    serviceDate: ServiceDay
+): number {
+    let low = 0;
+    let high = rows.length - 1;
+    let result = -1;
+
+    while (low <= high) {
+        const middle = Math.floor((low + high) / 2);
+        if (rows[middle]!.service_date_start <= serviceDate) {
+            result = middle;
+            low = middle + 1;
+        } else {
+            high = middle - 1;
+        }
+    }
+
+    return result;
 }
 
 export interface TimetableHistoryMergedCoverageResult {
@@ -305,7 +375,11 @@ export function mergeTimetableHistoryCoverageByMiddleId(
         } satisfies TimetableHistoryMergedCoverageResult;
     });
 
-    return transaction();
+    const result = transaction();
+    if (result) {
+        invalidateTimetableHistoryCoverageCacheByTrainCode(result.trainCode);
+    }
+    return result;
 }
 
 export function listLatestTimetableHistoryCoveragesByTrainCodeAtOrBeforeDate(
@@ -703,6 +777,7 @@ function syncConfirmedTimetableHistoryGroups(
     }
 
     const nextServiceDate = getNextServiceDateInteger(serviceDate);
+    const mutatedTrainCodes = new Map<string, TrainCodeParts>();
     const transaction = useTimetableHistoryDatabase().transaction(() => {
         for (const groupItems of groups) {
             if (groupItems.length === 0) {
@@ -747,6 +822,10 @@ function syncConfirmedTimetableHistoryGroups(
             let groupTimetableChanged = false;
 
             for (const aliasCode of aliasCodes) {
+                const mutationCountBefore =
+                    result.insertedCoverages +
+                    result.updatedCoverages +
+                    result.deletedCoverages;
                 const coverageSyncResult = syncCoverageForTrainCode(
                     aliasCode,
                     serviceDate,
@@ -755,6 +834,13 @@ function syncConfirmedTimetableHistoryGroups(
                     nowSeconds,
                     result
                 );
+                const mutationCountAfter =
+                    result.insertedCoverages +
+                    result.updatedCoverages +
+                    result.deletedCoverages;
+                if (mutationCountAfter > mutationCountBefore) {
+                    mutatedTrainCodes.set(trainCodeKey(aliasCode), aliasCode);
+                }
                 if (coverageSyncResult.isFirstObservation) {
                     groupHasFirstObservation = true;
                 } else {
@@ -776,5 +862,8 @@ function syncConfirmedTimetableHistoryGroups(
     });
 
     transaction();
+    for (const trainCode of mutatedTrainCodes.values()) {
+        invalidateTimetableHistoryCoverageCacheByTrainCode(trainCode);
+    }
     return result;
 }

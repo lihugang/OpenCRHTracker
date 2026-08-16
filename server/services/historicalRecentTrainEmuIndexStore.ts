@@ -1,5 +1,5 @@
 import getLogger from '~/server/libs/log4js';
-import { listLatestDailyRoutesByTrainCode } from '~/server/services/emuRoutesStore';
+import { listLatestDailyEmuIdsByTrainCodes } from '~/server/services/emuRoutesStore';
 import { getTodayScheduleProbeGroups } from '~/server/services/todayScheduleCache';
 import {
     trainCodeKey,
@@ -44,30 +44,27 @@ function buildScheduleFingerprint(trainCodes: TrainCodeParts[]) {
 }
 
 function rebuildCache(): HistoricalRecentTrainEmuIndexCache {
+    const startedAt = Date.now();
     const currentDate = getCurrentDateString();
     const trainCodes = collectCurrentScheduleTrainCodes();
     const scheduleFingerprint = buildScheduleFingerprint(trainCodes);
     const trainToEmuIds = new Map<string, EmuId[]>();
+    const seenEmuIdsByTrainCode = new Map<string, Set<number>>();
+    const latestRows = listLatestDailyEmuIdsByTrainCodes(trainCodes);
 
-    for (const trainCode of trainCodes) {
-        const latestRows = listLatestDailyRoutesByTrainCode(
-            trainCode,
-            LATEST_RECORD_LIMIT
-        );
-        const seenEmuIds = new Set<number>();
-        const emuIds: EmuId[] = [];
-        for (const row of latestRows) {
-            const emuId = Number(row.emu_id);
-            if (seenEmuIds.has(emuId)) {
-                continue;
-            }
-            seenEmuIds.add(emuId);
-            emuIds.push(row.emu_id);
+    for (const row of latestRows) {
+        const key = trainCodeKey(row.train_code);
+        const seenEmuIds = seenEmuIdsByTrainCode.get(key) ?? new Set<number>();
+        const emuId = Number(row.emu_id);
+        if (seenEmuIds.has(emuId)) {
+            continue;
         }
 
-        if (emuIds.length > 0) {
-            trainToEmuIds.set(trainCodeKey(trainCode), emuIds);
-        }
+        seenEmuIds.add(emuId);
+        seenEmuIdsByTrainCode.set(key, seenEmuIds);
+        const emuIds = trainToEmuIds.get(key) ?? [];
+        emuIds.push(row.emu_id);
+        trainToEmuIds.set(key, emuIds);
     }
 
     const nextCache: HistoricalRecentTrainEmuIndexCache = {
@@ -78,7 +75,7 @@ function rebuildCache(): HistoricalRecentTrainEmuIndexCache {
 
     cached = nextCache;
     logger.info(
-        `rebuilt currentDate=${currentDate} trainCodes=${trainCodes.length} matchedTrainCodes=${trainToEmuIds.size} latestRecordLimit=${LATEST_RECORD_LIMIT}`
+        `rebuilt currentDate=${currentDate} trainCodes=${trainCodes.length} sourceRows=${latestRows.length} matchedTrainCodes=${trainToEmuIds.size} latestRecordLimit=${LATEST_RECORD_LIMIT} durationMs=${Date.now() - startedAt}`
     );
     return nextCache;
 }

@@ -1,8 +1,12 @@
 import { useEmuDatabase, type EmuId } from '~/server/libs/database/emu';
 import { createPreparedSqlStore } from '~/server/libs/database/prepared';
-import { listDailyRoutesByTrainCodeInRange } from '~/server/services/emuRoutesStore';
+import getLogger from '~/server/libs/log4js';
+import {
+    clearCachedDailyRoutes,
+    listDailyRoutesByTrainCodeInRange
+} from '~/server/services/emuRoutesStore';
 import { resolveTimetableIdByTrainCodeAndServiceDate } from '~/server/services/historicalTimetableResolver';
-import { mergeEmuRouteStatuses } from '~/server/utils/emuRouteStatus';
+import { collectStatusByEmuFromRowsWithConflicts } from '~/server/utils/emuRouteFormation';
 import {
     serviceDayToShanghaiDayStartUnixSeconds,
     type ServiceDay
@@ -43,6 +47,7 @@ export interface CurrentDayTimetableIdSyncResult {
 }
 
 const DAY_SECONDS = 24 * 60 * 60;
+const logger = getLogger('current-day-timetable-id-sync');
 
 const maintenanceSql = importSqlBatch('emu/maintenance') as Record<
     MaintenanceSqlKey,
@@ -99,9 +104,13 @@ function buildDailySyncActions(
         const deleteIds = groupRows
             .filter((row) => row.id !== keeper.id)
             .map((row) => row.id);
-        const nextStatus = mergeEmuRouteStatuses(
-            groupRows.map((row) => row.status)
-        );
+        const collected = collectStatusByEmuFromRowsWithConflicts(groupRows);
+        const nextStatus = collected.statusByEmu.get(keeper.emu_id)!;
+        for (const conflict of collected.conflicts) {
+            logger.warn(
+                `daily_status_merge_conflict trainCode=${trainCodeKey(keeper.train_code)} emuId=${Number(conflict.emuId)} serviceDate=${keeper.service_date} statuses=${conflict.statuses.join('/')} mergedStatus=${conflict.mergedStatus}`
+            );
+        }
         const needsUpdate =
             keeper.timetable_id !== targetTimetableId ||
             keeper.status !== nextStatus;
@@ -209,5 +218,8 @@ export function syncCurrentDayTimetableIdsForTrainCodes(
     });
 
     syncTransaction();
+    if (result.updatedDailyRows > 0 || result.deletedDailyRows > 0) {
+        clearCachedDailyRoutes();
+    }
     return result;
 }

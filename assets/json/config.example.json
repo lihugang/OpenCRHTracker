@@ -41,7 +41,8 @@
             "coupling": {
                 "statusResetTimeHHmm": "0000",
                 "detectDelaySeconds": 900,
-                "detectCooldownSeconds": 3600
+                "detectCooldownSeconds": 3600,
+                "statusBindingWindowSeconds": 7200
             },
             "prefixRules": [
                 {
@@ -296,6 +297,9 @@
                 "maxEntries": 25
             },
             "historicalContent": {
+                "maxEntries": 1000
+            },
+            "historicalCoverage": {
                 "maxEntries": 1000
             }
         },

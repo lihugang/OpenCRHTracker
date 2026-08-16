@@ -4,8 +4,11 @@ import {
     markEmuCodesAssignedToday,
     markQueriedTrainKey
 } from '~/server/services/probeRuntimeState';
-import { updateDailyRouteFormationStatusByTrainCode } from '~/server/services/emuRoutesStore';
-import { EMU_ROUTE_STATUS_UNCONFIRMED_SINGLE } from '~/server/utils/emuRouteStatus';
+import {
+    decodeEmuRouteStatus,
+    EMU_ROUTE_STATUS_UNCONFIRMED_SINGLE,
+    withFormationStatus
+} from '~/server/utils/emuRouteStatus';
 import {
     persistProbeTrackingRows,
     type ProbeTrackingMutation
@@ -32,7 +35,7 @@ interface ApplyResolvedProbeResultInput {
     startAt: number;
     endAt: number;
     trainKey: string;
-    status: number;
+    statusByEmu: Map<EmuId, number>;
     nowSeconds: number;
     beforePersist?: () => void;
     afterPersist?: () => void;
@@ -40,7 +43,7 @@ interface ApplyResolvedProbeResultInput {
 
 interface ApplyPendingCouplingProbeResultInput extends Omit<
     ApplyResolvedProbeResultInput,
-    'status'
+    'statusByEmu'
 > {}
 
 export async function applyResolvedProbeResult(
@@ -64,7 +67,7 @@ export async function applyResolvedProbeResult(
         endStation: input.endStation,
         startAt: input.startAt,
         endAt: input.endAt,
-        status: input.status,
+        statusByEmu: input.statusByEmu,
         beforePersist: input.beforePersist,
         afterPersist: input.afterPersist
     });
@@ -77,7 +80,10 @@ export async function applyResolvedProbeResult(
     );
     markQueriedTrainKey(input.trainKey);
     await notifyLookupStatusChanges(
-        resolveLookupStatusNotificationCandidates(notificationSnapshot)
+        resolveLookupStatusNotificationCandidates(
+            notificationSnapshot,
+            trackingMutations
+        )
     );
     return trackingMutations;
 }
@@ -96,6 +102,32 @@ export async function applyPendingCouplingProbeResult(
         input.startAt
     );
 
+    const statusByEmu = new Map(
+        input.allEmuCodes.map((emuId) => {
+            const existingStatus =
+                notificationSnapshot.candidates.find(
+                    (candidate) =>
+                        candidate.targetType === 'emu' &&
+                        Number(candidate.targetId) === Number(emuId)
+                )?.previousStatus ?? EMU_ROUTE_STATUS_UNCONFIRMED_SINGLE;
+            const existingDecoded = decodeEmuRouteStatus(existingStatus);
+            if (
+                existingDecoded &&
+                (existingDecoded.confirmed ||
+                    existingDecoded.formationPosition !== 'single')
+            ) {
+                return [emuId, existingStatus];
+            }
+            return [
+                emuId,
+                withFormationStatus(existingStatus, {
+                    confirmed: false,
+                    formationPosition: 'single'
+                }) ?? EMU_ROUTE_STATUS_UNCONFIRMED_SINGLE
+            ];
+        })
+    );
+
     const trackingMutations = persistProbeTrackingRows({
         trainCodes: input.allTrainCodes,
         emuIds: input.allEmuCodes,
@@ -103,16 +135,7 @@ export async function applyPendingCouplingProbeResult(
         endStation: input.endStation,
         startAt: input.startAt,
         endAt: input.endAt,
-        status: EMU_ROUTE_STATUS_UNCONFIRMED_SINGLE,
-        beforePersist: () => {
-            for (const trainCode of input.allTrainCodes) {
-                updateDailyRouteFormationStatusByTrainCode(
-                    trainCode,
-                    input.startAt,
-                    EMU_ROUTE_STATUS_UNCONFIRMED_SINGLE
-                );
-            }
-        }
+        statusByEmu
     });
     markEmuCodesAssignedToday(
         input.allEmuCodes,
@@ -123,7 +146,10 @@ export async function applyPendingCouplingProbeResult(
     );
     markQueriedTrainKey(input.trainKey);
     await notifyLookupStatusChanges(
-        resolveLookupStatusNotificationCandidates(notificationSnapshot)
+        resolveLookupStatusNotificationCandidates(
+            notificationSnapshot,
+            trackingMutations
+        )
     );
     return trackingMutations;
 }

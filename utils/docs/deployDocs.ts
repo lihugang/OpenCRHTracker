@@ -868,12 +868,13 @@ export const deployDocsSections: DocsContentSection[] = [
                         valueType: 'object',
                         required: false,
                         description:
-                            '今日车次、今日车站和历史时刻表解析结果的服务端 LRU 缓存容量。',
+                            '今日车次、今日车站、历史时刻表内容和历史 coverage 的服务端 LRU 缓存容量。',
                         notes: [
                             'todayTrain.maxEntries 默认 500，同一车次的安全别名共享最终时刻表缓存。',
                             'todayStation.maxEntries 默认 25，缓存完成聚合和排序后的车站时刻表，包括空结果。',
                             'historicalContent.maxEntries 默认 1000，缓存按 ID 解析后的历史时刻表内容和不存在 ID 的空结果。',
-                            '这些缓存不设置 TTL；今日缓存随 scheduleStateVersion 失效，管理员重载配置时三类缓存都会立即清空并按新容量重建。'
+                            'historicalCoverage.maxEntries 默认 1000，按车次缓存完整的历史 coverage 分段列表，包括空结果；时刻表历史写入或合并后按车次失效。',
+                            '这些缓存不设置 TTL；今日缓存随 scheduleStateVersion 失效，管理员重载配置时四类缓存都会立即清空并按新容量重建。'
                         ]
                     },
                     {

@@ -1,11 +1,11 @@
 import getLogger from '~/server/libs/log4js';
 import useConfig from '~/server/config';
 import {
-    getEmuRouteStatusByEmuCode,
-    getEmuRouteStatusByTrainCode,
-    listDailyRoutesByEmuCodeAndStartAt,
-    listDailyRoutesByTrainCodeAndStartAt
+    filterDailyRoutesByStartAt,
+    listDailyRoutesByTargetsAtServiceDate,
+    mergeDailyRouteRowStatuses
 } from '~/server/services/emuRoutesStore';
+import type { ProbeTrackingMutation } from '~/server/services/probeTrackingMutations';
 import { isConfirmed } from '~/server/utils/emuRouteStatus';
 import {
     listUserIdsSubscribedToTarget,
@@ -29,6 +29,7 @@ import {
 import type { FeedbackStatus, FeedbackVisibility } from '~/types/feedback';
 import type { NotificationPayload } from '~/types/notifications';
 import type { AuthEventTarget } from '~/server/types/authTargets';
+import { unixSecondsToServiceDay } from '~/server/utils/date/serviceDay';
 
 export interface LookupStatusNotificationCandidate {
     targetType: 'train' | 'emu';
@@ -36,10 +37,14 @@ export interface LookupStatusNotificationCandidate {
     startAt: number;
     previousStatus: number;
     nextStatus: number;
+    routeRows: DailyEmuRouteRow[];
 }
 
 export interface LookupStatusNotificationSnapshot {
-    candidates: Array<Omit<LookupStatusNotificationCandidate, 'nextStatus'>>;
+    candidates: Array<
+        Omit<LookupStatusNotificationCandidate, 'nextStatus' | 'routeRows'>
+    >;
+    rows: DailyEmuRouteRow[];
 }
 
 interface FeedbackAccessTarget {
@@ -50,7 +55,7 @@ interface FeedbackAccessTarget {
 
 interface PreparedLookupStatusNotificationCandidate {
     candidate: LookupStatusNotificationCandidate;
-    routeRows: DailyEmuRouteRow[] | null;
+    routeRows: DailyEmuRouteRow[];
 }
 
 const logger = getLogger('event-notification');
@@ -83,11 +88,41 @@ function shouldNotifyLookupStatusChange(
     return previousStatus !== nextStatus && isConfirmed(nextStatus);
 }
 
+function getLookupCandidateRouteRows(
+    rows: DailyEmuRouteRow[],
+    candidate: Pick<
+        LookupStatusNotificationCandidate,
+        'targetType' | 'targetId' | 'startAt'
+    >
+): DailyEmuRouteRow[] {
+    const targetRows = rows.filter((row) =>
+        candidate.targetType === 'train'
+            ? formatExternalTrainCode(row.train_code) ===
+              formatExternalTrainCode(candidate.targetId as TrainCodeParts)
+            : Number(row.emu_id) === Number(candidate.targetId as EmuId)
+    );
+    return filterDailyRoutesByStartAt(targetRows, candidate.startAt);
+}
+
+function getLookupCandidateTargetKey(
+    candidate: Pick<
+        LookupStatusNotificationCandidate,
+        'targetType' | 'targetId'
+    >
+): string {
+    return `${candidate.targetType}:${candidate.targetType === 'train' ? formatExternalTrainCode(candidate.targetId as TrainCodeParts) : Number(candidate.targetId as EmuId)}`;
+}
+
 export function captureLookupStatusNotificationSnapshot(
     trainCodes: TrainCodeParts[],
     emuIds: EmuId[],
     startAt: number
 ): LookupStatusNotificationSnapshot {
+    const rows = listDailyRoutesByTargetsAtServiceDate(
+        trainCodes,
+        emuIds,
+        unixSecondsToServiceDay(startAt)
+    );
     const candidates: LookupStatusNotificationSnapshot['candidates'] = [];
     const seenTrainCodes = new Set<string>();
     for (const trainCode of trainCodes) {
@@ -96,11 +131,20 @@ export function captureLookupStatusNotificationSnapshot(
             continue;
         }
         seenTrainCodes.add(key);
+        const targetRows = getLookupCandidateRouteRows(rows, {
+            targetType: 'train',
+            targetId: trainCode,
+            startAt
+        });
         candidates.push({
             targetType: 'train',
             targetId: trainCode,
             startAt,
-            previousStatus: getEmuRouteStatusByTrainCode(trainCode, startAt)
+            previousStatus: mergeDailyRouteRowStatuses(
+                targetRows,
+                `train:${formatExternalTrainCode(trainCode)}`,
+                startAt
+            )
         });
     }
 
@@ -111,33 +155,71 @@ export function captureLookupStatusNotificationSnapshot(
             continue;
         }
         seenEmuIds.add(key);
+        const targetRows = getLookupCandidateRouteRows(rows, {
+            targetType: 'emu',
+            targetId: emuId,
+            startAt
+        });
         candidates.push({
             targetType: 'emu',
             targetId: emuId,
             startAt,
-            previousStatus: getEmuRouteStatusByEmuCode(emuId, startAt)
+            previousStatus: mergeDailyRouteRowStatuses(
+                targetRows,
+                `emu:${key}`,
+                startAt
+            )
         });
     }
 
-    return { candidates };
+    return { candidates, rows };
 }
 
 export function resolveLookupStatusNotificationCandidates(
-    snapshot: LookupStatusNotificationSnapshot
+    snapshot: LookupStatusNotificationSnapshot,
+    mutations: ProbeTrackingMutation[]
 ): LookupStatusNotificationCandidate[] {
-    return snapshot.candidates.map((candidate) => ({
-        ...candidate,
-        nextStatus:
-            candidate.targetType === 'train'
-                ? getEmuRouteStatusByTrainCode(
-                      candidate.targetId as TrainCodeParts,
-                      candidate.startAt
-                  )
-                : getEmuRouteStatusByEmuCode(
-                      candidate.targetId as EmuId,
-                      candidate.startAt
-                  )
-    }));
+    const rowsById = new Map(snapshot.rows.map((row) => [row.id, row]));
+    for (const mutation of mutations) {
+        if (mutation.id === null) {
+            continue;
+        }
+        if (mutation.nextStatus === null) {
+            rowsById.delete(mutation.id);
+            continue;
+        }
+
+        const existing = rowsById.get(mutation.id);
+        rowsById.set(mutation.id, {
+            id: mutation.id,
+            train_code: mutation.trainCode,
+            emu_id: mutation.emuId,
+            service_date: mutation.serviceDate,
+            timetable_id: mutation.timetableId,
+            status: mutation.nextStatus,
+            start_station_name: existing?.start_station_name ?? '',
+            end_station_name: existing?.end_station_name ?? '',
+            start_at:
+                mutation.timetableId === null
+                    ? 0
+                    : (mutation.startAt ?? existing?.start_at ?? 0),
+            end_at: existing?.end_at ?? 0
+        });
+    }
+
+    const rows = Array.from(rowsById.values());
+    return snapshot.candidates.map((candidate) => {
+        const routeRows = getLookupCandidateRouteRows(rows, candidate);
+        return {
+            ...candidate,
+            nextStatus: mergeDailyRouteRowStatuses(
+                routeRows,
+                getLookupCandidateTargetKey(candidate),
+                candidate.startAt
+            ),
+            routeRows
+        };
+    });
 }
 
 function buildLookupServiceInstanceKey(
@@ -196,15 +278,9 @@ async function sendLookupNotificationGroup(
             try {
                 let payload = payloadByCandidate.get(preparedCandidate);
                 if (!payload) {
-                    const routeRows =
-                        preparedCandidate.routeRows ??
-                        listDailyRoutesByEmuCodeAndStartAt(
-                            candidate.targetId as EmuId,
-                            candidate.startAt
-                        );
                     payload = buildLookupStatusNotificationPayload(
                         candidate,
-                        routeRows
+                        preparedCandidate.routeRows
                     );
                     payloadByCandidate.set(preparedCandidate, payload);
                 }
@@ -294,16 +370,12 @@ export async function notifyLookupStatusChanges(
             continue;
         }
 
-        const routeRows =
-            candidate.targetType === 'train'
-                ? listDailyRoutesByTrainCodeAndStartAt(
-                      candidate.targetId as TrainCodeParts,
-                      candidate.startAt
-                  )
-                : null;
-        const key = buildLookupServiceInstanceKey(candidate, routeRows ?? []);
+        const key = buildLookupServiceInstanceKey(
+            candidate,
+            candidate.routeRows
+        );
         const group = groupedCandidates.get(key) ?? [];
-        group.push({ candidate, routeRows });
+        group.push({ candidate, routeRows: candidate.routeRows });
         groupedCandidates.set(key, group);
     }
 

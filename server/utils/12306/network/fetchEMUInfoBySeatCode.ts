@@ -79,6 +79,45 @@ interface CachedSeatCodeResult {
 }
 
 const cachedSeatCodeResults = new Map<string, CachedSeatCodeResult>();
+const MAX_CACHED_SEAT_CODE_RESULTS = 2048;
+const CACHE_PRUNE_INTERVAL_SECONDS = 300;
+let cachedSeatCodeServiceDate = '';
+let lastCachePrunedAt = 0;
+
+function pruneCachedSeatCodeResults(
+    nowSeconds: number,
+    currentDate: string
+): void {
+    if (cachedSeatCodeServiceDate !== currentDate) {
+        cachedSeatCodeResults.clear();
+        cachedSeatCodeServiceDate = currentDate;
+        lastCachePrunedAt = nowSeconds;
+        return;
+    }
+    if (
+        cachedSeatCodeResults.size < MAX_CACHED_SEAT_CODE_RESULTS &&
+        nowSeconds - lastCachePrunedAt < CACHE_PRUNE_INTERVAL_SECONDS
+    ) {
+        return;
+    }
+
+    for (const [key, cached] of cachedSeatCodeResults) {
+        if (
+            cached.expiresAt <= nowSeconds ||
+            formatExternalServiceDate(cached.startDay) !== currentDate
+        ) {
+            cachedSeatCodeResults.delete(key);
+        }
+    }
+    while (cachedSeatCodeResults.size >= MAX_CACHED_SEAT_CODE_RESULTS) {
+        const oldestKey = cachedSeatCodeResults.keys().next().value;
+        if (typeof oldestKey !== 'string') {
+            break;
+        }
+        cachedSeatCodeResults.delete(oldestKey);
+    }
+    lastCachePrunedAt = nowSeconds;
+}
 
 export type FetchSeatCodeFailureReason =
     | 'network_error'
@@ -195,6 +234,7 @@ export default async function fetchEMUInfoBySeatCode(
     const normalizedCode = code.trim();
     const nowSeconds = getNowSeconds();
     const currentDate = getCurrentDateString();
+    pruneCachedSeatCodeResults(nowSeconds, currentDate);
 
     const cached = cachedSeatCodeResults.get(normalizedCode);
     if (cached) {
@@ -202,6 +242,8 @@ export default async function fetchEMUInfoBySeatCode(
             cached.expiresAt > nowSeconds &&
             formatExternalServiceDate(cached.startDay) === currentDate
         ) {
+            cachedSeatCodeResults.delete(normalizedCode);
+            cachedSeatCodeResults.set(normalizedCode, cached);
             return cached.value;
         }
 

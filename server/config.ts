@@ -38,6 +38,7 @@ interface ScheduleProbeCouplingConfig {
     statusResetTimeHHmm: string;
     detectDelaySeconds: number;
     detectCooldownSeconds: number;
+    statusBindingWindowSeconds: number;
 }
 
 interface ApiPermissionConfig {
@@ -386,6 +387,9 @@ export interface Config {
                 maxEntries: number;
             };
             historicalContent: {
+                maxEntries: number;
+            };
+            historicalCoverage: {
                 maxEntries: number;
             };
         };
@@ -1275,7 +1279,8 @@ function validateConfig(raw: unknown): Config {
     assertOnlyKeys(apiTimetableCache, 'api.timetableCache', [
         'todayTrain',
         'todayStation',
-        'historicalContent'
+        'historicalContent',
+        'historicalCoverage'
     ]);
     const apiTimetableCacheTodayTrain =
         apiTimetableCache.todayTrain === undefined
@@ -1311,6 +1316,18 @@ function validateConfig(raw: unknown): Config {
     assertOnlyKeys(
         apiTimetableCacheHistoricalContent,
         'api.timetableCache.historicalContent',
+        ['maxEntries']
+    );
+    const apiTimetableCacheHistoricalCoverage =
+        apiTimetableCache.historicalCoverage === undefined
+            ? {}
+            : asObject(
+                  apiTimetableCache.historicalCoverage,
+                  'api.timetableCache.historicalCoverage'
+              );
+    assertOnlyKeys(
+        apiTimetableCacheHistoricalCoverage,
+        'api.timetableCache.historicalCoverage',
         ['maxEntries']
     );
     const apiPayload = asObject(api.payload, 'api.payload');
@@ -1723,6 +1740,14 @@ function validateConfig(raw: unknown): Config {
                         spiderScheduleProbeCoupling.detectCooldownSeconds,
                         'spider.scheduleProbe.coupling.detectCooldownSeconds',
                         0
+                    ),
+                    statusBindingWindowSeconds: asInteger(
+                        spiderScheduleProbeCoupling.statusBindingWindowSeconds ===
+                            undefined
+                            ? 7200
+                            : spiderScheduleProbeCoupling.statusBindingWindowSeconds,
+                        'spider.scheduleProbe.coupling.statusBindingWindowSeconds',
+                        0
                     )
                 },
                 prefixRules: spiderScheduleProbePrefixRules.map(
@@ -2116,6 +2141,13 @@ function validateConfig(raw: unknown): Config {
                     maxEntries: asInteger(
                         apiTimetableCacheHistoricalContent.maxEntries ?? 1000,
                         'api.timetableCache.historicalContent.maxEntries',
+                        1
+                    )
+                },
+                historicalCoverage: {
+                    maxEntries: asInteger(
+                        apiTimetableCacheHistoricalCoverage.maxEntries ?? 1000,
+                        'api.timetableCache.historicalCoverage.maxEntries',
                         1
                     )
                 }

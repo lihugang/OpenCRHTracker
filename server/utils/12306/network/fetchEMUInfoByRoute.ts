@@ -5,6 +5,7 @@ import { record12306RequestHourlyStat } from '~/server/services/trainProvenanceS
 import getCurrentDateString from '../../date/getCurrentDateString';
 import log12306RequestFailure from './log12306RequestFailure';
 import waitFor12306RequestSlot from '../requestLimiter';
+import { parseCarDetailFormationObservation } from '~/server/utils/emuRouteFormation';
 import {
     ensureEmuId,
     formatExternalTrainCode
@@ -108,6 +109,11 @@ export default async function fetchEMUInfoByRoute(route: TrainCodeParts) {
         }
 
         const canonicalEmuCode = await resolveCanonicalEmuCode(emuCode);
+        const coachPic = contentData.coachPicList?.[0] ?? null;
+        const formationObservation = parseCarDetailFormationObservation(
+            coachPic?.pictureName,
+            coachPic !== null
+        );
 
         record12306RequestHourlyStat({
             requestType: 'fetch_emu_by_route',
@@ -119,6 +125,9 @@ export default async function fetchEMUInfoByRoute(route: TrainCodeParts) {
             },
             emu: {
                 code: ensureEmuId(canonicalEmuCode)
+            },
+            formation: {
+                observation: formationObservation
             }
         };
     } catch (error) {

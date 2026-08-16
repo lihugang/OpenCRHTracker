@@ -8,6 +8,7 @@ import useConfig, {
 } from '~/server/config';
 import getLogger from '~/server/libs/log4js';
 import { invalidateHistoricalTimetableContentCache } from '~/server/services/historicalTimetableResolver';
+import { invalidateTimetableHistoryCoverageCache } from '~/server/services/timetableHistoryStore';
 import { invalidateLookupIndexCache } from '~/server/services/lookupIndexStore';
 import {
     invalidateProbeAssetsCache,
@@ -245,6 +246,7 @@ function resetSafeRuntimeCaches(): void {
     invalidateLookupIndexCache();
     invalidateTodayScheduleCache();
     invalidateHistoricalTimetableContentCache();
+    invalidateTimetableHistoryCoverageCache();
 }
 
 async function reloadQrcodeDetectionAfterAssetChange(): Promise<string> {

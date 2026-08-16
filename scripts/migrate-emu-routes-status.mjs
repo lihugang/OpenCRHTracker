@@ -880,6 +880,16 @@ async function main() {
                 'probe_status table is missing; cannot migrate a database that has no old probe status source.'
             );
         }
+        if (tableExists(db, 'daily_emu_routes_migrated_status')) {
+            console.log(
+                'Detected a stale daily_emu_routes migration stage from an interrupted run; dropping it before rebuilding.\n'
+            );
+            db.exec(
+                loadSql(
+                    'assets/sql/emu/migrations/dropMigratedDailyEmuRoutesStageForMigration.sql'
+                )
+            );
+        }
 
         const discoveredRouteDays = loadAllRouteDays(db);
         const futureRouteDays = discoveredRouteDays.filter(

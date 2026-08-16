@@ -39,7 +39,8 @@ import {
     type ServiceDay
 } from '~/server/utils/date/serviceDay';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
-import { EMU_ROUTE_STATUS_CONFIRMED_SINGLE } from '~/server/utils/emuRouteStatus';
+import { getEmuRouteStatusByEmuCode } from '~/server/services/emuRoutesStore';
+import { withFormationStatus } from '~/server/utils/emuRouteStatus';
 import type { EmuId } from '~/server/libs/database/emu';
 import {
     ensureExternalEmuId,
@@ -243,6 +244,17 @@ async function executeProbeQrcodeDetectionEmuTask(
     });
 
     if (getProbeEmuMultipleStateFromRecord(resolvedRecord) === 'non_multiple') {
+        const existingStatus = getEmuRouteStatusByEmuCode(
+            scannedEmuId,
+            routeStartAt
+        );
+        const confirmedSingleStatus = withFormationStatus(existingStatus, {
+            confirmed: true,
+            formationPosition: 'single'
+        });
+        if (confirmedSingleStatus === null) {
+            throw new Error(`invalid_emu_route_status ${existingStatus}`);
+        }
         const trackingMutations = await applyResolvedProbeResult({
             trainCode: routeTrainCode,
             trainInternalCode: routeTrainInternalCode,
@@ -253,7 +265,7 @@ async function executeProbeQrcodeDetectionEmuTask(
             startAt: routeStartAt,
             endAt: routeEndAt,
             trainKey,
-            status: EMU_ROUTE_STATUS_CONFIRMED_SINGLE,
+            statusByEmu: new Map([[scannedEmuId, confirmedSingleStatus]]),
             nowSeconds
         });
         recordCurrentTrainProvenanceEventsForTrainCodes(allTrainCodes, {
