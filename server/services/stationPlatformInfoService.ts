@@ -428,7 +428,7 @@ function loadCandidateCacheEntries(
     candidate: StationPlatformInfoCandidate
 ): ScheduleStationPlatformInfoCacheEntry[] {
     const entries: ScheduleStationPlatformInfoCacheEntry[] = [];
-    for (const stationTrainCode of candidate.stationTrainCodes) {
+    for (const stationTrainCode of getCandidateTrainCodes(candidate)) {
         const entry = loadScheduleStationPlatformInfoCacheEntry({
             lookupType: candidate.lookupType,
             internalCode: candidate.internalCode,
@@ -905,7 +905,7 @@ async function refreshCandidates(
         let failed = false;
         let errorMessage = '';
         const attemptedTrainCodes: TrainCodeParts[] = [];
-        for (const stationTrainCode of candidate.stationTrainCodes) {
+        for (const stationTrainCode of getCandidateTrainCodes(candidate)) {
             requestCount += 1;
             attemptedTrainCodes.push(stationTrainCode);
 
