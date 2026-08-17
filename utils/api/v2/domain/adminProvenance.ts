@@ -1,5 +1,3 @@
-import { toJson } from '@bufbuild/protobuf';
-import { StructSchema } from '@bufbuild/protobuf/wkt';
 import type {
     GetAdminTrainProvenanceCouplingScanData,
     GetAdminTrainProvenanceCouplingScanTasksData,
@@ -99,7 +97,7 @@ function mapOutcomeStatus(value: number | undefined | null) {
 }
 
 function mapStruct(value: unknown): unknown {
-    return value ? toJson(StructSchema, value as never) : null;
+    return value ?? null;
 }
 
 function mapRouteSnapshot(
