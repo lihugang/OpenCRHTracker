@@ -720,7 +720,9 @@ function mapPlatformRefresh(
                   trigger:
                       summary?.trigger === 1
                           ? ('route_refresh' as const)
-                          : ('station_board' as const),
+                          : summary?.trigger === 3
+                            ? ('scheduled_task' as const)
+                            : ('station_board' as const),
                   status: mapOutcomeStatus(
                       summary?.status
                   ) as ResultItem['status'],
