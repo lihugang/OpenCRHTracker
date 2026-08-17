@@ -1,6 +1,6 @@
 import useConfig from '~/server/config';
 import getLogger from '~/server/libs/log4js';
-import { record12306RequestHourlyStat } from '~/server/services/trainProvenanceStore';
+import { record12306RequestHourlyStatSafely } from '~/server/services/trainProvenanceRecorder';
 import parsePlatformNo from '../parsePlatformNo';
 import waitFor12306RequestSlot from '../requestLimiter';
 import log12306RequestFailure from './log12306RequestFailure';
@@ -85,7 +85,7 @@ export default async function fetchStationExitInfo(
         });
         if (!response.ok) {
             requestStatRecorded = true;
-            record12306RequestHourlyStat({
+            record12306RequestHourlyStatSafely({
                 requestType: 'fetch_station_exit_info',
                 isSuccess: false
             });
@@ -106,7 +106,7 @@ export default async function fetchStationExitInfo(
         const json = (await response.json()) as StationExitInfoResponse;
         if (json.status !== true) {
             requestStatRecorded = true;
-            record12306RequestHourlyStat({
+            record12306RequestHourlyStatSafely({
                 requestType: 'fetch_station_exit_info',
                 isSuccess: false
             });
@@ -129,7 +129,7 @@ export default async function fetchStationExitInfo(
 
         if (json.data !== undefined && !isResponseData(json.data)) {
             requestStatRecorded = true;
-            record12306RequestHourlyStat({
+            record12306RequestHourlyStatSafely({
                 requestType: 'fetch_station_exit_info',
                 isSuccess: false
             });
@@ -150,7 +150,7 @@ export default async function fetchStationExitInfo(
         }
 
         requestStatRecorded = true;
-        record12306RequestHourlyStat({
+        record12306RequestHourlyStatSafely({
             requestType: 'fetch_station_exit_info',
             isSuccess: true
         });
@@ -171,7 +171,7 @@ export default async function fetchStationExitInfo(
         };
     } catch (error) {
         if (!requestStatRecorded) {
-            record12306RequestHourlyStat({
+            record12306RequestHourlyStatSafely({
                 requestType: 'fetch_station_exit_info',
                 isSuccess: false
             });

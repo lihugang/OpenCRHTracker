@@ -1,7 +1,7 @@
 import useConfig from '~/server/config';
 import getLogger from '~/server/libs/log4js';
 import { resolveCanonicalEmuCode } from '~/server/services/probeAssetStore';
-import { record12306RequestHourlyStat } from '~/server/services/trainProvenanceStore';
+import { record12306RequestHourlyStatSafely } from '~/server/services/trainProvenanceRecorder';
 import getCurrentDateString from '../../date/getCurrentDateString';
 import log12306RequestFailure from './log12306RequestFailure';
 import waitFor12306RequestSlot from '../requestLimiter';
@@ -66,7 +66,7 @@ export default async function fetchEMUInfoByRoute(route: TrainCodeParts) {
             }
         );
         if (!response.ok) {
-            record12306RequestHourlyStat({
+            record12306RequestHourlyStatSafely({
                 requestType: 'fetch_emu_by_route',
                 isSuccess: false
             });
@@ -87,7 +87,7 @@ export default async function fetchEMUInfoByRoute(route: TrainCodeParts) {
         const contentData = json.content?.data;
         const emuCode = contentData?.carCode?.trim();
         if (!emuCode) {
-            record12306RequestHourlyStat({
+            record12306RequestHourlyStatSafely({
                 requestType: 'fetch_emu_by_route',
                 isSuccess: false
             });
@@ -115,7 +115,7 @@ export default async function fetchEMUInfoByRoute(route: TrainCodeParts) {
             coachPic !== null
         );
 
-        record12306RequestHourlyStat({
+        record12306RequestHourlyStatSafely({
             requestType: 'fetch_emu_by_route',
             isSuccess: true
         });
@@ -131,7 +131,7 @@ export default async function fetchEMUInfoByRoute(route: TrainCodeParts) {
             }
         };
     } catch (error) {
-        record12306RequestHourlyStat({
+        record12306RequestHourlyStatSafely({
             requestType: 'fetch_emu_by_route',
             isSuccess: false
         });

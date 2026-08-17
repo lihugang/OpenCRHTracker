@@ -38,9 +38,9 @@ import getNowSeconds from '~/server/utils/time/getNowSeconds';
 import { expandSequentialShanghaiDayOffsets } from '~/server/utils/date/shanghaiDateTime';
 import {
     getCurrentTrainProvenanceTaskRunId,
-    recordCurrentTrainProvenanceEvent
+    recordCurrentTrainProvenanceEvent,
+    recordStationBoardFetchResultSafely
 } from '~/server/services/trainProvenanceRecorder';
-import { recordStationBoardFetchResult } from '~/server/services/trainProvenanceStore';
 import { getStationBoardIdleTaskOptions } from '~/server/services/stationBoardTaskScheduling';
 
 export const FETCH_STATION_BOARD_TASK_EXECUTOR = 'fetch_station_board';
@@ -170,7 +170,7 @@ function maybeRecordFetchResult(input: {
         return;
     }
 
-    recordStationBoardFetchResult({
+    recordStationBoardFetchResultSafely({
         taskRunId,
         serviceDate: input.serviceDate,
         parentSchedulerTaskId: input.parentSchedulerTaskId,

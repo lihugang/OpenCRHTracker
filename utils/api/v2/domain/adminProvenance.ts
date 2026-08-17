@@ -254,6 +254,7 @@ function mapCouplingScanTaskRun(item: {
     finishedAt?: bigint | number | undefined;
     serviceDay: number;
     taskArgs?: unknown;
+    errorMessage: string;
 }): AdminCouplingScanTaskRunSummary {
     return {
         id: item.id,
@@ -263,7 +264,8 @@ function mapCouplingScanTaskRun(item: {
         startedAt: protoInt64ToNumber(item.startedAt) ?? 0,
         finishedAt: protoInt64ToNumber(item.finishedAt),
         serviceDate: epochServiceDayToDateString(item.serviceDay),
-        taskArgs: mapStruct(item.taskArgs)
+        taskArgs: mapStruct(item.taskArgs),
+        errorMessage: item.errorMessage
     };
 }
 
@@ -285,7 +287,8 @@ function mapCouplingScanTasks(
                 serviceDate: epochServiceDayToDateString(item.serviceDay),
                 bureau: item.bureau,
                 model: item.model,
-                taskArgs: mapStruct(item.taskArgs)
+                taskArgs: mapStruct(item.taskArgs),
+                errorMessage: item.errorMessage
             })
         )
     };

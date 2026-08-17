@@ -1,6 +1,6 @@
 import useConfig from '~/server/config';
 import getLogger from '~/server/libs/log4js';
-import { record12306RequestHourlyStat } from '~/server/services/trainProvenanceStore';
+import { record12306RequestHourlyStatSafely } from '~/server/services/trainProvenanceRecorder';
 import waitFor12306RequestSlot from '../requestLimiter';
 import log12306RequestFailure from './log12306RequestFailure';
 import {
@@ -111,7 +111,7 @@ export default async function fetchStationBoardByStation(
         });
         if (!response.ok) {
             requestStatRecorded = true;
-            record12306RequestHourlyStat({
+            record12306RequestHourlyStatSafely({
                 requestType: 'fetch_station_board',
                 isSuccess: false
             });
@@ -135,7 +135,7 @@ export default async function fetchStationBoardByStation(
         const json = (await response.json()) as StationBoardResponse;
         if (json.status !== true) {
             requestStatRecorded = true;
-            record12306RequestHourlyStat({
+            record12306RequestHourlyStatSafely({
                 requestType: 'fetch_station_board',
                 isSuccess: false
             });
@@ -161,7 +161,7 @@ export default async function fetchStationBoardByStation(
 
         if (!Array.isArray(json.data)) {
             requestStatRecorded = true;
-            record12306RequestHourlyStat({
+            record12306RequestHourlyStatSafely({
                 requestType: 'fetch_station_board',
                 isSuccess: false
             });
@@ -186,7 +186,7 @@ export default async function fetchStationBoardByStation(
 
         if (json.data.length === 0) {
             requestStatRecorded = true;
-            record12306RequestHourlyStat({
+            record12306RequestHourlyStatSafely({
                 requestType: 'fetch_station_board',
                 isSuccess: false
             });
@@ -211,7 +211,7 @@ export default async function fetchStationBoardByStation(
             .map((row) => normalizeStationBoardRow(row))
             .filter((row): row is StationBoardTrainRow => row !== null);
         requestStatRecorded = true;
-        record12306RequestHourlyStat({
+        record12306RequestHourlyStatSafely({
             requestType: 'fetch_station_board',
             isSuccess: true
         });
@@ -219,7 +219,7 @@ export default async function fetchStationBoardByStation(
         return rows;
     } catch (error) {
         if (!requestStatRecorded) {
-            record12306RequestHourlyStat({
+            record12306RequestHourlyStatSafely({
                 requestType: 'fetch_station_board',
                 isSuccess: false
             });

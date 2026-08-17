@@ -27,7 +27,7 @@ import {
 } from '~/server/services/taskQueue';
 import { loadProbeAssets } from '~/server/services/probeAssetStore';
 import { warmHistoricalRecentTrainEmuIndex } from '~/server/services/historicalRecentTrainEmuIndexStore';
-import { cleanupExpiredTrainProvenance } from '~/server/services/trainProvenanceStore';
+import { cleanupExpiredTrainProvenanceSafely } from '~/server/services/trainProvenanceRecorder';
 import { parseInternalJson } from '~/server/utils/internal/storageValues';
 import {
     BUILD_SCHEDULE_TASK_EXECUTOR,
@@ -256,9 +256,19 @@ export default defineNitroPlugin(async () => {
     try {
         ensureTaskDatabaseSchema();
         ensureEmuDatabaseSchema();
-        ensureTrainProvenanceDatabaseSchema();
+        try {
+            ensureTrainProvenanceDatabaseSchema();
+        } catch (error) {
+            const message =
+                error instanceof Error
+                    ? `${error.name}: ${error.message}`
+                    : String(error);
+            logger.error(
+                `ensure_train_provenance_schema_failed error=${message}`
+            );
+        }
         ensureScheduleDatabaseSchema();
-        cleanupExpiredTrainProvenance();
+        cleanupExpiredTrainProvenanceSafely();
         await loadProbeAssets();
         await loadStationCoordAssets();
         const qrcodeDetectionConfigResult = await reloadQrcodeDetectionConfig();

@@ -1,5 +1,5 @@
 import useConfig from '~/server/config';
-import { record12306RequestHourlyStat } from '~/server/services/trainProvenanceStore';
+import { record12306RequestHourlyStatSafely } from '~/server/services/trainProvenanceRecorder';
 import waitFor12306RequestSlot from '../requestLimiter';
 import parseJsonpToJson from '../../json/parseJsonpToJson';
 import { parseExternalTrainCodeOrThrow } from '~/server/utils/internal/boundaries';
@@ -51,7 +51,7 @@ export default async function queryTrainCodeThroughPrefix(prefix: string) {
             method: 'GET'
         });
         if (!response.ok) {
-            record12306RequestHourlyStat({
+            record12306RequestHourlyStatSafely({
                 requestType: 'search_train_code',
                 isSuccess: false
             });
@@ -63,14 +63,14 @@ export default async function queryTrainCodeThroughPrefix(prefix: string) {
             config.spider.params.jsonpCallback
         );
         if (!json.status) {
-            record12306RequestHourlyStat({
+            record12306RequestHourlyStatSafely({
                 requestType: 'search_train_code',
                 isSuccess: false
             });
             return null;
         }
 
-        record12306RequestHourlyStat({
+        record12306RequestHourlyStatSafely({
             requestType: 'search_train_code',
             isSuccess: true
         });
@@ -86,7 +86,7 @@ export default async function queryTrainCodeThroughPrefix(prefix: string) {
             };
         });
     } catch {
-        record12306RequestHourlyStat({
+        record12306RequestHourlyStatSafely({
             requestType: 'search_train_code',
             isSuccess: false
         });

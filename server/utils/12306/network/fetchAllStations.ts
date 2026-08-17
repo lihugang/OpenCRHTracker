@@ -1,6 +1,6 @@
 import useConfig from '~/server/config';
 import getLogger from '~/server/libs/log4js';
-import { record12306RequestHourlyStat } from '~/server/services/trainProvenanceStore';
+import { record12306RequestHourlyStatSafely } from '~/server/services/trainProvenanceRecorder';
 import waitFor12306RequestSlot from '../requestLimiter';
 import log12306RequestFailure from './log12306RequestFailure';
 
@@ -38,7 +38,7 @@ export default async function fetchAllStations(): Promise<AllStationRow[]> {
         });
         if (!response.ok) {
             requestStatRecorded = true;
-            record12306RequestHourlyStat({
+            record12306RequestHourlyStatSafely({
                 requestType: 'fetch_all_stations',
                 isSuccess: false
             });
@@ -58,7 +58,7 @@ export default async function fetchAllStations(): Promise<AllStationRow[]> {
         const json = (await response.json()) as AllStationsResponse;
         if (json.status !== true) {
             requestStatRecorded = true;
-            record12306RequestHourlyStat({
+            record12306RequestHourlyStatSafely({
                 requestType: 'fetch_all_stations',
                 isSuccess: false
             });
@@ -103,7 +103,7 @@ export default async function fetchAllStations(): Promise<AllStationRow[]> {
 
         if (normalizedStations.length === 0) {
             requestStatRecorded = true;
-            record12306RequestHourlyStat({
+            record12306RequestHourlyStatSafely({
                 requestType: 'fetch_all_stations',
                 isSuccess: false
             });
@@ -121,7 +121,7 @@ export default async function fetchAllStations(): Promise<AllStationRow[]> {
         }
 
         requestStatRecorded = true;
-        record12306RequestHourlyStat({
+        record12306RequestHourlyStatSafely({
             requestType: 'fetch_all_stations',
             isSuccess: true
         });
@@ -130,7 +130,7 @@ export default async function fetchAllStations(): Promise<AllStationRow[]> {
         return normalizedStations;
     } catch (error) {
         if (!requestStatRecorded) {
-            record12306RequestHourlyStat({
+            record12306RequestHourlyStatSafely({
                 requestType: 'fetch_all_stations',
                 isSuccess: false
             });

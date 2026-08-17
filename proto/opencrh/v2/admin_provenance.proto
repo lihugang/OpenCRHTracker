@@ -151,6 +151,7 @@ message AdminCouplingScanTaskRunSummary {
   optional int64 finished_at = 6;
   uint32 service_day = 7;
   optional google.protobuf.Struct task_args = 8;
+  string error_message = 9;
 }
 
 message AdminCouplingScanTaskListItem {
@@ -164,6 +165,7 @@ message AdminCouplingScanTaskListItem {
   string bureau = 8;
   string model = 9;
   optional google.protobuf.Struct task_args = 10;
+  string error_message = 11;
 }
 
 message GetAdminTrainProvenanceCouplingScanTasksRequest {}

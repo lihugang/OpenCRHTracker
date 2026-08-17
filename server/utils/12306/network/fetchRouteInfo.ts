@@ -1,6 +1,6 @@
 import useConfig from '~/server/config';
 import getLogger from '~/server/libs/log4js';
-import { record12306RequestHourlyStat } from '~/server/services/trainProvenanceStore';
+import { record12306RequestHourlyStatSafely } from '~/server/services/trainProvenanceRecorder';
 import getCurrentDateString from '../../date/getCurrentDateString';
 import { getShanghaiUnixSecondsFromDateAndTime } from '../../date/shanghaiDateTime';
 import log12306RequestFailure from './log12306RequestFailure';
@@ -160,7 +160,7 @@ export default async function fetchRouteInfo(
             method: 'POST'
         });
         if (!response.ok) {
-            record12306RequestHourlyStat({
+            record12306RequestHourlyStatSafely({
                 requestType: 'fetch_route_info',
                 isSuccess: false
             });
@@ -181,7 +181,7 @@ export default async function fetchRouteInfo(
 
         const json: RouteInfoResponse = await response.json();
         if (!json.status) {
-            record12306RequestHourlyStat({
+            record12306RequestHourlyStatSafely({
                 requestType: 'fetch_route_info',
                 isSuccess: false
             });
@@ -244,7 +244,7 @@ export default async function fetchRouteInfo(
         const startStation = stops.at(0);
         const endStation = stops.at(-1);
         if (!startStation || !endStation || !json.data?.trainNo) {
-            record12306RequestHourlyStat({
+            record12306RequestHourlyStatSafely({
                 requestType: 'fetch_route_info',
                 isSuccess: false
             });
@@ -273,7 +273,7 @@ export default async function fetchRouteInfo(
         const startAt = startStation.departAt ?? startStation.arriveAt;
         const endAt = endStation.arriveAt ?? endStation.departAt;
         if (startAt === null || endAt === null) {
-            record12306RequestHourlyStat({
+            record12306RequestHourlyStatSafely({
                 requestType: 'fetch_route_info',
                 isSuccess: false
             });
@@ -298,7 +298,7 @@ export default async function fetchRouteInfo(
             };
         }
 
-        record12306RequestHourlyStat({
+        record12306RequestHourlyStatSafely({
             requestType: 'fetch_route_info',
             isSuccess: true
         });
@@ -331,7 +331,7 @@ export default async function fetchRouteInfo(
             }
         };
     } catch (error) {
-        record12306RequestHourlyStat({
+        record12306RequestHourlyStatSafely({
             requestType: 'fetch_route_info',
             isSuccess: false
         });

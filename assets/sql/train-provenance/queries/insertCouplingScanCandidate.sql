@@ -17,4 +17,21 @@ INSERT INTO coupling_scan_candidates (
     train_repeat,
     detail_json,
     created_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT(task_run_id, candidate_order) DO UPDATE SET
+    service_date = excluded.service_date,
+    bureau = excluded.bureau,
+    model = excluded.model,
+    candidate_emu_id = excluded.candidate_emu_id,
+    status = excluded.status,
+    reason = excluded.reason,
+    scanned_train_prefix = excluded.scanned_train_prefix,
+    scanned_train_number = excluded.scanned_train_number,
+    scanned_internal_code = excluded.scanned_internal_code,
+    scanned_start_at = excluded.scanned_start_at,
+    matched_train_prefix = excluded.matched_train_prefix,
+    matched_train_number = excluded.matched_train_number,
+    matched_start_at = excluded.matched_start_at,
+    train_repeat = excluded.train_repeat,
+    detail_json = excluded.detail_json,
+    created_at = excluded.created_at;

@@ -37,9 +37,9 @@ import {
 import fetchAllStations from '~/server/utils/12306/network/fetchAllStations';
 import {
     getCurrentTrainProvenanceTaskRunId,
-    recordCurrentTrainProvenanceEvent
+    recordCurrentTrainProvenanceEvent,
+    recordStationBoardDispatchResultSafely
 } from '~/server/services/trainProvenanceRecorder';
-import { recordStationBoardDispatchResult } from '~/server/services/trainProvenanceStore';
 
 export const DISPATCH_STATION_BOARD_TASKS_EXECUTOR =
     'dispatch_station_board_tasks';
@@ -204,7 +204,7 @@ function maybeRecordDispatchResult(input: {
         return;
     }
 
-    recordStationBoardDispatchResult({
+    recordStationBoardDispatchResultSafely({
         taskRunId,
         serviceDate: input.serviceDate,
         candidateGroupCount: input.candidateGroupCount,

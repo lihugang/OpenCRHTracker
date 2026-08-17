@@ -1613,6 +1613,12 @@
                                             class="text-sm leading-6 text-slate-600">
                                             扫描任务 #{{ item.schedulerTaskId }}
                                         </p>
+                                        <p
+                                            v-if="item.errorMessage"
+                                            class="line-clamp-2 max-w-3xl break-all rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm leading-6 text-rose-700"
+                                            :title="item.errorMessage">
+                                            {{ item.errorMessage }}
+                                        </p>
                                     </div>
 
                                     <div
@@ -1681,7 +1687,8 @@
                 <UiEmptyState
                     v-else-if="
                         couplingDetailData &&
-                        couplingDetailData.candidates.length === 0
+                        couplingDetailData.candidates.length === 0 &&
+                        !couplingDetailData.taskRun?.errorMessage
                     "
                     eyebrow="无候选"
                     title="本次扫描没有候选结果"
@@ -1709,6 +1716,12 @@
                             }}
                         </p>
                     </div>
+
+                    <p
+                        v-if="couplingDetailData.taskRun?.errorMessage"
+                        class="whitespace-pre-wrap break-all rounded-md border border-rose-200 bg-rose-50 px-4 py-4 text-sm leading-6 text-rose-700">
+                        {{ couplingDetailData.taskRun.errorMessage }}
+                    </p>
 
                     <div class="space-y-3">
                         <article

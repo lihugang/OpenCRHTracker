@@ -986,6 +986,7 @@ export interface AdminCouplingScanTaskRunSummary {
     finishedAt: number | null;
     serviceDate: string;
     taskArgs: unknown;
+    errorMessage: string;
 }
 
 export interface AdminCouplingScanTaskListItem {
@@ -999,6 +1000,7 @@ export interface AdminCouplingScanTaskListItem {
     bureau: string;
     model: string;
     taskArgs: unknown;
+    errorMessage: string;
 }
 
 export interface AdminCouplingScanCandidate {

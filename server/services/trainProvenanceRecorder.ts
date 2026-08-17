@@ -1,13 +1,20 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import getLogger from '~/server/libs/log4js';
 import {
+    cleanupExpiredTrainProvenance,
     finishTrainProvenanceTaskRun,
     isTrainProvenanceEnabled,
+    record12306RequestHourlyStat,
     recordCouplingScanCandidate,
+    recordStationBoardDispatchResult,
+    recordStationBoardFetchResult,
     recordStationPlatformRefreshResult,
     recordTrainProvenanceEvent,
     startTrainProvenanceTaskRun,
+    type Record12306RequestHourlyStatInput,
     type RecordCouplingScanCandidateInput,
+    type RecordStationBoardDispatchResultInput,
+    type RecordStationBoardFetchResultInput,
     type RecordTrainProvenanceEventInput,
     type StationPlatformRefreshStatus,
     type StationPlatformRefreshTrigger,
@@ -32,9 +39,11 @@ import type {
 
 interface TrainProvenanceContextValue {
     taskRunId: number;
+    executor: string;
     nextSequenceNo: number;
     finalStatus: Exclude<TrainProvenanceTaskRunStatus, 'running'>;
     errorMessage: string;
+    writesDisabled: boolean;
 }
 
 type TrainProvenanceEventInput = Omit<
@@ -50,6 +59,61 @@ type CouplingScanCandidateInput = Omit<
 const logger = getLogger('train-provenance-recorder');
 const trainProvenanceContext =
     new AsyncLocalStorage<TrainProvenanceContextValue>();
+const GLOBAL_WRITE_FAILURE_COOLDOWN_MS = 60 * 1000;
+let globalWritesDisabledUntil = 0;
+
+function formatErrorMessage(error: unknown) {
+    return error instanceof Error
+        ? `${error.name}: ${error.message}`
+        : String(error);
+}
+
+function safeWrite<T>(operation: string, callback: () => T, fallback: T): T {
+    const context = getCurrentContext();
+    if (context?.writesDisabled) {
+        return fallback;
+    }
+
+    const now = Date.now();
+    if (!context && now < globalWritesDisabledUntil) {
+        return fallback;
+    }
+
+    try {
+        return callback();
+    } catch (error) {
+        const message = formatErrorMessage(error);
+        if (context) {
+            context.writesDisabled = true;
+            logger.error(
+                `provenance_write_failed operation=${operation} taskRunId=${context.taskRunId} executor=${context.executor} error=${message}`
+            );
+        } else {
+            globalWritesDisabledUntil = now + GLOBAL_WRITE_FAILURE_COOLDOWN_MS;
+            logger.error(
+                `provenance_write_failed operation=${operation} scope=global cooldownMs=${GLOBAL_WRITE_FAILURE_COOLDOWN_MS} error=${message}`
+            );
+        }
+        return fallback;
+    }
+}
+
+function finishTaskRunBestEffort(
+    context: TrainProvenanceContextValue,
+    status: Exclude<TrainProvenanceTaskRunStatus, 'running'>,
+    errorMessage: string
+) {
+    try {
+        finishTrainProvenanceTaskRun(context.taskRunId, status, errorMessage);
+    } catch (error) {
+        if (!context.writesDisabled) {
+            logger.error(
+                `task_run_finish_failed taskRunId=${context.taskRunId} executor=${context.executor} error=${formatErrorMessage(error)}`
+            );
+        }
+        context.writesDisabled = true;
+    }
+}
 
 function extractObject(value: unknown): Record<string, unknown> | null {
     if (typeof value !== 'object' || value === null || Array.isArray(value)) {
@@ -157,65 +221,63 @@ export async function runWithTrainProvenanceTaskContext<T>(
     taskArgs: unknown,
     callback: () => Promise<T> | T
 ): Promise<T> {
-    if (!isTrainProvenanceEnabled()) {
+    let enabled = false;
+    try {
+        enabled = isTrainProvenanceEnabled();
+    } catch (error) {
+        logger.error(
+            `provenance_enablement_check_failed executor=${executionContext.executor} error=${formatErrorMessage(error)}`
+        );
+        return callback();
+    }
+    if (!enabled) {
         return callback();
     }
 
-    const taskRun = startTrainProvenanceTaskRun({
-        schedulerTaskId: executionContext.taskId,
-        executor: executionContext.executor,
-        executionTime: executionContext.executionTime,
-        startedAt: Math.floor(Date.now() / 1000),
-        taskArgs,
-        serviceDate: extractServiceDate(taskArgs, executionContext),
-        primaryTrainCode: extractPrimaryTrainCode(taskArgs),
-        primaryStartAt: extractPrimaryStartAt(taskArgs),
-        primaryEmuId: extractPrimaryEmuId(taskArgs)
-    });
+    const taskRun = safeWrite(
+        'start_task_run',
+        () =>
+            startTrainProvenanceTaskRun({
+                schedulerTaskId: executionContext.taskId,
+                executor: executionContext.executor,
+                executionTime: executionContext.executionTime,
+                startedAt: Math.floor(Date.now() / 1000),
+                taskArgs,
+                serviceDate: extractServiceDate(taskArgs, executionContext),
+                primaryTrainCode: extractPrimaryTrainCode(taskArgs),
+                primaryStartAt: extractPrimaryStartAt(taskArgs),
+                primaryEmuId: extractPrimaryEmuId(taskArgs)
+            }),
+        null
+    );
+    if (taskRun === null) {
+        return callback();
+    }
     const taskRunId = taskRun.id;
 
     const contextValue: TrainProvenanceContextValue = {
         taskRunId,
+        executor: executionContext.executor,
         nextSequenceNo: 1,
         finalStatus: 'success',
-        errorMessage: ''
+        errorMessage: '',
+        writesDisabled: false
     };
 
     return trainProvenanceContext.run(contextValue, async () => {
         try {
             const result = await callback();
-            try {
-                finishTrainProvenanceTaskRun(
-                    taskRunId,
-                    contextValue.finalStatus,
-                    contextValue.errorMessage
-                );
-            } catch (error) {
-                const message =
-                    error instanceof Error ? error.message : String(error);
-                logger.error(
-                    `task_run_finish_failed taskRunId=${taskRunId} executor=${executionContext.executor} error=${message}`
-                );
-            }
+            finishTaskRunBestEffort(
+                contextValue,
+                contextValue.finalStatus,
+                contextValue.errorMessage
+            );
             return result;
         } catch (error) {
-            const message =
-                error instanceof Error
-                    ? `${error.name}: ${error.message}`
-                    : String(error);
+            const message = formatErrorMessage(error);
             contextValue.finalStatus = 'failed';
             contextValue.errorMessage = message;
-            try {
-                finishTrainProvenanceTaskRun(taskRunId, 'failed', message);
-            } catch (finishError) {
-                const finishMessage =
-                    finishError instanceof Error
-                        ? finishError.message
-                        : String(finishError);
-                logger.error(
-                    `task_run_fail_finalize_failed taskRunId=${taskRunId} executor=${executionContext.executor} error=${finishMessage}`
-                );
-            }
+            finishTaskRunBestEffort(contextValue, 'failed', message);
             throw error;
         }
     });
@@ -249,12 +311,17 @@ export function recordCurrentTrainProvenanceEvent(
         return;
     }
 
-    recordTrainProvenanceEvent({
-        ...input,
-        taskRunId: context.taskRunId,
-        sequenceNo: context.nextSequenceNo
-    });
     context.nextSequenceNo += 1;
+    safeWrite(
+        'record_event',
+        () =>
+            recordTrainProvenanceEvent({
+                ...input,
+                taskRunId: context.taskRunId,
+                sequenceNo: context.nextSequenceNo - 1
+            }),
+        undefined
+    );
 }
 
 export function recordCurrentTrainProvenanceEventsForTrainCodes(
@@ -391,31 +458,36 @@ export function recordCurrentStationPlatformRefreshResults(input: {
             group.entries,
             persistenceErrorMessage
         );
-        const resultId = recordStationPlatformRefreshResult({
-            taskRunId: context.taskRunId,
-            serviceDate: input.serviceDate,
-            startAt: group.startAt,
-            primaryTrainCode: group.trainCodes[0]!,
-            trainCodes: group.trainCodes,
-            trigger: input.trigger,
-            status,
-            entries: group.entries.map((entry) => ({
-                stationOrder: entry.stationOrder,
-                lookupType: entry.lookupType,
-                stationName: entry.stationName,
-                stationTelecode: entry.stationTelecode,
-                stationNo: entry.stationNo,
-                trainDate: entry.trainDate,
-                stationTrainCodes: entry.stationTrainCodes,
-                attemptedTrainCodes: entry.attemptedTrainCodes,
-                status: entry.status,
-                platformNo: entry.platformNo,
-                wicket: entry.wicket,
-                fetchedAt: entry.fetchedAt,
-                errorMessage: entry.errorMessage
-            })),
-            errorMessage: persistenceErrorMessage
-        });
+        const resultId = safeWrite(
+            'record_station_platform_refresh',
+            () =>
+                recordStationPlatformRefreshResult({
+                    taskRunId: context.taskRunId,
+                    serviceDate: input.serviceDate,
+                    startAt: group.startAt,
+                    primaryTrainCode: group.trainCodes[0]!,
+                    trainCodes: group.trainCodes,
+                    trigger: input.trigger,
+                    status,
+                    entries: group.entries.map((entry) => ({
+                        stationOrder: entry.stationOrder,
+                        lookupType: entry.lookupType,
+                        stationName: entry.stationName,
+                        stationTelecode: entry.stationTelecode,
+                        stationNo: entry.stationNo,
+                        trainDate: entry.trainDate,
+                        stationTrainCodes: entry.stationTrainCodes,
+                        attemptedTrainCodes: entry.attemptedTrainCodes,
+                        status: entry.status,
+                        platformNo: entry.platformNo,
+                        wicket: entry.wicket,
+                        fetchedAt: entry.fetchedAt,
+                        errorMessage: entry.errorMessage
+                    })),
+                    errorMessage: persistenceErrorMessage
+                }),
+            null
+        );
         const updatedCount = group.entries.filter(
             (entry) => entry.status === 'updated'
         ).length;
@@ -460,8 +532,51 @@ export function recordCurrentCouplingScanCandidate(
         return;
     }
 
-    recordCouplingScanCandidate({
-        ...input,
-        taskRunId: context.taskRunId
-    });
+    safeWrite(
+        'record_coupling_scan_candidate',
+        () =>
+            recordCouplingScanCandidate({
+                ...input,
+                taskRunId: context.taskRunId
+            }),
+        undefined
+    );
+}
+
+export function record12306RequestHourlyStatSafely(
+    input: Record12306RequestHourlyStatInput
+) {
+    safeWrite(
+        'record_12306_request_hourly_stat',
+        () => record12306RequestHourlyStat(input),
+        undefined
+    );
+}
+
+export function recordStationBoardDispatchResultSafely(
+    input: RecordStationBoardDispatchResultInput
+) {
+    safeWrite(
+        'record_station_board_dispatch_result',
+        () => recordStationBoardDispatchResult(input),
+        undefined
+    );
+}
+
+export function recordStationBoardFetchResultSafely(
+    input: RecordStationBoardFetchResultInput
+) {
+    safeWrite(
+        'record_station_board_fetch_result',
+        () => recordStationBoardFetchResult(input),
+        undefined
+    );
+}
+
+export function cleanupExpiredTrainProvenanceSafely() {
+    return safeWrite(
+        'cleanup_expired_provenance',
+        () => cleanupExpiredTrainProvenance(),
+        0
+    );
 }

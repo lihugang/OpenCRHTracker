@@ -2564,7 +2564,8 @@ export function getAdminCouplingScanDetail(
               startedAt: taskRun.startedAt,
               finishedAt: taskRun.finishedAt,
               serviceDate: formatExternalServiceDate(taskRun.serviceDate),
-              taskArgs: formatInternalPayload(taskRun.taskArgs)
+              taskArgs: formatInternalPayload(taskRun.taskArgs),
+              errorMessage: taskRun.errorMessage
           }
         : null;
 
@@ -2638,7 +2639,8 @@ export function getAdminCouplingScanTaskList(
                     serviceDate: formatExternalServiceDate(taskRun.serviceDate),
                     bureau: taskArgs.bureau,
                     model: taskArgs.model,
-                    taskArgs: formatInternalPayload(taskRun.taskArgs)
+                    taskArgs: formatInternalPayload(taskRun.taskArgs),
+                    errorMessage: taskRun.errorMessage
                 };
             });
 

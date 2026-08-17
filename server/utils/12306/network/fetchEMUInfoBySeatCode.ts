@@ -2,7 +2,7 @@ import waitFor12306RequestSlot from '../requestLimiter';
 import useConfig from '~/server/config';
 import getLogger from '~/server/libs/log4js';
 import { resolveCanonicalEmuCode } from '~/server/services/probeAssetStore';
-import { record12306RequestHourlyStat } from '~/server/services/trainProvenanceStore';
+import { record12306RequestHourlyStatSafely } from '~/server/services/trainProvenanceRecorder';
 import getCurrentDateString from '../../date/getCurrentDateString';
 import { getShanghaiUnixSecondsFromDateAndTime } from '../../date/shanghaiDateTime';
 import log12306RequestFailure from './log12306RequestFailure';
@@ -264,7 +264,7 @@ export default async function fetchEMUInfoBySeatCode(
             method: 'POST'
         });
         if (!response.ok) {
-            record12306RequestHourlyStat({
+            record12306RequestHourlyStatSafely({
                 requestType: 'fetch_emu_by_seat_code',
                 isSuccess: false
             });
@@ -285,7 +285,7 @@ export default async function fetchEMUInfoBySeatCode(
 
         const json: EMUInfoResponse = await response.json();
         if (isSeatCodeNotEnabledResponse(json)) {
-            record12306RequestHourlyStat({
+            record12306RequestHourlyStatSafely({
                 requestType: 'fetch_emu_by_seat_code',
                 isSuccess: false
             });
@@ -316,7 +316,7 @@ export default async function fetchEMUInfoBySeatCode(
         const emuCode = data?.carCode?.trim();
         const startDay = data?.startDay?.trim() ?? '';
         if (!emuCode || !data?.trainNo) {
-            record12306RequestHourlyStat({
+            record12306RequestHourlyStatSafely({
                 requestType: 'fetch_emu_by_seat_code',
                 isSuccess: false
             });
@@ -344,7 +344,7 @@ export default async function fetchEMUInfoBySeatCode(
             });
         }
         if (startDay !== currentDate) {
-            record12306RequestHourlyStat({
+            record12306RequestHourlyStatSafely({
                 requestType: 'fetch_emu_by_seat_code',
                 isSuccess: false
             });
@@ -409,13 +409,13 @@ export default async function fetchEMUInfoBySeatCode(
             });
         }
 
-        record12306RequestHourlyStat({
+        record12306RequestHourlyStatSafely({
             requestType: 'fetch_emu_by_seat_code',
             isSuccess: true
         });
         return result;
     } catch (error) {
-        record12306RequestHourlyStat({
+        record12306RequestHourlyStatSafely({
             requestType: 'fetch_emu_by_seat_code',
             isSuccess: false
         });
