@@ -31,7 +31,14 @@ import {
     hasQueriedTrainKey
 } from '~/server/services/probeRuntimeState';
 import { deleteProbeUntrustedRecordsByTrainCodeAndEmuCodeAtServiceDate } from '~/server/services/probeUntrustedRecordStore';
-import { EMU_ROUTE_STATUS_UNCONFIRMED_SINGLE } from '~/server/utils/emuRouteStatus';
+import {
+    EMU_ROUTE_STATUS_CONFIRMED_COUPLED_I,
+    EMU_ROUTE_STATUS_CONFIRMED_COUPLED_II,
+    EMU_ROUTE_STATUS_CONFIRMED_SINGLE,
+    EMU_ROUTE_STATUS_FAULT,
+    EMU_ROUTE_STATUS_HOT_SPARE,
+    EMU_ROUTE_STATUS_UNCONFIRMED_SINGLE
+} from '~/server/utils/emuRouteStatus';
 import { getTodayScheduleProbeGroupByTrainCode } from '~/server/services/todayScheduleCache';
 import { type TrainCodeParts } from '~/server/utils/12306/trainCode';
 import type { EmuId } from '~/server/libs/database/emu';
@@ -52,6 +59,18 @@ import type {
 
 const TIMETABLE_CANDIDATE_LIMIT = 12;
 const DAY_SECONDS = 24 * 60 * 60;
+const ADMIN_DAILY_ROUTE_STATUSES = new Set([
+    EMU_ROUTE_STATUS_UNCONFIRMED_SINGLE,
+    EMU_ROUTE_STATUS_CONFIRMED_SINGLE,
+    EMU_ROUTE_STATUS_CONFIRMED_COUPLED_I,
+    EMU_ROUTE_STATUS_CONFIRMED_COUPLED_II,
+    EMU_ROUTE_STATUS_CONFIRMED_SINGLE | EMU_ROUTE_STATUS_FAULT,
+    EMU_ROUTE_STATUS_CONFIRMED_COUPLED_I | EMU_ROUTE_STATUS_FAULT,
+    EMU_ROUTE_STATUS_CONFIRMED_COUPLED_II | EMU_ROUTE_STATUS_FAULT,
+    EMU_ROUTE_STATUS_CONFIRMED_SINGLE | EMU_ROUTE_STATUS_HOT_SPARE,
+    EMU_ROUTE_STATUS_CONFIRMED_COUPLED_I | EMU_ROUTE_STATUS_HOT_SPARE,
+    EMU_ROUTE_STATUS_CONFIRMED_COUPLED_II | EMU_ROUTE_STATUS_HOT_SPARE
+]);
 
 function toAdminDailyRouteRecord(row: DailyEmuRouteRow): AdminDailyRouteRecord {
     return {
@@ -309,7 +328,8 @@ export function createAdminDailyRoute(
     serviceDate: ServiceDay,
     trainCode: TrainCodeParts,
     emuId: EmuId,
-    timetableId: number | null
+    timetableId: number | null,
+    status: number
 ): AdminDailyRouteCreateResponse {
     if (
         timetableId !== null &&
@@ -319,6 +339,14 @@ export function createAdminDailyRoute(
             400,
             'invalid_param',
             'timetableId 必须是正整数或 null'
+        );
+    }
+
+    if (!Number.isInteger(status) || !ADMIN_DAILY_ROUTE_STATUSES.has(status)) {
+        throw new ApiRequestError(
+            400,
+            'invalid_param',
+            'status 不是数据维护功能支持的记录状态'
         );
     }
 
@@ -342,7 +370,7 @@ export function createAdminDailyRoute(
         emuId,
         serviceDate,
         timetableId,
-        EMU_ROUTE_STATUS_UNCONFIRMED_SINGLE
+        status
     );
     const createdRecord =
         insertedId > 0 ? getDailyRecordById(insertedId) : null;

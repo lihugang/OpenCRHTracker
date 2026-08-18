@@ -3558,6 +3558,7 @@ import {
     fetchAdminTrainProvenanceStationPlatformRefresh
 } from '~/utils/api/v2/domain/adminProvenance';
 import getApiErrorMessage from '~/utils/api/getApiErrorMessage';
+import { formatEmuRouteStatus } from '~/utils/emuRouteStatus';
 import formatShanghaiTime from '~/utils/time/formatShanghaiTime';
 import formatTrackerTimestamp from '~/utils/time/formatTrackerTimestamp';
 
@@ -5178,21 +5179,7 @@ function getDepartureStatusLabel(
     status: AdminTrainProvenanceLatestStatus | number
 ) {
     if (typeof status === 'number') {
-        const confirmed = (status & 0x01) !== 0;
-        const formation = status & 0x06;
-        const formationLabel =
-            formation === 0x00
-                ? '单组'
-                : formation === 0x02
-                  ? '重联'
-                  : formation === 0x04
-                    ? '重联 I 位'
-                    : '重联 II 位';
-        const flags = [
-            (status & 0x08) !== 0 ? '故障' : '',
-            (status & 0x10) !== 0 ? '热备' : ''
-        ].filter((value) => value.length > 0);
-        return `${confirmed ? '已确认' : '未确认'}${formationLabel}${flags.length > 0 ? ` / ${flags.join(' / ')}` : ''}`;
+        return formatEmuRouteStatus(status);
     }
     switch (status) {
         case 'pending':

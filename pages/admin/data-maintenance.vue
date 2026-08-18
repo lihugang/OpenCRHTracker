@@ -148,6 +148,18 @@
                                                     {{ item.trainCode }} /
                                                     {{ item.emuCode }}
                                                 </span>
+                                                <span
+                                                    :class="
+                                                        getRouteStatusBadgeClass(
+                                                            item.status
+                                                        )
+                                                    ">
+                                                    {{
+                                                        formatEmuRouteStatus(
+                                                            item.status
+                                                        )
+                                                    }}
+                                                </span>
                                             </div>
                                             <p
                                                 class="text-sm leading-6 text-slate-600">
@@ -232,15 +244,26 @@
                             required />
                     </div>
 
-                    <UiField
-                        label="日期"
-                        help="与页面顶部管理员日期同步。">
-                        <input
-                            v-model="selectedDateInput"
-                            type="date"
-                            class="harmony-input w-full px-4 py-3 text-base text-crh-grey-dark"
-                            :max="todayDateInputValue" />
-                    </UiField>
+                    <div class="grid gap-4 md:grid-cols-2">
+                        <UiField
+                            label="日期"
+                            help="与页面顶部管理员日期同步。">
+                            <input
+                                v-model="selectedDateInput"
+                                type="date"
+                                class="harmony-input w-full px-4 py-3 text-base text-crh-grey-dark"
+                                :max="todayDateInputValue" />
+                        </UiField>
+                        <UiField
+                            label="记录状态"
+                            help="仅提供已确认、故障和热备状态；未确认状态只用于展示旧记录。">
+                            <UiSelect
+                                v-model="selectedStatusValue"
+                                :options="ADMIN_DAILY_ROUTE_STATUS_OPTIONS"
+                                mobile-sheet-title="选择记录状态"
+                                mobile-sheet-eyebrow="数据维护" />
+                        </UiField>
+                    </div>
 
                     <div
                         class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -767,6 +790,10 @@ import {
     fetchAdminDailyRoutesTimetables,
     fetchAdminTimetableHistoryMergeCandidates
 } from '~/utils/api/v2/domain/admin';
+import {
+    ADMIN_DAILY_ROUTE_STATUS_OPTIONS,
+    formatEmuRouteStatus
+} from '~/utils/emuRouteStatus';
 import { normalizeLookupCode } from '~/utils/lookup/lookupTarget';
 import formatTrackerTimestamp from '~/utils/time/formatTrackerTimestamp';
 
@@ -796,6 +823,7 @@ const candidateData = ref<AdminDailyRouteTimetableCandidatesResponse | null>(
 );
 const candidateErrorMessage = ref('');
 const selectedTimetableId = ref<number | null>(null);
+const selectedStatusValue = ref('1');
 const createStatus = ref<'idle' | 'pending' | 'success' | 'error'>('idle');
 const createSuccessMessage = ref('');
 const createErrorMessage = ref('');
@@ -846,6 +874,9 @@ const canCreateRoute = computed(
         candidateStatus.value === 'success' &&
         candidateItems.value.some(
             (item) => item.timetableId === selectedTimetableId.value
+        ) &&
+        ADMIN_DAILY_ROUTE_STATUS_OPTIONS.some(
+            (item) => item.value === selectedStatusValue.value
         ) &&
         createStatus.value !== 'pending'
 );
@@ -985,7 +1016,8 @@ async function createDailyRoute() {
             emuCode: normalizedEmuCode.value,
             ...(selectedTimetableId.value === null
                 ? {}
-                : { timetableId: selectedTimetableId.value })
+                : { timetableId: selectedTimetableId.value }),
+            status: Number(selectedStatusValue.value)
         });
         createSuccessMessage.value = response.inserted
             ? `已添加 ${response.trainCode} / ${response.emuCode} 的记录。`
@@ -1180,6 +1212,26 @@ function formatRouteStations(item: AdminDailyRouteRecord) {
     const start = item.startStation || '--';
     const end = item.endStation || '--';
     return `${start} 到 ${end}`;
+}
+
+function getRouteStatusBadgeClass(status: number) {
+    const baseClass =
+        'inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold';
+
+    if ((status & 0x08) !== 0) {
+        return `${baseClass} bg-rose-50 text-rose-700`;
+    }
+    if ((status & 0x10) !== 0) {
+        return `${baseClass} bg-amber-50 text-amber-700`;
+    }
+    if ((status & 0x01) === 0) {
+        return `${baseClass} bg-slate-100 text-slate-600`;
+    }
+    if ((status & 0x06) !== 0) {
+        return `${baseClass} bg-blue-50 text-crh-blue`;
+    }
+
+    return `${baseClass} bg-emerald-50 text-emerald-700`;
 }
 
 function formatCandidateStations(item: AdminDailyRouteTimetableCandidate) {

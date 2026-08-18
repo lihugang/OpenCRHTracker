@@ -233,6 +233,30 @@ interface CouplingPersistenceFailure {
     message: string;
 }
 
+function toCouplingPersistenceFailure(
+    phase: CouplingPersistenceFailure['phase'],
+    groupKey: string,
+    trainCodes: TrainCodeParts[],
+    startAt: number,
+    error: unknown
+): CouplingPersistenceFailure {
+    return {
+        phase,
+        groupKey,
+        trainCodes,
+        startAt,
+        message: formatErrorMessage(error)
+    };
+}
+
+function logCouplingPersistenceFailure(
+    failure: CouplingPersistenceFailure
+): void {
+    logger.error(
+        `coupling_persistence_failed phase=${failure.phase} groupKey=${failure.groupKey} trainCodes=${failure.trainCodes.map(formatExternalTrainCode).join('/')} startAt=${failure.startAt} error=${failure.message}`
+    );
+}
+
 interface AssignedCandidateScanState {
     shouldSkip: boolean;
     detail: {

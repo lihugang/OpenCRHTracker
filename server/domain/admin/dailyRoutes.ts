@@ -21,12 +21,14 @@ export function postAdminDailyRoutes(input: {
     trainCode: TrainCodeParts;
     emuId: EmuId;
     timetableId: number | null;
+    status: number;
 }) {
     return createAdminDailyRoute(
         input.serviceDay,
         input.trainCode,
         input.emuId,
-        input.timetableId
+        input.timetableId,
+        input.status
     );
 }
 

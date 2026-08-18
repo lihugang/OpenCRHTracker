@@ -286,6 +286,7 @@ message PostAdminDailyRoutesRequest {
   string train_code = 2;
   string emu_code = 3;
   optional uint32 timetable_id = 4;
+  optional uint32 status = 5;
 }
 
 message PostAdminDailyRoutesData {

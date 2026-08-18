@@ -347,6 +347,7 @@ export async function postAdminDailyRoutesV2Adapter(ctx: V2OperationContext) {
         trainCode?: string;
         emuCode?: string;
         timetableId?: number | null;
+        status?: number;
     };
     const result = postAdminDailyRoutes({
         serviceDay: parseExternalServiceDate(request.date ?? ''),
@@ -355,7 +356,8 @@ export async function postAdminDailyRoutesV2Adapter(ctx: V2OperationContext) {
             'trainCode'
         ),
         emuId: ensureExternalEmuId(request.emuCode ?? ''),
-        timetableId: request.timetableId ?? null
+        timetableId: request.timetableId ?? null,
+        status: request.status ?? 0
     });
     return {
         date: result.date,

@@ -1133,6 +1133,7 @@ export async function createAdminDailyRoute(input: {
     trainCode: string;
     emuCode: string;
     timetableId?: number;
+    status: number;
 }) {
     const result = await requestV2<
         PostAdminDailyRoutesData,
@@ -1146,7 +1147,8 @@ export async function createAdminDailyRoute(input: {
                 emuCode: input.emuCode,
                 ...(input.timetableId === undefined
                     ? {}
-                    : { timetableId: input.timetableId })
+                    : { timetableId: input.timetableId }),
+                status: input.status
             }
         },
         mapDailyRouteCreate
