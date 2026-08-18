@@ -698,10 +698,17 @@ interface GroupedHistoryListItem {
     endAt: number | null;
     startStation: string | null;
     endStation: string | null;
-    codes: string[];
+    codes: GroupedHistoryCode[];
 }
 
-interface DisplayHistoryListItem extends GroupedHistoryListItem {
+interface GroupedHistoryCode {
+    code: string;
+    status: number;
+}
+
+interface DisplayHistoryListItem
+    extends Omit<GroupedHistoryListItem, 'codes'> {
+    codes: string[];
     dateKey: string;
     isTintedDateBand: boolean;
     startTimeText: string;
@@ -725,6 +732,8 @@ const TIME_FORMATTER = new Intl.DateTimeFormat('zh-CN', {
 });
 
 const EMPTY_PLACEHOLDER = '-';
+const FORMATION_POSITION_MASK = 0x06;
+const FORMATION_POSITION_I = 0x04;
 
 const props = defineProps<{
     type: LookupTargetType;
@@ -787,8 +796,16 @@ const groupedItems = computed<DisplayHistoryListItem[]>(() => {
         const existingGroup = groups.get(groupKey);
 
         if (existingGroup) {
-            if (!existingGroup.codes.includes(item.code)) {
-                existingGroup.codes.push(item.code);
+            if (
+                !existingGroup.codes.some(
+                    (entry) => entry.code === item.code
+                ) &&
+                item.code.trim().length > 0
+            ) {
+                existingGroup.codes.push({
+                    code: item.code,
+                    status: item.status
+                });
             }
 
             if (
@@ -816,7 +833,10 @@ const groupedItems = computed<DisplayHistoryListItem[]>(() => {
             endAt: item.endAt,
             startStation: item.startStation,
             endStation: item.endStation,
-            codes: item.code.trim().length > 0 ? [item.code] : []
+            codes:
+                item.code.trim().length > 0
+                    ? [{ code: item.code, status: item.status }]
+                    : []
         });
     }
 
@@ -853,24 +873,47 @@ const groupedItems = computed<DisplayHistoryListItem[]>(() => {
     });
 });
 
-function normalizeDisplayCodes(codes: string[]): string[] {
-    const normalizedCodes = Array.from(
-        new Set(
-            codes
-                .map((code) => code.trim().toUpperCase())
-                .filter((code) => code.length > 0)
-        )
-    );
+function normalizeDisplayCodes(codes: GroupedHistoryCode[]): string[] {
+    const normalizedCodes: GroupedHistoryCode[] = [];
+    const seenCodes = new Set<string>();
 
-    if (normalizedCodes.length < 2) {
-        return normalizedCodes;
+    for (const entry of codes) {
+        const code = entry.code.trim().toUpperCase();
+        if (code.length === 0 || seenCodes.has(code)) {
+            continue;
+        }
+        seenCodes.add(code);
+        normalizedCodes.push({ code, status: entry.status });
     }
 
-    const leftCode = normalizedCodes[0]!;
-    const rightCode = normalizedCodes[1]!;
-    return leftCode.localeCompare(rightCode) <= 0
-        ? normalizedCodes
-        : [rightCode, leftCode];
+    if (normalizedCodes.length < 2) {
+        return normalizedCodes.map((entry) => entry.code);
+    }
+
+    const hasFormationPositionI = (status: number) =>
+        (status & FORMATION_POSITION_MASK) === FORMATION_POSITION_I;
+
+    if (normalizedCodes.length === 2) {
+        normalizedCodes.sort((left, right) => {
+            const leftIsPositionI = hasFormationPositionI(left.status);
+            const rightIsPositionI = hasFormationPositionI(right.status);
+            if (leftIsPositionI !== rightIsPositionI) {
+                return leftIsPositionI ? -1 : 1;
+            }
+            return left.code.localeCompare(right.code);
+        });
+    } else {
+        normalizedCodes.sort((left, right) => {
+            const leftIsPositionI = hasFormationPositionI(left.status);
+            const rightIsPositionI = hasFormationPositionI(right.status);
+            if (leftIsPositionI === rightIsPositionI) {
+                return 0;
+            }
+            return leftIsPositionI ? -1 : 1;
+        });
+    }
+
+    return normalizedCodes.map((entry) => entry.code);
 }
 
 function resolveStationFocusTrainCodes(item: DisplayHistoryListItem) {
@@ -1068,7 +1111,7 @@ function shouldShowMobileDateHeader(
     return groupedItems.value[index - 1]?.dateKey !== item.dateKey;
 }
 
-function isRunningItem(item: GroupedHistoryListItem) {
+function isRunningItem(item: DisplayHistoryListItem) {
     if (item.startAt === null || item.endAt === null) {
         return false;
     }
