@@ -7,6 +7,31 @@ const EMU_ROUTE_STATUS_FORMATION_POSITION_II = 0x06;
 const EMU_ROUTE_STATUS_FAULT = 0x08;
 const EMU_ROUTE_STATUS_HOT_SPARE = 0x10;
 
+export type EmuRouteFormationPosition = 'single' | 'unknown' | 'I' | 'II';
+
+export function getEmuRouteFormationPosition(
+    status: number
+): EmuRouteFormationPosition {
+    if (
+        !Number.isInteger(status) ||
+        status < 0 ||
+        status > EMU_ROUTE_STATUS_MASK
+    ) {
+        return 'unknown';
+    }
+
+    switch (status & EMU_ROUTE_STATUS_FORMATION_POSITION_MASK) {
+        case 0x00:
+            return 'single';
+        case EMU_ROUTE_STATUS_FORMATION_POSITION_I:
+            return 'I';
+        case EMU_ROUTE_STATUS_FORMATION_POSITION_II:
+            return 'II';
+        default:
+            return 'unknown';
+    }
+}
+
 export const ADMIN_DAILY_ROUTE_STATUS_OPTIONS = [
     { value: '1', label: '单组' },
     { value: '5', label: '重联 I' },

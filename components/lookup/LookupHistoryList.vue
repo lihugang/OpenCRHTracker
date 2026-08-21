@@ -234,19 +234,30 @@
                                         class="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
                                         <template
                                             v-for="(
-                                                code, codeIndex
+                                                codeEntry, codeIndex
                                             ) in item.codes"
-                                            :key="`${item.id}:${code}`">
+                                            :key="`${item.id}:${codeEntry.code}`">
                                             <NuxtLink
-                                                :to="buildCodeLink(code)"
+                                                :to="
+                                                    buildCodeLink(codeEntry.code)
+                                                "
                                                 :data-guide="
                                                     itemIndex === 0 &&
                                                     codeIndex === 0
                                                         ? 'history-code-link'
                                                         : undefined
                                                 "
+                                                :title="
+                                                    getDesktopCouplingHint(
+                                                        codeEntry
+                                                    )
+                                                "
                                                 class="cursor-pointer transition hover:underline">
-                                                {{ formatCodeText(code) }}
+                                                {{
+                                                    formatCodeText(
+                                                        codeEntry.code
+                                                    )
+                                                }}
                                             </NuxtLink>
                                             <span
                                                 v-if="
@@ -413,20 +424,55 @@
                                         class="min-w-0 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-sm font-semibold text-crh-blue">
                                         <template
                                             v-for="(
-                                                code, codeIndex
+                                                codeEntry, codeIndex
                                             ) in item.codes"
-                                            :key="`${item.id}:mobile:${code}`">
-                                            <NuxtLink
-                                                :to="buildCodeLink(code)"
-                                                :data-guide="
-                                                    index === 0 &&
-                                                    codeIndex === 0
-                                                        ? 'history-code-link'
-                                                        : undefined
-                                                "
-                                                class="cursor-pointer transition hover:underline">
-                                                {{ formatCodeText(code) }}
-                                            </NuxtLink>
+                                            :key="`${item.id}:mobile:${codeEntry.code}`">
+                                            <span
+                                                class="inline-flex items-center gap-1">
+                                                <NuxtLink
+                                                    :to="
+                                                        buildCodeLink(
+                                                            codeEntry.code
+                                                        )
+                                                    "
+                                                    :data-guide="
+                                                        index === 0 &&
+                                                        codeIndex === 0
+                                                            ? 'history-code-link'
+                                                            : undefined
+                                                    "
+                                                    class="cursor-pointer transition hover:underline">
+                                                    {{
+                                                        formatCodeText(
+                                                            codeEntry.code
+                                                        )
+                                                    }}
+                                                </NuxtLink>
+                                                <button
+                                                    v-if="
+                                                        hasKnownCouplingPosition(
+                                                            codeEntry
+                                                        )
+                                                    "
+                                                    type="button"
+                                                    class="coupling-position-button"
+                                                    :aria-label="
+                                                        getCouplingAriaLabel(
+                                                            codeEntry
+                                                        )
+                                                    "
+                                                    @click="
+                                                        openCouplingSheet(item)
+                                                    ">
+                                                    <LookupCouplingPositionIcon
+                                                        class="h-5 w-7"
+                                                        :position="
+                                                            getKnownCouplingPosition(
+                                                                codeEntry
+                                                            )
+                                                        " />
+                                                </button>
+                                            </span>
                                             <span
                                                 v-if="
                                                     codeIndex <
@@ -662,6 +708,32 @@
         </div>
     </UiCard>
 
+    <UiBottomSheet
+        :model-value="isCouplingSheetOpen"
+        title="重联编组"
+        eyebrow="FORMATION"
+        description=""
+        @update:model-value="isCouplingSheetOpen = $event">
+        <div class="space-y-3">
+            <div
+                v-for="codeEntry in selectedCouplingCodes"
+                :key="`coupling:${codeEntry.code}`"
+                class="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm text-slate-700">
+                <LookupCouplingPositionIcon
+                    class="h-6 w-8 shrink-0 text-crh-blue"
+                    :position="getKnownCouplingPosition(codeEntry)" />
+                <p class="min-w-0 leading-6">
+                    <span class="font-mono font-semibold text-crh-blue">
+                        {{ codeEntry.code }}
+                    </span>
+                    重联 {{ getCouplingEndLabel(codeEntry.status) }}，{{
+                        getCouplingRange(codeEntry.status)
+                    }}
+                </p>
+            </div>
+        </div>
+    </UiBottomSheet>
+
     <LookupCurrentTimetableModal
         :model-value="isTimetableModalOpen"
         :train-code="selectedTimetableTrainCode"
@@ -689,6 +761,10 @@ import { getShanghaiDayOffsetFromServiceDate } from '~/utils/time/getShanghaiDay
 import isTimestampRangeActive from '~/utils/time/isTimestampRangeActive';
 import formatShanghaiDateString from '~/utils/time/formatShanghaiDateString';
 import { buildLookupPath } from '~/utils/lookup/lookupTarget';
+import {
+    getEmuRouteFormationPosition,
+    type EmuRouteFormationPosition
+} from '~/utils/emuRouteStatus';
 
 interface GroupedHistoryListItem {
     id: string;
@@ -708,7 +784,7 @@ interface GroupedHistoryCode {
 
 interface DisplayHistoryListItem
     extends Omit<GroupedHistoryListItem, 'codes'> {
-    codes: string[];
+    codes: GroupedHistoryCode[];
     dateKey: string;
     isTintedDateBand: boolean;
     startTimeText: string;
@@ -732,8 +808,6 @@ const TIME_FORMATTER = new Intl.DateTimeFormat('zh-CN', {
 });
 
 const EMPTY_PLACEHOLDER = '-';
-const FORMATION_POSITION_MASK = 0x06;
-const FORMATION_POSITION_I = 0x04;
 
 const props = defineProps<{
     type: LookupTargetType;
@@ -758,6 +832,8 @@ const selectedTimetableTrainCode = ref('');
 const selectedTimetableDisplayCodes = ref<string[]>([]);
 const requestedTimetableId = ref<number | null>(null);
 const requestedServiceDate = ref<string | null>(null);
+const isCouplingSheetOpen = ref(false);
+const selectedCouplingCodes = ref<GroupedHistoryCode[]>([]);
 let sentinelObserver: IntersectionObserver | null = null;
 
 const codeColumnLabel = computed(() => {
@@ -873,7 +949,9 @@ const groupedItems = computed<DisplayHistoryListItem[]>(() => {
     });
 });
 
-function normalizeDisplayCodes(codes: GroupedHistoryCode[]): string[] {
+function normalizeDisplayCodes(
+    codes: GroupedHistoryCode[]
+): GroupedHistoryCode[] {
     const normalizedCodes: GroupedHistoryCode[] = [];
     const seenCodes = new Set<string>();
 
@@ -887,11 +965,11 @@ function normalizeDisplayCodes(codes: GroupedHistoryCode[]): string[] {
     }
 
     if (normalizedCodes.length < 2) {
-        return normalizedCodes.map((entry) => entry.code);
+        return normalizedCodes;
     }
 
     const hasFormationPositionI = (status: number) =>
-        (status & FORMATION_POSITION_MASK) === FORMATION_POSITION_I;
+        getEmuRouteFormationPosition(status) === 'I';
 
     if (normalizedCodes.length === 2) {
         normalizedCodes.sort((left, right) => {
@@ -913,7 +991,52 @@ function normalizeDisplayCodes(codes: GroupedHistoryCode[]): string[] {
         });
     }
 
-    return normalizedCodes.map((entry) => entry.code);
+    return normalizedCodes;
+}
+
+function getCouplingPosition(status: number): EmuRouteFormationPosition {
+    return getEmuRouteFormationPosition(status);
+}
+
+function hasKnownCouplingPosition(codeEntry: GroupedHistoryCode) {
+    const position = getCouplingPosition(codeEntry.status);
+    return props.type === 'train' && (position === 'I' || position === 'II');
+}
+
+function getKnownCouplingPosition(codeEntry: GroupedHistoryCode): 'I' | 'II' {
+    return getCouplingPosition(codeEntry.status) === 'I' ? 'I' : 'II';
+}
+
+function getCouplingRange(status: number) {
+    return getCouplingPosition(status) === 'I' ? '01-08 车' : '09-16 车';
+}
+
+function getCouplingEndLabel(status: number) {
+    return getCouplingPosition(status) === 'I' ? '1 位端' : '2 位端';
+}
+
+function getDesktopCouplingHint(codeEntry: GroupedHistoryCode) {
+    if (!hasKnownCouplingPosition(codeEntry)) {
+        return undefined;
+    }
+
+    return getCouplingRange(codeEntry.status);
+}
+
+function getCouplingAriaLabel(codeEntry: GroupedHistoryCode) {
+    const position = getKnownCouplingPosition(codeEntry);
+    const endLabel = position === 'I' ? '1 位端' : '2 位端';
+    return `${codeEntry.code}，重联 ${position}，${endLabel}`;
+}
+
+function openCouplingSheet(item: DisplayHistoryListItem) {
+    const couplingCodes = item.codes.filter(hasKnownCouplingPosition);
+    if (couplingCodes.length === 0) {
+        return;
+    }
+
+    selectedCouplingCodes.value = couplingCodes.map((entry) => ({ ...entry }));
+    isCouplingSheetOpen.value = true;
 }
 
 function resolveStationFocusTrainCodes(item: DisplayHistoryListItem) {
@@ -925,7 +1048,7 @@ function resolveStationFocusTrainCodes(item: DisplayHistoryListItem) {
     return Array.from(
         new Set(
             item.codes
-                .map((code) => code.trim().toUpperCase())
+                .map((entry) => entry.code.trim().toUpperCase())
                 .filter((code) => code.length > 0)
         )
     );
@@ -936,7 +1059,7 @@ function resolveTimetableTrainCode(item: DisplayHistoryListItem) {
         return props.code.trim().toUpperCase();
     }
 
-    return item.codes[0]?.trim().toUpperCase() ?? '';
+    return item.codes[0]?.code.trim().toUpperCase() ?? '';
 }
 
 function canOpenTimetable(item: DisplayHistoryListItem) {
@@ -955,7 +1078,7 @@ function openTimetable(item: DisplayHistoryListItem) {
     selectedTimetableDisplayCodes.value =
         props.type === 'train'
             ? [props.code.trim().toUpperCase()]
-            : [...item.codes];
+            : item.codes.map((entry) => entry.code);
     isTimetableModalOpen.value = true;
 }
 
@@ -1207,6 +1330,29 @@ function buildCodeLink(code: string) {
     transition:
         background-color 220ms ease,
         border-color 220ms ease;
+}
+
+.coupling-position-button {
+    display: inline-flex;
+    min-width: 2.25rem;
+    height: 2.25rem;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.5rem;
+    color: rgb(0 82 155);
+    transition:
+        color 180ms ease,
+        background-color 180ms ease;
+}
+
+.coupling-position-button:active {
+    background-color: rgb(219 234 254 / 0.8);
+}
+
+.coupling-position-button:focus-visible {
+    outline: 2px solid rgb(0 82 155 / 0.55);
+    outline-offset: 2px;
 }
 
 @media (max-width: 767px) {
