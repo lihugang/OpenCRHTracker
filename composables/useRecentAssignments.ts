@@ -115,6 +115,7 @@ export function useRecentHistoryList(
     const isLoadingMore = ref(false);
     const loadMoreErrorMessage = ref('');
     const requestVersion = ref(0);
+    let inFlightLoadMore: Promise<boolean> | null = null;
 
     const targetKey = computed(() => {
         const target = toValue(targetSource);
@@ -235,11 +236,28 @@ export function useRecentHistoryList(
         return '';
     });
 
+    const oldestLoadedServiceDate = computed(() => {
+        const dates = items.value
+            .map((item) => item.serviceDate)
+            .filter((date) => /^\d{8}$/.test(date));
+        return dates.reduce((oldest, date) => {
+            if (!oldest || date < oldest) {
+                return date;
+            }
+            return oldest;
+        }, '');
+    });
+
+    const isHistoryExhausted = computed(
+        () => state.value === 'success' && nextCursor.value.length === 0
+    );
+
     function resetTransientState() {
         extraPages.value = [];
         manualNextCursor.value = null;
         isLoadingMore.value = false;
         loadMoreErrorMessage.value = '';
+        inFlightLoadMore = null;
     }
 
     async function reload() {
@@ -252,37 +270,101 @@ export function useRecentHistoryList(
         await refresh();
     }
 
-    async function loadMore() {
+    async function loadMorePage(): Promise<boolean> {
+        if (inFlightLoadMore) {
+            return await inFlightLoadMore;
+        }
+
         const target = toValue(targetSource);
         const cursor = nextCursor.value;
-        if (!target || !cursor || !canLoadMore.value) {
-            return;
+        if (!target || !cursor || isLoadingMore.value) {
+            return false;
         }
 
         const currentRequestVersion = requestVersion.value;
         isLoadingMore.value = true;
         loadMoreErrorMessage.value = '';
 
+        const request = (async () => {
+            try {
+                const result = await fetchPage(target, cursor);
+                if (currentRequestVersion !== requestVersion.value) {
+                    return false;
+                }
+                extraPages.value = [...extraPages.value, result];
+                manualNextCursor.value = result.nextCursor;
+                return true;
+            } catch (loadMoreError) {
+                if (currentRequestVersion !== requestVersion.value) {
+                    return false;
+                }
+                loadMoreErrorMessage.value = getApiErrorMessage(
+                    loadMoreError,
+                    '加载更多历史记录失败，请稍后重试。'
+                );
+                return false;
+            } finally {
+                if (currentRequestVersion === requestVersion.value) {
+                    isLoadingMore.value = false;
+                }
+            }
+        })();
+
+        inFlightLoadMore = request;
         try {
-            const result = await fetchPage(target, cursor);
-            if (currentRequestVersion !== requestVersion.value) {
-                return;
-            }
-            extraPages.value = [...extraPages.value, result];
-            manualNextCursor.value = result.nextCursor;
-        } catch (loadMoreError) {
-            if (currentRequestVersion !== requestVersion.value) {
-                return;
-            }
-            loadMoreErrorMessage.value = getApiErrorMessage(
-                loadMoreError,
-                '加载更多历史记录失败，请稍后重试。'
-            );
+            return await request;
         } finally {
-            if (currentRequestVersion === requestVersion.value) {
-                isLoadingMore.value = false;
+            if (inFlightLoadMore === request) {
+                inFlightLoadMore = null;
             }
         }
+    }
+
+    async function loadMore() {
+        if (inFlightLoadMore) {
+            await inFlightLoadMore;
+            return;
+        }
+
+        if (!canLoadMore.value) {
+            return;
+        }
+
+        await loadMorePage();
+    }
+
+    async function ensureLoadedThroughServiceDate(serviceDate: string) {
+        if (!/^\d{8}$/.test(serviceDate)) {
+            return false;
+        }
+
+        const target = toValue(targetSource);
+        if (!target || state.value === 'loading' || state.value === 'error') {
+            return false;
+        }
+
+        while (
+            oldestLoadedServiceDate.value.length === 0 ||
+            oldestLoadedServiceDate.value > serviceDate
+        ) {
+            if (isHistoryExhausted.value) {
+                break;
+            }
+
+            const cursorBeforeLoad = nextCursor.value;
+            const loaded = await loadMorePage();
+            if (!loaded) {
+                break;
+            }
+            if (nextCursor.value === cursorBeforeLoad) {
+                break;
+            }
+        }
+
+        return (
+            oldestLoadedServiceDate.value.length > 0 &&
+            oldestLoadedServiceDate.value <= serviceDate
+        );
     }
 
     watch(
@@ -302,9 +384,12 @@ export function useRecentHistoryList(
         errorMessage,
         summary,
         nextCursor,
+        oldestLoadedServiceDate,
+        isHistoryExhausted,
         isLoadingMore,
         canLoadMore,
         reload,
-        loadMore
+        loadMore,
+        ensureLoadedThroughServiceDate
     };
 }

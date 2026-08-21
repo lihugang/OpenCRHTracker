@@ -1,14 +1,31 @@
 <template>
     <UiCard class="history-panel-card">
         <div class="space-y-6">
-            <div class="space-y-2">
-                <p
-                    class="text-xs font-medium uppercase tracking-[0.28em] text-crh-blue/70">
-                    RECENT RECORDS
-                </p>
-                <h2 class="text-2xl font-semibold text-crh-grey-dark">
-                    {{ title }}
-                </h2>
+            <div class="flex flex-wrap items-end justify-between gap-4">
+                <div class="space-y-2">
+                    <p
+                        class="text-xs font-medium uppercase tracking-[0.28em] text-crh-blue/70">
+                        RECENT RECORDS
+                    </p>
+                    <h2 class="text-2xl font-semibold text-crh-grey-dark">
+                        {{ title }}
+                    </h2>
+                </div>
+
+                <button
+                    v-if="items.length > 0"
+                    type="button"
+                    class="history-calendar-button"
+                    title="打开历史日历"
+                    aria-label="打开历史日历"
+                    @click="isCalendarOpen = true">
+                    <span
+                        class="history-calendar-icon"
+                        aria-hidden="true">
+                        <span />
+                    </span>
+                    <span>日历</span>
+                </button>
             </div>
 
             <div class="motion-divider" />
@@ -176,6 +193,8 @@
                             <tr
                                 v-for="(item, itemIndex) in groupedItems"
                                 :key="item.id"
+                                :data-history-date="item.dateKey"
+                                tabindex="-1"
                                 :class="[
                                     'history-table-row align-top',
                                     item.isTintedDateBand
@@ -183,6 +202,9 @@
                                         : '',
                                     isRunningItem(item)
                                         ? 'running-result-row'
+                                        : '',
+                                    item.dateKey === highlightedServiceDate
+                                        ? 'history-date-target'
                                         : ''
                                 ]">
                                 <td
@@ -239,7 +261,9 @@
                                             :key="`${item.id}:${codeEntry.code}`">
                                             <NuxtLink
                                                 :to="
-                                                    buildCodeLink(codeEntry.code)
+                                                    buildCodeLink(
+                                                        codeEntry.code
+                                                    )
                                                 "
                                                 :data-guide="
                                                     itemIndex === 0 &&
@@ -365,9 +389,14 @@
                         :key="item.id">
                         <div
                             v-if="shouldShowMobileDateHeader(index, item)"
+                            :data-history-date="item.dateKey"
+                            tabindex="-1"
                             :class="[
                                 'px-1 pb-1 text-xs font-medium text-slate-500',
-                                index === 0 ? 'pt-0' : 'pt-3'
+                                index === 0 ? 'pt-0' : 'pt-3',
+                                item.dateKey === highlightedServiceDate
+                                    ? 'history-mobile-date-target'
+                                    : ''
                             ]">
                             <NuxtLink
                                 v-if="
@@ -741,6 +770,19 @@
         :requested-timetable-id="requestedTimetableId"
         :requested-service-date="requestedServiceDate"
         @update:model-value="isTimetableModalOpen = $event" />
+
+    <LookupHistoryCalendar
+        :model-value="isCalendarOpen"
+        :type="type"
+        :code="code"
+        :items="items"
+        :is-loading-more="isLoadingMore"
+        :error-message="errorMessage"
+        :oldest-loaded-service-date="oldestLoadedServiceDate"
+        :is-history-exhausted="isHistoryExhausted"
+        :ensure-loaded-through-service-date="ensureLoadedThroughServiceDate"
+        @update:model-value="isCalendarOpen = $event"
+        @select-date="locateHistoryDate" />
 </template>
 
 <script setup lang="ts">
@@ -782,8 +824,7 @@ interface GroupedHistoryCode {
     status: number;
 }
 
-interface DisplayHistoryListItem
-    extends Omit<GroupedHistoryListItem, 'codes'> {
+interface DisplayHistoryListItem extends Omit<GroupedHistoryListItem, 'codes'> {
     codes: GroupedHistoryCode[];
     dateKey: string;
     isTintedDateBand: boolean;
@@ -817,6 +858,9 @@ const props = defineProps<{
     summary: string;
     isLoadingMore: boolean;
     canLoadMore: boolean;
+    oldestLoadedServiceDate: string;
+    isHistoryExhausted: boolean;
+    ensureLoadedThroughServiceDate: (serviceDate: string) => Promise<boolean>;
     errorMessage?: string;
 }>();
 
@@ -834,7 +878,10 @@ const requestedTimetableId = ref<number | null>(null);
 const requestedServiceDate = ref<string | null>(null);
 const isCouplingSheetOpen = ref(false);
 const selectedCouplingCodes = ref<GroupedHistoryCode[]>([]);
+const isCalendarOpen = ref(false);
+const highlightedServiceDate = ref('');
 let sentinelObserver: IntersectionObserver | null = null;
+let highlightTimeout: ReturnType<typeof setTimeout> | null = null;
 
 const codeColumnLabel = computed(() => {
     return props.type === 'train' ? '车组号' : '车次号';
@@ -1082,6 +1129,46 @@ function openTimetable(item: DisplayHistoryListItem) {
     isTimetableModalOpen.value = true;
 }
 
+async function locateHistoryDate(serviceDate: string) {
+    if (!/^\d{8}$/.test(serviceDate)) {
+        return;
+    }
+
+    const loaded = await props.ensureLoadedThroughServiceDate(serviceDate);
+    if (
+        !loaded &&
+        !props.items.some((item) => item.serviceDate === serviceDate)
+    ) {
+        return;
+    }
+
+    isCalendarOpen.value = false;
+    await nextTick();
+    const target =
+        Array.from(
+            document.querySelectorAll<HTMLElement>(
+                `[data-history-date="${serviceDate}"]`
+            )
+        ).find((candidate) => candidate.offsetParent !== null) ?? null;
+    if (!target) {
+        return;
+    }
+
+    highlightedServiceDate.value = serviceDate;
+    target.focus({ preventScroll: true });
+    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+    if (highlightTimeout) {
+        clearTimeout(highlightTimeout);
+    }
+    highlightTimeout = setTimeout(() => {
+        if (highlightedServiceDate.value === serviceDate) {
+            highlightedServiceDate.value = '';
+        }
+        highlightTimeout = null;
+    }, 1800);
+}
+
 function disconnectSentinelObserver() {
     sentinelObserver?.disconnect();
     sentinelObserver = null;
@@ -1143,6 +1230,9 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
     disconnectSentinelObserver();
+    if (highlightTimeout) {
+        clearTimeout(highlightTimeout);
+    }
 });
 
 function isMissingTimestamp(timestamp: number | null) {
@@ -1301,6 +1391,74 @@ function buildCodeLink(code: string) {
         box-shadow 220ms ease,
         color 220ms ease,
         border-color 220ms ease;
+}
+
+.history-calendar-button {
+    display: inline-flex;
+    min-height: 2.5rem;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border: 1px solid rgb(203 213 225);
+    border-radius: 0.75rem;
+    background: rgb(255 255 255 / 0.9);
+    padding: 0.55rem 0.8rem;
+    color: rgb(0 82 155);
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition:
+        border-color 180ms ease,
+        background-color 180ms ease,
+        box-shadow 180ms ease;
+}
+
+.history-calendar-button:hover {
+    border-color: rgb(147 197 253);
+    background: rgb(239 246 255);
+    box-shadow: 0 10px 22px -18px rgb(15 23 42 / 0.35);
+}
+
+.history-calendar-icon {
+    position: relative;
+    display: inline-block;
+    height: 1rem;
+    width: 1rem;
+    border: 1.5px solid currentColor;
+    border-radius: 0.2rem;
+}
+
+.history-calendar-icon::before,
+.history-calendar-icon::after {
+    position: absolute;
+    top: -0.2rem;
+    height: 0.4rem;
+    width: 1.5px;
+    background: currentColor;
+    content: '';
+}
+
+.history-calendar-icon::before {
+    left: 0.25rem;
+}
+.history-calendar-icon::after {
+    right: 0.25rem;
+}
+
+.history-calendar-icon > span {
+    position: absolute;
+    inset: 0.28rem 0.12rem auto;
+    height: 1.5px;
+    background: currentColor;
+}
+
+.history-date-target > td {
+    box-shadow: inset 0 0 0 999px rgb(254 243 199 / 0.9);
+}
+
+.history-mobile-date-target {
+    border-radius: 0.5rem;
+    background: rgb(254 243 199 / 0.9);
+    box-shadow: 0 0 0 0.3rem rgb(254 243 199 / 0.9);
 }
 
 .history-table-row--tinted:not(.running-result-row) > td {

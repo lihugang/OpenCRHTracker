@@ -216,6 +216,9 @@
             :error-message="errorMessage"
             :is-loading-more="isLoadingMore"
             :can-load-more="canLoadMore"
+            :oldest-loaded-service-date="oldestLoadedServiceDate"
+            :is-history-exhausted="isHistoryExhausted"
+            :ensure-loaded-through-service-date="ensureLoadedThroughServiceDate"
             @request-more="loadMore" />
 
         <LookupFutureAssignmentPredictionModal
@@ -310,9 +313,12 @@ const {
     items,
     errorMessage,
     summary,
+    oldestLoadedServiceDate,
+    isHistoryExhausted,
     isLoadingMore,
     canLoadMore,
-    loadMore
+    loadMore,
+    ensureLoadedThroughServiceDate
 } = useRecentHistoryList(target);
 
 const favoriteItem = computed(() => {
