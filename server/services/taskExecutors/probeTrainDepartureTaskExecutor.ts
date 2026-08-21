@@ -28,6 +28,7 @@ import {
     deleteDailyRoutesByTrainCodeInRange,
     getCachedDailyRoutesByEmuCodeAtServiceDate,
     invalidateCachedDailyRoutesByEmuCodes,
+    listConfirmedDailyRoutesByEmuCodeBefore,
     listDailyRoutesByEmuCodeInRange,
     listDailyRoutesByTrainCodeAndStartAt,
     listDailyRoutesByTrainCodesAndStartAt,
@@ -2111,63 +2112,27 @@ function collectCoupledModelConflictWarnings(
 
 function resolveInheritanceCandidate(
     args: ProbeTrainDepartureTaskArgs,
-    mainEmuId: EmuId,
-    routeReadCache: DepartureRouteReadCache
+    mainEmuId: EmuId
 ): FormationInheritanceCandidate | null {
     const statusBindingWindowSeconds =
         useConfig().spider.scheduleProbe.coupling.statusBindingWindowSeconds;
-    const currentScheduleGroup = getTodayScheduleProbeGroupByTrainCode(
-        args.trainCode
+    // An overnight assignment can end inside the window while belonging to the
+    // previous service date because its timetable started before midnight.
+    const serviceDateLookbackSeconds = Math.max(
+        statusBindingWindowSeconds,
+        24 * 60 * 60
     );
-    if (
-        !currentScheduleGroup ||
-        currentScheduleGroup.startAt !== args.startAt
-    ) {
-        return null;
-    }
-
-    const currentTrainCodes =
-        getSafeTodayScheduleProbeTrainCodes(currentScheduleGroup);
-    const currentTrainCodeKeys = new Set(currentTrainCodes.map(trainCodeKey));
-    const currentServiceDay = unixSecondsToServiceDay(args.startAt);
-    const dayStart = serviceDayToShanghaiDayStartUnixSeconds(currentServiceDay);
-    const candidateRows = routeReadCache
-        .getInRange(mainEmuId, dayStart, args.startAt)
-        .filter(
-            (row) =>
-                currentTrainCodeKeys.has(trainCodeKey(row.train_code)) &&
-                isConfirmed(row.status)
-        )
-        .sort(
-            (left, right) =>
-                right.end_at - left.end_at ||
-                right.start_at - left.start_at ||
-                right.id - left.id
-        );
+    const minServiceDate = unixSecondsToServiceDay(
+        args.startAt - serviceDateLookbackSeconds
+    );
+    const candidateRows = listConfirmedDailyRoutesByEmuCodeBefore(
+        mainEmuId,
+        args.startAt,
+        minServiceDate
+    );
     for (const previousRow of candidateRows) {
-        if (
-            previousRow.start_at < dayStart ||
-            unixSecondsToServiceDay(previousRow.start_at) !== currentServiceDay
-        ) {
-            continue;
-        }
-
         const gapSeconds = args.startAt - previousRow.end_at;
         if (gapSeconds <= 0 || gapSeconds > statusBindingWindowSeconds) {
-            continue;
-        }
-
-        const previousScheduleGroup = getTodayScheduleProbeGroupByTrainCode(
-            previousRow.train_code
-        );
-        if (
-            !previousScheduleGroup ||
-            previousScheduleGroup.startAt !== previousRow.start_at ||
-            previousScheduleGroup.trainKey !== currentScheduleGroup.trainKey ||
-            !getSafeTodayScheduleProbeTrainCodes(previousScheduleGroup).some(
-                (trainCode) => currentTrainCodeKeys.has(trainCodeKey(trainCode))
-            )
-        ) {
             continue;
         }
 
@@ -2185,11 +2150,7 @@ function resolveFormationStatusContext(
     emuId: EmuId,
     routeReadCache: DepartureRouteReadCache
 ): FormationStatusResolutionContext {
-    const inheritanceCandidate = resolveInheritanceCandidate(
-        args,
-        emuId,
-        routeReadCache
-    );
+    const inheritanceCandidate = resolveInheritanceCandidate(args, emuId);
     return {
         currentRows: routeReadCache.getAtStartAt(emuId, args.startAt),
         inheritanceCandidate,
@@ -2326,7 +2287,7 @@ async function tryReuseHistoricalRouteStatus(
 ): Promise<HistoricalRouteStatusReuseResult | null> {
     const inheritanceCandidate =
         options.inheritanceCandidate ??
-        resolveInheritanceCandidate(args, mainEmuId, routeReadCache);
+        resolveInheritanceCandidate(args, mainEmuId);
     if (!inheritanceCandidate) {
         return null;
     }
@@ -2354,15 +2315,18 @@ async function tryReuseHistoricalRouteStatus(
         seenHistoricalTrainKeys.add(key);
         historicalTrainCodes.push(row.train_code);
     }
-    const allEmuCodes =
-        knownGroup.emuIds.length > 0 ? knownGroup.emuIds : [mainEmuId];
+    const historicalMainStatus =
+        knownGroup.statusByEmu.get(mainEmuId) ?? latestResolvedRow.status;
+    const historicalIsCoupled = isConfirmedCoupled(historicalMainStatus);
+    const allEmuCodes = historicalIsCoupled
+        ? knownGroup.emuIds.length > 0
+            ? knownGroup.emuIds
+            : [mainEmuId]
+        : [mainEmuId];
     if (options.requireRelatedEmu && allEmuCodes.length <= 1) {
         return null;
     }
-    if (
-        isConfirmedCoupled(latestResolvedRow.status) &&
-        allEmuCodes.length <= 1
-    ) {
+    if (historicalIsCoupled && allEmuCodes.length <= 1) {
         recordCurrentTrainProvenanceEventsForTrainCodes(allTrainCodes, {
             serviceDate: unixSecondsToServiceDay(args.startAt),
             startAt: args.startAt,
@@ -2373,7 +2337,7 @@ async function tryReuseHistoricalRouteStatus(
                 historicalStartAt: latestResolvedRow.start_at,
                 historicalEndAt: latestResolvedRow.end_at,
                 gapSeconds,
-                historicalStatus: latestResolvedRow.status,
+                historicalStatus: historicalMainStatus,
                 knownStatuses: Array.from(
                     knownGroup.statusByEmu.entries(),
                     ([emuId, status]) => ({ emuId, status })
@@ -2388,7 +2352,9 @@ async function tryReuseHistoricalRouteStatus(
         return null;
     }
 
-    const statusByEmu = new Map(knownGroup.statusByEmu);
+    const statusByEmu = historicalIsCoupled
+        ? new Map(knownGroup.statusByEmu)
+        : new Map([[mainEmuId, historicalMainStatus]]);
     if (!statusByEmu.has(mainEmuId)) {
         statusByEmu.set(mainEmuId, latestResolvedRow.status);
     }
@@ -2444,7 +2410,7 @@ async function tryReuseHistoricalRouteStatus(
             historicalStartAt: latestResolvedRow.start_at,
             historicalEndAt: latestResolvedRow.end_at,
             gapSeconds,
-            historicalStatus: latestResolvedRow.status,
+            historicalStatus: historicalMainStatus,
             statusByEmu: Array.from(
                 statusByEmu.entries(),
                 ([emuId, status]) => ({ emuId, status })

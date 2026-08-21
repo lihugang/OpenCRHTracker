@@ -1169,14 +1169,15 @@ export function getEmuRouteStatusByEmuCode(
 
 export function listConfirmedDailyRoutesByEmuCodeBefore(
     emuId: EmuId,
-    startAtExclusive: number
+    startAtExclusive: number,
+    minServiceDate?: ServiceDay
 ): DailyEmuRouteRow[] {
     if (!Number.isInteger(startAtExclusive) || startAtExclusive <= 0) {
         return [];
     }
 
     const serviceDate = normalizeServiceDateFromTimestamp(startAtExclusive);
-    const minServiceDate = serviceDate;
+    const effectiveMinServiceDate = minServiceDate ?? serviceDate;
     let cursorServiceDate = serviceDate;
     let cursorId = Number.MAX_SAFE_INTEGER;
     const rowsBeforeStartAt: DailyEmuRouteRow[] = [];
@@ -1186,7 +1187,7 @@ export function listConfirmedDailyRoutesByEmuCodeBefore(
             'selectConfirmedDailyRoutesByEmuCodeBeforeCursor',
             emuId,
             EMU_ROUTE_STATUS_CONFIRMED,
-            minServiceDate,
+            effectiveMinServiceDate,
             cursorServiceDate,
             cursorServiceDate,
             cursorId,
@@ -1224,11 +1225,15 @@ export function listConfirmedDailyRoutesByEmuCodeBefore(
 
 export function getLatestConfirmedDailyRouteByEmuCodeBefore(
     emuId: EmuId,
-    startAtExclusive: number
+    startAtExclusive: number,
+    minServiceDate?: ServiceDay
 ): DailyEmuRouteRow | null {
     return (
-        listConfirmedDailyRoutesByEmuCodeBefore(emuId, startAtExclusive)[0] ??
-        null
+        listConfirmedDailyRoutesByEmuCodeBefore(
+            emuId,
+            startAtExclusive,
+            minServiceDate
+        )[0] ?? null
     );
 }
 
