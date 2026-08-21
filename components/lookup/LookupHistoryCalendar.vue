@@ -791,7 +791,7 @@ function mergeEmuCalendarEntries(entries: CalendarCodeEntry[]) {
 
     return Array.from(groups.values())
         .map((group) => {
-            const first = group[0];
+            const first = group[0]!;
             const codes = Array.from(
                 new Set(group.map((entry) => entry.code))
             ).sort((left, right) => left.localeCompare(right));

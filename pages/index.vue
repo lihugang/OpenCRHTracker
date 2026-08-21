@@ -46,6 +46,11 @@
                         summary="正在加载历史记录…"
                         :is-loading-more="false"
                         :can-load-more="false"
+                        oldest-loaded-service-date=""
+                        :is-history-exhausted="false"
+                        :ensure-loaded-through-service-date="
+                            ensurePreviewHistoryLoaded
+                        "
                         error-message="" />
                 </div>
             </Transition>
@@ -162,6 +167,11 @@ const previewSearchTitle = computed(() => {
 });
 const previewSearchDescription = computed(() => '');
 const usesGuideBottomSheet = computed(() => !isLandscapeWide.value);
+
+// The split preview only renders a loading shell; history loads after navigation.
+function ensurePreviewHistoryLoaded(): Promise<boolean> {
+    return Promise.resolve(false);
+}
 
 useSiteSeo({
     title: '首页 | Open CRH Tracker',

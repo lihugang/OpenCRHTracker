@@ -484,7 +484,8 @@
                                             <NuxtLink
                                                 :to="
                                                     buildCodeLink(
-                                                        item.codes[0].code
+                                                        item.codes[0]?.code ??
+                                                            ''
                                                     )
                                                 "
                                                 :data-guide="
@@ -495,7 +496,8 @@
                                                 class="coupling-pair-code coupling-pair-code--start cursor-pointer transition hover:underline">
                                                 {{
                                                     formatCodeText(
-                                                        item.codes[0].code
+                                                        item.codes[0]?.code ??
+                                                            ''
                                                     )
                                                 }}
                                             </NuxtLink>
@@ -525,13 +527,15 @@
                                             <NuxtLink
                                                 :to="
                                                     buildCodeLink(
-                                                        item.codes[1].code
+                                                        item.codes[1]?.code ??
+                                                            ''
                                                     )
                                                 "
                                                 class="coupling-pair-code coupling-pair-code--end cursor-pointer transition hover:underline">
                                                 {{
                                                     formatCodeText(
-                                                        item.codes[1].code
+                                                        item.codes[1]?.code ??
+                                                            ''
                                                     )
                                                 }}
                                             </NuxtLink>
