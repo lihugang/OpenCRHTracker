@@ -16,8 +16,8 @@
                     v-if="items.length > 0"
                     type="button"
                     class="history-calendar-button"
-                    title="打开历史日历"
-                    aria-label="打开历史日历"
+                    title="打开历史开行记录"
+                    aria-label="打开历史开行记录"
                     @click="isCalendarOpen = true">
                     <span
                         class="history-calendar-icon"
@@ -529,8 +529,22 @@
                                                         " />
                                                 </button>
                                             </span>
-                                            <span
+                                            <button
                                                 v-if="
+                                                    codeIndex <
+                                                        item.codes.length - 1 &&
+                                                    canOpenCouplingSheet(item)
+                                                "
+                                                type="button"
+                                                class="cursor-pointer text-slate-400 transition hover:text-crh-blue hover:underline focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-crh-blue/55"
+                                                aria-label="查看重联编组"
+                                                @click="
+                                                    openCouplingSheet(item)
+                                                ">
+                                                {{ mergeSeparator }}
+                                            </button>
+                                            <span
+                                                v-else-if="
                                                     codeIndex <
                                                     item.codes.length - 1
                                                 "
@@ -778,9 +792,11 @@
                 <LookupCouplingPositionIcon
                     :position="getKnownCouplingPosition(codeEntry)" />
                 <p class="min-w-0 leading-6">
-                    <span class="font-mono font-semibold text-crh-blue">
+                    <NuxtLink
+                        :to="buildCodeLink(codeEntry.code)"
+                        class="font-mono font-semibold text-crh-blue transition hover:underline focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-crh-blue/55">
                         {{ codeEntry.code }}
-                    </span>
+                    </NuxtLink>
                     重联 {{ getCouplingEndLabel(codeEntry.status) }}，{{
                         getCouplingRange(codeEntry.status)
                     }}
@@ -1110,6 +1126,10 @@ function openCouplingSheet(item: DisplayHistoryListItem) {
 
     selectedCouplingCodes.value = couplingCodes.map((entry) => ({ ...entry }));
     isCouplingSheetOpen.value = true;
+}
+
+function canOpenCouplingSheet(item: DisplayHistoryListItem) {
+    return item.codes.some(hasKnownCouplingPosition);
 }
 
 function resolveStationFocusTrainCodes(item: DisplayHistoryListItem) {
@@ -1478,13 +1498,13 @@ function buildCodeLink(code: string) {
 }
 
 .history-date-target > td {
-    box-shadow: inset 0 0 0 999px rgb(254 243 199 / 0.9);
+    box-shadow: inset 0 0 0 999px rgb(219 234 254 / 0.92);
 }
 
 .history-mobile-date-target {
     border-radius: 0.5rem;
-    background: rgb(254 243 199 / 0.9);
-    box-shadow: 0 0 0 0.3rem rgb(254 243 199 / 0.9);
+    background: rgb(219 234 254 / 0.92);
+    box-shadow: 0 0 0 0.3rem rgb(219 234 254 / 0.92);
 }
 
 .history-table-row--tinted:not(.running-result-row) > td {

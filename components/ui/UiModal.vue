@@ -92,7 +92,7 @@ const props = withDefaults(
         title: string;
         eyebrow?: string;
         description?: string;
-        size?: 'md' | 'lg' | 'screen';
+        size?: 'sm' | 'md' | 'lg' | 'screen';
         height?: 'default' | 'tall' | 'screen';
         layer?: 'base' | 'raised';
         closeOnBackdrop?: boolean;
@@ -116,7 +116,9 @@ const sizeClass = computed(() =>
         ? 'max-w-[min(96vw,96rem)]'
         : props.size === 'lg'
           ? 'max-w-4xl'
-          : 'max-w-2xl'
+          : props.size === 'sm'
+            ? 'max-w-xl'
+            : 'max-w-2xl'
 );
 const heightClass = computed(() =>
     props.height === 'screen'

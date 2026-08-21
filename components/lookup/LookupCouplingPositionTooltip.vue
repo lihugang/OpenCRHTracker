@@ -1,7 +1,7 @@
 <template>
     <span
         ref="triggerRef"
-        class="inline-flex"
+        :class="['inline-flex', triggerClass]"
         @mouseenter="openTooltip"
         @mouseleave="closeTooltip"
         @focusin="openTooltip"
@@ -36,12 +36,21 @@ import {
     nextTick,
     onBeforeUnmount,
     ref,
+    watch,
     type CSSProperties
 } from 'vue';
 
-defineProps<{
-    label: string;
-}>();
+const props = withDefaults(
+    defineProps<{
+        label: string;
+        disabled?: boolean;
+        triggerClass?: string;
+    }>(),
+    {
+        disabled: false,
+        triggerClass: ''
+    }
+);
 
 const VIEWPORT_GAP_PX = 8;
 const TOOLTIP_OFFSET_PX = 8;
@@ -89,6 +98,10 @@ function removePositionListeners() {
 }
 
 async function openTooltip() {
+    if (props.disabled) {
+        return;
+    }
+
     isOpen.value = true;
     addPositionListeners();
     await nextTick();
@@ -99,6 +112,15 @@ function closeTooltip() {
     isOpen.value = false;
     removePositionListeners();
 }
+
+watch(
+    () => props.disabled,
+    (disabled) => {
+        if (disabled) {
+            closeTooltip();
+        }
+    }
+);
 
 onBeforeUnmount(removePositionListeners);
 </script>
