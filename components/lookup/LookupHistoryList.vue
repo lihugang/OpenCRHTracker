@@ -477,81 +477,149 @@
                             <div class="space-y-3">
                                 <div class="flex items-start gap-3">
                                     <div
-                                        class="min-w-0 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-sm font-semibold text-crh-blue">
-                                        <template
-                                            v-for="(
-                                                codeEntry, codeIndex
-                                            ) in item.codes"
-                                            :key="`${item.id}:mobile:${codeEntry.code}`">
-                                            <span
-                                                class="inline-flex items-center gap-1">
-                                                <NuxtLink
-                                                    :to="
-                                                        buildCodeLink(
-                                                            codeEntry.code
-                                                        )
-                                                    "
-                                                    :data-guide="
-                                                        index === 0 &&
-                                                        codeIndex === 0
-                                                            ? 'history-code-link'
-                                                            : undefined
-                                                    "
-                                                    class="cursor-pointer transition hover:underline">
-                                                    {{
-                                                        formatCodeText(
-                                                            codeEntry.code
-                                                        )
-                                                    }}
-                                                </NuxtLink>
-                                                <button
-                                                    v-if="
-                                                        hasKnownCouplingPosition(
-                                                            codeEntry
-                                                        )
-                                                    "
-                                                    type="button"
-                                                    class="coupling-position-button"
-                                                    :aria-label="
-                                                        getCouplingAriaLabel(
-                                                            codeEntry
-                                                        )
-                                                    "
-                                                    @click="
-                                                        openCouplingSheet(item)
-                                                    ">
-                                                    <LookupCouplingPositionIcon
-                                                        mode="active-half"
-                                                        :position="
-                                                            getKnownCouplingPosition(
-                                                                codeEntry
-                                                            )
-                                                        " />
-                                                </button>
-                                            </span>
-                                            <button
-                                                v-if="
-                                                    codeIndex <
-                                                        item.codes.length - 1 &&
-                                                    canOpenCouplingSheet(item)
+                                        class="min-w-0 w-full font-mono text-sm font-semibold text-crh-blue">
+                                        <div
+                                            v-if="hasCompleteCouplingPair(item)"
+                                            class="coupling-pair-layout">
+                                            <NuxtLink
+                                                :to="
+                                                    buildCodeLink(
+                                                        item.codes[0].code
+                                                    )
                                                 "
+                                                :data-guide="
+                                                    index === 0
+                                                        ? 'history-code-link'
+                                                        : undefined
+                                                "
+                                                class="coupling-pair-code coupling-pair-code--start cursor-pointer transition hover:underline">
+                                                {{
+                                                    formatCodeText(
+                                                        item.codes[0].code
+                                                    )
+                                                }}
+                                            </NuxtLink>
+
+                                            <button
                                                 type="button"
-                                                class="cursor-pointer text-slate-400 transition hover:text-crh-blue hover:underline focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-crh-blue/55"
-                                                aria-label="查看重联编组"
+                                                class="coupling-pair-button"
+                                                :aria-label="
+                                                    getCouplingPairAriaLabel(
+                                                        item
+                                                    )
+                                                "
                                                 @click="
                                                     openCouplingSheet(item)
                                                 ">
-                                                {{ mergeSeparator }}
+                                                <LookupCouplingPositionIcon
+                                                    v-for="codeEntry in item.codes"
+                                                    :key="`${item.id}:mobile:pair:${codeEntry.code}`"
+                                                    mode="active-half"
+                                                    :position="
+                                                        getKnownCouplingPosition(
+                                                            codeEntry
+                                                        )
+                                                    " />
                                             </button>
-                                            <span
-                                                v-else-if="
-                                                    codeIndex <
-                                                    item.codes.length - 1
+
+                                            <NuxtLink
+                                                :to="
+                                                    buildCodeLink(
+                                                        item.codes[1].code
+                                                    )
                                                 "
-                                                class="text-slate-400">
-                                                {{ mergeSeparator }}
-                                            </span>
-                                        </template>
+                                                class="coupling-pair-code coupling-pair-code--end cursor-pointer transition hover:underline">
+                                                {{
+                                                    formatCodeText(
+                                                        item.codes[1].code
+                                                    )
+                                                }}
+                                            </NuxtLink>
+                                        </div>
+
+                                        <div
+                                            v-else
+                                            class="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                            <template
+                                                v-for="(
+                                                    codeEntry, codeIndex
+                                                ) in item.codes"
+                                                :key="`${item.id}:mobile:${codeEntry.code}`">
+                                                <span
+                                                    class="inline-flex items-center gap-1">
+                                                    <NuxtLink
+                                                        :to="
+                                                            buildCodeLink(
+                                                                codeEntry.code
+                                                            )
+                                                        "
+                                                        :data-guide="
+                                                            index === 0 &&
+                                                            codeIndex === 0
+                                                                ? 'history-code-link'
+                                                                : undefined
+                                                        "
+                                                        class="cursor-pointer transition hover:underline">
+                                                        {{
+                                                            formatCodeText(
+                                                                codeEntry.code
+                                                            )
+                                                        }}
+                                                    </NuxtLink>
+                                                    <button
+                                                        v-if="
+                                                            hasKnownCouplingPosition(
+                                                                codeEntry
+                                                            )
+                                                        "
+                                                        type="button"
+                                                        class="coupling-position-button"
+                                                        :aria-label="
+                                                            getCouplingAriaLabel(
+                                                                codeEntry
+                                                            )
+                                                        "
+                                                        @click="
+                                                            openCouplingSheet(
+                                                                item
+                                                            )
+                                                        ">
+                                                        <LookupCouplingPositionIcon
+                                                            mode="active-half"
+                                                            :position="
+                                                                getKnownCouplingPosition(
+                                                                    codeEntry
+                                                                )
+                                                            " />
+                                                    </button>
+                                                </span>
+                                                <button
+                                                    v-if="
+                                                        codeIndex <
+                                                            item.codes.length -
+                                                                1 &&
+                                                        canOpenCouplingSheet(
+                                                            item
+                                                        )
+                                                    "
+                                                    type="button"
+                                                    class="cursor-pointer text-slate-400 transition hover:text-crh-blue hover:underline focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-crh-blue/55"
+                                                    aria-label="查看重联编组"
+                                                    @click="
+                                                        openCouplingSheet(item)
+                                                    ">
+                                                    {{ mergeSeparator }}
+                                                </button>
+                                                <span
+                                                    v-else-if="
+                                                        codeIndex <
+                                                        item.codes.length - 1
+                                                    "
+                                                    class="text-slate-400">
+                                                    {{ mergeSeparator }}
+                                                </span>
+                                            </template>
+                                        </div>
                                     </div>
                                 </div>
 
@@ -1118,6 +1186,21 @@ function getCouplingAriaLabel(codeEntry: GroupedHistoryCode) {
     return `${codeEntry.code}，重联 ${position}，${endLabel}`;
 }
 
+function hasCompleteCouplingPair(item: DisplayHistoryListItem) {
+    if (props.type !== 'train' || item.codes.length !== 2) {
+        return false;
+    }
+
+    const positions = item.codes.map((entry) =>
+        getCouplingPosition(entry.status)
+    );
+    return positions.includes('I') && positions.includes('II');
+}
+
+function getCouplingPairAriaLabel(item: DisplayHistoryListItem) {
+    return `查看 ${item.codes.map((entry) => entry.code).join(' 与 ')} 重联编组`;
+}
+
 function openCouplingSheet(item: DisplayHistoryListItem) {
     const couplingCodes = item.codes.filter(hasKnownCouplingPosition);
     if (couplingCodes.length === 0) {
@@ -1556,6 +1639,48 @@ function buildCodeLink(code: string) {
 }
 
 .coupling-position-button:focus-visible {
+    outline: 2px solid rgb(0 82 155 / 0.55);
+    outline-offset: 2px;
+}
+
+.coupling-pair-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+}
+
+.coupling-pair-code {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.coupling-pair-code--start {
+    text-align: left;
+}
+
+.coupling-pair-code--end {
+    text-align: right;
+}
+
+.coupling-pair-button {
+    display: inline-flex;
+    min-width: 3.5rem;
+    min-height: 2.75rem;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: background-color 180ms ease;
+}
+
+.coupling-pair-button:active {
+    background-color: rgb(219 234 254 / 0.8);
+}
+
+.coupling-pair-button:focus-visible {
     outline: 2px solid rgb(0 82 155 / 0.55);
     outline-offset: 2px;
 }
