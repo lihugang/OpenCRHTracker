@@ -1,48 +1,71 @@
 <template>
-    <svg
-        viewBox="0 0 28 20"
-        fill="none"
-        aria-hidden="true">
-        <path
-            d="M5.5 5.5h17a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2h-17a2 2 0 0 1-2-2v-6a2 2 0 0 1 2-2Z"
-            stroke="currentColor"
-            stroke-width="1.5" />
-        <path
-            d="M9 8v5M14 8v5M19 8v5"
-            stroke="currentColor"
-            stroke-width="1.25"
-            stroke-linecap="round"
-            opacity="0.45" />
-        <path
-            :d="position === 'I' ? 'M3.5 7.5v6' : 'M24.5 7.5v6'"
-            stroke="currentColor"
-            stroke-width="2.5"
-            stroke-linecap="round" />
-        <circle cx="8" cy="17" r="1" fill="currentColor" />
-        <circle cx="20" cy="17" r="1" fill="currentColor" />
-        <circle
-            :cx="position === 'I' ? 4.5 : 23.5"
-            cy="3.5"
-            r="3"
-            fill="currentColor" />
-        <path
-            v-if="position === 'I'"
-            d="M4.5 2.3v2.4"
-            stroke="white"
-            stroke-width="1.1"
-            stroke-linecap="round" />
-        <path
-            v-else
-            d="M22.7 2.7c.25-.3.55-.45.9-.45.55 0 .9.3.9.75 0 .35-.2.6-.65.9l-1.15.85h1.9"
-            stroke="white"
-            stroke-width="0.9"
-            stroke-linecap="round"
-            stroke-linejoin="round" />
-    </svg>
+    <span
+        :class="[
+            'relative inline-block h-6 shrink-0 overflow-hidden',
+            mode === 'active-half' ? 'w-6' : 'w-12'
+        ]">
+        <svg
+            :class="[
+                'absolute top-0 h-6 w-12 max-w-none',
+                mode === 'active-half' && position === 'II'
+                    ? '-translate-x-6'
+                    : 'left-0'
+            ]"
+            width="48"
+            height="24"
+            viewBox="0 0 48 24"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            aria-hidden="true">
+            <path
+                d="M21 5H8C4 5 2 7.5 2 11.5V19H21V5Z"
+                :stroke="position === 'I' ? '#00478B' : '#CBD5E1'"
+                stroke-width="2" />
+            <text
+                v-if="position === 'I'"
+                x="11.5"
+                y="15.5"
+                fill="#00478B"
+                font-size="10"
+                font-family="system-ui, -apple-system, sans-serif"
+                font-weight="800"
+                text-anchor="middle">
+                1
+            </text>
+            <line
+                x1="21"
+                y1="14"
+                x2="27"
+                y2="14"
+                stroke="#CBD5E1"
+                stroke-width="2" />
+            <path
+                d="M27 5H40C44 5 46 7.5 46 11.5V19H27V5Z"
+                :stroke="position === 'II' ? '#00478B' : '#CBD5E1'"
+                stroke-width="2" />
+            <text
+                v-if="position === 'II'"
+                x="36.5"
+                y="15.5"
+                fill="#00478B"
+                font-size="10"
+                font-family="system-ui, -apple-system, sans-serif"
+                font-weight="800"
+                text-anchor="middle">
+                2
+            </text>
+        </svg>
+    </span>
 </template>
 
 <script setup lang="ts">
-defineProps<{
-    position: 'I' | 'II';
-}>();
+withDefaults(
+    defineProps<{
+        position: 'I' | 'II';
+        mode?: 'full' | 'active-half';
+    }>(),
+    {
+        mode: 'full'
+    }
+);
 </script>
