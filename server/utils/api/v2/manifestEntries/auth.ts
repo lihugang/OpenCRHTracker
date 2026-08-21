@@ -113,20 +113,47 @@ import {
 } from '~/server/utils/api/v2/adapters/auth';
 import { API_SCOPES } from '~/server/utils/api/scopes/apiScopes';
 
+function extractAuthTargetEmuIds(data: unknown): number[] {
+    const items = (
+        data as {
+            items?: Array<{
+                target?: {
+                    target?: {
+                        case?: string;
+                        value?: unknown;
+                    };
+                };
+            }>;
+        }
+    ).items;
+
+    if (!Array.isArray(items)) {
+        return [];
+    }
+
+    const ids = items
+        .map((item) => {
+            const target = item.target?.target;
+            if (target?.case !== 'emuId') {
+                return null;
+            }
+
+            const id = target.value;
+            return typeof id === 'number' && Number.isInteger(id) && id > 0
+                ? id
+                : null;
+        })
+        .filter((id): id is number => id !== null);
+
+    return [...new Set(ids)];
+}
+
 function favoriteEmuIds(data: unknown): number[] {
-    return (
-        (data as { items?: Array<{ target?: { emuId?: number } }> }).items
-            ?.map((item) => item.target?.emuId)
-            .filter((id): id is number => id !== undefined) ?? []
-    );
+    return extractAuthTargetEmuIds(data);
 }
 
 function eventSubscriptionEmuIds(data: unknown): number[] {
-    return (
-        (data as { items?: Array<{ target?: { emuId?: number } }> }).items
-            ?.map((item) => item.target?.emuId)
-            .filter((id): id is number => id !== undefined) ?? []
-    );
+    return extractAuthTargetEmuIds(data);
 }
 
 export const AUTH_MANIFEST_ENTRIES = {
