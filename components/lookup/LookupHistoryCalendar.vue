@@ -91,13 +91,13 @@
                                 class="relative flex min-h-12 w-full flex-col rounded-lg p-1 text-left transition sm:min-h-[4.25rem] sm:p-1.5"
                                 :class="[
                                     cell.state === 'running'
-                                        ? 'cursor-pointer hover:bg-blue-50/60'
+                                        ? 'cursor-pointer hover:bg-slate-50'
                                         : 'cursor-default',
                                     cell.isToday
-                                        ? 'bg-blue-50/30 ring-2 ring-[#00529B]/50'
+                                        ? 'bg-slate-50 ring-1 ring-slate-400/70'
                                         : '',
                                     selectedServiceDate === cell.serviceDate
-                                        ? 'bg-blue-50 ring-2 ring-[#00529B]/60 md:bg-white md:ring-0'
+                                        ? 'bg-slate-100 ring-2 ring-slate-500/60 md:bg-white md:ring-0'
                                         : ''
                                 ]"
                                 :disabled="cell.state !== 'running'"
@@ -150,7 +150,7 @@
                                 </span>
                                 <span
                                     v-if="cell.categories.length > 0"
-                                    class="absolute inset-x-1 bottom-1 flex h-1 overflow-hidden rounded-full"
+                                    class="absolute inset-x-1 bottom-1 flex h-[2px] overflow-hidden opacity-75"
                                     aria-hidden="true">
                                     <span
                                         v-for="category in cell.categories"
@@ -169,14 +169,23 @@
             </div>
 
             <div
-                v-if="legendItems.length > 0"
                 class="flex flex-wrap gap-x-3 gap-y-2 px-2 text-xs text-slate-600 sm:px-3">
                 <span
-                    v-for="item in legendItems"
+                    v-for="item in statusLegendItems"
                     :key="item.key"
                     class="inline-flex min-w-0 items-center gap-1.5">
                     <span
-                        class="h-2.5 w-2.5 shrink-0 rounded-sm"
+                        class="h-2 w-2 shrink-0 rounded-full"
+                        :style="{ backgroundColor: item.color }"
+                        aria-hidden="true" />
+                    <span>{{ item.label }}</span>
+                </span>
+                <span
+                    v-for="item in modelLegendItems"
+                    :key="item.key"
+                    class="inline-flex min-w-0 items-center gap-1.5">
+                    <span
+                        class="h-2 w-2 shrink-0 rounded-full"
                         :style="{ backgroundColor: item.color }"
                         aria-hidden="true" />
                     <span>{{ item.label }}</span>
@@ -186,7 +195,7 @@
             <div
                 v-if="selectedMobileCell"
                 id="history-calendar-mobile-detail"
-                class="space-y-3 rounded-xl border border-blue-100 bg-white p-4 shadow-sm md:hidden"
+                class="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm md:hidden"
                 aria-live="polite">
                 <div class="flex items-start justify-between gap-3">
                     <div class="min-w-0">
@@ -344,7 +353,20 @@ const emit = defineEmits<{
 }>();
 
 const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
-const CATEGORY_COLOR_HUE_STEP = 137.508;
+const CATEGORY_COLOR_HUE_RANGES = [
+    [80, 105],
+    [210, 320]
+] as const;
+const CATEGORY_COLOR_HUE_SPAN = CATEGORY_COLOR_HUE_RANGES.reduce(
+    (total, [start, end]) => total + end - start,
+    0
+);
+const CATEGORY_COLOR_SEQUENCE_STEP = 0.618033988749895;
+const statusLegendItems = [
+    { key: 'closed', label: '未开行', color: '#ef4444' },
+    { key: 'running', label: '开行', color: '#10b981' },
+    { key: 'unavailable', label: '无数据', color: '#cbd5e1' }
+] as const;
 const currentUnixSeconds = useCurrentUnixSeconds();
 const today = computed(() =>
     formatShanghaiDateString(currentUnixSeconds.value)
@@ -422,7 +444,7 @@ const visibleCategories = computed(() =>
     dedupeCategories(calendarCells.value.flatMap((cell) => cell.categories))
 );
 
-const legendItems = computed(() =>
+const modelLegendItems = computed(() =>
     visibleCategories.value.map((category) => ({
         ...category,
         color: getCategoryColor(category.key)
@@ -693,11 +715,9 @@ function assignCategoryColors(categories: readonly CalendarCategory[]) {
             continue;
         }
 
-        const hue =
-            (colorWheelStart +
-                nextCategoryColorIndex * CATEGORY_COLOR_HUE_STEP) %
-            360;
-        nextColors.set(category.key, `oklch(68% 0.16 ${hue})`);
+        const colorIndex = nextCategoryColorIndex;
+        const hue = getCategoryColorHue(colorIndex);
+        nextColors.set(category.key, `oklch(62% 0.18 ${hue})`);
         nextCategoryColorIndex += 1;
         hasNewColor = true;
     }
@@ -708,14 +728,30 @@ function assignCategoryColors(categories: readonly CalendarCategory[]) {
 }
 
 function resetCategoryColors() {
-    colorWheelStart = Math.random() * 360;
+    colorWheelStart = Math.random();
     nextCategoryColorIndex = 0;
     categoryColors.value = new Map();
     assignCategoryColors(visibleCategories.value);
 }
 
+function getCategoryColorHue(colorIndex: number) {
+    const sequencePosition =
+        (colorWheelStart + colorIndex * CATEGORY_COLOR_SEQUENCE_STEP) % 1;
+    let offset = sequencePosition * CATEGORY_COLOR_HUE_SPAN;
+
+    for (const [start, end] of CATEGORY_COLOR_HUE_RANGES) {
+        const rangeSpan = end - start;
+        if (offset <= rangeSpan) {
+            return (start + offset).toFixed(2);
+        }
+        offset -= rangeSpan;
+    }
+
+    return String(CATEGORY_COLOR_HUE_RANGES[0][0]);
+}
+
 function getCategoryColor(categoryKey: string) {
-    return categoryColors.value.get(categoryKey) ?? 'oklch(68% 0 0)';
+    return categoryColors.value.get(categoryKey) ?? 'oklch(62% 0.18 245)';
 }
 
 function compareFormationEntries(
