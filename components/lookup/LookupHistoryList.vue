@@ -259,7 +259,39 @@
                                                 codeEntry, codeIndex
                                             ) in item.codes"
                                             :key="`${item.id}:${codeEntry.code}`">
+                                            <LookupCouplingPositionTooltip
+                                                v-if="
+                                                    hasKnownCouplingPosition(
+                                                        codeEntry
+                                                    )
+                                                "
+                                                :label="
+                                                    getDesktopCouplingHint(
+                                                        codeEntry
+                                                    ) ?? ''
+                                                ">
+                                                <NuxtLink
+                                                    :to="
+                                                        buildCodeLink(
+                                                            codeEntry.code
+                                                        )
+                                                    "
+                                                    :data-guide="
+                                                        itemIndex === 0 &&
+                                                        codeIndex === 0
+                                                            ? 'history-code-link'
+                                                            : undefined
+                                                    "
+                                                    class="cursor-pointer transition hover:underline">
+                                                    {{
+                                                        formatCodeText(
+                                                            codeEntry.code
+                                                        )
+                                                    }}
+                                                </NuxtLink>
+                                            </LookupCouplingPositionTooltip>
                                             <NuxtLink
+                                                v-else
                                                 :to="
                                                     buildCodeLink(
                                                         codeEntry.code
@@ -270,11 +302,6 @@
                                                     codeIndex === 0
                                                         ? 'history-code-link'
                                                         : undefined
-                                                "
-                                                :title="
-                                                    getDesktopCouplingHint(
-                                                        codeEntry
-                                                    )
                                                 "
                                                 class="cursor-pointer transition hover:underline">
                                                 {{
@@ -494,7 +521,7 @@
                                                         openCouplingSheet(item)
                                                     ">
                                                     <LookupCouplingPositionIcon
-                                                        class="h-5 w-7"
+                                                        mode="active-half"
                                                         :position="
                                                             getKnownCouplingPosition(
                                                                 codeEntry
@@ -749,7 +776,6 @@
                 :key="`coupling:${codeEntry.code}`"
                 class="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm text-slate-700">
                 <LookupCouplingPositionIcon
-                    class="h-6 w-8 shrink-0 text-crh-blue"
                     :position="getKnownCouplingPosition(codeEntry)" />
                 <p class="min-w-0 leading-6">
                     <span class="font-mono font-semibold text-crh-blue">
@@ -1498,6 +1524,7 @@ function buildCodeLink(code: string) {
     align-items: center;
     justify-content: center;
     border-radius: 0.5rem;
+    cursor: pointer;
     color: rgb(0 82 155);
     transition:
         color 180ms ease,

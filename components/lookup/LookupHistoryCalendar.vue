@@ -3,144 +3,122 @@
         :model-value="modelValue"
         :title="`${code} 历史日历`"
         eyebrow="HISTORY CALENDAR"
-        description="与下方历史表格使用同一份数据；翻月时会按需继续加载。"
+        description=""
         size="lg"
         height="tall"
         @update:model-value="emit('update:modelValue', $event)">
-        <div class="space-y-5">
-            <div class="flex flex-wrap items-center justify-between gap-3">
-                <div class="flex items-center gap-2">
-                    <button
-                        type="button"
-                        class="calendar-nav-button"
-                        :disabled="!canGoPreviousMonth"
-                        aria-label="上一个月"
-                        @click="moveMonth(-1)">
-                        &lt;
-                    </button>
-                    <p
-                        class="min-w-[9rem] text-center text-lg font-semibold text-slate-900">
-                        {{ monthLabel }}
-                    </p>
-                    <button
-                        type="button"
-                        class="calendar-nav-button"
-                        :disabled="!canGoNextMonth"
-                        aria-label="下一个月"
-                        @click="moveMonth(1)">
-                        &gt;
-                    </button>
-                </div>
-
-                <div
-                    class="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-slate-500">
-                    <span class="calendar-legend-item">
-                        <span
-                            class="calendar-legend-dot calendar-legend-dot--running" />
-                        开行
-                    </span>
-                    <span class="calendar-legend-item">
-                        <span
-                            class="calendar-legend-dot calendar-legend-dot--closed" />
-                        未开行
-                    </span>
-                    <span class="calendar-legend-item">
-                        <span
-                            class="calendar-legend-dot calendar-legend-dot--loading" />
-                        获取数据中
-                    </span>
-                </div>
+        <div class="space-y-4 rounded-[20px] bg-slate-50 p-2 sm:p-3">
+            <div
+                class="flex items-center justify-between gap-3 px-2 py-1 sm:px-3">
+                <button
+                    type="button"
+                    class="inline-flex h-9 w-9 items-center justify-center rounded-2xl text-lg text-slate-500 transition hover:bg-white hover:text-[#00529B] disabled:cursor-not-allowed disabled:opacity-30"
+                    :disabled="!canGoPreviousMonth"
+                    aria-label="上一个月"
+                    @click="moveMonth(-1)">
+                    <span aria-hidden="true">&lsaquo;</span>
+                </button>
+                <p class="text-base font-semibold text-[#334155] sm:text-lg">
+                    {{ monthLabel }}
+                </p>
+                <button
+                    type="button"
+                    class="inline-flex h-9 w-9 items-center justify-center rounded-2xl text-lg text-slate-500 transition hover:bg-white hover:text-[#00529B] disabled:cursor-not-allowed disabled:opacity-30"
+                    :disabled="!canGoNextMonth"
+                    aria-label="下一个月"
+                    @click="moveMonth(1)">
+                    <span aria-hidden="true">&rsaquo;</span>
+                </button>
             </div>
 
             <div
                 v-if="isLoadingMonth"
-                class="calendar-loading-banner">
+                class="flex items-center gap-2 px-3 text-xs text-slate-400">
                 <span
-                    class="calendar-loading-spinner"
+                    class="h-2.5 w-2.5 animate-spin rounded-full border-2 border-[#00529B]/25 border-t-[#00529B]"
                     aria-hidden="true" />
-                正在加载 {{ monthLabel }} 的历史数据
+                <span>加载中</span>
             </div>
             <div
                 v-else-if="loadError"
-                class="calendar-error-banner">
-                <span>{{ loadError }}</span>
+                class="flex items-center justify-between gap-3 rounded-xl border border-red-100 bg-red-50 p-3 text-sm text-red-600">
+                <span>网络请求失败，请稍后重试</span>
                 <button
                     type="button"
-                    class="text-sm font-medium text-rose-700 underline underline-offset-4"
+                    class="shrink-0 rounded-lg border border-red-100 bg-white px-3 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-50"
                     @click="retryMonth">
                     重试
                 </button>
             </div>
 
             <div
-                class="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                class="overflow-hidden rounded-[20px] border border-slate-100 bg-white shadow-sm">
                 <div
-                    class="grid grid-cols-7 border-b border-slate-200 bg-slate-50/80">
+                    class="grid grid-cols-7 bg-white px-1 pt-1 sm:px-2 sm:pt-2">
                     <div
                         v-for="weekday in weekdays"
                         :key="weekday"
-                        class="px-1 py-2 text-center text-[11px] font-medium tracking-[0.12em] text-slate-400 sm:px-2 sm:py-3">
+                        class="px-1 py-2 text-center text-xs font-semibold uppercase tracking-wider text-slate-400 sm:py-3">
                         {{ weekday }}
                     </div>
                 </div>
 
-                <div class="grid grid-cols-7">
+                <div
+                    class="grid grid-cols-7 gap-0.5 bg-slate-50 p-1 sm:gap-1 sm:p-2">
                     <div
                         v-for="cell in calendarCells"
                         :key="cell.key"
-                        class="min-h-[4.8rem] border-b border-r border-slate-100 p-1 last:border-r-0 sm:min-h-[6.5rem] sm:p-2"
-                        :class="
-                            cell.isCurrentMonth ? 'bg-white' : 'bg-slate-50/65'
-                        ">
+                        class="m-px min-h-[5.5rem] rounded-lg bg-white p-1.5 sm:min-h-[7.25rem] sm:p-2"
+                        :class="cell.isCurrentMonth ? '' : 'opacity-60'">
                         <button
                             v-if="cell.serviceDate"
                             type="button"
-                            class="calendar-day-button"
+                            class="flex min-h-[5.25rem] w-full flex-col rounded-xl p-1 text-left transition sm:min-h-[7rem] sm:p-1.5"
                             :class="[
-                                `calendar-day-button--${cell.state}`,
-                                cell.isToday
-                                    ? 'calendar-day-button--today'
-                                    : '',
                                 cell.state === 'running'
-                                    ? 'cursor-pointer'
-                                    : 'cursor-default'
+                                    ? 'cursor-pointer hover:bg-blue-50/60'
+                                    : 'cursor-default',
+                                cell.isToday
+                                    ? 'bg-blue-50/30 ring-2 ring-[#00529B]/50'
+                                    : ''
                             ]"
                             :disabled="cell.state !== 'running'"
                             :aria-label="cell.ariaLabel"
                             @click="selectDate(cell.serviceDate)">
                             <span
                                 class="flex items-center justify-between gap-1">
-                                <span class="calendar-day-number">{{
-                                    cell.day
-                                }}</span>
                                 <span
-                                    v-if="cell.recordCount > 0"
-                                    class="calendar-day-count">
-                                    {{ cell.recordCount }}
+                                    class="text-sm font-medium"
+                                    :class="
+                                        cell.isCurrentMonth
+                                            ? 'text-slate-700'
+                                            : 'text-slate-300'
+                                    ">
+                                    {{ cell.day }}
                                 </span>
-                            </span>
-                            <span
-                                v-if="cell.colors.length > 0"
-                                class="mt-2 flex min-h-1.5 gap-1">
                                 <span
-                                    v-for="color in cell.colors"
-                                    :key="color"
-                                    class="calendar-model-dot"
-                                    :style="{ backgroundColor: color }" />
+                                    v-if="cell.state === 'running'"
+                                    class="h-1.5 w-1.5 rounded-full bg-[#10B981]"
+                                    aria-label="开行" />
+                                <span
+                                    v-else-if="cell.state === 'loading'"
+                                    class="h-1.5 w-1.5 rounded-full bg-[#00529B]/30"
+                                    aria-label="获取数据中" />
                             </span>
                             <span
-                                v-if="cell.hasRecords"
-                                class="mt-1 line-clamp-2 text-left text-[10px] leading-4 text-slate-500 sm:text-[11px]">
-                                {{ cell.summary }}
+                                v-if="cell.codes.length > 0"
+                                class="mt-2 flex min-w-0 flex-col gap-1">
+                                <span
+                                    v-for="entry in cell.codes"
+                                    :key="entry"
+                                    class="truncate border-b border-slate-100 pb-1 font-mono text-[11px] leading-tight text-slate-600 last:border-b-0 last:pb-0 md:text-xs">
+                                    {{ entry }}
+                                </span>
                             </span>
                         </button>
                     </div>
                 </div>
             </div>
-
-            <p class="text-xs leading-5 text-slate-500">
-                当前日期之后显示为“获取数据中”，不会为了未来日期扩大历史请求范围。车型色标按车组号去掉末尾编号后的车型键自动分配。
-            </p>
         </div>
     </UiModal>
 </template>
@@ -159,10 +137,7 @@ interface CalendarCell {
     isCurrentMonth: boolean;
     isToday: boolean;
     state: CalendarState;
-    hasRecords: boolean;
-    recordCount: number;
-    colors: string[];
-    summary: string;
+    codes: string[];
     ariaLabel: string;
 }
 
@@ -184,16 +159,6 @@ const emit = defineEmits<{
 }>();
 
 const weekdays = ['一', '二', '三', '四', '五', '六', '日'];
-const palette = [
-    '#00529b',
-    '#0f766e',
-    '#b45309',
-    '#7c3aed',
-    '#be123c',
-    '#0369a1',
-    '#4d7c0f',
-    '#c2410c'
-];
 const currentUnixSeconds = useCurrentUnixSeconds();
 const today = computed(() =>
     formatShanghaiDateString(currentUnixSeconds.value)
@@ -287,14 +252,10 @@ const calendarCells = computed(() => {
               : !isCovered && !props.isHistoryExhausted
                 ? 'loading'
                 : 'closed';
-        const colors = Array.from(
-            new Set(records.map((record) => colorForModel(modelKey(record))))
-        ).slice(0, 3);
-        const summary = records
-            .map((record) => record.code.trim())
-            .filter(Boolean)
-            .slice(0, 2)
-            .join(' / ');
+        const codes = Array.from(
+            new Set(records.map((record) => record.code.trim()).filter(Boolean))
+        ).slice(0, 4);
+        const summary = codes.slice(0, 2).join('、');
 
         cells.push({
             key: serviceDate,
@@ -303,32 +264,13 @@ const calendarCells = computed(() => {
             isCurrentMonth,
             isToday: serviceDate === today.value,
             state,
-            hasRecords,
-            recordCount: records.length,
-            colors,
-            summary,
+            codes,
             ariaLabel: `${serviceDate.slice(0, 4)} 年 ${Number(serviceDate.slice(4, 6))} 月 ${Number(serviceDate.slice(6, 8))} 日，${state === 'running' ? `开行，${summary || '有记录'}` : state === 'closed' ? '未开行' : '获取数据中'}`
         });
     }
 
     return cells;
 });
-
-function modelKey(item: LookupHistoryListItem) {
-    const value = (props.type === 'emu' ? props.code : item.code)
-        .trim()
-        .toUpperCase();
-    const separator = value.lastIndexOf('-');
-    return separator > 0 ? value.slice(0, separator) : value || 'UNKNOWN';
-}
-
-function colorForModel(model: string) {
-    let hash = 0;
-    for (const char of model) {
-        hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
-    }
-    return palette[hash % palette.length] ?? palette[0];
-}
 
 function moveMonth(delta: number) {
     const year = Number(visibleMonth.value.slice(0, 4));
@@ -403,141 +345,3 @@ watch(
     }
 );
 </script>
-
-<style scoped>
-.calendar-nav-button {
-    display: inline-flex;
-    height: 2.25rem;
-    width: 2.25rem;
-    align-items: center;
-    justify-content: center;
-    border: 1px solid rgb(226 232 240);
-    border-radius: 0.75rem;
-    color: rgb(71 85 105);
-    transition:
-        border-color 180ms ease,
-        background-color 180ms ease,
-        color 180ms ease;
-}
-
-.calendar-nav-button:hover:not(:disabled) {
-    border-color: rgb(147 197 253);
-    background: rgb(239 246 255);
-    color: rgb(0 82 155);
-}
-
-.calendar-nav-button:disabled {
-    cursor: not-allowed;
-    opacity: 0.35;
-}
-
-.calendar-legend-item {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    white-space: nowrap;
-}
-
-.calendar-legend-dot {
-    display: inline-block;
-    height: 0.55rem;
-    width: 0.55rem;
-    border-radius: 999px;
-}
-
-.calendar-legend-dot--running {
-    background: rgb(16 185 129);
-}
-.calendar-legend-dot--closed {
-    background: rgb(203 213 225);
-}
-.calendar-legend-dot--loading {
-    background: rgb(245 158 11);
-}
-
-.calendar-loading-banner,
-.calendar-error-banner {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
-    border-radius: 0.75rem;
-    padding: 0.7rem 0.85rem;
-    font-size: 0.8rem;
-}
-
-.calendar-loading-banner {
-    background: rgb(255 247 237);
-    color: rgb(154 52 18);
-}
-.calendar-error-banner {
-    background: rgb(255 241 242);
-    color: rgb(159 18 57);
-}
-
-.calendar-loading-spinner {
-    height: 0.65rem;
-    width: 0.65rem;
-    flex-shrink: 0;
-    border: 2px solid currentColor;
-    border-right-color: transparent;
-    border-radius: 999px;
-    animation: calendar-spin 800ms linear infinite;
-}
-
-.calendar-day-button {
-    display: block;
-    min-height: 4.25rem;
-    width: 100%;
-    border-radius: 0.75rem;
-    padding: 0.4rem;
-    text-align: left;
-    transition:
-        background-color 180ms ease,
-        box-shadow 180ms ease;
-}
-
-.calendar-day-button:hover:not(:disabled) {
-    background: rgb(239 246 255);
-}
-.calendar-day-button--running {
-    background: rgb(240 253 250);
-    color: rgb(15 118 110);
-}
-.calendar-day-button--closed {
-    color: rgb(100 116 139);
-}
-.calendar-day-button--loading {
-    background: rgb(255 251 235);
-    color: rgb(180 83 9);
-}
-.calendar-day-button--today {
-    box-shadow: inset 0 0 0 2px rgb(0 82 155 / 0.55);
-}
-
-.calendar-day-number {
-    font-size: 0.8rem;
-    font-weight: 600;
-}
-.calendar-day-count {
-    font-size: 0.65rem;
-    color: rgb(100 116 139);
-}
-.calendar-model-dot {
-    height: 0.35rem;
-    width: 1.15rem;
-    border-radius: 999px;
-}
-
-@keyframes calendar-spin {
-    to {
-        transform: rotate(360deg);
-    }
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .calendar-loading-spinner {
-        animation: none;
-    }
-}
-</style>
