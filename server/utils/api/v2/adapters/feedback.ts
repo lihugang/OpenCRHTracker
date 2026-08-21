@@ -25,6 +25,7 @@ import {
 import ensure from '~/server/utils/api/executor/ensure';
 import parseLimit from '~/server/utils/api/query/parseLimit';
 import type { V2OperationContext } from '~/server/utils/api/v2/V2Types';
+import type { FeedbackMessage } from '~/types/feedback';
 
 function toFeedbackString(
     schema: Parameters<typeof enumJsonName>[0],
@@ -45,6 +46,16 @@ function toFeedbackTopicResponse<T extends { secondaryType: string }>(
         ...topic,
         secondaryType:
             topic.secondaryType === '' ? 'empty' : topic.secondaryType
+    };
+}
+
+function toFeedbackMessageResponse(message: FeedbackMessage) {
+    return {
+        ...message,
+        authorType:
+            message.authorType === 'topicCreator'
+                ? 'topic_creator'
+                : message.authorType
     };
 }
 
@@ -156,7 +167,7 @@ export async function getFeedbackTopicV2Adapter(ctx: V2OperationContext) {
         topic: {
             topic: toFeedbackTopicResponse(topic),
             permissions,
-            messages
+            messages: messages.map(toFeedbackMessageResponse)
         }
     };
 }
