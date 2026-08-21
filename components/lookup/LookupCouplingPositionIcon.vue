@@ -1,15 +1,15 @@
 <template>
     <span
         :class="[
-            'relative inline-block h-5 shrink-0 overflow-hidden',
-            mode === 'active-half' ? 'w-5' : 'w-10'
+            'relative inline-block h-5 shrink-0 align-middle leading-none overflow-hidden',
+            mode === 'active-half' ? 'w-6' : 'w-12'
         ]">
         <svg
             :class="[
-                'absolute top-0 h-5 w-10 max-w-none',
+                'absolute left-0 top-1/2 h-6 w-12 max-w-none -translate-y-1/2',
                 mode === 'active-half' && position === 'II'
-                    ? '-translate-x-5'
-                    : 'left-0'
+                    ? '-translate-x-6'
+                    : ''
             ]"
             width="48"
             height="24"
