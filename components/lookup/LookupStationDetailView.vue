@@ -28,17 +28,35 @@
                 :active="isFavorited(favoriteItem)"
                 :loading="isFavoritePending(favoriteItem)"
                 :error-message="favoriteErrorMessage"
-                @click="toggleFavoriteItem" />
+                @click="toggleFavoriteItem">
+                <template #actions>
+                    <UiButton
+                        variant="secondary"
+                        size="sm"
+                        block
+                        @click="isExportModalOpen = true">
+                        导出数据
+                    </UiButton>
+                </template>
+            </LookupFavoritePanel>
         </template>
 
         <div
             v-if="favoriteItem"
             class="px-1 min-[960px]:landscape:hidden">
             <div class="space-y-2">
-                <UiFavoriteButton
-                    :active="isFavorited(favoriteItem)"
-                    :loading="isFavoritePending(favoriteItem)"
-                    @click="toggleFavoriteItem" />
+                <div class="flex flex-wrap items-center gap-2">
+                    <UiFavoriteButton
+                        :active="isFavorited(favoriteItem)"
+                        :loading="isFavoritePending(favoriteItem)"
+                        @click="toggleFavoriteItem" />
+                    <UiButton
+                        variant="secondary"
+                        size="sm"
+                        @click="isExportModalOpen = true">
+                        导出数据
+                    </UiButton>
+                </div>
                 <p
                     v-if="favoriteErrorMessage"
                     class="flex items-center gap-1.5 pl-1 text-xs leading-5 text-[#E53E3E]">
@@ -62,6 +80,12 @@
             :can-load-more="canLoadMore"
             :focus-train-codes="focusedTrainCodes"
             @request-more="loadMore" />
+
+        <LookupDataExportModal
+            :model-value="isExportModalOpen"
+            type="station"
+            :code="stationName"
+            @update:model-value="isExportModalOpen = $event" />
     </LookupDetailShell>
 </template>
 
@@ -94,6 +118,7 @@ const isMobileHeaderCollapsed = ref(false);
 const shouldUseMobileStickyHeader = ref(false);
 const focusLocateToken = ref(0);
 const isLocatingFocusedTrain = ref(false);
+const isExportModalOpen = ref(false);
 
 let mobileQueryList: MediaQueryList | null = null;
 let mobileQueryHandler: ((event: MediaQueryListEvent) => void) | null = null;
@@ -261,6 +286,7 @@ watch(
     (value) => {
         draftCode.value = normalizeLookupCode(value);
         inputError.value = '';
+        isExportModalOpen.value = false;
     },
     {
         immediate: true

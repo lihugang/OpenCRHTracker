@@ -12,8 +12,7 @@ import {
 import getApiErrorMessage from '~/utils/api/getApiErrorMessage';
 import getShanghaiDayStartUnixSeconds from '~/utils/time/getShanghaiDayStartUnixSeconds';
 import { parseCanonicalTrainCode } from '~/utils/api/v2/mappers/trainCode';
-
-const REQUEST_LIMIT = 100;
+import { LOOKUP_PAGE_LIMIT } from '~/utils/lookup/pagination';
 
 function getHistorySortTimestamp(item: LookupHistoryListItem) {
     if (
@@ -69,13 +68,13 @@ async function fetchPage(
     if (target.type === 'train') {
         return fetchTrainHistoryPage(target.code, {
             cursor: cursor || undefined,
-            limit: REQUEST_LIMIT
+            limit: LOOKUP_PAGE_LIMIT
         });
     }
 
     return fetchEmuHistoryPage(target.code, {
         cursor: cursor || undefined,
-        limit: REQUEST_LIMIT
+        limit: LOOKUP_PAGE_LIMIT
     });
 }
 

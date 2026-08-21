@@ -23,6 +23,8 @@
                         @click="emit('click')" />
                 </div>
 
+                <slot name="actions" />
+
                 <p
                     v-if="errorMessage"
                     class="flex items-center gap-1.5 text-xs leading-5 text-[#E53E3E]">

@@ -9,8 +9,7 @@ import {
     type StationTimetablePageResult
 } from '~/utils/api/v2/domain/lookup';
 import getApiErrorMessage from '~/utils/api/getApiErrorMessage';
-
-const REQUEST_LIMIT = 100;
+import { LOOKUP_PAGE_LIMIT } from '~/utils/lookup/pagination';
 
 function buildStationRecordKey(item: StationTimetableRecord) {
     return `${item.trainCode}:${item.arriveAt ?? ''}:${item.departAt ?? ''}`;
@@ -34,7 +33,7 @@ async function fetchStationPage(
 ): Promise<StationTimetablePageResult> {
     return fetchStationTimetablePage(target.code, {
         cursor: cursor || undefined,
-        limit: REQUEST_LIMIT
+        limit: LOOKUP_PAGE_LIMIT
     });
 }
 

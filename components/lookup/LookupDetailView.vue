@@ -60,14 +60,34 @@
                                 @click="toggleEventSubscriptionItem" />
                         </div>
 
-                        <UiButton
+                        <div
                             v-if="isEmuTarget"
-                            data-guide="allocation-button"
+                            class="flex items-center justify-between gap-2">
+                            <UiButton
+                                variant="secondary"
+                                size="sm"
+                                class="min-w-0 flex-1"
+                                @click="isExportModalOpen = true">
+                                导出数据
+                            </UiButton>
+
+                            <UiButton
+                                data-guide="allocation-button"
+                                variant="secondary"
+                                size="sm"
+                                class="min-w-0 flex-1"
+                                @click="openAllocationModal">
+                                配属信息
+                            </UiButton>
+                        </div>
+
+                        <UiButton
+                            v-else
                             variant="secondary"
                             size="sm"
                             block
-                            @click="openAllocationModal">
-                            配属信息
+                            @click="isExportModalOpen = true">
+                            导出数据
                         </UiButton>
 
                         <UiButton
@@ -118,7 +138,7 @@
                 <div
                     v-if="isEmuTarget"
                     class="space-y-2">
-                    <div class="flex items-center gap-2">
+                    <div class="flex flex-wrap items-center gap-2">
                         <UiFavoriteButton
                             guide="favorite-button"
                             :active="isFavorited(favoriteItem)"
@@ -141,6 +161,16 @@
                             配属信息
                         </UiButton>
                         <UiButton
+                            variant="secondary"
+                            size="sm"
+                            class="shrink-0"
+                            @click="isExportModalOpen = true">
+                            导出数据
+                        </UiButton>
+                    </div>
+
+                    <div class="flex justify-end">
+                        <UiButton
                             data-guide="future-prediction-button"
                             variant="secondary"
                             size="sm"
@@ -154,7 +184,7 @@
                 <div
                     v-else
                     class="flex items-center justify-between gap-3">
-                    <div class="flex items-center gap-2">
+                    <div class="flex flex-wrap items-center gap-2">
                         <UiFavoriteButton
                             guide="favorite-button"
                             :active="isFavorited(favoriteItem)"
@@ -165,6 +195,13 @@
                             :active="isSubscribed(eventSubscriptionTarget)"
                             :loading="isSubscriptionActionPending"
                             @click="toggleEventSubscriptionItem" />
+                        <UiButton
+                            variant="secondary"
+                            size="sm"
+                            class="shrink-0"
+                            @click="isExportModalOpen = true">
+                            导出数据
+                        </UiButton>
                     </div>
 
                     <div class="flex flex-wrap justify-end gap-2">
@@ -234,6 +271,12 @@
             :model-value="isAllocationModalOpen"
             :emu-code="normalizedCode"
             @update:model-value="isAllocationModalOpen = $event" />
+
+        <LookupDataExportModal
+            :model-value="isExportModalOpen"
+            :type="props.targetType"
+            :code="normalizedCode"
+            @update:model-value="isExportModalOpen = $event" />
     </LookupDetailShell>
 </template>
 
@@ -274,6 +317,7 @@ const isMobileHeaderCollapsed = ref(false);
 const shouldUseMobileStickyHeader = ref(false);
 const isFuturePredictionModalOpen = ref(false);
 const isAllocationModalOpen = ref(false);
+const isExportModalOpen = ref(false);
 
 let mobileQueryList: MediaQueryList | null = null;
 let mobileQueryHandler: ((event: MediaQueryListEvent) => void) | null = null;
@@ -439,6 +483,7 @@ watch(
         inputError.value = '';
         isFuturePredictionModalOpen.value = false;
         isAllocationModalOpen.value = false;
+        isExportModalOpen.value = false;
     },
     {
         immediate: true
