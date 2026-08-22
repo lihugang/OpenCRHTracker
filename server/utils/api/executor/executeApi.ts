@@ -16,8 +16,6 @@ import apiFailure from '~/server/utils/api/response/apiFailure';
 import apiSuccess from '~/server/utils/api/response/apiSuccess';
 import setCommonHeaders from '~/server/utils/api/response/setCommonHeaders';
 import assertRequiredScopes from '~/server/utils/api/scopes/assertRequiredScopes';
-import { withV1DeprecationNotice } from '~/server/utils/api/v1/deprecation';
-import isPlainJsonObject from '~/server/utils/json/isPlainJsonObject';
 import { measureServerTimingPhase } from '~/server/utils/timing/serverTiming';
 
 export default async function executeApi<TData>(
@@ -172,9 +170,7 @@ export default async function executeApi<TData>(
                 cost: costApplied
             });
             setResponseStatus(event, options.successStatusCode ?? 200);
-            return isPlainJsonObject(rawSuccessResponse)
-                ? withV1DeprecationNotice(event, rawSuccessResponse)
-                : rawSuccessResponse;
+            return rawSuccessResponse;
         }
 
         recordChargedUsage();

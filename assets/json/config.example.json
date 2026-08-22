@@ -241,7 +241,7 @@
         }
     },
     "api": {
-        "versionPrefix": "/api/v1",
+        "versionPrefix": "/api/v2",
         "apiKeyHeader": "authorization",
         "authCookieName": "token",
         "clientIpHeaders": [
