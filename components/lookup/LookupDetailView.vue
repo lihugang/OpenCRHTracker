@@ -149,6 +149,13 @@
                             :active="isSubscribed(eventSubscriptionTarget)"
                             :loading="isSubscriptionActionPending"
                             @click="toggleEventSubscriptionItem" />
+                        <UiButton
+                            variant="secondary"
+                            size="sm"
+                            class="shrink-0"
+                            @click="isExportModalOpen = true">
+                            导出数据
+                        </UiButton>
                     </div>
 
                     <div class="flex items-center justify-between gap-2">
@@ -160,16 +167,6 @@
                             @click="openAllocationModal">
                             配属信息
                         </UiButton>
-                        <UiButton
-                            variant="secondary"
-                            size="sm"
-                            class="shrink-0"
-                            @click="isExportModalOpen = true">
-                            导出数据
-                        </UiButton>
-                    </div>
-
-                    <div class="flex justify-end">
                         <UiButton
                             data-guide="future-prediction-button"
                             variant="secondary"
@@ -195,6 +192,9 @@
                             :active="isSubscribed(eventSubscriptionTarget)"
                             :loading="isSubscriptionActionPending"
                             @click="toggleEventSubscriptionItem" />
+                    </div>
+
+                    <div class="flex items-center justify-between gap-2">
                         <UiButton
                             variant="secondary"
                             size="sm"
@@ -202,9 +202,6 @@
                             @click="isExportModalOpen = true">
                             导出数据
                         </UiButton>
-                    </div>
-
-                    <div class="flex flex-wrap justify-end gap-2">
                         <UiButton
                             data-guide="future-prediction-button"
                             variant="secondary"
