@@ -705,7 +705,7 @@ function buildTypstSource(
             }
         })),
         headerText: headerInfo?.text ?? null,
-        footerText: '算法生成，仅供参考 | Open CRH Tracker'
+        footerText: '算法生成，仅供参考'
     };
 
     return template.replace(
