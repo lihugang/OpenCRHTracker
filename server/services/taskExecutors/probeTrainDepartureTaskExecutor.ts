@@ -73,7 +73,8 @@ import type { ProbeTrackingMutation } from '~/server/services/probeTrackingMutat
 import { rescheduleTaskUntilScheduleReady } from '~/server/services/scheduleReadinessGuard';
 import {
     markCurrentTrainProvenanceTaskSkipped,
-    recordCurrentTrainProvenanceEventsForTrainCodes
+    recordCurrentTrainProvenanceEventsForTrainCodes,
+    recordCurrentTrainProvenanceTrackingMutations
 } from '~/server/services/trainProvenanceRecorder';
 import {
     getSafeTodayScheduleProbeTrainCodes,
@@ -113,6 +114,18 @@ export const PROBE_TRAIN_DEPARTURE_TASK_EXECUTOR = 'probe_train_departure';
 
 const logger = getLogger('task-executor:probe-train-departure');
 const MAX_REQUEUE_TRAIN_CODES = 8;
+
+function serializeTrackingSourceRows(rows: readonly DailyEmuRouteRow[]) {
+    return rows.map((row) => ({
+        id: row.id,
+        trainCode: formatTrainCode(row.train_code),
+        emuCode: formatExternalEmuCode(row.emu_id),
+        serviceDate: row.service_date,
+        timetableId: row.timetable_id,
+        startAt: row.start_at,
+        status: row.status
+    }));
+}
 
 interface ProbeTrainDepartureTaskArgs {
     trainCode: TrainCodeParts;
@@ -715,6 +728,11 @@ function downgradeAffectedRouteStatuses(
     nextDayStart: number
 ): number {
     let downgradedRouteRows = 0;
+    const mutations: Array<
+        Parameters<
+            typeof recordCurrentTrainProvenanceTrackingMutations
+        >[0]['mutations'][number]
+    > = [];
 
     const seenEmuIds = new Set<number>();
     for (const emuId of emuIds) {
@@ -737,13 +755,54 @@ function downgradeAffectedRouteStatuses(
         }
 
         for (const startAt of startAts) {
-            downgradedRouteRows += updateDailyRouteFormationStatusByEmuCode(
+            const beforeRows = listDailyRoutesByEmuCodeInRange(
+                emuId,
+                startAt,
+                startAt + 1
+            ).filter((row) => row.start_at === startAt);
+            const changed = updateDailyRouteFormationStatusByEmuCode(
                 emuId,
                 startAt,
                 EMU_ROUTE_STATUS_UNCONFIRMED_SINGLE
             );
+            downgradedRouteRows += changed;
+            if (changed > 0) {
+                const afterRows = listDailyRoutesByEmuCodeInRange(
+                    emuId,
+                    startAt,
+                    startAt + 1
+                ).filter((row) => row.start_at === startAt);
+                for (const before of beforeRows) {
+                    const after = afterRows.find((row) => row.id === before.id);
+                    if (!after || after.status === before.status) continue;
+                    mutations.push({
+                        id: before.id,
+                        trainCode: before.train_code,
+                        emuId: before.emu_id,
+                        serviceDate: before.service_date,
+                        timetableId: before.timetable_id,
+                        startAt: before.start_at,
+                        action: 'downgraded',
+                        previousStatus: before.status,
+                        nextStatus: after.status,
+                        detail: {
+                            source: 'probe_cleanup',
+                            reason: 'affected_emu_status_downgrade'
+                        }
+                    });
+                }
+            }
         }
     }
+
+    recordCurrentTrainProvenanceTrackingMutations({
+        source: 'probe_cleanup',
+        operation: 'downgrade_affected_route_statuses',
+        eventType: 'overlap_cleanup',
+        serviceDate: serviceDateToDay(getCurrentDateString()),
+        detail: { deletedTrainCodes: Array.from(deletedTrainCodes), emuIds },
+        mutations
+    });
 
     return downgradedRouteRows;
 }
@@ -757,6 +816,11 @@ function clearOverlappingGroups(
     const affectedEmuIds = new Set<number>();
     const clearedTrainKeys: string[] = [];
     let deletedDailyRouteRows = 0;
+    const mutations: Array<
+        Parameters<
+            typeof recordCurrentTrainProvenanceTrackingMutations
+        >[0]['mutations'][number]
+    > = [];
 
     for (const group of groups) {
         clearQueriedTrainKey(group.trainKey);
@@ -775,17 +839,37 @@ function clearOverlappingGroups(
             return true;
         });
         for (const trainCode of groupTrainCodes) {
-            listDailyRoutesByTrainCodeInRange(
+            const existingRows = listDailyRoutesByTrainCodeInRange(
                 trainCode,
                 dayStart,
                 nextDayStart
-            ).forEach((row) => affectedEmuIds.add(Number(row.emu_id)));
+            );
+            existingRows.forEach((row) =>
+                affectedEmuIds.add(Number(row.emu_id))
+            );
 
             deletedDailyRouteRows += deleteDailyRoutesByTrainCodeInRange(
                 trainCode,
                 dayStart,
                 nextDayStart
             );
+            for (const row of existingRows) {
+                mutations.push({
+                    id: row.id,
+                    trainCode: row.train_code,
+                    emuId: row.emu_id,
+                    serviceDate: row.service_date,
+                    timetableId: row.timetable_id,
+                    startAt: row.start_at,
+                    action: 'deleted',
+                    previousStatus: row.status,
+                    nextStatus: null,
+                    detail: {
+                        source: 'probe_cleanup',
+                        reason: 'overlapping_group'
+                    }
+                });
+            }
             deleteProbeUntrustedRecordsByTrainCodeInRange(
                 trainCode,
                 dayStart,
@@ -793,6 +877,15 @@ function clearOverlappingGroups(
             );
         }
     }
+
+    recordCurrentTrainProvenanceTrackingMutations({
+        source: 'probe_cleanup',
+        operation: 'clear_overlapping_groups',
+        eventType: 'overlap_cleanup',
+        serviceDate: serviceDateToDay(getCurrentDateString()),
+        detail: { clearedTrainKeys, affectedEmuIds },
+        mutations
+    });
 
     for (const detectionGroup of collectAffectedDetectionGroups(
         Array.from(affectedEmuIds, (emuId) => emuId as EmuId),
@@ -822,6 +915,11 @@ function clearNotRunningGroups(
     const deletedTrainCodes = new Set<string>();
     const clearedTrainKeys: string[] = [];
     let deletedDailyRouteRows = 0;
+    const mutations: Array<
+        Parameters<
+            typeof recordCurrentTrainProvenanceTrackingMutations
+        >[0]['mutations'][number]
+    > = [];
 
     for (const group of groups) {
         clearQueriedTrainKey(group.trainKey);
@@ -838,17 +936,37 @@ function clearNotRunningGroups(
 
         for (const trainCode of getGroupTrainCodes(group)) {
             deletedTrainCodes.add(trainCodeKey(trainCode));
-            listDailyRoutesByTrainCodeInRange(
+            const existingRows = listDailyRoutesByTrainCodeInRange(
                 trainCode,
                 dayStart,
                 nextDayStart
-            ).forEach((row) => affectedEmuIds.add(Number(row.emu_id)));
+            );
+            existingRows.forEach((row) =>
+                affectedEmuIds.add(Number(row.emu_id))
+            );
 
             deletedDailyRouteRows += deleteDailyRoutesByTrainCodeInRange(
                 trainCode,
                 dayStart,
                 nextDayStart
             );
+            for (const row of existingRows) {
+                mutations.push({
+                    id: row.id,
+                    trainCode: row.train_code,
+                    emuId: row.emu_id,
+                    serviceDate: row.service_date,
+                    timetableId: row.timetable_id,
+                    startAt: row.start_at,
+                    action: 'deleted',
+                    previousStatus: row.status,
+                    nextStatus: null,
+                    detail: {
+                        source: 'probe_cleanup',
+                        reason: 'not_running_group'
+                    }
+                });
+            }
             deleteProbeUntrustedRecordsByTrainCodeInRange(
                 trainCode,
                 dayStart,
@@ -856,6 +974,15 @@ function clearNotRunningGroups(
             );
         }
     }
+
+    recordCurrentTrainProvenanceTrackingMutations({
+        source: 'probe_cleanup',
+        operation: 'clear_not_running_groups',
+        eventType: 'overlap_cleanup',
+        serviceDate: serviceDateToDay(getCurrentDateString()),
+        detail: { clearedTrainKeys, affectedEmuIds },
+        mutations
+    });
 
     const normalizedAffectedEmuIds = Array.from(
         affectedEmuIds,
@@ -1161,10 +1288,11 @@ async function tryAutoMergeResolvedInternalGroup(
 
     const existingStatusByEmu = new Map<EmuId, number>();
     const statusAggregationWarnings: FormationStatusWarning[] = [];
+    const statusSourceRows = new Map<number, DailyEmuRouteRow>();
     for (const emuId of mergedEmuIds) {
-        const collected = collectStatusByEmuFromRowsWithConflicts(
-            routeReadCache.getAtStartAt(emuId, args.startAt)
-        );
+        const currentRows = routeReadCache.getAtStartAt(emuId, args.startAt);
+        currentRows.forEach((row) => statusSourceRows.set(row.id, row));
+        const collected = collectStatusByEmuFromRowsWithConflicts(currentRows);
         existingStatusByEmu.set(
             emuId,
             collected.statusByEmu.get(emuId) ??
@@ -1224,6 +1352,10 @@ async function tryAutoMergeResolvedInternalGroup(
             emuIds: mergedEmuIds,
             mergedFromEmuIds: mergedFromEmuIds,
             mergedFromTrainCodes,
+            sourceRows: serializeTrackingSourceRows([
+                ...resolvedRows,
+                ...statusSourceRows.values()
+            ]),
             trackingMutations
         }
     });
@@ -1982,7 +2114,13 @@ async function applyResolvedResult(
         trainKey,
         statusByEmu,
         nowSeconds,
-        beforePersist
+        beforePersist,
+        auditSource: 'departure_probe',
+        auditOperation: 'persist_departure_probe_result',
+        auditDetail: {
+            trainInternalCode: args.trainInternalCode,
+            probedTrainCode: args.trainCode
+        }
     });
 }
 
@@ -2417,6 +2555,7 @@ async function tryReuseHistoricalRouteStatus(
             ),
             historicalTrainCodes,
             emuIds: allEmuCodes,
+            sourceRows: serializeTrackingSourceRows(historicalRows),
             trackingMutations
         }
     });
@@ -3107,6 +3246,23 @@ async function executeProbeTrainDepartureTaskInternal(
                   args.startAt,
                   serviceDate
               );
+        const sourceRows = [
+            ...existingRows,
+            ...listDailyRoutesByTrainCodesAndStartAt(
+                Array.from(
+                    new Map(
+                        existingRows.map((row) => [
+                            trainCodeKey(row.train_code),
+                            row.train_code
+                        ])
+                    ).values()
+                ),
+                args.startAt
+            )
+        ].filter(
+            (row, index, rows) =>
+                rows.findIndex((candidate) => candidate.id === row.id) === index
+        );
         const statusByEmu = new Map(effectiveKnownGroup.statusByEmu);
         for (const emuCode of effectiveKnownGroup.emuIds) {
             if (!statusByEmu.has(emuCode)) {
@@ -3158,6 +3314,7 @@ async function executeProbeTrainDepartureTaskInternal(
             result: hasConfirmedCoupled ? 'coupled' : 'single',
             payload: {
                 emuIds: effectiveKnownGroup.emuIds,
+                sourceRows: serializeTrackingSourceRows(sourceRows),
                 statusByEmu: Array.from(
                     statusByEmu.entries(),
                     ([emuId, status]) => ({ emuId, status })
@@ -3268,7 +3425,10 @@ async function executeProbeTrainDepartureTaskInternal(
         startAt: args.startAt,
         endAt: args.endAt,
         trainKey,
-        nowSeconds
+        nowSeconds,
+        auditSource: 'departure_probe',
+        auditOperation: 'persist_departure_pending_status',
+        auditDetail: { trainInternalCode: args.trainInternalCode }
     });
 
     const detectionTaskId = mainRecord

@@ -35,6 +35,7 @@ import {
     formatExternalEmuCode,
     formatExternalServiceDate
 } from '~/server/utils/internal/boundaries';
+import { recordCurrentTrainProvenanceTrackingMutations } from '~/server/services/trainProvenanceRecorder';
 
 const ADMIN_ANOMALY_TYPES: readonly AdminAnomalyType[] = [
     'train_multi_emu',
@@ -47,6 +48,39 @@ const DAY_SECONDS = 24 * 60 * 60;
 interface DeleteDailyRouteResult {
     deletedDailyRoute: boolean;
     route: NonNullable<ReturnType<typeof getDailyRecordById>> | null;
+}
+
+function recordDeletedAnomalyRoute(
+    route: NonNullable<ReturnType<typeof getDailyRecordById>>
+) {
+    recordCurrentTrainProvenanceTrackingMutations({
+        source: 'admin_anomaly',
+        operation: 'delete_anomaly_route',
+        eventType: 'admin_anomaly_delete',
+        serviceDate: route.service_date,
+        startAt: route.start_at,
+        detail: {
+            routeId: route.id,
+            reason: 'anomaly_action'
+        },
+        mutations: [
+            {
+                id: route.id,
+                trainCode: route.train_code,
+                emuId: route.emu_id,
+                serviceDate: route.service_date,
+                timetableId: route.timetable_id,
+                startAt: route.start_at,
+                action: 'deleted',
+                previousStatus: route.status,
+                nextStatus: null,
+                detail: {
+                    source: 'admin_anomaly',
+                    routeId: route.id
+                }
+            }
+        ]
+    });
 }
 
 function collectDetectionGroupsFromEmuIds(
@@ -184,6 +218,9 @@ export async function deleteAnomalyRoute(
     const numericRouteId = normalizeRouteId(routeId);
 
     const deleteResult = deleteDailyRoute(serviceDate, numericRouteId, true);
+    if (deleteResult.route) {
+        recordDeletedAnomalyRoute(deleteResult.route);
+    }
 
     const wasToday = serviceDate === serviceDateToDay(getCurrentDateString());
     let clearedRuntimeTrainKey = false;
@@ -263,6 +300,9 @@ export async function deleteAnomalyRoutesByType(
 
     let deletedDailyRoutes = 0;
     let skippedRoutes = 0;
+    const deletedRoutes: Array<
+        NonNullable<ReturnType<typeof getDailyRecordById>>
+    > = [];
 
     const deleteTransaction = useEmuDatabase().transaction(() => {
         for (const routeId of routeIds) {
@@ -274,10 +314,14 @@ export async function deleteAnomalyRoutesByType(
             }
 
             deletedDailyRoutes += 1;
+            if (result.route) {
+                deletedRoutes.push(result.route);
+            }
         }
     });
 
     deleteTransaction();
+    deletedRoutes.forEach(recordDeletedAnomalyRoute);
 
     return {
         date: formatExternalServiceDate(serviceDate),

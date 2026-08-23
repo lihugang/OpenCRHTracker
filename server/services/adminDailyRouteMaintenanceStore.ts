@@ -42,6 +42,7 @@ import {
 import { getTodayScheduleProbeGroupByTrainCode } from '~/server/services/todayScheduleCache';
 import { type TrainCodeParts } from '~/server/utils/12306/trainCode';
 import type { EmuId } from '~/server/libs/database/emu';
+import { recordCurrentTrainProvenanceTrackingMutations } from '~/server/services/trainProvenanceRecorder';
 import parseEmuCode from '~/server/utils/12306/parseEmuCode';
 import {
     formatExternalEmuCode,
@@ -365,6 +366,16 @@ export function createAdminDailyRoute(
         );
     }
 
+    const dayStart = serviceDayToShanghaiDayStartUnixSeconds(serviceDate);
+    const existingRecord = listDailyRoutesByTrainCodeInRange(
+        trainCode,
+        dayStart,
+        dayStart + SHANGHAI_DAY_SECONDS
+    ).find(
+        (row) =>
+            Number(row.emu_id) === Number(emuId) &&
+            row.timetable_id === timetableId
+    );
     const insertedId = insertDailyEmuRouteWithIdentity(
         trainCode,
         emuId,
@@ -374,6 +385,32 @@ export function createAdminDailyRoute(
     );
     const createdRecord =
         insertedId > 0 ? getDailyRecordById(insertedId) : null;
+    if (
+        createdRecord &&
+        (!existingRecord || existingRecord.status !== createdRecord.status)
+    ) {
+        recordCurrentTrainProvenanceTrackingMutations({
+            source: 'admin_maintenance',
+            operation: 'create_daily_route',
+            serviceDate,
+            startAt: createdRecord.start_at,
+            detail: { manual: true },
+            mutations: [
+                {
+                    id: createdRecord.id,
+                    trainCode: createdRecord.train_code,
+                    emuId: createdRecord.emu_id,
+                    serviceDate: createdRecord.service_date,
+                    timetableId: createdRecord.timetable_id,
+                    startAt: createdRecord.start_at,
+                    action: existingRecord ? 'updated' : 'created',
+                    previousStatus: existingRecord?.status ?? null,
+                    nextStatus: createdRecord.status,
+                    detail: { manual: true }
+                }
+            ]
+        });
+    }
 
     return {
         date: formatExternalServiceDate(serviceDate),
@@ -404,6 +441,27 @@ export async function deleteAdminDailyRoute(
     if (deletedDailyRouteRows <= 0) {
         throw new ApiRequestError(409, 'conflict', '日记录删除失败');
     }
+    recordCurrentTrainProvenanceTrackingMutations({
+        source: 'admin_maintenance',
+        operation: 'delete_daily_route',
+        serviceDate: route.service_date,
+        startAt: route.start_at,
+        detail: { manual: true },
+        mutations: [
+            {
+                id: route.id,
+                trainCode: route.train_code,
+                emuId: route.emu_id,
+                serviceDate: route.service_date,
+                timetableId: route.timetable_id,
+                startAt: route.start_at,
+                action: 'deleted',
+                previousStatus: route.status,
+                nextStatus: null,
+                detail: { manual: true }
+            }
+        ]
+    });
 
     const today = serviceDateToDay(getCurrentDateString());
     const wasToday = route.service_date === today;

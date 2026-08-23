@@ -9,12 +9,14 @@ import {
     recordStationBoardDispatchResult,
     recordStationBoardFetchResult,
     recordStationPlatformRefreshResult,
+    recordTrackingMutationBatch,
     recordTrainProvenanceEvent,
     startTrainProvenanceTaskRun,
     type Record12306RequestHourlyStatInput,
     type RecordCouplingScanCandidateInput,
     type RecordStationBoardDispatchResultInput,
     type RecordStationBoardFetchResultInput,
+    type RecordTrackingMutationBatchInput,
     type RecordTrainProvenanceEventInput,
     type StationPlatformRefreshStatus,
     type StationPlatformRefreshTrigger,
@@ -39,6 +41,7 @@ import type {
 
 interface TrainProvenanceContextValue {
     taskRunId: number;
+    schedulerTaskId: number;
     executor: string;
     nextSequenceNo: number;
     finalStatus: Exclude<TrainProvenanceTaskRunStatus, 'running'>;
@@ -257,6 +260,7 @@ export async function runWithTrainProvenanceTaskContext<T>(
 
     const contextValue: TrainProvenanceContextValue = {
         taskRunId,
+        schedulerTaskId: executionContext.taskId,
         executor: executionContext.executor,
         nextSequenceNo: 1,
         finalStatus: 'success',
@@ -321,6 +325,29 @@ export function recordCurrentTrainProvenanceEvent(
                 sequenceNo: context.nextSequenceNo - 1
             }),
         undefined
+    );
+}
+
+export function recordCurrentTrainProvenanceTrackingMutations(
+    input: Omit<
+        RecordTrackingMutationBatchInput,
+        'taskRunId' | 'schedulerTaskId'
+    >
+): number | null {
+    const context = getCurrentContext();
+    if (input.mutations.length === 0) {
+        return null;
+    }
+
+    return safeWrite(
+        'record_tracking_mutation_batch',
+        () =>
+            recordTrackingMutationBatch({
+                ...input,
+                taskRunId: context?.taskRunId ?? null,
+                schedulerTaskId: context?.schedulerTaskId ?? null
+            }),
+        null
     );
 }
 

@@ -266,7 +266,13 @@ async function executeProbeQrcodeDetectionEmuTask(
             endAt: routeEndAt,
             trainKey,
             statusByEmu: new Map([[scannedEmuId, confirmedSingleStatus]]),
-            nowSeconds
+            nowSeconds,
+            auditSource: 'qrcode_scan',
+            auditOperation: 'persist_qrcode_single_status',
+            auditDetail: {
+                detectedAt: args.detectedAt,
+                trainRepeat: seatCodeResult.route.trainRepeat
+            }
         });
         recordCurrentTrainProvenanceEventsForTrainCodes(allTrainCodes, {
             serviceDate,
@@ -278,6 +284,16 @@ async function executeProbeQrcodeDetectionEmuTask(
                 detectedAt: args.detectedAt,
                 source: 'qrcode_detection',
                 temporary: args.temporary,
+                trainRepeat: seatCodeResult.route.trainRepeat,
+                statusDecisions: trackingMutations.map((mutation) => ({
+                    emuId: mutation.emuId,
+                    status: mutation.nextStatus,
+                    persistenceAction: mutation.action,
+                    persisted:
+                        mutation.action === 'created' ||
+                        mutation.action === 'updated',
+                    mutationBatchId: mutation.mutationBatchId ?? null
+                })),
                 trackingMutations
             }
         });
@@ -294,7 +310,13 @@ async function executeProbeQrcodeDetectionEmuTask(
         startAt: routeStartAt,
         endAt: routeEndAt,
         trainKey,
-        nowSeconds
+        nowSeconds,
+        auditSource: 'qrcode_scan',
+        auditOperation: 'persist_qrcode_pending_status',
+        auditDetail: {
+            detectedAt: args.detectedAt,
+            trainRepeat: seatCodeResult.route.trainRepeat
+        }
     });
     const detectionTaskId = queueCoupledDetectionTask(resolvedRecord);
     recordCurrentTrainProvenanceEventsForTrainCodes(allTrainCodes, {
@@ -310,6 +332,16 @@ async function executeProbeQrcodeDetectionEmuTask(
             model: resolvedRecord.model,
             source: 'qrcode_detection',
             temporary: args.temporary,
+            trainRepeat: seatCodeResult.route.trainRepeat,
+            statusDecisions: trackingMutations.map((mutation) => ({
+                emuId: mutation.emuId,
+                status: mutation.nextStatus,
+                persistenceAction: mutation.action,
+                persisted:
+                    mutation.action === 'created' ||
+                    mutation.action === 'updated',
+                mutationBatchId: mutation.mutationBatchId ?? null
+            })),
             trackingMutations
         }
     });

@@ -50,22 +50,20 @@ export function formatEmuRouteStatus(status: number): string {
         status < 0 ||
         status > EMU_ROUTE_STATUS_MASK
     ) {
-        return `未知状态（${status}）`;
+        return '未知状态';
     }
 
     const formation = status & EMU_ROUTE_STATUS_FORMATION_POSITION_MASK;
-    const labels = [formation === 0 ? '单组' : '多组'];
-    labels.push(
-        (status & EMU_ROUTE_STATUS_CONFIRMED) !== 0 ? '已确认' : '未确认'
-    );
-
-    if (formation === EMU_ROUTE_STATUS_FORMATION_POSITION_UNKNOWN) {
-        labels.push('重联');
-    } else if (formation === EMU_ROUTE_STATUS_FORMATION_POSITION_I) {
-        labels.push('重联 I');
-    } else if (formation === EMU_ROUTE_STATUS_FORMATION_POSITION_II) {
-        labels.push('重联 II');
-    }
+    const confirmed = (status & EMU_ROUTE_STATUS_CONFIRMED) !== 0;
+    const formationLabel =
+        formation === 0
+            ? '单组'
+            : formation === EMU_ROUTE_STATUS_FORMATION_POSITION_I
+              ? '重联 1 位端'
+              : formation === EMU_ROUTE_STATUS_FORMATION_POSITION_II
+                ? '重联 2 位端'
+                : '重联位置待确认';
+    const labels = [`${confirmed ? '已确认' : '未确认'}${formationLabel}`];
 
     if ((status & EMU_ROUTE_STATUS_FAULT) !== 0) {
         labels.push('故障');
@@ -74,5 +72,5 @@ export function formatEmuRouteStatus(status: number): string {
         labels.push('热备');
     }
 
-    return labels.join(' / ');
+    return labels.join(' · ');
 }

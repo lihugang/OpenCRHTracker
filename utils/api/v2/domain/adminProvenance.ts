@@ -43,6 +43,8 @@ import type {
     AdminTrainDataRequestTypeSummary,
     AdminTrainProvenanceEvent,
     AdminTrainProvenanceResponse,
+    AdminTrackingMutation,
+    AdminTrackingMutationBatch,
     AdminTrainProvenanceTaskRunStatus,
     AdminTrainRouteSnapshot
 } from '~/types/admin';
@@ -241,7 +243,61 @@ function mapProvenance(
                 isTimetableResolved: row.isTimetableResolved
             }))
         })),
-        timeline: data.timeline.map(mapEvent)
+        timeline: data.timeline.map(mapEvent),
+        trackingMutationBatches: data.trackingMutationBatches.map(
+            mapTrackingMutationBatch
+        )
+    };
+}
+
+function mapTrackingMutationBatch(value: unknown): AdminTrackingMutationBatch {
+    const batch = (mapStruct(value) ?? {}) as Record<string, unknown>;
+    const rawMutations = Array.isArray(batch.mutations) ? batch.mutations : [];
+    return {
+        id: Number(batch.id ?? 0),
+        source: String(batch.source ?? ''),
+        operation: String(batch.operation ?? ''),
+        eventType: String(batch.eventType ?? ''),
+        serviceDate: epochServiceDayToDateString(
+            Number(batch.serviceDate ?? 0)
+        ),
+        startAt: typeof batch.startAt === 'number' ? batch.startAt : null,
+        createdAt: Number(batch.createdAt ?? 0),
+        mutations: rawMutations.map((value) => {
+            const mutation = (mapStruct(value) ?? {}) as Record<
+                string,
+                unknown
+            >;
+            return {
+                table: 'daily_emu_routes',
+                action: String(
+                    mutation.action ?? 'updated'
+                ) as AdminTrackingMutation['action'],
+                id: typeof mutation.id === 'number' ? mutation.id : null,
+                trainCode: String(mutation.trainCode ?? ''),
+                emuCode: String(mutation.emuCode ?? ''),
+                serviceDate: epochServiceDayToDateString(
+                    Number(mutation.serviceDate ?? 0)
+                ),
+                timetableId:
+                    typeof mutation.timetableId === 'number'
+                        ? mutation.timetableId
+                        : null,
+                startAt:
+                    typeof mutation.startAt === 'number'
+                        ? mutation.startAt
+                        : null,
+                previousStatus:
+                    typeof mutation.previousStatus === 'number'
+                        ? mutation.previousStatus
+                        : null,
+                nextStatus:
+                    typeof mutation.nextStatus === 'number'
+                        ? mutation.nextStatus
+                        : null,
+                rowCount: Number(mutation.rowCount ?? 1)
+            };
+        })
     };
 }
 

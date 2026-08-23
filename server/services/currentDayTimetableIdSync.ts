@@ -16,6 +16,7 @@ import {
     type TrainCodeParts
 } from '~/server/utils/12306/trainCode';
 import importSqlBatch from '~/server/utils/sql/importSqlBatch';
+import { recordCurrentTrainProvenanceTrackingMutations } from '~/server/services/trainProvenanceRecorder';
 
 interface DailySyncRow {
     id: number;
@@ -23,6 +24,7 @@ interface DailySyncRow {
     emu_id: EmuId;
     service_date: ServiceDay;
     timetable_id: number | null;
+    start_at: number;
     status: number;
 }
 
@@ -159,6 +161,15 @@ export function syncCurrentDayTimetableIdsForTrainCodes(
 
     const dayStartAt = serviceDayToShanghaiDayStartUnixSeconds(serviceDate);
     const dayEndAtExclusive = dayStartAt + DAY_SECONDS;
+    const pendingAudits: Array<{
+        trainCode: TrainCodeParts;
+        targetTimetableId: number;
+        mutations: Array<
+            Parameters<
+                typeof recordCurrentTrainProvenanceTrackingMutations
+            >[0]['mutations'][number]
+        >;
+    }> = [];
     const syncTransaction = useEmuDatabase().transaction(() => {
         for (const trainCode of normalizedTrainCodes) {
             const targetTimetableId =
@@ -180,6 +191,7 @@ export function syncCurrentDayTimetableIdsForTrainCodes(
                 emu_id: row.emu_id,
                 service_date: row.service_date,
                 timetable_id: row.timetable_id,
+                start_at: row.start_at,
                 status: row.status
             }));
 
@@ -194,16 +206,50 @@ export function syncCurrentDayTimetableIdsForTrainCodes(
 
             result.changedTrainCodes += 1;
 
+            const mutations: Array<
+                Parameters<
+                    typeof recordCurrentTrainProvenanceTrackingMutations
+                >[0]['mutations'][number]
+            > = [];
+
             for (const action of dailyActions) {
+                const groupRows = dailyRows.filter(
+                    (row) =>
+                        row.id === action.keeperId ||
+                        action.deleteIds.includes(row.id)
+                );
                 for (const deleteId of action.deleteIds) {
+                    const deletedRow = groupRows.find(
+                        (row) => row.id === deleteId
+                    );
                     maintenanceStatements.run(
                         'deleteDailyEmuRouteById',
                         deleteId
                     );
                     result.deletedDailyRows += 1;
+                    if (deletedRow) {
+                        mutations.push({
+                            id: deletedRow.id,
+                            trainCode: deletedRow.train_code,
+                            emuId: deletedRow.emu_id,
+                            serviceDate: deletedRow.service_date,
+                            timetableId: deletedRow.timetable_id,
+                            startAt: deletedRow.start_at,
+                            action: 'deleted',
+                            previousStatus: deletedRow.status,
+                            nextStatus: null,
+                            detail: {
+                                source: 'timetable_sync',
+                                reason: 'duplicate_route_row'
+                            }
+                        });
+                    }
                 }
 
                 if (action.needsUpdate) {
+                    const keeper = groupRows.find(
+                        (row) => row.id === action.keeperId
+                    );
                     maintenanceStatements.run(
                         'updateDailyEmuRouteAliasById',
                         action.emuId,
@@ -212,12 +258,51 @@ export function syncCurrentDayTimetableIdsForTrainCodes(
                         action.keeperId
                     );
                     result.updatedDailyRows += 1;
+                    if (keeper) {
+                        mutations.push({
+                            id: keeper.id,
+                            trainCode: keeper.train_code,
+                            emuId: keeper.emu_id,
+                            serviceDate: keeper.service_date,
+                            timetableId: keeper.timetable_id,
+                            startAt: keeper.start_at,
+                            action: 'updated',
+                            previousStatus: keeper.status,
+                            nextStatus: action.status,
+                            detail: {
+                                source: 'timetable_sync',
+                                previousTimetableId: keeper.timetable_id,
+                                nextTimetableId: action.timetableId
+                            }
+                        });
+                    }
                 }
             }
+
+            pendingAudits.push({ trainCode, targetTimetableId, mutations });
         }
     });
 
     syncTransaction();
+    for (const audit of pendingAudits) {
+        recordCurrentTrainProvenanceTrackingMutations({
+            source: 'timetable_sync',
+            operation: 'sync_current_day_timetable_ids',
+            eventType: 'daily_route_timetable_sync',
+            serviceDate,
+            detail: {
+                trainCode: trainCodeKey(audit.trainCode),
+                targetTimetableId: audit.targetTimetableId,
+                updatedDailyRows: audit.mutations.filter(
+                    (item) => item.action === 'updated'
+                ).length,
+                deletedDailyRows: audit.mutations.filter(
+                    (item) => item.action === 'deleted'
+                ).length
+            },
+            mutations: audit.mutations
+        });
+    }
     if (result.updatedDailyRows > 0 || result.deletedDailyRows > 0) {
         clearCachedDailyRoutes();
     }

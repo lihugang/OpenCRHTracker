@@ -816,10 +816,6 @@
                                                                 row.status
                                                             )
                                                         }}
-                                                        <span
-                                                            class="text-xs text-slate-400">
-                                                            ({{ row.status }})
-                                                        </span>
                                                     </td>
                                                 </tr>
                                             </tbody>
@@ -827,6 +823,95 @@
                                     </div>
                                 </div>
                             </div>
+                        </div>
+
+                        <div class="space-y-3">
+                            <div class="space-y-1">
+                                <p
+                                    class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                                    Database Audit
+                                </p>
+                                <h3
+                                    class="text-xl font-semibold text-slate-900">
+                                    数据库变动
+                                </h3>
+                            </div>
+
+                            <UiEmptyState
+                                v-if="
+                                    activeStartAt !== null &&
+                                    trackingMutationBatches.length === 0
+                                "
+                                eyebrow="无变动"
+                                title="该班次没有实际数据库变动"
+                                description="状态未变化的笛卡尔积组合不会写入审计记录。" />
+
+                            <article
+                                v-for="batch in trackingMutationBatches"
+                                :key="`mutation-batch:${batch.id}`"
+                                class="rounded-[1rem] border border-slate-200 bg-white/90 px-4 py-4">
+                                <div
+                                    class="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+                                    <div>
+                                        <p
+                                            class="text-sm font-semibold text-slate-900">
+                                            {{
+                                                getTrackingMutationSourceLabel(
+                                                    batch.source
+                                                )
+                                            }}
+                                        </p>
+                                        <p class="text-xs text-slate-500">
+                                            {{
+                                                getTrackingMutationOperationLabel(
+                                                    batch.operation
+                                                )
+                                            }}
+                                        </p>
+                                    </div>
+                                    <p class="text-xs text-slate-500">
+                                        {{ formatTimestamp(batch.createdAt) }}
+                                    </p>
+                                </div>
+                                <div class="mt-3 grid gap-2 md:grid-cols-2">
+                                    <div
+                                        v-for="(
+                                            mutation, index
+                                        ) in batch.mutations"
+                                        :key="`${batch.id}:${index}`"
+                                        class="rounded-[0.75rem] border border-slate-100 bg-slate-50/80 px-3 py-3">
+                                        <p
+                                            class="text-sm font-semibold text-slate-900">
+                                            {{
+                                                formatTrackingMutationTarget(
+                                                    mutation
+                                                )
+                                            }}
+                                        </p>
+                                        <p class="text-xs text-slate-500">
+                                            {{
+                                                getTrackingMutationActionLabel(
+                                                    mutation.action
+                                                )
+                                            }}
+                                            · row #{{ mutation.id ?? '--' }}
+                                        </p>
+                                        <p class="mt-1 text-sm text-slate-700">
+                                            {{
+                                                formatMutationStatus(
+                                                    mutation.previousStatus
+                                                )
+                                            }}
+                                            →
+                                            {{
+                                                formatMutationStatus(
+                                                    mutation.nextStatus
+                                                )
+                                            }}
+                                        </p>
+                                    </div>
+                                </div>
+                            </article>
                         </div>
 
                         <div class="space-y-3">
@@ -1197,6 +1282,114 @@
 
                                         <div
                                             v-if="
+                                                getStatusDecisionRows(item)
+                                                    .length > 0 ||
+                                                getPayloadTrainRepeat(item)
+                                            "
+                                            class="rounded-[0.875rem] border border-violet-200 bg-violet-50/70 px-4 py-4">
+                                            <div class="space-y-3">
+                                                <div
+                                                    class="flex flex-wrap items-center gap-3">
+                                                    <p
+                                                        class="text-sm font-semibold text-slate-900">
+                                                        本次状态决策
+                                                    </p>
+                                                    <span
+                                                        v-if="
+                                                            getPayloadTrainRepeat(
+                                                                item
+                                                            )
+                                                        "
+                                                        class="rounded-full bg-white/80 px-2.5 py-1 text-xs font-medium text-violet-800">
+                                                        trainRepeat={{
+                                                            getPayloadTrainRepeat(
+                                                                item
+                                                            )
+                                                        }}
+                                                    </span>
+                                                </div>
+                                                <div
+                                                    class="grid gap-2 md:grid-cols-2">
+                                                    <div
+                                                        v-for="row in getStatusDecisionRows(
+                                                            item
+                                                        )"
+                                                        :key="`${item.id}:decision:${row.emuCode}`"
+                                                        class="rounded-[0.75rem] border border-white/80 bg-white/90 px-3 py-3">
+                                                        <p
+                                                            class="text-sm font-semibold text-slate-900">
+                                                            {{ row.emuCode }}
+                                                        </p>
+                                                        <p
+                                                            class="text-sm text-slate-700">
+                                                            {{
+                                                                row.statusLabel
+                                                            }}
+                                                        </p>
+                                                        <p
+                                                            class="text-xs text-slate-500">
+                                                            {{
+                                                                row.persistenceLabel
+                                                            }}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div
+                                            v-if="item.historicalReuse"
+                                            class="rounded-[0.875rem] border border-amber-200 bg-amber-50/70 px-4 py-4">
+                                            <p
+                                                class="text-sm font-semibold text-slate-900">
+                                                复用来源
+                                            </p>
+                                            <p
+                                                class="mt-1 text-sm text-slate-700">
+                                                {{
+                                                    formatReuseSource(
+                                                        item.historicalReuse
+                                                    )
+                                                }}
+                                            </p>
+                                            <div
+                                                v-if="
+                                                    item.historicalReuse
+                                                        .sourceRows.length > 0
+                                                "
+                                                class="mt-3 grid gap-2 md:grid-cols-2">
+                                                <div
+                                                    v-for="row in item
+                                                        .historicalReuse
+                                                        .sourceRows"
+                                                    :key="`${item.id}:reuse:${row.id}`"
+                                                    class="rounded-[0.75rem] border border-white/80 bg-white/90 px-3 py-3 text-xs leading-5 text-slate-600">
+                                                    <p
+                                                        class="font-semibold text-slate-900">
+                                                        {{ row.trainCode }} /
+                                                        {{ row.emuCode }}
+                                                    </p>
+                                                    <p>
+                                                        来源行 #{{ row.id }} ·
+                                                        {{
+                                                            formatServiceDate(
+                                                                row.serviceDate
+                                                            )
+                                                        }}
+                                                    </p>
+                                                    <p>
+                                                        {{
+                                                            formatEmuRouteStatus(
+                                                                row.status
+                                                            )
+                                                        }}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div
+                                            v-if="
                                                 item.conflictDetail &&
                                                 item.conflictDetail
                                                     .conflictGroups.length > 0
@@ -1301,7 +1494,11 @@
                                                     class="flex flex-col gap-1 lg:flex-row lg:items-center lg:justify-between">
                                                     <p
                                                         class="text-sm font-semibold text-slate-900">
-                                                        历史复用
+                                                        {{
+                                                            getStatusReuseTitle(
+                                                                item.historicalReuse
+                                                            )
+                                                        }}
                                                     </p>
                                                     <p
                                                         class="text-xs leading-5 text-slate-500">
@@ -1385,6 +1582,44 @@
                                                                 .cacheNote
                                                         }}
                                                     </p>
+                                                </div>
+
+                                                <div
+                                                    v-if="
+                                                        item.historicalReuse
+                                                            .sourceRows.length >
+                                                        0
+                                                    "
+                                                    class="grid gap-2 md:grid-cols-2">
+                                                    <div
+                                                        v-for="row in item
+                                                            .historicalReuse
+                                                            .sourceRows"
+                                                        :key="`${item.id}:status-reuse:${row.id}`"
+                                                        class="rounded-[0.75rem] border border-white/80 bg-white/90 px-3 py-3 text-xs leading-5 text-slate-600">
+                                                        <p
+                                                            class="font-semibold text-slate-900">
+                                                            {{ row.trainCode }}
+                                                            /
+                                                            {{ row.emuCode }}
+                                                        </p>
+                                                        <p>
+                                                            来源行 #{{ row.id }}
+                                                            ·
+                                                            {{
+                                                                formatServiceDate(
+                                                                    row.serviceDate
+                                                                )
+                                                            }}
+                                                        </p>
+                                                        <p>
+                                                            {{
+                                                                formatEmuRouteStatus(
+                                                                    row.status
+                                                                )
+                                                            }}
+                                                        </p>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
@@ -2410,6 +2645,65 @@
                                                                 .cacheNote
                                                         }}
                                                     </p>
+                                                </div>
+                                            </div>
+
+                                            <div
+                                                v-if="
+                                                    getStatusDecisionRows(event)
+                                                        .length > 0 ||
+                                                    getPayloadTrainRepeat(event)
+                                                "
+                                                class="rounded-[0.875rem] border border-violet-200 bg-violet-50/70 px-4 py-4">
+                                                <div class="space-y-3">
+                                                    <div
+                                                        class="flex flex-wrap items-center gap-3">
+                                                        <p
+                                                            class="text-sm font-semibold text-slate-900">
+                                                            本次状态决策
+                                                        </p>
+                                                        <span
+                                                            v-if="
+                                                                getPayloadTrainRepeat(
+                                                                    event
+                                                                )
+                                                            "
+                                                            class="rounded-full bg-white/80 px-2.5 py-1 text-xs font-medium text-violet-800">
+                                                            trainRepeat={{
+                                                                getPayloadTrainRepeat(
+                                                                    event
+                                                                )
+                                                            }}
+                                                        </span>
+                                                    </div>
+                                                    <div
+                                                        class="grid gap-2 md:grid-cols-2">
+                                                        <div
+                                                            v-for="row in getStatusDecisionRows(
+                                                                event
+                                                            )"
+                                                            :key="`${event.id}:decision:${row.emuCode}`"
+                                                            class="rounded-[0.75rem] border border-white/80 bg-white/90 px-3 py-3">
+                                                            <p
+                                                                class="text-sm font-semibold text-slate-900">
+                                                                {{
+                                                                    row.emuCode
+                                                                }}
+                                                            </p>
+                                                            <p
+                                                                class="text-sm text-slate-700">
+                                                                {{
+                                                                    row.statusLabel
+                                                                }}
+                                                            </p>
+                                                            <p
+                                                                class="text-xs text-slate-500">
+                                                                {{
+                                                                    row.persistenceLabel
+                                                                }}
+                                                            </p>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
@@ -3852,6 +4146,9 @@ const activeDeparture = computed(
 const timelineItems = computed<AdminTrainProvenanceEvent[]>(
     () => provenanceData.value?.timeline ?? []
 );
+const trackingMutationBatches = computed(
+    () => provenanceData.value?.trackingMutationBatches ?? []
+);
 const qrcodeScanSummaryItems = computed<AdminQrcodeScanTimeSummaryItem[]>(
     () => qrcodeScanTaskListData.value?.items ?? []
 );
@@ -4739,6 +5036,51 @@ function getTrackingMutationActionLabel(
     }
 }
 
+function getTrackingMutationSourceLabel(source: string) {
+    switch (source) {
+        case 'departure_probe':
+            return '发车探测任务';
+        case 'qrcode_scan':
+            return '畅行码扫描';
+        case 'coupling_scan':
+            return '重联扫描';
+        case 'probe_cleanup':
+            return '探测冲突清理';
+        case 'timetable_sync':
+            return '时刻表 ID 同步';
+        case 'admin_maintenance':
+            return '后台数据维护';
+        case 'admin_anomaly':
+            return '异常数据处理';
+        case 'coupling_cleanup':
+            return '重联结果清理';
+        default:
+            return source || '未知来源';
+    }
+}
+
+function getTrackingMutationOperationLabel(operation: string) {
+    const labels: Record<string, string> = {
+        persist_departure_probe_result: '写入发车探测结果',
+        persist_departure_pending_status: '写入待重联状态',
+        persist_qrcode_single_status: '写入畅行码单组判断',
+        persist_qrcode_pending_status: '写入畅行码待重联判断',
+        persist_untracked_scan_result: '写入未追踪车次扫描结果',
+        persist_coupling_resolution: '写入重联扫描结论',
+        persist_probe_tracking_rows: '写入发车探测交路',
+        persist_pending_coupling_rows: '写入待重联交路',
+        create_daily_route: '新增或更新日交路记录',
+        delete_daily_route: '删除日交路记录',
+        delete_anomaly_route: '删除异常日交路记录',
+        sync_current_day_timetable_ids: '同步当日时刻表关联',
+        clear_overlapping_groups: '清理时段冲突交路',
+        clear_not_running_groups: '清理未开行交路',
+        downgrade_affected_route_statuses: '降级受影响车组状态',
+        cleanup_pruned_tracked_group_rows: '清理重联结果中移除的车组'
+    };
+    return labels[operation] ?? operation;
+}
+
 function formatTrackingMutationTarget(mutation: AdminTrackingMutation) {
     const trainCode = mutation.trainCode || '--';
     const emuCode = mutation.emuCode || '--';
@@ -4747,6 +5089,80 @@ function formatTrackingMutationTarget(mutation: AdminTrackingMutation) {
 
 function formatMutationStatus(status: number | null) {
     return status === null ? '--' : getDepartureStatusLabel(status);
+}
+
+function getPayloadObject(value: unknown): Record<string, unknown> | null {
+    return typeof value === 'object' && value !== null && !Array.isArray(value)
+        ? (value as Record<string, unknown>)
+        : null;
+}
+
+function getPayloadTrainRepeat(event: AdminTrainProvenanceEvent) {
+    const payload = getPayloadObject(event.payload);
+    return typeof payload?.trainRepeat === 'string' &&
+        payload.trainRepeat.length > 0
+        ? payload.trainRepeat
+        : '';
+}
+
+function getStatusDecisionRows(event: AdminTrainProvenanceEvent) {
+    const payload = getPayloadObject(event.payload);
+    const raw = Array.isArray(payload?.statusDecisions)
+        ? payload.statusDecisions
+        : Array.isArray(payload?.statusByEmu)
+          ? payload.statusByEmu
+          : [];
+    return raw
+        .map((item) => getPayloadObject(item))
+        .filter((item): item is Record<string, unknown> => item !== null)
+        .map((item) => {
+            const emuCode =
+                typeof item.emuCode === 'string'
+                    ? item.emuCode
+                    : typeof item.emuId === 'string'
+                      ? item.emuId
+                      : typeof item.emuId === 'number'
+                        ? String(item.emuId)
+                        : '--';
+            const status = typeof item.status === 'number' ? item.status : null;
+            const action =
+                typeof item.persistenceAction === 'string'
+                    ? item.persistenceAction
+                    : '';
+            return {
+                emuCode,
+                statusLabel:
+                    status === null
+                        ? '未提供状态'
+                        : formatEmuRouteStatus(status),
+                persistenceLabel: action
+                    ? `${getTrackingMutationActionLabel(action as AdminTrackingMutation['action'])}${item.persisted === true ? '，已写入数据库' : '，未产生数据库变动'}`
+                    : '状态决策'
+            };
+        });
+}
+
+function formatReuseSource(
+    detail: NonNullable<AdminTrainProvenanceEvent['historicalReuse']>
+) {
+    const route = detail.historicalRoute;
+    const trainCodes = route?.trainCodes?.join(' / ') || '--';
+    const startAt = route?.startAt ? formatTimestamp(route.startAt) : '--';
+    const emus = detail.emuCodes.join(' / ') || '--';
+    return `来源车次 ${trainCodes}，发车 ${startAt}，复用${detail.resultStatus === 'coupled' ? '重联' : '单组'}状态，车组 ${emus}`;
+}
+
+function getStatusReuseTitle(
+    detail: NonNullable<AdminTrainProvenanceEvent['historicalReuse']>
+) {
+    switch (detail.source) {
+        case 'internal_code_group':
+            return '内部车号重联状态复用';
+        case 'current_route_status':
+            return '当前交路状态复用';
+        default:
+            return '历史复用';
+    }
 }
 
 function formatTrackingMutationSummary(

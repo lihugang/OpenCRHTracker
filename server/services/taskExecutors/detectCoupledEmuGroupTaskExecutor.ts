@@ -59,7 +59,8 @@ import {
     markCurrentTrainProvenanceTaskSkipped,
     recordCurrentCouplingScanCandidate,
     recordCurrentTrainProvenanceEvent,
-    recordCurrentTrainProvenanceEventsForTrainCodes
+    recordCurrentTrainProvenanceEventsForTrainCodes,
+    recordCurrentTrainProvenanceTrackingMutations
 } from '~/server/services/trainProvenanceRecorder';
 import {
     getTodayScheduleCache,
@@ -1058,7 +1059,7 @@ async function persistResolvedUntrackedGroups(
                     group.startAt
                 );
 
-            const trackingMutations = persistProbeTrackingRows({
+            let trackingMutations = persistProbeTrackingRows({
                 trainCodes: [group.trainCode],
                 emuIds: emuCodes,
                 startStation: '',
@@ -1067,6 +1068,20 @@ async function persistResolvedUntrackedGroups(
                 endAt: group.endAt,
                 statusByEmu
             });
+            const mutationBatchId =
+                recordCurrentTrainProvenanceTrackingMutations({
+                    source: 'coupling_scan',
+                    operation: 'persist_untracked_scan_result',
+                    serviceDate: unixSecondsToServiceDay(group.startAt),
+                    startAt: group.startAt,
+                    mutations: trackingMutations
+                        .filter((mutation) => mutation.action !== 'unchanged')
+                        .map((mutation) => ({ ...mutation }))
+                });
+            trackingMutations = trackingMutations.map((mutation) => ({
+                ...mutation,
+                mutationBatchId
+            }));
             await notifyLookupStatusChangesBestEffort(
                 notificationSnapshot,
                 trackingMutations
@@ -1133,6 +1148,7 @@ async function persistResolvedUntrackedGroups(
                         statusByEmu.entries(),
                         ([emuId, status]) => ({ emuId, status })
                     ),
+                    trackingMutations,
                     nonMultiple:
                         multipleStateByEmu.get(emuCodes[0]!) === 'non_multiple'
                 }
@@ -1175,6 +1191,11 @@ function cleanupPrunedTrackedGroupRows(
 } {
     let deletedDailyRouteRows = 0;
     let clearedAssignedEmuCodes = 0;
+    const mutations: Array<
+        Parameters<
+            typeof recordCurrentTrainProvenanceTrackingMutations
+        >[0]['mutations'][number]
+    > = [];
 
     for (const emuCode of removedEmuCodes) {
         trackedGroup.knownEmuCodes.delete(emuCode);
@@ -1184,12 +1205,34 @@ function cleanupPrunedTrackedGroupRows(
         }
 
         for (const trainCode of trackedGroup.trainCodes) {
+            const existingRows = listDailyRoutesByTrainCodesAndStartAt(
+                [trainCode],
+                trackedGroup.group.startAt
+            ).filter((row) => Number(row.emu_id) === Number(emuCode));
             deletedDailyRouteRows +=
                 deleteDailyRouteByTrainCodeAndEmuCodeAtStartAt(
                     trainCode,
                     emuCode,
                     trackedGroup.group.startAt
                 );
+            for (const row of existingRows) {
+                mutations.push({
+                    id: row.id,
+                    trainCode: row.train_code,
+                    emuId: row.emu_id,
+                    serviceDate: row.service_date,
+                    timetableId: row.timetable_id,
+                    startAt: row.start_at,
+                    action: 'deleted',
+                    previousStatus: row.status,
+                    nextStatus: null,
+                    detail: {
+                        source: 'coupling_cleanup',
+                        reason: 'pruned_emu_from_tracked_group',
+                        groupKey
+                    }
+                });
+            }
             deleteProbeUntrustedRecordsByTrainCodeAndEmuCodeAtServiceDate(
                 trainCode,
                 emuCode,
@@ -1197,6 +1240,20 @@ function cleanupPrunedTrackedGroupRows(
             );
         }
     }
+
+    recordCurrentTrainProvenanceTrackingMutations({
+        source: 'coupling_cleanup',
+        operation: 'cleanup_pruned_tracked_group_rows',
+        eventType: 'coupling_group_pruned',
+        serviceDate: unixSecondsToServiceDay(trackedGroup.group.startAt),
+        startAt: trackedGroup.group.startAt,
+        detail: {
+            groupKey,
+            removedEmuCodes,
+            trainCodes: trackedGroup.trainCodes
+        },
+        mutations
+    });
 
     return {
         deletedDailyRouteRows,
@@ -1373,7 +1430,7 @@ async function persistResolvedTrackedGroup(
             group.startAt
         );
 
-    const trackingMutations = persistProbeTrackingRows({
+    let trackingMutations = persistProbeTrackingRows({
         trainCodes,
         emuIds: emuCodes,
         startStation,
@@ -1382,6 +1439,19 @@ async function persistResolvedTrackedGroup(
         endAt,
         statusByEmu
     });
+    const mutationBatchId = recordCurrentTrainProvenanceTrackingMutations({
+        source: 'coupling_scan',
+        operation: 'persist_coupling_resolution',
+        serviceDate: unixSecondsToServiceDay(group.startAt),
+        startAt: group.startAt,
+        mutations: trackingMutations
+            .filter((mutation) => mutation.action !== 'unchanged')
+            .map((mutation) => ({ ...mutation }))
+    });
+    trackingMutations = trackingMutations.map((mutation) => ({
+        ...mutation,
+        mutationBatchId
+    }));
 
     if (hasConfirmedCoupled) {
         if (previousStatuses.some((status) => isConfirmedSingle(status))) {
@@ -1410,7 +1480,8 @@ async function persistResolvedTrackedGroup(
                 startStation,
                 endStation,
                 endAt,
-                matchedEmuScanRecords
+                matchedEmuScanRecords,
+                trackingMutations
             }
         });
     } else if (
@@ -1432,7 +1503,12 @@ async function persistResolvedTrackedGroup(
                 emuIds: emuCodes,
                 startStation,
                 endStation,
-                endAt
+                endAt,
+                statusByEmu: Array.from(
+                    statusByEmu.entries(),
+                    ([emuId, status]) => ({ emuId, status })
+                ),
+                trackingMutations
             }
         });
     }

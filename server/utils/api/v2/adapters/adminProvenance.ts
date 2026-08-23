@@ -79,12 +79,10 @@ const REQUEST_TYPE_TO_PROTO = {
     search_train_code: ProtoTrainDataRequestType.SEARCH_TRAIN_CODE,
     fetch_route_info: ProtoTrainDataRequestType.FETCH_ROUTE_INFO,
     fetch_emu_by_route: ProtoTrainDataRequestType.FETCH_EMU_BY_ROUTE,
-    fetch_emu_by_seat_code:
-        ProtoTrainDataRequestType.FETCH_EMU_BY_SEAT_CODE,
+    fetch_emu_by_seat_code: ProtoTrainDataRequestType.FETCH_EMU_BY_SEAT_CODE,
     fetch_all_stations: ProtoTrainDataRequestType.FETCH_ALL_STATIONS,
     fetch_station_board: ProtoTrainDataRequestType.FETCH_STATION_BOARD,
-    fetch_station_exit_info:
-        ProtoTrainDataRequestType.FETCH_STATION_EXIT_INFO,
+    fetch_station_exit_info: ProtoTrainDataRequestType.FETCH_STATION_EXIT_INFO,
     fetch_station_transport_info:
         ProtoTrainDataRequestType.FETCH_STATION_TRANSPORT_INFO
 } satisfies Record<AdminTrainDataRequestType, ProtoTrainDataRequestType>;
@@ -124,8 +122,7 @@ const STATION_BOARD_ACTION_TO_PROTO = {
 
 const STATION_BOARD_RESULT_STATUS_TO_PROTO = {
     saved_entries: ProtoStationBoardFetchResultStatus.SAVED_ENTRIES,
-    no_official_entries:
-        ProtoStationBoardFetchResultStatus.NO_OFFICIAL_ENTRIES
+    no_official_entries: ProtoStationBoardFetchResultStatus.NO_OFFICIAL_ENTRIES
 } satisfies Record<
     AdminStationBoardFetchResultStatus,
     ProtoStationBoardFetchResultStatus
@@ -182,8 +179,7 @@ function toProtoTimelineEvent(event: AdminTrainProvenanceEvent) {
         ...(event.outcomeStatus === null
             ? {}
             : {
-                  outcomeStatus:
-                      OUTCOME_STATUS_TO_PROTO[event.outcomeStatus]
+                  outcomeStatus: OUTCOME_STATUS_TO_PROTO[event.outcomeStatus]
               }),
         createdAt: event.createdAt,
         trainCode: event.trainCode,
@@ -473,7 +469,39 @@ export async function getAdminTrainProvenanceV2Adapter(
             ? {}
             : { selectedStartAt: result.selectedStartAt }),
         timeline: result.timeline.map(toProtoTimelineEvent),
-        departures: result.departures.map(toProtoDeparture)
+        departures: result.departures.map(toProtoDeparture),
+        trackingMutationBatches: result.trackingMutationBatches.map(
+            (batch) => ({
+                id: batch.id,
+                source: batch.source,
+                operation: batch.operation,
+                eventType: batch.eventType,
+                serviceDate: serviceDateToDay(batch.serviceDate),
+                ...(batch.startAt === null ? {} : { startAt: batch.startAt }),
+                createdAt: batch.createdAt,
+                mutations: batch.mutations.map((mutation) => ({
+                    table: mutation.table,
+                    action: mutation.action,
+                    ...(mutation.id === null ? {} : { id: mutation.id }),
+                    trainCode: mutation.trainCode,
+                    emuCode: mutation.emuCode,
+                    serviceDate: serviceDateToDay(mutation.serviceDate),
+                    ...(mutation.timetableId === null
+                        ? {}
+                        : { timetableId: mutation.timetableId }),
+                    ...(mutation.startAt === null
+                        ? {}
+                        : { startAt: mutation.startAt }),
+                    ...(mutation.previousStatus === null
+                        ? {}
+                        : { previousStatus: mutation.previousStatus }),
+                    ...(mutation.nextStatus === null
+                        ? {}
+                        : { nextStatus: mutation.nextStatus }),
+                    rowCount: mutation.rowCount
+                }))
+            })
+        )
     };
 }
 

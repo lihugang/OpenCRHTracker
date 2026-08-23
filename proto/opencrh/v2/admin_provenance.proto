@@ -132,6 +132,7 @@ message GetAdminTrainProvenanceData {
   optional int64 selected_start_at = 5;
   repeated AdminTrainProvenanceDeparture departures = 6;
   repeated AdminTrainProvenanceEvent timeline = 7;
+  repeated google.protobuf.Struct tracking_mutation_batches = 8;
 }
 
 message GetAdminTrainProvenanceResponse {

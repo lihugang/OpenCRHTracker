@@ -23,6 +23,7 @@ import {
     listTrainProvenanceTaskRunsByDateAndExecutor,
     listTrainProvenanceDepartureStartAts,
     listTrainProvenanceEventsByDateAndTrainCode,
+    listTrackingMutationBatchesByTrain,
     type CouplingScanCandidateRecord,
     type StationBoardDispatchResultRecord,
     type StationBoardFetchResultRecord,
@@ -74,6 +75,7 @@ import type {
     AdminTrainProvenanceOutcomeStatus,
     AdminDailyRouteTrackingRecord,
     AdminTrackingMutation,
+    AdminTrackingMutationBatch,
     AdminTrackingMutationAction,
     AdminTrackingMutationSummary,
     AdminTrackingMutationTable,
@@ -544,7 +546,8 @@ function extractTrackingMutationSummary(
     const mutations = rawMutations
         .map(toTrackingMutation)
         .filter(
-            (mutation): mutation is AdminTrackingMutation => mutation !== null
+            (mutation): mutation is AdminTrackingMutation =>
+                mutation !== null && mutation.action !== 'unchanged'
         );
 
     return mutations.length > 0
@@ -1211,13 +1214,47 @@ function buildQrcodeScanTimeSummaryItem(
 function extractHistoricalReuseDetail(
     event: TrainProvenanceEventRecord
 ): AdminTrainProvenanceHistoricalReuseDetail | null {
-    if (event.eventType !== 'historical_reuse_selected') {
+    if (
+        event.eventType !== 'historical_reuse_selected' &&
+        event.eventType !== 'resolved_from_status'
+    ) {
         return null;
     }
 
     const payload = getPayloadObject(event.payload);
-    const historicalStartAt = getOptionalInteger(payload?.historicalStartAt);
-    const emuCodes = formatUnknownEmuIdList(payload?.emuIds);
+    const payloadSourceRows = Array.isArray(payload?.sourceRows)
+        ? payload.sourceRows
+              .map((value) => getPayloadObject(value))
+              .filter(
+                  (value): value is Record<string, unknown> => value !== null
+              )
+              .map((row) => ({
+                  id: getOptionalInteger(row.id) ?? 0,
+                  trainCode: String(row.trainCode ?? ''),
+                  emuCode: String(row.emuCode ?? ''),
+                  serviceDate: formatExternalServiceDate(
+                      asServiceDay(getOptionalInteger(row.serviceDate) ?? 0)
+                  ),
+                  timetableId: getOptionalInteger(row.timetableId),
+                  startAt: getOptionalInteger(row.startAt) ?? 0,
+                  status: getOptionalInteger(row.status) ?? 0
+              }))
+              .filter((row) => row.id > 0)
+        : [];
+    if (
+        event.eventType === 'resolved_from_status' &&
+        payloadSourceRows.length === 0
+    ) {
+        return null;
+    }
+    const historicalStartAt =
+        getOptionalInteger(payload?.historicalStartAt) ??
+        payloadSourceRows[0]?.startAt ??
+        null;
+    const emuCodes = normalizeTrainCodeList([
+        ...formatUnknownEmuIdList(payload?.emuIds),
+        ...payloadSourceRows.map((row) => row.emuCode)
+    ]);
     const payloadTrainCodes = formatUnknownTrainCodeList(
         payload?.historicalTrainCodes
     );
@@ -1232,6 +1269,7 @@ function extractHistoricalReuseDetail(
                 );
     const historicalTrainCodes = normalizeTrainCodeList([
         ...payloadTrainCodes,
+        ...payloadSourceRows.map((row) => row.trainCode),
         ...routeRows.map((row) => formatExternalTrainCode(row.train_code))
     ]);
     const historicalRoute = fillRouteStationsFromTodayCache(
@@ -1243,9 +1281,27 @@ function extractHistoricalReuseDetail(
     );
 
     return {
+        source:
+            payload?.source === 'internal_code_auto_merge'
+                ? 'internal_code_group'
+                : event.eventType === 'historical_reuse_selected'
+                  ? 'historical_route'
+                  : 'current_route_status',
         historicalRoute,
         resultStatus: event.result === 'coupled' ? 'coupled' : 'single',
-        emuCodes: normalizeTrainCodeList(emuCodes)
+        emuCodes,
+        sourceRows:
+            payloadSourceRows.length > 0
+                ? payloadSourceRows
+                : routeRows.map((row) => ({
+                      id: row.id,
+                      trainCode: formatExternalTrainCode(row.train_code),
+                      emuCode: formatExternalEmuCode(row.emu_id),
+                      serviceDate: formatExternalServiceDate(row.service_date),
+                      timetableId: row.timetable_id,
+                      startAt: row.start_at,
+                      status: row.status
+                  }))
     };
 }
 
@@ -2398,7 +2454,8 @@ export function getAdminTrainProvenance(
             trainCode: trainCodeText,
             selectedStartAt: null,
             departures: [],
-            timeline: []
+            timeline: [],
+            trackingMutationBatches: []
         };
     }
 
@@ -2466,6 +2523,40 @@ export function getAdminTrainProvenance(
                       .filter((event) => event.startAt === selectedStartAt)
                       .map(toTimelineEvent)
               );
+    const trackingMutationBatches: AdminTrackingMutationBatch[] =
+        listTrackingMutationBatchesByTrain(
+            serviceDate,
+            trainCode,
+            selectedStartAt
+        ).map((batch) => ({
+            id: batch.id,
+            source: batch.source,
+            operation: batch.operation,
+            eventType: batch.eventType,
+            serviceDate: formatExternalServiceDate(batch.serviceDate),
+            startAt: batch.startAt,
+            createdAt: batch.createdAt,
+            mutations: batch.mutations
+                .map((mutation) =>
+                    toTrackingMutation({
+                        table: 'daily_emu_routes',
+                        action: mutation.action,
+                        id: mutation.dailyRouteId,
+                        trainCode: mutation.trainCode,
+                        emuId: mutation.emuId,
+                        serviceDate: mutation.serviceDate,
+                        timetableId: mutation.timetableId,
+                        startAt: mutation.startAt,
+                        previousStatus: mutation.previousStatus,
+                        nextStatus: mutation.nextStatus,
+                        rowCount: 1
+                    })
+                )
+                .filter(
+                    (mutation): mutation is AdminTrackingMutation =>
+                        mutation !== null && mutation.action !== 'unchanged'
+                )
+        }));
 
     return {
         enabled: true,
@@ -2474,7 +2565,8 @@ export function getAdminTrainProvenance(
         trainCode: trainCodeText,
         selectedStartAt,
         departures,
-        timeline
+        timeline,
+        trackingMutationBatches
     };
 }
 

@@ -23,6 +23,8 @@ import { DETECT_COUPLED_EMU_GROUP_TASK_EXECUTOR } from '~/server/services/taskEx
 import type { EmuListRecord } from '~/server/services/probeAssetStore';
 import type { TrainCodeParts } from '~/server/utils/12306/trainCode';
 import type { EmuId } from '~/server/libs/database/emu';
+import { recordCurrentTrainProvenanceTrackingMutations } from '~/server/services/trainProvenanceRecorder';
+import { unixSecondsToServiceDay } from '~/server/utils/date/serviceDay';
 import getNowSeconds from '~/server/utils/time/getNowSeconds';
 
 interface ApplyResolvedProbeResultInput {
@@ -37,8 +39,31 @@ interface ApplyResolvedProbeResultInput {
     trainKey: string;
     statusByEmu: Map<EmuId, number>;
     nowSeconds: number;
+    auditSource?: string;
+    auditOperation?: string;
+    auditDetail?: unknown;
     beforePersist?: () => void;
     afterPersist?: () => void;
+}
+
+function recordTrackingMutations(
+    input: ApplyResolvedProbeResultInput,
+    mutations: ProbeTrackingMutation[]
+): number | null {
+    const changedMutations = mutations.filter(
+        (mutation) => mutation.action !== 'unchanged'
+    );
+    return recordCurrentTrainProvenanceTrackingMutations({
+        source: input.auditSource ?? 'departure_probe',
+        operation: input.auditOperation ?? 'persist_probe_tracking_rows',
+        serviceDate: unixSecondsToServiceDay(input.startAt),
+        startAt: input.startAt,
+        detail: input.auditDetail,
+        mutations: changedMutations.map((mutation) => ({
+            ...mutation,
+            detail: input.auditDetail
+        }))
+    });
 }
 
 interface ApplyPendingCouplingProbeResultInput extends Omit<
@@ -71,6 +96,7 @@ export async function applyResolvedProbeResult(
         beforePersist: input.beforePersist,
         afterPersist: input.afterPersist
     });
+    const mutationBatchId = recordTrackingMutations(input, trackingMutations);
     markEmuCodesAssignedToday(
         input.allEmuCodes,
         input.trainKey,
@@ -85,7 +111,10 @@ export async function applyResolvedProbeResult(
             trackingMutations
         )
     );
-    return trackingMutations;
+    return trackingMutations.map((mutation) => ({
+        ...mutation,
+        mutationBatchId
+    }));
 }
 
 export async function applyPendingCouplingProbeResult(
@@ -137,6 +166,15 @@ export async function applyPendingCouplingProbeResult(
         endAt: input.endAt,
         statusByEmu
     });
+    const mutationBatchId = recordTrackingMutations(
+        {
+            ...input,
+            statusByEmu,
+            auditOperation:
+                input.auditOperation ?? 'persist_pending_coupling_rows'
+        },
+        trackingMutations
+    );
     markEmuCodesAssignedToday(
         input.allEmuCodes,
         input.trainKey,
@@ -151,7 +189,10 @@ export async function applyPendingCouplingProbeResult(
             trackingMutations
         )
     );
-    return trackingMutations;
+    return trackingMutations.map((mutation) => ({
+        ...mutation,
+        mutationBatchId
+    }));
 }
 
 export function queueCoupledDetectionTask(mainRecord: EmuListRecord): number {

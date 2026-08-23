@@ -43,6 +43,7 @@ export interface ProbeTrackingMutation {
     previousStatus: number | null;
     nextStatus: number | null;
     rowCount: number;
+    mutationBatchId?: number | null;
 }
 
 export interface PersistTrackingRowsInput {

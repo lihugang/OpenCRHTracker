@@ -743,6 +743,17 @@ export interface AdminTrackingMutationSummary {
     dailyRouteDeleted: number;
 }
 
+export interface AdminTrackingMutationBatch {
+    id: number;
+    source: string;
+    operation: string;
+    eventType: string;
+    serviceDate: string;
+    startAt: number | null;
+    createdAt: number;
+    mutations: AdminTrackingMutation[];
+}
+
 export interface AdminTrainProvenanceDeparture {
     startAt: number;
     endAt: number | null;
@@ -807,9 +818,19 @@ export interface AdminTrainRouteSnapshot {
 }
 
 export interface AdminTrainProvenanceHistoricalReuseDetail {
+    source: 'historical_route' | 'current_route_status' | 'internal_code_group';
     historicalRoute: AdminTrainRouteSnapshot | null;
     resultStatus: 'single' | 'coupled';
     emuCodes: string[];
+    sourceRows: Array<{
+        id: number;
+        trainCode: string;
+        emuCode: string;
+        serviceDate: string;
+        timetableId: number | null;
+        startAt: number;
+        status: number;
+    }>;
 }
 
 export interface AdminTrainProvenanceCoupledResolutionDetail {
@@ -959,6 +980,7 @@ export interface AdminTrainProvenanceResponse {
     selectedStartAt: number | null;
     departures: AdminTrainProvenanceDeparture[];
     timeline: AdminTrainProvenanceEvent[];
+    trackingMutationBatches: AdminTrackingMutationBatch[];
 }
 
 export interface AdminStationPlatformRefreshDetailResponse {

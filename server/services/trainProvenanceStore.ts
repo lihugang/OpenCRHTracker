@@ -58,6 +58,7 @@ export type StationPlatformRefreshEntryStatus =
 type TrainProvenanceSqlKey =
     | 'cleanupExpiredRequestHourlyStats'
     | 'cleanupExpiredTaskRuns'
+    | 'cleanupExpiredTrackingMutationBatches'
     | 'incrementRequestHourlyStat'
     | 'insertCouplingScanCandidate'
     | 'insertProvenanceEvent'
@@ -65,6 +66,8 @@ type TrainProvenanceSqlKey =
     | 'insertStationPlatformRefreshResult'
     | 'insertStationBoardDispatchResult'
     | 'insertStationBoardFetchResult'
+    | 'insertTrackingMutationBatch'
+    | 'insertTrackingMutation'
     | 'selectRequestHourlyStatsInRange'
     | 'selectCouplingScanCandidatesByTaskRunId'
     | 'selectDepartureStartAtsByDateAndTrainCode'
@@ -79,6 +82,8 @@ type TrainProvenanceSqlKey =
     | 'selectTaskRunById'
     | 'selectTaskRunsByDateAndExecutor'
     | 'selectTaskRunBySchedulerTaskId'
+    | 'selectTrackingMutationBatchesByTrain'
+    | 'selectTrackingMutationsByBatchId'
     | 'updateTaskRunFinished'
     | 'upsertTaskRunStart';
 
@@ -119,6 +124,36 @@ interface TrainProvenanceEventRow {
     linked_scheduler_task_id: number | null;
     linked_task_run_id: number | null;
     payload_json: string;
+}
+
+interface TrackingMutationBatchRow {
+    id: number;
+    task_run_id: number | null;
+    scheduler_task_id: number | null;
+    source: string;
+    operation: string;
+    event_type: string;
+    service_date: number;
+    start_at: number | null;
+    detail_json: string;
+    created_at: number;
+}
+
+interface TrackingMutationRow {
+    id: number;
+    batch_id: number;
+    daily_route_id: number | null;
+    train_prefix: string;
+    train_number: number;
+    emu_id: number;
+    service_date: number;
+    timetable_id: number | null;
+    start_at: number | null;
+    action: string;
+    previous_status: number | null;
+    next_status: number | null;
+    detail_json: string;
+    created_at: number;
 }
 
 interface CouplingScanCandidateRow {
@@ -255,6 +290,33 @@ export interface TrainProvenanceEventRecord {
     payload: unknown;
 }
 
+export interface TrackingMutationBatchRecord {
+    id: number;
+    taskRunId: number | null;
+    schedulerTaskId: number | null;
+    source: string;
+    operation: string;
+    eventType: string;
+    serviceDate: ServiceDay;
+    startAt: number | null;
+    detail: unknown;
+    createdAt: number;
+    mutations: Array<{
+        id: number;
+        dailyRouteId: number | null;
+        trainCode: TrainCodeParts;
+        emuId: EmuId;
+        serviceDate: ServiceDay;
+        timetableId: number | null;
+        startAt: number | null;
+        action: string;
+        previousStatus: number | null;
+        nextStatus: number | null;
+        detail: unknown;
+        createdAt: number;
+    }>;
+}
+
 export interface CouplingScanCandidateRecord {
     id: number;
     taskRunId: number;
@@ -377,6 +439,30 @@ export interface RecordTrainProvenanceEventInput {
     result?: string;
     linkedSchedulerTaskId?: number | null;
     payload?: unknown;
+}
+
+export interface RecordTrackingMutationBatchInput {
+    taskRunId?: number | null;
+    schedulerTaskId?: number | null;
+    source: string;
+    operation: string;
+    eventType?: string;
+    serviceDate: ServiceDay;
+    startAt?: number | null;
+    detail?: unknown;
+    mutations: Array<{
+        id: number | null;
+        trainCode: TrainCodeParts;
+        emuId: EmuId;
+        serviceDate: ServiceDay;
+        timetableId: number | null;
+        startAt: number | null;
+        action: string;
+        previousStatus: number | null;
+        nextStatus: number | null;
+        detail?: unknown;
+    }>;
+    createdAt?: number;
 }
 
 export interface RecordCouplingScanCandidateInput {
@@ -752,8 +838,16 @@ export function cleanupExpiredTrainProvenance(
         'cleanupExpiredRequestHourlyStats',
         cutoffSeconds
     );
+    const mutationBatchResult = trainProvenanceStatements.run(
+        'cleanupExpiredTrackingMutationBatches',
+        cutoffSeconds
+    );
     lastCleanupAt = nowSeconds;
-    return taskRunResult.changes + requestStatResult.changes;
+    return (
+        taskRunResult.changes +
+        requestStatResult.changes +
+        mutationBatchResult.changes
+    );
 }
 
 export function maybeCleanupExpiredTrainProvenance(
@@ -843,6 +937,49 @@ export function recordTrainProvenanceEvent(
         normalizeOptionalInteger(input.linkedSchedulerTaskId),
         stringifyJson(input.payload)
     );
+}
+
+export function recordTrackingMutationBatch(
+    input: RecordTrackingMutationBatchInput
+): number | null {
+    const createdAt = input.createdAt ?? getNowSeconds();
+    maybeCleanupExpiredTrainProvenance(createdAt);
+    const db = useTrainProvenanceDatabase();
+    const transaction = db.transaction(() => {
+        const batchResult = trainProvenanceStatements.run(
+            'insertTrackingMutationBatch',
+            input.taskRunId ?? null,
+            input.schedulerTaskId ?? null,
+            input.source.trim(),
+            input.operation.trim(),
+            input.eventType?.trim() ?? '',
+            input.serviceDate,
+            normalizeOptionalInteger(input.startAt),
+            stringifyJson(input.detail),
+            createdAt
+        );
+        const batchId = Number(batchResult.lastInsertRowid);
+        for (const mutation of input.mutations) {
+            trainProvenanceStatements.run(
+                'insertTrackingMutation',
+                batchId,
+                mutation.id,
+                mutation.trainCode.prefix,
+                mutation.trainCode.number,
+                mutation.emuId,
+                mutation.serviceDate,
+                mutation.timetableId,
+                normalizeOptionalInteger(mutation.startAt),
+                mutation.action,
+                mutation.previousStatus,
+                mutation.nextStatus,
+                stringifyJson(mutation.detail),
+                createdAt
+            );
+        }
+        return batchId;
+    });
+    return transaction();
 }
 
 export function recordCouplingScanCandidate(
@@ -1169,6 +1306,66 @@ export function listTrainProvenanceEventsByDateAndTrainCode(
             normalizeOptionalInteger(startAt)
         )
         .map(toEventRecord);
+}
+
+function toTrackingMutationBatchRecord(
+    row: TrackingMutationBatchRow,
+    mutations: TrackingMutationRow[]
+): TrackingMutationBatchRecord {
+    return {
+        id: row.id,
+        taskRunId: row.task_run_id,
+        schedulerTaskId: row.scheduler_task_id,
+        source: row.source,
+        operation: row.operation,
+        eventType: row.event_type,
+        serviceDate: asServiceDay(row.service_date),
+        startAt: row.start_at,
+        detail: parseJson(row.detail_json),
+        createdAt: row.created_at,
+        mutations: mutations.map((item) => ({
+            id: item.id,
+            dailyRouteId: item.daily_route_id,
+            trainCode: {
+                prefix: item.train_prefix,
+                number: item.train_number
+            },
+            emuId: asEmuId(item.emu_id),
+            serviceDate: asServiceDay(item.service_date),
+            timetableId: item.timetable_id,
+            startAt: item.start_at,
+            action: item.action,
+            previousStatus: item.previous_status,
+            nextStatus: item.next_status,
+            detail: parseJson(item.detail_json),
+            createdAt: item.created_at
+        }))
+    };
+}
+
+export function listTrackingMutationBatchesByTrain(
+    serviceDate: ServiceDay,
+    trainCode: TrainCodeParts,
+    startAt: number | null
+): TrackingMutationBatchRecord[] {
+    maybeCleanupExpiredTrainProvenance();
+    const rows = trainProvenanceStatements.all<TrackingMutationBatchRow>(
+        'selectTrackingMutationBatchesByTrain',
+        serviceDate,
+        trainCode.prefix,
+        trainCode.number,
+        normalizeOptionalInteger(startAt),
+        normalizeOptionalInteger(startAt)
+    );
+    return rows.map((row) =>
+        toTrackingMutationBatchRecord(
+            row,
+            trainProvenanceStatements.all<TrackingMutationRow>(
+                'selectTrackingMutationsByBatchId',
+                row.id
+            )
+        )
+    );
 }
 
 export function listCouplingScanCandidatesByTaskRunId(taskRunId: number) {
