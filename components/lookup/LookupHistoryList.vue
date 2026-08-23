@@ -574,6 +574,9 @@
                                                         v-if="
                                                             hasKnownCouplingPosition(
                                                                 codeEntry
+                                                            ) &&
+                                                            !shouldUsePlainMobileCouplingText(
+                                                                item
                                                             )
                                                         "
                                                         type="button"
@@ -596,6 +599,17 @@
                                                                 )
                                                             " />
                                                     </button>
+                                                    <span
+                                                        v-else-if="
+                                                            item.codes
+                                                                .length === 1 &&
+                                                            shouldUsePlainMobileCouplingText(
+                                                                item
+                                                            )
+                                                        "
+                                                        class="font-sans font-medium text-slate-400">
+                                                        重联
+                                                    </span>
                                                 </span>
                                                 <button
                                                     v-if="
@@ -1205,7 +1219,21 @@ function getCouplingPairAriaLabel(item: DisplayHistoryListItem) {
     return `查看 ${item.codes.map((entry) => entry.code).join(' 与 ')} 重联编组`;
 }
 
+function shouldUsePlainMobileCouplingText(item: DisplayHistoryListItem) {
+    if (props.type !== 'train' || hasCompleteCouplingPair(item)) {
+        return false;
+    }
+
+    return item.codes.some(
+        (entry) => getCouplingPosition(entry.status) !== 'single'
+    );
+}
+
 function openCouplingSheet(item: DisplayHistoryListItem) {
+    if (shouldUsePlainMobileCouplingText(item)) {
+        return;
+    }
+
     const couplingCodes = item.codes.filter(hasKnownCouplingPosition);
     if (couplingCodes.length === 0) {
         return;
@@ -1216,7 +1244,10 @@ function openCouplingSheet(item: DisplayHistoryListItem) {
 }
 
 function canOpenCouplingSheet(item: DisplayHistoryListItem) {
-    return item.codes.some(hasKnownCouplingPosition);
+    return (
+        !shouldUsePlainMobileCouplingText(item) &&
+        item.codes.some(hasKnownCouplingPosition)
+    );
 }
 
 function resolveStationFocusTrainCodes(item: DisplayHistoryListItem) {
