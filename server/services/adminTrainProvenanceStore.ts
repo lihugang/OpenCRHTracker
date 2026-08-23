@@ -234,6 +234,12 @@ function formatPayloadTrainCode(value: unknown): string {
     return formatExternalTrainCode(value as TrainCodeParts);
 }
 
+function formatPayloadTrainCodeCompat(value: unknown): string {
+    return typeof value === 'string'
+        ? value
+        : formatPayloadTrainCode(value);
+}
+
 function formatPayloadServiceDay(value: unknown): string {
     if (value === null || value === undefined) {
         return '';
@@ -1230,7 +1236,7 @@ function extractHistoricalReuseDetail(
               )
               .map((row) => ({
                   id: getOptionalInteger(row.id) ?? 0,
-                  trainCode: String(row.trainCode ?? ''),
+                  trainCode: formatPayloadTrainCodeCompat(row.trainCode),
                   emuCode: String(row.emuCode ?? ''),
                   serviceDate: formatExternalServiceDate(
                       asServiceDay(getOptionalInteger(row.serviceDate) ?? 0)

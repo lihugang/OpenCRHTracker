@@ -118,7 +118,7 @@ const MAX_REQUEUE_TRAIN_CODES = 8;
 function serializeTrackingSourceRows(rows: readonly DailyEmuRouteRow[]) {
     return rows.map((row) => ({
         id: row.id,
-        trainCode: formatTrainCode(row.train_code),
+        trainCode: row.train_code,
         emuCode: formatExternalEmuCode(row.emu_id),
         serviceDate: row.service_date,
         timetableId: row.timetable_id,
