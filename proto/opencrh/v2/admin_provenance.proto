@@ -274,6 +274,7 @@ message AdminQrcodeScanTaskRunSummary {
 message AdminQrcodeScanTimeDetailTaskItem {
   AdminQrcodeScanTaskRunSummary task_run = 1;
   repeated AdminTrainProvenanceEvent timeline = 2;
+  optional string train_repeat = 3;
 }
 
 message GetAdminTrainProvenanceQrcodeScanRequest {}

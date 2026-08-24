@@ -562,7 +562,10 @@ export async function getAdminTrainProvenanceQrcodeScanV2Adapter(
         ...(result.summary === null ? {} : { summary: result.summary }),
         tasks: result.tasks.map((task) => ({
             taskRun: toProtoTaskRunSummary(task.taskRun),
-            timeline: task.timeline.map(toProtoTimelineEvent)
+            timeline: task.timeline.map(toProtoTimelineEvent),
+            ...(task.trainRepeat === null
+                ? {}
+                : { trainRepeat: task.trainRepeat })
         }))
     };
 }

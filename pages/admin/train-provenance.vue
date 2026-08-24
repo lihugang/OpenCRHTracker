@@ -2409,6 +2409,15 @@
                                                     )
                                                 }}
                                             </span>
+                                            <span
+                                                v-if="item.trainRepeat !== null"
+                                                class="rounded-full bg-violet-50 px-2.5 py-1 text-xs font-medium text-violet-800">
+                                                repeat={{
+                                                    item.trainRepeat === ''
+                                                        ? '(空)'
+                                                        : item.trainRepeat
+                                                }}
+                                            </span>
                                         </div>
                                         <p
                                             class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">

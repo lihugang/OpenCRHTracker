@@ -1091,6 +1091,7 @@ export interface AdminQrcodeScanTaskListResponse {
 export interface AdminQrcodeScanTimeDetailTaskItem {
     taskRun: AdminQrcodeScanTaskRunSummary;
     timeline: AdminTrainProvenanceEvent[];
+    trainRepeat: string | null;
 }
 
 export interface AdminQrcodeScanDetailResponse {

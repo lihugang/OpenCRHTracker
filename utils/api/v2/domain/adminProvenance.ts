@@ -444,6 +444,8 @@ function mapQrcodeDetail(
         tasks: data.tasks.map((item): AdminQrcodeScanTimeDetailTaskItem => {
             const taskRun = item.taskRun;
             return {
+                trainRepeat:
+                    item.trainRepeat === undefined ? null : item.trainRepeat,
                 taskRun: {
                     id: taskRun?.id ?? 0,
                     schedulerTaskId: taskRun?.schedulerTaskId ?? 0,

@@ -218,6 +218,20 @@ function getOptionalString(value: unknown): string | null {
     return typeof value === 'string' ? value : null;
 }
 
+function extractQrcodeScanTrainRepeat(
+    events: ReadonlyArray<TrainProvenanceEventRecord>
+): string | null {
+    const successEvent = events.find(
+        (event) => event.eventType === 'qrcode_detection_succeeded'
+    );
+    if (!successEvent) {
+        return null;
+    }
+
+    const payload = getPayloadObject(successEvent.payload);
+    return getOptionalString(payload?.trainRepeat);
+}
+
 function getOptionalInteger(value: unknown): number | null {
     return typeof value === 'number' && Number.isInteger(value) && value >= 0
         ? value
@@ -2840,11 +2854,11 @@ export function getAdminQrcodeScanDetail(
                 return null;
             }
 
+            const events = listTrainProvenanceEventsByTaskRunId(taskRun.id);
             return {
                 taskRun: taskRunSummary,
-                timeline: listTrainProvenanceEventsByTaskRunId(taskRun.id).map(
-                    toTimelineEvent
-                )
+                timeline: events.map(toTimelineEvent),
+                trainRepeat: extractQrcodeScanTrainRepeat(events)
             };
         })
         .filter(
