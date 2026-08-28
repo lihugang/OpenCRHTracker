@@ -180,23 +180,16 @@ const groups = listDocsApiGroups();
 const { data: apiConfig } = await useDocsApiRuntimeConfig();
 const responseEnvelopeExample = [
     '{',
-    '    "meta": {',
-    '        "remain": 199,',
-    '        "cost": 1',
-    '    },',
-    '    "data": {}',
+    '    "ok": true,',
+    '    "data": {},',
+    '    "error": ""',
     '}'
 ].join('\n');
 const responseErrorExample = [
     '{',
-    '    "meta": {',
-    '        "remain": 199,',
-    '        "cost": 1',
-    '    },',
-    '    "error": {',
-    '        "code": "invalid_param",',
-    '        "message": "date 必须使用 YYYYMMDD 格式。"',
-    '    }',
+    '    "ok": false,',
+    '    "data": "date 必须是 YYYYMMDD",',
+    '    "error": "invalid_param"',
     '}'
 ].join('\n');
 const basics = [
@@ -224,18 +217,18 @@ const basics = [
             apiConfig.value.quota.refillIntervalSeconds +
             ' 秒恢复 ' +
             apiConfig.value.quota.refillAmount +
-            ' 点。每次响应的 meta 字段和响应头（' +
+            ' 点。每次响应通过响应头（' +
             apiConfig.value.headers.remain +
             '、' +
             apiConfig.value.headers.cost +
             '、' +
             apiConfig.value.headers.retryAfter +
-            '）都会带上剩余额度、本次扣费和重试等待时间。'
+            '）提供剩余额度、本次扣费和重试等待时间；这些额度信息不放在 JSON 响应体中。'
     },
     {
         title: '响应结构',
         description:
-            '成功时返回 meta + data，失败时返回 meta + error（包含 code 和 message）。支持分页的接口还会返回 cursor、limit 和 nextCursor。'
+            'JSON 成功响应返回 ok=true、data 和空字符串 error；失败响应返回 ok=false、面向用户的 data 文本和机器可读的 error 错误码。支持分页的接口会在 data 中返回 cursor、limit 和 nextCursor。'
     }
 ];
 const conventions = [

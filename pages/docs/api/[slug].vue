@@ -390,6 +390,18 @@
                                     :code="stringifyExample(content.example)"
                                     text-class="text-xs leading-6" />
                             </div>
+
+                            <div
+                                v-for="example in content.examples"
+                                :key="example.id"
+                                class="space-y-2">
+                                <p class="text-sm font-semibold text-slate-900">
+                                    {{ example.summary }}
+                                </p>
+                                <DocsCodeBlock
+                                    :code="stringifyExample(example.value)"
+                                    text-class="text-xs leading-6" />
+                            </div>
                         </div>
                     </div>
                 </div>

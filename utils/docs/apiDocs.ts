@@ -171,19 +171,28 @@ function resolveResponse(
             }
         ),
         content: Object.entries(response.content ?? {}).map(
-            ([contentType, mediaType]) => ({
-                contentType,
-                schema: resolveSchema(mediaType.schema),
-                example: (() => {
-                    if (mediaType.example !== undefined) {
-                        return mediaType.example;
-                    }
+            ([contentType, mediaType]) => {
+                const schema = resolveSchema(mediaType.schema);
+                const examples = Object.entries(mediaType.examples ?? {}).map(
+                    ([id, example]) => ({
+                        id,
+                        summary: example.summary ?? id,
+                        value: example.value
+                    })
+                );
 
-                    return extractSchemaExample(
-                        resolveSchema(mediaType.schema)
-                    );
-                })()
-            })
+                return {
+                    contentType,
+                    schema,
+                    example:
+                        examples.length > 0
+                            ? undefined
+                            : mediaType.example !== undefined
+                              ? mediaType.example
+                              : extractSchemaExample(schema),
+                    examples
+                };
+            }
         )
     };
 }

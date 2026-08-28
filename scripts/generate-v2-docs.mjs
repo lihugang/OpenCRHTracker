@@ -574,16 +574,14 @@ export function generateDocs() {
     const { messages, enums } = collectProtoTypes();
     const builder = createSchemaBuilder(messages, enums);
 
-    const metaRef = builder.registerMessage('ApiMeta');
-    const errorRef = builder.registerMessage('ApiError');
-
     function successSchema(dataMessageName) {
         return {
             type: 'object',
-            required: ['meta', 'data'],
+            required: ['ok', 'data', 'error'],
             properties: {
-                meta: metaRef,
-                data: builder.registerMessage(dataMessageName)
+                ok: { type: 'boolean', enum: [true] },
+                data: builder.registerMessage(dataMessageName),
+                error: { type: 'string', enum: [''] }
             }
         };
     }
@@ -591,24 +589,40 @@ export function generateDocs() {
     function errorSchema() {
         return {
             type: 'object',
-            required: ['meta', 'error'],
-            properties: {
-                meta: metaRef,
-                error: errorRef
-            }
-        };
-    }
-
-    function rawErrorSchema() {
-        return {
-            type: 'object',
             required: ['ok', 'data', 'error'],
             properties: {
-                ok: { type: 'boolean' },
+                ok: { type: 'boolean', enum: [false] },
                 data: { type: 'string' },
                 error: { type: 'string' }
             }
         };
+    }
+
+    function applyJsonDataSchemaOverrides(operationName, dataMessageName) {
+        builder.registerMessage(dataMessageName);
+        const schema = builder.components.schemas[dataMessageName];
+        if (!schema || schema.type !== 'object') {
+            return;
+        }
+
+        if (operationName === 'GetTrainCirculationImage') {
+            schema.properties = {
+                cacheHit: { type: 'boolean' },
+                ...schema.properties
+            };
+            delete schema.properties.content;
+            delete schema.properties.binaryContentType;
+            schema.required = [
+                'cacheHit',
+                ...(schema.required ?? []).filter(
+                    (name) => name !== 'content' && name !== 'binaryContentType'
+                )
+            ];
+        }
+
+        if (operationName === 'GetDailyExport') {
+            schema.properties.content = { type: 'string' };
+        }
     }
 
     const paths = {};
@@ -649,9 +663,9 @@ export function generateDocs() {
             .replace(/^\/api\/v2/, '')
             .replace(/:([A-Za-z0-9_]+)/g, '{$1}');
         const method = manifest.method.toLowerCase();
-        const raw = endpoint.rawContentTypes !== undefined;
+        applyJsonDataSchemaOverrides(endpoint.operationName, dataMessageName);
         const successSchemaRef = successSchema(dataMessageName);
-        const failureSchema = raw ? rawErrorSchema() : errorSchema();
+        const failureSchema = errorSchema();
 
         const responses = {
             200: {
@@ -680,29 +694,43 @@ export function generateDocs() {
             }
         };
 
+        const errorsByStatus = new Map();
         for (const errorResponse of endpoint.errors) {
-            responses[errorResponse.statusCode] = {
-                description: errorResponse.description,
+            const statusErrors =
+                errorsByStatus.get(errorResponse.statusCode) ?? [];
+            statusErrors.push(errorResponse);
+            errorsByStatus.set(errorResponse.statusCode, statusErrors);
+        }
+
+        for (const [statusCode, statusErrors] of errorsByStatus) {
+            const examples = Object.fromEntries(
+                statusErrors.map((errorResponse) => [
+                    errorResponse.id,
+                    {
+                        summary: errorResponse.description,
+                        value: {
+                            ok: false,
+                            data: errorResponse.data,
+                            error: errorResponse.errorCode
+                        }
+                    }
+                ])
+            );
+            responses[statusCode] = {
+                description: statusErrors
+                    .map((errorResponse) => errorResponse.description)
+                    .join('；'),
                 headers: responseHeaders(),
                 content: {
                     'application/json': {
                         schema: failureSchema,
-                        example: raw
+                        ...(statusErrors.length === 1
                             ? {
-                                  ok: false,
-                                  data: errorResponse.data,
-                                  error: errorResponse.errorCode
+                                  example: statusErrors[0]
+                                      ? examples[statusErrors[0].id].value
+                                      : undefined
                               }
-                            : {
-                                  meta: {
-                                      remain: 159,
-                                      cost: 1
-                                  },
-                                  error: {
-                                      code: errorResponse.errorCode,
-                                      message: errorResponse.data
-                                  }
-                              }
+                            : { examples })
                     }
                 }
             };

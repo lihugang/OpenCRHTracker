@@ -54,6 +54,189 @@ function expect(condition, message) {
     }
 }
 
+function resolveSchema(document, schema) {
+    if (!schema?.$ref) {
+        return schema;
+    }
+
+    const prefix = '#/components/schemas/';
+    if (!schema.$ref.startsWith(prefix)) {
+        return null;
+    }
+    return document.components?.schemas?.[schema.$ref.slice(prefix.length)];
+}
+
+function validateSchemaExample(document, schema, value, pathLabel) {
+    const resolved = resolveSchema(document, schema);
+    if (!resolved) {
+        failures.push(`${pathLabel}: unresolved schema`);
+        return;
+    }
+
+    if (resolved.enum && !resolved.enum.includes(value)) {
+        failures.push(
+            `${pathLabel}: ${JSON.stringify(value)} is not in schema enum`
+        );
+        return;
+    }
+
+    if (resolved.type === 'object') {
+        if (
+            typeof value !== 'object' ||
+            value === null ||
+            Array.isArray(value)
+        ) {
+            failures.push(`${pathLabel}: expected object`);
+            return;
+        }
+
+        for (const requiredName of resolved.required ?? []) {
+            if (!(requiredName in value)) {
+                failures.push(
+                    `${pathLabel}.${requiredName}: missing required property`
+                );
+            }
+        }
+
+        for (const [name, propertySchema] of Object.entries(
+            resolved.properties ?? {}
+        )) {
+            if (name in value) {
+                validateSchemaExample(
+                    document,
+                    propertySchema,
+                    value[name],
+                    `${pathLabel}.${name}`
+                );
+            }
+        }
+
+        if (
+            resolved.additionalProperties &&
+            typeof resolved.additionalProperties === 'object'
+        ) {
+            for (const [name, item] of Object.entries(value)) {
+                validateSchemaExample(
+                    document,
+                    resolved.additionalProperties,
+                    item,
+                    `${pathLabel}.${name}`
+                );
+            }
+        }
+        return;
+    }
+
+    if (resolved.type === 'array') {
+        if (!Array.isArray(value)) {
+            failures.push(`${pathLabel}: expected array`);
+            return;
+        }
+        for (const [index, item] of value.entries()) {
+            validateSchemaExample(
+                document,
+                resolved.items,
+                item,
+                `${pathLabel}[${index}]`
+            );
+        }
+        return;
+    }
+
+    const typeMatches =
+        resolved.type === undefined ||
+        (resolved.type === 'string' && typeof value === 'string') ||
+        (resolved.type === 'boolean' && typeof value === 'boolean') ||
+        (resolved.type === 'number' && typeof value === 'number') ||
+        (resolved.type === 'integer' && Number.isInteger(value));
+    if (!typeMatches) {
+        failures.push(`${pathLabel}: expected ${resolved.type}`);
+    }
+}
+
+function listMediaExamples(mediaType) {
+    if (mediaType.example !== undefined) {
+        return [['example', mediaType.example]];
+    }
+    return Object.entries(mediaType.examples ?? {}).map(([name, example]) => [
+        name,
+        example.value
+    ]);
+}
+
+function validateGeneratedDocument(document) {
+    for (const [pathName, pathItem] of Object.entries(document.paths ?? {})) {
+        for (const [method, operation] of Object.entries(pathItem)) {
+            for (const [statusCode, response] of Object.entries(
+                operation.responses ?? {}
+            )) {
+                const jsonMedia = response.content?.['application/json'];
+                if (!jsonMedia) {
+                    continue;
+                }
+
+                const required = jsonMedia.schema?.required ?? [];
+                expect(
+                    ['ok', 'data', 'error'].every((name) =>
+                        required.includes(name)
+                    ) && !required.includes('meta'),
+                    `${method.toUpperCase()} ${pathName} ${statusCode}: JSON envelope must require ok/data/error and not meta`
+                );
+
+                for (const [exampleName, exampleValue] of listMediaExamples(
+                    jsonMedia
+                )) {
+                    validateSchemaExample(
+                        document,
+                        jsonMedia.schema,
+                        exampleValue,
+                        `${method.toUpperCase()} ${pathName} ${statusCode} ${exampleName}`
+                    );
+                }
+            }
+        }
+    }
+
+    const circulationSchema =
+        document.components.schemas.GetTrainCirculationImageData;
+    expect(
+        circulationSchema?.required?.includes('cacheHit') &&
+            circulationSchema.properties?.cacheHit?.type === 'boolean',
+        'circulation image JSON data must require boolean cacheHit'
+    );
+    expect(
+        circulationSchema?.properties?.content === undefined &&
+            circulationSchema?.properties?.binaryContentType === undefined,
+        'circulation image JSON data must not expose raw content fields'
+    );
+
+    const exportSchema = document.components.schemas.GetDailyExportData;
+    expect(
+        exportSchema?.properties?.content?.type === 'string' &&
+            exportSchema.properties.content.format === undefined,
+        'daily export JSON content must be plain CSV text'
+    );
+
+    const allocation404 =
+        document.paths['/allocation/emu/{emuCode}']?.get?.responses?.['404'];
+    const allocation404Examples = listMediaExamples(
+        allocation404?.content?.['application/json'] ?? {}
+    ).map(([, value]) => value?.error);
+    expect(
+        allocation404Examples.includes('allocation_not_found'),
+        'allocation 404 must document allocation_not_found'
+    );
+    expect(
+        document.paths['/history/emu/{emuCode}']?.get?.responses?.['404'] !==
+            undefined,
+        'EMU history must document its 404 response'
+    );
+    expect(
+        document.paths['/exports/daily']?.get?.responses?.['400'] === undefined,
+        'daily export index must not document an unsupported 400 response'
+    );
+}
+
 async function main() {
     const metadata = loadTypeScriptModule(metadataPath);
     const endpoints = metadata.V2_DOC_ENDPOINTS;
@@ -140,9 +323,23 @@ async function main() {
             Array.isArray(endpoint.errors) && endpoint.errors.length > 0,
             `${endpoint.slug}: needs at least one error response`
         );
+        const seenErrorIds = new Set();
+        for (const errorResponse of endpoint.errors ?? []) {
+            expect(
+                typeof errorResponse.id === 'string' &&
+                    errorResponse.id.length > 0,
+                `${endpoint.slug}: every error example needs an id`
+            );
+            expect(
+                !seenErrorIds.has(errorResponse.id),
+                `${endpoint.slug}: duplicate error example id ${errorResponse.id}`
+            );
+            seenErrorIds.add(errorResponse.id);
+        }
     }
 
     const generated = generateDocs();
+    validateGeneratedDocument(generated.document);
     const expectedTs = await formatGeneratedTs(
         renderGeneratedTs(generated.document)
     );

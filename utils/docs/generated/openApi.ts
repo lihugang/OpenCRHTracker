@@ -82,36 +82,6 @@ export const developerDocsOpenApi: OpenApiDocument = {
             }
         },
         schemas: {
-            ApiMeta: {
-                type: 'object',
-                properties: {
-                    remain: {
-                        type: 'integer',
-                        format: 'int64'
-                    },
-                    cost: {
-                        type: 'integer',
-                        format: 'int64'
-                    },
-                    retryAfter: {
-                        type: 'integer',
-                        format: 'int64'
-                    }
-                },
-                required: ['remain', 'cost']
-            },
-            ApiError: {
-                type: 'object',
-                properties: {
-                    code: {
-                        type: 'string'
-                    },
-                    message: {
-                        type: 'string'
-                    }
-                },
-                required: ['code', 'message']
-            },
             GetAuthMeData: {
                 type: 'object',
                 properties: {
@@ -636,6 +606,9 @@ export const developerDocsOpenApi: OpenApiDocument = {
             GetTrainCirculationImageData: {
                 type: 'object',
                 properties: {
+                    cacheHit: {
+                        type: 'boolean'
+                    },
                     requestTrainCode: {
                         $ref: '#/components/schemas/TrainCode'
                     },
@@ -647,16 +620,9 @@ export const developerDocsOpenApi: OpenApiDocument = {
                     },
                     imageUrl: {
                         type: 'string'
-                    },
-                    content: {
-                        type: 'string',
-                        format: 'byte'
-                    },
-                    binaryContentType: {
-                        type: 'string'
                     }
                 },
-                required: ['documentId', 'imageUrl']
+                required: ['cacheHit', 'documentId', 'imageUrl']
             },
             GetTrainTimetableHistoryData: {
                 type: 'object',
@@ -1211,8 +1177,7 @@ export const developerDocsOpenApi: OpenApiDocument = {
                         format: 'uint32'
                     },
                     content: {
-                        type: 'string',
-                        format: 'byte'
+                        type: 'string'
                     }
                 },
                 required: ['serviceDay', 'total', 'content']
@@ -1254,21 +1219,23 @@ export const developerDocsOpenApi: OpenApiDocument = {
                             'application/json': {
                                 schema: {
                                     type: 'object',
-                                    required: ['meta', 'data'],
+                                    required: ['ok', 'data', 'error'],
                                     properties: {
-                                        meta: {
-                                            $ref: '#/components/schemas/ApiMeta'
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [true]
                                         },
                                         data: {
                                             $ref: '#/components/schemas/GetAuthMeData'
+                                        },
+                                        error: {
+                                            type: 'string',
+                                            enum: ['']
                                         }
                                     }
                                 },
                                 example: {
-                                    meta: {
-                                        remain: 2000,
-                                        cost: 1
-                                    },
+                                    ok: true,
                                     data: {
                                         user: {
                                             userId: 'demo-user'
@@ -1293,7 +1260,8 @@ export const developerDocsOpenApi: OpenApiDocument = {
                                             refillIntervalSeconds: 300,
                                             nextRefillAt: 1786637100
                                         }
-                                    }
+                                    },
+                                    error: ''
                                 }
                             }
                         }
@@ -1316,32 +1284,31 @@ export const developerDocsOpenApi: OpenApiDocument = {
                             'application/json': {
                                 schema: {
                                     type: 'object',
-                                    required: ['meta', 'error'],
+                                    required: ['ok', 'data', 'error'],
                                     properties: {
-                                        meta: {
-                                            $ref: '#/components/schemas/ApiMeta'
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [false]
+                                        },
+                                        data: {
+                                            type: 'string'
                                         },
                                         error: {
-                                            $ref: '#/components/schemas/ApiError'
+                                            type: 'string'
                                         }
                                     }
                                 },
                                 example: {
-                                    meta: {
-                                        remain: 159,
-                                        cost: 1
-                                    },
-                                    error: {
-                                        code: 'invalid_api_key',
-                                        message: 'API Key 无效或已过期。'
-                                    }
+                                    ok: false,
+                                    data: 'API Key 无效或已过期',
+                                    error: 'invalid_api_key'
                                 }
                             }
                         }
                     },
                     '403': {
                         description:
-                            '账号已被封禁，或当前凭证缺少 api.auth.me.read 权限。',
+                            '账号已被封禁。；当前凭证缺少调用该接口所需的 scope。；当前身份的额度上限低于接口最低调用成本。',
                         headers: {
                             'x-api-remain': {
                                 $ref: '#/components/headers/ApiRemain'
@@ -1357,31 +1324,53 @@ export const developerDocsOpenApi: OpenApiDocument = {
                             'application/json': {
                                 schema: {
                                     type: 'object',
-                                    required: ['meta', 'error'],
+                                    required: ['ok', 'data', 'error'],
                                     properties: {
-                                        meta: {
-                                            $ref: '#/components/schemas/ApiMeta'
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [false]
+                                        },
+                                        data: {
+                                            type: 'string'
                                         },
                                         error: {
-                                            $ref: '#/components/schemas/ApiError'
+                                            type: 'string'
                                         }
                                     }
                                 },
-                                example: {
-                                    meta: {
-                                        remain: 159,
-                                        cost: 1
+                                examples: {
+                                    '403-account_banned': {
+                                        summary: '账号已被封禁。',
+                                        value: {
+                                            ok: false,
+                                            data: '账号已被封禁',
+                                            error: 'account_banned'
+                                        }
                                     },
-                                    error: {
-                                        code: 'account_banned',
-                                        message: '账号已被封禁。'
+                                    '403-forbidden_scope': {
+                                        summary:
+                                            '当前凭证缺少调用该接口所需的 scope。',
+                                        value: {
+                                            ok: false,
+                                            data: '当前 API Key 缺乏访问该接口的权限',
+                                            error: 'forbidden_scope'
+                                        }
+                                    },
+                                    '403-cost_exceeds_quota_limit': {
+                                        summary:
+                                            '当前身份的额度上限低于接口最低调用成本。',
+                                        value: {
+                                            ok: false,
+                                            data: '当前身份额度上限不足，无法调用该接口',
+                                            error: 'cost_exceeds_quota_limit'
+                                        }
                                     }
                                 }
                             }
                         }
                     },
-                    '429': {
-                        description: '额度不足或请求过于频繁。',
+                    '406': {
+                        description: 'Accept 请求头不支持 JSON 响应。',
                         headers: {
                             'x-api-remain': {
                                 $ref: '#/components/headers/ApiRemain'
@@ -1397,25 +1386,103 @@ export const developerDocsOpenApi: OpenApiDocument = {
                             'application/json': {
                                 schema: {
                                     type: 'object',
-                                    required: ['meta', 'error'],
+                                    required: ['ok', 'data', 'error'],
                                     properties: {
-                                        meta: {
-                                            $ref: '#/components/schemas/ApiMeta'
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [false]
+                                        },
+                                        data: {
+                                            type: 'string'
                                         },
                                         error: {
-                                            $ref: '#/components/schemas/ApiError'
+                                            type: 'string'
                                         }
                                     }
                                 },
                                 example: {
-                                    meta: {
-                                        remain: 159,
-                                        cost: 1
-                                    },
-                                    error: {
-                                        code: 'rate_limited',
-                                        message: '额度不足，请稍后再试。'
+                                    ok: false,
+                                    data: 'Accept 不支持 application/json 或 application/x-protobuf',
+                                    error: 'not_acceptable'
+                                }
+                            }
+                        }
+                    },
+                    '429': {
+                        description:
+                            '额度不足或请求过于频繁，建议等 Retry-After 提示的时间后再试。',
+                        headers: {
+                            'x-api-remain': {
+                                $ref: '#/components/headers/ApiRemain'
+                            },
+                            'x-api-cost': {
+                                $ref: '#/components/headers/ApiCost'
+                            },
+                            'Retry-After': {
+                                $ref: '#/components/headers/RetryAfter'
+                            }
+                        },
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    type: 'object',
+                                    required: ['ok', 'data', 'error'],
+                                    properties: {
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [false]
+                                        },
+                                        data: {
+                                            type: 'string'
+                                        },
+                                        error: {
+                                            type: 'string'
+                                        }
                                     }
+                                },
+                                example: {
+                                    ok: false,
+                                    data: '额度不足，请稍后再试',
+                                    error: 'quota_exceeded'
+                                }
+                            }
+                        }
+                    },
+                    '500': {
+                        description: '服务内部错误或响应编码失败。',
+                        headers: {
+                            'x-api-remain': {
+                                $ref: '#/components/headers/ApiRemain'
+                            },
+                            'x-api-cost': {
+                                $ref: '#/components/headers/ApiCost'
+                            },
+                            'Retry-After': {
+                                $ref: '#/components/headers/RetryAfter'
+                            }
+                        },
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    type: 'object',
+                                    required: ['ok', 'data', 'error'],
+                                    properties: {
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [false]
+                                        },
+                                        data: {
+                                            type: 'string'
+                                        },
+                                        error: {
+                                            type: 'string'
+                                        }
+                                    }
+                                },
+                                example: {
+                                    ok: false,
+                                    data: '服务内部错误，请稍后再试',
+                                    error: 'internal_error'
                                 }
                             }
                         }
@@ -1448,7 +1515,7 @@ export const developerDocsOpenApi: OpenApiDocument = {
                 'x-faq': [
                     {
                         question: '为什么调用这个接口也能看到额度？',
-                        answer: '每次响应都会带 meta 字段，里面是本次请求后的剩余额度（remain）、本次扣费（cost）和可能的重试等待时间（retryAfter）。'
+                        answer: '额度信息通过 x-api-remain、x-api-cost 和可选的 Retry-After 响应头返回，不放在 JSON 响应体里。'
                     },
                     {
                         question: 'issuer 字段表示什么？',
@@ -1527,13 +1594,18 @@ export const developerDocsOpenApi: OpenApiDocument = {
                             'application/json': {
                                 schema: {
                                     type: 'object',
-                                    required: ['meta', 'data'],
+                                    required: ['ok', 'data', 'error'],
                                     properties: {
-                                        meta: {
-                                            $ref: '#/components/schemas/ApiMeta'
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [true]
                                         },
                                         data: {
                                             $ref: '#/components/schemas/GetDailyRecordsData'
+                                        },
+                                        error: {
+                                            type: 'string',
+                                            enum: ['']
                                         }
                                     }
                                 },
@@ -1553,7 +1625,8 @@ export const developerDocsOpenApi: OpenApiDocument = {
                                                 trainCode: {
                                                     prefix: 'G',
                                                     number: 7309
-                                                }
+                                                },
+                                                status: 3
                                             },
                                             {
                                                 id: 1894995,
@@ -1563,7 +1636,8 @@ export const developerDocsOpenApi: OpenApiDocument = {
                                                 trainCode: {
                                                     prefix: 'G',
                                                     number: 7309
-                                                }
+                                                },
+                                                status: 3
                                             }
                                         ],
                                         emuCodeMappings: {
@@ -1586,7 +1660,7 @@ export const developerDocsOpenApi: OpenApiDocument = {
                     },
                     '400': {
                         description:
-                            '请求参数不合法：可能是日期格式、游标格式或 limit 不符合要求。',
+                            'date 查询参数不是有效的 YYYYMMDD 日期。；limit 查询参数不是正整数。；cursor 查询参数格式无效。',
                         headers: {
                             'x-api-remain': {
                                 $ref: '#/components/headers/ApiRemain'
@@ -1602,24 +1676,45 @@ export const developerDocsOpenApi: OpenApiDocument = {
                             'application/json': {
                                 schema: {
                                     type: 'object',
-                                    required: ['meta', 'error'],
+                                    required: ['ok', 'data', 'error'],
                                     properties: {
-                                        meta: {
-                                            $ref: '#/components/schemas/ApiMeta'
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [false]
+                                        },
+                                        data: {
+                                            type: 'string'
                                         },
                                         error: {
-                                            $ref: '#/components/schemas/ApiError'
+                                            type: 'string'
                                         }
                                     }
                                 },
-                                example: {
-                                    meta: {
-                                        remain: 159,
-                                        cost: 1
+                                examples: {
+                                    '400-invalid-date': {
+                                        summary:
+                                            'date 查询参数不是有效的 YYYYMMDD 日期。',
+                                        value: {
+                                            ok: false,
+                                            data: 'date 必须是 YYYYMMDD',
+                                            error: 'invalid_param'
+                                        }
                                     },
-                                    error: {
-                                        code: 'invalid_param',
-                                        message: 'date 必须使用 YYYYMMDD 格式。'
+                                    '400-invalid-limit': {
+                                        summary: 'limit 查询参数不是正整数。',
+                                        value: {
+                                            ok: false,
+                                            data: 'limit 必须是正整数',
+                                            error: 'invalid_param'
+                                        }
+                                    },
+                                    '400-invalid-cursor': {
+                                        summary: 'cursor 查询参数格式无效。',
+                                        value: {
+                                            ok: false,
+                                            data: 'cursor 必须是 "serviceDay:id" 格式',
+                                            error: 'invalid_param'
+                                        }
                                     }
                                 }
                             }
@@ -1643,31 +1738,31 @@ export const developerDocsOpenApi: OpenApiDocument = {
                             'application/json': {
                                 schema: {
                                     type: 'object',
-                                    required: ['meta', 'error'],
+                                    required: ['ok', 'data', 'error'],
                                     properties: {
-                                        meta: {
-                                            $ref: '#/components/schemas/ApiMeta'
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [false]
+                                        },
+                                        data: {
+                                            type: 'string'
                                         },
                                         error: {
-                                            $ref: '#/components/schemas/ApiError'
+                                            type: 'string'
                                         }
                                     }
                                 },
                                 example: {
-                                    meta: {
-                                        remain: 159,
-                                        cost: 1
-                                    },
-                                    error: {
-                                        code: 'invalid_api_key',
-                                        message: 'API Key 无效或已过期。'
-                                    }
+                                    ok: false,
+                                    data: 'API Key 无效或已过期',
+                                    error: 'invalid_api_key'
                                 }
                             }
                         }
                     },
                     '403': {
-                        description: '当前凭证缺少调用该接口所需的 scope。',
+                        description:
+                            '账号已被封禁。；当前凭证缺少调用该接口所需的 scope。；当前身份的额度上限低于接口最低调用成本。',
                         headers: {
                             'x-api-remain': {
                                 $ref: '#/components/headers/ApiRemain'
@@ -1683,25 +1778,86 @@ export const developerDocsOpenApi: OpenApiDocument = {
                             'application/json': {
                                 schema: {
                                     type: 'object',
-                                    required: ['meta', 'error'],
+                                    required: ['ok', 'data', 'error'],
                                     properties: {
-                                        meta: {
-                                            $ref: '#/components/schemas/ApiMeta'
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [false]
+                                        },
+                                        data: {
+                                            type: 'string'
                                         },
                                         error: {
-                                            $ref: '#/components/schemas/ApiError'
+                                            type: 'string'
+                                        }
+                                    }
+                                },
+                                examples: {
+                                    '403-account_banned': {
+                                        summary: '账号已被封禁。',
+                                        value: {
+                                            ok: false,
+                                            data: '账号已被封禁',
+                                            error: 'account_banned'
+                                        }
+                                    },
+                                    '403-forbidden_scope': {
+                                        summary:
+                                            '当前凭证缺少调用该接口所需的 scope。',
+                                        value: {
+                                            ok: false,
+                                            data: '当前 API Key 缺乏访问该接口的权限',
+                                            error: 'forbidden_scope'
+                                        }
+                                    },
+                                    '403-cost_exceeds_quota_limit': {
+                                        summary:
+                                            '当前身份的额度上限低于接口最低调用成本。',
+                                        value: {
+                                            ok: false,
+                                            data: '当前身份额度上限不足，无法调用该接口',
+                                            error: 'cost_exceeds_quota_limit'
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    '406': {
+                        description: 'Accept 请求头不支持 JSON 响应。',
+                        headers: {
+                            'x-api-remain': {
+                                $ref: '#/components/headers/ApiRemain'
+                            },
+                            'x-api-cost': {
+                                $ref: '#/components/headers/ApiCost'
+                            },
+                            'Retry-After': {
+                                $ref: '#/components/headers/RetryAfter'
+                            }
+                        },
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    type: 'object',
+                                    required: ['ok', 'data', 'error'],
+                                    properties: {
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [false]
+                                        },
+                                        data: {
+                                            type: 'string'
+                                        },
+                                        error: {
+                                            type: 'string'
                                         }
                                     }
                                 },
                                 example: {
-                                    meta: {
-                                        remain: 159,
-                                        cost: 1
-                                    },
-                                    error: {
-                                        code: 'forbidden',
-                                        message: '缺少调用该接口所需的权限。'
-                                    }
+                                    ok: false,
+                                    data: 'Accept 不支持 application/json 或 application/x-protobuf',
+                                    error: 'not_acceptable'
                                 }
                             }
                         }
@@ -1724,25 +1880,63 @@ export const developerDocsOpenApi: OpenApiDocument = {
                             'application/json': {
                                 schema: {
                                     type: 'object',
-                                    required: ['meta', 'error'],
+                                    required: ['ok', 'data', 'error'],
                                     properties: {
-                                        meta: {
-                                            $ref: '#/components/schemas/ApiMeta'
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [false]
+                                        },
+                                        data: {
+                                            type: 'string'
                                         },
                                         error: {
-                                            $ref: '#/components/schemas/ApiError'
+                                            type: 'string'
                                         }
                                     }
                                 },
                                 example: {
-                                    meta: {
-                                        remain: 159,
-                                        cost: 1
-                                    },
-                                    error: {
-                                        code: 'rate_limited',
-                                        message: '额度不足，请稍后再试。'
+                                    ok: false,
+                                    data: '额度不足，请稍后再试',
+                                    error: 'quota_exceeded'
+                                }
+                            }
+                        }
+                    },
+                    '500': {
+                        description: '服务内部错误或响应编码失败。',
+                        headers: {
+                            'x-api-remain': {
+                                $ref: '#/components/headers/ApiRemain'
+                            },
+                            'x-api-cost': {
+                                $ref: '#/components/headers/ApiCost'
+                            },
+                            'Retry-After': {
+                                $ref: '#/components/headers/RetryAfter'
+                            }
+                        },
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    type: 'object',
+                                    required: ['ok', 'data', 'error'],
+                                    properties: {
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [false]
+                                        },
+                                        data: {
+                                            type: 'string'
+                                        },
+                                        error: {
+                                            type: 'string'
+                                        }
                                     }
+                                },
+                                example: {
+                                    ok: false,
+                                    data: '服务内部错误，请稍后再试',
+                                    error: 'internal_error'
                                 }
                             }
                         }
@@ -1841,20 +2035,25 @@ export const developerDocsOpenApi: OpenApiDocument = {
                             'application/json': {
                                 schema: {
                                     type: 'object',
-                                    required: ['meta', 'data'],
+                                    required: ['ok', 'data', 'error'],
                                     properties: {
-                                        meta: {
-                                            $ref: '#/components/schemas/ApiMeta'
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [true]
                                         },
                                         data: {
                                             $ref: '#/components/schemas/GetCurrentTrainTimetableData'
+                                        },
+                                        error: {
+                                            type: 'string',
+                                            enum: ['']
                                         }
                                     }
                                 },
                                 example: {
                                     ok: true,
                                     data: {
-                                        updatedAt: 1786672375,
+                                        updatedAt: 1787838393,
                                         requestTrainCode: {
                                             prefix: 'G',
                                             number: 2492
@@ -1882,11 +2081,11 @@ export const developerDocsOpenApi: OpenApiDocument = {
                                         ],
                                         startStation: '包头',
                                         endStation: '北京北',
-                                        startAt: 1786663920,
-                                        endAt: 1786675800,
+                                        startAt: 1787873520,
+                                        endAt: 1787885400,
                                         circulation: {
                                             source: 'official',
-                                            refreshAt: 1786622308,
+                                            refreshAt: 1787825543,
                                             nodes: [
                                                 {
                                                     internalCode:
@@ -1999,12 +2198,12 @@ export const developerDocsOpenApi: OpenApiDocument = {
                                             {
                                                 stationNo: 1,
                                                 stationName: '包头',
-                                                departAt: 1786663920,
+                                                departAt: 1787873520,
                                                 stationTrainCode: {
                                                     prefix: 'G',
                                                     number: 2492
                                                 },
-                                                wicket: '一层2检票口',
+                                                wicket: '一层1检票口,一层2检票口',
                                                 distance: 0,
                                                 platformNo: 1,
                                                 isStart: true,
@@ -2013,77 +2212,36 @@ export const developerDocsOpenApi: OpenApiDocument = {
                                             {
                                                 stationNo: 2,
                                                 stationName: '呼和浩特',
-                                                arriveAt: 1786667460,
-                                                departAt: 1786667760,
+                                                arriveAt: 1787877060,
+                                                departAt: 1787877360,
                                                 stationTrainCode: {
                                                     prefix: 'G',
                                                     number: 2492
                                                 },
                                                 wicket: '3检票口,4检票口',
                                                 distance: 165,
-                                                platformNo: 4,
+                                                platformNo: 2,
                                                 isStart: false,
                                                 isEnd: false
                                             },
                                             {
                                                 stationNo: 3,
                                                 stationName: '北京北',
-                                                arriveAt: 1786675800,
+                                                arriveAt: 1787885400,
                                                 stationTrainCode: {
                                                     prefix: 'G',
                                                     number: 2492
                                                 },
-                                                wicket: '1检票口',
+                                                wicket: '',
                                                 distance: 633,
                                                 platformNo: 4,
                                                 isStart: false,
                                                 isEnd: true
                                             }
                                         ],
-                                        serviceDay: 20679
+                                        serviceDay: 20693
                                     },
                                     error: ''
-                                }
-                            }
-                        }
-                    },
-                    '400': {
-                        description:
-                            '请求参数不合法：可能是日期格式、游标格式或 limit 不符合要求。',
-                        headers: {
-                            'x-api-remain': {
-                                $ref: '#/components/headers/ApiRemain'
-                            },
-                            'x-api-cost': {
-                                $ref: '#/components/headers/ApiCost'
-                            },
-                            'Retry-After': {
-                                $ref: '#/components/headers/RetryAfter'
-                            }
-                        },
-                        content: {
-                            'application/json': {
-                                schema: {
-                                    type: 'object',
-                                    required: ['meta', 'error'],
-                                    properties: {
-                                        meta: {
-                                            $ref: '#/components/schemas/ApiMeta'
-                                        },
-                                        error: {
-                                            $ref: '#/components/schemas/ApiError'
-                                        }
-                                    }
-                                },
-                                example: {
-                                    meta: {
-                                        remain: 159,
-                                        cost: 1
-                                    },
-                                    error: {
-                                        code: 'invalid_param',
-                                        message: 'date 必须使用 YYYYMMDD 格式。'
-                                    }
                                 }
                             }
                         }
@@ -2106,31 +2264,31 @@ export const developerDocsOpenApi: OpenApiDocument = {
                             'application/json': {
                                 schema: {
                                     type: 'object',
-                                    required: ['meta', 'error'],
+                                    required: ['ok', 'data', 'error'],
                                     properties: {
-                                        meta: {
-                                            $ref: '#/components/schemas/ApiMeta'
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [false]
+                                        },
+                                        data: {
+                                            type: 'string'
                                         },
                                         error: {
-                                            $ref: '#/components/schemas/ApiError'
+                                            type: 'string'
                                         }
                                     }
                                 },
                                 example: {
-                                    meta: {
-                                        remain: 159,
-                                        cost: 1
-                                    },
-                                    error: {
-                                        code: 'invalid_api_key',
-                                        message: 'API Key 无效或已过期。'
-                                    }
+                                    ok: false,
+                                    data: 'API Key 无效或已过期',
+                                    error: 'invalid_api_key'
                                 }
                             }
                         }
                     },
                     '403': {
-                        description: '当前凭证缺少调用该接口所需的 scope。',
+                        description:
+                            '账号已被封禁。；当前凭证缺少调用该接口所需的 scope。；当前身份的额度上限低于接口最低调用成本。',
                         headers: {
                             'x-api-remain': {
                                 $ref: '#/components/headers/ApiRemain'
@@ -2146,24 +2304,46 @@ export const developerDocsOpenApi: OpenApiDocument = {
                             'application/json': {
                                 schema: {
                                     type: 'object',
-                                    required: ['meta', 'error'],
+                                    required: ['ok', 'data', 'error'],
                                     properties: {
-                                        meta: {
-                                            $ref: '#/components/schemas/ApiMeta'
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [false]
+                                        },
+                                        data: {
+                                            type: 'string'
                                         },
                                         error: {
-                                            $ref: '#/components/schemas/ApiError'
+                                            type: 'string'
                                         }
                                     }
                                 },
-                                example: {
-                                    meta: {
-                                        remain: 159,
-                                        cost: 1
+                                examples: {
+                                    '403-account_banned': {
+                                        summary: '账号已被封禁。',
+                                        value: {
+                                            ok: false,
+                                            data: '账号已被封禁',
+                                            error: 'account_banned'
+                                        }
                                     },
-                                    error: {
-                                        code: 'forbidden',
-                                        message: '缺少调用该接口所需的权限。'
+                                    '403-forbidden_scope': {
+                                        summary:
+                                            '当前凭证缺少调用该接口所需的 scope。',
+                                        value: {
+                                            ok: false,
+                                            data: '当前 API Key 缺乏访问该接口的权限',
+                                            error: 'forbidden_scope'
+                                        }
+                                    },
+                                    '403-cost_exceeds_quota_limit': {
+                                        summary:
+                                            '当前身份的额度上限低于接口最低调用成本。',
+                                        value: {
+                                            ok: false,
+                                            data: '当前身份额度上限不足，无法调用该接口',
+                                            error: 'cost_exceeds_quota_limit'
+                                        }
                                     }
                                 }
                             }
@@ -2186,25 +2366,63 @@ export const developerDocsOpenApi: OpenApiDocument = {
                             'application/json': {
                                 schema: {
                                     type: 'object',
-                                    required: ['meta', 'error'],
+                                    required: ['ok', 'data', 'error'],
                                     properties: {
-                                        meta: {
-                                            $ref: '#/components/schemas/ApiMeta'
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [false]
+                                        },
+                                        data: {
+                                            type: 'string'
                                         },
                                         error: {
-                                            $ref: '#/components/schemas/ApiError'
+                                            type: 'string'
                                         }
                                     }
                                 },
                                 example: {
-                                    meta: {
-                                        remain: 159,
-                                        cost: 1
-                                    },
-                                    error: {
-                                        code: 'not_found',
-                                        message: '当前暂无时刻表。'
+                                    ok: false,
+                                    data: '当前暂无时刻表',
+                                    error: 'not_found'
+                                }
+                            }
+                        }
+                    },
+                    '406': {
+                        description: 'Accept 请求头不支持 JSON 响应。',
+                        headers: {
+                            'x-api-remain': {
+                                $ref: '#/components/headers/ApiRemain'
+                            },
+                            'x-api-cost': {
+                                $ref: '#/components/headers/ApiCost'
+                            },
+                            'Retry-After': {
+                                $ref: '#/components/headers/RetryAfter'
+                            }
+                        },
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    type: 'object',
+                                    required: ['ok', 'data', 'error'],
+                                    properties: {
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [false]
+                                        },
+                                        data: {
+                                            type: 'string'
+                                        },
+                                        error: {
+                                            type: 'string'
+                                        }
                                     }
+                                },
+                                example: {
+                                    ok: false,
+                                    data: 'Accept 不支持 application/json 或 application/x-protobuf',
+                                    error: 'not_acceptable'
                                 }
                             }
                         }
@@ -2227,25 +2445,63 @@ export const developerDocsOpenApi: OpenApiDocument = {
                             'application/json': {
                                 schema: {
                                     type: 'object',
-                                    required: ['meta', 'error'],
+                                    required: ['ok', 'data', 'error'],
                                     properties: {
-                                        meta: {
-                                            $ref: '#/components/schemas/ApiMeta'
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [false]
+                                        },
+                                        data: {
+                                            type: 'string'
                                         },
                                         error: {
-                                            $ref: '#/components/schemas/ApiError'
+                                            type: 'string'
                                         }
                                     }
                                 },
                                 example: {
-                                    meta: {
-                                        remain: 159,
-                                        cost: 1
-                                    },
-                                    error: {
-                                        code: 'rate_limited',
-                                        message: '额度不足，请稍后再试。'
+                                    ok: false,
+                                    data: '额度不足，请稍后再试',
+                                    error: 'quota_exceeded'
+                                }
+                            }
+                        }
+                    },
+                    '500': {
+                        description: '服务内部错误或响应编码失败。',
+                        headers: {
+                            'x-api-remain': {
+                                $ref: '#/components/headers/ApiRemain'
+                            },
+                            'x-api-cost': {
+                                $ref: '#/components/headers/ApiCost'
+                            },
+                            'Retry-After': {
+                                $ref: '#/components/headers/RetryAfter'
+                            }
+                        },
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    type: 'object',
+                                    required: ['ok', 'data', 'error'],
+                                    properties: {
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [false]
+                                        },
+                                        data: {
+                                            type: 'string'
+                                        },
+                                        error: {
+                                            type: 'string'
+                                        }
                                     }
+                                },
+                                example: {
+                                    ok: false,
+                                    data: '服务内部错误，请稍后再试',
+                                    error: 'internal_error'
                                 }
                             }
                         }
@@ -2328,10 +2584,10 @@ export const developerDocsOpenApi: OpenApiDocument = {
                         name: 'binary',
                         in: 'query',
                         description:
-                            '是否直接返回图片或 PDF 的原始二进制内容。传 true 时响应体就是文件本身；不传或传 false 时返回 JSON 包装结构（包含图片直链）。',
+                            '是否直接返回图片或 PDF 的原始二进制内容。传 true 或 1 时响应体就是文件本身；不传、传 false 或 0 时返回 JSON 包装结构（包含图片直链）。',
                         schema: {
                             type: 'string',
-                            enum: ['true', 'false'],
+                            enum: ['true', 'false', '1', '0'],
                             default: 'false'
                         },
                         example: 'false'
@@ -2365,21 +2621,23 @@ export const developerDocsOpenApi: OpenApiDocument = {
                             'application/json': {
                                 schema: {
                                     type: 'object',
-                                    required: ['meta', 'data'],
+                                    required: ['ok', 'data', 'error'],
                                     properties: {
-                                        meta: {
-                                            $ref: '#/components/schemas/ApiMeta'
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [true]
                                         },
                                         data: {
                                             $ref: '#/components/schemas/GetTrainCirculationImageData'
+                                        },
+                                        error: {
+                                            type: 'string',
+                                            enum: ['']
                                         }
                                     }
                                 },
                                 example: {
-                                    meta: {
-                                        remain: 159,
-                                        cost: 2
-                                    },
+                                    ok: true,
                                     data: {
                                         cacheHit: false,
                                         requestTrainCode: {
@@ -2391,10 +2649,11 @@ export const developerDocsOpenApi: OpenApiDocument = {
                                             number: 2492
                                         },
                                         documentId:
-                                            '8d2fca6e88c2a1e3c2106a4f28f0d5e7b3147427ec8d1b4af75a4b6b485b92ce',
+                                            '7d56fe674ce2c3f76bb7b3b619eff3ed45704c9711328e5553e50a00537d8cad',
                                         imageUrl:
-                                            'https://static.example.com/circulation/8d2fca6e88c2a1e3c2106a4f28f0d5e7b3147427ec8d1b4af75a4b6b485b92ce/png/1'
-                                    }
+                                            'https://latex.lihugang.top/7d56fe674ce2c3f76bb7b3b619eff3ed45704c9711328e5553e50a00537d8cad/png/1'
+                                    },
+                                    error: ''
                                 }
                             },
                             'image/png': {
@@ -2432,7 +2691,8 @@ export const developerDocsOpenApi: OpenApiDocument = {
                                     required: ['ok', 'data', 'error'],
                                     properties: {
                                         ok: {
-                                            type: 'boolean'
+                                            type: 'boolean',
+                                            enum: [false]
                                         },
                                         data: {
                                             type: 'string'
@@ -2471,7 +2731,8 @@ export const developerDocsOpenApi: OpenApiDocument = {
                                     required: ['ok', 'data', 'error'],
                                     properties: {
                                         ok: {
-                                            type: 'boolean'
+                                            type: 'boolean',
+                                            enum: [false]
                                         },
                                         data: {
                                             type: 'string'
@@ -2483,14 +2744,15 @@ export const developerDocsOpenApi: OpenApiDocument = {
                                 },
                                 example: {
                                     ok: false,
-                                    data: 'API Key 无效或已过期。',
+                                    data: 'API Key 无效或已过期',
                                     error: 'invalid_api_key'
                                 }
                             }
                         }
                     },
                     '403': {
-                        description: '当前凭证缺少调用该接口所需的 scope。',
+                        description:
+                            '账号已被封禁。；当前凭证缺少调用该接口所需的 scope。；当前身份的额度上限低于接口最低调用成本。',
                         headers: {
                             'x-api-remain': {
                                 $ref: '#/components/headers/ApiRemain'
@@ -2509,7 +2771,8 @@ export const developerDocsOpenApi: OpenApiDocument = {
                                     required: ['ok', 'data', 'error'],
                                     properties: {
                                         ok: {
-                                            type: 'boolean'
+                                            type: 'boolean',
+                                            enum: [false]
                                         },
                                         data: {
                                             type: 'string'
@@ -2519,10 +2782,33 @@ export const developerDocsOpenApi: OpenApiDocument = {
                                         }
                                     }
                                 },
-                                example: {
-                                    ok: false,
-                                    data: '缺少调用该接口所需的权限。',
-                                    error: 'forbidden'
+                                examples: {
+                                    '403-account_banned': {
+                                        summary: '账号已被封禁。',
+                                        value: {
+                                            ok: false,
+                                            data: '账号已被封禁',
+                                            error: 'account_banned'
+                                        }
+                                    },
+                                    '403-forbidden_scope': {
+                                        summary:
+                                            '当前凭证缺少调用该接口所需的 scope。',
+                                        value: {
+                                            ok: false,
+                                            data: '当前 API Key 缺乏访问该接口的权限',
+                                            error: 'forbidden_scope'
+                                        }
+                                    },
+                                    '403-cost_exceeds_quota_limit': {
+                                        summary:
+                                            '当前身份的额度上限低于接口最低调用成本。',
+                                        value: {
+                                            ok: false,
+                                            data: '当前身份额度上限不足，无法调用该接口',
+                                            error: 'cost_exceeds_quota_limit'
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -2547,7 +2833,8 @@ export const developerDocsOpenApi: OpenApiDocument = {
                                     required: ['ok', 'data', 'error'],
                                     properties: {
                                         ok: {
-                                            type: 'boolean'
+                                            type: 'boolean',
+                                            enum: [false]
                                         },
                                         data: {
                                             type: 'string'
@@ -2561,6 +2848,45 @@ export const developerDocsOpenApi: OpenApiDocument = {
                                     ok: false,
                                     data: '当前暂无交路数据',
                                     error: 'not_found'
+                                }
+                            }
+                        }
+                    },
+                    '406': {
+                        description: 'Accept 请求头不支持 JSON 响应。',
+                        headers: {
+                            'x-api-remain': {
+                                $ref: '#/components/headers/ApiRemain'
+                            },
+                            'x-api-cost': {
+                                $ref: '#/components/headers/ApiCost'
+                            },
+                            'Retry-After': {
+                                $ref: '#/components/headers/RetryAfter'
+                            }
+                        },
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    type: 'object',
+                                    required: ['ok', 'data', 'error'],
+                                    properties: {
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [false]
+                                        },
+                                        data: {
+                                            type: 'string'
+                                        },
+                                        error: {
+                                            type: 'string'
+                                        }
+                                    }
+                                },
+                                example: {
+                                    ok: false,
+                                    data: 'Accept 不支持 application/json 或 application/x-protobuf',
+                                    error: 'not_acceptable'
                                 }
                             }
                         }
@@ -2585,7 +2911,8 @@ export const developerDocsOpenApi: OpenApiDocument = {
                                     required: ['ok', 'data', 'error'],
                                     properties: {
                                         ok: {
-                                            type: 'boolean'
+                                            type: 'boolean',
+                                            enum: [false]
                                         },
                                         data: {
                                             type: 'string'
@@ -2604,7 +2931,8 @@ export const developerDocsOpenApi: OpenApiDocument = {
                         }
                     },
                     '429': {
-                        description: '额度不足或请求过于频繁。',
+                        description:
+                            '额度不足或请求过于频繁，建议等 Retry-After 提示的时间后再试。',
                         headers: {
                             'x-api-remain': {
                                 $ref: '#/components/headers/ApiRemain'
@@ -2623,7 +2951,8 @@ export const developerDocsOpenApi: OpenApiDocument = {
                                     required: ['ok', 'data', 'error'],
                                     properties: {
                                         ok: {
-                                            type: 'boolean'
+                                            type: 'boolean',
+                                            enum: [false]
                                         },
                                         data: {
                                             type: 'string'
@@ -2635,8 +2964,47 @@ export const developerDocsOpenApi: OpenApiDocument = {
                                 },
                                 example: {
                                     ok: false,
-                                    data: '额度不足，请稍后再试。',
-                                    error: 'rate_limited'
+                                    data: '额度不足，请稍后再试',
+                                    error: 'quota_exceeded'
+                                }
+                            }
+                        }
+                    },
+                    '500': {
+                        description: '服务内部错误或响应编码失败。',
+                        headers: {
+                            'x-api-remain': {
+                                $ref: '#/components/headers/ApiRemain'
+                            },
+                            'x-api-cost': {
+                                $ref: '#/components/headers/ApiCost'
+                            },
+                            'Retry-After': {
+                                $ref: '#/components/headers/RetryAfter'
+                            }
+                        },
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    type: 'object',
+                                    required: ['ok', 'data', 'error'],
+                                    properties: {
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [false]
+                                        },
+                                        data: {
+                                            type: 'string'
+                                        },
+                                        error: {
+                                            type: 'string'
+                                        }
+                                    }
+                                },
+                                example: {
+                                    ok: false,
+                                    data: '服务内部错误，请稍后再试',
+                                    error: 'internal_error'
                                 }
                             }
                         }
@@ -2661,7 +3029,8 @@ export const developerDocsOpenApi: OpenApiDocument = {
                                     required: ['ok', 'data', 'error'],
                                     properties: {
                                         ok: {
-                                            type: 'boolean'
+                                            type: 'boolean',
+                                            enum: [false]
                                         },
                                         data: {
                                             type: 'string'
@@ -2804,13 +3173,18 @@ export const developerDocsOpenApi: OpenApiDocument = {
                             'application/json': {
                                 schema: {
                                     type: 'object',
-                                    required: ['meta', 'data'],
+                                    required: ['ok', 'data', 'error'],
                                     properties: {
-                                        meta: {
-                                            $ref: '#/components/schemas/ApiMeta'
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [true]
                                         },
                                         data: {
                                             $ref: '#/components/schemas/GetTrainTimetableHistoryData'
+                                        },
+                                        error: {
+                                            type: 'string',
+                                            enum: ['']
                                         }
                                     }
                                 },
@@ -2826,7 +3200,7 @@ export const developerDocsOpenApi: OpenApiDocument = {
                                                 coverageId: 6845,
                                                 timetableId: 5479,
                                                 serviceDayStart: 20575,
-                                                serviceDayEndExclusive: 20680
+                                                serviceDayEndExclusive: 20694
                                             }
                                         ],
                                         timetableMappings: {
@@ -2928,47 +3302,6 @@ export const developerDocsOpenApi: OpenApiDocument = {
                             }
                         }
                     },
-                    '400': {
-                        description:
-                            '请求参数不合法：可能是日期格式、游标格式或 limit 不符合要求。',
-                        headers: {
-                            'x-api-remain': {
-                                $ref: '#/components/headers/ApiRemain'
-                            },
-                            'x-api-cost': {
-                                $ref: '#/components/headers/ApiCost'
-                            },
-                            'Retry-After': {
-                                $ref: '#/components/headers/RetryAfter'
-                            }
-                        },
-                        content: {
-                            'application/json': {
-                                schema: {
-                                    type: 'object',
-                                    required: ['meta', 'error'],
-                                    properties: {
-                                        meta: {
-                                            $ref: '#/components/schemas/ApiMeta'
-                                        },
-                                        error: {
-                                            $ref: '#/components/schemas/ApiError'
-                                        }
-                                    }
-                                },
-                                example: {
-                                    meta: {
-                                        remain: 159,
-                                        cost: 1
-                                    },
-                                    error: {
-                                        code: 'invalid_param',
-                                        message: 'date 必须使用 YYYYMMDD 格式。'
-                                    }
-                                }
-                            }
-                        }
-                    },
                     '401': {
                         description:
                             '请求未携带有效的认证信息，或提供的 API Key 已失效。',
@@ -2987,31 +3320,31 @@ export const developerDocsOpenApi: OpenApiDocument = {
                             'application/json': {
                                 schema: {
                                     type: 'object',
-                                    required: ['meta', 'error'],
+                                    required: ['ok', 'data', 'error'],
                                     properties: {
-                                        meta: {
-                                            $ref: '#/components/schemas/ApiMeta'
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [false]
+                                        },
+                                        data: {
+                                            type: 'string'
                                         },
                                         error: {
-                                            $ref: '#/components/schemas/ApiError'
+                                            type: 'string'
                                         }
                                     }
                                 },
                                 example: {
-                                    meta: {
-                                        remain: 159,
-                                        cost: 1
-                                    },
-                                    error: {
-                                        code: 'invalid_api_key',
-                                        message: 'API Key 无效或已过期。'
-                                    }
+                                    ok: false,
+                                    data: 'API Key 无效或已过期',
+                                    error: 'invalid_api_key'
                                 }
                             }
                         }
                     },
                     '403': {
-                        description: '当前凭证缺少调用该接口所需的 scope。',
+                        description:
+                            '账号已被封禁。；当前凭证缺少调用该接口所需的 scope。；当前身份的额度上限低于接口最低调用成本。',
                         headers: {
                             'x-api-remain': {
                                 $ref: '#/components/headers/ApiRemain'
@@ -3027,25 +3360,86 @@ export const developerDocsOpenApi: OpenApiDocument = {
                             'application/json': {
                                 schema: {
                                     type: 'object',
-                                    required: ['meta', 'error'],
+                                    required: ['ok', 'data', 'error'],
                                     properties: {
-                                        meta: {
-                                            $ref: '#/components/schemas/ApiMeta'
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [false]
+                                        },
+                                        data: {
+                                            type: 'string'
                                         },
                                         error: {
-                                            $ref: '#/components/schemas/ApiError'
+                                            type: 'string'
+                                        }
+                                    }
+                                },
+                                examples: {
+                                    '403-account_banned': {
+                                        summary: '账号已被封禁。',
+                                        value: {
+                                            ok: false,
+                                            data: '账号已被封禁',
+                                            error: 'account_banned'
+                                        }
+                                    },
+                                    '403-forbidden_scope': {
+                                        summary:
+                                            '当前凭证缺少调用该接口所需的 scope。',
+                                        value: {
+                                            ok: false,
+                                            data: '当前 API Key 缺乏访问该接口的权限',
+                                            error: 'forbidden_scope'
+                                        }
+                                    },
+                                    '403-cost_exceeds_quota_limit': {
+                                        summary:
+                                            '当前身份的额度上限低于接口最低调用成本。',
+                                        value: {
+                                            ok: false,
+                                            data: '当前身份额度上限不足，无法调用该接口',
+                                            error: 'cost_exceeds_quota_limit'
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    '406': {
+                        description: 'Accept 请求头不支持 JSON 响应。',
+                        headers: {
+                            'x-api-remain': {
+                                $ref: '#/components/headers/ApiRemain'
+                            },
+                            'x-api-cost': {
+                                $ref: '#/components/headers/ApiCost'
+                            },
+                            'Retry-After': {
+                                $ref: '#/components/headers/RetryAfter'
+                            }
+                        },
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    type: 'object',
+                                    required: ['ok', 'data', 'error'],
+                                    properties: {
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [false]
+                                        },
+                                        data: {
+                                            type: 'string'
+                                        },
+                                        error: {
+                                            type: 'string'
                                         }
                                     }
                                 },
                                 example: {
-                                    meta: {
-                                        remain: 159,
-                                        cost: 1
-                                    },
-                                    error: {
-                                        code: 'forbidden',
-                                        message: '缺少调用该接口所需的权限。'
-                                    }
+                                    ok: false,
+                                    data: 'Accept 不支持 application/json 或 application/x-protobuf',
+                                    error: 'not_acceptable'
                                 }
                             }
                         }
@@ -3068,25 +3462,63 @@ export const developerDocsOpenApi: OpenApiDocument = {
                             'application/json': {
                                 schema: {
                                     type: 'object',
-                                    required: ['meta', 'error'],
+                                    required: ['ok', 'data', 'error'],
                                     properties: {
-                                        meta: {
-                                            $ref: '#/components/schemas/ApiMeta'
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [false]
+                                        },
+                                        data: {
+                                            type: 'string'
                                         },
                                         error: {
-                                            $ref: '#/components/schemas/ApiError'
+                                            type: 'string'
                                         }
                                     }
                                 },
                                 example: {
-                                    meta: {
-                                        remain: 159,
-                                        cost: 1
-                                    },
-                                    error: {
-                                        code: 'rate_limited',
-                                        message: '额度不足，请稍后再试。'
+                                    ok: false,
+                                    data: '额度不足，请稍后再试',
+                                    error: 'quota_exceeded'
+                                }
+                            }
+                        }
+                    },
+                    '500': {
+                        description: '服务内部错误或响应编码失败。',
+                        headers: {
+                            'x-api-remain': {
+                                $ref: '#/components/headers/ApiRemain'
+                            },
+                            'x-api-cost': {
+                                $ref: '#/components/headers/ApiCost'
+                            },
+                            'Retry-After': {
+                                $ref: '#/components/headers/RetryAfter'
+                            }
+                        },
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    type: 'object',
+                                    required: ['ok', 'data', 'error'],
+                                    properties: {
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [false]
+                                        },
+                                        data: {
+                                            type: 'string'
+                                        },
+                                        error: {
+                                            type: 'string'
+                                        }
                                     }
+                                },
+                                example: {
+                                    ok: false,
+                                    data: '服务内部错误，请稍后再试',
+                                    error: 'internal_error'
                                 }
                             }
                         }
@@ -3203,13 +3635,18 @@ export const developerDocsOpenApi: OpenApiDocument = {
                             'application/json': {
                                 schema: {
                                     type: 'object',
-                                    required: ['meta', 'data'],
+                                    required: ['ok', 'data', 'error'],
                                     properties: {
-                                        meta: {
-                                            $ref: '#/components/schemas/ApiMeta'
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [true]
                                         },
                                         data: {
                                             $ref: '#/components/schemas/GetStationTimetableData'
+                                        },
+                                        error: {
+                                            type: 'string',
+                                            enum: ['']
                                         }
                                     }
                                 },
@@ -3219,7 +3656,7 @@ export const developerDocsOpenApi: OpenApiDocument = {
                                         stationName: '北京南',
                                         cursor: '',
                                         limit: 1,
-                                        nextCursor: '20679:6292081551810740',
+                                        nextCursor: '20693:2937121549732148',
                                         items: [
                                             {
                                                 trainCode: {
@@ -3232,10 +3669,10 @@ export const developerDocsOpenApi: OpenApiDocument = {
                                                         number: 9418
                                                     }
                                                 ],
-                                                arriveAt: 1786723260,
+                                                arriveAt: 1787932860,
                                                 startStation: '天津西',
                                                 endStation: '北京南',
-                                                updatedAt: 1786717003,
+                                                updatedAt: 1787849644,
                                                 referenceModels: [
                                                     {
                                                         model: 'CR400AF-B',
@@ -3251,8 +3688,7 @@ export const developerDocsOpenApi: OpenApiDocument = {
                         }
                     },
                     '400': {
-                        description:
-                            '请求参数不合法：可能是日期格式、游标格式或 limit 不符合要求。',
+                        description: 'limit 或 cursor 查询参数格式无效。',
                         headers: {
                             'x-api-remain': {
                                 $ref: '#/components/headers/ApiRemain'
@@ -3268,25 +3704,24 @@ export const developerDocsOpenApi: OpenApiDocument = {
                             'application/json': {
                                 schema: {
                                     type: 'object',
-                                    required: ['meta', 'error'],
+                                    required: ['ok', 'data', 'error'],
                                     properties: {
-                                        meta: {
-                                            $ref: '#/components/schemas/ApiMeta'
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [false]
+                                        },
+                                        data: {
+                                            type: 'string'
                                         },
                                         error: {
-                                            $ref: '#/components/schemas/ApiError'
+                                            type: 'string'
                                         }
                                     }
                                 },
                                 example: {
-                                    meta: {
-                                        remain: 159,
-                                        cost: 1
-                                    },
-                                    error: {
-                                        code: 'invalid_param',
-                                        message: 'date 必须使用 YYYYMMDD 格式。'
-                                    }
+                                    ok: false,
+                                    data: 'limit 必须是正整数',
+                                    error: 'invalid_param'
                                 }
                             }
                         }
@@ -3309,31 +3744,31 @@ export const developerDocsOpenApi: OpenApiDocument = {
                             'application/json': {
                                 schema: {
                                     type: 'object',
-                                    required: ['meta', 'error'],
+                                    required: ['ok', 'data', 'error'],
                                     properties: {
-                                        meta: {
-                                            $ref: '#/components/schemas/ApiMeta'
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [false]
+                                        },
+                                        data: {
+                                            type: 'string'
                                         },
                                         error: {
-                                            $ref: '#/components/schemas/ApiError'
+                                            type: 'string'
                                         }
                                     }
                                 },
                                 example: {
-                                    meta: {
-                                        remain: 159,
-                                        cost: 1
-                                    },
-                                    error: {
-                                        code: 'invalid_api_key',
-                                        message: 'API Key 无效或已过期。'
-                                    }
+                                    ok: false,
+                                    data: 'API Key 无效或已过期',
+                                    error: 'invalid_api_key'
                                 }
                             }
                         }
                     },
                     '403': {
-                        description: '当前凭证缺少调用该接口所需的 scope。',
+                        description:
+                            '账号已被封禁。；当前凭证缺少调用该接口所需的 scope。；当前身份的额度上限低于接口最低调用成本。',
                         headers: {
                             'x-api-remain': {
                                 $ref: '#/components/headers/ApiRemain'
@@ -3349,24 +3784,46 @@ export const developerDocsOpenApi: OpenApiDocument = {
                             'application/json': {
                                 schema: {
                                     type: 'object',
-                                    required: ['meta', 'error'],
+                                    required: ['ok', 'data', 'error'],
                                     properties: {
-                                        meta: {
-                                            $ref: '#/components/schemas/ApiMeta'
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [false]
+                                        },
+                                        data: {
+                                            type: 'string'
                                         },
                                         error: {
-                                            $ref: '#/components/schemas/ApiError'
+                                            type: 'string'
                                         }
                                     }
                                 },
-                                example: {
-                                    meta: {
-                                        remain: 159,
-                                        cost: 1
+                                examples: {
+                                    '403-account_banned': {
+                                        summary: '账号已被封禁。',
+                                        value: {
+                                            ok: false,
+                                            data: '账号已被封禁',
+                                            error: 'account_banned'
+                                        }
                                     },
-                                    error: {
-                                        code: 'forbidden',
-                                        message: '缺少调用该接口所需的权限。'
+                                    '403-forbidden_scope': {
+                                        summary:
+                                            '当前凭证缺少调用该接口所需的 scope。',
+                                        value: {
+                                            ok: false,
+                                            data: '当前 API Key 缺乏访问该接口的权限',
+                                            error: 'forbidden_scope'
+                                        }
+                                    },
+                                    '403-cost_exceeds_quota_limit': {
+                                        summary:
+                                            '当前身份的额度上限低于接口最低调用成本。',
+                                        value: {
+                                            ok: false,
+                                            data: '当前身份额度上限不足，无法调用该接口',
+                                            error: 'cost_exceeds_quota_limit'
+                                        }
                                     }
                                 }
                             }
@@ -3389,25 +3846,63 @@ export const developerDocsOpenApi: OpenApiDocument = {
                             'application/json': {
                                 schema: {
                                     type: 'object',
-                                    required: ['meta', 'error'],
+                                    required: ['ok', 'data', 'error'],
                                     properties: {
-                                        meta: {
-                                            $ref: '#/components/schemas/ApiMeta'
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [false]
+                                        },
+                                        data: {
+                                            type: 'string'
                                         },
                                         error: {
-                                            $ref: '#/components/schemas/ApiError'
+                                            type: 'string'
                                         }
                                     }
                                 },
                                 example: {
-                                    meta: {
-                                        remain: 159,
-                                        cost: 1
-                                    },
-                                    error: {
-                                        code: 'not_found',
-                                        message: '当前暂无该车站的时刻表。'
+                                    ok: false,
+                                    data: '当前暂无该车站的时刻表',
+                                    error: 'not_found'
+                                }
+                            }
+                        }
+                    },
+                    '406': {
+                        description: 'Accept 请求头不支持 JSON 响应。',
+                        headers: {
+                            'x-api-remain': {
+                                $ref: '#/components/headers/ApiRemain'
+                            },
+                            'x-api-cost': {
+                                $ref: '#/components/headers/ApiCost'
+                            },
+                            'Retry-After': {
+                                $ref: '#/components/headers/RetryAfter'
+                            }
+                        },
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    type: 'object',
+                                    required: ['ok', 'data', 'error'],
+                                    properties: {
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [false]
+                                        },
+                                        data: {
+                                            type: 'string'
+                                        },
+                                        error: {
+                                            type: 'string'
+                                        }
                                     }
+                                },
+                                example: {
+                                    ok: false,
+                                    data: 'Accept 不支持 application/json 或 application/x-protobuf',
+                                    error: 'not_acceptable'
                                 }
                             }
                         }
@@ -3430,25 +3925,63 @@ export const developerDocsOpenApi: OpenApiDocument = {
                             'application/json': {
                                 schema: {
                                     type: 'object',
-                                    required: ['meta', 'error'],
+                                    required: ['ok', 'data', 'error'],
                                     properties: {
-                                        meta: {
-                                            $ref: '#/components/schemas/ApiMeta'
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [false]
+                                        },
+                                        data: {
+                                            type: 'string'
                                         },
                                         error: {
-                                            $ref: '#/components/schemas/ApiError'
+                                            type: 'string'
                                         }
                                     }
                                 },
                                 example: {
-                                    meta: {
-                                        remain: 159,
-                                        cost: 1
-                                    },
-                                    error: {
-                                        code: 'rate_limited',
-                                        message: '额度不足，请稍后再试。'
+                                    ok: false,
+                                    data: '额度不足，请稍后再试',
+                                    error: 'quota_exceeded'
+                                }
+                            }
+                        }
+                    },
+                    '500': {
+                        description: '服务内部错误或响应编码失败。',
+                        headers: {
+                            'x-api-remain': {
+                                $ref: '#/components/headers/ApiRemain'
+                            },
+                            'x-api-cost': {
+                                $ref: '#/components/headers/ApiCost'
+                            },
+                            'Retry-After': {
+                                $ref: '#/components/headers/RetryAfter'
+                            }
+                        },
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    type: 'object',
+                                    required: ['ok', 'data', 'error'],
+                                    properties: {
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [false]
+                                        },
+                                        data: {
+                                            type: 'string'
+                                        },
+                                        error: {
+                                            type: 'string'
+                                        }
                                     }
+                                },
+                                example: {
+                                    ok: false,
+                                    data: '服务内部错误，请稍后再试',
+                                    error: 'internal_error'
                                 }
                             }
                         }
@@ -3483,7 +4016,7 @@ export const developerDocsOpenApi: OpenApiDocument = {
                         },
                         query: {
                             limit: '1',
-                            cursor: '20679:6292081551810740'
+                            cursor: '20693:2937121549732148'
                         }
                     }
                 ],
@@ -3595,13 +4128,18 @@ export const developerDocsOpenApi: OpenApiDocument = {
                             'application/json': {
                                 schema: {
                                     type: 'object',
-                                    required: ['meta', 'data'],
+                                    required: ['ok', 'data', 'error'],
                                     properties: {
-                                        meta: {
-                                            $ref: '#/components/schemas/ApiMeta'
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [true]
                                         },
                                         data: {
                                             $ref: '#/components/schemas/GetTrainHistoryData'
+                                        },
+                                        error: {
+                                            type: 'string',
+                                            enum: ['']
                                         }
                                     }
                                 },
@@ -3614,24 +4152,26 @@ export const developerDocsOpenApi: OpenApiDocument = {
                                         },
                                         cursor: '',
                                         limit: 2,
-                                        nextCursor: '20678:1858368',
+                                        nextCursor: '20692:2090568',
                                         items: [
                                             {
-                                                id: 1886130,
-                                                serviceDay: 20679,
+                                                id: 2105057,
+                                                serviceDay: 20693,
                                                 timetableId: 5479,
-                                                emuId: 1540
+                                                emuId: 1540,
+                                                status: 1
                                             },
                                             {
-                                                id: 1858368,
-                                                serviceDay: 20678,
+                                                id: 2090568,
+                                                serviceDay: 20692,
                                                 timetableId: 5479,
-                                                emuId: 1544
+                                                emuId: 1545,
+                                                status: 1
                                             }
                                         ],
                                         emuCodeMappings: {
                                             '1540': 'CR400BF-AZ-0518',
-                                            '1544': 'CR400BF-AZ-5253'
+                                            '1545': 'CR400BF-AZ-5254'
                                         },
                                         timetableMappings: {
                                             '5479': {
@@ -3649,7 +4189,7 @@ export const developerDocsOpenApi: OpenApiDocument = {
                     },
                     '400': {
                         description:
-                            '请求参数不合法：可能是日期格式、游标格式或 limit 不符合要求。',
+                            'start、end、limit 或 cursor 查询参数格式无效。',
                         headers: {
                             'x-api-remain': {
                                 $ref: '#/components/headers/ApiRemain'
@@ -3665,25 +4205,24 @@ export const developerDocsOpenApi: OpenApiDocument = {
                             'application/json': {
                                 schema: {
                                     type: 'object',
-                                    required: ['meta', 'error'],
+                                    required: ['ok', 'data', 'error'],
                                     properties: {
-                                        meta: {
-                                            $ref: '#/components/schemas/ApiMeta'
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [false]
+                                        },
+                                        data: {
+                                            type: 'string'
                                         },
                                         error: {
-                                            $ref: '#/components/schemas/ApiError'
+                                            type: 'string'
                                         }
                                     }
                                 },
                                 example: {
-                                    meta: {
-                                        remain: 159,
-                                        cost: 1
-                                    },
-                                    error: {
-                                        code: 'invalid_param',
-                                        message: 'date 必须使用 YYYYMMDD 格式。'
-                                    }
+                                    ok: false,
+                                    data: 'start 必须是秒级时间戳',
+                                    error: 'invalid_param'
                                 }
                             }
                         }
@@ -3706,31 +4245,31 @@ export const developerDocsOpenApi: OpenApiDocument = {
                             'application/json': {
                                 schema: {
                                     type: 'object',
-                                    required: ['meta', 'error'],
+                                    required: ['ok', 'data', 'error'],
                                     properties: {
-                                        meta: {
-                                            $ref: '#/components/schemas/ApiMeta'
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [false]
+                                        },
+                                        data: {
+                                            type: 'string'
                                         },
                                         error: {
-                                            $ref: '#/components/schemas/ApiError'
+                                            type: 'string'
                                         }
                                     }
                                 },
                                 example: {
-                                    meta: {
-                                        remain: 159,
-                                        cost: 1
-                                    },
-                                    error: {
-                                        code: 'invalid_api_key',
-                                        message: 'API Key 无效或已过期。'
-                                    }
+                                    ok: false,
+                                    data: 'API Key 无效或已过期',
+                                    error: 'invalid_api_key'
                                 }
                             }
                         }
                     },
                     '403': {
-                        description: '当前凭证缺少调用该接口所需的 scope。',
+                        description:
+                            '账号已被封禁。；当前凭证缺少调用该接口所需的 scope。；当前身份的额度上限低于接口最低调用成本。',
                         headers: {
                             'x-api-remain': {
                                 $ref: '#/components/headers/ApiRemain'
@@ -3746,25 +4285,86 @@ export const developerDocsOpenApi: OpenApiDocument = {
                             'application/json': {
                                 schema: {
                                     type: 'object',
-                                    required: ['meta', 'error'],
+                                    required: ['ok', 'data', 'error'],
                                     properties: {
-                                        meta: {
-                                            $ref: '#/components/schemas/ApiMeta'
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [false]
+                                        },
+                                        data: {
+                                            type: 'string'
                                         },
                                         error: {
-                                            $ref: '#/components/schemas/ApiError'
+                                            type: 'string'
+                                        }
+                                    }
+                                },
+                                examples: {
+                                    '403-account_banned': {
+                                        summary: '账号已被封禁。',
+                                        value: {
+                                            ok: false,
+                                            data: '账号已被封禁',
+                                            error: 'account_banned'
+                                        }
+                                    },
+                                    '403-forbidden_scope': {
+                                        summary:
+                                            '当前凭证缺少调用该接口所需的 scope。',
+                                        value: {
+                                            ok: false,
+                                            data: '当前 API Key 缺乏访问该接口的权限',
+                                            error: 'forbidden_scope'
+                                        }
+                                    },
+                                    '403-cost_exceeds_quota_limit': {
+                                        summary:
+                                            '当前身份的额度上限低于接口最低调用成本。',
+                                        value: {
+                                            ok: false,
+                                            data: '当前身份额度上限不足，无法调用该接口',
+                                            error: 'cost_exceeds_quota_limit'
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    '406': {
+                        description: 'Accept 请求头不支持 JSON 响应。',
+                        headers: {
+                            'x-api-remain': {
+                                $ref: '#/components/headers/ApiRemain'
+                            },
+                            'x-api-cost': {
+                                $ref: '#/components/headers/ApiCost'
+                            },
+                            'Retry-After': {
+                                $ref: '#/components/headers/RetryAfter'
+                            }
+                        },
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    type: 'object',
+                                    required: ['ok', 'data', 'error'],
+                                    properties: {
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [false]
+                                        },
+                                        data: {
+                                            type: 'string'
+                                        },
+                                        error: {
+                                            type: 'string'
                                         }
                                     }
                                 },
                                 example: {
-                                    meta: {
-                                        remain: 159,
-                                        cost: 1
-                                    },
-                                    error: {
-                                        code: 'forbidden',
-                                        message: '缺少调用该接口所需的权限。'
-                                    }
+                                    ok: false,
+                                    data: 'Accept 不支持 application/json 或 application/x-protobuf',
+                                    error: 'not_acceptable'
                                 }
                             }
                         }
@@ -3787,25 +4387,63 @@ export const developerDocsOpenApi: OpenApiDocument = {
                             'application/json': {
                                 schema: {
                                     type: 'object',
-                                    required: ['meta', 'error'],
+                                    required: ['ok', 'data', 'error'],
                                     properties: {
-                                        meta: {
-                                            $ref: '#/components/schemas/ApiMeta'
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [false]
+                                        },
+                                        data: {
+                                            type: 'string'
                                         },
                                         error: {
-                                            $ref: '#/components/schemas/ApiError'
+                                            type: 'string'
                                         }
                                     }
                                 },
                                 example: {
-                                    meta: {
-                                        remain: 159,
-                                        cost: 1
-                                    },
-                                    error: {
-                                        code: 'rate_limited',
-                                        message: '额度不足，请稍后再试。'
+                                    ok: false,
+                                    data: '额度不足，请稍后再试',
+                                    error: 'quota_exceeded'
+                                }
+                            }
+                        }
+                    },
+                    '500': {
+                        description: '服务内部错误或响应编码失败。',
+                        headers: {
+                            'x-api-remain': {
+                                $ref: '#/components/headers/ApiRemain'
+                            },
+                            'x-api-cost': {
+                                $ref: '#/components/headers/ApiCost'
+                            },
+                            'Retry-After': {
+                                $ref: '#/components/headers/RetryAfter'
+                            }
+                        },
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    type: 'object',
+                                    required: ['ok', 'data', 'error'],
+                                    properties: {
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [false]
+                                        },
+                                        data: {
+                                            type: 'string'
+                                        },
+                                        error: {
+                                            type: 'string'
+                                        }
                                     }
+                                },
+                                example: {
+                                    ok: false,
+                                    data: '服务内部错误，请稍后再试',
+                                    error: 'internal_error'
                                 }
                             }
                         }
@@ -3839,7 +4477,7 @@ export const developerDocsOpenApi: OpenApiDocument = {
                         },
                         query: {
                             limit: '2',
-                            cursor: '20678:1858368'
+                            cursor: '20692:2090568'
                         }
                     }
                 ],
@@ -3906,13 +4544,18 @@ export const developerDocsOpenApi: OpenApiDocument = {
                             'application/json': {
                                 schema: {
                                     type: 'object',
-                                    required: ['meta', 'data'],
+                                    required: ['ok', 'data', 'error'],
                                     properties: {
-                                        meta: {
-                                            $ref: '#/components/schemas/ApiMeta'
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [true]
                                         },
                                         data: {
                                             $ref: '#/components/schemas/GetEmuAllocationData'
+                                        },
+                                        error: {
+                                            type: 'string',
+                                            enum: ['']
                                         }
                                     }
                                 },
@@ -4036,8 +4679,7 @@ export const developerDocsOpenApi: OpenApiDocument = {
                         }
                     },
                     '400': {
-                        description:
-                            '请求参数不合法：可能是日期格式、游标格式或 limit 不符合要求。',
+                        description: 'emuCode 路径参数为空。',
                         headers: {
                             'x-api-remain': {
                                 $ref: '#/components/headers/ApiRemain'
@@ -4053,25 +4695,24 @@ export const developerDocsOpenApi: OpenApiDocument = {
                             'application/json': {
                                 schema: {
                                     type: 'object',
-                                    required: ['meta', 'error'],
+                                    required: ['ok', 'data', 'error'],
                                     properties: {
-                                        meta: {
-                                            $ref: '#/components/schemas/ApiMeta'
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [false]
+                                        },
+                                        data: {
+                                            type: 'string'
                                         },
                                         error: {
-                                            $ref: '#/components/schemas/ApiError'
+                                            type: 'string'
                                         }
                                     }
                                 },
                                 example: {
-                                    meta: {
-                                        remain: 159,
-                                        cost: 1
-                                    },
-                                    error: {
-                                        code: 'invalid_param',
-                                        message: 'date 必须使用 YYYYMMDD 格式。'
-                                    }
+                                    ok: false,
+                                    data: 'emuCode 不能为空',
+                                    error: 'invalid_param'
                                 }
                             }
                         }
@@ -4094,31 +4735,31 @@ export const developerDocsOpenApi: OpenApiDocument = {
                             'application/json': {
                                 schema: {
                                     type: 'object',
-                                    required: ['meta', 'error'],
+                                    required: ['ok', 'data', 'error'],
                                     properties: {
-                                        meta: {
-                                            $ref: '#/components/schemas/ApiMeta'
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [false]
+                                        },
+                                        data: {
+                                            type: 'string'
                                         },
                                         error: {
-                                            $ref: '#/components/schemas/ApiError'
+                                            type: 'string'
                                         }
                                     }
                                 },
                                 example: {
-                                    meta: {
-                                        remain: 159,
-                                        cost: 1
-                                    },
-                                    error: {
-                                        code: 'invalid_api_key',
-                                        message: 'API Key 无效或已过期。'
-                                    }
+                                    ok: false,
+                                    data: 'API Key 无效或已过期',
+                                    error: 'invalid_api_key'
                                 }
                             }
                         }
                     },
                     '403': {
-                        description: '当前凭证缺少调用该接口所需的 scope。',
+                        description:
+                            '账号已被封禁。；当前凭证缺少调用该接口所需的 scope。；当前身份的额度上限低于接口最低调用成本。',
                         headers: {
                             'x-api-remain': {
                                 $ref: '#/components/headers/ApiRemain'
@@ -4134,24 +4775,46 @@ export const developerDocsOpenApi: OpenApiDocument = {
                             'application/json': {
                                 schema: {
                                     type: 'object',
-                                    required: ['meta', 'error'],
+                                    required: ['ok', 'data', 'error'],
                                     properties: {
-                                        meta: {
-                                            $ref: '#/components/schemas/ApiMeta'
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [false]
+                                        },
+                                        data: {
+                                            type: 'string'
                                         },
                                         error: {
-                                            $ref: '#/components/schemas/ApiError'
+                                            type: 'string'
                                         }
                                     }
                                 },
-                                example: {
-                                    meta: {
-                                        remain: 159,
-                                        cost: 1
+                                examples: {
+                                    '403-account_banned': {
+                                        summary: '账号已被封禁。',
+                                        value: {
+                                            ok: false,
+                                            data: '账号已被封禁',
+                                            error: 'account_banned'
+                                        }
                                     },
-                                    error: {
-                                        code: 'forbidden',
-                                        message: '缺少调用该接口所需的权限。'
+                                    '403-forbidden_scope': {
+                                        summary:
+                                            '当前凭证缺少调用该接口所需的 scope。',
+                                        value: {
+                                            ok: false,
+                                            data: '当前 API Key 缺乏访问该接口的权限',
+                                            error: 'forbidden_scope'
+                                        }
+                                    },
+                                    '403-cost_exceeds_quota_limit': {
+                                        summary:
+                                            '当前身份的额度上限低于接口最低调用成本。',
+                                        value: {
+                                            ok: false,
+                                            data: '当前身份额度上限不足，无法调用该接口',
+                                            error: 'cost_exceeds_quota_limit'
+                                        }
                                     }
                                 }
                             }
@@ -4174,25 +4837,63 @@ export const developerDocsOpenApi: OpenApiDocument = {
                             'application/json': {
                                 schema: {
                                     type: 'object',
-                                    required: ['meta', 'error'],
+                                    required: ['ok', 'data', 'error'],
                                     properties: {
-                                        meta: {
-                                            $ref: '#/components/schemas/ApiMeta'
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [false]
+                                        },
+                                        data: {
+                                            type: 'string'
                                         },
                                         error: {
-                                            $ref: '#/components/schemas/ApiError'
+                                            type: 'string'
                                         }
                                     }
                                 },
                                 example: {
-                                    meta: {
-                                        remain: 159,
-                                        cost: 1
-                                    },
-                                    error: {
-                                        code: 'not_found',
-                                        message: '未找到该动车组配属信息'
+                                    ok: false,
+                                    data: '未找到该动车组配属信息',
+                                    error: 'allocation_not_found'
+                                }
+                            }
+                        }
+                    },
+                    '406': {
+                        description: 'Accept 请求头不支持 JSON 响应。',
+                        headers: {
+                            'x-api-remain': {
+                                $ref: '#/components/headers/ApiRemain'
+                            },
+                            'x-api-cost': {
+                                $ref: '#/components/headers/ApiCost'
+                            },
+                            'Retry-After': {
+                                $ref: '#/components/headers/RetryAfter'
+                            }
+                        },
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    type: 'object',
+                                    required: ['ok', 'data', 'error'],
+                                    properties: {
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [false]
+                                        },
+                                        data: {
+                                            type: 'string'
+                                        },
+                                        error: {
+                                            type: 'string'
+                                        }
                                     }
+                                },
+                                example: {
+                                    ok: false,
+                                    data: 'Accept 不支持 application/json 或 application/x-protobuf',
+                                    error: 'not_acceptable'
                                 }
                             }
                         }
@@ -4215,25 +4916,63 @@ export const developerDocsOpenApi: OpenApiDocument = {
                             'application/json': {
                                 schema: {
                                     type: 'object',
-                                    required: ['meta', 'error'],
+                                    required: ['ok', 'data', 'error'],
                                     properties: {
-                                        meta: {
-                                            $ref: '#/components/schemas/ApiMeta'
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [false]
+                                        },
+                                        data: {
+                                            type: 'string'
                                         },
                                         error: {
-                                            $ref: '#/components/schemas/ApiError'
+                                            type: 'string'
                                         }
                                     }
                                 },
                                 example: {
-                                    meta: {
-                                        remain: 159,
-                                        cost: 1
-                                    },
-                                    error: {
-                                        code: 'rate_limited',
-                                        message: '额度不足，请稍后再试。'
+                                    ok: false,
+                                    data: '额度不足，请稍后再试',
+                                    error: 'quota_exceeded'
+                                }
+                            }
+                        }
+                    },
+                    '500': {
+                        description: '服务内部错误或响应编码失败。',
+                        headers: {
+                            'x-api-remain': {
+                                $ref: '#/components/headers/ApiRemain'
+                            },
+                            'x-api-cost': {
+                                $ref: '#/components/headers/ApiCost'
+                            },
+                            'Retry-After': {
+                                $ref: '#/components/headers/RetryAfter'
+                            }
+                        },
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    type: 'object',
+                                    required: ['ok', 'data', 'error'],
+                                    properties: {
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [false]
+                                        },
+                                        data: {
+                                            type: 'string'
+                                        },
+                                        error: {
+                                            type: 'string'
+                                        }
                                     }
+                                },
+                                example: {
+                                    ok: false,
+                                    data: '服务内部错误，请稍后再试',
+                                    error: 'internal_error'
                                 }
                             }
                         }
@@ -4363,13 +5102,18 @@ export const developerDocsOpenApi: OpenApiDocument = {
                             'application/json': {
                                 schema: {
                                     type: 'object',
-                                    required: ['meta', 'data'],
+                                    required: ['ok', 'data', 'error'],
                                     properties: {
-                                        meta: {
-                                            $ref: '#/components/schemas/ApiMeta'
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [true]
                                         },
                                         data: {
                                             $ref: '#/components/schemas/GetEmuHistoryData'
+                                        },
+                                        error: {
+                                            type: 'string',
+                                            enum: ['']
                                         }
                                     }
                                 },
@@ -4379,36 +5123,44 @@ export const developerDocsOpenApi: OpenApiDocument = {
                                         emuId: 1500,
                                         cursor: '',
                                         limit: 2,
-                                        nextCursor: '20679:1880201',
+                                        nextCursor: '20692:2091894',
                                         items: [
                                             {
-                                                id: 1880202,
-                                                serviceDay: 20679,
-                                                timetableId: 18287,
+                                                id: 2110390,
+                                                serviceDay: 20693,
+                                                timetableId: 1137,
                                                 trainCode: {
                                                     prefix: 'G',
-                                                    number: 240
-                                                }
+                                                    number: 7381
+                                                },
+                                                status: 1
                                             },
                                             {
-                                                id: 1880201,
-                                                serviceDay: 20679,
-                                                timetableId: 18287,
+                                                id: 2091894,
+                                                serviceDay: 20692,
+                                                timetableId: 18285,
                                                 trainCode: {
                                                     prefix: 'G',
-                                                    number: 237
-                                                }
+                                                    number: 221
+                                                },
+                                                status: 1
                                             }
                                         ],
                                         emuCodeMappings: {
                                             '1500': 'CR400BF-A-5156'
                                         },
                                         timetableMappings: {
-                                            '18287': {
+                                            '1137': {
                                                 startStation: '上海虹桥',
-                                                endStation: '成都东',
-                                                startOffset: 32640,
-                                                endOffset: 70500
+                                                endStation: '江山',
+                                                startOffset: 69000,
+                                                endOffset: 79140
+                                            },
+                                            '18285': {
+                                                startStation: '张家界西',
+                                                endStation: '上海虹桥',
+                                                startOffset: 52740,
+                                                endOffset: 79020
                                             }
                                         }
                                     },
@@ -4419,7 +5171,7 @@ export const developerDocsOpenApi: OpenApiDocument = {
                     },
                     '400': {
                         description:
-                            '请求参数不合法：可能是日期格式、游标格式或 limit 不符合要求。',
+                            'emuCode 为空，或 start、end、limit、cursor 格式无效。',
                         headers: {
                             'x-api-remain': {
                                 $ref: '#/components/headers/ApiRemain'
@@ -4435,25 +5187,24 @@ export const developerDocsOpenApi: OpenApiDocument = {
                             'application/json': {
                                 schema: {
                                     type: 'object',
-                                    required: ['meta', 'error'],
+                                    required: ['ok', 'data', 'error'],
                                     properties: {
-                                        meta: {
-                                            $ref: '#/components/schemas/ApiMeta'
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [false]
+                                        },
+                                        data: {
+                                            type: 'string'
                                         },
                                         error: {
-                                            $ref: '#/components/schemas/ApiError'
+                                            type: 'string'
                                         }
                                     }
                                 },
                                 example: {
-                                    meta: {
-                                        remain: 159,
-                                        cost: 1
-                                    },
-                                    error: {
-                                        code: 'invalid_param',
-                                        message: 'date 必须使用 YYYYMMDD 格式。'
-                                    }
+                                    ok: false,
+                                    data: 'start 必须是秒级时间戳',
+                                    error: 'invalid_param'
                                 }
                             }
                         }
@@ -4476,31 +5227,31 @@ export const developerDocsOpenApi: OpenApiDocument = {
                             'application/json': {
                                 schema: {
                                     type: 'object',
-                                    required: ['meta', 'error'],
+                                    required: ['ok', 'data', 'error'],
                                     properties: {
-                                        meta: {
-                                            $ref: '#/components/schemas/ApiMeta'
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [false]
+                                        },
+                                        data: {
+                                            type: 'string'
                                         },
                                         error: {
-                                            $ref: '#/components/schemas/ApiError'
+                                            type: 'string'
                                         }
                                     }
                                 },
                                 example: {
-                                    meta: {
-                                        remain: 159,
-                                        cost: 1
-                                    },
-                                    error: {
-                                        code: 'invalid_api_key',
-                                        message: 'API Key 无效或已过期。'
-                                    }
+                                    ok: false,
+                                    data: 'API Key 无效或已过期',
+                                    error: 'invalid_api_key'
                                 }
                             }
                         }
                     },
                     '403': {
-                        description: '当前凭证缺少调用该接口所需的 scope。',
+                        description:
+                            '账号已被封禁。；当前凭证缺少调用该接口所需的 scope。；当前身份的额度上限低于接口最低调用成本。',
                         headers: {
                             'x-api-remain': {
                                 $ref: '#/components/headers/ApiRemain'
@@ -4516,25 +5267,125 @@ export const developerDocsOpenApi: OpenApiDocument = {
                             'application/json': {
                                 schema: {
                                     type: 'object',
-                                    required: ['meta', 'error'],
+                                    required: ['ok', 'data', 'error'],
                                     properties: {
-                                        meta: {
-                                            $ref: '#/components/schemas/ApiMeta'
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [false]
+                                        },
+                                        data: {
+                                            type: 'string'
                                         },
                                         error: {
-                                            $ref: '#/components/schemas/ApiError'
+                                            type: 'string'
+                                        }
+                                    }
+                                },
+                                examples: {
+                                    '403-account_banned': {
+                                        summary: '账号已被封禁。',
+                                        value: {
+                                            ok: false,
+                                            data: '账号已被封禁',
+                                            error: 'account_banned'
+                                        }
+                                    },
+                                    '403-forbidden_scope': {
+                                        summary:
+                                            '当前凭证缺少调用该接口所需的 scope。',
+                                        value: {
+                                            ok: false,
+                                            data: '当前 API Key 缺乏访问该接口的权限',
+                                            error: 'forbidden_scope'
+                                        }
+                                    },
+                                    '403-cost_exceeds_quota_limit': {
+                                        summary:
+                                            '当前身份的额度上限低于接口最低调用成本。',
+                                        value: {
+                                            ok: false,
+                                            data: '当前身份额度上限不足，无法调用该接口',
+                                            error: 'cost_exceeds_quota_limit'
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    '404': {
+                        description: '未找到指定的动车组。',
+                        headers: {
+                            'x-api-remain': {
+                                $ref: '#/components/headers/ApiRemain'
+                            },
+                            'x-api-cost': {
+                                $ref: '#/components/headers/ApiCost'
+                            },
+                            'Retry-After': {
+                                $ref: '#/components/headers/RetryAfter'
+                            }
+                        },
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    type: 'object',
+                                    required: ['ok', 'data', 'error'],
+                                    properties: {
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [false]
+                                        },
+                                        data: {
+                                            type: 'string'
+                                        },
+                                        error: {
+                                            type: 'string'
                                         }
                                     }
                                 },
                                 example: {
-                                    meta: {
-                                        remain: 159,
-                                        cost: 1
-                                    },
-                                    error: {
-                                        code: 'forbidden',
-                                        message: '缺少调用该接口所需的权限。'
+                                    ok: false,
+                                    data: '未找到该动车组',
+                                    error: 'not_found'
+                                }
+                            }
+                        }
+                    },
+                    '406': {
+                        description: 'Accept 请求头不支持 JSON 响应。',
+                        headers: {
+                            'x-api-remain': {
+                                $ref: '#/components/headers/ApiRemain'
+                            },
+                            'x-api-cost': {
+                                $ref: '#/components/headers/ApiCost'
+                            },
+                            'Retry-After': {
+                                $ref: '#/components/headers/RetryAfter'
+                            }
+                        },
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    type: 'object',
+                                    required: ['ok', 'data', 'error'],
+                                    properties: {
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [false]
+                                        },
+                                        data: {
+                                            type: 'string'
+                                        },
+                                        error: {
+                                            type: 'string'
+                                        }
                                     }
+                                },
+                                example: {
+                                    ok: false,
+                                    data: 'Accept 不支持 application/json 或 application/x-protobuf',
+                                    error: 'not_acceptable'
                                 }
                             }
                         }
@@ -4557,25 +5408,63 @@ export const developerDocsOpenApi: OpenApiDocument = {
                             'application/json': {
                                 schema: {
                                     type: 'object',
-                                    required: ['meta', 'error'],
+                                    required: ['ok', 'data', 'error'],
                                     properties: {
-                                        meta: {
-                                            $ref: '#/components/schemas/ApiMeta'
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [false]
+                                        },
+                                        data: {
+                                            type: 'string'
                                         },
                                         error: {
-                                            $ref: '#/components/schemas/ApiError'
+                                            type: 'string'
                                         }
                                     }
                                 },
                                 example: {
-                                    meta: {
-                                        remain: 159,
-                                        cost: 1
-                                    },
-                                    error: {
-                                        code: 'rate_limited',
-                                        message: '额度不足，请稍后再试。'
+                                    ok: false,
+                                    data: '额度不足，请稍后再试',
+                                    error: 'quota_exceeded'
+                                }
+                            }
+                        }
+                    },
+                    '500': {
+                        description: '服务内部错误或响应编码失败。',
+                        headers: {
+                            'x-api-remain': {
+                                $ref: '#/components/headers/ApiRemain'
+                            },
+                            'x-api-cost': {
+                                $ref: '#/components/headers/ApiCost'
+                            },
+                            'Retry-After': {
+                                $ref: '#/components/headers/RetryAfter'
+                            }
+                        },
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    type: 'object',
+                                    required: ['ok', 'data', 'error'],
+                                    properties: {
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [false]
+                                        },
+                                        data: {
+                                            type: 'string'
+                                        },
+                                        error: {
+                                            type: 'string'
+                                        }
                                     }
+                                },
+                                example: {
+                                    ok: false,
+                                    data: '服务内部错误，请稍后再试',
+                                    error: 'internal_error'
                                 }
                             }
                         }
@@ -4609,7 +5498,7 @@ export const developerDocsOpenApi: OpenApiDocument = {
                         },
                         query: {
                             limit: '2',
-                            cursor: '20679:1880201'
+                            cursor: '20692:2091894'
                         }
                     }
                 ],
@@ -4641,7 +5530,7 @@ export const developerDocsOpenApi: OpenApiDocument = {
                         name: 'year',
                         in: 'query',
                         description:
-                            '按年份筛选导出索引，例如 2026。留空时自动选择最近有导出文件的月份。',
+                            '请求优先选择的年份，例如 2026。留空或无法匹配时，服务端会选择最近的可用年份。',
                         schema: {
                             type: 'integer',
                             minimum: 1
@@ -4652,11 +5541,10 @@ export const developerDocsOpenApi: OpenApiDocument = {
                         name: 'month',
                         in: 'query',
                         description:
-                            '按月份筛选导出索引，取值 1-12。留空时自动选择最近有导出文件的月份。',
+                            '请求优先选择的月份。留空或没有完全匹配时，服务端会选择该年份最接近的可用月份。',
                         schema: {
                             type: 'integer',
-                            minimum: 1,
-                            maximum: 12
+                            minimum: 1
                         },
                         example: 8
                     }
@@ -4688,78 +5576,38 @@ export const developerDocsOpenApi: OpenApiDocument = {
                             'application/json': {
                                 schema: {
                                     type: 'object',
-                                    required: ['meta', 'data'],
+                                    required: ['ok', 'data', 'error'],
                                     properties: {
-                                        meta: {
-                                            $ref: '#/components/schemas/ApiMeta'
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [true]
                                         },
                                         data: {
                                             $ref: '#/components/schemas/GetDailyExportIndexData'
+                                        },
+                                        error: {
+                                            type: 'string',
+                                            enum: ['']
                                         }
                                     }
                                 },
                                 example: {
-                                    meta: {
-                                        remain: 159,
-                                        cost: 10
-                                    },
+                                    ok: true,
                                     data: {
                                         selectedYear: 2026,
                                         selectedMonth: 8,
-                                        availableYears: [2024, 2025, 2026],
-                                        availableMonths: [
-                                            1, 2, 3, 4, 5, 6, 7, 8
-                                        ],
+                                        availableYears: [2026],
+                                        availableMonths: [8, 7, 6, 5, 4, 3],
                                         items: [
                                             {
-                                                serviceDay: 20679
+                                                serviceDay: 20692
                                             },
                                             {
-                                                serviceDay: 20678
+                                                serviceDay: 20691
                                             }
                                         ]
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    '400': {
-                        description:
-                            '请求参数不合法：可能是日期格式、游标格式或 limit 不符合要求。',
-                        headers: {
-                            'x-api-remain': {
-                                $ref: '#/components/headers/ApiRemain'
-                            },
-                            'x-api-cost': {
-                                $ref: '#/components/headers/ApiCost'
-                            },
-                            'Retry-After': {
-                                $ref: '#/components/headers/RetryAfter'
-                            }
-                        },
-                        content: {
-                            'application/json': {
-                                schema: {
-                                    type: 'object',
-                                    required: ['meta', 'error'],
-                                    properties: {
-                                        meta: {
-                                            $ref: '#/components/schemas/ApiMeta'
-                                        },
-                                        error: {
-                                            $ref: '#/components/schemas/ApiError'
-                                        }
-                                    }
-                                },
-                                example: {
-                                    meta: {
-                                        remain: 159,
-                                        cost: 1
                                     },
-                                    error: {
-                                        code: 'invalid_param',
-                                        message: 'date 必须使用 YYYYMMDD 格式。'
-                                    }
+                                    error: ''
                                 }
                             }
                         }
@@ -4782,31 +5630,31 @@ export const developerDocsOpenApi: OpenApiDocument = {
                             'application/json': {
                                 schema: {
                                     type: 'object',
-                                    required: ['meta', 'error'],
+                                    required: ['ok', 'data', 'error'],
                                     properties: {
-                                        meta: {
-                                            $ref: '#/components/schemas/ApiMeta'
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [false]
+                                        },
+                                        data: {
+                                            type: 'string'
                                         },
                                         error: {
-                                            $ref: '#/components/schemas/ApiError'
+                                            type: 'string'
                                         }
                                     }
                                 },
                                 example: {
-                                    meta: {
-                                        remain: 159,
-                                        cost: 1
-                                    },
-                                    error: {
-                                        code: 'invalid_api_key',
-                                        message: 'API Key 无效或已过期。'
-                                    }
+                                    ok: false,
+                                    data: 'API Key 无效或已过期',
+                                    error: 'invalid_api_key'
                                 }
                             }
                         }
                     },
                     '403': {
-                        description: '当前凭证缺少调用该接口所需的 scope。',
+                        description:
+                            '账号已被封禁。；当前凭证缺少调用该接口所需的 scope。；当前身份的额度上限低于接口最低调用成本。',
                         headers: {
                             'x-api-remain': {
                                 $ref: '#/components/headers/ApiRemain'
@@ -4822,25 +5670,86 @@ export const developerDocsOpenApi: OpenApiDocument = {
                             'application/json': {
                                 schema: {
                                     type: 'object',
-                                    required: ['meta', 'error'],
+                                    required: ['ok', 'data', 'error'],
                                     properties: {
-                                        meta: {
-                                            $ref: '#/components/schemas/ApiMeta'
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [false]
+                                        },
+                                        data: {
+                                            type: 'string'
                                         },
                                         error: {
-                                            $ref: '#/components/schemas/ApiError'
+                                            type: 'string'
+                                        }
+                                    }
+                                },
+                                examples: {
+                                    '403-account_banned': {
+                                        summary: '账号已被封禁。',
+                                        value: {
+                                            ok: false,
+                                            data: '账号已被封禁',
+                                            error: 'account_banned'
+                                        }
+                                    },
+                                    '403-forbidden_scope': {
+                                        summary:
+                                            '当前凭证缺少调用该接口所需的 scope。',
+                                        value: {
+                                            ok: false,
+                                            data: '当前 API Key 缺乏访问该接口的权限',
+                                            error: 'forbidden_scope'
+                                        }
+                                    },
+                                    '403-cost_exceeds_quota_limit': {
+                                        summary:
+                                            '当前身份的额度上限低于接口最低调用成本。',
+                                        value: {
+                                            ok: false,
+                                            data: '当前身份额度上限不足，无法调用该接口',
+                                            error: 'cost_exceeds_quota_limit'
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    '406': {
+                        description: 'Accept 请求头不支持 JSON 响应。',
+                        headers: {
+                            'x-api-remain': {
+                                $ref: '#/components/headers/ApiRemain'
+                            },
+                            'x-api-cost': {
+                                $ref: '#/components/headers/ApiCost'
+                            },
+                            'Retry-After': {
+                                $ref: '#/components/headers/RetryAfter'
+                            }
+                        },
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    type: 'object',
+                                    required: ['ok', 'data', 'error'],
+                                    properties: {
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [false]
+                                        },
+                                        data: {
+                                            type: 'string'
+                                        },
+                                        error: {
+                                            type: 'string'
                                         }
                                     }
                                 },
                                 example: {
-                                    meta: {
-                                        remain: 159,
-                                        cost: 1
-                                    },
-                                    error: {
-                                        code: 'forbidden',
-                                        message: '缺少调用该接口所需的权限。'
-                                    }
+                                    ok: false,
+                                    data: 'Accept 不支持 application/json 或 application/x-protobuf',
+                                    error: 'not_acceptable'
                                 }
                             }
                         }
@@ -4863,25 +5772,63 @@ export const developerDocsOpenApi: OpenApiDocument = {
                             'application/json': {
                                 schema: {
                                     type: 'object',
-                                    required: ['meta', 'error'],
+                                    required: ['ok', 'data', 'error'],
                                     properties: {
-                                        meta: {
-                                            $ref: '#/components/schemas/ApiMeta'
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [false]
+                                        },
+                                        data: {
+                                            type: 'string'
                                         },
                                         error: {
-                                            $ref: '#/components/schemas/ApiError'
+                                            type: 'string'
                                         }
                                     }
                                 },
                                 example: {
-                                    meta: {
-                                        remain: 159,
-                                        cost: 1
-                                    },
-                                    error: {
-                                        code: 'rate_limited',
-                                        message: '额度不足，请稍后再试。'
+                                    ok: false,
+                                    data: '额度不足，请稍后再试',
+                                    error: 'quota_exceeded'
+                                }
+                            }
+                        }
+                    },
+                    '500': {
+                        description: '服务内部错误或响应编码失败。',
+                        headers: {
+                            'x-api-remain': {
+                                $ref: '#/components/headers/ApiRemain'
+                            },
+                            'x-api-cost': {
+                                $ref: '#/components/headers/ApiCost'
+                            },
+                            'Retry-After': {
+                                $ref: '#/components/headers/RetryAfter'
+                            }
+                        },
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    type: 'object',
+                                    required: ['ok', 'data', 'error'],
+                                    properties: {
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [false]
+                                        },
+                                        data: {
+                                            type: 'string'
+                                        },
+                                        error: {
+                                            type: 'string'
+                                        }
                                     }
+                                },
+                                example: {
+                                    ok: false,
+                                    data: '服务内部错误，请稍后再试',
+                                    error: 'internal_error'
                                 }
                             }
                         }
@@ -4920,6 +5867,10 @@ export const developerDocsOpenApi: OpenApiDocument = {
                         answer: '服务端会自动选择最近有导出文件的一年一月，并把 selectedYear、selectedMonth 返回给你。'
                     },
                     {
+                        question: '请求的年月没有导出文件会怎样？',
+                        answer: '接口不会返回参数错误，而是选择最接近的可用年份和月份；最终采用的值以 selectedYear 和 selectedMonth 为准。'
+                    },
+                    {
                         question: 'items 里的 serviceDay 是什么？',
                         answer: '它表示有导出文件的日期，是按上海时间自 1970-01-01 起的天数（epoch day），例如 20679 对应 2026-08-14。需要展示日期时再换算，不要直接当日期字符串用。'
                     }
@@ -4950,10 +5901,10 @@ export const developerDocsOpenApi: OpenApiDocument = {
                         name: 'binary',
                         in: 'query',
                         description:
-                            '是否直接返回原始 CSV 文件。传 true 时响应体就是 CSV 文本，并带有下载响应头；不传或传 false 时返回 JSON 包装结构。',
+                            '是否直接返回原始 CSV 文件。传 true 或 1 时响应体就是 CSV 文本，并带有下载响应头；不传、传 false 或 0 时返回 JSON 包装结构。其他值按 false 处理。',
                         schema: {
                             type: 'string',
-                            enum: ['true', 'false'],
+                            enum: ['true', 'false', '1', '0'],
                             default: 'false'
                         },
                         example: 'false'
@@ -4987,27 +5938,30 @@ export const developerDocsOpenApi: OpenApiDocument = {
                             'application/json': {
                                 schema: {
                                     type: 'object',
-                                    required: ['meta', 'data'],
+                                    required: ['ok', 'data', 'error'],
                                     properties: {
-                                        meta: {
-                                            $ref: '#/components/schemas/ApiMeta'
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [true]
                                         },
                                         data: {
                                             $ref: '#/components/schemas/GetDailyExportData'
+                                        },
+                                        error: {
+                                            type: 'string',
+                                            enum: ['']
                                         }
                                     }
                                 },
                                 example: {
-                                    meta: {
-                                        remain: 149,
-                                        cost: 400
-                                    },
+                                    ok: true,
                                     data: {
                                         serviceDay: 20679,
-                                        total: 2,
+                                        total: 15996,
                                         content:
-                                            'trainCode,emuCode,startStation,endStation,startAt,endAt\nG1,CR400AF-2149,北京南,上海虹桥,1786665600,1786680000\nG2,CR400BF-5028,北京南,上海虹桥,1786665600,1786680000'
-                                    }
+                                            'trainCode,emuCode,startStation,endStation,startTime,endTime\nD6093,CR400BF-GS-5402,潍坊,青岛北,05:00,05:57\nD6093,CR400BF-GS-5415,潍坊,青岛北,05:00,05:57'
+                                    },
+                                    error: ''
                                 }
                             },
                             'text/csv': {
@@ -5015,12 +5969,12 @@ export const developerDocsOpenApi: OpenApiDocument = {
                                     type: 'string'
                                 },
                                 example:
-                                    'trainCode,emuCode,startStation,endStation,startAt,endAt\nG1,CR400AF-2149,北京南,上海虹桥,1786665600,1786680000\nG2,CR400BF-5028,北京南,上海虹桥,1786665600,1786680000'
+                                    'trainCode,emuCode,startStation,endStation,startTime,endTime\nD6093,CR400BF-GS-5402,潍坊,青岛北,05:00,05:57\nD6093,CR400BF-GS-5415,潍坊,青岛北,05:00,05:57'
                             }
                         }
                     },
                     '400': {
-                        description: '路径参数或查询参数不合法。',
+                        description: 'date 路径参数不是有效的 YYYYMMDD 日期。',
                         headers: {
                             'x-api-remain': {
                                 $ref: '#/components/headers/ApiRemain'
@@ -5039,7 +5993,8 @@ export const developerDocsOpenApi: OpenApiDocument = {
                                     required: ['ok', 'data', 'error'],
                                     properties: {
                                         ok: {
-                                            type: 'boolean'
+                                            type: 'boolean',
+                                            enum: [false]
                                         },
                                         data: {
                                             type: 'string'
@@ -5051,7 +6006,7 @@ export const developerDocsOpenApi: OpenApiDocument = {
                                 },
                                 example: {
                                     ok: false,
-                                    data: 'date 必须使用 YYYYMMDD 格式。',
+                                    data: 'date 必须是 YYYYMMDD',
                                     error: 'invalid_param'
                                 }
                             }
@@ -5078,7 +6033,8 @@ export const developerDocsOpenApi: OpenApiDocument = {
                                     required: ['ok', 'data', 'error'],
                                     properties: {
                                         ok: {
-                                            type: 'boolean'
+                                            type: 'boolean',
+                                            enum: [false]
                                         },
                                         data: {
                                             type: 'string'
@@ -5090,14 +6046,15 @@ export const developerDocsOpenApi: OpenApiDocument = {
                                 },
                                 example: {
                                     ok: false,
-                                    data: 'API Key 无效或已过期。',
+                                    data: 'API Key 无效或已过期',
                                     error: 'invalid_api_key'
                                 }
                             }
                         }
                     },
                     '403': {
-                        description: '当前凭证缺少调用该接口所需的 scope。',
+                        description:
+                            '账号已被封禁。；当前凭证缺少调用该接口所需的 scope。；当前身份的额度上限低于接口最低调用成本。',
                         headers: {
                             'x-api-remain': {
                                 $ref: '#/components/headers/ApiRemain'
@@ -5116,7 +6073,8 @@ export const developerDocsOpenApi: OpenApiDocument = {
                                     required: ['ok', 'data', 'error'],
                                     properties: {
                                         ok: {
-                                            type: 'boolean'
+                                            type: 'boolean',
+                                            enum: [false]
                                         },
                                         data: {
                                             type: 'string'
@@ -5126,10 +6084,33 @@ export const developerDocsOpenApi: OpenApiDocument = {
                                         }
                                     }
                                 },
-                                example: {
-                                    ok: false,
-                                    data: '缺少调用该接口所需的权限。',
-                                    error: 'forbidden'
+                                examples: {
+                                    '403-account_banned': {
+                                        summary: '账号已被封禁。',
+                                        value: {
+                                            ok: false,
+                                            data: '账号已被封禁',
+                                            error: 'account_banned'
+                                        }
+                                    },
+                                    '403-forbidden_scope': {
+                                        summary:
+                                            '当前凭证缺少调用该接口所需的 scope。',
+                                        value: {
+                                            ok: false,
+                                            data: '当前 API Key 缺乏访问该接口的权限',
+                                            error: 'forbidden_scope'
+                                        }
+                                    },
+                                    '403-cost_exceeds_quota_limit': {
+                                        summary:
+                                            '当前身份的额度上限低于接口最低调用成本。',
+                                        value: {
+                                            ok: false,
+                                            data: '当前身份额度上限不足，无法调用该接口',
+                                            error: 'cost_exceeds_quota_limit'
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -5154,7 +6135,8 @@ export const developerDocsOpenApi: OpenApiDocument = {
                                     required: ['ok', 'data', 'error'],
                                     properties: {
                                         ok: {
-                                            type: 'boolean'
+                                            type: 'boolean',
+                                            enum: [false]
                                         },
                                         data: {
                                             type: 'string'
@@ -5166,14 +6148,14 @@ export const developerDocsOpenApi: OpenApiDocument = {
                                 },
                                 example: {
                                     ok: false,
-                                    data: '20260814.csv 尚未生成。',
+                                    data: '20990101.csv 未生成',
                                     error: 'not_found'
                                 }
                             }
                         }
                     },
-                    '429': {
-                        description: '额度不足或请求过于频繁。',
+                    '406': {
+                        description: 'Accept 请求头不支持 JSON 响应。',
                         headers: {
                             'x-api-remain': {
                                 $ref: '#/components/headers/ApiRemain'
@@ -5192,7 +6174,8 @@ export const developerDocsOpenApi: OpenApiDocument = {
                                     required: ['ok', 'data', 'error'],
                                     properties: {
                                         ok: {
-                                            type: 'boolean'
+                                            type: 'boolean',
+                                            enum: [false]
                                         },
                                         data: {
                                             type: 'string'
@@ -5204,8 +6187,87 @@ export const developerDocsOpenApi: OpenApiDocument = {
                                 },
                                 example: {
                                     ok: false,
-                                    data: '额度不足，请稍后再试。',
-                                    error: 'rate_limited'
+                                    data: 'Accept 不支持 application/json 或 application/x-protobuf',
+                                    error: 'not_acceptable'
+                                }
+                            }
+                        }
+                    },
+                    '429': {
+                        description:
+                            '额度不足或请求过于频繁，建议等 Retry-After 提示的时间后再试。',
+                        headers: {
+                            'x-api-remain': {
+                                $ref: '#/components/headers/ApiRemain'
+                            },
+                            'x-api-cost': {
+                                $ref: '#/components/headers/ApiCost'
+                            },
+                            'Retry-After': {
+                                $ref: '#/components/headers/RetryAfter'
+                            }
+                        },
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    type: 'object',
+                                    required: ['ok', 'data', 'error'],
+                                    properties: {
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [false]
+                                        },
+                                        data: {
+                                            type: 'string'
+                                        },
+                                        error: {
+                                            type: 'string'
+                                        }
+                                    }
+                                },
+                                example: {
+                                    ok: false,
+                                    data: '额度不足，请稍后再试',
+                                    error: 'quota_exceeded'
+                                }
+                            }
+                        }
+                    },
+                    '500': {
+                        description: '服务内部错误或响应编码失败。',
+                        headers: {
+                            'x-api-remain': {
+                                $ref: '#/components/headers/ApiRemain'
+                            },
+                            'x-api-cost': {
+                                $ref: '#/components/headers/ApiCost'
+                            },
+                            'Retry-After': {
+                                $ref: '#/components/headers/RetryAfter'
+                            }
+                        },
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    type: 'object',
+                                    required: ['ok', 'data', 'error'],
+                                    properties: {
+                                        ok: {
+                                            type: 'boolean',
+                                            enum: [false]
+                                        },
+                                        data: {
+                                            type: 'string'
+                                        },
+                                        error: {
+                                            type: 'string'
+                                        }
+                                    }
+                                },
+                                example: {
+                                    ok: false,
+                                    data: '服务内部错误，请稍后再试',
+                                    error: 'internal_error'
                                 }
                             }
                         }

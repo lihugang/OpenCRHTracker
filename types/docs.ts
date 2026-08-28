@@ -160,6 +160,11 @@ export interface DocsResolvedResponse {
         contentType: string;
         schema?: OpenApiSchema;
         example?: unknown;
+        examples: Array<{
+            id: string;
+            summary: string;
+            value: unknown;
+        }>;
     }>;
 }
 

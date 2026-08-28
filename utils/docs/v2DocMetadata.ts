@@ -20,6 +20,7 @@ export interface V2DocGroup {
 }
 
 export interface V2DocErrorResponse {
+    id: string;
     statusCode: string;
     description: string;
     data: string;
@@ -43,7 +44,6 @@ export interface V2DocEndpointMetadata {
     errors: V2DocErrorResponse[];
     rawContentTypes?: string[];
     rawExample?: string;
-    rawErrorShape?: boolean;
 }
 
 export const V2_DOC_GROUPS: V2DocGroup[] = [
@@ -228,7 +228,7 @@ const EXPORT_YEAR_QUERY: OpenApiParameter = {
     name: 'year',
     in: 'query',
     description:
-        '按年份筛选导出索引，例如 2026。留空时自动选择最近有导出文件的月份。',
+        '请求优先选择的年份，例如 2026。留空或无法匹配时，服务端会选择最近的可用年份。',
     schema: {
         type: 'integer',
         minimum: 1
@@ -240,11 +240,10 @@ const EXPORT_MONTH_QUERY: OpenApiParameter = {
     name: 'month',
     in: 'query',
     description:
-        '按月份筛选导出索引，取值 1-12。留空时自动选择最近有导出文件的月份。',
+        '请求优先选择的月份。留空或没有完全匹配时，服务端会选择该年份最接近的可用月份。',
     schema: {
         type: 'integer',
-        minimum: 1,
-        maximum: 12
+        minimum: 1
     },
     example: 8
 };
@@ -253,10 +252,10 @@ const EXPORT_BINARY_QUERY: OpenApiParameter = {
     name: 'binary',
     in: 'query',
     description:
-        '是否直接返回原始 CSV 文件。传 true 时响应体就是 CSV 文本，并带有下载响应头；不传或传 false 时返回 JSON 包装结构。',
+        '是否直接返回原始 CSV 文件。传 true 或 1 时响应体就是 CSV 文本，并带有下载响应头；不传、传 false 或 0 时返回 JSON 包装结构。其他值按 false 处理。',
     schema: {
         type: 'string',
-        enum: ['true', 'false'],
+        enum: ['true', 'false', '1', '0'],
         default: 'false'
     },
     example: 'false'
@@ -278,10 +277,10 @@ const IMAGE_BINARY_QUERY: OpenApiParameter = {
     name: 'binary',
     in: 'query',
     description:
-        '是否直接返回图片或 PDF 的原始二进制内容。传 true 时响应体就是文件本身；不传或传 false 时返回 JSON 包装结构（包含图片直链）。',
+        '是否直接返回图片或 PDF 的原始二进制内容。传 true 或 1 时响应体就是文件本身；不传、传 false 或 0 时返回 JSON 包装结构（包含图片直链）。',
     schema: {
         type: 'string',
-        enum: ['true', 'false'],
+        enum: ['true', 'false', '1', '0'],
         default: 'false'
     },
     example: 'false'
@@ -295,9 +294,11 @@ function error(
     statusCode: string,
     description: string,
     data: string,
-    errorCode: string
+    errorCode: string,
+    id = `${statusCode}-${errorCode}`
 ): V2DocErrorResponse {
     return {
+        id,
         statusCode,
         description,
         data,
@@ -305,44 +306,52 @@ function error(
     };
 }
 
-function commonQueryErrors(notFound?: {
-    description: string;
-    data: string;
-}): V2DocErrorResponse[] {
-    const errors = [
-        error(
-            '400',
-            '请求参数不合法：可能是日期格式、游标格式或 limit 不符合要求。',
-            'date 必须使用 YYYYMMDD 格式。',
-            'invalid_param'
-        ),
+function commonTransportErrors(): V2DocErrorResponse[] {
+    return [
         error(
             '401',
             '请求未携带有效的认证信息，或提供的 API Key 已失效。',
-            'API Key 无效或已过期。',
+            'API Key 无效或已过期',
             'invalid_api_key'
         ),
+        error('403', '账号已被封禁。', '账号已被封禁', 'account_banned'),
         error(
             '403',
             '当前凭证缺少调用该接口所需的 scope。',
-            '缺少调用该接口所需的权限。',
-            'forbidden'
+            '当前 API Key 缺乏访问该接口的权限',
+            'forbidden_scope'
+        ),
+        error(
+            '403',
+            '当前身份的额度上限低于接口最低调用成本。',
+            '当前身份额度上限不足，无法调用该接口',
+            'cost_exceeds_quota_limit'
+        ),
+        error(
+            '406',
+            'Accept 请求头不支持 JSON 响应。',
+            'Accept 不支持 application/json 或 application/x-protobuf',
+            'not_acceptable'
         ),
         error(
             '429',
             '额度不足或请求过于频繁，建议等 Retry-After 提示的时间后再试。',
-            '额度不足，请稍后再试。',
-            'rate_limited'
+            '额度不足，请稍后再试',
+            'quota_exceeded'
+        ),
+        error(
+            '500',
+            '服务内部错误或响应编码失败。',
+            '服务内部错误，请稍后再试',
+            'internal_error'
         )
     ];
+}
 
-    if (notFound) {
-        errors.push(
-            error('404', notFound.description, notFound.data, 'not_found')
-        );
-    }
-
-    return errors;
+function commonQueryErrors(
+    endpointErrors: V2DocErrorResponse[] = []
+): V2DocErrorResponse[] {
+    return [...endpointErrors, ...commonTransportErrors()];
 }
 
 // ---------------------------------------------------------------------------
@@ -368,7 +377,7 @@ export const V2_DOC_ENDPOINTS: V2DocEndpointMetadata[] = [
         faq: [
             {
                 question: '为什么调用这个接口也能看到额度？',
-                answer: '每次响应都会带 meta 字段，里面是本次请求后的剩余额度（remain）、本次扣费（cost）和可能的重试等待时间（retryAfter）。'
+                answer: '额度信息通过 x-api-remain、x-api-cost 和可选的 Retry-After 响应头返回，不放在 JSON 响应体里。'
             },
             {
                 question: 'issuer 字段表示什么？',
@@ -391,10 +400,7 @@ export const V2_DOC_ENDPOINTS: V2DocEndpointMetadata[] = [
             }
         ],
         successExample: {
-            meta: {
-                remain: 2000,
-                cost: 1
-            },
+            ok: true,
             data: {
                 user: {
                     userId: 'demo-user'
@@ -415,28 +421,10 @@ export const V2_DOC_ENDPOINTS: V2DocEndpointMetadata[] = [
                     refillIntervalSeconds: 300,
                     nextRefillAt: 1786637100
                 }
-            }
+            },
+            error: ''
         },
-        errors: [
-            error(
-                '401',
-                '请求未携带有效的认证信息，或提供的 API Key 已失效。',
-                'API Key 无效或已过期。',
-                'invalid_api_key'
-            ),
-            error(
-                '403',
-                '账号已被封禁，或当前凭证缺少 api.auth.me.read 权限。',
-                '账号已被封禁。',
-                'account_banned'
-            ),
-            error(
-                '429',
-                '额度不足或请求过于频繁。',
-                '额度不足，请稍后再试。',
-                'rate_limited'
-            )
-        ]
+        errors: commonQueryErrors()
     },
     {
         slug: 'records-daily',
@@ -502,7 +490,8 @@ export const V2_DOC_ENDPOINTS: V2DocEndpointMetadata[] = [
                         trainCode: {
                             prefix: 'G',
                             number: 7309
-                        }
+                        },
+                        status: 3
                     },
                     {
                         id: 1894995,
@@ -512,7 +501,8 @@ export const V2_DOC_ENDPOINTS: V2DocEndpointMetadata[] = [
                         trainCode: {
                             prefix: 'G',
                             number: 7309
-                        }
+                        },
+                        status: 3
                     }
                 ],
                 emuCodeMappings: {
@@ -530,7 +520,29 @@ export const V2_DOC_ENDPOINTS: V2DocEndpointMetadata[] = [
             },
             error: ''
         },
-        errors: commonQueryErrors()
+        errors: commonQueryErrors([
+            error(
+                '400',
+                'date 查询参数不是有效的 YYYYMMDD 日期。',
+                'date 必须是 YYYYMMDD',
+                'invalid_param',
+                '400-invalid-date'
+            ),
+            error(
+                '400',
+                'limit 查询参数不是正整数。',
+                'limit 必须是正整数',
+                'invalid_param',
+                '400-invalid-limit'
+            ),
+            error(
+                '400',
+                'cursor 查询参数格式无效。',
+                'cursor 必须是 "serviceDay:id" 格式',
+                'invalid_param',
+                '400-invalid-cursor'
+            )
+        ])
     },
     {
         slug: 'timetable-train-current',
@@ -581,7 +593,7 @@ export const V2_DOC_ENDPOINTS: V2DocEndpointMetadata[] = [
         successExample: {
             ok: true,
             data: {
-                updatedAt: 1786672375,
+                updatedAt: 1787838393,
                 requestTrainCode: {
                     prefix: 'G',
                     number: 2492
@@ -609,11 +621,11 @@ export const V2_DOC_ENDPOINTS: V2DocEndpointMetadata[] = [
                 ],
                 startStation: '包头',
                 endStation: '北京北',
-                startAt: 1786663920,
-                endAt: 1786675800,
+                startAt: 1787873520,
+                endAt: 1787885400,
                 circulation: {
                     source: 'official',
-                    refreshAt: 1786622308,
+                    refreshAt: 1787825543,
                     nodes: [
                         {
                             internalCode: '33000G249204',
@@ -717,12 +729,12 @@ export const V2_DOC_ENDPOINTS: V2DocEndpointMetadata[] = [
                     {
                         stationNo: 1,
                         stationName: '包头',
-                        departAt: 1786663920,
+                        departAt: 1787873520,
                         stationTrainCode: {
                             prefix: 'G',
                             number: 2492
                         },
-                        wicket: '一层2检票口',
+                        wicket: '一层1检票口,一层2检票口',
                         distance: 0,
                         platformNo: 1,
                         isStart: true,
@@ -731,41 +743,40 @@ export const V2_DOC_ENDPOINTS: V2DocEndpointMetadata[] = [
                     {
                         stationNo: 2,
                         stationName: '呼和浩特',
-                        arriveAt: 1786667460,
-                        departAt: 1786667760,
+                        arriveAt: 1787877060,
+                        departAt: 1787877360,
                         stationTrainCode: {
                             prefix: 'G',
                             number: 2492
                         },
                         wicket: '3检票口,4检票口',
                         distance: 165,
-                        platformNo: 4,
+                        platformNo: 2,
                         isStart: false,
                         isEnd: false
                     },
                     {
                         stationNo: 3,
                         stationName: '北京北',
-                        arriveAt: 1786675800,
+                        arriveAt: 1787885400,
                         stationTrainCode: {
                             prefix: 'G',
                             number: 2492
                         },
-                        wicket: '1检票口',
+                        wicket: '',
                         distance: 633,
                         platformNo: 4,
                         isStart: false,
                         isEnd: true
                     }
                 ],
-                serviceDay: 20679
+                serviceDay: 20693
             },
             error: ''
         },
-        errors: commonQueryErrors({
-            description: '当前时刻表暂不可用。',
-            data: '当前暂无时刻表。'
-        })
+        errors: commonQueryErrors([
+            error('404', '当前时刻表暂不可用。', '当前暂无时刻表', 'not_found')
+        ])
     },
     {
         slug: 'timetable-train-circulation-image',
@@ -851,10 +862,7 @@ export const V2_DOC_ENDPOINTS: V2DocEndpointMetadata[] = [
             }
         ],
         successExample: {
-            meta: {
-                remain: 159,
-                cost: 2
-            },
+            ok: true,
             data: {
                 cacheHit: false,
                 requestTrainCode: {
@@ -866,31 +874,19 @@ export const V2_DOC_ENDPOINTS: V2DocEndpointMetadata[] = [
                     number: 2492
                 },
                 documentId:
-                    '8d2fca6e88c2a1e3c2106a4f28f0d5e7b3147427ec8d1b4af75a4b6b485b92ce',
+                    '7d56fe674ce2c3f76bb7b3b619eff3ed45704c9711328e5553e50a00537d8cad',
                 imageUrl:
-                    'https://static.example.com/circulation/8d2fca6e88c2a1e3c2106a4f28f0d5e7b3147427ec8d1b4af75a4b6b485b92ce/png/1'
-            }
+                    'https://latex.lihugang.top/7d56fe674ce2c3f76bb7b3b619eff3ed45704c9711328e5553e50a00537d8cad/png/1'
+            },
+            error: ''
         },
         rawContentTypes: ['image/png', 'application/pdf'],
-        rawErrorShape: true,
-        errors: [
+        errors: commonQueryErrors([
             error(
                 '400',
                 '路径参数、binary 查询参数或 format 查询参数无效。',
                 'binary 必须是 true/false',
                 'invalid_param'
-            ),
-            error(
-                '401',
-                '请求未携带有效的认证信息，或提供的 API Key 已失效。',
-                'API Key 无效或已过期。',
-                'invalid_api_key'
-            ),
-            error(
-                '403',
-                '当前凭证缺少调用该接口所需的 scope。',
-                '缺少调用该接口所需的权限。',
-                'forbidden'
             ),
             error(
                 '404',
@@ -905,18 +901,12 @@ export const V2_DOC_ENDPOINTS: V2DocEndpointMetadata[] = [
                 'invalid_schedule_data'
             ),
             error(
-                '429',
-                '额度不足或请求过于频繁。',
-                '额度不足，请稍后再试。',
-                'rate_limited'
-            ),
-            error(
                 '502',
                 '上游渲染服务不可用或编译失败。',
                 '交路图渲染服务暂时不可用',
                 'upstream_unavailable'
             )
-        ]
+        ])
     },
     {
         slug: 'timetable-train-history',
@@ -976,7 +966,7 @@ export const V2_DOC_ENDPOINTS: V2DocEndpointMetadata[] = [
                         coverageId: 6845,
                         timetableId: 5479,
                         serviceDayStart: 20575,
-                        serviceDayEndExclusive: 20680
+                        serviceDayEndExclusive: 20694
                     }
                 ],
                 timetableMappings: {
@@ -1130,7 +1120,7 @@ export const V2_DOC_ENDPOINTS: V2DocEndpointMetadata[] = [
                 },
                 query: {
                     limit: '1',
-                    cursor: '20679:6292081551810740'
+                    cursor: '20693:2937121549732148'
                 }
             }
         ],
@@ -1140,7 +1130,7 @@ export const V2_DOC_ENDPOINTS: V2DocEndpointMetadata[] = [
                 stationName: '北京南',
                 cursor: '',
                 limit: 1,
-                nextCursor: '20679:6292081551810740',
+                nextCursor: '20693:2937121549732148',
                 items: [
                     {
                         trainCode: {
@@ -1153,10 +1143,10 @@ export const V2_DOC_ENDPOINTS: V2DocEndpointMetadata[] = [
                                 number: 9418
                             }
                         ],
-                        arriveAt: 1786723260,
+                        arriveAt: 1787932860,
                         startStation: '天津西',
                         endStation: '北京南',
-                        updatedAt: 1786717003,
+                        updatedAt: 1787849644,
                         referenceModels: [
                             {
                                 model: 'CR400AF-B',
@@ -1168,10 +1158,20 @@ export const V2_DOC_ENDPOINTS: V2DocEndpointMetadata[] = [
             },
             error: ''
         },
-        errors: commonQueryErrors({
-            description: '指定车站暂无当日时刻表数据。',
-            data: '当前暂无该车站的时刻表。'
-        })
+        errors: commonQueryErrors([
+            error(
+                '400',
+                'limit 或 cursor 查询参数格式无效。',
+                'limit 必须是正整数',
+                'invalid_param'
+            ),
+            error(
+                '404',
+                '指定车站暂无当日时刻表数据。',
+                '当前暂无该车站的时刻表',
+                'not_found'
+            )
+        ])
     },
     {
         slug: 'history-train',
@@ -1227,7 +1227,7 @@ export const V2_DOC_ENDPOINTS: V2DocEndpointMetadata[] = [
                 },
                 query: {
                     limit: '2',
-                    cursor: '20678:1858368'
+                    cursor: '20692:2090568'
                 }
             }
         ],
@@ -1240,24 +1240,26 @@ export const V2_DOC_ENDPOINTS: V2DocEndpointMetadata[] = [
                 },
                 cursor: '',
                 limit: 2,
-                nextCursor: '20678:1858368',
+                nextCursor: '20692:2090568',
                 items: [
                     {
-                        id: 1886130,
-                        serviceDay: 20679,
+                        id: 2105057,
+                        serviceDay: 20693,
                         timetableId: 5479,
-                        emuId: 1540
+                        emuId: 1540,
+                        status: 1
                     },
                     {
-                        id: 1858368,
-                        serviceDay: 20678,
+                        id: 2090568,
+                        serviceDay: 20692,
                         timetableId: 5479,
-                        emuId: 1544
+                        emuId: 1545,
+                        status: 1
                     }
                 ],
                 emuCodeMappings: {
                     '1540': 'CR400BF-AZ-0518',
-                    '1544': 'CR400BF-AZ-5253'
+                    '1545': 'CR400BF-AZ-5254'
                 },
                 timetableMappings: {
                     '5479': {
@@ -1270,7 +1272,14 @@ export const V2_DOC_ENDPOINTS: V2DocEndpointMetadata[] = [
             },
             error: ''
         },
-        errors: commonQueryErrors()
+        errors: commonQueryErrors([
+            error(
+                '400',
+                'start、end、limit 或 cursor 查询参数格式无效。',
+                'start 必须是秒级时间戳',
+                'invalid_param'
+            )
+        ])
     },
     {
         slug: 'allocation-emu',
@@ -1424,10 +1433,20 @@ export const V2_DOC_ENDPOINTS: V2DocEndpointMetadata[] = [
             },
             error: ''
         },
-        errors: commonQueryErrors({
-            description: '未找到该动车组的配属信息。',
-            data: '未找到该动车组配属信息'
-        })
+        errors: commonQueryErrors([
+            error(
+                '400',
+                'emuCode 路径参数为空。',
+                'emuCode 不能为空',
+                'invalid_param'
+            ),
+            error(
+                '404',
+                '未找到该动车组的配属信息。',
+                '未找到该动车组配属信息',
+                'allocation_not_found'
+            )
+        ])
     },
     {
         slug: 'history-emu',
@@ -1483,7 +1502,7 @@ export const V2_DOC_ENDPOINTS: V2DocEndpointMetadata[] = [
                 },
                 query: {
                     limit: '2',
-                    cursor: '20679:1880201'
+                    cursor: '20692:2091894'
                 }
             }
         ],
@@ -1493,42 +1512,58 @@ export const V2_DOC_ENDPOINTS: V2DocEndpointMetadata[] = [
                 emuId: 1500,
                 cursor: '',
                 limit: 2,
-                nextCursor: '20679:1880201',
+                nextCursor: '20692:2091894',
                 items: [
                     {
-                        id: 1880202,
-                        serviceDay: 20679,
-                        timetableId: 18287,
+                        id: 2110390,
+                        serviceDay: 20693,
+                        timetableId: 1137,
                         trainCode: {
                             prefix: 'G',
-                            number: 240
-                        }
+                            number: 7381
+                        },
+                        status: 1
                     },
                     {
-                        id: 1880201,
-                        serviceDay: 20679,
-                        timetableId: 18287,
+                        id: 2091894,
+                        serviceDay: 20692,
+                        timetableId: 18285,
                         trainCode: {
                             prefix: 'G',
-                            number: 237
-                        }
+                            number: 221
+                        },
+                        status: 1
                     }
                 ],
                 emuCodeMappings: {
                     '1500': 'CR400BF-A-5156'
                 },
                 timetableMappings: {
-                    '18287': {
+                    '1137': {
                         startStation: '上海虹桥',
-                        endStation: '成都东',
-                        startOffset: 32640,
-                        endOffset: 70500
+                        endStation: '江山',
+                        startOffset: 69000,
+                        endOffset: 79140
+                    },
+                    '18285': {
+                        startStation: '张家界西',
+                        endStation: '上海虹桥',
+                        startOffset: 52740,
+                        endOffset: 79020
                     }
                 }
             },
             error: ''
         },
-        errors: commonQueryErrors()
+        errors: commonQueryErrors([
+            error(
+                '400',
+                'emuCode 为空，或 start、end、limit、cursor 格式无效。',
+                'start 必须是秒级时间戳',
+                'invalid_param'
+            ),
+            error('404', '未找到指定的动车组。', '未找到该动车组', 'not_found')
+        ])
     },
     {
         slug: 'exports-daily-index',
@@ -1548,6 +1583,10 @@ export const V2_DOC_ENDPOINTS: V2DocEndpointMetadata[] = [
             {
                 question: '不传 year 和 month 会怎样？',
                 answer: '服务端会自动选择最近有导出文件的一年一月，并把 selectedYear、selectedMonth 返回给你。'
+            },
+            {
+                question: '请求的年月没有导出文件会怎样？',
+                answer: '接口不会返回参数错误，而是选择最接近的可用年份和月份；最终采用的值以 selectedYear 和 selectedMonth 为准。'
             },
             {
                 question: 'items 里的 serviceDay 是什么？',
@@ -1574,24 +1613,22 @@ export const V2_DOC_ENDPOINTS: V2DocEndpointMetadata[] = [
             }
         ],
         successExample: {
-            meta: {
-                remain: 159,
-                cost: 10
-            },
+            ok: true,
             data: {
                 selectedYear: 2026,
                 selectedMonth: 8,
-                availableYears: [2024, 2025, 2026],
-                availableMonths: [1, 2, 3, 4, 5, 6, 7, 8],
+                availableYears: [2026],
+                availableMonths: [8, 7, 6, 5, 4, 3],
                 items: [
                     {
-                        serviceDay: 20679
+                        serviceDay: 20692
                     },
                     {
-                        serviceDay: 20678
+                        serviceDay: 20691
                     }
                 ]
-            }
+            },
+            error: ''
         },
         errors: commonQueryErrors()
     },
@@ -1647,53 +1684,32 @@ export const V2_DOC_ENDPOINTS: V2DocEndpointMetadata[] = [
             }
         ],
         successExample: {
-            meta: {
-                remain: 149,
-                cost: 400
-            },
+            ok: true,
             data: {
                 serviceDay: 20679,
-                total: 2,
+                total: 15996,
                 content:
-                    'trainCode,emuCode,startStation,endStation,startAt,endAt\nG1,CR400AF-2149,北京南,上海虹桥,1786665600,1786680000\nG2,CR400BF-5028,北京南,上海虹桥,1786665600,1786680000'
-            }
+                    'trainCode,emuCode,startStation,endStation,startTime,endTime\nD6093,CR400BF-GS-5402,潍坊,青岛北,05:00,05:57\nD6093,CR400BF-GS-5415,潍坊,青岛北,05:00,05:57'
+            },
+            error: ''
         },
         rawContentTypes: ['text/csv'],
         rawExample:
-            'trainCode,emuCode,startStation,endStation,startAt,endAt\nG1,CR400AF-2149,北京南,上海虹桥,1786665600,1786680000\nG2,CR400BF-5028,北京南,上海虹桥,1786665600,1786680000',
-        rawErrorShape: true,
-        errors: [
+            'trainCode,emuCode,startStation,endStation,startTime,endTime\nD6093,CR400BF-GS-5402,潍坊,青岛北,05:00,05:57\nD6093,CR400BF-GS-5415,潍坊,青岛北,05:00,05:57',
+        errors: commonQueryErrors([
             error(
                 '400',
-                '路径参数或查询参数不合法。',
-                'date 必须使用 YYYYMMDD 格式。',
+                'date 路径参数不是有效的 YYYYMMDD 日期。',
+                'date 必须是 YYYYMMDD',
                 'invalid_param'
-            ),
-            error(
-                '401',
-                '请求未携带有效的认证信息，或提供的 API Key 已失效。',
-                'API Key 无效或已过期。',
-                'invalid_api_key'
-            ),
-            error(
-                '403',
-                '当前凭证缺少调用该接口所需的 scope。',
-                '缺少调用该接口所需的权限。',
-                'forbidden'
             ),
             error(
                 '404',
                 '目标导出文件暂不可用。',
-                '20260814.csv 尚未生成。',
+                '20990101.csv 未生成',
                 'not_found'
-            ),
-            error(
-                '429',
-                '额度不足或请求过于频繁。',
-                '额度不足，请稍后再试。',
-                'rate_limited'
             )
-        ]
+        ])
     }
 ];
 
